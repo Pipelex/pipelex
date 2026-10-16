@@ -74,6 +74,18 @@ class TestPipeDocGenSubmittedFiles:
         assert request.template == _DOCX_BYTES
         assert request.template_name == "templates/invoice.docx"
 
+    async def test_a_step_naming_its_template_with_a_repeated_slash_reads_the_file_submitted_under_its_one_spelling(
+        self, stub_engines: StubEngines
+    ) -> None:
+        """Blueprint validation accepts `templates//invoice.docx`, so the step finds the file submitted as `templates/invoice.docx`."""
+        await validate_bundle(
+            mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates//invoice.docx"')],
+            submitted_files={"templates/invoice.docx": _DOCX_BYTES},
+        )
+
+        (request,) = stub_engines.check_requests
+        assert request.template == _DOCX_BYTES
+
     async def test_the_check_s_errors_on_a_submitted_template_fail_the_validation(self, stub_engines: StubEngines) -> None:
         stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.ERROR, message="The tag {{ invoice.totl }} names no field")]
 
@@ -290,6 +302,13 @@ class TestPipeDocGenSubmittedFiles:
         (worker_pipe,) = remote_worker.worker_pipes
         assert isinstance(worker_pipe, PipeDocGen)
         assert worker_pipe.template_file_text is None
+        # An HTML template's print receives the stuffs the step's inputs name and the run's concepts, none of its pipes.
+        for render_call in render_spy.call_args_list:
+            render_context = render_call.kwargs["template_file"].render_context
+            assert set(render_context.working_memory_raw["root"]) == {"invoice"}
+            assert render_context.concepts_crate["pipes"] == {}
+            assert "doc_gen_tests.Invoice" in render_context.concepts_crate["concepts"]
+            assert render_context.crate_fingerprint == received_crate.fingerprint
         assert recording_store.read_scopes
         assert set(recording_store.read_scopes) == {"acme/runs"}
         match (pipe_run_mode, step_fields):

@@ -241,6 +241,7 @@ PipeControllerOutputConceptMismatchError | Pipe controller output concept mismat
 PipeDocGenFactoryError | Pipe doc gen factory | https://docs.pipelex.com/latest/errors/pipe-doc-gen-factory-error/
 PipeDocGenRunError | Pipe doc gen run | https://docs.pipelex.com/latest/errors/pipe-doc-gen-run-error/
 PipeDocGenTemplateCheckError | Pipe doc gen template check | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-check-error/
+PipeDocGenTemplateFileUncheckedError | Pipe doc gen template file unchecked | https://docs.pipelex.com/latest/errors/pipe-doc-gen-template-file-unchecked-error/
 PipeDocGenUndefinedValueError | Pipe doc gen undefined value | https://docs.pipelex.com/latest/errors/pipe-doc-gen-undefined-value-error/
 PipeExecutionError | Pipe execution | https://docs.pipelex.com/latest/errors/pipe-execution-error/
 PipeExtractFactoryError | Pipe extract factory | https://docs.pipelex.com/latest/errors/pipe-extract-factory-error/

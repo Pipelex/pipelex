@@ -1,4 +1,4 @@
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, PrivateAttr
 from typing_extensions import override
@@ -25,7 +25,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
-from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError
+from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateFileUncheckedError
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -36,6 +36,9 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.storage.storage_file_name import path_safe_file_name
 from pipelex.tools.templating.templating_style import TemplatingStyle
+
+if TYPE_CHECKING:
+    from pipelex.core.stuffs.stuff import Stuff
 
 
 class PipeDocGenOutput(PipeOutput):
@@ -67,9 +70,10 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     )
     filename: str | None = None
 
-    # The text of an HTML template file, read when the step was built from a bundle this process holds, for the checks
-    # of the method's load; None for a step built from a crate, which reads no file, its method having been checked
-    # where the crate was assembled.
+    # The text of an HTML template file, read when the step was built in a method tree this process holds, for the checks
+    # of the method's load: a bundle's, or a crate's whose load validates it where a library holds its tree. None for a
+    # step built from a crate by digest alone, which reads no file, and which a validation refuses rather than pass
+    # unchecked (`validate_inputs_with_library`).
     _template_file_text: str | None = PrivateAttr(default=None)
 
     def hold_template_file_text(self, *, template_file_text: str) -> None:
@@ -156,6 +160,16 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
 
     @override
     def validate_inputs_with_library(self):
+        # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
+        # validation refuses rather than reach a verdict the template could contradict. A load that skips validation,
+        # such as a worker's load of the crate a validated library made, never gets here.
+        if self.template_file is not None and self.doc_gen_format.is_template_html and self._template_file_text is None:
+            msg = (
+                f"PipeDocGen '{self.code}' prints from the HTML template file '{self.template_file}', which this validation "
+                "cannot check: the step was built from a library crate, which names its method tree by digest and carries "
+                "none of its files, and no library of this process holds that tree. Validate the method where its files are."
+            )
+            raise PipeDocGenTemplateFileUncheckedError(msg)
         # Every field a template reads exists on its input's concept, which is known once the library is loaded.
         checked_html_template = self._checked_html_template
         if checked_html_template is not None:
@@ -259,11 +273,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     filename=filename,
                     title=title,
                     template_file=self._composed_template_file(
-                        render_context=TemplateRenderContext(
-                            crate=self._run_crate_json(),
-                            working_memory_raw=working_memory.dump_for_transport(),
-                            runtime_params=dict(pipe_run_params.params),
-                        )
+                        render_context=self._render_context(working_memory=working_memory, pipe_run_params=pipe_run_params)
                     ),
                 )
             case DocGenSource.TEMPLATE_FILE:
@@ -295,8 +305,11 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             input_shapes=input_shapes or {},
         )
 
-    def _run_crate_json(self) -> dict[str, Any]:
-        """The crate of the library the step runs in, as JSON, whose concepts type the step's data wherever it renders.
+    def _render_context(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> TemplateRenderContext:
+        """What the print stage renders the step's HTML template file with, wherever it runs.
+
+        Only the stuffs the step's inputs name travel, under those names: the load checked that the template reads no other
+        variable but the run's params. The run's crate travels as its concepts and domains alone, which type them.
 
         Raises:
             PipeDocGenRunError: The library the step runs in has no crate.
@@ -306,7 +319,17 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         if crate is None:
             msg = f"PipeDocGen '{self.code}' cannot name its template file's data: the library it runs in has no crate."
             raise PipeDocGenRunError(msg)
-        return crate.model_dump(mode="json")
+        input_stuffs: dict[str, Stuff] = {}
+        for input_name in self.inputs.variables:
+            stuff = working_memory.get_optional_stuff(input_name)
+            if stuff is not None:
+                input_stuffs[input_name] = stuff
+        return TemplateRenderContext(
+            crate_fingerprint=crate.fingerprint,
+            concepts_crate=crate.concepts_only().model_dump(mode="json"),
+            working_memory_raw=WorkingMemory(root=input_stuffs).dump_for_transport(),
+            runtime_params=dict(pipe_run_params.params),
+        )
 
     def _input_shapes(self) -> dict[str, InputShape]:
         shapes: dict[str, InputShape] = {}

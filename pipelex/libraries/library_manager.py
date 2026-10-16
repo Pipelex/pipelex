@@ -601,49 +601,69 @@ class LibraryManager(LibraryManagerAbstract):
     def _join_submitted_files(self, *, library_id: str, files: "Mapping[str, HeldFile]") -> None:
         """Join files to the ones submitted beside the library's content strings, keyed by their path from the root.
 
-        A file already joined under the same path is kept when the new one has the same bytes.
+        A file already joined under the same path is kept when the new one has the same bytes. Nothing is joined when
+        any file is refused, so a refusal leaves the files already joined as they were.
 
         Raises:
-            BundleResourcePathError: A path is not a tree path, or collides with another once case-folded or as a
-                directory, so the files could not make one tree.
-            LibraryError: A file already joined under the same path has different bytes.
+            BundleResourcePathError: A path is not a tree path, collides with another once case-folded or as a
+                directory, or names a file already joined with different bytes, so the files could not make one tree.
+                The message names the files by their tree paths alone, never by a host path.
         """
         if not files:
             return
-        held = dict(self._submitted_files.get(library_id, {}))
+        self._submitted_files[library_id] = self._joined_submitted_files(held=self._submitted_files.get(library_id, {}), files=files)
+        self._submitted_trees.pop(library_id, None)
+        # The cached crate was built before them.
+        self._crate_cache.pop(library_id, None)
+
+    @staticmethod
+    def _joined_submitted_files(*, held: "Mapping[str, HeldFile]", files: "Mapping[str, HeldFile]") -> dict[str, HeldFile]:
+        """`held` with `files` joined to it, as a new mapping, `held` itself left untouched.
+
+        Raises:
+            BundleResourcePathError: The files could not make one tree with the ones held (`_join_submitted_files`).
+        """
+        joined = dict(held)
         for path, held_file in files.items():
             violation = tree_path_violation(path)
             if violation is not None:
                 msg = f"The file '{path}' submitted beside the method cannot be a file of its tree: {violation}."
                 raise BundleResourcePathError(msg)
-            already_held = held.get(path)
+            already_held = joined.get(path)
             if already_held is not None and already_held.sha256 != held_file.sha256:
                 msg = (
                     f"Two different files were submitted under the same path '{path}' for one library. The files submitted "
                     "beside a method's content strings, from its library directories and with its request, make one tree, "
                     "so each path names one file: give them distinct paths."
                 )
-                raise LibraryError(msg)
-            held[path] = held_file
-        collisions = path_collisions(held)
+                raise BundleResourcePathError(msg)
+            joined[path] = held_file
+        collisions = path_collisions(joined)
         if collisions:
             listed = ", ".join(f"'{collision}'" for collision in collisions)
             msg = f"The files submitted beside the method cannot make one tree: their paths collide at {listed}."
             raise BundleResourcePathError(msg)
-        self._submitted_files[library_id] = held
-        self._submitted_trees.pop(library_id, None)
-        # The cached crate was built before them.
-        self._crate_cache.pop(library_id, None)
+        return joined
 
     def _submitted_tree(self, *, library_id: str) -> MethodTree | None:
         """The tree of the files submitted beside the library's content strings, held for its runs, or None when there are none.
 
+        The files the library's directories submitted are joined all together or not at all: a refusal leaves every one
+        of them pending, so the library's next run is refused again rather than run without them.
+
         Raises:
-            BundleResourcePathError: The files cannot make one tree.
-            LibraryError: Two of them, from two library directories or from one and the request, share a path.
+            BundleResourcePathError: The files cannot make one tree, such as two of them, from two library directories
+                or from one and the request, sharing a path with different bytes.
         """
-        for library_dir_files in self._library_dir_submissions.pop(library_id, []):
-            self._join_submitted_files(library_id=library_id, files=library_dir_files)
+        pending = self._library_dir_submissions.get(library_id)
+        if pending:
+            joined: Mapping[str, HeldFile] = self._submitted_files.get(library_id, {})
+            for library_dir_files in pending:
+                joined = self._joined_submitted_files(held=joined, files=library_dir_files)
+            self._submitted_files[library_id] = dict(joined)
+            self._submitted_trees.pop(library_id, None)
+            self._crate_cache.pop(library_id, None)
+            del self._library_dir_submissions[library_id]
         tree = self._submitted_trees.get(library_id)
         if tree is not None:
             return tree
@@ -781,9 +801,9 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         crate: LibraryCrate,
         is_crate_prevalidated: bool = False,
-        written_trees: "Mapping[str, MethodTree] | None" = None,
+        written_pipe_trees: "Mapping[str, MethodTree] | None" = None,
     ) -> list[PipeAbstract]:
-        """Load a LibraryCrate into a live Library, reading no file.
+        """Load a LibraryCrate into a live Library, reading no file but, for its validation, files of trees this process holds.
 
         Fingerprint idempotency: if a crate with the same fingerprint was already loaded
         into this library_id, the load is skipped and an empty list is returned.
@@ -812,20 +832,33 @@ class LibraryManager(LibraryManagerAbstract):
                 to one another, the concept-cycle check, pipe construction with each pipe's static validation,
                 and source tracking. Leave it False for any crate whose library was not validated by this
                 pipelex version.
-            written_trees: The trees this process wrote out, by the digest the crate names each by, such as the tree
-                of a `PipeFunc` call written for its function to import. A pipe of such a tree is built as a member of
-                the written tree; every other pipe names its tree by digest alone, resolves a file it names lexically,
-                and reads nothing, the host that assembled the crate having checked the file was in its tree.
+            written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such as
+                the tree of a `PipeFunc` call written for its function to import. That step is built as a member of the
+                written tree, which holds none of its tree's bundles; no other step is, a sibling of the same tree
+                included.
+
+        Every other step is built as a member of its tree when the load validates the crate and a library of this
+        process holds the tree under the digest the crate names, so its checks read the files they read where the
+        crate was assembled, such as a `PipeDocGen` step's HTML template file, and reach the same verdict. Otherwise
+        it names its tree by digest alone, resolves a file it names lexically, and reads nothing: a load that skips
+        validation, such as one inside a workflow, never reads a file.
 
         Returns:
             List of all pipes that were loaded, or empty list if already loaded
         """
+        held_trees: dict[str, MethodTree] = {}
+        if not is_crate_prevalidated:
+            for tree_digest in crate.tree_digests():
+                held_tree = LOCAL_METHOD_FILES.held_tree(tree_digest=tree_digest)
+                if held_tree is not None:
+                    held_trees[tree_digest] = held_tree
         return self._load_crate(
             library_id=library_id,
             crate=crate,
             is_crate_prevalidated=is_crate_prevalidated,
             refuses_unresolved_structures=False,
-            live_trees=written_trees or {},
+            live_trees=held_trees,
+            written_pipe_trees=written_pipe_trees or {},
         )
 
     def _load_crate(
@@ -836,6 +869,7 @@ class LibraryManager(LibraryManagerAbstract):
         is_crate_prevalidated: bool,
         refuses_unresolved_structures: bool,
         live_trees: "Mapping[str, MethodTree]",
+        written_pipe_trees: "Mapping[str, MethodTree] | None" = None,
     ) -> list[PipeAbstract]:
         """The load behind load_from_crate and load_from_blueprints.
 
@@ -848,6 +882,8 @@ class LibraryManager(LibraryManagerAbstract):
                 reference which resolves to nothing is the bundle's own fault.
             live_trees: The trees this process holds, by digest: a pipe whose bundle's tree is one of them is built as a
                 member of it, and every other as a member of a tree the crate names by digest alone.
+            written_pipe_trees: As load_from_crate describes it: a step built in a tree this process wrote out for it,
+                which wins over its tree in `live_trees`.
         """
         # Bind the target library as current for the whole load: PipeFactory and the concept
         # factories resolve concepts and the class registry through the ambient current library,
@@ -934,7 +970,13 @@ class LibraryManager(LibraryManagerAbstract):
                 # this host.
                 pipe_blueprint = pipe_blueprint.model_copy(update={"source": None})
                 with (
-                    building_pipe_of(tree_bundle=_building_bundle_of(tree_bundle_ref=crate.tree_bundles.get(pipe_ref), live_trees=live_trees)),
+                    building_pipe_of(
+                        tree_bundle=_building_bundle_of(
+                            tree_bundle_ref=crate.tree_bundles.get(pipe_ref),
+                            live_trees=live_trees,
+                            written_tree=(written_pipe_trees or {}).get(pipe_ref),
+                        )
+                    ),
                     _locating_pipe_build_refusals(
                         pipe_code=pipe_code, domain_code=domain_code, source=source, elaboration=crate.elaboration_metadata.get(pipe_ref)
                     ),
@@ -1210,7 +1252,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         A tree listed from this host's disk is served from it, each file checked against the hash its listing recorded;
         the tree of submitted files was held when it was assembled. Two trees with one digest hold the same files, so the
-        first placed is the one returned.
+        first placed is the one returned, and each tree is held once, however many of its bundles load: a holder keeps
+        the first sources it held a tree with.
         """
         live_trees: dict[str, MethodTree] = {}
         for blueprint in blueprints:
@@ -1218,9 +1261,11 @@ class LibraryManager(LibraryManagerAbstract):
             if tree_bundle is None:
                 continue
             tree = tree_bundle.tree
-            if tree.directory is not None:
+            if tree.digest in live_trees:
+                continue
+            live_trees[tree.digest] = tree
+            if tree.directory is not None and not LOCAL_METHOD_FILES.holds(holder=library_id, tree_digest=tree.digest):
                 LOCAL_METHOD_FILES.hold_tree(holder=library_id, tree=tree)
-            live_trees.setdefault(tree.digest, tree)
         return live_trees
 
     def _load_mthds_files_into_library(self, *, library_id: str, bundle_files: list[LibraryBundleFile]) -> list[PipeAbstract]:
@@ -2080,10 +2125,18 @@ class LibraryManager(LibraryManagerAbstract):
             check_for_cycle(concept.concept_ref, visiting=set(), path=[])
 
 
-def _building_bundle_of(*, tree_bundle_ref: TreeBundleRef | None, live_trees: "Mapping[str, MethodTree]") -> BuildingBundle:
-    """Where a pipe of a crate is built: in the tree this process holds under the digest the crate names, or by the digest alone."""
+def _building_bundle_of(
+    *, tree_bundle_ref: TreeBundleRef | None, live_trees: "Mapping[str, MethodTree]", written_tree: MethodTree | None
+) -> BuildingBundle:
+    """Where a pipe of a crate is built: in the tree written out for it, in a held tree the crate names, or by digest alone.
+
+    A written tree holds none of its tree's bundles and may hold a generated `structures` module, so its own digest is
+    not the crate's: the bundle carries the crate's, the one any other process knows the tree by.
+    """
     if tree_bundle_ref is None:
         return None
+    if written_tree is not None:
+        return TreeBundle(tree=written_tree, tree_path=tree_bundle_ref.tree_path, named_digest=tree_bundle_ref.tree_digest)
     live_tree = live_trees.get(tree_bundle_ref.tree_digest)
     if live_tree is None:
         return tree_bundle_ref

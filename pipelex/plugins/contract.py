@@ -45,10 +45,6 @@ if TYPE_CHECKING:
 # boot: a model of the internal backend, as the table a backend file would hold, and the model deck's default engine for
 # one document format and source — joined under v4 without a bump, on the same reasoning as ``add_log_sink``.
 #
-# ``claim_method_file_store`` — the hub slot an activity reads method files through, by their tree's digest
-# (``MethodFileStoreProtocol`` in ``pipelex.core.method_trees.method_file_store``) — joined under v6 without a bump, on
-# the same reasoning as ``add_log_sink``: a menu addition breaks no plugin targeting v6.
-#
 # v5 changed the log-sink factory contract: boot now resolves the secrets provider before the log sink, and
 # a ``LogSinkFactoryFn`` receives it as the ``secrets_provider`` keyword argument, so a sink's settings can
 # name a secret. A factory written against v4 would be called with a keyword it does not accept and fail at
@@ -58,7 +54,18 @@ if TYPE_CHECKING:
 # the media type its source gives it, where it returned the bytes alone. An engine written against v5 would receive
 # the model where it expects bytes and fail in the middle of a print, with a ``TypeError`` raised deep inside its
 # rendering library; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 6
+#
+# v7 changed what a run hands an orchestration plugin, now that a run's library crate names each method tree by its
+# digest and carries no file's bytes. A bundle validator's ``validate_bundles`` receives ``submitted_files``, a mapping
+# from the path a step names to the file's bytes, where it received ``bundle_resources``; a PipeFunc executor's
+# transported request names its tree by ``tree_digest`` where it carried the call's ``files``, and the transported
+# entrypoint takes the directory the call's files were unpacked into as a required argument; and an orchestrator that
+# runs a job out of process copies the trees the job's crate names before its ``execute`` or ``start`` returns
+# (``OrchestratorProtocol``). A validator or an executor written against v6 would be called with a keyword it does not
+# accept, or read a field that is gone, on its first call; the bump turns that into a discovery-time mismatch naming
+# the plugin. ``claim_method_file_store``, the hub slot an activity reads method files through by their tree's digest
+# (``MethodFileStoreProtocol`` in ``pipelex.core.method_trees.method_file_store``), joined the menu with it.
+PLUGIN_API_VERSION: int = 7
 
 
 @runtime_checkable

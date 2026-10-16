@@ -24,12 +24,23 @@ class TreeBundle(BaseModel):
 
     `tree_path` is None for bundles parsed from content strings, which sit at the root of the tree of the files submitted
     with them without being a file of it: a reference they write resolves from the root.
+
+    `named_digest` is the digest a library crate names the tree by, when this host wrote the tree out apart from its
+    bundles, such as the tree of a `PipeFunc` call written for its function to import, which holds no `.mthds` file and
+    may hold a generated `structures` module, so its own digest is not the crate's. None when the tree is the one the
+    crate names. `digest` is the one to name the tree by to any other process.
     """
 
     model_config = ConfigDict(frozen=True)
 
     tree: MethodTree
     tree_path: str | None
+    named_digest: str | None = None
+
+    @property
+    def digest(self) -> str:
+        """The digest the tree is named by outside this host: the crate's, when this host wrote the tree out, else its own."""
+        return self.named_digest or self.tree.digest
 
     @property
     def location(self) -> Path:
@@ -45,7 +56,7 @@ class TreeBundle(BaseModel):
 
     def make_ref(self) -> "TreeBundleRef":
         """The bundle as a crate names it: its tree's digest and its tree path."""
-        return TreeBundleRef(tree_digest=self.tree.digest, tree_path=self.tree_path)
+        return TreeBundleRef(tree_digest=self.digest, tree_path=self.tree_path)
 
 
 class TreeBundleRef(BaseModel):

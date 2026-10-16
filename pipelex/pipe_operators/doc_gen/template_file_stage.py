@@ -4,22 +4,26 @@ The print stage, a kernel-layer leaf, reads the template file through the method
 needs the method itself (`pipelex.cogt.doc_gen.template_file_stage`):
 
 - an HTML template file is rendered with the step's data as the compose stage of a `PipeCompose` renders an HTML
-  template, with the whole stack, its filters included: the step's working memory is typed again by the concepts of the
-  run's library crate, in the run's own library when this process holds it, such as in a local run, and in a library
-  loaded from the crate for the render otherwise, such as in an activity on a worker;
+  template, with the whole stack, its filters included: the stuffs the step's inputs name are typed again by the
+  concepts of the run's library crate, in the run's own library when this process holds it, such as in a local run, and
+  otherwise, such as in an activity on a worker, in a library loaded from those concepts alone, which this process keeps
+  for the prints that follow (`RenderLibraryCache`);
 - the findings of the engine's check of an office template file, at a dry print, fail the step when one is an error,
   and join the validation verdict's warnings otherwise, or the log when no validation collects them.
 """
 
+import threading
 import uuid
+from collections import OrderedDict
 from collections.abc import Generator
 from contextlib import contextmanager
+from typing import NamedTuple
 
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile
+from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, TemplateRenderContext
 from pipelex.cogt.doc_gen.template_check import TemplateFinding
 from pipelex.cogt.doc_gen.template_file_stage import TemplateFileStageProtocol
 from pipelex.core.qualified_ref import QualifiedRef
@@ -35,29 +39,109 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.validation_error_types import TemplateCheckErrorType
 
 _RENDER_LIBRARY_PREFIX = "doc_gen_template_render"
+# How many libraries typing the data of HTML template files this process keeps once no print uses them: one per set of
+# concepts, so a worker printing for a handful of methods loads each one's concepts once, and one printing for many
+# keeps the ones it used last. A library a print is using is never torn down, however many there are.
+_RENDER_LIBRARY_CAPACITY = 8
+
+
+class _RenderLibrary(NamedTuple):
+    library_id: str
+    users: int
+
+
+class RenderLibraryCache:
+    """The libraries this process loaded from the concepts of a run's crate to type the data of HTML template files, by fingerprint.
+
+    Loading a crate builds its concepts' classes, which costs more than the render, so a library is kept after its print
+    for the next print typing data with the same concepts, such as the next document of the same method. Libraries no
+    print is using are torn down beyond the capacity, the least recently used first. A library torn down by someone else,
+    such as by the library manager's teardown of every library, is loaded again.
+    """
+
+    def __init__(self, *, capacity: int) -> None:
+        self._capacity = capacity
+        self._lock = threading.Lock()
+        self._libraries: OrderedDict[str, _RenderLibrary] = OrderedDict()
+
+    @contextmanager
+    def library_for(self, *, concepts_crate: LibraryCrate) -> Generator[str, None, None]:
+        """A library holding the crate's concepts, held for the block, the one kept for its fingerprint or one loaded for it."""
+        library_id = self._acquire(concepts_crate=concepts_crate)
+        try:
+            yield library_id
+        finally:
+            self._release(fingerprint=concepts_crate.fingerprint)
+
+    def held_library_ids(self) -> list[str]:
+        """The libraries kept, in use or not, the least recently used first."""
+        with self._lock:
+            return [render_library.library_id for render_library in self._libraries.values()]
+
+    def release_idle(self) -> None:
+        """Tear down every library kept that no print is using."""
+        with self._lock:
+            idle = [fingerprint for fingerprint, render_library in self._libraries.items() if render_library.users <= 0]
+            to_tear_down = [self._libraries.pop(fingerprint).library_id for fingerprint in idle]
+        for library_id in to_tear_down:
+            get_library_manager().teardown(library_id=library_id)
+
+    def _acquire(self, *, concepts_crate: LibraryCrate) -> str:
+        library_manager = get_library_manager()
+        fingerprint = concepts_crate.fingerprint
+        with self._lock:
+            kept = self._libraries.get(fingerprint)
+            if kept is not None and library_manager.is_crate_loaded(library_id=kept.library_id, fingerprint=fingerprint):
+                self._libraries[fingerprint] = kept._replace(users=kept.users + 1)
+                self._libraries.move_to_end(fingerprint)
+                return kept.library_id
+            library_id, _ = library_manager.open_library(library_id=f"{_RENDER_LIBRARY_PREFIX}_{uuid.uuid4().hex}")
+            try:
+                # The crate's concepts were validated where the run's method was loaded.
+                library_manager.load_from_crate(library_id=library_id, crate=concepts_crate, is_crate_prevalidated=True)
+            except BaseException:
+                library_manager.teardown(library_id=library_id)
+                raise
+            # A library kept under this fingerprint and torn down by someone else is replaced.
+            self._libraries[fingerprint] = _RenderLibrary(library_id=library_id, users=1)
+            self._libraries.move_to_end(fingerprint)
+            return library_id
+
+    def _release(self, *, fingerprint: str) -> None:
+        to_tear_down: list[str] = []
+        with self._lock:
+            kept = self._libraries.get(fingerprint)
+            if kept is not None:
+                self._libraries[fingerprint] = kept._replace(users=kept.users - 1)
+            idle = [kept_fingerprint for kept_fingerprint, render_library in self._libraries.items() if render_library.users <= 0]
+            for kept_fingerprint in idle[: max(0, len(idle) - self._capacity)]:
+                to_tear_down.append(self._libraries.pop(kept_fingerprint).library_id)
+        for library_id in to_tear_down:
+            get_library_manager().teardown(library_id=library_id)
+
+
+#: The libraries this process keeps to type the data of HTML template files.
+RENDER_LIBRARIES = RenderLibraryCache(capacity=_RENDER_LIBRARY_CAPACITY)
 
 
 @contextmanager
-def _library_for_crate(*, crate: LibraryCrate) -> Generator[None, None, None]:
-    """Make current a library holding the crate: the current one when it already does, or one loaded for the block.
+def _library_typing(*, render_context: TemplateRenderContext) -> Generator[None, None, None]:
+    """Make current a library whose concepts type the step's data: the run's own when current, or one holding its concepts.
 
-    The current library already holds the crate in the process that loaded the run's method, so its concepts' classes
-    are the ones the step's data was built with. Anywhere else, such as in an activity on a worker, a library is loaded
-    from the crate, which reads no file, and torn down after the block.
+    The current library is the run's own in the process that loaded the run's method, so its concepts' classes are the
+    ones the step's data was built with. Anywhere else, such as in an activity on a worker, the data is typed in a library
+    loaded from the run's concepts alone, which reads no file, and which this process keeps for the prints that follow.
     """
     library_manager = get_library_manager()
     current_library_id = get_current_library_id_or_none()
-    if current_library_id is not None and library_manager.is_crate_loaded(library_id=current_library_id, fingerprint=crate.fingerprint):
+    if current_library_id is not None and library_manager.is_crate_loaded(
+        library_id=current_library_id, fingerprint=render_context.crate_fingerprint
+    ):
         yield
         return
-    library_id, _ = library_manager.open_library(library_id=f"{_RENDER_LIBRARY_PREFIX}_{uuid.uuid4().hex}")
-    try:
-        with scoped_current_library(library_id=library_id):
-            # The crate was validated where the run's method was loaded.
-            library_manager.load_from_crate(library_id=library_id, crate=crate, is_crate_prevalidated=True)
-            yield
-    finally:
-        library_manager.teardown(library_id=library_id)
+    concepts_crate = LibraryCrate.model_validate(render_context.concepts_crate)
+    with RENDER_LIBRARIES.library_for(concepts_crate=concepts_crate) as library_id, scoped_current_library(library_id=library_id):
+        yield
 
 
 def _step_codes(*, template_file: ComposedTemplateFile) -> tuple[str | None, str]:
@@ -76,8 +160,7 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         if render_context is None:
             msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file.name}' with nothing to render it with."
             raise PipeDocGenRunError(msg)
-        crate = LibraryCrate.model_validate(render_context.crate)
-        with _library_for_crate(crate=crate):
+        with _library_typing(render_context=render_context):
             working_memory = hydrate_working_memory(render_context.working_memory_raw)
             context = build_compose_context(memory=working_memory, runtime_params=render_context.runtime_params)
             return await render_doc_gen_template(

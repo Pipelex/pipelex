@@ -42,3 +42,18 @@ class PipeDocGenTemplateCheckError(PipelexError):
 
     error_domain = ErrorDomain.INPUT
     _authors_caller_facing_message = True
+
+
+class PipeDocGenTemplateFileUncheckedError(PipelexError):
+    """Raised when a ``PipeDocGen`` step built from a library crate is validated where its HTML template file is not at hand.
+
+    An HTML template file's checks read the file: the variables it reads are inputs of the step, the fields it reads are
+    fields of their concepts, and every reference to an optional input is guarded. A crate names the step's method tree
+    by digest and carries none of its files, so a validation of the crate reads the file from a tree a library of this
+    process holds, and reaches the verdict the load where the crate was assembled reached. Where no library holds the
+    tree, the validation cannot reach it, and refuses rather than pass the step unchecked. The fault is where the crate
+    was validated, not in the method, and the message names only the step and the template file's tree path.
+    """
+
+    error_domain = ErrorDomain.RUNTIME
+    retryable = False

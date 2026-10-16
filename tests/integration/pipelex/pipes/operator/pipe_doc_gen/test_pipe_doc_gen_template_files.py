@@ -1,9 +1,12 @@
 from pathlib import Path
 
 import pytest
+from mthds.method_tree.models import MethodTree
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
+from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -127,6 +130,26 @@ class TestPipeDocGenTemplateFiles:
             await _validate_with_html_template_file(directory=tmp_path, load=load, template_bytes="<p>Facture émise</p>".encode("latin-1"))
 
         assert "could not read the template file 'invoice.html' as UTF-8 text" in str(exc_info.value.to_error_report().model_dump())
+
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_an_html_template_file_changed_after_its_tree_was_listed_is_refused_not_read_from_disk(
+        self, tmp_path: Path, mocker: MockerFixture
+    ) -> None:
+        """The load reads the file as its tree's listing recorded it, or not at all: bytes changed since are never read unchecked."""
+        (tmp_path / "invoice.html").write_bytes(b"<h1>{{ invoice.number }}</h1>")
+        bundle_path = write_bundle(directory=tmp_path, step_fields='format = "pdf"\ntemplate_file = "invoice.html"')
+        hold_tree = LOCAL_METHOD_FILES.hold_tree
+
+        def hold_then_change(*, holder: str, tree: MethodTree) -> None:
+            hold_tree(holder=holder, tree=tree)
+            (tmp_path / "invoice.html").write_bytes(b"<h1>{{ invoice.customer }}</h1>")
+
+        mocker.patch.object(LOCAL_METHOD_FILES, "hold_tree", side_effect=hold_then_change)
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        assert "could not read the template file 'invoice.html' as its method tree listed it" in str(exc_info.value.to_error_report().model_dump())
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])

@@ -51,7 +51,7 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                     # as a member of the tree, or parsed from a content string at the root of the tree of the files
                     # submitted with it.
                     resolved_tree_path = cls._resolve_template_file(pipe_code=pipe_code, template_file=template_file, tree_bundle=tree_bundle)
-                    template_file_ref = MethodFileRef(tree_digest=tree_bundle.tree.digest, tree_path=resolved_tree_path)
+                    template_file_ref = MethodFileRef(tree_digest=tree_bundle.digest, tree_path=resolved_tree_path)
                     if blueprint.format.is_template_html:
                         # An HTML template file is read and checked now, as written, for the method's load; the print
                         # stage reads it again, where the step prints.
@@ -124,23 +124,22 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
 
     @classmethod
     def _read_tree_file(cls, *, tree_bundle: TreeBundle, tree_path: str) -> bytes | None:
-        """The bytes of a file of the bundle's tree, as the library holds it, or from the disk the tree was listed from.
+        """The bytes of a file of the bundle's tree, as a library of this process holds the tree, checked against its hash.
 
-        None when neither gives the file's bytes as the tree's listing recorded them.
+        A tree a step is built in is always held: the library holds every tree it loads before it builds a pipe of one.
+        None when the file's bytes are no longer the ones the tree's listing recorded, such as a file edited, removed or
+        swapped for a link since: nothing is read from the disk past the hash check.
         """
-        data = LOCAL_METHOD_FILES.read_held_file(tree_digest=tree_bundle.tree.digest, tree_path=tree_path)
-        if data is not None or tree_bundle.tree.directory is None:
-            return data
-        try:
-            return tree_bundle.tree.file_location(tree_path).read_bytes()
-        except OSError:
-            return None
+        return LOCAL_METHOD_FILES.read_held_file(tree_digest=tree_bundle.tree.digest, tree_path=tree_path)
 
     @classmethod
     def _html_template_file_text(cls, *, pipe_code: str, template_file: str, data: bytes | None) -> str:
         """An HTML template file's text, decoded from its bytes as written, line endings included."""
         if data is None:
-            msg = f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}'."
+            msg = (
+                f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as its method tree listed it: "
+                "the file changed or went missing since the tree was listed."
+            )
             raise PipeDocGenFactoryError(msg)
         try:
             return data.decode("utf-8")

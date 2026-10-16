@@ -7,7 +7,8 @@ class BundleResourcePathError(PipelexError):
     A submitted file's key is the path a step names, relative to the bundle and written with forward slashes: an
     absolute path, a `..` segment, a backslash, a drive colon and an empty path are refused, and so are two keys naming
     the same file, or a key the tree of the submitted files cannot hold, such as one colliding with another once
-    case-folded. The path is the caller's own, so the message is theirs to read, and the same request is refused again.
+    case-folded, or naming a file already submitted, from a library directory or with the request, with other bytes.
+    The path is the caller's own, so the message is theirs to read, and the same request is refused again.
     """
 
     error_domain = ErrorDomain.INPUT

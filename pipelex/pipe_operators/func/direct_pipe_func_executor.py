@@ -31,7 +31,7 @@ from pipelex.system.job_metadata import JobMetadata
 
 # The library id the transported run rebuilds under. Internal to one process (a fresh sandbox box or a
 # one-shot subprocess), so a fixed id is safe — there is no other library to collide with.
-_TRANSPORTED_LIBRARY_ID = "pipe_func_transported_lib"
+TRANSPORTED_LIBRARY_ID = "pipe_func_transported_lib"
 
 
 def resolve_pipe_func(*, pipe_code: str) -> PipeFunc:
@@ -134,14 +134,14 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
         # The call's Python is held for the transported library until the run ends, and unloaded before its directory
         # is removed.
-        TREE_PYTHON_HOLD.acquire(tree=tree, holder=_TRANSPORTED_LIBRARY_ID, label=f"the method tree of the call to '{request.pipe_code}'")
+        TREE_PYTHON_HOLD.acquire(tree=tree, holder=TRANSPORTED_LIBRARY_ID, label=f"the method tree of the call to '{request.pipe_code}'")
         try:
-            # The step called is built in the tree written here, which the crate names by the digest of the tree its
-            # bundle was read from; every other step names its tree by digest alone.
-            written_trees = {request.tree_digest: tree} if request.tree_digest is not None else {}
-            return await self._run_transported(request=request, written_trees=written_trees)
+            # The step called, and it alone, is built in the tree written here, which holds none of its tree's bundles:
+            # every other step, a sibling of the same tree included, names its tree by the digest the crate names it by.
+            written_pipe_trees = {request.pipe_code: tree} if request.tree_digest is not None else {}
+            return await self._run_transported(request=request, written_pipe_trees=written_pipe_trees)
         finally:
-            TREE_PYTHON_HOLD.release(holder=_TRANSPORTED_LIBRARY_ID)
+            TREE_PYTHON_HOLD.release(holder=TRANSPORTED_LIBRARY_ID)
             TREE_PYTHON_HOLD.unload_if_unheld()
 
     @staticmethod
@@ -170,15 +170,15 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             generated_target.parent.mkdir(parents=True, exist_ok=True)
             generated_target.write_text(emitted.content, encoding="utf-8")
 
-    async def _run_transported(self, *, request: PipeFuncExecutionRequest, written_trees: dict[str, MethodTree]) -> PipeFuncExecutionResponse:
+    async def _run_transported(self, *, request: PipeFuncExecutionRequest, written_pipe_trees: dict[str, MethodTree]) -> PipeFuncExecutionResponse:
         # The crate was validated where it was assembled; its other steps name trees this process never receives, so it
         # is loaded as it is, and the one step called checks its function as it binds it.
         working_memory = rehydrate_library_and_memory(
-            library_id=_TRANSPORTED_LIBRARY_ID,
+            library_id=TRANSPORTED_LIBRARY_ID,
             crate=request.crate,
             working_memory_raw=request.working_memory_raw,
             is_crate_prevalidated=True,
-            written_trees=written_trees,
+            written_pipe_trees=written_pipe_trees,
         )
         if working_memory is None:
             msg = f"Transported rehydration produced no working memory for pipe '{request.pipe_code}'"
@@ -211,7 +211,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             raise PipeFuncExecutionError(msg) from exc
 
         # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
-        pipe = get_library_manager().get_library(library_id=_TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)
+        pipe = get_library_manager().get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)
         output_stuff = StuffFactory.make_stuff(concept=pipe.output.concept, content=execution_result.content)
         working_memory.set_new_main_stuff(stuff=output_stuff)
 

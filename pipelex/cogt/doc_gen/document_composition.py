@@ -11,17 +11,25 @@ from pipelex.tools.uri.uri_read_scope import UriReference
 
 
 class TemplateRenderContext(BaseModel):
-    """What the print stage renders a step's HTML template file with: the step's data, and the library that types it.
+    """What the print stage renders a step's HTML template file with: the step's data, and the concepts that type it.
 
-    The data is the step's working memory as it travels between processes, typed by the concepts of the run's library
-    crate, which travels beside it as plain JSON, so the print stage can type the data again wherever it runs and
-    render the template with the whole stack of a `PipeCompose` HTML template, its filters included.
+    The data is the stuffs the step's inputs name, the only ones its template may read, as they travel between processes.
+    The concepts are those of the run's library crate, with its domains and none of its pipes, which travel beside the
+    data as plain JSON, so the print stage can type the data again wherever it runs and render the template with the
+    whole stack of a `PipeCompose` HTML template, its filters included. The print stage renders in the run's own library
+    when its process holds it, which `crate_fingerprint` names, such as in a local run, so the data keeps the classes the
+    run built it with; anywhere else it types the data with the concepts alone, in a library it keeps for later prints.
+    The composition crosses into the print activity's payload, so it carries neither the run's pipes nor the data the
+    step does not read.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    crate: dict[str, Any] = Field(description="The run's library crate as JSON, whose concepts type the step's data")
-    working_memory_raw: dict[str, Any] = Field(description="The step's working memory, dumped for transport")
+    crate_fingerprint: str = Field(description="The fingerprint of the run's library crate, by which a process holding it renders in it")
+    concepts_crate: dict[str, Any] = Field(
+        description="The concepts and domains of the run's library crate, with none of its pipes, as JSON, which type the step's data"
+    )
+    working_memory_raw: dict[str, Any] = Field(description="The stuffs the step's inputs name, as a working memory dumped for transport")
     runtime_params: dict[str, Any] = Field(default_factory=dict, description="The run's runtime parameters, which a template may read")
 
 

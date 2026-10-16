@@ -37,7 +37,7 @@ def _html_template_file() -> ComposedTemplateFile:
         file=_FILE,
         name="templates/invoice.html",
         pipe_ref="invoicing.print_invoice",
-        render_context=TemplateRenderContext(crate={}, working_memory_raw={}),
+        render_context=TemplateRenderContext(crate_fingerprint="", concepts_crate={}, working_memory_raw={}),
     )
 
 

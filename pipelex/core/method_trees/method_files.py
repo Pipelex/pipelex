@@ -7,7 +7,7 @@ listing against the digest that names it, and each file against the hash the lis
 wrong bytes is refused rather than trusted.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 
 from mthds.method_tree.digest import DIGEST_PREFIX, is_sha256_hex, sha256_hex
 from mthds.method_tree.tree_path import tree_path_violation
@@ -19,6 +19,8 @@ from pipelex.runtime_hub import get_method_file_store
 
 #: The separator between a file's hash and its tree path on a line of a tree's listing.
 _LISTING_SEPARATOR = "  "
+#: What ends each line of a tree's listing, and the only character that does.
+_LISTING_LINE_END = "\n"
 
 
 class TreeListing(BaseModel):
@@ -44,8 +46,13 @@ class TreeListing(BaseModel):
         except UnicodeDecodeError as exc:
             msg = f"The listing of the tree '{tree_digest}' is not UTF-8 text."
             raise MethodFileUnavailableError(msg) from exc
+        # The standard ends every line with a line feed, and only a line feed separates them: a tree path may hold any
+        # other character `str.splitlines` would split on, such as U+2028 or U+2029.
+        if text and not text.endswith(_LISTING_LINE_END):
+            msg = f"The listing of the tree '{tree_digest}' does not end with a line feed."
+            raise MethodFileUnavailableError(msg)
         files: dict[str, str] = {}
-        for line in text.splitlines():
+        for line in text.split(_LISTING_LINE_END)[:-1]:
             sha256, separator, tree_path = line.partition(_LISTING_SEPARATOR)
             if not separator or not is_sha256_hex(sha256) or tree_path_violation(tree_path) is not None:
                 msg = f"The listing of the tree '{tree_digest}' holds a line that is not a file's hash and tree path."
@@ -110,3 +117,40 @@ async def read_tree_files(*, tree_digest: str, read_scope: str | None, keeps: Ca
             continue
         files[tree_path] = await _read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
     return files
+
+
+class StoredTree(BaseModel):
+    """A method tree as a store keeps it: its listing, under the tree's digest, and its files' bytes, under their hashes."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    tree_digest: str
+    listing: bytes
+    blobs: dict[str, bytes]
+
+
+async def read_stored_trees(*, tree_digests: Iterable[str], read_scope: str | None) -> list[StoredTree]:
+    """Every tree `tree_digests` names, as a store keeps it, read through the method file store and checked.
+
+    What an orchestrator that runs a job out of process copies into the store its workers read, for every tree the job's
+    crate names (`LibraryCrate.tree_digests`), before its `execute` or `start` returns: the runner may drop the files a
+    tree was listed from as soon as it does, such as the temporary directory it wrote a request's files into, and the
+    library holding the tree in this process is torn down with the request (`OrchestratorProtocol`).
+
+    Raises:
+        MethodFileUnavailableError: The store does not hold a tree or one of its files, or serves bytes the tree does not name.
+    """
+    method_file_store = get_method_file_store()
+    stored_trees: list[StoredTree] = []
+    for tree_digest in tree_digests:
+        listing_bytes = await method_file_store.read_tree_listing(tree_digest=tree_digest, read_scope=read_scope)
+        if listing_bytes is None:
+            msg = f"The method file store holds no tree '{tree_digest}' for this run."
+            raise MethodFileUnavailableError(msg)
+        listing = TreeListing.parse(tree_digest=tree_digest, listing=listing_bytes)
+        blobs: dict[str, bytes] = {}
+        for tree_path, sha256 in listing.files.items():
+            if sha256 not in blobs:
+                blobs[sha256] = await _read_listed_file(listing=listing, tree_path=tree_path, read_scope=read_scope)
+        stored_trees.append(StoredTree(tree_digest=tree_digest, listing=listing_bytes, blobs=blobs))
+    return stored_trees

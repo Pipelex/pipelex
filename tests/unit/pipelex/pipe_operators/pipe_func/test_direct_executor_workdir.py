@@ -15,8 +15,7 @@ from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
-from pipelex.pipe_operators.func import direct_pipe_func_executor
-from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
+from pipelex.pipe_operators.func.direct_pipe_func_executor import TRANSPORTED_LIBRARY_ID, DirectPipeFuncExecutor
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse
 from pipelex.pipe_operators.func.pipe_func_execution_transport import build_pipe_func_execution_request
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -94,7 +93,7 @@ def _missing_pipe_request(*, tree_digest: str) -> PipeFuncExecutionRequest:
 
 
 async def _run_transported(*, request: PipeFuncExecutionRequest, tree_root: Path | None = None) -> PipeFuncExecutionResponse:
-    library_id = direct_pipe_func_executor._TRANSPORTED_LIBRARY_ID  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    library_id = TRANSPORTED_LIBRARY_ID
     with scoped_current_library(library_id=library_id):
         try:
             if tree_root is None:

@@ -18,7 +18,7 @@ _HTML_TEMPLATE_FILE = ComposedTemplateFile(
     file=MethodFileRef(tree_digest=_TREE_DIGEST, tree_path="templates/report.html"),
     name="templates/report.html",
     pipe_ref="invoicing.print_report",
-    render_context=TemplateRenderContext(crate={}, working_memory_raw={}),
+    render_context=TemplateRenderContext(crate_fingerprint="", concepts_crate={}, working_memory_raw={}),
 )
 
 

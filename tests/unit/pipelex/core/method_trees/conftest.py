@@ -2,6 +2,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from pipelex.core.method_trees.method_file_store import LocalMethodFileStore
 from pipelex.core.method_trees.tree_python import TREE_PYTHON_HOLD
 
 
@@ -11,3 +12,9 @@ def released_hold() -> Iterator[None]:
     yield
     TREE_PYTHON_HOLD.release_all()
     TREE_PYTHON_HOLD.unload_if_unheld()
+
+
+@pytest.fixture
+def store() -> LocalMethodFileStore:
+    """A method file store of the test's own, holding nothing."""
+    return LocalMethodFileStore()

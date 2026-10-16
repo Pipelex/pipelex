@@ -57,6 +57,19 @@ class LibraryCrate(BaseModel):
         """The digest of every tree the crate's pipes belong to, each once, sorted."""
         return sorted({tree_bundle_ref.tree_digest for tree_bundle_ref in self.tree_bundles.values()})
 
+    def concepts_only(self) -> "LibraryCrate":
+        """The crate's concepts and domains, with none of its pipes: what a process typing the run's data loads.
+
+        Its fingerprint is its own, computed from its concepts, so two runs whose methods declare the same concepts share
+        it whatever their pipes.
+        """
+        return LibraryCrate(
+            mthds_version=self.mthds_version,
+            concepts=dict(self.concepts),
+            domains=dict(self.domains),
+            fingerprint=self.compute_fingerprint_from_content(concepts=self.concepts, pipes={}),
+        )
+
     fingerprint: str = ""
     """SHA-256 hex digest of the serialized concepts + pipes content (source is intentionally excluded)."""
 

@@ -141,9 +141,9 @@ class LibraryManagerAbstract(ABC):
         library_id: str,
         crate: LibraryCrate,
         is_crate_prevalidated: bool = False,
-        written_trees: "Mapping[str, MethodTree] | None" = None,
+        written_pipe_trees: "Mapping[str, MethodTree] | None" = None,
     ) -> list[PipeAbstract]:
-        """Load a LibraryCrate into a live Library, reading no file.
+        """Load a LibraryCrate into a live Library, reading no file but, for its validation, files of trees this process holds.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
         Callers must handle dependency loading before calling this method.
@@ -154,9 +154,10 @@ class LibraryManagerAbstract(ABC):
             is_crate_prevalidated: Skip the library validation that ends the load. Precondition: the crate
                 was built from a library that this same pipelex version loaded and validated (a runner's
                 crate, handed to the worker that executes it). Everything else the load does still happens.
-            written_trees: The trees this process wrote out, by the digest the crate names them by, such as the tree of
-                a `PipeFunc` call written for its function to import: a pipe of such a tree is built as a member of the
-                written tree, while every other pipe names its tree by digest alone.
+            written_pipe_trees: The trees this process wrote out for a step to run in, by that step's pipe ref, such
+                as the tree of a `PipeFunc` call written for its function to import: that step is built as a member of
+                the written tree, which holds none of its tree's bundles, while every other step is built as the
+                library crate names it.
         """
 
     @abstractmethod

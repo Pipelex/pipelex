@@ -17,8 +17,17 @@ class TestCrateFileReferences:
             ("bundles/invoice.mthds", "../templates/invoice.html", "templates/invoice.html"),
             ("bundles/invoice.mthds", "./invoice.html", "bundles/invoice.html"),
             (None, "templates/invoice.docx", "templates/invoice.docx"),
+            (None, "templates//invoice.docx", "templates/invoice.docx"),
+            (None, "./templates/./invoice.docx", "templates/invoice.docx"),
         ],
-        ids=["beside_the_bundle", "climbing_in_the_tree", "dot_segment", "content_string_at_the_root"],
+        ids=[
+            "beside_the_bundle",
+            "climbing_in_the_tree",
+            "dot_segment",
+            "content_string_at_the_root",
+            "repeated_slash_at_the_root",
+            "dot_segments_at_the_root",
+        ],
     )
     def test_a_reference_joins_the_bundle_s_tree_path(self, tree_path: str | None, reference: str, expected: str) -> None:
         tree_bundle_ref = TreeBundleRef(tree_digest=_TREE_DIGEST, tree_path=tree_path)

@@ -9,7 +9,9 @@ outside the tree is ever opened.
 A bundle loaded from a content string reads only the files submitted with it, so the parser, told so by its caller,
 validates its blueprint under that origin (`BundleValidationContext`), and a reference none of those files could be keyed
 by is refused there, as a blueprint item at the step that names it. Such bundles sit at the root of the tree of the files
-submitted with them, so their references resolve from the root, and the result must be one of those files.
+submitted with them, so their references resolve from the root, and the result must be one of those files. Such a
+reference is first spelled the one way the submitted files are keyed, its `.` segments and repeated slashes collapsed,
+so `templates//invoice.docx` names the file submitted as `templates/invoice.docx`.
 
 A pipe built from a library crate, which names its bundle's tree by digest and carries no listing, resolves a reference
 lexically and reads nothing: the host that assembled the crate resolved it in the tree and checked the file was there.
@@ -24,7 +26,7 @@ from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.core.bundle_resources.bundle_resource import resource_path_refusal
+from pipelex.core.bundle_resources.bundle_resource import canonical_resource_path_or_none, resource_path_refusal
 from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
 
 ONE_FILE_TREE_ADVICE = "Run the method's folder instead, or add a METHODS.toml to it."
@@ -152,6 +154,10 @@ def resolve_crate_file_reference(*, reference: str, tree_bundle_ref: TreeBundleR
 def _join_lexically(*, reference: str, holder: str | None) -> str:
     """The tree path `reference` names from `holder`, or from the root when None, by the standard's join alone.
 
+    From the root, the reference names a file submitted beside bundles loaded from content strings, so it is first spelled
+    as those files are keyed (`canonical_resource_path_or_none`): blueprint validation accepts a repeated slash or a `.`
+    segment there, which the standard's join would otherwise keep as an empty segment.
+
     Raises:
         MethodTreeRefusedError: The reference's form names no file, it climbs above the root, or it names the root.
     """
@@ -159,7 +165,11 @@ def _join_lexically(*, reference: str, holder: str | None) -> str:
     if form_refusal is not None:
         msg = f"The file reference '{reference}' cannot name a file of a method tree: {form_refusal}."
         raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_INVALID, names=[reference]))
-    segments = lexical_join(holder=holder if holder is not None else _ROOT_HOLDER, path=nfc(reference))
+    if holder is None:
+        joined = canonical_resource_path_or_none(path=reference) or reference
+        segments = lexical_join(holder=_ROOT_HOLDER, path=nfc(joined))
+    else:
+        segments = lexical_join(holder=holder, path=nfc(reference))
     if segments is None:
         msg = f"The file reference '{reference}' climbs above the root of its method tree."
         raise MethodTreeRefusedError(msg, refusal=TreeRefusal(code=TreeRefusalCode.REFERENCE_LEAVES_TREE, names=[reference]))

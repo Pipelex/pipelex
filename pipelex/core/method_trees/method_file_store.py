@@ -19,6 +19,7 @@ is served from the bytes it holds. A host whose activities run in another proces
 such as a Temporal worker, claims `HubSlot.METHOD_FILE_STORE` with an implementation reading its own blob store.
 """
 
+import asyncio
 import threading
 from collections.abc import Mapping
 from pathlib import Path
@@ -69,6 +70,14 @@ class _HeldTree(NamedTuple):
     files: dict[str, HeldFile]
 
 
+class _HeldFileKey(NamedTuple):
+    """Which holder holds a file, in which tree and at which tree path: the key of the store's index by hash."""
+
+    holder: str
+    tree_digest: str
+    tree_path: str
+
+
 def tree_of_held_files(*, files: Mapping[str, HeldFile]) -> MethodTree:
     """The tree whose files are `files`, keyed by tree path, read from no directory: its listing and its digest.
 
@@ -91,6 +100,9 @@ class LocalMethodFileStore(MethodFileStoreProtocol):
         self._lock = threading.Lock()
         # holder -> tree digest -> the tree as that holder listed or assembled it, with where its files are read from.
         self._held: dict[str, dict[str, _HeldTree]] = {}
+        # sha256 -> every held file with those bytes, in the order they were held: the index `read_blob` reads, so a read
+        # of every file of a tree costs one lookup per file rather than a scan of every held file.
+        self._by_sha256: dict[str, dict[_HeldFileKey, HeldFile]] = {}
 
     def hold_tree(self, *, holder: str, tree: MethodTree) -> None:
         """Serve `tree`, listed from a directory of this host, for `holder` until it releases its trees.
@@ -117,9 +129,21 @@ class LocalMethodFileStore(MethodFileStoreProtocol):
         return tree
 
     def _hold(self, *, holder: str, held_tree: _HeldTree) -> None:
+        tree_digest = held_tree.tree.digest
         with self._lock:
+            held_trees = self._held.setdefault(holder, {})
             # A holder holding a tree it already holds keeps its first sources.
-            self._held.setdefault(holder, {}).setdefault(held_tree.tree.digest, held_tree)
+            if tree_digest in held_trees:
+                return
+            held_trees[tree_digest] = held_tree
+            for tree_path, held_file in held_tree.files.items():
+                key = _HeldFileKey(holder=holder, tree_digest=tree_digest, tree_path=tree_path)
+                self._by_sha256.setdefault(held_file.sha256, {})[key] = held_file
+
+    def holds(self, *, holder: str, tree_digest: str) -> bool:
+        """Whether `holder` already holds the tree `tree_digest`."""
+        with self._lock:
+            return tree_digest in self._held.get(holder, {})
 
     def _held_trees(self, *, tree_digest: str) -> list[_HeldTree]:
         """Every holder's record of the tree `tree_digest`, in the order the holders first held a tree."""
@@ -129,12 +153,26 @@ class LocalMethodFileStore(MethodFileStoreProtocol):
     def release(self, *, holder: str) -> None:
         """Stop serving the trees `holder` held, except from the sources another holder still holds them with."""
         with self._lock:
-            self._held.pop(holder, None)
+            held_trees = self._held.pop(holder, {})
+            for tree_digest, held_tree in held_trees.items():
+                for tree_path, held_file in held_tree.files.items():
+                    same_bytes = self._by_sha256.get(held_file.sha256)
+                    if same_bytes is None:
+                        continue
+                    same_bytes.pop(_HeldFileKey(holder=holder, tree_digest=tree_digest, tree_path=tree_path), None)
+                    if not same_bytes:
+                        del self._by_sha256[held_file.sha256]
 
     def release_all(self) -> None:
         """Stop serving every tree."""
         with self._lock:
             self._held = {}
+            self._by_sha256 = {}
+
+    def held_files_with_hash(self, *, sha256: str) -> list[HeldFile]:
+        """Every held file whose bytes have the SHA-256 `sha256`, in the order they were held, wherever their bytes are."""
+        with self._lock:
+            return list(self._by_sha256.get(sha256, {}).values())
 
     def held_tree(self, *, tree_digest: str) -> MethodTree | None:
         """The tree held under `tree_digest`, as listed or assembled, or None when no library holds it."""
@@ -167,18 +205,15 @@ class LocalMethodFileStore(MethodFileStoreProtocol):
     @override
     async def read_blob(self, *, sha256: str, read_scope: str | None) -> bytes | None:
         # One process, one organization: the read scope selects nothing here.
-        with self._lock:
-            candidates = [
-                held_file
-                for held_trees in self._held.values()
-                for held_tree in held_trees.values()
-                for held_file in held_tree.files.values()
-                if held_file.sha256 == sha256
-            ]
-        for held_file in candidates:
-            data = _read_held_file(held_file=held_file)
-            if data is not None:
-                return data
+        for held_file in self.held_files_with_hash(sha256=sha256):
+            match held_file.source:
+                case bytes() as data:
+                    return data
+                case Path():
+                    # Reading and hashing a file on disk blocks, so it runs off the event loop.
+                    read_from_disk = await asyncio.to_thread(_read_held_file, held_file=held_file)
+                    if read_from_disk is not None:
+                        return read_from_disk
         return None
 
 

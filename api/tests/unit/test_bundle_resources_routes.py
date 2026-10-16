@@ -19,10 +19,10 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from mthds.method_tree.digest import digest_of_contents
+from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
-from pipelex.core.method_trees.method_files import read_method_file
+from pipelex.core.method_trees.method_files import StoredTree, read_method_file, read_stored_trees
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -99,12 +99,17 @@ def _stub_the_document_engine(mocker: MockerFixture) -> list[bytes]:
 
 
 class _RecordingTemporalStub:
-    """An async-capable orchestrator standing in for Temporal: it records the job it is handed and acks it."""
+    """An async-capable orchestrator standing in for Temporal: it records the job it is handed, copies its trees and acks it.
+
+    It copies every tree the job's crate names while it starts, as an orchestrator running the job out of process must
+    before it returns, since the runner may drop the files and the library holding them as soon as it does.
+    """
 
     supports_fire_and_forget = True
 
     def __init__(self) -> None:
         self.pipe_jobs: list[PipeJob] = []
+        self.copied_trees: list[StoredTree] = []
 
     async def execute(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:
         msg = "/start drives the fire-and-forget `start` arm; `execute` must not be reached."
@@ -112,6 +117,9 @@ class _RecordingTemporalStub:
 
     async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:  # noqa: ARG002
         self.pipe_jobs.append(pipe_job)
+        crate = pipe_job.library_crate
+        assert crate is not None
+        self.copied_trees.extend(await read_stored_trees(tree_digests=crate.tree_digests(), read_scope=pipe_job.job_metadata.run_metadata.read_scope))
         return PipelexPipeDispatchAck(pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id, workflow_id="wf-1")
 
 
@@ -137,6 +145,14 @@ def _assert_the_job_names_the_tree_of(*, pipe_job: PipeJob, files: Mapping[str, 
     job_json = pipe_job.model_dump_json()
     for data in files.values():
         assert _b64(data) not in job_json
+
+
+def _assert_the_orchestrator_copied_the_tree_of(*, orchestrator: _RecordingTemporalStub, files: Mapping[str, bytes]) -> None:
+    """The orchestrator read the tree of these files, its listing and each of its files, while it started."""
+    (copied_tree,) = orchestrator.copied_trees
+    assert copied_tree.tree_digest == digest_of_contents(dict(files))
+    assert copied_tree.listing == tree_listing(tree_files_from_contents(dict(files)))
+    assert copied_tree.blobs == {sha256_hex(data): data for data in files.values()}
 
 
 def _zip_b64(files: Mapping[str, str | bytes]) -> str:
@@ -308,6 +324,7 @@ class TestBundleResourcesRoutes:
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
         _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files={_TEMPLATE_PATH: _TEMPLATE_BYTES})
+        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files={_TEMPLATE_PATH: _TEMPLATE_BYTES})
 
     @pytest.mark.parametrize(
         ("bundle_files", "resources", "tree_files"),
@@ -346,6 +363,7 @@ class TestBundleResourcesRoutes:
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
         _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files=tree_files)
+        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files=tree_files)
 
     def test_a_method_bundle_s_files_map_names_the_html_template_it_ships_by_its_tree(self, mocker: MockerFixture) -> None:
         """An HTML template is read and checked while the method loads, and the job names it by its tree as an office one.
@@ -365,6 +383,7 @@ class TestBundleResourcesRoutes:
         assert response.status_code == 202, response.text
         (pipe_job,) = orchestrator.pipe_jobs
         _assert_the_job_names_the_tree_of(pipe_job=pipe_job, files={"templates/invoice.html": html_template.encode("utf-8")})
+        _assert_the_orchestrator_copied_the_tree_of(orchestrator=orchestrator, files={"templates/invoice.html": html_template.encode("utf-8")})
         assert "invoice.number }}" not in pipe_job.model_dump_json()
 
     @pytest.mark.parametrize(

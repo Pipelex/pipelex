@@ -82,6 +82,7 @@ own page. Classes are grouped by subsystem.
 - [`PipeDocGenFactoryError`](pipe-doc-gen-factory-error.md) — Pipe doc gen factory
 - [`PipeDocGenRunError`](pipe-doc-gen-run-error.md) — Pipe doc gen run
 - [`PipeDocGenTemplateCheckError`](pipe-doc-gen-template-check-error.md) — Pipe doc gen template check
+- [`PipeDocGenTemplateFileUncheckedError`](pipe-doc-gen-template-file-unchecked-error.md) — Pipe doc gen template file unchecked
 - [`PipeDocGenUndefinedValueError`](pipe-doc-gen-undefined-value-error.md) — Pipe doc gen undefined value
 - [`PipeExtractFactoryError`](pipe-extract-factory-error.md) — Pipe extract factory
 - [`PipeFuncExecutionError`](pipe-func-execution-error.md) — Pipe func execution

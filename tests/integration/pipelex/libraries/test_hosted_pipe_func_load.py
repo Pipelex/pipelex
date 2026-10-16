@@ -8,10 +8,10 @@ import pytest
 from mthds.method_tree.digest import digest_of_contents
 from mthds.method_tree.lister import list_method_tree
 
+from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library
-from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.mthds_parsing.parser import MthdsParser
 
@@ -157,12 +157,16 @@ class TestHostedPipeFuncLoad:
             try:
                 with scoped_current_library(library_id=library_id):
                     library_manager.load_libraries(library_id=library_id, library_dirs=[dir_a, dir_b])
+                    blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=HOSTED_DEMO_MTHDS)
+                    # The caller's conflict, named by tree path alone, never by the directories it came from.
                     with pytest.raises(
-                        LibraryError, match=re.escape("Two different files were submitted under the same path 'hosted_demo_funcs.py'")
-                    ):
-                        library_manager.load_from_blueprints(
-                            library_id=library_id, blueprints=[MthdsParser.make_pipelex_bundle_blueprint(mthds_content=HOSTED_DEMO_MTHDS)]
-                        )
+                        BundleResourcePathError, match=re.escape("Two different files were submitted under the same path 'hosted_demo_funcs.py'")
+                    ) as exc_info:
+                        library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+                    assert tmp_dir not in str(exc_info.value)
+                    # The refusal joined none of the directories' files, so the next load is refused the same way.
+                    with pytest.raises(BundleResourcePathError, match=re.escape("'hosted_demo_funcs.py'")):
+                        library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
             finally:
                 library_manager.teardown(library_id=library_id)
 
