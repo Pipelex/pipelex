@@ -129,8 +129,8 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.CHECK_CREDENTIALS:
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
-            # Worded from the code the classification picked, not from the metadata's wording, so a refusal of another
-            # status, or a parse failure quoting the model's own text, never reads as the context window
+            # Worded from the code the classification picked, not from the metadata's wording, so a 5xx, or a parse
+            # failure quoting the model's own text, never reads as the context window
             match classification.error_code:
                 case CoreCode.MODEL_CONTEXT_EXCEEDED:
                     return _render_context_exceeded_detail(family=family)

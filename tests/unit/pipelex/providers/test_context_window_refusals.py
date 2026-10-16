@@ -132,13 +132,18 @@ _GEMINI_INVALID_PAYLOAD: _Body = {
     "error": {"code": 400, "message": 'Invalid JSON payload received. Unknown name "foo": Cannot find field.', "status": "INVALID_ARGUMENT"}
 }
 _BEDROCK_INVALID_MODEL = "The provided model identifier is invalid."
+# Anthropic's 413 for a request over its payload size, which says nothing about the context window
+_ANTHROPIC_REQUEST_TOO_LARGE: _Body = {
+    "type": "error",
+    "error": {"type": "request_too_large", "message": "Request exceeds the maximum allowed number of bytes."},
+}
 
 
-def _answering(*, body: _Body) -> httpx.MockTransport:
-    """A transport whose every request the provider answers with a 400 carrying the body."""
+def _answering(*, body: _Body, status_code: int = 400) -> httpx.MockTransport:
+    """A transport whose every request the provider answers with the status, a 400 unless told, carrying the body."""
 
     def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(status_code=400, json=body, request=request)
+        return httpx.Response(status_code=status_code, json=body, request=request)
 
     return httpx.MockTransport(handle)
 
@@ -155,6 +160,23 @@ def _anthropic_refusal(body: _Body) -> BaseException:
     with httpx.Client(transport=_answering(body=body)) as http_client:
         client = anthropic.Anthropic(api_key="unused-in-this-test", base_url=_ORIGIN, max_retries=0, http_client=http_client)
         with pytest.raises(anthropic.BadRequestError) as exc_info:
+            client.messages.create(model="claude-sonnet-4-5", max_tokens=8192, messages=[{"role": "user", "content": "Summarize the contract."}])
+    return exc_info.value
+
+
+def _openai_compatible_refusal(*, body: _Body, status_code: int) -> BaseException:
+    """An OpenAI-compatible server, a gateway, answering with another 4xx than 400, raised by the OpenAI SDK."""
+    with httpx.Client(transport=_answering(body=body, status_code=status_code)) as http_client:
+        client = openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client)
+        with pytest.raises(openai.APIStatusError) as exc_info:
+            client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": "Summarize the contract."}])
+    return exc_info.value
+
+
+def _anthropic_status_refusal(*, body: _Body, status_code: int) -> BaseException:
+    with httpx.Client(transport=_answering(body=body, status_code=status_code)) as http_client:
+        client = anthropic.Anthropic(api_key="unused-in-this-test", base_url=_ORIGIN, max_retries=0, http_client=http_client)
+        with pytest.raises(anthropic.APIStatusError) as exc_info:
             client.messages.create(model="claude-sonnet-4-5", max_tokens=8192, messages=[{"role": "user", "content": "Summarize the contract."}])
     return exc_info.value
 
@@ -351,14 +373,62 @@ class TestContextWindowRefusals:
         assert "max_tokens" not in rendered.user_action.detail
 
     @pytest.mark.parametrize(
+        ("raise_refusal", "extract_metadata", "expected_error_code"),
+        [
+            pytest.param(
+                lambda: _openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=422),
+                extract_openai_metadata,
+                CoreCode.MODEL_CONTEXT_EXCEEDED,
+                id="gateway-422-context-length",
+            ),
+            pytest.param(
+                lambda: _openai_compatible_refusal(body=_OPENAI_CONTEXT_LENGTH, status_code=413),
+                extract_openai_metadata,
+                CoreCode.MODEL_CONTEXT_EXCEEDED,
+                id="gateway-413-context-length",
+            ),
+            pytest.param(
+                lambda: _anthropic_status_refusal(body=_ANTHROPIC_REQUEST_TOO_LARGE, status_code=413),
+                extract_anthropic_metadata,
+                CoreCode.INPUT_TOO_LARGE,
+                id="anthropic-413-payload-size",
+            ),
+        ],
+    )
+    def test_another_4xx_reads_the_window_as_a_400_does(
+        self,
+        raise_refusal: Callable[[], BaseException],
+        extract_metadata: Callable[[BaseException], ProviderErrorMetadata],
+        expected_error_code: ErrorCode,
+    ) -> None:
+        """A gateway may answer the window's refusal with a 422 or a 413; a 413 over the payload size alone keeps its reading."""
+        metadata = extract_metadata(raise_refusal())
+        assert metadata.status_code != 400
+
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
+        rendered = render_inference_error(
+            metadata=metadata,
+            classification=classification,
+            family=InferenceErrorFamily.LLM,
+            model_desc="test-model-desc",
+            model_handle="test-model",
+        )
+
+        assert classification.error_code == expected_error_code
+        assert classification.user_action_kind is UserActionKind.CHANGE_INPUT
+        assert rendered.resolve_error_code() == expected_error_code
+        assert rendered.user_action is not None
+        assert ("context window" in rendered.user_action.detail) is (expected_error_code == CoreCode.MODEL_CONTEXT_EXCEEDED)
+
+    @pytest.mark.parametrize(
         ("status_code", "sdk_exception_type"),
         [
-            (422, "UnprocessableEntityError"),
+            (500, "InternalServerError"),
             (None, "ValidationError"),
         ],
     )
     def test_the_same_words_on_another_answer_never_read_as_the_window(self, status_code: int | None, sdk_exception_type: str) -> None:
-        """Only a 400 is read for the window: the words on a 422, or quoted in a parse failure, keep their own reading."""
+        """Only a 4xx is read for the window: the words on a 5xx, or quoted in a parse failure, keep their own reading."""
         metadata = ProviderErrorMetadata(
             provider=ProviderName.OPENAI,
             sdk_exception_type=sdk_exception_type,

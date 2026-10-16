@@ -171,9 +171,10 @@ class ProviderErrorMetadata(BaseModel):
         (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
         prefers), then the wording each provider gives such a refusal, in its rendered message or in the in-process
         ``body``, as the content-policy check reads them: a raw ``httpx`` error, such as Azure REST's, renders only
-        its status and URL, and keeps the provider's words in the body alone. Only the classifier's 400 arm reads it,
-        and the Render step words its next step from the code that arm picks, so a phrase in an answer of another
-        status says nothing.
+        its status and URL, and keeps the provider's words in the body alone. The classifier reads it on a 400 and on
+        any other 4xx, which a gateway may answer such a refusal with, and the Render step words its next step from
+        the code the classifier picks, so a phrase in a 5xx, or quoted in a failure that reached no status, says
+        nothing.
         """
         if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
             return True

@@ -372,11 +372,20 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
         return _classify_server_error(status_code=status_code, family=family)
 
     if status_code >= 400:
-        # Unrecognized 4xx (e.g. 405, 409, 422) — 5xx is handled above. A safety/content
-        # policy rejection routed as 422 (FAL surfaces these here, signalled by
-        # ``provider_error_code = "ContentPolicyViolation"``) is rejected content, not a
-        # configuration issue — keep it CONTENT so downstream reporting and retry policy
-        # treat it as bad input.
+        # Unrecognized 4xx (e.g. 405, 409, 413, 422) — 5xx is handled above. A refusal of the
+        # caller's material may arrive on another status than 400, and is read as the 400 arm
+        # reads it: inputs over what the model can read, which a gateway may answer 422 or 413,
+        # and a safety/content policy rejection routed as 422 (FAL surfaces these here, signalled
+        # by ``provider_error_code = "ContentPolicyViolation"``). Each is rejected content, not a
+        # configuration issue — keep it CONTENT so downstream reporting and retry policy treat it
+        # as bad input. The context-window signal comes first, as on a 400, and a 413 that
+        # carries none keeps its payload-size reading below.
+        if metadata.is_context_window_exceeded:
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=CoreCode.MODEL_CONTEXT_EXCEEDED,
+            )
         if metadata.is_content_policy_violation:
             return ClassificationResult(
                 category=InferenceErrorCategory.CONTENT,
