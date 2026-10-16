@@ -12,8 +12,9 @@ A registry document is checked in three passes, each run only on a document the 
    undeclared, a family no code uses, a code or a family outside the prefix, a template naming a
    parameter its reader may not see, and a reference to a documentation page that does not exist.
    To these, Pipelex adds the rules its own use of the registry needs: the prefix is registered in the
-   core registry under the same base URL, every code a sentence names in backticks exists, and every
-   parameter name can be a field of the typed Python generated from the registry.
+   core registry under the same base URL, every code a sentence names in backticks exists, every
+   parameter name can be a field of the typed Python generated from the registry, and distinct codes
+   generate distinct names in it.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ from jsonschema import Draft202012Validator, FormatChecker, ValidationError
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
+from pipelex.cli.dev_cli.commands.error_registry.codes_generator import code_member_name, params_class_name
 from pipelex.errors.registry.registry_document import ErrorRegistryDocument, RegistryDomain, RegistryEntry
 
 if TYPE_CHECKING:
@@ -39,6 +41,9 @@ _PARAM_NAME_REGEX = re.compile(r"[a-z][a-z0-9_]*")
 
 # The class attributes of a code's generated parameters model, which no parameter may be named after.
 RESERVED_PARAM_NAMES = frozenset({"code", "operator_only_params"})
+
+# The class the generated module defines beside the codes' own models, which no code's model may be named after.
+RESERVED_PARAMS_CLASS_NAMES = frozenset({"PipelexErrorParams"})
 
 
 class _SchemaValidator(Protocol):
@@ -199,6 +204,35 @@ def param_name_errors(*, entry: RegistryEntry, here: str) -> list[str]:
     return errors
 
 
+def generated_name_errors(*, registry: ErrorRegistryDocument, where: str) -> list[str]:
+    """Distinct codes generate distinct ``PipelexErrorCode`` members and distinct parameters models.
+
+    The generated names drop the prefix and join the segments, so ``pipelex.run_job.failed`` and
+    ``pipelex.run.job_failed`` would both be ``RUN_JOB_FAILED`` and ``RunJobFailedParams``, and the second
+    would silently replace the first in the generated module. A code given twice is reported as such, not here.
+    """
+    codes_by_member: dict[str, list[str]] = {}
+    codes_by_class: dict[str, list[str]] = {}
+    errors: list[str] = []
+    for entry in registry.codes:
+        member_codes = codes_by_member.setdefault(code_member_name(registry=registry, code=entry.code), [])
+        if entry.code not in member_codes:
+            member_codes.append(entry.code)
+        class_name = params_class_name(registry=registry, code=entry.code)
+        class_codes = codes_by_class.setdefault(class_name, [])
+        if entry.code not in class_codes:
+            class_codes.append(entry.code)
+        if class_name in RESERVED_PARAMS_CLASS_NAMES:
+            errors.append(f"{where}: {entry.code}: its parameters model would be named {class_name}, which the generated module already defines")
+    for member, codes in codes_by_member.items():
+        if len(codes) > 1:
+            errors.append(f"{where}: the codes {', '.join(codes)} generate the same PipelexErrorCode member, {member}")
+    for class_name, codes in codes_by_class.items():
+        if len(codes) > 1:
+            errors.append(f"{where}: the codes {', '.join(codes)} generate the same parameters model, {class_name}")
+    return errors
+
+
 def semantic_errors(*, registry: ErrorRegistryDocument, core: ErrorRegistryDocument, docs_dir: Path, where: str) -> list[str]:
     """The rules a JSON Schema cannot state. Run only on a document the schema and the typed model accept."""
     errors: list[str] = []
@@ -247,6 +281,7 @@ def semantic_errors(*, registry: ErrorRegistryDocument, core: ErrorRegistryDocum
     for family in families:
         if family not in used_families:
             errors.append(f"{where}: the family {family} is declared but no code belongs to it")
+    errors.extend(generated_name_errors(registry=registry, where=where))
     return errors
 
 

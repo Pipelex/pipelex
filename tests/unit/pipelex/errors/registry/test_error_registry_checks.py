@@ -83,6 +83,22 @@ def _move_code_to_undeclared_family(document: dict[str, Any]) -> None:
     _entry(document, "pipelex.billing.credit_exhausted")["code"] = "pipelex.nowhere.credit_exhausted"
 
 
+def _add_codes(families: list[str], codes: list[str]) -> Callable[[dict[str, Any]], None]:
+    """Declare families and codes, each code a copy of an existing entry, to test names derived from the codes."""
+
+    def mutate(document: dict[str, Any]) -> None:
+        declared = {family["family"] for family in document["families"]}
+        for family in families:
+            if family not in declared:
+                document["families"].append({"family": family, "description": "A family for the test."})
+        for code in codes:
+            entry = copy.deepcopy(_entry(document, "pipelex.storage.unavailable"))
+            entry["code"] = code
+            document["codes"].append(entry)
+
+    return mutate
+
+
 def _remove_status_of_a_problem(document: dict[str, Any]) -> None:
     del _entry(document, "pipelex.billing.credit_exhausted")["status"]
 
@@ -241,6 +257,22 @@ class TestErrorRegistryChecks:
             (
                 _add_param("pipelex.storage.unavailable", "code", {"type": "identifier", "description": "A code."}),
                 "the parameter code names an attribute of the generated parameters model",
+            ),
+            (
+                _add_codes(["pipelex.run_job", "pipelex.run"], ["pipelex.run_job.failed", "pipelex.run.job_failed"]),
+                "the codes pipelex.run_job.failed, pipelex.run.job_failed generate the same PipelexErrorCode member, RUN_JOB_FAILED",
+            ),
+            (
+                _add_codes(["pipelex.run_job", "pipelex.run"], ["pipelex.run_job.failed", "pipelex.run.job_failed"]),
+                "the codes pipelex.run_job.failed, pipelex.run.job_failed generate the same parameters model, RunJobFailedParams",
+            ),
+            (
+                _add_codes(["pipelex.run_job", "pipelex.run__job"], ["pipelex.run_job.failed", "pipelex.run__job.failed"]),
+                "the codes pipelex.run_job.failed, pipelex.run__job.failed generate the same parameters model, RunJobFailedParams",
+            ),
+            (
+                _add_codes(["pipelex.pipelex"], ["pipelex.pipelex.error"]),
+                "pipelex.pipelex.error: its parameters model would be named PipelexErrorParams, which the generated module already defines",
             ),
         ],
     )
