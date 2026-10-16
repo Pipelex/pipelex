@@ -99,6 +99,8 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.CHECK_CREDENTIALS:
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
+            if metadata.is_context_window_exceeded:
+                return "The prompt exceeds the model's context window — shorten the input, or choose a model with a larger context window."
             if metadata.is_content_policy_violation:
                 return "Content was rejected by the provider's safety filters — revise the prompt."
             return "The provider rejected the request — review the prompt, parameters, and inputs."

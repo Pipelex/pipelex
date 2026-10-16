@@ -247,6 +247,19 @@ def _classify_server_error(*, status_code: int, family: InferenceErrorFamily) ->
     )
 
 
+def _bad_request_error_code(*, metadata: SDKErrorEnvelope) -> ErrorCode:
+    """The code of a provider 400, which says what the provider refused when it says it, and is ours otherwise.
+
+    A prompt over the model's context window is the caller's input to shorten, and a content-policy signal is the
+    caller's material refused. A 400 nothing recognises is most likely a request of ours the provider could not take.
+    """
+    if metadata.is_context_window_exceeded:
+        return CoreCode.MODEL_CONTEXT_EXCEEDED
+    if metadata.is_content_policy_violation:
+        return CoreCode.MODEL_CONTENT_REFUSED
+    return CoreCode.RUNTIME_UNEXPECTED
+
+
 def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErrorFamily) -> ClassificationResult:
     """Classify an inference SDK error from its structured metadata.
 
@@ -346,12 +359,10 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
         )
 
     if status_code == 400:
-        # A 400 nothing recognises is most likely a request of ours the provider could not take; only a
-        # content-policy signal says the caller's material was refused.
         return ClassificationResult(
             category=InferenceErrorCategory.CONTENT,
             user_action_kind=UserActionKind.CHANGE_INPUT,
-            error_code=CoreCode.MODEL_CONTENT_REFUSED if metadata.is_content_policy_violation else CoreCode.RUNTIME_UNEXPECTED,
+            error_code=_bad_request_error_code(metadata=metadata),
         )
 
     if status_code >= 500:

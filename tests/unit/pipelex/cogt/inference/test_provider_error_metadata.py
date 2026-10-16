@@ -7,6 +7,8 @@ from the exception chain.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -161,6 +163,40 @@ class TestProviderErrorMetadata:
         )
 
         assert metadata.is_content_policy_violation is expected
+
+    @pytest.mark.parametrize(
+        ("_topic", "message", "provider_error_code", "body", "expected"),
+        [
+            ("openai_code_in_the_body", "Error code: 400", "invalid_request_error", {"code": "context_length_exceeded"}, True),
+            ("gateway_code_first", "Request failed", "context_length_exceeded", None, True),
+            ("openai_earlier_wording", "This model's maximum context length is 8192 tokens", None, None, True),
+            ("openai_current_wording", "Your input exceeds the context window of this model", None, None, True),
+            ("anthropic", "prompt is too long: 208310 tokens > 200000 maximum", None, None, True),
+            ("anthropic_with_max_tokens", "input length and `max_tokens` exceed context limit: 197202 + 8192 > 200000", None, None, True),
+            ("bedrock", "Input is too long for requested model.", None, None, True),
+            ("gemini", "The input token count (1234567) exceeds the maximum number of tokens allowed (1048576).", None, None, True),
+            (
+                "a_parameter_refused",
+                "Invalid value for 'temperature': must be between 0 and 2",
+                "invalid_request_error",
+                {"code": "invalid_value"},
+                False,
+            ),
+            ("a_missing_field", "max_tokens: Field required", None, None, False),
+            ("a_size_limit", "Request exceeds the maximum size", "request_too_large", None, False),
+        ],
+    )
+    def test_is_context_window_exceeded(self, _topic: str, message: str, provider_error_code: str | None, body: Any, expected: bool) -> None:
+        metadata = ProviderErrorMetadata(
+            provider=ProviderName.OPENAI,
+            sdk_exception_type="BadRequestError",
+            message=message,
+            status_code=400,
+            provider_error_code=provider_error_code,
+            body=body,
+        )
+
+        assert metadata.is_context_window_exceeded is expected
 
     def test_is_content_policy_violation_scans_body_when_message_is_empty(self) -> None:
         """Azure REST puts safety phrasing only in the response body; the message stays the

@@ -162,6 +162,22 @@ class ProviderErrorMetadata(BaseModel):
         return self.body is not None and _is_content_policy_violation(_stringify_for_scan(self.body))
 
     @property
+    def is_context_window_exceeded(self) -> bool:
+        """Whether the provider refused the request because its prompt is over the model's context window.
+
+        Reads the structured error code first, ``provider_error_code`` and the code an error body carries
+        (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
+        prefers), then the wording each provider gives such a refusal in its rendered message. Only the
+        classifier's 400 arm reads it, so a phrase elsewhere in an answer of another status says nothing.
+        """
+        if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        if error_code_from_body_code_first(self.body) in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        lower_message = self.message.lower()
+        return any(pattern in lower_message for pattern in _CONTEXT_WINDOW_PATTERNS)
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -225,6 +241,29 @@ _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
     "safety system",
     "safety filter",
     "blocked by safety",
+)
+
+# The error code a provider gives a refusal of a prompt over the model's context window: OpenAI's, which Azure OpenAI
+# and the OpenAI-compatible gateways relay.
+_CONTEXT_WINDOW_ERROR_CODES: frozenset[str] = frozenset({"context_length_exceeded"})
+
+# How each provider words that refusal in the message its SDK renders, every one a 400. Each phrase names the
+# context window or the prompt's length, so a 400 about a parameter or a malformed request matches none of them.
+_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
+    # OpenAI's code, which its SDK renders into the message with the error body
+    "context_length_exceeded",
+    # OpenAI's earlier wording, also Mistral's and that of OpenAI-compatible servers such as vLLM
+    "maximum context length",
+    # OpenAI's current wording
+    "exceeds the context window",
+    # Anthropic's, directly or through Bedrock
+    "prompt is too long",
+    # Anthropic's when the prompt and the max_tokens requested together pass the window
+    "exceed context limit",
+    # Bedrock's ValidationException
+    "input is too long",
+    # Gemini's INVALID_ARGUMENT
+    "exceeds the maximum number of tokens allowed",
 )
 
 _GOOGLE_QUOTA_PATTERNS: tuple[str, ...] = (
