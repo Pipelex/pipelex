@@ -163,27 +163,20 @@ class CogtError(PipelexError):
 
     @property
     @override
-    def own_error_code(self) -> ErrorCode | None:
-        """The code this error carries by itself, or, failing that, the one its category names when its cause carries none.
+    def implied_error_code(self) -> ErrorCode | None:
+        """The code its category names, when its class declares it, ``None`` otherwise.
 
         A failure class takes its cause's code, or its fallback with no coded cause. An error built by hand with a
         category and no code, by a worker or by a plugin, reports its category's code instead
         (``InferenceErrorCategory.default_error_code``), when its class declares it and no Pipelex error along its
-        cause chain carries a code of its own, so that its report's retry verdict agrees with the category's.
+        cause chain carries a code of its own, so that its report's retry verdict agrees with the category's. Which
+        of the chain's codes wins is ``PipelexError.resolve_error_code``'s one walk, so a cyclic chain cannot recurse.
         """
-        own_code = super().own_error_code
-        if own_code is not None or self.error_category is None:
-            return own_code
+        if self.error_category is None:
+            return None
         category_code = self.error_category.default_error_code
         if category_code is None or category_code not in declared_error_codes(type(self).error_code):
             return None
-        for node in iter_cause_chain(self):
-            if node is self:
-                continue
-            if not isinstance(node, PipelexError):
-                break
-            if node.own_error_code is not None:
-                return None
         return category_code
 
     def fill_model_and_provider(self, model_handle: str | None, *, backend_name: str | None) -> None:

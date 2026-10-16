@@ -43,23 +43,27 @@ def find_root_fault(*, error: BaseException) -> PipelexError | None:
     That is the first `PipelexError` down the chain that carries a code of its own
     (`PipelexError.own_error_code`), the error `resolve_error_code` stops at: every `PipelexError`
     above it takes its cause's code, being a wrapper that located it or carried it across a boundary.
-    When no error on the chain carries a code of its own, it is the innermost `PipelexError`, whose
-    fallback the failure reports. The walk stops at the first exception that is not a `PipelexError`,
+    When no error on the chain carries a code of its own, it is the deepest error implying one
+    (`PipelexError.implied_error_code`), whose code the failure reports, and else the innermost
+    `PipelexError`, whose fallback the failure reports. The walk stops at the first exception that is not a `PipelexError`,
     since what caused a foreign exception is that code's own affair and the `PipelexUnexpectedError`
     standing in for it is the fault; and among wrappers that carry no code, one raised from its own
     class restates that fault with more context, so the outer one is kept. `None` when the chain
     starts with no `PipelexError`.
     """
     root_fault: PipelexError | None = None
+    implying_fault: PipelexError | None = None
     for node in iter_cause_chain(error):
         if not isinstance(node, PipelexError):
             break
         if node.own_error_code is not None:
             return node
+        if node.implied_error_code is not None:
+            implying_fault = node
         if root_fault is not None and type(node) is type(root_fault):
             continue
         root_fault = node
-    return root_fault
+    return implying_fault or root_fault
 
 
 def find_foreign_fault(*, error: BaseException) -> BaseException | None:

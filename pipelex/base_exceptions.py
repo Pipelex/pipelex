@@ -755,15 +755,28 @@ class PipelexError(Exception):
             return None
         return declaration
 
+    @property
+    def implied_error_code(self) -> ErrorCode | None:
+        """The code this error implies without carrying it, ``None`` for an error that implies none.
+
+        An inference error built by hand with a category and no code implies its category's code
+        (``CogtError``). :meth:`resolve_error_code` reads it in the same walk as the codes the chain carries: a code
+        any error along the chain carries by itself wins over it, and the deepest implied code wins over a wrapper's
+        fallback.
+        """
+        return None
+
     def resolve_error_code(self) -> ErrorCode:
         """The registry code this error reports, resolved along its ``__cause__`` chain.
 
         The walk starts at this error and stops at the first error that carries a code by itself
         (:attr:`own_error_code`). It descends through every error that takes its cause's code, and through an
         abstract base raised by mistake, and stops at a cause that is not a Pipelex error. When no error along
-        the way carries a code, the error reports the fallback of the deepest error that takes its cause's code,
-        and ``runtime.unexpected`` when none names one.
+        the way carries a code, the error reports the code the deepest error implies (:attr:`implied_error_code`),
+        else the fallback of the deepest error that takes its cause's code, and ``runtime.unexpected`` when none
+        names one. The walk is the one cycle-guarded ``iter_cause_chain``, which no error's code walks again.
         """
+        implied_code: ErrorCode | None = None
         fallback: ErrorCode | None = None
         for node in iter_cause_chain(self):
             if not isinstance(node, PipelexError):
@@ -771,10 +784,11 @@ class PipelexError(Exception):
             own_code = node.own_error_code
             if own_code is not None:
                 return own_code
+            implied_code = node.implied_error_code or implied_code
             declaration = type(node).error_code
             if isinstance(declaration, InheritsCause):
                 fallback = declaration.fallback
-        return fallback or _FALLBACK_ERROR_CODE
+        return implied_code or fallback or _FALLBACK_ERROR_CODE
 
     def as_caller_fault(self, *, user_action: UserAction | None = None) -> Self:
         """Say, where this error is raised, that its message describes only the caller's own method or inputs.

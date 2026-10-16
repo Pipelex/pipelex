@@ -13,6 +13,7 @@ from pipelex.base_exceptions import ErrorDomain, PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.pipe_run.located_failure import find_root_fault
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
@@ -91,3 +92,17 @@ class TestInferenceErrorDomain:
 
         assert report.code == CoreCode.PROVIDER_UNAVAILABLE
         assert report.retryable is True
+
+    def test_a_cyclic_pair_of_category_failures_reports_without_recursing(self) -> None:
+        """Two failures chained to each other report the category's code, under a wrapper too, where the walk of each recursed."""
+        outer = LLMCompletionError("connection reset", error_category=InferenceErrorCategory.TRANSIENT)
+        inner = LLMCompletionError("connection reset again", error_category=InferenceErrorCategory.TRANSIENT)
+        outer.__cause__ = inner
+        inner.__cause__ = outer
+        wrapper = _WrapperError("Pipe 'greet' failed")
+        wrapper.__cause__ = outer
+
+        assert outer.resolve_error_code() == CoreCode.PROVIDER_UNAVAILABLE
+        assert outer.to_error_report().code == CoreCode.PROVIDER_UNAVAILABLE
+        assert wrapper.to_error_report().code == CoreCode.PROVIDER_UNAVAILABLE
+        assert find_root_fault(error=wrapper) is inner
