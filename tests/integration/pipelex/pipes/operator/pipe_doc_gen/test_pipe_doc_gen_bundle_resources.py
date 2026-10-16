@@ -24,8 +24,20 @@ _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "templates/invoice.docx"
 _DOCX_BYTES = b"PK docx template bytes"
 
 
+_ESCAPING_DOCX_STEP = 'format = "docx"\ntemplate_file = "../invoice.docx"'
+
+
 def _docx_resources() -> BundleResources:
     return make_bundle_resources(files={"./templates/invoice.docx": _DOCX_BYTES})
+
+
+def _bundle_file_climbing_in_its_method_tree(*, method_dir: Path) -> Path:
+    """Write a method whose bundle file, in `bundles/`, names its template through `..` in `templates/`, and return that file."""
+    (method_dir / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
+    (method_dir / "templates").mkdir()
+    (method_dir / "templates" / "invoice.docx").write_bytes(_DOCX_BYTES)
+    (method_dir / "bundles").mkdir()
+    return write_bundle(directory=method_dir / "bundles", step_fields='format = "docx"\ntemplate_file = "../templates/invoice.docx"', as_method=False)
 
 
 async def _load_from_content(*, load: str, content: str, resources: BundleResources | None) -> None:
@@ -105,13 +117,7 @@ class TestPipeDocGenBundleResources:
         self, stub_engines: StubEngines, tmp_path: Path
     ) -> None:
         """Contents read from a file named in `bundle_uris` are that file's bundle, whose step may climb through `..` in its tree."""
-        (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
-        (tmp_path / "templates").mkdir()
-        (tmp_path / "templates" / "invoice.docx").write_bytes(_DOCX_BYTES)
-        (tmp_path / "bundles").mkdir()
-        bundle_path = write_bundle(
-            directory=tmp_path / "bundles", step_fields='format = "docx"\ntemplate_file = "../templates/invoice.docx"', as_method=False
-        )
+        bundle_path = _bundle_file_climbing_in_its_method_tree(method_dir=tmp_path)
 
         await PipelexMTHDSProtocol(bundle_uris=[str(bundle_path)], pipe_run_mode=PipeRunMode.DRY).execute(
             mthds_contents=[bundle_path.read_text(encoding="utf-8")],
@@ -119,6 +125,63 @@ class TestPipeDocGenBundleResources:
         )
 
         assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
+
+    @pytest.mark.usefixtures("stub_engines")
+    @pytest.mark.parametrize("uri_kind", ["label", "stale_path", "directory"])
+    async def test_a_content_whose_uri_names_no_file_here_reads_only_the_files_submitted_with_it(self, tmp_path: Path, uri_kind: str) -> None:
+        """A URI naming no file on this host, a label, a path to no file or a directory, gives its content no method tree to climb in."""
+        bundle_uri = {"label": "invoice-printer", "stale_path": str(tmp_path / "gone.mthds"), "directory": str(tmp_path)}[uri_kind]
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await PipelexMTHDSProtocol(bundle_uris=[bundle_uri], pipe_run_mode=PipeRunMode.DRY).execute(
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields=_ESCAPING_DOCX_STEP)],
+                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            )
+
+        (item,) = exc_info.value.to_error_report().validation_errors or []
+        assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
+        assert item.field_path == "pipe.print_invoice"
+        assert "it leaves the bundle through a '..' segment" in item.message
+
+    @pytest.mark.parametrize("file_first", [True, False], ids=["file_first", "label_first"])
+    async def test_in_a_mixed_list_the_file_read_here_climbs_in_its_tree_and_the_other_content_does_not(
+        self, stub_engines: StubEngines, tmp_path: Path, file_first: bool
+    ) -> None:
+        """Each content takes the origin its own URI gives it, wherever it sits in the list.
+
+        Beside a content under a label whose step names no file, the file's step climbs through `..` in its tree. Beside one
+        whose step climbs, that step is the verdict's one item, and the file's own `..` is not refused.
+        """
+        bundle_path = _bundle_file_climbing_in_its_method_tree(method_dir=tmp_path)
+        read_here = (bundle_path.read_text(encoding="utf-8"), str(bundle_path))
+        under_a_label = (PipeDocGenTestData.bundle_in_the_other_domain(step_fields=PipeDocGenTestData.PDF_LAYOUT_STEP), "invoice-printer")
+        escaping_under_a_label = (PipeDocGenTestData.bundle_in_the_other_domain(step_fields=_ESCAPING_DOCX_STEP), "invoice-printer")
+
+        def _ordered(other: tuple[str, str]) -> list[tuple[str, str]]:
+            return [read_here, other] if file_first else [other, read_here]
+
+        entries = _ordered(under_a_label)
+        await PipelexMTHDSProtocol(bundle_uris=[uri for _, uri in entries], pipe_run_mode=PipeRunMode.DRY).execute(
+            pipe_code="doc_gen_tests.print_invoice",
+            mthds_contents=[content for content, _ in entries],
+            inputs=PipeDocGenTestData.INVOICE_INPUTS,
+        )
+        assert [check_request.template for check_request in stub_engines.check_requests] == [_DOCX_BYTES]
+
+        entries = _ordered(escaping_under_a_label)
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await PipelexMTHDSProtocol(bundle_uris=[uri for _, uri in entries], pipe_run_mode=PipeRunMode.DRY).execute(
+                pipe_code="doc_gen_tests.print_invoice",
+                mthds_contents=[content for content, _ in entries],
+                inputs=PipeDocGenTestData.INVOICE_INPUTS,
+            )
+        (item,) = exc_info.value.to_error_report().validation_errors or []
+        assert (item.category, item.domain_code, item.pipe_code) == (
+            ValidationErrorCategory.BLUEPRINT_VALIDATION,
+            PipeDocGenTestData.OTHER_DOMAIN,
+            "print_invoice",
+        )
+        assert "it leaves the bundle through a '..' segment" in item.message
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_file_no_step_names_is_refused_as_the_request_s_fault_not_as_a_verdict(self) -> None:
