@@ -2,17 +2,19 @@
 
 Pins the seam independent of the real DIRECT/Temporal validators: a validator registered for
 a mode is the one the registry hands back; a second registration for the same mode fails loud
-naming both plugins; an empty registry reports the mode as absent.
+naming both plugins; an empty registry reports the mode as absent; and the protocol requires the
+read scope a worker-dispatched validator reads the method's trees under.
 """
 
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
+from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol, BundleValidatorRegistry
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.exceptions import DuplicateBundleValidatorError
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
@@ -43,6 +45,7 @@ class _FakeBundleValidator:
         submitted_files: Mapping[str, bytes] | None,
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
+        read_scope: str | None,
     ) -> PipelexValidationReport | ErrorReport:
         raise NotImplementedError
 
@@ -95,3 +98,11 @@ class TestBundleValidatorRegistry:
         assert registry.get_optional(mode=DIRECT_ORCHESTRATION_MODE) is None
         assert not registry.has(mode="temporal")
         assert registry.modes == []
+
+    def test_the_protocol_requires_the_read_scope_by_keyword(self) -> None:
+        """A host must name the read scope, ``None`` included, so a dispatched validator never reads under a scope it guessed."""
+        read_scope = inspect.signature(BundleValidatorProtocol.validate_bundles).parameters["read_scope"]
+
+        assert read_scope.kind is inspect.Parameter.KEYWORD_ONLY
+        assert read_scope.default is inspect.Parameter.empty
+        assert read_scope.annotation == str | None

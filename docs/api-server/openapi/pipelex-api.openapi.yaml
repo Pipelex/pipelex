@@ -8280,10 +8280,12 @@ components:
           - type: string
           - type: 'null'
           title: Read Scope
-          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry
-            of `files` resolves in, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves.
-            Omit it and the caller''s own id is the scope. Only a validation carrying it records the tree it read in the blob
-            store, so a dry run without one leaves nothing stored.'
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the validation reads the method
+            under, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry
+            of `files` resolves in that scope''s blob store, the tree the validation read is recorded there, and the runner
+            hands the scope to its validator, so a validation dispatched to a worker hands it the method through that store.
+            Omit it and a hash entry resolves in the caller''s own id''s store, but nothing is recorded and the validator
+            is handed no scope, so a dry run without one leaves nothing stored.'
       type: object
       title: ValidateRequest
       description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.

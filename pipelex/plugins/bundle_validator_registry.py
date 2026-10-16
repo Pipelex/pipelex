@@ -90,6 +90,21 @@ class BundleValidatorProtocol(Protocol):
     hold the dependency trees the caller ships with it. Both are required for the same reason as
     ``caller_identity``, ``None`` meaning the method came as contents. A worker-dispatched arm reads
     the tree's files on the host, where it is called, and hands them to its worker as trees.
+
+    ``read_scope`` is the scope the host named for the validation: on a multi-tenant host, the
+    organization it serves, the trusted prefix a run of the same request reads under
+    (``pipelex.tools.uri.uri_read_scope``). It is the scope of the blob store a worker-dispatched arm
+    hands the method to its worker through, as a run's orchestrator and worker do under the run's read
+    scope: the arm holds every tree it validates in that store, a tree the host already recorded there
+    included, names each by its digest, and the worker reads them through its method file store under
+    the scope, building every key from it and never from what the request names. ``None`` means the
+    host named no scope, as a single-tenant deployment does, or a multi-tenant host serving a caller
+    who belongs to no organization: no blob store is then scoped to the caller, so a worker-dispatched
+    arm has none to hand the method through and must not make one up, such as one under the caller's
+    id, where nothing lists or erases what a validation would leave.
+    The in-process arm reads every file in its own process and ignores it. It is required for the
+    same reason as ``caller_identity``: a validator that dropped it would read the method under no
+    scope.
     """
 
     async def validate_bundles(
@@ -104,6 +119,7 @@ class BundleValidatorProtocol(Protocol):
         submitted_files: "Mapping[str, bytes] | None",
         method_dir: "Path | None",
         methods_dirs: "Sequence[Path] | None",
+        read_scope: str | None,
     ) -> BundleValidationVerdict: ...
 
 

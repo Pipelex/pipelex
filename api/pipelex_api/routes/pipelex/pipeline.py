@@ -555,6 +555,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         `method_dir` is the directory a method tree the request carries was written as, by `files` or
         fetched by `method_ref`: the validation loads it whole, with this runner's `methods_dirs`, in
         place of `mthds_contents`, which is then None, and its refusals are the method's verdict.
+
+        This runner's `read_scope` is handed to the validator as the scope of the blob store a dispatched
+        arm hands the method's trees to its worker through. The route builds a validating runner with the
+        `read_scope` its request names, `None` when it names none, and never with the caller's id a run
+        would fall back to: nothing lists or erases what a validation would leave under that prefix.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (403) here, before any validator dispatch / library load. Mirrors start().
@@ -585,6 +590,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             graph_pipe_code=graph_pipe_code,
             # The files submitted with the contents, which the validation's dry run reads, the template check included.
             submitted_files=self.submitted_files,
+            # The scope the host named, under which a dispatched validator's worker reads the method's trees.
+            read_scope=self.read_scope,
         )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical

@@ -108,6 +108,7 @@ class _UnreachableValidator:
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
+        read_scope: str | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."
