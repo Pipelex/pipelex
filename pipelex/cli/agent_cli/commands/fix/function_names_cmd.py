@@ -18,7 +18,7 @@ def _payload(*, migration: FunctionNamesMigration, directory: Path, is_dry_run: 
         "is_dry_run": is_dry_run,
         "is_complete": migration.is_complete,
         "changed_files": sorted(migration.changed_files),
-        **migration.model_dump(mode="json", include={"rewrites", "marker_removals", "unresolved"}),
+        **migration.model_dump(mode="json", include={"rewrites", "marker_removals", "unresolved", "unresolved_markers"}),
     }
 
 

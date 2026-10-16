@@ -111,7 +111,7 @@ pipelex fix function-names invoicing/
 pipelex fix function-names invoicing/ --dry-run
 ```
 
-For each `PipeFunc` step whose `function_name` holds no dot, it finds the marked function of the tree that the flat name registered and writes its import path, then drops the argument of every `@pipe_func(name=...)` marker. It imports nothing and keeps every comment and alignment of your files. A flat name that no module of the tree registers, or that two register, is left as it is and reported, and the command exits `1`. See [Fix Commands](../../../tools/cli/fix.md#fix-function-names).
+For each `PipeFunc` step whose `function_name` holds no dot, it finds the marked function of the tree that the flat name registered and writes its import path, then drops the argument of every `@pipe_func(name=...)` marker. It imports nothing and keeps every comment and alignment of your files. A flat name that no module of the tree registers, or that two register, is left as it is and reported with the markers registering it, a marker whose name is not a string literal is reported too, and the command exits `1`. See [Fix Commands](../../../tools/cli/fix.md#fix-function-names).
 
 ## Declaring the packages your functions need
 

@@ -8,7 +8,7 @@ def format_function_names_markdown(*, migration: FunctionNamesMigration, directo
     """The migration's report: what it rewrote, or would rewrite in a dry run, and what it left for the author."""
     verb = "would rewrite" if is_dry_run else "rewrote"
     lines: list[str] = [f"# Function names of the method at {directory}", ""]
-    if not migration.rewrites and not migration.marker_removals and not migration.unresolved:
+    if not migration.rewrites and not migration.marker_removals and not migration.unresolved and not migration.unresolved_markers:
         lines.append("Every PipeFunc step already names its function by import path: nothing to migrate.")
         return "\n".join(lines)
 
@@ -31,6 +31,12 @@ def format_function_names_markdown(*, migration: FunctionNamesMigration, directo
             lines.append(f"- {where}{name}: {unresolved.reason}")
             for candidate in unresolved.candidates:
                 lines.append(f"    - candidate `{candidate}`")
+        lines.append("")
+    if migration.unresolved_markers:
+        lines.extend(["These `@pipe_func(...)` markers keep their argument, for you to decide:", ""])
+        for marker in migration.unresolved_markers:
+            registered = f", registered as `{marker.registered_name}`" if marker.registered_name is not None else ""
+            lines.append(f"- `{marker.module}`, function `{marker.function}`{registered}: {marker.reason}")
         lines.append("")
     if is_dry_run and migration.has_changes:
         lines.append(f"Nothing was written. Run `{FUNCTION_NAMES_MIGRATION_COMMAND} {directory}` to write these changes.")

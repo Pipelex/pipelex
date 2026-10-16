@@ -10,7 +10,9 @@ The migration is mechanical: for each `PipeFunc` step whose `function_name` hold
 that defines the marked function the flat name registered, and write its import path; then drop the argument of every
 `@pipe_func(name=...)` marker, since the marker takes none. Nothing is imported: the modules are read as syntax trees,
 so a method whose Python cannot run here still migrates. A flat name no module of the tree registers, or that two
-register, is left as it is and reported, for the author to decide.
+register, is left as it is and reported, for the author to decide, and so is the name of each marker registering it,
+which is then the only record of which function the step meant; a marker whose name is not a string literal is left and
+reported too, since its name cannot be read without running the module.
 
 The engine is pure, over a map of tree paths to texts, so it serves a method folder on disk (`pipelex fix
 function-names`) and a method held anywhere else, such as a stored method rewritten in place, alike. Only the `.mthds`
@@ -18,6 +20,7 @@ and `.py` files are read; the others are ignored.
 """
 
 import ast
+import re
 from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 from typing import Any, cast
@@ -39,6 +42,9 @@ _PYTHON_SUFFIX = ".py"
 _PACKAGE_INIT = "__init__"
 _PIPE_FUNC_TYPE = "PipeFunc"
 _MARKER_NAME_ARGUMENT = "name"
+# A line of a module as the syntax tree counts lines, with its ending: Python ends a line only at `\r\n`, `\r` or `\n`,
+# where `str.splitlines` also breaks at a form feed, a vertical tab, the separators of the C1 and Unicode ranges.
+_SOURCE_LINE = re.compile(r".*?(?:\r\n|\r|\n)|.+\Z", flags=re.DOTALL)
 
 
 class FunctionNameRewrite(BaseModel):
@@ -62,6 +68,17 @@ class MarkerArgumentRemoval(BaseModel):
     registered_name: str = Field(description="The name the marker registered the function under")
 
 
+class UnresolvedMarker(BaseModel):
+    """A `@pipe_func(...)` marker whose argument the migration left in place, and why."""
+
+    model_config = ConfigDict(frozen=True)
+
+    module: str = Field(description="The tree path of the Python module that defines the function")
+    function: str = Field(description="The function's own name")
+    registered_name: str | None = Field(default=None, description="The name the marker registered the function under, when it is a string literal")
+    reason: str = Field(description="Why the argument was left, and what to do")
+
+
 class UnresolvedFunctionName(BaseModel):
     """A flat `function_name` the migration left as it is, and why."""
 
@@ -82,12 +99,13 @@ class FunctionNamesMigration(BaseModel):
     rewrites: list[FunctionNameRewrite] = Field(default_factory=empty_list_factory_of(FunctionNameRewrite))
     marker_removals: list[MarkerArgumentRemoval] = Field(default_factory=empty_list_factory_of(MarkerArgumentRemoval))
     unresolved: list[UnresolvedFunctionName] = Field(default_factory=empty_list_factory_of(UnresolvedFunctionName))
+    unresolved_markers: list[UnresolvedMarker] = Field(default_factory=empty_list_factory_of(UnresolvedMarker))
     changed_files: dict[str, str] = Field(default_factory=dict, description="Each file the migration changed, by tree path, with its new text")
 
     @property
     def is_complete(self) -> bool:
-        """Whether every `PipeFunc` step of the method names its function by import path once the changes are written."""
-        return not self.unresolved
+        """Whether every `PipeFunc` step names its function by import path, and every marker takes no argument, once the changes are written."""
+        return not self.unresolved and not self.unresolved_markers
 
     @property
     def has_changes(self) -> bool:
@@ -141,10 +159,42 @@ def migrate_function_names(*, files: Mapping[str, str]) -> FunctionNamesMigratio
         if new_text is not None:
             changed_files[tree_path] = new_text
 
+    # A marker's name is the only record of which function a step left unresolved meant, so it stays until every step
+    # naming it is rewritten.
+    unresolved_names = {name.flat_name: name for name in unresolved if name.flat_name is not None}
     marker_removals: list[MarkerArgumentRemoval] = []
+    unresolved_markers: list[UnresolvedMarker] = []
     spans_by_module: dict[str, list[tuple[int, int, int, int]]] = {}
     for marked_function in marked_functions:
-        if marked_function.name_argument_span is None or marked_function.registered_name is None:
+        if marked_function.name_argument_span is None:
+            continue
+        if marked_function.registered_name is None:
+            unresolved_markers.append(
+                UnresolvedMarker(
+                    module=marked_function.module_path,
+                    function=marked_function.function,
+                    reason=(
+                        "The marker's name is not a string literal, so the name the retired registry gave the function cannot be read "
+                        "without running the module: write the function's import path in each step that names it, then drop the "
+                        "marker's argument."
+                    ),
+                )
+            )
+            continue
+        unresolved_step = unresolved_names.get(marked_function.registered_name)
+        if unresolved_step is not None:
+            unresolved_markers.append(
+                UnresolvedMarker(
+                    module=marked_function.module_path,
+                    function=marked_function.function,
+                    registered_name=marked_function.registered_name,
+                    reason=(
+                        f"The step '{unresolved_step.pipe_code}' of {unresolved_step.bundle} still names '{marked_function.registered_name}', "
+                        "which the migration left unresolved: the marker keeps its name until that step names its function by import "
+                        "path, then the migration drops it."
+                    ),
+                )
+            )
             continue
         spans_by_module.setdefault(marked_function.module_path, []).append(marked_function.name_argument_span)
         marker_removals.append(
@@ -161,6 +211,7 @@ def migrate_function_names(*, files: Mapping[str, str]) -> FunctionNamesMigratio
         rewrites=rewrites,
         marker_removals=marker_removals,
         unresolved=unresolved,
+        unresolved_markers=unresolved_markers,
         changed_files=dict(sorted(changed_files.items())),
     )
 
@@ -285,7 +336,7 @@ def _arguments_span(*, decorator: ast.Call) -> tuple[int, int, int, int] | None:
 
 def _without_spans(*, text: str, spans: list[tuple[int, int, int, int]]) -> str:
     """The module's text with each marker call's arguments replaced by `()`, the last span first so offsets hold."""
-    lines = text.splitlines(keepends=True)
+    lines = _SOURCE_LINE.findall(text)
     encoded_lines = [line.encode("utf-8") for line in lines]
     for start_line, start_col, end_line, end_col in sorted(spans, reverse=True):
         head = encoded_lines[start_line - 1][:start_col]

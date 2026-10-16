@@ -93,6 +93,25 @@ class TestFixFunctionNamesCmds:
         (unresolved,) = payload["unresolved"]
         assert unresolved["pipe_code"] == "totals"
         assert unresolved["flat_name"] == "no_such_totals"
+        assert payload["unresolved_markers"] == []
+
+    def test_a_marker_whose_name_is_not_a_literal_exits_one(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        method_dir = _method_folder(root=tmp_path, flat_name="funcs.totals.compute_totals")
+        module_file = method_dir / "funcs" / "totals.py"
+        module_file.write_text(_MODULE.replace('(name="invoice_totals")', "(name=TOTALS_NAME)"), encoding="utf-8")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            agent_fix_function_names_cmd(path=str(method_dir), output_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 1
+        payload = json.loads(capsys.readouterr().out)
+        assert payload["is_complete"] is False
+        assert payload["changed_files"] == []
+        (marker,) = payload["unresolved_markers"]
+        assert marker["module"] == "funcs/totals.py"
+        assert marker["function"] == "compute_totals"
+        assert marker["registered_name"] is None
+        assert "(name=TOTALS_NAME)" in module_file.read_text(encoding="utf-8")
 
     def test_the_agent_command_reports_in_markdown_by_default(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         method_dir = _method_folder(root=tmp_path, flat_name="invoice_totals")

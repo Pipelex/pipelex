@@ -124,6 +124,61 @@ class TestFunctionNamesMigration:
         assert expected_reason in unresolved.reason
         assert unresolved.candidates == expected_candidates
 
+    @pytest.mark.parametrize(
+        "module_text",
+        [
+            pytest.param(f"\x0c\n{_NAMED_MARKER}", id="form-feed-line-above"),
+            pytest.param(f'"""Summaries\u2028of invoices\x0b."""\n\n{_NAMED_MARKER}', id="line-separator-in-docstring"),
+            pytest.param(_NAMED_MARKER.replace("\n", "\r\n"), id="crlf-line-endings"),
+            pytest.param(_NAMED_MARKER.replace("\n", "\r"), id="cr-line-endings"),
+        ],
+    )
+    def test_a_marker_loses_its_name_whatever_characters_python_does_not_count_as_line_breaks(self, module_text: str) -> None:
+        bundle = _BUNDLE.split("[pipe.already]", maxsplit=1)[0]
+        migration = migrate_function_names(
+            files={"invoicing.mthds": bundle, "funcs/totals.py": _MARKED_TOTALS, "funcs/summary.py": module_text},
+        )
+
+        assert migration.is_complete
+        assert migration.changed_files["funcs/summary.py"] == module_text.replace('(name="invoice_summary")', "()")
+
+    def test_a_marker_whose_name_is_not_a_literal_is_left_and_reported(self) -> None:
+        module_text = _NAMED_MARKER.replace('(name="invoice_summary")', "(name=SUMMARY_NAME)")
+        bundle = _BUNDLE.split("[pipe.summary]", maxsplit=1)[0]
+        migration = migrate_function_names(files={"invoicing.mthds": bundle, "funcs/totals.py": _MARKED_TOTALS, "funcs/summary.py": module_text})
+
+        assert not migration.is_complete
+        assert migration.unresolved == []
+        assert migration.marker_removals == []
+        (marker,) = migration.unresolved_markers
+        assert (marker.module, marker.function, marker.registered_name) == ("funcs/summary.py", "summarize", None)
+        assert "not a string literal" in marker.reason
+        assert "funcs/summary.py" not in migration.changed_files
+
+    def test_a_marker_keeps_its_name_while_a_step_naming_it_is_unresolved(self) -> None:
+        other_marker = _NAMED_MARKER.replace("def summarize(", "def summarize_again(")
+        bundle = _BUNDLE.split("[pipe.already]", maxsplit=1)[0]
+        migration = migrate_function_names(
+            files={
+                "invoicing.mthds": bundle,
+                "funcs/totals.py": _MARKED_TOTALS,
+                "funcs/summary.py": _NAMED_MARKER,
+                "funcs/other_summary.py": other_marker,
+            },
+        )
+
+        assert not migration.is_complete
+        assert [(rewrite.pipe_code, rewrite.import_path) for rewrite in migration.rewrites] == [("totals", "funcs.totals.compute_totals")]
+        (unresolved,) = migration.unresolved
+        assert (unresolved.pipe_code, unresolved.flat_name) == ("summary", "invoice_summary")
+        assert migration.marker_removals == []
+        assert [(marker.module, marker.registered_name) for marker in migration.unresolved_markers] == [
+            ("funcs/other_summary.py", "invoice_summary"),
+            ("funcs/summary.py", "invoice_summary"),
+        ]
+        assert all("'summary'" in marker.reason for marker in migration.unresolved_markers)
+        assert sorted(migration.changed_files) == ["invoicing.mthds"]
+
     def test_a_bundle_that_does_not_parse_is_reported_without_a_step(self) -> None:
         broken_bundle = '[pipe.totals]\ntype = "PipeFunc"\nfunction_name = "compute_totals\n'
         migration = migrate_function_names(files={"broken.mthds": broken_bundle, "funcs/totals.py": _MARKED_TOTALS})

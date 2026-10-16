@@ -23,7 +23,8 @@ def fix_function_names_cmd(
     A PipeFunc names its function by import path, such as 'funcs.totals.compute_totals' for the function
     compute_totals of funcs/totals.py. This finds the @pipe_func function each flat name registered, writes its
     import path, and drops the registration name of every @pipe_func(name=...) marker. Nothing is imported, and
-    Pipelex does not boot. A name it cannot resolve is left as it is and reported; the command then exits 1.
+    Pipelex does not boot. A name it cannot resolve is left as it is and reported, with the markers registering it
+    and any marker whose name is not a string literal; the command then exits 1.
 
     Examples:
         pipelex fix function-names my_method/

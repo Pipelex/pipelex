@@ -71,7 +71,7 @@ pipelex fix function-names <PATH>
 
 Rewrites every flat `PipeFunc` `function_name` of a method as the function's import path from the method's folder. A `PipeFunc` step names its function by import path, such as `funcs.totals.compute_totals` for the function `compute_totals` of `funcs/totals.py`, and a flat name, the key of the retired function registry, is refused as the bundle is read (see [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md#migrating-flat-function-names)).
 
-For each step whose `function_name` holds no dot, the command finds the `@pipe_func` function of the method's tree that the flat name registered, its own name or the one its `@pipe_func(name=...)` marker gave it, and writes its import path; then it drops the argument of every `@pipe_func(name=...)` marker, since the marker takes none. It reads the method's files as text and syntax trees: nothing is imported, Pipelex does not boot, and every comment and alignment of the files is kept. A flat name that no module of the tree registers, or that two register, is left as it is and reported for you to decide.
+For each step whose `function_name` holds no dot, the command finds the `@pipe_func` function of the method's tree that the flat name registered, its own name or the one its `@pipe_func(name=...)` marker gave it, and writes its import path; then it drops the argument of every `@pipe_func(name=...)` marker, since the marker takes none. It reads the method's files as text and syntax trees: nothing is imported, Pipelex does not boot, and every comment and alignment of the files is kept. A flat name that no module of the tree registers, or that two register, is left as it is and reported for you to decide, and so is the argument of each marker registering it, the only record left of which function the step meant. A marker whose name is not a string literal, such as `@pipe_func(name=NAME)`, is left and reported too, since its name cannot be read without running the module.
 
 **Arguments:**
 
@@ -91,7 +91,7 @@ pipelex fix function-names invoicing/
 pipelex fix function-names invoicing/ --dry-run
 ```
 
-**Exit codes:** `0` when every flat name was rewritten (or there was none), `1` when a flat name was left unresolved, `2` when the folder cannot be listed as a method tree or a file cannot be read or written.
+**Exit codes:** `0` when every flat name was rewritten (or there was none), `1` when a flat name or a marker's argument was left unresolved, `2` when the folder cannot be listed as a method tree or a file cannot be read or written.
 
 ## Related Documentation
 
