@@ -42,6 +42,15 @@ class CompletionStopOutcome(StrEnum):
     CONTEXT_WINDOW_EXCEEDED = "context_window_exceeded"
     REFUSED = "refused"
 
+    @property
+    def is_refused(self) -> bool:
+        """Whether the model refused, or a content filter stopped the output."""
+        match self:
+            case CompletionStopOutcome.REFUSED:
+                return True
+            case CompletionStopOutcome.NORMAL | CompletionStopOutcome.TRUNCATED | CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED:
+                return False
+
 
 _NORMAL = CompletionStopOutcome.NORMAL
 _TRUNCATED = CompletionStopOutcome.TRUNCATED

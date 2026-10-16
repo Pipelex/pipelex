@@ -739,9 +739,10 @@ class ImgGenGenerationError(CogtError):
     """An image generation that failed: a provider's failure the classification read, or an answer that cannot be used.
 
     The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
-    one: ``provider.response_invalid`` for an answer with no usable image, ``provider.outcome_unknown`` for a call
-    that failed after it was sent, which may have generated, and billed, the image. With no code chosen and no coded
-    cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
+    one: ``provider.response_invalid`` for an answer with no usable image, ``model.content_refused`` for an answer
+    whose finish or block reason says the provider refused the request on policy grounds, ``provider.outcome_unknown``
+    for a call that failed after it was sent, which may have generated, and billed, the image. With no code chosen and
+    no coded cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
     """
 
     error_code = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
