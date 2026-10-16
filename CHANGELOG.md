@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`Jinja2TemplateSecurityError` is a `SecurityError` (Breaking)**: the template sandbox's refusal at render time now derives from `SecurityError`, like `UriReadRefusedError`, `SsrfBlockedError` and `UnsafeSchemaError`, instead of `ToolError`, so a host catching `SecurityError` catches it too and an `except ToolError` no longer does; it stays a type of its own, apart from `Jinja2TemplateRenderError`, and its `error_type`, title and classification are unchanged.
+
 ## [v0.87.0] - 2026-10-16
 
 ### Highlights
