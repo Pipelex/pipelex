@@ -10,6 +10,7 @@ from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -47,6 +48,24 @@ from pipelex.validation_error_types import PipeValidationErrorType
 
 #: Who holds a tree's Python for a run with no current library, such as a pipe run directly by a test.
 _PROCESS_HOLDER = "process"
+
+
+def _describe_executor_failure(*, exc: BaseException) -> str:
+    """What the executor's failure was, named by classes and a code, never by a text.
+
+    What the function raised is named by its class, which the in-process executor marks by raising `PipeFuncRaisedError`
+    from it. Any other failure is named by its class, and a Pipelex error by its code as well: an out-of-process
+    executor reports a coded Pipelex error whose message can hold the function's own text, and a foreign exception, a
+    transport's, can quote it too. The text of either can quote the run's inputs, and no message carries those.
+    """
+    if isinstance(exc, PipeFuncRaisedError):
+        function_exc = exc.__cause__
+        if function_exc is None:
+            return "The function raised an exception"
+        return f"The function raised {type(function_exc).__name__}"
+    if isinstance(exc, PipelexError):
+        return f"{type(exc).__name__} ({exc.resolve_error_code()})"
+    return type(exc).__name__
 
 
 class PipeFuncOutput(PipeOutput):
@@ -356,8 +375,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # The message names the step's inputs, never their values: those are this run's content.
             inputs_desc = ", ".join(self.inputs.root) or "none"
             output_desc = self.output.to_bundle_representation()
-            # The function's own exception, which the executor marks as raised by the function and names by its class.
-            error_desc = exc.message if isinstance(exc, PipeFuncRaisedError) else f"{type(exc).__name__}: {exc}"
+            error_desc = _describe_executor_failure(exc=exc)
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )

@@ -102,6 +102,37 @@ class _TransportFailingExecutor(PipeFuncExecutorProtocol):
         raise NotImplementedError(msg)
 
 
+#: What a function's own text can quote: the run's input.
+_FUNCTION_TEXT = "cannot file the note 'confidential-patient-diagnosis'"
+
+
+class _OutOfProcessExecutor(PipeFuncExecutorProtocol):
+    """An out-of-process executor reporting what the function raised as a coded Pipelex error, as its carrier rebuilds it.
+
+    The far process's message holds the function's own text, and no exception of the function's rides as its cause.
+    """
+
+    def __init__(self, *, failure: Exception) -> None:
+        self.failure = failure
+
+    @override
+    async def run_pipe_func(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        pipe_code: str,
+        function_name: str,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+    ) -> PipeFuncExecutionResult:
+        raise self.failure
+
+    @override
+    async def run_pipe_func_transported(self, *, request: PipeFuncExecutionRequest) -> PipeFuncExecutionResponse:
+        msg = "Not used by this test"
+        raise NotImplementedError(msg)
+
+
 def _make_pipe_func() -> PipeFunc:
     blueprint = PipeFuncBlueprint(
         description="Read the parcel's line in the ledger",
@@ -185,6 +216,35 @@ class TestPipeFuncFailureCode:
         failure = await _failure_of(pipe_func=_make_pipe_func(), executor=executor, function=_raises_a_plain_error)
 
         assert failure.to_problem(view=ProblemView.CALLER).code == expected_code
+
+    @pytest.mark.parametrize(
+        ("failure", "expected_error"),
+        [
+            (PipeFuncRaisedError(f"KeyError: {_FUNCTION_TEXT}"), "Error: The function raised an exception"),
+            (
+                PipeFuncExecutionError(f"The function failed in the sandbox: {_FUNCTION_TEXT}"),
+                "Error: PipeFuncExecutionError (runtime.unexpected)",
+            ),
+            (ConnectionResetError(f"The sandbox closed the call: {_FUNCTION_TEXT}"), "Error: ConnectionResetError"),
+        ],
+        ids=["function_raised_far_away", "coded_seam_failure", "foreign_transport_failure"],
+    )
+    @pytest.mark.asyncio
+    async def test_an_out_of_process_failure_is_named_without_its_text(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+        failure: Exception,
+        expected_error: str,
+    ) -> None:
+        """Whatever an executor raised, its text can hold the function's own, which quotes the run's inputs: the step names its class."""
+        load_empty_library()
+        mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
+
+        step_failure = await _failure_of(pipe_func=_make_pipe_func(), executor=_OutOfProcessExecutor(failure=failure), function=_raises_a_plain_error)
+
+        assert step_failure.message.endswith(expected_error)
+        assert _FUNCTION_TEXT not in step_failure.message
 
     @pytest.mark.parametrize(
         "function",
