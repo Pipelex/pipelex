@@ -411,7 +411,7 @@ Beside the failure, the deployment logs one **security event**, so that whoever 
 | `event.name` | `pipelex.security.refusal` |
 | `error.code` | The refusal's code, such as `security.method_url_refused` |
 | `error.domain` | The code's domain, who caused it: `input`, `method` or `runtime` |
-| `error.type` | The class of the error that carries the code, such as `SsrfBlockedError` |
+| `error.type` | The class of the error that carries or implies the code, such as `SsrfBlockedError`, never a wrapper above it |
 | `security.target` | The kind of thing refused, which the code decides: `url`, `path`, `template`, `schema`, `dependency`, `object_key` or `result_location` |
 | `security.target_class` | The class of destination refused, when the raise site knows it: `loopback`, `private`, `link_local`, `metadata` (a cloud metadata endpoint), `scheme` (a scheme the run does not read, a `file://` URL or a path on the server's disk among them) or `foreign_storage_key` (a storage key outside the run's read scope) |
 | `pipeline_run_id`, `request_id` | The run and the request, when there are some |

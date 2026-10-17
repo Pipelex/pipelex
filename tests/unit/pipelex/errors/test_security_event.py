@@ -8,11 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.cogt.content_generation.exceptions import UnsafeSchemaError
 from pipelex.cogt.doc_gen.exceptions import TemplateUrlRefusedError
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
+from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.errors.security_event import (
@@ -65,6 +67,49 @@ def _security_event_lines() -> Generator[list[dict[str, Any]]]:
 def _ssrf_refusal() -> SsrfBlockedError:
     message = f"Refusing to connect to '{_SECRET_HOST}': it resolved to a disallowed (private/loopback/metadata) address."
     return SsrfBlockedError(message).with_security_target_class(SecurityTargetClass.PRIVATE)
+
+
+class _ImpliedRefusalError(PipelexError):
+    """A refusal that carries no code of its own and implies a security code, as an inference error implies its category's."""
+
+    error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.SECURITY_PROVIDER_URL_REFUSED,))
+
+    @property
+    @override
+    def implied_error_code(self) -> ErrorCode | None:
+        return CoreCode.SECURITY_PROVIDER_URL_REFUSED
+
+
+class _FallbackRefusalError(PipelexError):
+    """A refusal that takes its cause's code, and names a security code as its fallback when no cause carries one."""
+
+    error_code = InheritsCause(fallback=CoreCode.SECURITY_METHOD_PATH_REFUSED)
+
+
+def _chained(*, error: PipelexError, cause: BaseException) -> PipelexError:
+    error.__cause__ = cause
+    return error
+
+
+def _restate(*, refusal: SsrfBlockedError, suppress_context: bool) -> None:
+    """Raise the refusal anew while handling it, as a layer that chains nothing explicitly does."""
+    try:
+        raise refusal
+    except SsrfBlockedError:
+        msg = "Refusing to fetch the input 'photo'."
+        restated = SsrfBlockedError(msg).with_security_target_class(SecurityTargetClass.PRIVATE)
+        if suppress_context:
+            raise restated from None
+        raise restated  # ruff: ignore[raise-without-from-inside-except] — the layer under test chains nothing explicitly
+
+
+def _refuse_another_while_handling(*, refusal: SsrfBlockedError) -> None:
+    """Raise a refusal of another code while handling ``refusal``, chained to it only as its ``__context__``."""
+    try:
+        raise refusal
+    except SsrfBlockedError:
+        msg = "The schema of concept 'Invoice' carries x-python-* extensions."
+        raise UnsafeSchemaError(msg)  # ruff: ignore[raise-without-from-inside-except] — chained only as its context, on purpose
 
 
 def _wrapped(*, refusal: PipelexError) -> PipelineInputContentError:
@@ -180,6 +225,24 @@ class TestSecurityEvent:
                 SecurityTargetClass.PRIVATE,
                 id="ssrf_under_its_wrapper",
             ),
+            pytest.param(
+                _wrapped(refusal=_ImpliedRefusalError("The answer names an address this run may not fetch.")),
+                CoreCode.SECURITY_PROVIDER_URL_REFUSED,
+                ProblemDomain.RUNTIME,
+                "_ImpliedRefusalError",
+                SecurityTargetKind.URL,
+                None,
+                id="implied_code_under_its_wrapper",
+            ),
+            pytest.param(
+                _wrapped(refusal=_chained(error=_FallbackRefusalError("The template names a file outside the bundle."), cause=OSError("denied"))),
+                CoreCode.SECURITY_METHOD_PATH_REFUSED,
+                ProblemDomain.METHOD,
+                "_FallbackRefusalError",
+                SecurityTargetKind.PATH,
+                None,
+                id="fallback_code_under_its_wrapper",
+            ),
         ],
     )
     def test_a_refusal_fails_under_its_security_code_and_logs_its_event(
@@ -264,6 +327,35 @@ class TestSecurityEvent:
             assert not emit_security_event(error=refusal)
 
         assert len(lines) == 1
+
+    @pytest.mark.parametrize("suppress_context", [False, True], ids=["implicit_chaining", "from_none"])
+    def test_a_refusal_raised_again_without_explicit_chaining_is_not_reported_again(self, suppress_context: bool) -> None:
+        """A layer that raises the same refusal anew, with no `from exc` or with `from None`, keeps it only as `__context__`."""
+        refusal = _ssrf_refusal()
+        with _security_event_lines() as lines:
+            assert emit_security_event(error=refusal)
+            with pytest.raises(SsrfBlockedError) as exc_info:
+                _restate(refusal=refusal, suppress_context=suppress_context)
+            raised_again = exc_info.value
+            wrapper = PipelineInputContentError("The input 'photo' cannot be read.")
+            wrapper.__cause__ = raised_again
+            assert not emit_security_event(error=wrapper)
+
+        assert raised_again.__cause__ is None
+        assert raised_again.__context__ is refusal
+        assert len(lines) == 1
+
+    def test_a_distinct_refusal_raised_while_handling_a_reported_one_is_reported(self) -> None:
+        """`__context__` only ties a refusal to the one it restates: another code, raised while handling the first, is its own."""
+        refusal = _ssrf_refusal()
+        with _security_event_lines() as lines:
+            assert emit_security_event(error=refusal)
+            with pytest.raises(UnsafeSchemaError) as exc_info:
+                _refuse_another_while_handling(refusal=refusal)
+            assert emit_security_event(error=exc_info.value)
+
+        assert exc_info.value.__context__ is refusal
+        assert [line["error.code"] for line in lines] == [CoreCode.SECURITY_INPUT_URL_REFUSED, CoreCode.SECURITY_SCHEMA_REFUSED]
 
     def test_a_failure_whose_event_was_logged_elsewhere_is_not_reported_again(self) -> None:
         """A host marks the error a transport rebuilt from a worker's report, whose worker logged the event."""
