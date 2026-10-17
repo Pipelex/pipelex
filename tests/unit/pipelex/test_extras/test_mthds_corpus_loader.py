@@ -7,11 +7,14 @@ The bundles themselves are validated by the integration-tier entry gate; this mo
 layout rules and the filter semantics a consumer selects on.
 """
 
+from pathlib import Path
+
 import pytest
 
 from pipelex.test_extras.mthds_corpus.exceptions import CorpusEntryError
-from pipelex.test_extras.mthds_corpus.loader import get_entry, iter_entries
-from pipelex.test_extras.mthds_corpus.manifest import EntryGranularity, EntryTier, EntryValidity
+from pipelex.test_extras.mthds_corpus.loader import get_entry, iter_entries, load_entry
+from pipelex.test_extras.mthds_corpus.manifest import MANIFEST_FILE_NAME, EntryGranularity, EntryTier, EntryValidity
+from tests.helpers.method_folders import MethodFolderShape, write_method_folder
 
 
 class TestMthdsCorpusLoader:
@@ -24,6 +27,39 @@ class TestMthdsCorpusLoader:
         for entry in iter_entries():
             assert entry.manifest.name == entry.directory.name
             assert entry.bundle_path.is_file()
+
+    @pytest.mark.parametrize("shape", [MethodFolderShape.MANIFEST_MAIN_PIPE, MethodFolderShape.ONE_DECLARED_MAIN_PIPE])
+    def test_an_entry_resolves_to_the_bundle_its_method_starts_at(self, tmp_path: Path, shape: MethodFolderShape) -> None:
+        """The CLI's own entry rule picks the bundle, so a folder `run bundle` starts at one pipe is an entry as it stands."""
+        entry_dir = self._entry_dir(tmp_path=tmp_path, shape=shape)
+        assert shape.entry is not None
+
+        entry = load_entry(directory=entry_dir)
+
+        assert entry.bundle_path == (entry_dir / shape.entry.tree_path).resolve()
+
+    @pytest.mark.parametrize("shape", [MethodFolderShape.SEVERAL_MAIN_PIPES, MethodFolderShape.NO_MAIN_PIPE])
+    def test_an_entry_with_no_single_main_pipe_is_refused(self, tmp_path: Path, shape: MethodFolderShape) -> None:
+        entry_dir = self._entry_dir(tmp_path=tmp_path, shape=shape)
+        assert shape.refusal is not None
+
+        with pytest.raises(CorpusEntryError) as exc_info:
+            load_entry(directory=entry_dir)
+
+        assert "Corpus entry 'sample_entry' does not resolve to a bundle" in str(exc_info.value)
+        assert shape.refusal in str(exc_info.value)
+
+    @staticmethod
+    def _entry_dir(*, tmp_path: Path, shape: MethodFolderShape) -> Path:
+        entry_dir = write_method_folder(directory=tmp_path / "sample_entry", shape=shape)
+        (entry_dir / MANIFEST_FILE_NAME).write_text(
+            (
+                'name = "sample_entry"\ndescription = "A sample entry"\nvalidity = "valid"\n'
+                'tier = "dry"\ngranularity = "focused"\ncovers = ["native.text"]\n'
+            ),
+            encoding="utf-8",
+        )
+        return entry_dir
 
     def test_entries_are_yielded_in_name_order(self) -> None:
         names = [entry.name for entry in iter_entries()]

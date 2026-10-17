@@ -25,7 +25,7 @@ pipelex/test_extras/mthds_corpus/
       inputs.json     optional
 ```
 
-An entry directory holds either exactly one `.mthds` file, or several with a `bundle.mthds` acting as the entry point — which is exactly what `pipelex validate bundle <dir>` already resolves, so an entry directory is a valid CLI argument as it stands.
+An entry directory is a method's folder whose bundles declare one `main_pipe` between them, or whose `METHODS.toml` names it: the pipe the MTHDS protocol's entry rule starts the folder at, and the bundle defining it is the entry's bundle. That is exactly where `pipelex run bundle <dir>` starts, while `pipelex validate bundle <dir>` judges every bundle of the folder, so an entry directory is a valid CLI argument as it stands. The rule reads only what the bundles declare, so a deliberately invalid entry still resolves as long as its bundle is TOML that declares its `domain` and `main_pipe`.
 
 ## Adding an entry
 

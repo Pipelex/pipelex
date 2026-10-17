@@ -6,9 +6,9 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
-from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 def run_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, which starts at its entry pipe unless --pipe names one"),
     ],
     pipe: Annotated[
         str | None,

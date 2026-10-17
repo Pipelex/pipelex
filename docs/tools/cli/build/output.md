@@ -33,15 +33,17 @@ pipelex build output pipe <PIPE_CODE> [OPTIONS]
 pipelex build output bundle <PATH> [OPTIONS]
 ```
 
+A folder is read as its [method tree](../../../building-methods/method-trees.md), as [`pipelex run bundle`](../run.md#run-bundle) reads it. With no `--pipe`, the representation is for the pipe a run of the folder starts at: the manifest's `main_pipe`, or, with no manifest, the one `main_pipe` its bundles declare. A folder whose bundles declare none, or several, is refused with the message `run bundle` gives, naming each bundle by its path in the tree. With `--pipe`, the folder loads as the method's library and the pipe named is looked up there, as a run naming its pipe does. Either way the file is written in the folder unless `--output` says otherwise.
+
 **Arguments:**
 
-- `PATH` - Path to a `.mthds` bundle file or a pipeline directory
+- `PATH` - Path to a `.mthds` bundle file or a method's folder
 
 **Options:**
 
-- `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
+- `--pipe` - Pipe code to use (can be omitted if the bundle, or the method's folder, declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated file (defaults to bundle's directory)
+- `--output`, `-o` - Path to save the generated file (defaults to the method's folder, or to the bundle file's directory)
 - `--format`, `-f` - Output format (default: `json`): `json`, `python`, or `schema`
 
 ### From an installed method
@@ -81,7 +83,7 @@ pipelex build output bundle my_bundle.mthds
 pipelex build output bundle my_bundle.mthds --format schema
 ```
 
-**Generate output from a pipeline directory:**
+**Generate output for the main pipe of a method's folder:**
 
 ```bash
 pipelex build output bundle pipeline_01/

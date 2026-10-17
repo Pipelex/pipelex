@@ -7,6 +7,7 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
@@ -19,7 +20,8 @@ from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_t
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file, fix_method_folder
 from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
@@ -77,7 +79,7 @@ def _failure_message(result: FixBundleResult) -> str:
 def fix_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, whose every bundle is judged"),
     ],
     library_dir: Annotated[
         list[str] | None,
@@ -111,28 +113,56 @@ def fix_bundle_cmd(
         typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
     ] = None,
 ) -> None:
-    """Fix a bundle file (.mthds) or pipeline directory in place."""
+    """Fix a bundle file (.mthds) or a method's folder in place.
+
+    A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
+    """
     set_agent_cli_error_format(error_format or output_format)
 
     select_codes = _normalize_rule_codes(select_codes_raw)
     ignore_codes = _normalize_rule_codes(ignore_codes_raw)
     _reject_invalid_rule_filters(select_codes=select_codes, ignore_codes=ignore_codes)
 
-    bundle_path, library_dir = resolve_bundle_target(path, library_dir=library_dir)
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
+    try:
+        target = resolve_bundle_target(path, library_dir=library_dir)
+    except ValidateBundleError as exc:
+        agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+    judged_path: Path
+    if target.method_dir is not None:
+        judged_path = target.method_dir
+    elif target.bundle_path is not None:
+        judged_path = target.bundle_path
+    else:
+        msg = f"The target '{path}' resolved to neither a bundle file nor a method's folder."
+        raise PipelexUnexpectedError(msg)
+    bundle_path = str(judged_path)
+    library_dirs = target.library_dirs
 
     try:
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
-        result = asyncio.run(
-            fix_bundle_file(
-                Path(bundle_path),
-                library_dirs=library_dirs,
-                allow_signatures=allow_signatures,
-                max_iterations=max_iterations,
-                select_codes=select_codes,
-                ignore_codes=ignore_codes,
+        if target.method_dir is not None:
+            result = asyncio.run(
+                fix_method_folder(
+                    method_dir=target.method_dir,
+                    library_dirs=library_dirs,
+                    allow_signatures=allow_signatures,
+                    max_iterations=max_iterations,
+                    select_codes=select_codes,
+                    ignore_codes=ignore_codes,
+                )
             )
-        )
+        else:
+            result = asyncio.run(
+                fix_bundle_file(
+                    judged_path,
+                    library_dirs=library_dirs,
+                    allow_signatures=allow_signatures,
+                    max_iterations=max_iterations,
+                    select_codes=select_codes,
+                    ignore_codes=ignore_codes,
+                )
+            )
         payload = _result_payload(result, bundle_path=bundle_path)
         if result.is_valid:
             agent_success_formatted({"success": True, **payload}, markdown_renderer=format_fix_markdown, output_format=output_format)

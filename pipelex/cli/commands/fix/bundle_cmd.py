@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -34,7 +33,7 @@ def _reject_invalid_rule_filters(*, select_codes: tuple[str, ...] | None, ignore
 def fix_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, whose every bundle is judged"),
     ],
     library_dir: Annotated[
         list[str] | None,
@@ -72,14 +71,15 @@ def fix_bundle_cmd(
         ),
     ] = False,
 ) -> None:
-    """Fix a bundle file (.mthds) or pipeline directory in place.
+    """Fix a bundle file (.mthds) or a method's folder in place.
 
     Runs the validate → apply safe fixes → re-validate loop until the bundle is valid, out
-    of fixes, or the iteration cap is reached, and names every change made.
+    of fixes, or the iteration cap is reached, and names every change made. A folder is judged
+    whole, every bundle of its method tree, as `validate bundle` judges it.
 
     Examples:
         pipelex fix bundle my_bundle.mthds
-        pipelex fix bundle pipeline_01/
+        pipelex fix bundle my_method/
         pipelex fix bundle my_bundle.mthds --select match-sequence-output
         pipelex fix bundle my_bundle.mthds --diff
     """
@@ -87,17 +87,18 @@ def fix_bundle_cmd(
     ignore_codes = tuple(ignore_codes_raw) if ignore_codes_raw else None
     _reject_invalid_rule_filters(select_codes=select_codes, ignore_codes=ignore_codes)
 
-    bundle_path, library_dir = resolve_bundle_target(
+    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
+    target = resolve_bundle_target(
         path,
         library_dir=library_dir,
         command=COMMAND,
         not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
     )
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     execute_fix(
-        Path(bundle_path),
-        library_dirs=library_dirs,
+        bundle_path=target.bundle_path,
+        method_dir=target.method_dir,
+        library_dirs=target.library_dirs,
         allow_signatures=allow_signatures,
         max_iterations=max_iterations,
         select_codes=select_codes,

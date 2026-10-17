@@ -38,10 +38,15 @@ async def _generate_output_core(
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
+    default_output_dir: Path | None = None,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
     library_dir: list[str] | None = None,
 ) -> None:
-    """Core logic for generating output representation for a pipe."""
+    """Core logic for generating output representation for a pipe.
+
+    The file goes to ``output_path``, else into ``default_output_dir`` (a method's folder), else beside the bundle,
+    else under ``results/``.
+    """
     # Set up library so pipes can be found
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
@@ -98,17 +103,17 @@ async def _generate_output_core(
         raise typer.Exit(1) from exc
 
     final_output_path: Path
+    output_dir = default_output_dir or (bundle_path.parent if bundle_path else None)
     if output_path:
         final_output_path = output_path
-    elif bundle_path:
-        bundle_dir = Path(bundle_path).parent
+    elif output_dir:
         match output_format:
             case ConceptRepresentationFormat.JSON:
-                final_output_path = bundle_dir / "output.json"
+                final_output_path = output_dir / "output.json"
             case ConceptRepresentationFormat.PYTHON:
-                final_output_path = bundle_dir / "output.py"
+                final_output_path = output_dir / "output.py"
             case ConceptRepresentationFormat.SCHEMA:
-                final_output_path = bundle_dir / "output_schema.json"
+                final_output_path = output_dir / "output_schema.json"
     else:
         match output_format:
             case ConceptRepresentationFormat.JSON:
@@ -134,6 +139,7 @@ def execute_generate_output(
     bundle_path: Path | None,
     output_path: Path | None,
     output_format: ConceptRepresentationFormat,
+    default_output_dir: Path | None = None,
     library_dir: list[str] | None = None,
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_OUTPUT}",
 ) -> None:
@@ -148,7 +154,12 @@ def execute_generate_output(
 
             asyncio.run(
                 _generate_output_core(
-                    pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path, output_format=output_format, library_dir=library_dir
+                    pipe_code=pipe_code,
+                    bundle_path=bundle_path,
+                    output_path=output_path,
+                    default_output_dir=default_output_dir,
+                    output_format=output_format,
+                    library_dir=library_dir,
                 )
             )
 

@@ -64,11 +64,11 @@ pipelex validate --all --allow-signatures
 pipelex validate bundle <PATH>
 ```
 
-Validates all pipes defined in a bundle file (`.mthds`) or a pipeline directory. When a directory is given, the bundle file is auto-detected inside it.
+Validates all pipes defined in a bundle file (`.mthds`), or every bundle of a method's folder. A folder is read as its [method tree](../../building-methods/method-trees.md), the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and the whole tree is judged, as the MTHDS protocol's validation judges a method: every bundle of it is loaded and every pipe of it dry-run, whatever its bundles declare of where the method starts. A folder whose bundles declare several `main_pipe`s, or none, is validated like any other, since validation needs no pipe to start at; only a command acting on one pipe, such as [`pipelex run bundle`](run.md#run-bundle), needs the folder's entry. The `-L` directories load beside the method for its bundles to use, but their own pipes are not judged. A folder holding no `.mthds` bundle produces no verdict and exits with code `2`.
 
 **Arguments:**
 
-- `PATH` - Path to a `.mthds` bundle file or a directory containing one
+- `PATH` - Path to a `.mthds` bundle file or a method's folder
 
 **Options:**
 
@@ -82,7 +82,7 @@ Validates all pipes defined in a bundle file (`.mthds`) or a pipeline directory.
 pipelex validate bundle my_pipeline.mthds
 pipelex validate bundle pipelines/invoice_processor.mthds
 
-# Validate a pipeline directory (auto-detects the bundle file)
+# Validate a method's folder (every bundle of its method tree)
 pipelex validate bundle pipelines/invoice_processor/
 
 # Validate with additional library directories

@@ -28,8 +28,8 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
     run_hosted_for_agent,
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
+from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
-from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
@@ -48,7 +48,7 @@ if TYPE_CHECKING:
 def run_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, which starts at its entry pipe unless --pipe names one"),
     ],
     pipe: Annotated[
         str | None,

@@ -28,6 +28,7 @@ from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.method_trees import list_local_method_tree, reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
+from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -143,7 +144,9 @@ async def validate_bundle(
     ``method_dir`` is the directory of a method's tree, the caller's own, such as the tree a host wrote out for a
     request: every bundle of the tree is loaded as a member of it and dry-run, every refusal is the caller's verdict and
     names the tree's files as the tree does, and ``methods_dirs``, laid out like ``.mthds/methods/``, hold the packages
-    the caller ships with it, searched first for an address-based reference. No other library directory loads beside it.
+    the caller ships with it, searched first for an address-based reference. No host's library directory loads beside
+    it: only ``library_dirs`` that ``library_dirs_are_callers`` says are the caller's own, as on a command run over the
+    caller's own disk, which load with the tree for its bundles to use while only the tree's own pipes are judged.
 
     ``submitted_files`` are the files submitted with ``mthds_contents`` that their steps read, such as a
     ``PipeDocGen`` step's ``template_file``, keyed by canonical bundle-relative path (see
@@ -182,8 +185,8 @@ async def validate_bundle(
     if provided_params > 1:
         msg = "Only one of mthds_contents, mthds_file_path or method_dir can be provided to validate_bundle"
         raise PipelexUnexpectedError(msg)
-    if method_dir is not None and library_dirs is not None:
-        msg = "A method's tree validates alone: no library directory loads beside method_dir"
+    if method_dir is not None and library_dirs is not None and not library_dirs_are_callers:
+        msg = "A method's tree validates beside no host's library directory: only the caller's own directories load beside method_dir"
         raise PipelexUnexpectedError(msg)
     if methods_dirs is not None and method_dir is None:
         msg = "methods_dirs accompany method_dir, the method whose packages they hold"
@@ -221,6 +224,7 @@ async def validate_bundle(
             result = await _validate_method_dir(
                 method_dir=method_dir,
                 methods_dirs=methods_dirs,
+                library_dirs=library_dirs,
                 library_id=library_id,
                 allow_signatures=allow_signatures,
                 dry_run_pipe_codes=dry_run_pipe_codes,
@@ -380,27 +384,56 @@ def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
         raise ValidateBundleError(message=" ".join(item.message for item in items), pipelex_bundle_blueprint_validation_errors=items)
 
 
+def _is_member_source(*, source: str | None, tree: MethodTree) -> bool:
+    """Whether a loaded bundle's source names a file of the method's tree.
+
+    A bundle of a tree a host holds is named by its tree path, any other by its file on this host's disk, which is a
+    member when it lies under the tree's root at one of the tree's paths.
+    """
+    if source is None:
+        return False
+    if WRITTEN_METHOD_TREES.holds_tree(tree=tree):
+        return source in tree.members
+    if tree.directory is None:
+        return False
+    root = tree.directory.resolve()
+    resolved = Path(source).resolve()
+    return resolved.is_relative_to(root) and resolved.relative_to(root).as_posix() in tree.members
+
+
 async def _validate_method_dir(
     *,
     method_dir: Path,
     methods_dirs: Sequence[Path] | None,
+    library_dirs: Sequence[Path] | None,
     library_id: str,
     allow_signatures: bool,
     dry_run_pipe_codes: list[str] | None,
     caller_identity: CallerIdentity | None,
     collect_dry_run_warnings: bool,
 ) -> ValidateBundleResult:
-    """Load the tree of a caller's method into the open library and dry-run its pipes (see ``validate_bundle``)."""
+    """Load the tree of a caller's method into the open library and dry-run its pipes (see ``validate_bundle``).
+
+    The caller's own `library_dirs` load in the same pass as the tree, so the method's bundles and theirs can name one
+    another as a run of the folder loads them, but only the pipes of the tree's own bundles are judged.
+    """
     library_manager = get_library_manager()
     library = library_manager.get_library(library_id=library_id)
+    resolved_method_dir = method_dir.resolve()
+    beside_dirs = [library_dir for library_dir in library_dirs or [] if library_dir.resolve() != resolved_method_dir]
     with translate_to_validate_bundle_error():
-        _ensure_tree_python_parses(tree=list_local_method_tree(handed_over=method_dir))
+        tree = list_local_method_tree(handed_over=method_dir)
+        _ensure_tree_python_parses(tree=tree)
         loaded_pipes = library_manager.load_libraries(
             library_id=library_id,
-            library_dirs=[method_dir],
+            library_dirs=[method_dir, *beside_dirs],
             methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
         )
         blueprints = library_manager.get_accumulated_blueprints(library_id)
+        if beside_dirs:
+            # The directories beside the method hold what its bundles use, not the method: their pipes are not judged.
+            loaded_pipes = [pipe for pipe in loaded_pipes if _is_member_source(source=library_manager.get_pipe_source(pipe.pipe_ref), tree=tree)]
+            blueprints = [blueprint for blueprint in blueprints if _is_member_source(source=blueprint.source, tree=tree)]
         if not blueprints:
             msg = "The method holds no .mthds bundle, so it has nothing to validate."
             raise ValidateBundleError(message=msg)

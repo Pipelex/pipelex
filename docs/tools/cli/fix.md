@@ -19,11 +19,11 @@ When `pipelex validate` reports errors that have a deterministic safe fix, each 
 pipelex fix bundle <PATH>
 ```
 
-Fixes a bundle file (`.mthds`) or a pipeline directory in place. When a directory is given, the bundle file is auto-detected inside it — exactly the same resolution as `pipelex validate bundle`, so fix patches exactly what validate judged.
+Fixes a bundle file (`.mthds`) or a method's folder in place. A folder is read as its [method tree](../../building-methods/method-trees.md) and judged whole, every bundle of it, exactly as `pipelex validate bundle` judges it, so fix patches exactly what validate judged; it needs no pipe to start at, so a folder whose bundles declare several `main_pipe`s, or none, is fixed like any other. The folder joins the library directories, so every file of it is inside the fix write scope, and a fix lands in the file its error names.
 
 **Arguments:**
 
-- `PATH` - Path to a `.mthds` bundle file or a directory containing one
+- `PATH` - Path to a `.mthds` bundle file or a method's folder
 
 **Options:**
 
@@ -43,7 +43,7 @@ pipelex fix bundle my_pipeline.mthds
 # Preview the changes without writing anything
 pipelex fix bundle my_pipeline.mthds --diff
 
-# Fix a pipeline directory (auto-detects the bundle file)
+# Fix a method's folder (every bundle of its method tree)
 pipelex fix bundle pipelines/invoice_processor/
 
 # Fix with additional library directories (also widens the write scope)
@@ -57,7 +57,7 @@ pipelex fix bundle my_bundle.mthds --select match-sequence-output
 
 - `0` - The bundle is valid after the run (fixed, or already valid)
 - `1` - Negative verdict: the bundle is still invalid, or valid but not runnable (pending `PipeSignature` placeholders without `--allow-signatures`)
-- `2` - No verdict: bad path, ambiguous bundle directory, invalid rule filter, or an unexpected failure
+- `2` - No verdict: bad path, a folder holding no `.mthds` bundle, invalid rule filter, or an unexpected failure
 
 ## What Gets Fixed
 

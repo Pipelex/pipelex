@@ -10,6 +10,7 @@ import typer
 from posthog import tag
 from rich.markup import escape
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview
 from pipelex.cli.error_handlers import (
@@ -22,7 +23,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
+from pipelex.pipeline.fixes.fix_loop import fix_bundle_file, fix_method_folder
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -210,10 +211,48 @@ def _print_preview_diffs(*, console: Console, result: FixBundleResult, sandbox: 
         console.print()
 
 
+async def _fix(
+    *,
+    bundle_path: Path | None,
+    method_dir: Path | None,
+    library_dirs: list[Path] | None,
+    writable_library_dirs: list[Path] | None,
+    allow_signatures: bool,
+    max_iterations: int | None,
+    select_codes: tuple[str, ...] | None,
+    ignore_codes: tuple[str, ...] | None,
+) -> FixBundleResult:
+    """Run the fix loop on a method's folder, judged whole, or else on a bundle file."""
+    if method_dir is not None:
+        return await fix_method_folder(
+            method_dir=method_dir,
+            library_dirs=library_dirs,
+            writable_library_dirs=writable_library_dirs,
+            allow_signatures=allow_signatures,
+            max_iterations=max_iterations,
+            select_codes=select_codes,
+            ignore_codes=ignore_codes,
+        )
+    if bundle_path is None:
+        msg = "A fix was asked with neither a bundle file nor a method's folder"
+        raise PipelexUnexpectedError(msg)
+    return await fix_bundle_file(
+        bundle_path,
+        library_dirs=library_dirs,
+        writable_library_dirs=writable_library_dirs,
+        allow_signatures=allow_signatures,
+        max_iterations=max_iterations,
+        select_codes=select_codes,
+        ignore_codes=ignore_codes,
+    )
+
+
 def _run_fix_preview(
     *,
     console: Console,
-    bundle_path: Path,
+    bundle_path: Path | None,
+    method_dir: Path | None,
+    judged_path: Path,
     library_dirs: list[Path] | None,
     allow_signatures: bool,
     max_iterations: int | None,
@@ -224,8 +263,9 @@ def _run_fix_preview(
     with tempfile.TemporaryDirectory(prefix="pipelex-fix-preview-") as sandbox_root:
         sandbox = mirror_bundle_for_preview(bundle_path, library_dirs=library_dirs, sandbox_root=Path(sandbox_root))
         result = asyncio.run(
-            fix_bundle_file(
-                sandbox.entry_path,
+            _fix(
+                bundle_path=sandbox.entry_path,
+                method_dir=sandbox.to_copy(original=method_dir) if method_dir is not None else None,
                 library_dirs=sandbox.library_dirs,
                 writable_library_dirs=sandbox.writable_library_dirs,
                 allow_signatures=allow_signatures,
@@ -237,12 +277,13 @@ def _run_fix_preview(
         if result.files_written:
             _print_preview_diffs(console=console, result=result, sandbox=sandbox)
         display_result = _remap_result_to_originals(result, sandbox=sandbox)
-        _render_fix_result(console=console, result=display_result, bundle_path=bundle_path, allow_signatures=allow_signatures, preview=True)
+        _render_fix_result(console=console, result=display_result, bundle_path=judged_path, allow_signatures=allow_signatures, preview=True)
 
 
 def execute_fix(
-    bundle_path: Path,
     *,
+    bundle_path: Path | None,
+    method_dir: Path | None,
     library_dirs: list[Path] | None,
     allow_signatures: bool = False,
     max_iterations: int | None = None,
@@ -253,13 +294,22 @@ def execute_fix(
     """Synchronous entry point wrapping the fix loop with Pipelex setup/teardown.
 
     Boots with the same profile ``validate`` uses (no inference, real model specs), runs
-    ``fix_bundle_file``, renders the verdict for humans, and tears down in ``finally``.
+    ``fix_method_folder`` on a method's folder, judged whole, else ``fix_bundle_file`` on the
+    bundle file, renders the verdict for humans, and tears down in ``finally``.
     Exit codes are presentation: 0 = valid, 1 = negative verdict (still invalid, or valid but
     not runnable without ``--allow-signatures``), 2 = no verdict (bad target, boot failure,
     unexpected exception). ``diff`` previews instead of writing: the same loop runs against a
     temp-copy sandbox and a unified diff is rendered per would-be-written file, with the same
     verdict semantics.
     """
+    judged_path: Path
+    if method_dir is not None:
+        judged_path = method_dir
+    elif bundle_path is not None:
+        judged_path = bundle_path
+    else:
+        msg = "A fix was asked with neither a bundle file nor a method's folder"
+        raise PipelexUnexpectedError(msg)
     try:
         make_pipelex_for_cli(context=ErrorContext.FIX, needs_inference=False)
         with get_telemetry_manager().telemetry_context():
@@ -271,6 +321,8 @@ def execute_fix(
                 _run_fix_preview(
                     console=get_console(),
                     bundle_path=bundle_path,
+                    method_dir=method_dir,
+                    judged_path=judged_path,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
                     max_iterations=max_iterations,
@@ -280,19 +332,21 @@ def execute_fix(
                 return
 
             result = asyncio.run(
-                fix_bundle_file(
-                    bundle_path,
+                _fix(
+                    bundle_path=bundle_path,
+                    method_dir=method_dir,
                     library_dirs=library_dirs,
+                    writable_library_dirs=None,
                     allow_signatures=allow_signatures,
                     max_iterations=max_iterations,
                     select_codes=select_codes,
                     ignore_codes=ignore_codes,
                 )
             )
-            _render_fix_result(console=get_console(), result=result, bundle_path=bundle_path, allow_signatures=allow_signatures)
+            _render_fix_result(console=get_console(), result=result, bundle_path=judged_path, allow_signatures=allow_signatures)
     except FileNotFoundError as exc:
         print_traceback_if_requested(console=get_console())
-        typer.secho(f"Failed to fix: bundle file not found: '{bundle_path}'", fg=typer.colors.RED, err=True)
+        typer.secho(f"Failed to fix: bundle file not found: '{judged_path}'", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.FIX, exit_code=2)

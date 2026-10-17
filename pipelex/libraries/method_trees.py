@@ -50,7 +50,13 @@ from pipelex import log
 from pipelex.core.method_trees.method_file_store import HeldFile
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
-from pipelex.libraries.exceptions import HostLibraryRequirementsError, HostLibraryTreeError, MethodRequirementsError, MethodTreeLoadError
+from pipelex.libraries.exceptions import (
+    EmptyMethodTreeError,
+    HostLibraryRequirementsError,
+    HostLibraryTreeError,
+    MethodRequirementsError,
+    MethodTreeLoadError,
+)
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 
 LIMITS_ADVICE = (
@@ -84,7 +90,8 @@ def list_local_method_tree(*, handed_over: Path, limits: TreeLimits | None = Non
         limits: The limits to list under, read from the configuration when not given.
 
     Raises:
-        MethodTreeLoadError: The standard refused the tree, it passed a limit, or it could not be read.
+        EmptyMethodTreeError: The membership rule keeps every file of the directory out of its tree.
+        MethodTreeLoadError: The standard refused the tree otherwise, it passed a limit, or it could not be read.
     """
     written = WRITTEN_METHOD_TREES.tree_written_at(directory=handed_over)
     if written is not None:
@@ -94,7 +101,11 @@ def list_local_method_tree(*, handed_over: Path, limits: TreeLimits | None = Non
     except TreeLimitError as exc:
         msg = f"{exc.message} {LIMITS_ADVICE}"
         raise MethodTreeLoadError(msg) from exc
-    except (MethodTreeRefusedError, TreeSourceError) as exc:
+    except MethodTreeRefusedError as exc:
+        if _is_empty_tree(refusal_error=exc):
+            raise EmptyMethodTreeError(exc.message) from exc
+        raise MethodTreeLoadError(exc.message) from exc
+    except TreeSourceError as exc:
         raise MethodTreeLoadError(exc.message) from exc
 
 

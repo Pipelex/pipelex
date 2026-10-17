@@ -2,10 +2,11 @@
 
 import asyncio
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, NamedTuple
 
 import typer
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
@@ -15,26 +16,57 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     run_failure_fields,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
+from pipelex.cli.agent_cli.commands.bundle_path_resolver import AgentBundleTarget, resolve_bundle_target
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
+    validate_method_folder_core,
     validate_pipe_in_bundle_core,
 )
+from pipelex.cli.bundle_target_resolution import locate_folder_pipe
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.bundle_graph_rendering import generate_graph_for_bundle, generate_view_for_bundle
-from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError, PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.tools.misc.chart_utils import FlowchartDirection
+
+_GRAPH_UNAVAILABLE_KEY = "graph_unavailable"
+
+
+class _GraphTarget(NamedTuple):
+    """The bundle file a graph is drawn from, and the pipe drawn: the one named, else the bundle's or method's entry."""
+
+    bundle_path: Path
+    pipe_code: str | None
+
+
+def _graph_target(*, target: AgentBundleTarget, pipe: str | None) -> _GraphTarget | str:
+    """Where `--graph` and `--view` draw from, or why no graph is drawn.
+
+    A bundle file draws its pipe named, else its own `main_pipe`. A method's folder, judged whole, draws the pipe named,
+    in the bundle defining it, else the pipe the method starts at by the MTHDS protocol's rule; when no single bundle
+    defines the pipe named, or the method has no single pipe to start at, nothing is drawn and the reason is returned,
+    the validation standing as it is.
+    """
+    if target.bundle_path is not None:
+        return _GraphTarget(bundle_path=target.bundle_path, pipe_code=pipe)
+    if target.method_tree is None:
+        msg = "A method's folder was resolved without its method tree."
+        raise PipelexUnexpectedError(msg)
+    try:
+        entry = locate_folder_pipe(tree=target.method_tree, pipe_override=pipe)
+    except MethodEntryError as exc:
+        return f"No graph was drawn, since a graph is drawn from one pipe: {exc.message}"
+    return _GraphTarget(bundle_path=target.method_tree.file_location(entry.tree_path), pipe_code=entry.pipe_ref)
 
 
 def validate_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, whose every bundle is judged"),
     ],
     pipe: Annotated[
         str | None,
@@ -76,7 +108,10 @@ def validate_bundle_cmd(
         typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
     ] = None,
 ) -> None:
-    """Validate a bundle file (.mthds) or pipeline directory and output the results.
+    """Validate a bundle file (.mthds) or a method's folder and output the results.
+
+    A folder is judged whole: every bundle of its method tree, with no pipe to start at needed. --pipe narrows the dry
+    run to one pipe. --graph and --view draw the pipe named, else the method's main pipe, and say so when it has none.
 
     Default output is markdown; use --format json for structured JSON.
     Results go to stdout on success, errors to stderr with exit code 1.
@@ -85,15 +120,33 @@ def validate_bundle_cmd(
         pipelex-agent validate bundle my_bundle.mthds
         pipelex-agent validate bundle my_bundle.mthds --pipe my_pipe
         pipelex-agent validate bundle my_bundle.mthds --graph
-        pipelex-agent validate bundle pipeline_01/
-        pipelex-agent validate bundle pipeline_01/ --graph
+        pipelex-agent validate bundle my_method/
+        pipelex-agent validate bundle my_method/ --pipe my_domain.my_pipe
+        pipelex-agent validate bundle my_method/ --graph
         pipelex-agent validate bundle draft_pipeline.mthds --allow-signatures
     """
     set_agent_cli_error_format(error_format or output_format)
 
-    bundle_path, library_dir = resolve_bundle_target(path, library_dir=library_dir)
-
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+    # A folder is judged whole, as the MTHDS protocol's validation judges a method: every bundle of its tree.
+    try:
+        target = resolve_bundle_target(path, library_dir=library_dir)
+    except ValidateBundleError as exc:
+        agent_error_validate_bundle(
+            exc,
+            bundle_path=Path(path).expanduser(),
+            library_dirs=[Path(lib_dir).expanduser() for lib_dir in library_dir] if library_dir else None,
+            allow_signatures=allow_signatures,
+        )
+    # The path judged: the method's folder, or the bundle file.
+    judged_path: Path
+    if target.method_dir is not None:
+        judged_path = target.method_dir
+    elif target.bundle_path is not None:
+        judged_path = target.bundle_path
+    else:
+        msg = f"The target '{path}' resolved to neither a bundle file nor a method's folder."
+        raise PipelexUnexpectedError(msg)
+    library_dirs = target.library_dirs
 
     # Convert library_dirs to list[str] for graph helper
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
@@ -101,26 +154,35 @@ def validate_bundle_cmd(
     make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
 
     try:
-        if pipe:
+        if target.method_dir is not None:
+            # The whole method, every pipe of it, or only the pipe named while the whole tree loads
+            result = asyncio.run(
+                validate_method_folder_core(
+                    method_dir=target.method_dir, library_dirs=library_dirs, allow_signatures=allow_signatures, pipe_code=pipe
+                )
+            )
+        elif pipe:
             # Validate a specific pipe within the bundle
             result = asyncio.run(
-                validate_pipe_in_bundle_core(
-                    bundle_path=Path(bundle_path), pipe_code=pipe, library_dirs=library_dirs, allow_signatures=allow_signatures
-                )
+                validate_pipe_in_bundle_core(bundle_path=judged_path, pipe_code=pipe, library_dirs=library_dirs, allow_signatures=allow_signatures)
             )
         else:
             # Validate the entire bundle
-            result = asyncio.run(validate_bundle_core(bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures))
+            result = asyncio.run(validate_bundle_core(bundle_path=judged_path, library_dirs=library_dirs, allow_signatures=allow_signatures))
+
+        graph_target: _GraphTarget | str | None = _graph_target(target=target, pipe=pipe) if graph or view else None
+        if isinstance(graph_target, str):
+            result[_GRAPH_UNAVAILABLE_KEY] = graph_target
 
         # Generate graph if requested and validation succeeded
-        if graph:
+        if graph and isinstance(graph_target, _GraphTarget):
             try:
                 graph_result = asyncio.run(
                     generate_graph_for_bundle(
-                        bundle_path=Path(bundle_path),
+                        bundle_path=graph_target.bundle_path,
                         graph_format=graph_format,
                         library_dirs=library_dir_strings,
-                        pipe_code=pipe,
+                        pipe_code=graph_target.pipe_code,
                         direction=direction,
                     )
                 )
@@ -142,13 +204,13 @@ def validate_bundle_cmd(
                 agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
-        if view:
+        if view and isinstance(graph_target, _GraphTarget):
             try:
                 view_result = asyncio.run(
                     generate_view_for_bundle(
-                        bundle_path=Path(bundle_path),
+                        bundle_path=graph_target.bundle_path,
                         library_dirs=library_dir_strings,
-                        pipe_code=pipe,
+                        pipe_code=graph_target.pipe_code,
                         direction=direction,
                     )
                 )
@@ -189,14 +251,14 @@ def validate_bundle_cmd(
         agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+        agent_error(f"Bundle file not found: {judged_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict: emit the format-aware failure surface. JSON keeps the exact structured
         # envelope (is_valid:false discriminant + validation_errors[], the shared builder's output,
         # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
         # footer. Signatures never reach here (they are a runnability fact, gated above).
-        agent_error_validate_bundle(exc, bundle_path=Path(bundle_path), library_dirs=library_dirs, allow_signatures=allow_signatures)
+        agent_error_validate_bundle(exc, bundle_path=judged_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {

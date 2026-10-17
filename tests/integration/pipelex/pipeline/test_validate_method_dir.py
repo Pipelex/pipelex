@@ -5,6 +5,7 @@ import pytest
 from mthds.method_tree.digest import digest_of_contents
 from mthds.method_tree.models import MethodTree
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -23,6 +24,17 @@ template = "Hello $text"
 """
 
 _SECOND_GREET_MTHDS = _GREET_MTHDS.replace(b'domain = "greeting"', b'domain = "greeting_too"')
+
+_LIBRARY_MTHDS = """\
+domain = "shouting"
+
+[pipe.shout]
+type = "PipeCompose"
+description = "Shout"
+inputs = { text = "Text" }
+output = "Text"
+template = "HEY $text"
+"""
 
 _BROKEN_PYTHON = b"def ok():\n    return 1\n\n\ndef oops(:\n    pass\n"
 
@@ -84,3 +96,24 @@ class TestValidateMethodDir:
             report = await validate_bundles_in_process(method_dir=method_dir, library_dirs_are_callers=True)
 
         assert report.graph_spec is None
+
+    async def test_the_callers_library_loads_beside_the_folder_while_only_the_folders_pipes_are_judged(self, tmp_path: Path) -> None:
+        """A command run over the caller's own disk: the ``-L`` directories load with the method, but are not the method."""
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
+        (method_dir / "greet.mthds").write_bytes(_GREET_MTHDS)
+        library_dir = tmp_path / "library"
+        library_dir.mkdir()
+        (library_dir / "shout.mthds").write_text(_LIBRARY_MTHDS, encoding="utf-8")
+
+        result = await validate_bundle(method_dir=method_dir, library_dirs=[method_dir, library_dir], library_dirs_are_callers=True)
+
+        assert [pipe.code for pipe in result.pipes] == ["greet"]
+        assert [Path(blueprint.source or "") for blueprint in result.blueprints] == [method_dir / "greet.mthds"]
+
+    async def test_a_hosts_library_never_loads_beside_a_method(self, tmp_path: Path) -> None:
+        library_dir = tmp_path / "library"
+        library_dir.mkdir()
+
+        with pytest.raises(PipelexUnexpectedError, match="only the caller's own directories load beside method_dir"):
+            await validate_bundle(method_dir=tmp_path, library_dirs=[library_dir])

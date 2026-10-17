@@ -44,7 +44,9 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     ``validated_pipes`` (a list of ``{pipe_ref, status}``), ``total_pipes``,
     and an optional ``bundle_path``. ``validate bundle --graph`` / ``--view``
     also merge ``graph_files`` / ``graphspec`` into the result — those are
-    surfaced too so markdown mode does not silently drop them.
+    surfaced too so markdown mode does not silently drop them — or, for a
+    method's folder with no single pipe to draw, ``graph_unavailable``, the
+    reason no graph was drawn.
 
     Args:
         result: The JSON-mode result dict for the validation.
@@ -115,6 +117,10 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
 
     if "graphspec" in result:
         lines += ["", "_A GraphSpec (structured graph JSON) is included — use `--format json` to retrieve it._"]
+
+    graph_unavailable = result.get("graph_unavailable")
+    if graph_unavailable:
+        lines += ["", "## Graph", "", str(graph_unavailable)]
 
     return "\n".join(lines)
 

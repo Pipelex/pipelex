@@ -7,7 +7,7 @@ description: "Reference for the `MethodEntryError` Pipelex error class."
 
 # Method entry
 
-Raised when a method run with no pipe named has no single pipe to start at.
+Raised when a method has no single pipe to start at, or no single bundle defining the pipe named.
 
 | Field | Value |
 |---|---|
@@ -18,6 +18,6 @@ Raised when a method run with no pipe named has no single pipe to start at.
 | Defined in | `pipelex.pipeline.exceptions` |
 | Parent class | [`PipelexError`](pipelex-error.md) |
 | `retryable` | `false` |
-| `user_action` | `change_input` — Name the pipe to run, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles |
+| `user_action` | `change_input` — Name the pipe, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles |
 
 [Back to Error Reference](index.md)

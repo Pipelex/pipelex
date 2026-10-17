@@ -12,8 +12,12 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError, resolve_bundle_target_core
+from pipelex.libraries.exceptions import MethodTreeLoadError
+from pipelex.libraries.method_trees import list_local_method_tree
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME
+from pipelex.pipeline.exceptions import MethodEntryError
+from pipelex.pipeline.method_entry import select_method_entry
 from pipelex.test_extras.mthds_corpus.exceptions import CorpusEntryError
 from pipelex.test_extras.mthds_corpus.manifest import (
     ENTRY_NAME_PATTERN,
@@ -43,21 +47,22 @@ class CorpusEntry(BaseModel):
 
 
 def _resolve_bundle_path(*, directory: Path) -> Path:
-    """Pick the entry's bundle file through the very resolution ``pipelex validate bundle <dir>`` runs.
+    """Pick the entry's bundle file by the MTHDS protocol's entry rule, the one ``pipelex run bundle <dir>`` starts at.
 
-    The contract says an entry directory is a valid CLI argument as it stands — either exactly one
-    ``.mthds`` file, or several with a ``bundle.mthds`` entry point. That claim is made true by
-    calling the CLI's own core rather than by keeping a corpus copy of its rules: a copy is how the
-    two drift, and a hand-rolled glob had already lost the core's refusal to auto-detect a symlinked
-    bundle. Only the rendering of a failure is ours.
+    The contract says an entry directory is a valid CLI argument as it stands: a method's folder whose entry the rule
+    selects, the one ``main_pipe`` its bundles declare, so ``run bundle <dir>`` starts at it while ``validate bundle
+    <dir>`` judges the folder whole. That claim is made true by calling the rule the CLI calls
+    (``select_method_entry`` over the folder's method tree) rather than by keeping a corpus copy of it: a copy is how
+    the two drift. The rule reads only the bundles' declarations, so an entry whose bundle is deliberately invalid
+    resolves as long as it declares its ``main_pipe``. Only the rendering of a failure is ours.
     """
-    resolved = resolve_bundle_target_core(str(directory), library_dir=None)
-    if isinstance(resolved, BundleTargetResolutionError):
-        candidates = ", ".join(candidate.name for candidate in resolved.candidate_files)
-        detail = f" ({candidates})" if candidates else ""
-        msg = f"Corpus entry '{directory.name}' does not resolve to a bundle: {resolved.kind}{detail}"
-        raise CorpusEntryError(msg)
-    return resolved.bundle_path
+    try:
+        tree = list_local_method_tree(handed_over=directory)
+        entry = select_method_entry(tree=tree)
+    except (MethodTreeLoadError, MethodEntryError, MthdsParserError) as exc:
+        msg = f"Corpus entry '{directory.name}' does not resolve to a bundle: {exc.message}"
+        raise CorpusEntryError(msg) from exc
+    return tree.file_location(entry.tree_path)
 
 
 def load_entry(*, directory: Path) -> CorpusEntry:

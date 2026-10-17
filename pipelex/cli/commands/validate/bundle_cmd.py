@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -17,7 +16,7 @@ _NOT_A_BUNDLE_HINT = (
 def validate_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, whose every bundle is judged"),
     ],
     library_dir: Annotated[
         list[str] | None,
@@ -43,25 +42,28 @@ def validate_bundle_cmd(
         ),
     ] = None,
 ) -> None:
-    """Validate a bundle file (.mthds) or pipeline directory.
+    """Validate a bundle file (.mthds) or a method's folder.
+
+    A folder is judged whole, every bundle of its method tree, as the MTHDS protocol's validation judges a method: it
+    needs no pipe to start at.
 
     Examples:
         pipelex validate bundle my_bundle.mthds
-        pipelex validate bundle pipeline_01/
+        pipelex validate bundle my_method/
         pipelex validate bundle my_bundle.mthds --allow-signatures
     """
-    bundle_path, library_dir = resolve_bundle_target(
+    target = resolve_bundle_target(
         path,
         library_dir=library_dir,
         command=COMMAND,
         not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
     )
-    library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     execute_validate(
         pipe_code=None,
-        bundle_path=Path(bundle_path),
-        library_dirs=library_dirs_paths,
+        bundle_path=target.bundle_path,
+        method_dir=target.method_dir,
+        library_dirs=target.library_dirs,
         telemetry_command_label=f"{COMMAND} bundle",
         allow_signatures=allow_signatures,
         orchestrator=orchestrator,

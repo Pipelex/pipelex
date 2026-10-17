@@ -4,7 +4,12 @@
 
 ### Changed
 
+- **Every command taking a method's folder reads it as its method tree (Breaking)**: `validate bundle` and `fix bundle` on both CLIs judge every bundle of the folder's tree, as the MTHDS protocol's validation does, instead of a `bundle.mthds` or the folder's only `.mthds` file, so a folder whose bundles declare several `main_pipe`s, or none, is validated and fixed like any other, and one holding no bundle exits with code `2` under `EmptyMethodTreeError`. `pipelex-agent inputs bundle`, `pipelex build inputs bundle` and `pipelex build output bundle` act, with no `--pipe`, on the pipe `run bundle` starts at, the `METHODS.toml`'s `main_pipe` or, with no manifest, the one `main_pipe` its bundles declare, and refuse a folder that decides none with the `MethodEntryError` `run bundle` gives. `pipelex-agent validate bundle <folder> --graph` draws that same pipe, or the one `--pipe` names, and when the folder decides none it says why in `graph_unavailable` instead of failing the validation.
 - **A bundle validator receives the read scope, plugin API version 8 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `read_scope`, the scope the host named for the validation, `None` when it named none, so a validator dispatching the validation to another process hands the method's trees to its worker through that scope's blob store and the worker reads them by digest under it, as a run's worker reads under the run's read scope. The API server's `POST /v1/validate` hands its validator the request's `read_scope` on every arm, never the caller's own id, and `PLUGIN_API_VERSION` moves to 8, so a plugin declaring `targets_api = 7` is refused at discovery with `PluginApiVersionMismatchError`.
+
+### Fixed
+
+- **A `main_pipe` that is not a string is an invalid bundle**: a bundle declaring its `main_pipe` as another type, such as a list, is refused with a validation error located on `main_pipe` instead of crashing the parse with a `TypeError`.
 
 ## [v0.88.0] - 2026-10-16
 
