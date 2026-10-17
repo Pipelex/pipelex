@@ -397,8 +397,10 @@ async def handle_api_error(request: Request, exc: Exception) -> Response:
     own 4xx/5xx — request validation, auth, payload limits, misconfiguration.
     The helper builds the problem document at raise time, where it holds no
     `Request`, so this handler stamps the two request-scoped members (`instance`
-    and `request_id`) onto a copy of it — the same two values, read from the same
-    place, as the pipelex-error and request-validation paths use. It then
+    and `request_id`) onto a copy of it, read from the same place as the
+    request-validation path reads them. A `PipelexError`'s problem carries
+    `request_id` alone, since the problem document leaves the RFC's `instance`
+    out: the request id already names the occurrence. It then
     serializes that document, re-attaches any `WWW-Authenticate` challenge header,
     and emits the structured error record so an API-owned 500 from any
     route is observable (a `raise_internal_server_error` site like `version.py`'s
