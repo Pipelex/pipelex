@@ -79,14 +79,14 @@ A bare `pipe_ref` that matches one pipe (`echo` where `smoke.echo` is meant) is 
 
 ## Response (invalid verdict)
 
-An invalid closure is the `200` crate verdict `/v1/resolve` gives: `is_valid: false`, the structured `validation_errors[]` and a `message`. It carries no artifacts, no `pipe_ref` or `default_pipe_ref`, no runnability facts and no `files`, whatever the request asked for.
+An invalid closure is the `200` crate verdict `/v1/resolve` gives: `is_valid: false`, the structured `errors[]` and a `message`. It carries no artifacts, no `pipe_ref` or `default_pipe_ref`, no runnability facts and no `files`, whatever the request asked for.
 
 ## No verdict
 
 Every non-2xx is RFC 9457 `application/problem+json` (see [Error Responses](error-responses.md)):
 
-- **`422`** for a malformed body, neither or both closure selectors and an over-limit file, all `ValidationError`, and for the selection refusals above, by their codes.
+- **`422`** for a malformed body, neither or both closure selectors and an over-limit file, all `request.invalid` naming the field, and for the selection refusals above, by their codes.
 - **`422` `request.unsupported`** with `params.reason` set to `address_based_dependency` for a closure calling another method by its address, which this route cannot load: the request is what it cannot serve, not the method, so it is no verdict, and the run routes, which fetch such a dependency, run the closure.
-- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `method.not_found` when no package in the fetched repository matches the address, `422` for a reference that does not parse (`request.invalid`) or a package the server cannot accept (`method.ambiguous`, `method.package_invalid`), `502` `method.fetch_failed` when the fetch itself failed, and `501` `MethodRefNotSupported` for a registry-form reference. The route reads only a package's `.mthds` files, so the custom-code and structures `403`s of `/v1/validate` and the run routes never arise here.
-- **`401` / `403`** for authentication, and **`413`** for a body over the size limit.
+- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `method.not_found` when no package in the fetched repository matches the address, `422` for a reference that does not parse (`request.invalid`) or a package the server cannot accept (`method.ambiguous`, `method.package_invalid`), `502` `method.fetch_failed` when the fetch itself failed, and `422` `request.unsupported` for a registry-form reference. The route reads only a package's `.mthds` files, so the custom-code `501` and the structures `422` of `/v1/validate` and the run routes never arise here.
+- **`401`** for authentication, and **`413`** `request.too_large` for a body over the size limit.
 - **`500`** when an artifact cannot be derived: a pipe whose input or output JSON Schema cannot be rendered raises `PipeIOContractError`, which answers `500` as it does on `/v1/validate` — a fault of the tool, not a verdict about the method.

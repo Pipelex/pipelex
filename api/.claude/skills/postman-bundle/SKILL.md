@@ -32,7 +32,7 @@ This is a focused, one-bundle-at-a-time tool. It is **not** the full collection 
 | `resolve` | `POST /v1/resolve` | `files[]` crate | no | no | no (free) |
 | `codegen` | `POST /v1/codegen` | `files[]` crate + `kind`/`target` | no | no | no (free) |
 
-Every non-run endpoint answers with the **`/validate` verdict discipline**: a produced verdict is always a `200` discriminated on `is_valid` — the artifact on the valid arm, structured `validation_errors[]` on the invalid arm. Non-2xx is reserved for no-verdict conditions (request-shape `422`, auth `401`/`403`, server `5xx`), rendered as RFC 7807 `problem+json`.
+Every non-run endpoint answers with the **`/validate` verdict discipline**: a produced verdict is always a `200` discriminated on `is_valid` — the artifact on the valid arm, structured `errors[]` problem items on the invalid arm. Non-2xx is reserved for no-verdict conditions (request-shape `422`, auth `401`, server `5xx`), rendered as RFC 9457 `problem+json` with a registry `code`.
 
 ## What it produces in Postman
 
@@ -51,7 +51,7 @@ Which requests appear depends on `--endpoint`: the default `both` is `execute` +
 
 ## The two request envelopes
 
-**Run + validate routes** carry the bundle as parallel lists — `mthds_contents` (full text of each `.mthds` file, main one first) plus, on `/validate`, `mthds_sources` (one filename per content, so `validation_errors[].source` names the owning file):
+**Run + validate routes** carry the bundle as parallel lists — `mthds_contents` (full text of each `.mthds` file, main one first) plus, on `/validate`, `mthds_sources` (one filename per content, so `errors[].location.file` names the owning file):
 
 ```json
 {

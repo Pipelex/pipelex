@@ -1,6 +1,6 @@
 # Error Responses
 
-Every error returned by the API is an RFC 9457 `application/problem+json` document. A failure the Pipelex runtime raised, which is every domain error, every run failure and the catch-all, answers its **problem document**, named by a registry code and seen through the view the request's identity gives it. A refusal the API authors itself, such as a malformed body, a missing token or a payload over its limit, answers a problem document of its own, classified by an `error_type`.
+Every error returned by the API is an RFC 9457 `application/problem+json` **problem document**, named by a registry code and seen through the view the request's identity gives it. That holds for a failure the Pipelex runtime raised, which is every domain error, every run failure and the catch-all, and for a refusal the runner authors itself at its own boundary, such as a malformed body, a missing token, a payload over its limit or a path no route serves: there is one shape, and a client branches on its `code`.
 
 ## Envelope
 
@@ -59,20 +59,16 @@ A failure the runtime raised looks like this, in the caller view:
 - `request_id` — server-correlated identifier for the request. Echoed from inbound `X-Request-ID` if provided, otherwise generated. Use this when reporting issues.
 - `diagnostics` — present in the operator view alone. See [Views chosen by identity](#views-chosen-by-identity).
 
-### API-authored errors
+### The runner's own refusals
 
-A refusal the API authors itself, before the runtime is asked anything, carries no `code` yet. It keeps the classification members it had before the problem document, beside the RFC's `type`, `title`, `status` and `detail`:
+A refusal the runner authors itself, before the runtime is asked anything, is a problem document like any other, named by its code and seen through the view the request's identity gives it. Its `detail` and `next_step` are its code's sentences, and the runner's own account of what it checked rides the operator view's `diagnostics.message`. The codes it answers are listed under [Status codes](#status-codes). A few conventions hold across them:
 
-- `error_type` — the refusal's name, such as `ValidationError`, `InvalidJSON`, `Unauthenticated` or `PayloadTooLarge`, the member to branch on. See [Status codes](#status-codes).
-- `error_domain` — `input` for a refusal the caller can fix, `config` for one the deployment must.
-- `retryable` — always present, and `false`: every such refusal is a request to correct or a deployment to fix.
-- `instance` — the request's path.
-- `request_id` — as above.
-- `tree_refusal` — on a **422** `InvalidMethodFiles`, the MTHDS standard's refusal of a method tree the request sent: `{"code": "<refusal code>", "names": [...]}`, the code one of the standard's tree refusal codes, such as `invalid_tree_path`, `duplicate_key`, `excluded_name` or `malformed_entry`, and `names` the keys, paths or addresses it refuses. A name holding a code point UTF-8 cannot encode, such as a lone surrogate a JSON escape can carry, is written with that code point backslash-escaped. See [Pipe Run](pipe-run.md#sending-a-method-as-a-tree).
-- `missing_blobs` — on a **422** `MissingBlobs`, the SHA-256 hashes the request named by hash entries that this runner does not hold at their stated size, to upload through the blob routes before sending the request again. See [Sending files by hash](pipe-run.md#sending-files-by-hash).
-- `mismatched_blobs` — on a **422** `BlobMismatch` refusing a request's hash entries, each hash this runner holds at another size than its entry states, as `{"sha256": "…", "held_size": n}`: the entry's size is the one to correct, since uploading the bytes again would not change the size they are held at.
+- A field the route's rules refuse is `request.invalid`, whose `field` parameter, also its `location.field`, names the field as the request spells it, or a dotted path into the body such as `callback_urls.0`. When several fields fail at once, `errors` carries one `request.invalid` item per refused field, so a client fixes them all in one go, and the problem's own `field` is the first of them. A rule of the request model that concerns the body as a whole, such as sending exactly one of `mthds_contents`, `files` and `method_ref`, names the field `body`.
+- A body, or an encoded part of one, that cannot be parsed is `request.malformed`, whose `reason` says why: `not_json`, `not_utf8`, `bad_base64`, `bad_zip`, `too_deeply_nested` or `body_incomplete`.
+- A request past one of this runner's size limits is `request.too_large`, a **413** whose `limit` and `size` parameters give the limit and what the request carried, in bytes or, for an encoded value, in characters.
+- A method tree the runner refuses to read as a method is `method.package_invalid`, whose `reason` names the rule the tree breaks and whose `path` or `limit` says where or how far.
 
-Its `detail` is the API's own sentence about what it checked, and it reads the same in every view.
+The members the runner's refusals used to carry are gone: no refusal carries an `error_type`, `error_domain`, `retryable` or `instance`. The request's path is not echoed, since `request_id`, which the runner takes from an inbound `X-Request-ID` or mints, is what correlates a response with the server's records.
 
 ## Views chosen by identity
 
@@ -84,6 +80,8 @@ A failure the runtime raised is one problem seen through a view, and the identit
 | `AUTH_MODE=none` with `TRUST_FORWARDED_IDENTITY_HEADERS=true`: the only party reaching this server is the trusted proxy in front of it, such as the hosted platform, which owes its own callers their caller view | The operator view |
 | `AUTH_MODE=jwt`: a caller's token | The caller view |
 | `AUTH_MODE=none` without the trusted proxy, or a request refused before any authentication ran | The caller view |
+
+A refusal the runner authors before any authentication ran, such as a body over the size limit or a path no route serves, is answered in the caller view.
 
 **The caller view** carries the code's sentences, rendered from the parameters a caller may read, and the step for the caller: for a code of the `operator` domain, whose actor is whoever runs this server, that is what the caller can do meanwhile, such as choosing another model. It never carries the error's own message, its class, a path on the host, a provider's answer or a foreign exception's text, whatever the failure. A problem this server relays with a code its own registries do not hold, such as one a newer worker built, reaches the caller with the generic step of its kind, and `report` for a code of the `operator` domain, since its recorded step was written for the operator.
 
@@ -107,48 +105,40 @@ The server's own record of a failure the runtime raised is built from the operat
 
 ## Structured validation errors
 
-When a bundle fails validation, the runtime builds one structured item per fault — the per-error diagnostics an editor maps to per-line problems — and where they surface depends on the endpoint. On the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/pipe-io`) an invalid bundle is the successful product of the call: a **200 `is_valid: false`** verdict carrying the items whole as `validation_errors` (see [Pipe Validate](pipe-validate.md)). On the run routes (`/execute`, `/start`), where an invalid bundle means the run cannot proceed, it is a **422** `method.invalid` problem carrying the same items as its `errors`, each with its own code. Built by pipelex's one shared builder, the items name the same faults at the same places wherever they appear, and the same as the agent CLI's.
+When a bundle fails validation, the runtime builds one structured item per fault — the per-error diagnostics an editor maps to per-line problems — and every surface of this server carries them as the MTHDS standard's **problem items**. On the diagnostic routes (`/validate`, `/resolve`, `/codegen`, `/pipe-io`) an invalid bundle is the successful product of the call: a **200 `is_valid: false`** verdict carrying the items as `errors` (see [Pipe Validate](pipe-validate.md)). On the run routes (`/execute`, `/start`), where an invalid bundle means the run cannot proceed, it is a **422** `method.invalid` problem carrying the same items as its `errors`. Built by pipelex's one shared builder, the items name the same faults at the same places wherever they appear, and the same as the agent CLI's. A valid verdict's `warnings` are problem items too, in the same shape.
 
-Each `validation_errors` item of a verdict is one categorized validation failure:
+Each item is one fault:
 
-| Field | Meaning |
+| Member | Meaning |
 |---|---|
-| `category` | The failure family — one of `blueprint_validation`, `pipe_factory`, `pipe_validation`, `dry_run`. |
-| `message` | Human-readable description of this specific error. On a `dry_run` item it names the pipe, then the sentence the failure's code renders for a caller, never the failure's own text. |
-| `error_type` | Finer error subtype within the category, when the source error provides one. |
-| `source` | The owning file of the error, when the runtime could attribute it to one: on `blueprint_validation` and `pipe_validation` items, and on a `dry_run` item, where it is the file of the pipe whose dry run failed. On the in-memory submit path it is the matching `mthds_sources[i]` (see [Sourcing submitted files](pipe-validate.md)), so it is absent when the caller sent no sources. Absent on `pipe_factory` items and on the parse-level residual described below. Beside a server's own library directories, an item never names one of their files, nor a template file one of their `PipeDocGen` steps names. |
-| `pipe_code`, `concept_code`, `domain_code` | The pipe / concept / domain the error is about, when applicable. On a `dry_run` item they name the innermost pipe that failed, not the controller the failure passed through. |
-| `field_path`, `field_name` | The offending field within the bundle, when the error localizes to one. |
-| `variable_names`, `missing_concept_code`, `missing_pipe_code`, `declared_concepts` | Extra context for specific failure shapes (undefined variables, an unresolved concept, pipe or package reference, the set of concepts that were declared). On an `unresolved_package_dependency` item, `missing_pipe_code` is the reference as written, `<address>->domain.code`, so the package's address is the part before `->`. |
-| `line`, `column` | The 1-based position where the TOML parser stopped, on a TOML syntax error. |
-| `model_reference`, `model_type`, `suggestions` | On an `unknown_model` item — a pipe naming a model the deployment's model deck does not define — the reference as the bundle wrote it, the kind of model the pipe needs (`llm`, `extract`, …), and the deck's close matches of that kind. With exactly one suggestion the item also carries an `unsafe` `suggested_fix` renaming the model. On an `llm_setting_refused_by_model` item — a `PipeLLM` or `PipeStructure` whose model setting the model it resolves to refuses, which its worker would refuse at the first call — `field_name` and `field_path` name the `model` or `model_to_structure` field holding the setting, and `model_reference` is the preset, alias or model that field names, absent when it writes the setting inline or the pipe leaves it to the deck's override or default. |
-| `template_file`, `template_location` | On a `template_check_warning` item, which rides the valid verdict's `warnings` rather than `validation_errors`, the template file as the `PipeDocGen` step names it and the place in it the engine's finding names, in the engine's own words (a defined name, a Table, a cell, a shape, a tag); `template_location` is absent when the engine names no place. A step of the server's own library directories is named by its `pipe_code` and `domain_code` alone: its item carries no `template_file`, and its message reads `<host library file>` where it named the file. |
-| `suggested_fix` | A structured, deterministic fix for this error — present only when the fix planner derived one. See [Suggested fixes](#suggested-fixes). |
+| `code` | The registry code of the fault: the code its type maps to, such as `method.input_undeclared` for an input a pipe reads but does not declare, `model.unknown` for a model the deck does not define, `method.syntax` for a TOML syntax error or `method.dependency_missing` for a package the method calls and no one supplied. A `dry_run` item's code is its failure's own, and an item no stage classified takes `method.schema_violation`, or the code of the refusal behind it. |
+| `detail` | The code's sentence, rendered from the item's parameters, or the code's title when the item lacks a parameter the sentence names. A program branches on `code`, never on a sentence. |
+| `params` | The facts the item's locators give the code, by the registry's names: the `pipe`, the `variables` it reads, the `concept` or `model` it names, the `model_type`, a `finding` quoting the validation's own account. |
+| `location` | Where the fault is: the `pipe`, the `field` within the bundle, and the `file` with its 1-based `line` and `column` when the parser stopped there. On the in-memory submit path the `file` is the matching `mthds_sources[i]` (see [Sourcing submitted files](pipe-validate.md)), so it is absent when the caller sent no sources. Beside a server's own library directories, an item never names one of their files, nor a template file one of their `PipeDocGen` steps names. |
+| `suggestions` | On a `model.unknown` item, the deck's close matches of the kind the pipe needs. |
+| `suggested_fix` | A structured, deterministic fix for this fault — present only when the fix planner derived one. See [Suggested fixes](#suggested-fixes). |
 
-Items carry only the fields that apply to their category — absent fields are omitted, not null.
+An item writes no member that has no value: an absent member is not `null`.
 
-On a `422` problem, each item becomes one `errors` entry: its `code` is the code its `error_type` maps to (`method.input_undeclared` for a `missing_input_variable`, `model.unknown` for an `unknown_model`), a `dry_run` item's is its failure's own, and an item no stage classified takes `method.schema_violation` or the code of the refusal behind it; its `detail` is that code's sentence and its `params` the facts the item's locators give it; its `location` holds the item's `pipe`, `field`, `file`, `line` and `column`; and it keeps the item's `suggestions` and `suggested_fix`.
-
-Every invalid verdict carries a **non-empty** list of items — the structured-info invariant is total. A parse-level failure the runtime cannot attribute to a known pipe/concept/field — an empty blueprint, an elaborator failure — still becomes one `blueprint_validation` residual item carrying the failure message (no `source`, no `error_type` at this layer), so the list is never empty on an invalid verdict. A TOML syntax error is an item of the same category without an `error_type`, which carries the `line` and `column` the parser stopped at and the `source` when the caller sent one. A failing dry run is one `dry_run` item per failing pipe, located at the innermost pipe that failed. A dry run whose every failure belongs to someone other than the method's author, such as a storage outage, is no verdict about the method: it answers the failure's own code, with every failure riding its `errors`.
+Every invalid verdict carries a **non-empty** list of items — the structured-info invariant is total. A parse-level failure the runtime cannot attribute to a known pipe, concept or field — an empty blueprint, an elaborator failure — still becomes one residual item carrying the failure as its `finding`, so the list is never empty on an invalid verdict. A TOML syntax error is a `method.syntax` item whose `location` holds the `line` and `column` the parser stopped at, and the `file` when the caller sent one. A failing dry run is one item per failing pipe, located at the innermost pipe that failed. A dry run whose every failure belongs to someone other than the method's author, such as a storage outage, is no verdict about the method: it answers the failure's own code, with every failure riding its `errors`.
 
 On the run routes, **every refusal of the bundle while it loads is this verdict**, and the load happens before any pipe runs: a misspelled concept, a wiring mismatch, an unknown model, a TOML fault or a refusal raised while a pipe is built all answer the same **422** `method.invalid` carrying the same items validating the bundle gives. None of them reaches a run as a `500`. An entry pipe the bundle does not declare answers `request.pipe_not_found`, and a bare code matching pipes in several domains `request.pipe_ambiguous`.
 
 ## Suggested fixes
 
-A validation error item may carry a `suggested_fix`: a deterministic repair the runtime's fix planner derived from the *typed* error data — never by parsing a message string. It rides a verdict's `validation_errors` item and a problem's `errors` item as the same object. It is optional and additive. An item the planner has no rule for simply omits the field, and a client that ignores `suggested_fix` entirely behaves exactly as before.
+A problem item may carry a `suggested_fix`: a deterministic repair the runtime's fix planner derived from the *typed* error data — never by parsing a message string. It is the MTHDS standard's fix, the same object on a verdict's item and on a problem's. It is optional and additive. An item the planner has no rule for simply omits the member, and a client that ignores `suggested_fix` entirely behaves exactly as before.
 
 ```json
 {
-  "category": "pipe_validation",
-  "message": "Pipe 'summarize_and_translate' declares output 'Text' but its last step produces 'Translation'",
-  "error_type": "inadequate_output_concept",
-  "pipe_code": "summarize_and_translate",
-  "source": "translate.mthds",
+  "code": "method.output_concept_mismatch",
+  "detail": "A pipe's output concept does not fit",
+  "params": { "pipe": "summarize_and_translate" },
+  "location": { "pipe": "summarize_and_translate", "file": "translate.mthds" },
   "suggested_fix": {
     "fix_code": "match-sequence-output",
     "description": "Set output of pipe 'summarize_and_translate' to 'Translation' to match its last step",
     "safety": "safe",
-    "source": "translate.mthds",
+    "file": "translate.mthds",
     "ops": [
       {
         "kind": "set_key",
@@ -166,10 +156,10 @@ A validation error item may carry a `suggested_fix`: a deterministic repair the 
 - `fix_code` — the kebab-case rule id that produced the fix (`match-sequence-output`, `sync-controller-inputs`, `strip-native-concept-redecl`, `strip-namespace`, `delete-redundant-dotted-input`, …). Stable; use it to allow-list or suppress rules.
 - `description` — human-readable summary of what the fix does.
 - `safety` — `safe` or `unsafe`. Only apply an `unsafe` fix behind an explicit opt-in: it is a likely correction, such as the one close match for an unknown model, that a person or an agent must confirm, and `pipelex fix bundle` never applies one on its own.
-- `source` — the file the ops target, when known. **An applier must only apply ops to the file they target** — in a multi-file library the ops are meaningless against any other file.
+- `file` — the file the ops target, when known. **An applier must only apply ops to the file they target** — in a multi-file library the ops are meaningless against any other file.
 - `ops` — the semantic TOML patch operations, in order.
 
-**Ops** are addressed by `table_path` (the containing table, e.g. `["pipe", "my_seq"]` — the same addressing convention as the items' `field_path`). An op is a **union discriminated on `kind`**: read `kind` off the wire and you know exactly which other fields the op carries, because each kind is its own shape in the OpenAPI artifact rather than one open shape with everything optional.
+**Ops** are addressed by `table_path` (the containing table, e.g. `["pipe", "my_seq"]`). Each op's `kind` names its shape: read `kind` off the wire and you know exactly which other fields the op carries, because each kind is its own shape in the OpenAPI artifact rather than one open shape with everything optional. An op whose `kind` is none of those below, which a newer runtime could send, is read as an unknown op that an applier never applies.
 
 | `kind` | Effect | Carries besides `table_path` |
 |---|---|---|
@@ -242,31 +232,36 @@ A few runtime refusals worth knowing by their code:
 - **409** — `pipelex.run.already_exists`: the submitted `pipeline_run_id` is already registered for a run that is still in flight on this server. Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates — resubmit after the in-flight run finishes, or pick a fresh id. Only `POST /v1/start` accepts a client-supplied `pipeline_run_id`, so only `/start` can produce it.
 - **422** — the `method_ref` resolution refusals the caller can fix: `request.invalid` for a reference that does not parse, `method.ambiguous`, and `method.package_invalid` for a package past its limits or carrying a symbolic link. `pipelex.deployment.python_structures_refused` is a **422** too: a method, fetched by `method_ref` or sent as a tree, declares in-process Python structure classes (`StructuredContent` subclasses), which hosted execution always refuses, sandbox or not — express the types as MTHDS concepts with inline structures instead (see [Pipe Run](pipe-run.md#running-a-method-by-address-method_ref)).
 
-The API's own refusals, which carry an `error_type` and no code, answer these statuses:
+The runner's own refusals answer these codes:
 
-- **400** — `StartRequiresAsyncOrchestration`: `POST /v1/start` is fire-and-forget by nature, and this deployment's orchestrator is blocking-only (the in-process `direct` default), so it refuses honestly rather than blocking and acking — use `POST /v1/execute` instead. `BadRequest`: the client disconnected before its request body was received in full, which only the server's logs show, at warning level, since the client is gone before the answer; or a forwarded `X-User-Id` is not a single path-safe segment.
-- **401** — `Unauthenticated`, `InvalidToken` or `TokenExpired`: a missing, invalid or expired bearer token, with `WWW-Authenticate: Bearer` set. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`), or trusts a proxy that forwarded no identity.
-- **403** — `OrchestrationModeOverrideForbidden`: the request asked for an `orchestration_mode` this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`). `BlobUploadNotAuthorized`: a `PUT /v1/blobs/{sha256}` without a valid upload target, its signature missing, forged, expired, or signed for another hash or scope, so ask `POST /v1/blobs/missing` for a fresh target. `CustomCodeRequiresSandbox`: the method (a tree sent with the request, or a fetched `method_ref` package) holds custom Python `.py` files and this deployment is not sandbox-hosted, so running caller-supplied code in-process is refused.
-- **413** — `PayloadTooLarge`: the request body exceeds the configured size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default), or a part of it exceeds its own: a `bundle_b64` archive over `MAX_BUNDLE_FILES` or `MAX_BUNDLE_TOTAL_KIB`, or `resources` over `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` or `MAX_RESOURCES_TOTAL_KIB`.
-- **501** — `MethodRefNotSupported`: the request selected its closure by a **registry-form** `method_ref` — not a `github.com/...` address — and no server-side method registry resolves those yet. Address-form references are fetched and resolved server-side (see [Pipe Run](pipe-run.md#running-a-method-by-address-method_ref)); use one of those, or submit inline `files[]`. It is permanent under the current deployment — do not retry.
+- **401** — `auth.missing_credential` for a request carrying no bearer token, `auth.invalid_credential` for a token the runner refuses, and `auth.credential_expired` for an expired one, each with `WWW-Authenticate: Bearer` set. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`), or trusts a proxy, which then answers `auth.missing_credential` when it forwarded no identity and `auth.invalid_credential` when the forwarded `X-User-Id` is not a single path-safe segment.
+- **403** — `auth.forbidden` with the `requirement` `signed_upload_target`: a `PUT /v1/blobs/{sha256}` without a valid upload target, its signature missing, forged, expired, or signed for another hash or scope, so ask `POST /v1/blobs/missing` for a fresh target.
+- **404** — `request.not_found`: no route serves the request's path.
+- **405** — `request.method_not_allowed`: the route does not accept the request's HTTP method. The response carries the `Allow` header listing the methods it accepts.
+- **413** — `request.too_large`: the request body exceeds the configured size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default), or a part of it exceeds its own: an encoded `bundle_b64` archive over `MAX_BUNDLE_TOTAL_KIB`, a file in `resources` over `MAX_RESOURCE_FILE_KIB`, the files in `resources` over `MAX_RESOURCES_TOTAL_KIB`, or a blob upload over the per-file tree limit.
+- **422** — `request.invalid` for a field the route's rules refuse, `request.malformed` for a body or an encoded part that cannot be parsed, `request.unsupported` for a **registry-form** `method_ref` — not a `github.com/...` address — which no server-side method registry resolves yet (its `reason` is `registry_form_method_ref`; use an address or submit inline `files[]`), and `pipelex.deployment.orchestration_override_forbidden`, naming the `requested_mode`, for a request asking for an `orchestration_mode` this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`).
+- **500** — `runtime.misconfigured`: the runner's own configuration cannot serve the request, such as a missing `API_KEY` or `JWT_SECRET_KEY`, a `PUBLIC_BASE_URL` that is not an HTTP URL, missing package metadata, or a blob store holding bytes under a hash they do not hash to, which its operator removes for the blob to be uploaded again. Which setting is at fault is the operator's to read, in `diagnostics.params.component`. `pipelex.deployment.token_claims_invalid` is a **500** too: a token whose signature holds carries a `user_id` claim that is missing, unsafe or reserved, which its issuer, not its bearer, must fix.
+- **501** — `runtime.unsupported` naming the `capability` `asynchronous execution`: `POST /v1/start` is fire-and-forget by nature, and this deployment's orchestrator is blocking-only (the in-process `direct` default), so it refuses honestly rather than blocking and acking — use `POST /v1/execute` instead. `pipelex.deployment.custom_code_requires_sandbox`: the method holds custom Python `.py` files and this deployment is not sandbox-hosted, so running caller-supplied code in-process is refused; its `origin` says whether the code came in the request's `bundle` or a fetched `package`.
 
-Every route that takes a JSON body refuses one whose arrays and objects nest more than 128 levels deep, the body's own envelope included, with a **422** `InvalidJSON` whose `detail` says the body is nested too deeply. The depth is checked before the body is parsed, so the answer does not depend on the Python version or the stack size the server runs with. The bound is fixed rather than configurable, and real inputs stay far below it.
+A client that disconnects before its request body was received in full is answered `request.malformed` with the reason `body_incomplete`, which only the server's logs show, at warning level, since the client is gone before the answer.
 
-The run routes read their body as plain JSON before anything else, and two refusals come from that step, both **422**. A body that is not valid UTF-8, not valid JSON, nested too deeply, or not a JSON object answers `InvalidJSON`. A body carrying, in any object at any depth, a key named `__class__` or `__module__`, or a key starting with `__kajson`, answers `ReservedObjectKey`, and the `detail` names the key, cut short when it is long. Those are the keys a kajson decoder reads as an order to import and instantiate a class, so the runner refuses them rather than carry them as data. Only keys are checked: a string value that mentions `__class__` is accepted.
+Every route that takes a JSON body refuses one whose arrays and objects nest more than 128 levels deep, the body's own envelope included, with a **422** `request.malformed` whose `reason` is `too_deeply_nested`. The depth is checked before the body is parsed, so the answer does not depend on the Python version or the stack size the server runs with. The bound is fixed rather than configurable, and real inputs stay far below it.
+
+The run routes read their body as plain JSON before anything else, and two refusals come from that step, both **422**. A body that is not valid UTF-8 or not valid JSON answers `request.malformed` with the reason `not_utf8` or `not_json`, and one that is not a JSON object `request.invalid` naming the field `body`. A body carrying, in any object at any depth, a key named `__class__` or `__module__`, or a key starting with `__kajson`, answers `pipelex.security.reserved_key`, whose `keys` parameter names the key, cut short when it is long. Those are the keys a kajson decoder reads as an order to import and instantiate a class, so the runner refuses them rather than carry them as data, and logs the refusal's security event. Only keys are checked: a string value that mentions `__class__` is accepted.
 
 A pipe selection the server cannot make is an input **422** named for its failure: `request.pipe_not_found` when the selector names no pipe, and `request.pipe_ambiguous` when a bare code matches pipes in several domains. The run routes answer an unknown or ambiguous `pipe_code` that way. `POST /v1/pipe-io` answers every selection refusal that way, counting a request with no `pipe_ref` over a method that declares no `main_pipe`, or whose domains declare several, as `request.pipe_unspecified`, which names the declared ones as its `candidates`, and a manifest `main_pipe` the method lacks or declares in several domains as the method's own `method.pipe_unresolved` or `method.ref_ambiguous` (see [Pipe I/O](pipe-io.md#pipe-selection)).
 
-The run routes' extension fields are validated before any method is fetched or any library loaded, and a failure there is a **422** whose `error_type` names the field that failed: `InvalidCallbackUrls` for `callback_urls`, `InvalidStorageScope` for `storage_scope`, `InvalidReadScope` for `read_scope`, `InvalidAnalyticsGroups` for `analytics_groups` (see [Pipe Run](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups)). A storage scope that does not lie under the run's read scope, whether either was sent or defaulted, is an `InvalidReadScope` as well. A failure on another extension field, or on more than one at once, carries the generic `ValidationError`, and the `detail` names every field that failed. `POST /v1/validate` takes `analytics_groups` too and classifies it the same way: a body failing on that field alone answers `InvalidAnalyticsGroups`, and one failing on it and another field answers `ValidationError`.
+The run routes' extension fields are validated before any method is fetched or any library loaded, and a failure there is a **422** `request.invalid` naming the field that failed, `callback_urls`, `storage_scope`, `read_scope` or `analytics_groups`, or a path into it (see [Pipe Run](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups)). A storage scope that does not lie under the run's read scope, whether either was sent or defaulted, names `read_scope`. A body failing on several fields at once carries one item per refused field in `errors`. A callback URL whose scheme is not `http` or `https`, or whose host the SSRF rules refuse, is the security refusal `security.input_url_refused`, which logs its security event and names the class of destination it refused, never the URL. `POST /v1/validate` takes `analytics_groups` too and refuses it the same way.
 
-A method sent as a tree, in `files` or `bundle_b64`, is read under the MTHDS standard's tree rule before anything loads, on the run routes and `/validate` alike (see [Pipe Run](pipe-run.md#sending-a-method-as-a-tree)). A key or an entry the rule refuses, two shipped packages a reference could not tell apart, or `dependencies` that do not fit the request is a **422** `InvalidMethodFiles` carrying `tree_refusal` when the standard's reader refused it; a hash entry this runner does not hold is a **422** `MissingBlobs` carrying `missing_blobs`, and one it holds at another size than the entry states a **422** `BlobMismatch` carrying `mismatched_blobs`; a tree past `MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_FILE_KIB` or `MAX_METHOD_TREE_TOTAL_KIB`, or a method past `MAX_METHOD_DEPENDENCIES` or `MAX_METHOD_REQUEST_TOTAL_KIB` across its trees, is a **422** `MethodTreeTooLarge`. The blob routes answer in the same vocabulary: a body whose SHA-256 is not the one its path names, or one hash listed with two sizes, is a **422** `BlobMismatch`, and a blob past the per-file limit a **422** `MethodTreeTooLarge`. Every one of these carries `retryable: false`. Bytes the blob store holds under a hash that do not hash to it are a **500** `BlobStoreCorrupted`: the deployment's storage is damaged, and its operator removes the object for the blob to be uploaded again.
+A method sent as a tree, in `files` or `bundle_b64`, is read under the MTHDS standard's tree rule before anything loads, on the run routes and `/validate` alike (see [Pipe Run](pipe-run.md#sending-a-method-as-a-tree)). A key or an entry the rule refuses, two shipped packages a reference could not tell apart, or a tree past `MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_FILE_KIB` or `MAX_METHOD_TREE_TOTAL_KIB`, or a method past `MAX_METHOD_DEPENDENCIES` or `MAX_METHOD_REQUEST_TOTAL_KIB` across its trees, is a **422** `method.package_invalid` whose `reason` names the rule: the standard's tree refusal codes, such as `invalid_tree_path`, `duplicate_key`, `excluded_name` or `path_collision`, with the `path` it refuses, or the runner's own `too_many_files`, `file_too_large`, `tree_too_large`, `too_many_dependencies`, `method_too_large`, `bundle_too_large`, `manifest_missing`, `manifest_invalid`, `package_name_invalid`, `dependency_address_collision`, `empty_tree` or `no_bundle`, with the `path` or the `limit` it names. A path of the tree that would leave its root is the security refusal `security.input_path_refused`, naming the `rule` it broke, `absolute` or `parent_segment`, never the path. A malformed entry, or `dependencies` that do not fit the request, is a **422** `request.invalid` naming the field. A hash entry this runner does not hold is a **422** `request.blobs_missing` whose `missing_blobs` parameter lists the SHA-256 hashes to upload through the blob routes before sending the request again, and one it holds at another size than the entry states a **422** `request.invalid`: the entry's size is the one to correct, since uploading the bytes again would not change the size they are held at. The blob routes answer in the same vocabulary: a body whose SHA-256 is not the one its path names is a **422** `request.invalid` naming the field `body`, one hash listed with two sizes a **422** `request.invalid` naming `blobs`, and a blob past the per-file limit a **413** `request.too_large`. None of them invites a retry, since the same request is refused again.
 
-The files a request sends in `resources` are checked before the bundle loads and again once it is parsed (see [Pipe Validate](pipe-validate.md#sending-the-files-the-steps-read-resources)). A key that cannot name a file inside the bundle is a **422** `InvalidResourcePath` and a value that is not base64 a **400** `InvalidBase64`, both the API's own refusals; a file none of the bundle's steps names, and files that cannot make one method tree, such as two keys equal once case-folded, are **422** problems with the code `request.invalid`, or `security.input_path_refused` for a path the tree rule refuses, on every route, the diagnostic ones included: they are the request's fault, not the bundle's, and none invites a retry, since the same request is refused again.
+The files a request sends in `resources` are checked before the bundle loads and again once it is parsed (see [Pipe Validate](pipe-validate.md#sending-the-files-the-steps-read-resources)). A key that would leave the bundle is the security refusal `security.input_path_refused`, naming the `rule` it broke; any other key that cannot name a file inside the bundle, two keys naming the same file, more files than `MAX_RESOURCES_PER_REQUEST`, a file none of the bundle's steps names, and files that cannot make one method tree, such as two keys equal once case-folded, are **422** `request.invalid` naming the field `resources`; and a value that is not base64 is a **422** `request.malformed` with the reason `bad_base64`. They answer the same on every route, the diagnostic ones included: they are the request's fault, not the bundle's.
 
 The HTTP status is the source of truth for success vs failure — there is no `success: true/false` field anywhere in the envelope.
 
 Which statuses a given route can actually produce is documented per operation in the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml), each as an `application/problem+json` `ProblemDocument`.
 
-**What is *not* an error status:** an invalid `.mthds` bundle. On the diagnostic routes — `/validate`, `/resolve`, `/codegen`, and `/pipe-io` — a bundle that fails validation is the *successful product* of the call, so it rides a **200** discriminated on `is_valid: false`, carrying the same `validation_errors[]` described above. Non-2xx on those routes is reserved for *no verdict could be produced*. See [Pipe Validate](pipe-validate.md).
+**What is *not* an error status:** an invalid `.mthds` bundle. On the diagnostic routes — `/validate`, `/resolve`, `/codegen`, and `/pipe-io` — a bundle that fails validation is the *successful product* of the call, so it rides a **200** discriminated on `is_valid: false`, carrying the same `errors[]` items described above. Non-2xx on those routes is reserved for *no verdict could be produced*. See [Pipe Validate](pipe-validate.md).
 
 ## The `type` URI
 
@@ -279,9 +274,9 @@ https://docs.pipelex.com/errors/<code>      a pipelex. code, such as pipelex.con
 
 Both families are listed on the [Error Codes](../errors/index.md) page, and `title` is the code's title. A Pipelex code's type URI names no documentation version: the documentation site answers it with the code's page in the latest release (see [The pages and the type URI](../contribute/error-registry.md#the-pages-and-the-type-uri)).
 
-API-authored errors (`ValidationError`, `BadRequest`, `Unauthenticated`, etc.) carry no code, and their `type` is still derived from their name, `https://docs.pipelex.com/latest/errors/<kebab-name>/`, a URL the documentation site sends to the Error Codes index.
+The runner's own refusals carry a code like every other error, so their `type` is their code's page too.
 
-Before every error carried its code, the `type` of an error the runtime raised was derived from its class in the same way and named a page per class. Those pages are retired, and the documentation site redirects each one to the page of its class's code, or to the Error Codes index when the class is gone or raises no single code, so a stored `type` still leads somewhere useful.
+Before every error carried its code, the `type` of an error was derived from its class or, for a refusal the API authored, from its `error_type`, and named a page per class. Those pages are retired, and the documentation site redirects each one to the page of its class's code, or to the Error Codes index when the class is gone or raises no single code, so a stored `type` still leads somewhere useful.
 
 ## Request correlation
 
@@ -330,7 +325,7 @@ X-Request-ID: 9f2c1ab3-…
 }
 ```
 
-The `detail` is the human summary; `errors` is the machine-readable list a client maps to per-line diagnostics. Only the run routes answer an invalid bundle with this 422 — on the diagnostic routes the same bundle is a **200 `is_valid: false`** verdict carrying the items whole as `validation_errors` — see [Structured validation errors](#structured-validation-errors) and [Sourcing submitted files](pipe-validate.md).
+The `detail` is the human summary; `errors` is the machine-readable list a client maps to per-line diagnostics. Only the run routes answer an invalid bundle with this 422 — on the diagnostic routes the same bundle is a **200 `is_valid: false`** verdict carrying the same items as `errors` — see [Structured validation errors](#structured-validation-errors) and [Sourcing submitted files](pipe-validate.md).
 
 ### 500 — deployment configuration fault
 
@@ -366,17 +361,61 @@ WWW-Authenticate: Bearer
 X-Request-ID: 9f2c1ab3-…
 
 {
-  "type": "https://docs.pipelex.com/latest/errors/unauthenticated/",
-  "title": "Unauthenticated",
+  "type": "https://mthds.ai/errors/auth.missing_credential",
+  "title": "No credential was sent",
   "status": 401,
-  "detail": "Missing bearer token.",
-  "instance": "/v1/execute",
-  "request_id": "9f2c1ab3-…",
-  "error_type": "Unauthenticated",
-  "error_domain": "input",
-  "retryable": false
+  "detail": "This route needs a credential, and the request carried none.",
+  "code": "auth.missing_credential",
+  "domain": "account",
+  "retry": "no",
+  "next_step": {
+    "kind": "check_credentials",
+    "detail": "Send the request with a credential this runtime accepts."
+  },
+  "request_id": "9f2c1ab3-…"
 }
 ```
+
+### 422 — two fields the route refuses
+
+```http
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/problem+json
+X-Request-ID: 9f2c1ab3-…
+
+{
+  "type": "https://mthds.ai/errors/request.invalid",
+  "title": "The request does not match the route's schema",
+  "status": 422,
+  "detail": "The request's field 'storage_scope' does not match the route's schema.",
+  "code": "request.invalid",
+  "domain": "input",
+  "retry": "no",
+  "next_step": {
+    "kind": "change_input",
+    "detail": "Correct the field 'storage_scope' as the route's schema requires, then send the request again."
+  },
+  "params": { "field": "storage_scope" },
+  "location": { "field": "storage_scope" },
+  "errors": [
+    {
+      "code": "request.invalid",
+      "detail": "The request's field 'storage_scope' does not match the route's schema.",
+      "params": { "field": "storage_scope" },
+      "location": { "field": "storage_scope" }
+    },
+    {
+      "code": "request.invalid",
+      "detail": "The request's field 'analytics_groups' does not match the route's schema.",
+      "params": { "field": "analytics_groups" },
+      "location": { "field": "analytics_groups" }
+    }
+  ],
+  "request_id": "9f2c1ab3-…"
+}
+```
+
+The operator view of the same refusal adds `diagnostics`, whose `message` holds the rules each field broke, in the request model's own words, which can quote what the caller sent and so never reach a caller.
 
 ## Async callbacks (webhook payload)
 

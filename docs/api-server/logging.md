@@ -7,12 +7,12 @@ The server writes structured logs: one JSON object per line, on **stderr**, with
 An error response produces exactly one line. A caller mistake:
 
 ```json
-{"time": "2026-09-18T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "A request ended in an error response", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "url.path": "/v1/models", "error.type": "InvalidModelCategory", "error_domain": "input", "retryable": false, "http.response.status_code": 422, "detail": "Invalid model category. Valid values: extract, img_gen, judgment, llm, search"}
+{"time": "2026-10-17T13:53:17.919Z", "severity": "WARNING", "logger": "pipelex_api.exception_handlers", "message": "A request ended in an error response", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "url.path": "/v1/models", "error.code": "request.invalid", "error.type": "RunnerRequestError", "error_domain": "input", "retryable": false, "http.response.status_code": 422, "error.chain": ["RunnerRequestError"]}
 ```
 
-A server fault looks the same at `ERROR`, and carries the traceback under an `exception` key.
+A server fault looks the same at `ERROR`, and adds `error.frames`, where the deepest exception of its chain was raised.
 
-The `message` is the same sentence on every error line, `A request ended in an error response`, whichever failure it reports, so it is the key a query or an alert selects this server's error stream by, following the [log-call conventions](../tools/logging.md#log-call-conventions). Everything about the failure, the HTTP status and the error type included, rides a field of its own, and nothing a caller supplied ever reaches the message: the API's explanation of a refusal rides the `detail` field instead, so a body crafted with newlines or quotes cannot break the line or forge a key. Two layers keep the `detail` value safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, so a newline a caller sent reads as `\n` in `detail`, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
+The `message` is the same sentence on every error line, `A request ended in an error response`, whichever failure it reports, so it is the key a query or an alert selects this server's error stream by, following the [log-call conventions](../tools/logging.md#log-call-conventions). Everything about the failure, the HTTP status, the code and the error type included, rides a field of its own, and nothing a caller supplied ever reaches the message. **No error line carries an exception's text or its traceback**, whatever the failure: a traceback prints the text of every exception of its chain, and a foreign exception's text, a pydantic `ValidationError`'s or a method function's, can quote a run's inputs or a model's answer. The line names the classes of the chain under `error.chain` and, on a `5xx`, where the deepest was raised under `error.frames`, and the operator reads the error's message, cut to a bounded length, in the operator view's `diagnostics` of the response. Two layers keep the values a caller can shape, such as the `url.path`, safe to write. Before any sink sees a record, the Pipelex runtime's redaction processor replaces a control character in a field's value with its printable escape, and replaces a credential it recognises, an `Authorization` header's token or an API key, with `[REDACTED]`. The sink then escapes what it writes, so a quote or an `=` stays inside its value. The processor is configured under `[runtime.log.redaction]` and is on by default.
 
 ## The fields a line carries
 
@@ -38,12 +38,13 @@ The remaining keys are what the error handlers attach to an error line. The ones
 | --- | --- |
 | `url.path` | The request's URL path |
 | `http.response.status_code` | The HTTP status actually sent, including any API-level override |
-| `error.code` | The code of the problem the response carries, on a failure the runtime raised: the body's `code` |
-| `error.type` | On a failure the runtime raised, the class of the exception that escaped, which for an exception that is not a Pipelex error is that exception's own class; on an API-authored failure, the `ErrorType` name the body carries as `error_type` |
+| `error.code` | The code of the problem the response carries: the body's `code` |
+| `error.type` | The class of the exception that escaped, which for an exception that is not a Pipelex error is that exception's own class, and for a failure a route received as a value the class its problem names |
+| `error.chain` | The classes of the exceptions the failure was raised from or while handling, by name, outermost first, as a traceback would print them, without their text |
+| `error.frames` | On a `5xx` alone, where the deepest exception of the chain was raised, as `file:line in function` from the outermost frame inward, without the source lines |
 | `error_domain` | `input`, `config` or `runtime` — who fixes it. On a failure the runtime raised it is read from the problem's `domain`, the `input` and `method` domains reading `input`, and the `account` and `operator` domains `config` |
 | `error_category` | The inference error category, on a failure the cause chain of which carries one |
-| `retryable` | Whether a blind retry can help: the problem's `retry` is `yes`, or the API-authored body's `retryable` |
-| `detail` | The API's own explanation, the same text the response body carries — on an API-authored failure only, see below |
+| `retryable` | Whether a blind retry can help: the problem's `retry` is `yes` |
 | `user.id` | The authenticated caller, when auth bound one. An identity the server refused, a token's `user_id` claim or a forwarded `X-User-Id` that is not a path-safe segment, is never written under it: the warning about the refusal carries the claim's type as `claim_type`, and no value at all for the header |
 | `pipe_code` | The pipe the request named, on a run route whose body parsed |
 | `pipeline_run_id` | The run the request named, on a run route whose body parsed |
@@ -65,13 +66,13 @@ The record took these keys when the server's lines were brought to the log-call 
 | `provider` | `backend_name` |
 | `model` | `model_handle` |
 
-The other keys, `error_domain`, `error_category`, `retryable`, `detail`, `pipe_code`, `pipeline_run_id`, `provider_status_code` and `provider_request_id`, kept their names. `error.code` came later, with the problem document.
+The other keys, `error_domain`, `error_category`, `retryable`, `pipe_code`, `pipeline_run_id`, `provider_status_code` and `provider_request_id`, kept their names. `error.code` came later, with the problem document.
 
-`detail` and `error.code` are the two fields whose presence follows the failure's origin rather than the request's shape. A failure this API authored itself — a validation error, an unknown model category — carries `detail` on the record and no `error.code`. A failure the runtime raised, which is every domain error, every run failure and the catch-all, carries `error.code` and no `detail`: its record is built from the problem's operator view, whichever view the response carried, so `error.type` names the class of the error behind it, and the sentence the response carried is the code's, which `error.code` already names. A `5xx` from that path carries the traceback, and a `4xx` none. Build an operator query on `error.code` or `error.type`, with `url.path`, rather than on `detail`.
+Every error line carries `error.code`, since every failure, the runner's own refusals included, is answered by a problem with a registry code. The record is built from the problem's operator view, whichever view the response carried, so `error.type` names the class of the error behind it, and the sentence the response carried is the code's, which `error.code` already names. Build an operator query on `error.code` or `error.type`, with `url.path`. Two keys the line carried before the runner's refusals took codes are gone: `detail`, the explanation an API-authored refusal wrote, which `error.code` replaces, and the `exception` key holding a `5xx`'s traceback, which `error.chain` and `error.frames` replace without any exception's text.
 
 Every field in that table is a **record attribute**, which is a different thing from the message. A structured sink — `json` here, and the OTLP sink — writes them beside the message as keys. The Rich console sink shows them after the message as a `key=value` suffix, each value on one line and cut short when long, a handled exception's `error.message` at a far more generous length, and leaves out the run identifiers (`request_id`, `pipeline_run_id`), which a person at a terminal does not need on every line, so `A request ended in an error response` is followed by the path, the status, the error type and the rest of the fields above. That rendering is for a person reading a terminal; keep `sink = "json"` wherever the lines are read by anything else.
 
-Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
+Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING`; a `5xx` is a server fault and logs at `ERROR`, with `error.frames`. See [Error Responses](error-responses.md) for the response side of the same failure.
 
 ## Security events
 

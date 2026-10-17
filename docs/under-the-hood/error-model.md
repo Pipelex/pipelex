@@ -219,7 +219,7 @@ exc.validation_error_items()  # the typed items a verdict carries as validation_
 ```
 
 !!! info "Two shapes of the same items"
-    A validation verdict — the `200` `is_valid: false` answer of the API's diagnostic routes, the CLIs' validation output and a validator's invalid arm — carries the `ValidationErrorItem`s whole, as `validation_errors`. A problem — the `422` answer of a run refused before any pipe ran — carries them as `errors` items, each with its code. Both are built from the same items, so they name the same faults at the same places.
+    A validation verdict of the runtime — the CLIs' validation output and a validator's invalid arm — carries the `ValidationErrorItem`s whole, as `validation_errors`. A problem carries them as `errors` items, each with its code, and so does the API server's `200` `is_valid: false` answer on its diagnostic routes, whose `errors` are its refusal's problem items: the `422` answer of a run refused before any pipe ran is such a problem. Both are built from the same items, so they name the same faults at the same places.
 
 ### `suggested_fix` — structured deterministic fixes
 
@@ -237,7 +237,7 @@ The **fix planner** (`pipelex/pipeline/fixes/planner.py`) translates enriched ty
 
 Applying fixes is the runtime's job too: the **applier** (`pipelex/fix_ops/applier.py`) mutates a tomlkit DOM in place per op (guarded — an op whose target table is absent is skipped and reported, never raised) and then reflows the whole file to canonical MTHDS style, and the **convergence loop** (`pipelex/pipeline/fixes/fix_loop.py`) runs validate → apply SAFE fixes → re-validate to a fixed point, reporting non-convergence loudly. The user-facing surface is [`pipelex fix bundle`](../tools/cli/fix.md).
 
-On the hosted API the same payload rides the wire verbatim as `validation_errors[].suggested_fix`; how it appears in HTTP error responses is documented on the API side, in the API server's [Error Responses](../api-server/error-responses.md#suggested-fixes) page.
+On the API server the same payload rides the wire as `errors[].suggested_fix`, the problem item's fix, which names the file to apply it to as `file`; how it appears in HTTP error responses is documented on the API side, in the API server's [Error Responses](../api-server/error-responses.md#suggested-fixes) page.
 
 ---
 
@@ -452,7 +452,7 @@ Beside the failure, the deployment logs one **security event**, so that whoever 
 | `event.name` | `pipelex.security.refusal` |
 | `error.code` | The refusal's code, such as `security.method_url_refused` |
 | `error.domain` | The code's domain, who caused it: `input`, `method` or `runtime` |
-| `error.type` | The class of the error that carries or implies the code, such as `SsrfBlockedError`, never a wrapper above it; for a refusal the API server authors with no error class behind it, the `error_type` its response names, such as `ReservedObjectKey` |
+| `error.type` | The class of the error that carries or implies the code, such as `SsrfBlockedError`, never a wrapper above it, the API server's own refusals included, such as `ReservedObjectKeyError` |
 | `security.target` | The kind of thing refused, which the code decides: `url`, `path`, `template`, `schema`, `dependency`, `object_key` or `result_location` |
 | `security.target_class` | The class of destination refused, when the raise site knows it: `loopback`, `private`, `link_local`, `metadata` (a cloud metadata endpoint), `scheme` (a scheme the run does not read, a `file://` URL or a path on the server's disk among them) or `foreign_storage_key` (a storage key outside the run's read scope) |
 | `pipeline_run_id`, `request_id` | The run, only when the runtime assigned it one, never a run id a request body names before any run exists, and the request, when there is one |
