@@ -36,6 +36,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -322,6 +323,31 @@ class TestAgentOutput:
         assert parsed["error_domain"] == "input"
         assert parsed["retryable"] is True
         assert parsed["hint"] == problem.next_step.detail
+
+    def test_agent_error_lists_no_item_of_a_verdict_behind_a_foreign_exception(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A foreign exception raised from a handled verdict is a new failure: its envelope lists none of the verdict's items."""
+        stale_verdict = ValidateBundleError(message="validation failed", pipelex_bundle_blueprint_validation_errors=[])
+        foreign_fault = RuntimeError("the cache could not be written")
+        foreign_fault.__cause__ = stale_verdict
+        stand_in = make_unexpected_failure(error=foreign_fault)
+
+        with pytest.raises(typer.Exit):
+            agent_error("unexpected failure", error_type="PipelexUnexpectedError", cause=stand_in)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_code"] == CoreCode.RUNTIME_UNEXPECTED
+        assert "validation_errors" not in parsed
+
+    def test_agent_error_lists_the_items_of_a_verdict_under_pipelex_wrappers(self, capsys: pytest.CaptureFixture[str]) -> None:
+        verdict = ValidateBundleError(message="Pipe 'post_notice' could not be loaded")
+        wrapper = PipelexError("the run was refused")
+        wrapper.__cause__ = verdict
+
+        with pytest.raises(typer.Exit):
+            agent_error("the run was refused", error_type="PipelexError", cause=wrapper)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert [item["message"] for item in parsed["validation_errors"]] == ["Pipe 'post_notice' could not be loaded"]
 
     def test_agent_error_has_no_error_code_without_a_coded_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A builtin cause carries no registry code, so the envelope names none rather than inventing one."""

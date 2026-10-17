@@ -29,7 +29,7 @@ import typer
 from pipelex_sdk.errors import ApiResponseError
 from pydantic import ValidationError
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorItem, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorItem, iter_cause_chain, iter_pipelex_cause_chain
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.errors.problem import ProblemView
 from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
@@ -466,8 +466,12 @@ def run_failure_fields(*, error: PipelineExecutionError) -> dict[str, Any]:
 
 
 def _chain_validation_error_items(*, error: BaseException) -> list[ValidationErrorItem]:
-    """The items of the first invalid verdict along ``error``'s cause chain, ``error`` itself included; empty when none."""
-    for node in iter_cause_chain(error):
+    """The items of the first invalid verdict along ``error``'s cause chain, ``error`` itself included; empty when none.
+
+    The walk stops at the first exception that is not a Pipelex error, as every walk reading a failure's chain does: a
+    foreign exception raised from an earlier, handled verdict is a new failure, whose envelope lists none of its items.
+    """
+    for node in iter_pipelex_cause_chain(error):
         if isinstance(node, ValidateBundleError):
             return node.validation_error_items()
     return []
