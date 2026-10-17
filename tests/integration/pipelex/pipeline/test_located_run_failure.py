@@ -23,7 +23,6 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
 
 if TYPE_CHECKING:
-
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob

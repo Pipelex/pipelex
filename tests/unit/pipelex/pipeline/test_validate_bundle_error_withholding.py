@@ -5,13 +5,13 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
     PipeFactoryErrorData,
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
-from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView, make_location, make_problem_item
 from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -91,7 +91,9 @@ class TestValidateBundleErrorWithholding:
 
     def test_what_the_raise_site_chose_is_carried(self) -> None:
         """The code a raise site chose, and the parameters and items it gave, survive the withholding, withheld as the messages are."""
-        item = make_problem_item(code=CoreCode.METHOD_SYNTAX, params={"finding": _mentioning_the_host_file(label="item")}, location=make_location(file=_HOST_FILE))
+        item = make_problem_item(
+            code=CoreCode.METHOD_SYNTAX, params={"finding": _mentioning_the_host_file(label="item")}, location=make_location(file=_HOST_FILE)
+        )
         verdict = (
             ValidateBundleError(message=_mentioning_the_host_file(label="raw"))
             .with_error_code(CoreCode.REQUEST_INVALID)

@@ -20,10 +20,9 @@ import jwt
 import pytest
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
-from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.mthds_parsing.parser import MthdsParser
 from pytest_mock import MockerFixture
@@ -65,26 +64,15 @@ class _MisconfiguredComponentError(PipelexError):
 
 
 class _RecoveredProblemError(PipelexError):
-    """Carries a problem recovered across a transport boundary in the operator's view, and reports it as it is."""
+    """Carries a problem recovered across a transport boundary in the operator's view, which it reports as it is."""
 
     def __init__(self, message: str, *, problem: PipelexProblem):
         super().__init__(message)
-        self.recovered_problem = problem
+        self.carried_problem = problem
 
     @override
-    def to_problem(
-        self,
-        *,
-        view: ProblemView,
-        request_id: str | None = None,
-        pipeline_run_id: str | None = None,
-        failure_location: ProblemLocation | None = None,
-    ) -> PipelexProblem:
-        match view:
-            case ProblemView.OPERATOR:
-                return self.recovered_problem
-            case ProblemView.CALLER:
-                return caller_view_of(problem=self.recovered_problem)
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
 # Route handlers are deliberately not underscore-prefixed: a private,

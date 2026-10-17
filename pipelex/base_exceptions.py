@@ -445,7 +445,7 @@ class PipelexError(Exception):
         """
         return {}
 
-    def _chain_items(self) -> list[ProblemItem] | None:
+    def chain_items(self) -> list[ProblemItem] | None:
         """The items of the first error along the cause chain that refuses several faults at once."""
         for node in iter_pipelex_cause_chain(self):
             items = node.problem_items()
@@ -490,7 +490,7 @@ class PipelexError(Exception):
         """
         return None
 
-    def _errors_above(self, *, carrier: "PipelexError") -> list["PipelexError"]:
+    def errors_above(self, *, carrier: "PipelexError") -> list["PipelexError"]:
         """The errors from this one down to ``carrier``, ``carrier`` left out, this one first; empty when the chain never reaches it."""
         errors: list[PipelexError] = []
         for node in iter_pipelex_cause_chain(self):
@@ -616,7 +616,7 @@ class PipelexError(Exception):
         code = self.resolve_error_code()
         carrier = self.code_carrier()
         # The wrappers between the reporter and the error whose code the problem reports, the reporter first.
-        wrappers = reporter._errors_above(carrier=carrier)
+        wrappers = reporter.errors_above(carrier=carrier)
         facts = reporter.chain_facts()
         spec = error_code_spec(code)
         params: dict[str, Any] = {}
@@ -626,7 +626,7 @@ class PipelexError(Exception):
             params.update(wrapper.given_params)
         params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names})
         params.update(carrier.given_params)
-        items = list(carrier._chain_items() or [])
+        items = list(carrier.chain_items() or [])
         for wrapper in reversed(wrappers):
             items.extend(wrapper.problem_items() or [])
         location = reporter.chain_location(carrier=carrier)
