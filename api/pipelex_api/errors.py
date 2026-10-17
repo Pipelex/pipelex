@@ -16,12 +16,41 @@ itself.
 """
 
 from collections.abc import Mapping
-from typing import Any, NoReturn
+from typing import Any, NamedTuple, NoReturn
 
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.security_event import log_security_event, security_target_kind
+from pipelex.errors.security_target import SecurityTargetClass
 
 from pipelex_api.error_types import ErrorType
 from pipelex_api.problem_document import build_problem_document_from_api_error
+
+
+class ApiSecurityRefusal(NamedTuple):
+    """The refusal of a security rule an API-authored error answers, which its handler logs as a security event.
+
+    It holds what the event names and never what was refused: the refusal's code, the class of the error that refused
+    (or the response's `error_type` when no error class did), and the class of destination when the rule knows it.
+    """
+
+    code: ErrorCode
+    error_type: str
+    target_class: SecurityTargetClass | None = None
+
+
+def security_refusal_of(*, error: BaseException | None) -> ApiSecurityRefusal | None:
+    """The security refusal `error` reports, when it is a `PipelexError` whose code is a security refusal, else `None`.
+
+    For a route that answers a pipelex refusal with an API-authored problem document, which keeps the response the
+    API has always given while the refusal still logs its security event.
+    """
+    if not isinstance(error, PipelexError):
+        return None
+    code = error.resolve_error_code()
+    if security_target_kind(code=code) is None:
+        return None
+    return ApiSecurityRefusal(code=code, error_type=type(error).__name__, target_class=error.security_target_class)
 
 
 class ApiError(Exception):
@@ -36,11 +65,31 @@ class ApiError(Exception):
     `Request`.
     """
 
-    def __init__(self, *, status_code: int, document: dict[str, Any], headers: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        document: dict[str, Any],
+        headers: dict[str, str] | None = None,
+        security_refusal: ApiSecurityRefusal | None = None,
+    ) -> None:
         self.status_code = status_code
         self.document = document
         self.headers: dict[str, str] = headers or {}
+        self.security_refusal = security_refusal
         super().__init__(str(document.get("detail", "")))
+
+
+def log_api_security_event(*, api_error: ApiError, extras: Mapping[str, str] | None) -> None:
+    """Log the security event of an API-authored error that answers a security rule's refusal, and nothing otherwise.
+
+    The event names the request through the log context and the run's extras the body carried, never a run id, since
+    no run exists yet, and never what was refused.
+    """
+    refusal = api_error.security_refusal
+    if refusal is None:
+        return
+    log_security_event(code=refusal.code, error_type=refusal.error_type, target_class=refusal.target_class, extras=extras)
 
 
 def _raise_api_error(
@@ -51,6 +100,7 @@ def _raise_api_error(
     error_domain: ErrorDomain,
     headers: dict[str, str] | None = None,
     members: Mapping[str, Any] | None = None,
+    security_refusal: ApiSecurityRefusal | None = None,
 ) -> NoReturn:
     """Build the RFC 7807 document and raise `ApiError`.
 
@@ -72,21 +122,44 @@ def _raise_api_error(
     if members:
         # Extension members of RFC 7807 (section 3.2), such as `missing_blobs`: data a client acts on, beside the prose.
         document.update(members)
-    raise ApiError(status_code=status, document=document, headers=headers)
+    raise ApiError(status_code=status, document=document, headers=headers, security_refusal=security_refusal)
 
 
-def raise_validation_error(message: str, error_type: ErrorType = ErrorType.VALIDATION_ERROR) -> NoReturn:
-    """Raise a 422 RFC 7807 problem response for invalid caller input."""
-    _raise_api_error(error_type=error_type, message=message, status=422, error_domain=ErrorDomain.INPUT)
+def raise_validation_error(
+    message: str,
+    error_type: ErrorType = ErrorType.VALIDATION_ERROR,
+    *,
+    security_refusal: ApiSecurityRefusal | None = None,
+) -> NoReturn:
+    """Raise a 422 RFC 7807 problem response for invalid caller input.
+
+    `security_refusal` names the security rule the input broke, when it broke one, so the response's handler logs
+    the security event of the refusal; the response is the same either way.
+    """
+    _raise_api_error(error_type=error_type, message=message, status=422, error_domain=ErrorDomain.INPUT, security_refusal=security_refusal)
 
 
-def raise_validation_problem(*, message: str, error_type: ErrorType, members: Mapping[str, Any]) -> NoReturn:
+def raise_validation_problem(
+    *,
+    message: str,
+    error_type: ErrorType,
+    members: Mapping[str, Any],
+    security_refusal: ApiSecurityRefusal | None = None,
+) -> NoReturn:
     """Raise a 422 RFC 7807 problem response for invalid caller input, carrying extension members a client acts on.
 
     The members join the document beside `detail`, such as the `missing_blobs` a sender uploads before it sends the
-    request again, or the `tree_refusal` naming the standard's refusal code and the paths it names.
+    request again, or the `tree_refusal` naming the standard's refusal code and the paths it names. `security_refusal`
+    is `raise_validation_error`'s.
     """
-    _raise_api_error(error_type=error_type, message=message, status=422, error_domain=ErrorDomain.INPUT, members=members)
+    _raise_api_error(
+        error_type=error_type,
+        message=message,
+        status=422,
+        error_domain=ErrorDomain.INPUT,
+        members=members,
+        security_refusal=security_refusal,
+    )
 
 
 def raise_bad_request(message: str, error_type: ErrorType = ErrorType.BAD_REQUEST) -> NoReturn:

@@ -8,22 +8,24 @@ one — owns it. `RunRequest` / `StartRequest` are defined here, not imported.
 
 from __future__ import annotations
 
-from ipaddress import ip_address
 from typing import Annotated, Any, Self
 from urllib.parse import urlparse
 
 from mthds.protocol.pipe_output import VariableMultiplicity
 from mthds.protocol.pipeline_inputs import PipelineInputs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.reporting.usage_records import TokensUsageRecord
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope
+from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.functional_validators import SkipValidation
 
+from pipelex_api.exceptions import CallbackUrlRefusedError
 from pipelex_api.limits import (
     DEFAULT_MAX_RESOURCE_FILE_KIB,
     DEFAULT_MAX_RESOURCES_PER_REQUEST,
@@ -396,22 +398,15 @@ _ALLOWED_CALLBACK_SCHEMES = frozenset({"http", "https"})
 
 
 def _is_disallowed_host(host: str) -> bool:
-    """True if `host` looks like a private/loopback/link-local address.
+    """True if `host` is a destination a completion callback must not reach: the runtime's own SSRF rule.
 
-    Used to harden /start callback_urls against SSRF — a malicious
-    client could otherwise aim webhooks at internal services or cloud metadata
-    endpoints (e.g. 169.254.169.254). Best-effort: hostnames that resolve to
-    private addresses at fire time aren't blocked here, only literal IPs.
+    Used to harden /start callback_urls against SSRF — a malicious client could otherwise aim webhooks at internal
+    services or cloud metadata endpoints (e.g. 169.254.169.254). The rule is the one the delivery-time guard applies
+    when the webhook fires, `pipelex.tools.network.host_rules`, so a spelling the guard refuses at fire time (an
+    uppercase or trailing-dot alias, a carrier-grade NAT address) is refused here first. Best-effort: hostnames that
+    resolve to private addresses at fire time aren't blocked here, only literal IPs and the known internal names.
     """
-    if not host:
-        return True
-    if host in {"localhost", "metadata.google.internal", "metadata"}:
-        return True
-    try:
-        addr = ip_address(host)
-    except ValueError:
-        return False
-    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved or addr.is_unspecified
+    return is_disallowed_host(host)
 
 
 class PipelineApiExtras(BaseModel):
@@ -493,12 +488,22 @@ class PipelineApiExtras(BaseModel):
                 msg = f"callback URL exceeds {MAX_CALLBACK_URL_LEN} chars"
                 raise ValueError(msg)
             parsed = urlparse(url)
+            # A URL with no scheme or no host is malformed, the shape of the field, which a plain `ValueError` refuses
+            # with no security event. A scheme other than http or https, and a host the SSRF rule refuses, are a security
+            # rule's refusals, so each states the class of destination its security event names.
+            if not parsed.scheme:
+                msg = "callback URL must be an absolute http or https URL, starting with its scheme"
+                raise ValueError(msg)
             if parsed.scheme not in _ALLOWED_CALLBACK_SCHEMES:
                 msg = f"callback URL scheme must be http or https (got {parsed.scheme!r})"
+                raise CallbackUrlRefusedError(msg).with_security_target_class(SecurityTargetClass.SCHEME)
+            host = parsed.hostname
+            if not host:
+                msg = "callback URL must name a host"
                 raise ValueError(msg)
-            if _is_disallowed_host(parsed.hostname or ""):
+            if _is_disallowed_host(host):
                 msg = f"callback URL host {parsed.hostname!r} is not allowed (private/loopback/metadata addresses are blocked)"
-                raise ValueError(msg)
+                raise CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
         return value
 
 

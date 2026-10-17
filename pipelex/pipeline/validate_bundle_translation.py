@@ -30,6 +30,7 @@ from pipelex.core.pipes.exceptions import (
     caller_facing_refusal_text,
 )
 from pipelex.core.validation import report_validation_error
+from pipelex.errors.security_event import is_security_refusal
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
@@ -96,9 +97,10 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     as a crash or a no-verdict fault. Only a failure of the tool or its environment — a ``config`` or
     ``runtime`` fault, an unclassified one, anything that is not a ``PipelexError`` — propagates as
     no verdict, along with the refusals that must keep their own class: ``PipeNotFoundError`` (its
-    dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
-    ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
-    ``BundleResourcePathError``, which refuse the files submitted with the bundle rather than the bundle.
+    dedicated not-found handler), a security refusal, a ``SecurityError`` or any refusal coded in a security
+    family (never absorbed by a domain handler), a ``ValidateBundleError`` already produced (never
+    re-wrapped), and a ``BundleResourceNotNamedError`` or a ``BundleResourcePathError``, which refuse the
+    files submitted with the bundle rather than the bundle.
     """
     try:
         yield
@@ -248,16 +250,20 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
 
     ``None`` — no verdict — unless the refusal's report is ``input``-domained: a ``config`` or ``runtime``
     fault, or an unclassified one, is a failure of the tool or its environment, which the validator must
-    not report as the bundle's fault. The item is ``pipe_validation`` when the library load located the
-    refusal on the pipe it was building (``PipeLoadRefusalError``, with the pipe's code, domain and file),
-    and ``blueprint_validation`` otherwise. It carries no ``error_type``: a refusal with a closed code
-    has its own arm above, and naming one here would claim a diagnosis the refusal does not make.
+    not report as the bundle's fault. A security refusal has no verdict either, whatever its class: a refusal
+    coded in a security family, such as a step's template file that climbs out of its method tree
+    (``security.method_path_refused``), keeps its code and logs its security event, never a verdict's.
+
+    The item is ``pipe_validation`` when the library load located the refusal on the pipe it was building
+    (``PipeLoadRefusalError``, with the pipe's code, domain and file), and ``blueprint_validation`` otherwise.
+    It carries no ``error_type``: a refusal with a closed code has its own arm above, and naming one here
+    would claim a diagnosis the refusal does not make.
 
     The item's text is the refusal's message only when that message was authored as caller-facing copy,
     and otherwise its title: the verdict is caller-facing as a whole and is kept verbatim under STRICT
     disclosure, so internal text must not ride it past the redaction it would otherwise get.
     """
-    if not error_domain_is_input(refusal.to_error_report().error_domain):
+    if is_security_refusal(error=refusal) or not error_domain_is_input(refusal.to_error_report().error_domain):
         return None
     message = caller_facing_refusal_text(refusal=refusal)
     if isinstance(refusal, PipeLoadRefusalError):

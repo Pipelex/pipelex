@@ -35,13 +35,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexError
+from pipelex.errors.security_event import emit_security_event
 from pipelex.plugins.registrar import HttpErrorMapperFn
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from starlette.requests import ClientDisconnect
 
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import ApiError
+from pipelex_api.errors import ApiError, log_api_security_event
 from pipelex_api.middleware import request_id_of
 from pipelex_api.problem_document import (
     PROBLEM_JSON_MEDIA_TYPE,
@@ -103,6 +104,16 @@ def _pipeline_run_id_of(request: Request) -> str | None:
     backend frame having to forward it.
     """
     return getattr(request.state, "pipeline_run_id", None)
+
+
+def _run_extras_of(request: Request) -> dict[str, str] | None:
+    """Return the run's extras when `_parse_request` bound them on the request.
+
+    The opaque labels a host attaches to a run, which the hosted plane fills with the organization. They ride
+    the security event a refusal answered here logs, so a refusal before any run exists still names whose
+    request it was. `None` for a route that parses no run request, or a body whose extras did not validate.
+    """
+    return getattr(request.state, "run_extras", None)
 
 
 def _request_fields(request: Request) -> dict[str, Any]:
@@ -421,7 +432,13 @@ async def handle_pipelex_error(request: Request, exc: Exception, *, disclosure_m
     transport error (no `PipelexError` in its MRO) is routed to that plugin's
     own mapper-backed handler instead.
     """
-    report = cast("PipelexError", exc).to_error_report()
+    error = cast("PipelexError", exc)
+    # A security refusal logs its security event, once: a run's boundary already reported a refusal it saw, and
+    # one refused before any run exists, or by a route around the runner, is reported here. The request id is
+    # the log context's, which `RequestIdMiddleware` binds for the whole request. No run id: the one a body names
+    # is the caller's claim, and no run the runtime assigned one to exists yet.
+    emit_security_event(error=error, extras=_run_extras_of(request))
+    report = error.to_error_report()
     return _problem_response(report, request=request, disclosure_mode=disclosure_mode)
 
 
@@ -524,8 +541,11 @@ async def handle_api_error(request: Request, exc: Exception) -> Response:
     and emits the structured error record so an API-owned 500 from any
     route is observable (a `raise_internal_server_error` site like `version.py`'s
     missing-package case is the canonical example — it has no preceding
-    `log.error` at the call site). `exc` is typed `Exception` to match Starlette's
-    handler contract; FastAPI only routes an `ApiError` here, so the cast is sound.
+    `log.error` at the call site). An `ApiError` answering a security rule's refusal,
+    a reserved object key, a callback URL or a path leaving the method, also logs its
+    security event here, with the run's extras the body carried and no run id.
+    `exc` is typed `Exception` to match Starlette's handler contract; FastAPI only
+    routes an `ApiError` here, so the cast is sound.
     """
     api_error = cast("ApiError", exc)
     document = with_request_context(
@@ -534,6 +554,7 @@ async def handle_api_error(request: Request, exc: Exception) -> Response:
         request_id=request_id_of(request),
     )
     _log_api_authored_error(document=document, status=api_error.status_code, request=request)
+    log_api_security_event(api_error=api_error, extras=_run_extras_of(request))
     return JSONResponse(
         status_code=api_error.status_code,
         content=document,

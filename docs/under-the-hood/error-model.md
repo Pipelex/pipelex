@@ -400,6 +400,37 @@ See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boun
 
 ---
 
+## Security Refusals and the Security Event
+
+A refusal a security rule makes is a failed run and a security event. The run fails under a code of the `security.` family of the core registry, or of Pipelex's own `pipelex.security.` family, and that code's domain says who caused the refusal: `security.input_url_refused` and `security.input_path_refused` are the caller's, `security.method_url_refused`, `security.method_path_refused`, `security.template_refused`, `security.schema_refused` and `security.integrity_mismatch` are the method's, and `security.provider_url_refused` is the runtime's, a URL a model's answer named. A refusal is coded where it is raised, as every error is, and every wrapper above it takes its cause's code, so the failure a host receives reports the security code however many boundaries it crossed. A security refusal, a `SecurityError` or any error its raise site coded in a security family, such as a step's template file that climbs out of its method tree, is never absorbed into a verdict or a domain answer on the way. One refusal is coded otherwise on purpose: the sandbox refusing one of Pipelex's own templates is our bug, `runtime.unexpected`, and so it is no security refusal and logs no event.
+
+Beside the failure, the deployment logs one **security event**, so that whoever runs it learns that someone tried to reach what a rule forbids. It is a structured log record of its own kind, routable without reading its text: it is logged at warning level on its own logger, `pipelex.errors.security_event`, with the fixed message `A security rule refused a request`, and its `event.name` field is `pipelex.security.refusal`. It goes through the deployment's log sinks like any other record, so a hosted deployment routes it to its alerts and an on-premises one receives it in its own sinks, and nothing leaves the deployment because of it. Its fields name the refusal and never its content:
+
+| Field | What it carries |
+|-------|-----------------|
+| `event.name` | `pipelex.security.refusal` |
+| `error.code` | The refusal's code, such as `security.method_url_refused` |
+| `error.domain` | The code's domain, who caused it: `input`, `method` or `runtime` |
+| `error.type` | The class of the error that carries or implies the code, such as `SsrfBlockedError`, never a wrapper above it; for a refusal the API server authors with no error class behind it, the `error_type` its response names, such as `ReservedObjectKey` |
+| `security.target` | The kind of thing refused, which the code decides: `url`, `path`, `template`, `schema`, `dependency`, `object_key` or `result_location` |
+| `security.target_class` | The class of destination refused, when the raise site knows it: `loopback`, `private`, `link_local`, `metadata` (a cloud metadata endpoint), `scheme` (a scheme the run does not read, a `file://` URL or a path on the server's disk among them) or `foreign_storage_key` (a storage key outside the run's read scope) |
+| `pipeline_run_id`, `request_id` | The run, only when the runtime assigned it one, never a run id a request body names before any run exists, and the request, when there is one |
+| `run.extras.<key>` | Each of the run's opaque extras, one field per key, which the hosted plane fills with the organization |
+
+Never the URL, the path, the template, the schema, a prompt or an input value, nor the error's message, which may quote any of them, and never a traceback: the failure itself is reported where it is handled, as any other failure is. The runtime does not know organizations, so the event names one only through the run's extras, which it carries without reading.
+
+The class of destination is stated where the refusal is decided, with `PipelexError.with_security_target_class()`. The SSRF guard classifies the host it refused, or the first disallowed address a name resolved to, through `classify_disallowed_host` in `pipelex/tools/network/host_rules.py`, and a read the run's read scope refuses takes its class from its reason, a storage key of another tenant or a scheme the run does not read. A refusal that states no class, such as a schema or a template refusal, has no `security.target_class`.
+
+**Where it is logged.** `pipelex/errors/security_event.py` holds the event, and **the process that raises a refusal logs it**: whoever executes a run owns the events of the refusals raised in it, and the side that dispatched the run to another process never logs a failure it receives from there. Three boundaries call it, each with what it knows of the run:
+
+- the pipe run, `PipeRun`, for a refusal raised while it executes, whether one of its pipes raised it or its tail did, such as a webhook the SSRF guard refuses at fire time, with the run's identity, its extras included;
+- the runner, `PipelexMTHDSProtocol.execute`, for a refusal before the run exists, at the input seam or while the method loads, with the runner's extras, and for a run's refusal raised in this process that the pipe run left unreported, with the run's identity: a pipe run that hands the job to another process can be refused here first, such as an input URL the SSRF guard refuses while it uploads the inputs before it dispatches. A refusal the pipe run logged, `PipeRun` in this process, is found reported, and so is a failure an orchestrator rebuilt from a remote worker's report, which it marks where it rebuilds it;
+- the API server's handler of every `PipelexError`, for a refusal answered before any run, and its handler of the problem responses it authors itself, for the refusals of a security rule it decides at its own boundary: a reserved object key in a run body (`pipelex.security.reserved_key`), a callback URL whose scheme or host the SSRF rule refuses (`security.input_url_refused`), and a resource path or a key of a method tree that leaves the method (`security.input_path_refused`). Both log with the extras the request body carried and no run id. One rule tells a path that leaves its root from one of the wrong shape, `root_escape_refusal` in `pipelex/core/bundle_resources/bundle_resource.py`: a path that is absolute, names a drive or a network share, or holds a `..` segment, read with either separator, leaves it, and any other refused path, empty or holding a backslash or a colon, is `request.invalid` and logs no event. It decides for a key of `resources`, a file submitted beside a method, and a key of a method tree, which the standard's reader refuses without saying why.
+
+A refusal is reported once per process, however many of these boundaries it crosses: the event marks the errors of the chain it reported, and a boundary that receives the same failure again, wrapped, finds the mark and logs nothing. The refusal is the error of the chain that carries or implies the code the failure reports, so a wrapper chained to it with `from`, which takes its code, restates it, while a new refusal is reported on its own, even of the same code, whether it was raised while a reported one was being handled or chained to one with `from`: a run whose input URL the SSRF guard refused, and whose webhook it then refuses, logs two events. Across processes, the rule above keeps it to one event whatever the transport rebuilds: a distributed orchestrator logs the refusal on the worker that raised it, at the boundary where the failure leaves that process, and marks every error it rebuilds from another process's report with `mark_security_event_emitted()`, so that neither its own boundaries nor the runner log it again, since the runner logs a run failure it finds unreported; [Orchestrator Plugins](./orchestrator-plugins.md#security-refusals-are-logged-where-they-are-raised) states what an orchestrator owes. A `/start` run, whose failure the dispatching side never receives, is covered the same way. A host that decides a refusal itself, such as a gateway's refusal of a private address or a tenant-boundary refusal of its own, logs the same record with `log_security_event()`. A program embedding the kernel without the runner (see [The Pipelex Kernel](./pipelex-kernel.md)) calls `emit_security_event()` on the refusals it receives.
+
+---
+
 ## Interfaces
 
 ### CLI
@@ -487,6 +518,10 @@ Exception
     ├── PipelexUnexpectedError     → runtime.unexpected
     ├── PipelexConfigError         → one of pipelex.config.invalid, .syntax, .file_missing
     ├── PipelexSetupError          → inherits its cause's code, else runtime.misconfigured
+    ├── SecurityError              base_exceptions.py — abstract; the policy refusals never absorbed into a domain answer
+    │   ├── UriReadRefusedError / SsrfBlockedError   → security.input_url_refused, .method_url_refused (and .provider_url_refused)
+    │   ├── UnsafeSchemaError                        → security.schema_refused
+    │   └── Jinja2TemplateSecurityError              → security.template_refused, else runtime.unexpected on Pipelex's own template
     ├── CogtError                  cogt/exceptions.py — abstract; error_category, provider_metadata
     │   ├── LLMCompletionError      ← a set the worker's classification picks from
     │   ├── ImgGenGenerationError   ← a set the worker's classification picks from
@@ -494,6 +529,8 @@ Exception
     ├── PipelineExecutionError      pipeline/exceptions.py — reports its located root fault and its code
     └── ... (one exceptions.py per package) ...
 ```
+
+`SecurityError` is the base class of the policy refusals that are never absorbed into a domain answer: `UriReadRefusedError` (a read outside the run's scope), `SsrfBlockedError` (an outbound request the SSRF guard blocks), `UnsafeSchemaError` (a schema carrying Python code-generation extensions) and `Jinja2TemplateSecurityError` (a template the sandbox refuses at render time). The handlers that turn a refusal of the caller's input into a verdict, the bundle-validation cascade and the library load, let a `SecurityError` through as it is, and the cascade also lets through any refusal coded in a security family, whatever its class (`is_security_refusal` in `pipelex/errors/security_event.py`), and a host that treats this family alike, a durable-execution plugin marking it non-retryable for instance, names that base class. Not every refusal belongs to it: the template sandbox's render-budget refusal, `Jinja2TemplateBudgetError`, is a `ToolError` coded `pipe.template_budget_exceeded`, and `TemplateUrlRefusedError` derives from `PipelexError` directly, so each is handled by its code like any other refusal.
 
 ### Factory-time vs Runtime
 
@@ -545,6 +582,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | `pipelex/errors/error_code_declaration.py` | What a class declares: a code, `ErrorCodeSet`, `InheritsCause`, `ABSTRACT_ERROR` |
 | `pipelex/errors/error_codes.py` | `ErrorCode`, `error_code_spec()`: what the registries declare about each code, as generated tables |
 | `pipelex/errors/foreign_raises.py` | The scan behind the foreign-raise check |
+| `pipelex/errors/security_event.py` | The security event: `emit_security_event()`, `emit_security_event_for_run()`, `log_security_event()`, `mark_security_event_emitted()`, `is_security_refusal()`, and the kind of target each security code refuses |
+| `pipelex/errors/security_target.py` | `SecurityTargetKind` and `SecurityTargetClass`, the vocabulary of what a security refusal refused |
 | `pipelex/errors/retired_error_pages.py` | The static redirects of the retired per-class error pages |
 | `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
 | `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
@@ -586,6 +625,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | Unknown or ambiguous entry `pipe_code` (a CLI argument, a run request's field, the `--pipe` / `pipe_ref` slice selector of bundle validation) | `EntryPipeNotFoundError` / `EntryPipeAmbiguousError` → `UserAction(CHANGE_INPUT)`; `request.pipe_not_found`, `request.pipe_unspecified` or `request.pipe_ambiguous` → **HTTP 422**, and caller-facing under STRICT. The in-body lookups (`get_optional_pipe` / `get_required_pipe`) keep raising `PipeNotFoundError` / `PipeLibraryError`, whose codes are the method's: a ref written inside a bundle is not the caller's input |
 | A template naming a filter or a test that does not exist, found only when it renders | `Jinja2TemplateInvalidError` at the pipe, naming the filter or test and none of the template: `method.template_invalid` → **HTTP 422**, caller-facing under STRICT, for a method's `PipeCondition` expression, `PipeLLM` prompt or `PipeDocGen` template, and `runtime.unexpected` for one of Pipelex's own templates |
 | A URL or a storage key refused by the SSRF guard or the run's read scope | A `security.*` code saying whose the URL was: `security.input_url_refused` for one of the run's inputs, the default when the guard cannot tell, `security.method_url_refused` for one the method names and for a read refused inside a step, whose inputs were authorized when they were normalized, both → **HTTP 422**, and `security.provider_url_refused` for one in a model's generated answer, the runtime's → HTTP 500; a traversal in a storage key the caller supplied is `security.input_path_refused`, which `PipelineInputContentError` takes from its cause |
+| Any refusal coded in the `security.` or `pipelex.security.` family | The run fails under that code, and the deployment logs one security event on `pipelex.errors.security_event`, naming the code, its domain, the kind and class of target refused, the run, the request and the run's extras, never the target or any content; a refusal crossing several boundaries is logged once |
 | A method of the host's own library directories refuses to load | `HostLibraryLoadRefusalError`, `pipelex.config.invalid` → HTTP 500, its message withheld under STRICT; the same refusal in the caller's own content stays the caller's verdict |
 | Wrapper exception (no own category) | Takes its cause's code, and its classification via enrichment |
 | A pipe fails during a run | `PipeRouterError` → `PipelineExecutionError`, both reporting the root fault's `code` and `error_type` and its own message prefixed with `Pipe '<code>' failed (<path>): `; the classification comes from the chain |
