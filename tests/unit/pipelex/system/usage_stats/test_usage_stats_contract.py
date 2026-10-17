@@ -11,6 +11,8 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     CONTAINER_MARKER_FILES,
     CONTAINER_MARKER_VARIABLES,
     FALSY_VALUES,
+    ERROR_CODE_MAX_LENGTH,
+    ERROR_CODE_PATTERN,
     MODEL_HANDLE_PATTERN,
     NOTICE_DETAILS_URL,
     NOTICE_DISABLE_COMMAND,
@@ -160,6 +162,8 @@ class TestUsageStatsContract:
         assert patterns["release_version"]["regex"] == RELEASE_VERSION_PATTERN
         assert patterns["installation_id"]["regex"] == INSTALLATION_ID_PATTERN
         assert patterns["model_handle"]["regex"] == MODEL_HANDLE_PATTERN
+        assert patterns["error_code"]["regex"] == ERROR_CODE_PATTERN
+        assert patterns["error_code"]["max_length"] == ERROR_CODE_MAX_LENGTH
 
     def test_enums_are_the_schemas_values(self) -> None:
         assert {event.value for event in UsageStatsEventName} <= set(load_usage_stats_schema()["events"])

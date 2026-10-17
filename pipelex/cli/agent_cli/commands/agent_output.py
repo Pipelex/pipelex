@@ -36,8 +36,8 @@ from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusa
 from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
-from pipelex.system.usage_stats.usage_stats_client import note_command_error_domain
-from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error_domain_of
+from pipelex.system.usage_stats.usage_stats_client import note_command_error
+from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error_of_code, usage_stats_error_of_problem
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
@@ -244,6 +244,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
         report_category = find_inference_error_category_in_chain(cause)
         report_domain = ErrorDomain.from_problem_domain(problem.effective_domain)
         report_code = problem.code
+        # The command's usage statistics carry the same classification, never the error itself.
+        note_command_error(error=usage_stats_error_of_problem(problem=problem))
         diagnostics = problem.diagnostics
         if diagnostics is not None and diagnostics.model:
             report_extras["model"] = diagnostics.model
@@ -268,8 +270,6 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     domain = report_domain or AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
-        # The command's usage statistics carry the same classification, never the error itself.
-        note_command_error_domain(error_domain=usage_stats_error_domain_of(domain=domain))
 
     # error_code: the cause's registry code, the member a hosted refusal carries as well; an uncoded cause names none
     if report_code:
@@ -534,7 +534,8 @@ def api_response_error_payload(*, error: ApiResponseError) -> dict[str, Any]:
         payload["retryable"] = True
     if sent.error_domain:
         payload["error_domain"] = sent.error_domain
-        note_command_error_domain(error_domain=usage_stats_error_domain_of(domain=sent.error_domain))
+    if sent_error := usage_stats_error_of_code(code=_non_empty_string(value=problem.get("code"))):
+        note_command_error(error=sent_error)
     if error_category := _non_empty_string(value=problem.get("error_category")):
         payload["error_category"] = error_category
     if error.validation_errors:

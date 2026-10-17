@@ -28,7 +28,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsSurface,
 )
 from pipelex.system.usage_stats.usage_stats_events import CommandCompletedProperties, UsageStatsEvent, bounded_duration_ms
-from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error_domain
+from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error
 from pipelex.tools.log.error_fields import error_fields
 
 #: The statistics command group, `pipelex usage-stats`.
@@ -280,9 +280,9 @@ def _end_command(
     runs whatever the one before it did.
     """
     try:
-        error_domain = None
+        command_error = None
         if outcome.is_failed:
-            error_domain = usage_stats_error_domain(error=failure) if failure is not None else client.command_error_domain
+            command_error = usage_stats_error(error=failure) if failure is not None else client.command_error
         init_properties: dict[str, Any] = {}
         if client.command_init_choices is not None and command == INIT_COMMAND:
             init_properties = client.command_init_choices.as_properties()
@@ -292,7 +292,8 @@ def _end_command(
                 properties=CommandCompletedProperties(
                     command=command,
                     outcome=outcome,
-                    error_domain=error_domain,
+                    error_code=command_error.code if command_error is not None else None,
+                    error_domain=command_error.domain if command_error is not None else None,
                     duration_ms=bounded_duration_ms(seconds=duration_seconds),
                     hosted=True if client.is_command_hosted else None,
                     **init_properties,

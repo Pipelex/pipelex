@@ -23,7 +23,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsProvider,
 )
 from pipelex.system.usage_stats.usage_stats_events import UsageStatsEvent
-from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error_domain
+from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error
 from pipelex.tracing.trace_events import TraceEvent
 from tests.helpers.recovered_problem import make_recovered_url_refusal
 from tests.helpers.usage_stats_run_events import envelope_of, llm_usage_event, pipe_start_event
@@ -112,16 +112,14 @@ class TestUsageStatsReporting:
             tally.note_call(
                 model_handle=_SHIPPED_ANTHROPIC_MODEL,
                 backend_name="anthropic",
-                failed=False,
-                failure_category=None,
+                failure_domain=None,
                 images_generated=0,
                 pages_extracted=0,
             )
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
-            failed=True,
-            failure_category="capacity",
+            failure_domain=UsageStatsErrorDomain.RUNTIME,
             images_generated=0,
             pages_extracted=0,
         )
@@ -147,13 +145,14 @@ class TestUsageStatsReporting:
         assert (run["input_tokens"], run["output_tokens"], run["cached_tokens"]) == (300, 60, 20)
         assert run["cost_usd"] > 0
         model = _properties(usage_event=model_event)
-        assert (model["provider"], model["model"], model["calls"], model["failures"], model["failures_capacity"]) == (
+        assert (model["provider"], model["model"], model["calls"], model["failures"], model["failures_runtime"]) == (
             "anthropic",
             _SHIPPED_ANTHROPIC_MODEL,
             3,
             1,
             1,
         )
+        assert (model["failures_input"], model["failures_method"], model["failures_account"], model["failures_operator"]) == (0, 0, 0, 0)
         assert (model["input_tokens"], model["output_tokens"], model["cached_tokens"]) == (300, 60, 20)
         assert model["cost_usd"] == run["cost_usd"]
 
@@ -166,8 +165,7 @@ class TestUsageStatsReporting:
             tally.note_call(
                 model_handle=_SHIPPED_ANTHROPIC_MODEL,
                 backend_name=backend_name,
-                failed=failed,
-                failure_category="capacity" if failed else None,
+                failure_domain=UsageStatsErrorDomain.RUNTIME if failed else None,
                 images_generated=0,
                 pages_extracted=0,
             )
@@ -196,16 +194,14 @@ class TestUsageStatsReporting:
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
-            failed=False,
-            failure_category=None,
+            failure_domain=None,
             images_generated=0,
             pages_extracted=0,
         )
         tally.note_call(
             model_handle="my-own-gpu-model",
             backend_name="my_gpu_box",
-            failed=False,
-            failure_category=None,
+            failure_domain=None,
             images_generated=0,
             pages_extracted=0,
         )
@@ -247,14 +243,21 @@ class TestUsageStatsReporting:
         assert run["outcome"] == outcome
         assert run["input_tokens"] == 7
         if outcome.is_failed:
-            assert run["error_domain"] == usage_stats_error_domain(error=error)
+            assert (run["error_code"], run["error_domain"]) == ("runtime.unexpected", "runtime")
         else:
+            assert "error_code" not in run
             assert "error_domain" not in run
         assert "secret" not in str(envelope)
 
-    def test_a_recovered_problem_is_counted_in_its_own_domain(self) -> None:
-        """A failure reporting a problem recovered from a worker is counted by that problem's domain, not by its carrier's class."""
-        assert usage_stats_error_domain(error=make_recovered_url_refusal()) == UsageStatsErrorDomain.INPUT
+    def test_a_recovered_problem_is_counted_by_its_own_code(self) -> None:
+        """A failure reporting a problem recovered from a worker is counted by that problem's code and domain, not by its carrier's class."""
+        assert usage_stats_error(error=make_recovered_url_refusal()) == ("input.url_unreachable", UsageStatsErrorDomain.INPUT)
+
+    def test_a_failed_run_carries_its_error_s_code_and_domain(self, mocker: MockerFixture) -> None:
+        """A failed run's `run_completed` names its error's code and that code's domain, which the gate accepts."""
+        run_event = build_run_usage_events(facts=_facts(mocker=mocker, outcome=UsageStatsOutcome.FAILED, error=make_recovered_url_refusal()))[0]
+        run = _properties(usage_event=run_event)
+        assert (run["error_code"], run["error_domain"]) == ("input.url_unreachable", "input")
 
     @pytest.mark.parametrize(
         ("backend_name", "model_handle", "provider", "model"),

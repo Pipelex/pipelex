@@ -11,7 +11,7 @@ are in `usage_stats_core`, which the sender runs alone; the tests check them aga
 """
 
 from enum import StrEnum
-from typing import Final
+from typing import Final, NamedTuple
 
 SCHEMA_VERSION = 1
 
@@ -163,12 +163,20 @@ class UsageStatsOutcome(StrEnum):
 
 
 class UsageStatsErrorDomain(StrEnum):
-    """Who can fix a failure: the runtime's own error domains, `other` when it cannot say."""
+    """Who must act on a failure: the domain of its error's code, from the problem registry's closed list."""
 
     INPUT = "input"
-    CONFIG = "config"
+    METHOD = "method"
+    ACCOUNT = "account"
+    OPERATOR = "operator"
     RUNTIME = "runtime"
-    OTHER = "other"
+
+
+class UsageStatsError(NamedTuple):
+    """What the usage statistics say of a failure: the code of its error, and that code's domain, who must act on it."""
+
+    code: str
+    domain: UsageStatsErrorDomain
 
 
 class UsageStatsMethodSource(StrEnum):
@@ -397,3 +405,7 @@ OTHER_COMMAND = "other"
 #: The patterns of the contract the emitter's own values must match, in Python's `re.fullmatch`.
 RELEASE_VERSION_PATTERN = r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}([.-]?(a|b|rc|alpha|beta|dev|post|insider)[.]?[0-9]{0,4})?$"
 MODEL_HANDLE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,95}$"
+#: A registry error code, the standard's code pattern: a family and a name, or a runtime's own code under its prefix.
+ERROR_CODE_PATTERN = r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$"
+#: The longest error code the events carry.
+ERROR_CODE_MAX_LENGTH = 96

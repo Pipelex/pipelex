@@ -247,7 +247,7 @@ Two `StrEnum`s sit beside the code. Neither decides anything a reader branches o
 
 ### InferenceErrorCategory
 
-Defined in `pipelex/cogt/exceptions.py`. It stays inside the runtime as the classification that **picks a provider failure's code**: the worker's classification (`pipelex/cogt/inference/error_classify.py`) reads the provider's answer, assigns a category and a code together, and the rendered error carries both. The category also still drives one decision the code cannot carry: whether the Temporal activity may repeat a provider call within the run, through `is_retryable` and `find_inference_error_category_in_chain`. A call whose outcome is unknown (`AMBIGUOUS`) must never be repeated within the run, though its code, `provider.outcome_unknown`, says a new run may succeed.
+Defined in `pipelex/cogt/exceptions.py`. It stays inside the runtime as the classification that **picks a provider failure's code**: the worker's classification (`pipelex/cogt/inference/error_classify.py`) reads the provider's answer, assigns a category and a code together, and the rendered error carries both. The category also still drives one decision the code cannot carry: whether the Temporal activity may repeat a provider call within the run, through `is_retryable` and `find_inference_error_category_in_chain`. A call whose outcome is unknown (`AMBIGUOUS`) must never be repeated within the run, though its code, `provider.outcome_unknown`, says a new run may succeed. It never reaches a reader: no problem, no CLI output and no usage-statistics event carries it, and the usage statistics count a model's failed calls by the domain of their code.
 
 | Category | Meaning | Repeated within the run | Typical codes |
 |----------|---------|-------------------------|---------------|
@@ -265,7 +265,7 @@ The category and the code are checked against each other. A classification whose
 
 ### ErrorDomain
 
-Defined in `pipelex/base_exceptions.py`. A problem carries its code's own domain, one of the five the MTHDS core declares; `ErrorDomain` is a three-valued reading of it, derived through `ErrorDomain.from_problem_domain()`, which the CLIs' error envelopes, the usage statistics and the API's log records still carry as `error_domain`:
+Defined in `pipelex/base_exceptions.py`. A problem carries its code's own domain, one of the five the MTHDS core declares; `ErrorDomain` is a three-valued reading of it, derived through `ErrorDomain.from_problem_domain()`, which the API's log records still carry as `error_domain`. The CLIs' problems and the usage statistics carry the code's own domain instead, one of the five:
 
 | Code's domain | `error_domain` | Who acts |
 |---------------|----------------|----------|

@@ -1,6 +1,6 @@
 """What a run's inference calls did, tallied as they end, for the run's `run_completed` and `model_used` events.
 
-The run's events carry its pipes and its token usage, but not what a call that failed was refused for, which backend
+The run's events carry its pipes and its token usage, but not who must act on a call that failed, which backend
 served a model, or how many images and pages a call produced. The inference call's own summary event knows all of it
 when the call ends, so it notes it here, in the tally of the run the call belongs to: a context variable `PipeRun`
 sets for the duration of a run, which the run's tasks inherit. With no run tallying (statistics off, or a call made
@@ -10,19 +10,28 @@ The tally is in-process: a run whose calls execute in other processes, a Tempora
 all. The hosted plane sets `DO_NOT_TRACK=1`, so no such run reports.
 """
 
+import re
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.errors.problem import ProblemView
-from pipelex.system.usage_stats.usage_stats_contract import UsageStatsErrorDomain, UsageStatsMethodSource
+from mthds.protocol.problem.models import Problem
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-#: The failure categories a `model_used` event counts, the runtime's own `InferenceErrorCategory` values.
-FAILURE_CATEGORIES: tuple[str, ...] = ("transient", "configuration", "content", "capacity", "ambiguous", "unknown")
-#: The category a failure is counted under when the runtime could not classify it.
-UNCLASSIFIED_FAILURE_CATEGORY = "unknown"
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_codes import error_code_spec, parse_error_code
+from pipelex.errors.problem import ProblemView
+from pipelex.system.usage_stats.usage_stats_contract import (
+    ERROR_CODE_MAX_LENGTH,
+    ERROR_CODE_PATTERN,
+    UsageStatsError,
+    UsageStatsErrorDomain,
+    UsageStatsMethodSource,
+)
+
+#: A failure that is no Pipelex error, which every surface reads as the registry's catch-all.
+UNEXPECTED_USAGE_STATS_ERROR = UsageStatsError(code=CoreCode.RUNTIME_UNEXPECTED, domain=UsageStatsErrorDomain.RUNTIME)
 
 
 class ModelCallTally:
@@ -32,7 +41,7 @@ class ModelCallTally:
         self.backend_name = backend_name
         self.calls = 0
         self.failures = 0
-        self.failures_by_category: dict[str, int] = dict.fromkeys(FAILURE_CATEGORIES, 0)
+        self.failures_by_domain: dict[UsageStatsErrorDomain, int] = dict.fromkeys(UsageStatsErrorDomain, 0)
         self.images_generated = 0
         self.pages_extracted = 0
 
@@ -56,14 +65,13 @@ class RunInferenceTally:
         *,
         model_handle: str,
         backend_name: str | None,
-        failed: bool,
-        failure_category: str | None,
+        failure_domain: UsageStatsErrorDomain | None,
         images_generated: int,
         pages_extracted: int,
     ) -> None:
         with self._lock:
             self.calls += 1
-            if failed:
+            if failure_domain is not None:
                 self.failures += 1
             if backend_name is None:
                 return
@@ -74,10 +82,9 @@ class RunInferenceTally:
             model_tally.calls += 1
             model_tally.images_generated += images_generated
             model_tally.pages_extracted += pages_extracted
-            if failed:
+            if failure_domain is not None:
                 model_tally.failures += 1
-                category = failure_category if failure_category in model_tally.failures_by_category else UNCLASSIFIED_FAILURE_CATEGORY
-                model_tally.failures_by_category[category] += 1
+                model_tally.failures_by_domain[failure_domain] += 1
 
 
 _RUN_TALLY: ContextVar[RunInferenceTally | None] = ContextVar("pipelex_usage_stats_run_tally", default=None)
@@ -104,31 +111,51 @@ def tallying_inference_calls(*, tally: RunInferenceTally | None) -> Generator[No
         _RUN_TALLY.reset(token)
 
 
-def usage_stats_error_domain(*, error: BaseException | None) -> UsageStatsErrorDomain:
-    """Who can fix a failure, by the domain of the runtime's own code: `input`, `config`, `runtime`, or `other` when it cannot say.
+def usage_stats_error(*, error: BaseException | None) -> UsageStatsError:
+    """The code of a failure and its domain, as its problem gives them; `runtime.unexpected` for an error that is no Pipelex error.
 
-    The domain is the failure's problem's, which a cause reporting a problem of its own, such as one recovered across a
-    transport boundary, decides, as every other surface reads it.
+    The code is the failure's problem's, which a cause reporting a problem of its own, such as one recovered across a
+    transport boundary, decides, as every other surface reads it. A failure with no error to read is the catch-all too,
+    since every failure has a code.
     """
     if not isinstance(error, PipelexError):
-        return UsageStatsErrorDomain.OTHER
-    return usage_stats_error_domain_of(domain=ErrorDomain.from_problem_domain(error.to_problem(view=ProblemView.CALLER).effective_domain))
+        return UNEXPECTED_USAGE_STATS_ERROR
+    return usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER))
 
 
-def usage_stats_error_domain_of(*, domain: ErrorDomain | str | None) -> UsageStatsErrorDomain:
-    """The statistics' error domain of a runtime domain, given as the enum or as its value; `other` for none or another."""
-    if domain is None:
-        return UsageStatsErrorDomain.OTHER
-    try:
-        runtime_domain = ErrorDomain(domain)
-    except ValueError:
-        return UsageStatsErrorDomain.OTHER
-    match runtime_domain:
-        case ErrorDomain.INPUT:
+def usage_stats_error_of_problem(*, problem: Problem) -> UsageStatsError:
+    """The code and the domain of a problem a surface reports.
+
+    A code the contract's pattern refuses, which no registry gives, reads as the catch-all rather than losing the event.
+    """
+    code = problem.code
+    if len(code) > ERROR_CODE_MAX_LENGTH or re.fullmatch(ERROR_CODE_PATTERN, code) is None:
+        return UNEXPECTED_USAGE_STATS_ERROR
+    return UsageStatsError(code=code, domain=usage_stats_error_domain_of(domain=problem.effective_domain))
+
+
+def usage_stats_error_of_code(*, code: str | None) -> UsageStatsError | None:
+    """The code and the domain of a code another runtime's answer named, when this runtime's registries know it; else `None`."""
+    if code is None:
+        return None
+    known_code = parse_error_code(code)
+    if known_code is None:
+        return None
+    return UsageStatsError(code=known_code, domain=usage_stats_error_domain_of(domain=error_code_spec(known_code).domain))
+
+
+def usage_stats_error_domain_of(*, domain: ProblemDomain) -> UsageStatsErrorDomain:
+    """The statistics' error domain of a problem's domain: the same closed list, under the contract's own enum."""
+    match domain:
+        case ProblemDomain.INPUT:
             return UsageStatsErrorDomain.INPUT
-        case ErrorDomain.CONFIG:
-            return UsageStatsErrorDomain.CONFIG
-        case ErrorDomain.RUNTIME:
+        case ProblemDomain.METHOD:
+            return UsageStatsErrorDomain.METHOD
+        case ProblemDomain.ACCOUNT:
+            return UsageStatsErrorDomain.ACCOUNT
+        case ProblemDomain.OPERATOR:
+            return UsageStatsErrorDomain.OPERATOR
+        case ProblemDomain.RUNTIME:
             return UsageStatsErrorDomain.RUNTIME
 
 

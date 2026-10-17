@@ -36,6 +36,11 @@
       "max_length": 96,
       "description": "A model's name as a shipped backend table names it, or `other`."
     },
+    "error_code": {
+      "regex": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*){1,2}$",
+      "max_length": 96,
+      "description": "A problem registry's error code, the MTHDS standard's code pattern: a family and a name, such as `input.invalid`, or a runtime's own code under its prefix, such as `pipelex.config.invalid`."
+    },
     "installation_id": {
       "regex": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
       "max_length": 36,
@@ -240,16 +245,27 @@
           ],
           "description": "How the run ended."
         },
+        "error_code": {
+          "type": "pattern",
+          "required": true,
+          "pattern": "error_code",
+          "description": "For a failed run, the code of its error, from the problem registry: `runtime.unexpected` for an error the runtime gives no other code.",
+          "when": {
+            "property": "outcome",
+            "equals": "failed"
+          }
+        },
         "error_domain": {
           "type": "enum",
           "required": true,
           "values": [
             "input",
-            "config",
-            "runtime",
-            "other"
+            "method",
+            "account",
+            "operator",
+            "runtime"
           ],
-          "description": "For a failed run, who can fix the error, `other` when the runtime cannot say.",
+          "description": "For a failed run, who must act on the error: the domain of its code.",
           "when": {
             "property": "outcome",
             "equals": "failed"
@@ -653,47 +669,40 @@
           "max": 10000000,
           "description": "The run's failed calls to this model."
         },
-        "failures_transient": {
+        "failures_input": {
           "type": "integer",
           "required": true,
           "min": 0,
           "max": 10000000,
-          "description": "The failed calls the runtime classified as `transient`."
+          "description": "The failed calls whose error's code has the domain `input`."
         },
-        "failures_configuration": {
+        "failures_method": {
           "type": "integer",
           "required": true,
           "min": 0,
           "max": 10000000,
-          "description": "The failed calls the runtime classified as `configuration`."
+          "description": "The failed calls whose error's code has the domain `method`."
         },
-        "failures_content": {
+        "failures_account": {
           "type": "integer",
           "required": true,
           "min": 0,
           "max": 10000000,
-          "description": "The failed calls the runtime classified as `content`."
+          "description": "The failed calls whose error's code has the domain `account`."
         },
-        "failures_capacity": {
+        "failures_operator": {
           "type": "integer",
           "required": true,
           "min": 0,
           "max": 10000000,
-          "description": "The failed calls the runtime classified as `capacity`."
+          "description": "The failed calls whose error's code has the domain `operator`."
         },
-        "failures_ambiguous": {
+        "failures_runtime": {
           "type": "integer",
           "required": true,
           "min": 0,
           "max": 10000000,
-          "description": "The failed calls the runtime classified as `ambiguous`."
-        },
-        "failures_unknown": {
-          "type": "integer",
-          "required": true,
-          "min": 0,
-          "max": 10000000,
-          "description": "The failed calls the runtime classified as `unknown`."
+          "description": "The failed calls whose error's code has the domain `runtime`."
         },
         "input_tokens": {
           "type": "integer",
@@ -894,16 +903,27 @@
           ],
           "description": "How the command ended; `cancelled` for an interrupt."
         },
+        "error_code": {
+          "type": "pattern",
+          "required": false,
+          "pattern": "error_code",
+          "description": "For a failed command, the code of its error, from the problem registry, when the tool can say.",
+          "when": {
+            "property": "outcome",
+            "equals": "failed"
+          }
+        },
         "error_domain": {
           "type": "enum",
           "required": false,
           "values": [
             "input",
-            "config",
-            "runtime",
-            "other"
+            "method",
+            "account",
+            "operator",
+            "runtime"
           ],
-          "description": "For a failed command, who can fix the error, when the tool can say.",
+          "description": "For a failed command, who must act on the error, the domain of its code, when the tool can say.",
           "when": {
             "property": "outcome",
             "equals": "failed"
