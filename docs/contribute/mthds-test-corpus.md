@@ -60,11 +60,13 @@ An entry directory holds either exactly one `.mthds` file, or several with a `bu
 
 7. **Run the gates**: `.venv/bin/pytest tests/unit/pipelex/test_extras tests/integration/pipelex/test_extras`.
 
-An **invalid** entry additionally declares the exact wire `error_type` it must produce. Read that string off the runtime rather than inferring it from the source:
+An **invalid** entry additionally declares the exact `error_type` its validation item must carry. Read that string off the runtime rather than inferring it from the source: declare any value, run the entries gate on the entry, and its failure names the `error_type` the bundle produced:
 
 ```bash
-.venv/bin/pipelex-agent validate bundle <path> -L <entry_dir>/ --format json --error-format json
+.venv/bin/pytest tests/integration/pipelex/test_extras/test_mthds_corpus_entries.py -k <entry_name>
 ```
+
+The agent CLI no longer prints it: its invalid verdict is a problem, whose items carry the registry `code` of each fault rather than the validation item's `error_type`.
 
 Two rules shape an invalid entry beyond that. Its **`covers` list is its `error.*` tag and nothing else** — it is tempting to also tag the pipe kind that carries the fault, but the exhaustivity gate reads `covers` as the claim that a tag has a focused entry, and a deliberately broken bundle must never be what satisfies that claim for a working feature. And the two ways it names its fault have to agree: `expected_error` carries the wire string, `covers` carries the normalized tag, and the exhaustivity gate requires the entry to cover the tag whose `code` is its `expected_error`, so an entry cannot advertise coverage it does not produce. The rule has a second half, gated alongside it: a **valid** entry may not carry an `error.*` tag at all, because its bundle produces no diagnostic and the claim would go unhonoured in exactly the same way.
 

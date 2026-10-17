@@ -40,7 +40,7 @@ The Pipelex CLI is organized into several command groups:
 
 These flags work on any `pipelex` command and are position-agnostic — place them anywhere in the invocation:
 
-- `--traceback` - print the full Rich-rendered stack trace before the friendly one-line error. Off by default. Both `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` work.
+- `--traceback` - print the full Rich-rendered stack trace before the error panel, and let the log line about an unexpected failure carry its traceback. Off by default, since a traceback prints the text of every exception along the chain, which can quote a run's data; without it the log line names the failure by its code and the classes along its chain. Both `pipelex run --traceback pipe ...` and `pipelex run pipe ... --traceback` work.
 - `--no-logo` - suppress the startup logo banner. Handy for clean logs and to save tokens in agent output.
 
 `--version` / `-V` is **not** one of these: it is an option on the root command, so it goes before any subcommand (`pipelex --version`, never `pipelex show --version`). See below.
