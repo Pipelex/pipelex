@@ -24,7 +24,7 @@ import pipelex_api
 _PACKAGE_NAME = pipelex_api.__name__
 _PACKAGE_ROOT = Path(pipelex_api.__file__).resolve().parent
 
-# What a code decides, which a class no longer declares: `ErrorReport` reads all four from the code.
+# What a code decides, which a class no longer declares: the problem document reads all four from the code.
 _ATTRIBUTES_THE_CODE_DECIDES: tuple[str, ...] = ("error_domain", "retryable", "_declared_title", "_declared_type_uri")
 
 
@@ -58,7 +58,7 @@ class TestRunnerErrorCodeGate:
     def test_the_gate_reads_a_non_empty_set(self) -> None:
         """Anti-vacuity: the discovery found the runner's boot errors and its source files."""
         classes = _runner_error_classes()
-        assert {"ApiBootConfigError", "InvalidAuthModeError", "InvalidErrorDisclosureError"} <= set(classes)
+        assert {"ApiBootConfigError", "InvalidAuthModeError"} <= set(classes)
         assert _source_files()
 
     def test_every_runner_error_class_declares_its_code(self) -> None:

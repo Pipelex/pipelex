@@ -14,14 +14,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import sha256_hex
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 
@@ -66,12 +68,13 @@ def sandbox_hosted_mode_fixture() -> Generator[None, None, None]:
         pipe_func_config.execution_mode = previous
 
 
-def _build_client(mocker: MockerFixture) -> TestClient:
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     mocker.patch(
         f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="direct", allow_request_orchestration_mode_override=False)
     )
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     app.include_router(blob_upload_router, prefix="/v1")
     register_exception_handlers(app)
     return TestClient(app)
@@ -95,6 +98,12 @@ def _upload_all(client: TestClient, *blobs: bytes, read_scope: str | None = None
 
 def _run_output(body: dict[str, Any]) -> str:
     return json.dumps(body["pipe_output"]["working_memory"])
+
+
+def _error_files(problem: dict[str, Any]) -> list[tuple[str, int | None, int | None]]:
+    """The file, line and column each item of an invalid method's problem is located at."""
+    assert problem["code"] == CoreCode.METHOD_INVALID, problem
+    return [(item["location"]["file"], item["location"].get("line"), item["location"].get("column")) for item in problem["errors"]]
 
 
 def _assert_no_host_path(body: Any) -> None:
@@ -178,8 +187,8 @@ class TestMethodTreeRuns:
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "ValidateBundleError"
-        assert {item["source"] for item in body["validation_errors"]} == {"methods/broken.mthds"}
+        assert body["domain"] == "method"
+        assert {file for file, _, _ in _error_files(body)} == {"methods/broken.mthds"}
         _assert_no_host_path(body)
 
     def test_validate_a_method_tree_sent_as_files(self, mocker: MockerFixture) -> None:
@@ -241,7 +250,8 @@ class TestMethodTreeRuns:
 
         for response in (inline, beside_a_tree):
             assert response.status_code == 422, response.text
-            assert response.json()["error_type"] == "WrongScalarKindError"
+            assert response.json()["code"] == CoreCode.INPUT_INVALID
+            assert response.json()["domain"] == "input"
         assert inside_the_tree.status_code == 422, inside_the_tree.text
         assert inside_the_tree.json()["error_type"] == "InvalidMethodFiles"
 
@@ -256,7 +266,7 @@ class TestMethodTreeRuns:
         assert response.json()["is_valid"] is True, response.text
 
     def test_a_bundle_that_is_not_utf8_text_is_the_callers_located_diagnostic(self, mocker: MockerFixture) -> None:
-        client = _build_client(mocker)
+        client = _build_client(mocker, as_operator=True)
         files = {"greet.mthds": _GREET_MTHDS, "bad.mthds": {"base64": "/w=="}}
 
         run = client.post("/v1/execute", json={"files": files, "pipe_code": "greeting.greet", "inputs": {"text": "x"}})
@@ -264,12 +274,12 @@ class TestMethodTreeRuns:
         validated = client.post("/v1/validate", json={"files": files})
 
         assert run.status_code == 422, run.text
-        assert run.json()["error_type"] == "ValidateBundleError"
-        assert [(item["source"], item["line"], item["column"]) for item in run.json()["validation_errors"]] == [("bad.mthds", 1, 1)]
+        assert _error_files(run.json()) == [("bad.mthds", 1, 1)]
         assert run_from_the_entry.status_code == 422, run_from_the_entry.text
-        assert run_from_the_entry.json()["error_type"] == "MethodEntryError"
-        assert run_from_the_entry.json()["code"] == "method.syntax"
-        assert "'bad.mthds'" in run_from_the_entry.json()["detail"]
+        entry_problem = run_from_the_entry.json()
+        assert entry_problem["code"] == CoreCode.METHOD_SYNTAX
+        assert entry_problem["diagnostics"]["error_class"] == "MethodEntryError"
+        assert "'bad.mthds'" in entry_problem["diagnostics"]["message"]
         assert validated.status_code == 200, validated.text
         verdict = validated.json()
         assert verdict["is_valid"] is False

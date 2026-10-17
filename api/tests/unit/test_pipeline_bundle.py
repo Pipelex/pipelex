@@ -17,12 +17,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import (
     UNRESOLVED_PACKAGE_MTHDS,
@@ -146,16 +148,17 @@ def _zip_b64_of_entries(entries: list[tuple[str, str]]) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> tuple[TestClient, dict[str, Any]]:
     """Wire an app whose ApiRunner is mocked and records what the run actually saw.
 
     The `snapshot` captures BOTH what the runner was asked to run — the
     `mthds_contents` and `pipe_code` passed to `execute`/`start` — and the
     `library_dirs` it was constructed with plus the files on disk at run time.
     Together they prove the tree was written whole and torn down after the request.
+    `as_operator` marks each request as the operator's, whose view carries a refusal's own message in `diagnostics`.
     """
     app = FastAPI()
-    app.include_router(pipeline_router, prefix="/v1")
+    app.include_router(pipeline_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
 
     snapshot: dict[str, Any] = {}
@@ -249,16 +252,19 @@ class TestPipelineBundle:
         assert snapshot["pipe_code"] == "echo"
 
     def test_a_tree_with_no_entry_pipe_and_no_pipe_code_is_refused(self, mocker: MockerFixture):
-        client, snapshot = _build_client(mocker)
+        client, snapshot = _build_client(mocker, as_operator=True)
         files = {"a.mthds": VALID_MTHDS, "b.mthds": VALID_MTHDS.replace('domain = "smoke"', 'domain = "other"')}
 
         response = client.post("/v1/execute", json={"files": files, "inputs": {"text": "hi"}})
 
         assert response.status_code == 422, response.text
         problem = response.json()
-        assert problem["error_type"] == "MethodEntryError"
-        assert "'a.mthds'" in problem["detail"]
-        assert "'b.mthds'" in problem["detail"]
+        # Both bundles declare a main_pipe, so the run that names no pipe has several to start at.
+        assert problem["code"] == CoreCode.REQUEST_PIPE_AMBIGUOUS
+        assert problem["domain"] == "input"
+        assert problem["diagnostics"]["error_class"] == "MethodEntryError"
+        assert "'a.mthds'" in problem["diagnostics"]["message"]
+        assert "'b.mthds'" in problem["diagnostics"]["message"]
         assert snapshot == {}, "the runner was reached"
 
     def test_no_bundle_passes_request_mthds_contents(self, mocker: MockerFixture):
@@ -335,13 +341,16 @@ class TestPipelineBundle:
         assert snapshot == {}, "the runner was reached"
 
     def test_bundle_and_mthds_contents_are_mutually_exclusive(self, mocker: MockerFixture):
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post(
             "/v1/execute",
             json={"files": {"main.mthds": VALID_MTHDS}, "mthds_contents": [VALID_MTHDS]},
         )
         assert response.status_code == 422
-        assert "mutually exclusive" in response.text
+        problem = response.json()
+        assert problem["code"] == CoreCode.REQUEST_INVALID
+        assert problem.get("params") == {"field": "mthds_contents"}
+        assert "mutually exclusive" in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize("transport", ["dependencies", "bundle_b64"])
     @pytest.mark.parametrize("path", ["/v1/execute", "/v1/start"])
@@ -389,9 +398,10 @@ class TestPipelineBundle:
         response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
 
         assert response.status_code == 422, response.text
-        assert response.json()["code"] == "request.invalid"
-        assert response.json()["error_type"] == "PipelexRequestError"
-        assert "dependencies" in response.json()["detail"]
+        problem = response.json()
+        assert problem["code"] == CoreCode.REQUEST_INVALID
+        assert problem.get("params") == {"field": "dependencies"}
+        assert problem["detail"] == "The request's field 'dependencies' does not match the route's schema."
         assert snapshot == {}, "the runner was reached"
 
     def test_a_bundle_shipping_no_package_gets_no_methods_dir(self, mocker: MockerFixture):

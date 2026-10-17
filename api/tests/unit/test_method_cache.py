@@ -67,7 +67,7 @@ class TestMethodCloneCache:
         branch_ref = parse_method_ref("github.com/pipelex/methods/documents@main")
         with pytest.raises(MethodFetchError, match="does not name a git tag") as exc_info:
             resolve_remote_commit_sha(ref=branch_ref, clone_url=clone_url)
-        assert exc_info.value.to_error_report().code == "method.not_found"
+        assert exc_info.value.resolve_error_code() == "method.not_found"
 
     def test_a_cached_sha_is_never_recloned(self, origin: tuple[str, Path], tmp_path: Path, mocker: MockerFixture):
         clone_url, repo = origin
@@ -188,4 +188,4 @@ class TestMethodCloneCache:
             resolve_remote_commit_sha(ref=_BARE_REF, clone_url=f"file://{tmp_path}/no-such-repo")
         # One exit status of `git ls-remote` covers a missing repository and an unreachable host, so the
         # code is the transient one until the fetch tells them apart.
-        assert exc_info.value.to_error_report().code == "method.fetch_failed"
+        assert exc_info.value.resolve_error_code() == "method.fetch_failed"

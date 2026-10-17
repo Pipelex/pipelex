@@ -4,7 +4,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.interpreter_hub import get_library_manager
 from pytest_mock import MockerFixture
 
@@ -58,9 +60,10 @@ class TestValidateAndModelsRoutes:
         body = response.json()
         assert body["is_valid"] is False
         assert body["is_runnable"] is False
-        # The pipelex message is preserved (caller-facing under `_authors_caller_facing_message`) so
-        # the client gets the actual interpreter complaint, not a generic placeholder.
-        assert "TOML" in body["message"]
+        # The verdict's message is the sentence its code renders, `method.invalid`'s; the interpreter's
+        # actual complaint rides the item, so the client still reads what is wrong and where.
+        assert body["message"] == error_code_spec(CoreCode.METHOD_INVALID).detail
+        assert "TOML syntax error" in body["validation_errors"][0]["message"]
         # The diagnostics list is non-empty on every invalid arm — the structured-info invariant is
         # total. A raw TOML-syntax error is a parse-level failure the interpreter raises with no
         # categorized error-data, but the shared builder's last-resort residual still emits one

@@ -22,7 +22,7 @@ fail-fast), so a misconfigured env var cannot crash collection of every module t
 app class.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI
 from typing_extensions import override
@@ -65,6 +65,59 @@ def use_problem_json_media_type(schema: dict[str, Any]) -> None:
                     content[PROBLEM_JSON_MEDIA_TYPE] = json_content
 
 
+# Two families of models share their class names: the fix vocabulary `pipelex.suggested_fix` publishes on a verdict's
+# `ValidationErrorItem`, and the standard's, which a problem's `ProblemItem` carries (`file` where Pipelex's has `source`,
+# and a catch-all for an operation kind it does not list). Pydantic names both by their module when they meet, which would
+# rename the schemas a generated client binds to; this pass gives Pipelex's their own names back, and the standard's the
+# `Problem` prefix its other models carry.
+_SCHEMA_RENAMES_BY_PREFIX: dict[str, str] = {
+    "pipelex__suggested_fix__": "",
+    "mthds__protocol__problem__models__": "Problem",
+}
+
+_SCHEMA_REF_PREFIX = "#/components/schemas/"
+
+
+def _renamed_schema(name: str) -> str:
+    for prefix, replacement in _SCHEMA_RENAMES_BY_PREFIX.items():
+        if name.startswith(prefix):
+            return f"{replacement}{name.removeprefix(prefix)}"
+    return name
+
+
+def _with_renamed_refs(node: Any, *, renames: dict[str, str]) -> Any:
+    """``node`` with every schema reference to a renamed schema pointing at its new name."""
+    if isinstance(node, dict):
+        return {key: _with_renamed_refs(value, renames=renames) for key, value in cast("dict[str, Any]", node).items()}
+    if isinstance(node, list):
+        return [_with_renamed_refs(item, renames=renames) for item in cast("list[Any]", node)]
+    if isinstance(node, str) and node.startswith(_SCHEMA_REF_PREFIX):
+        name = node.removeprefix(_SCHEMA_REF_PREFIX)
+        return f"{_SCHEMA_REF_PREFIX}{renames.get(name, name)}"
+    return node
+
+
+def name_shared_fix_schemas(schema: dict[str, Any]) -> None:
+    """Rename the module-qualified fix schemas Pydantic generates for the two fix families, in place.
+
+    Refuses a rename onto a name another schema already holds, which would merge two shapes into one.
+    """
+    components: dict[str, Any] = schema.get("components", {})
+    schemas: dict[str, Any] = components.get("schemas", {})
+    renames = {name: _renamed_schema(name) for name in schemas if _renamed_schema(name) != name}
+    if not renames:
+        return
+    taken = set(schemas) - set(renames)
+    clashes = sorted(new_name for new_name in renames.values() if new_name in taken)
+    if clashes:
+        msg = f"Renaming the fix schemas would overwrite the schemas {clashes}"
+        raise ValueError(msg)
+    renamed_schemas = {renames.get(name, name): value for name, value in schemas.items()}
+    components["schemas"] = dict(sorted(renamed_schemas.items()))
+    for key in list(schema):
+        schema[key] = _with_renamed_refs(schema[key], renames=renames)
+
+
 class PipelexFastAPI(FastAPI):
     """The app class. Stock FastAPI, extended only to publish errors as `application/problem+json`."""
 
@@ -80,4 +133,5 @@ class PipelexFastAPI(FastAPI):
             return self.openapi_schema
         schema = super().openapi()
         use_problem_json_media_type(schema)
+        name_shared_fix_schemas(schema)
         return schema

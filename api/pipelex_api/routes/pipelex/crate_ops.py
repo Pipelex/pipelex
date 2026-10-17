@@ -346,6 +346,8 @@ def _select_entry_pipe(selector: str, *, origin: SelectorOrigin) -> RequestedPip
             message=f"{described} matches pipes in several domains of {scope}, so it selects none: {exc}",
             origin=origin,
             selector=selector,
+            # The qualified refs the entry lookup found, which the refusal names to the caller.
+            candidates=exc.given_params.get("candidates"),
         )
     except PipeNotFoundError as exc:
         return PipeSelectionMiss(

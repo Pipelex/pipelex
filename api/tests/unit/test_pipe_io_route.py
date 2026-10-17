@@ -14,14 +14,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.pipeline.exceptions import PipeIOContractError
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.limits import MAX_PIPE_CODE_LEN
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     COLLIDING_ECHO_LIST_MTHDS,
@@ -48,19 +51,18 @@ STUB_METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 # The three artifact maps the valid arm carries, sharing one key set.
 ARTIFACT_FIELDS = ("pipe_io_contracts", "input_form", "output_form")
 
-# The `error_type`s of a no-verdict 422: a malformed request, and the two pipe-selection refusals,
-# which carry the pipelex entry-lookup class names the run routes answer for the same failure.
+# The `error_type` of a malformed request's 422, which the API authors itself; a pipe-selection refusal is the
+# runtime's, answered under its registry code.
 REQUEST_SHAPE_ERROR = "ValidationError"
-PIPE_NOT_FOUND_ERROR = "EntryPipeNotFoundError"
-PIPE_AMBIGUOUS_ERROR = "EntryPipeAmbiguousError"
 
 # Every field only the valid arm carries: the invalid arm is the crate verdict alone.
 VALID_ARM_ONLY_FIELDS = ("pipe_ref", "default_pipe_ref", *ARTIFACT_FIELDS, "pending_signatures", "is_runnable", "files")
 
 
-def _build_client() -> TestClient:
+def _build_client(*, as_operator: bool = False) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
     return TestClient(app)
 
@@ -85,7 +87,7 @@ def _assert_keys(body: dict[str, Any], expected: set[str]) -> None:
 
 
 def _assert_input_422(response: Any, *, error_type: str) -> str:
-    """Assert a no-verdict input 422 of the given `error_type`, and return its detail."""
+    """Assert an API-authored no-verdict input 422 of the given `error_type`, and return its detail."""
     assert response.status_code == 422, response.text
     assert response.headers["content-type"] == "application/problem+json"
     problem = response.json()
@@ -94,6 +96,21 @@ def _assert_input_422(response: Any, *, error_type: str) -> str:
     assert "is_valid" not in problem
     detail: str = problem["detail"]
     return detail
+
+
+def _assert_selection_refusal(response: Any, *, code: CoreCode, params: dict[str, Any]) -> dict[str, Any]:
+    """Assert a no-verdict selection 422 is the problem of `code`, its sentences rendered from `params`, and return it.
+
+    The response is compared whole with the problem the registry builds for the code and the parameters, in the view of
+    the request's reader, so a missing parameter shows as the sentence it could not render.
+    """
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"] == "application/problem+json"
+    problem: dict[str, Any] = response.json()
+    view = ProblemView.OPERATOR if "diagnostics" in problem else ProblemView.CALLER
+    expected = make_problem(code=code, view=view, params=params).model_copy(update={"status": 422}).to_wire()
+    assert {member: value for member, value in problem.items() if member != "diagnostics"} == expected
+    return problem
 
 
 class TestPipeIoRoute:
@@ -220,26 +237,29 @@ class TestPipeIoRoute:
         assert body["pipe_ref"] is None
         assert body["default_pipe_ref"] is None
         _assert_keys(body, {"other.shout"})
-        response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
-        detail = _assert_input_422(response, error_type=PIPE_NOT_FOUND_ERROR)
+        response = _build_client(as_operator=True).post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
         # The author's manifest names a pipe the method lacks: the method's fault, not the caller's selector.
-        assert response.json()["code"] == "method.pipe_unresolved"
-        assert "manifest" in detail
-        assert "not found" in detail
+        problem = _assert_selection_refusal(response, code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"missing": "echo"})
+        assert problem["domain"] == "method"
+        assert problem["diagnostics"]["error_class"] == "EntryPipeNotFoundError"
+        message = problem["diagnostics"]["message"]
+        assert "manifest" in message
+        assert "not found" in message
 
     def test_an_ambiguous_manifest_main_pipe_says_ambiguous(self, install_method_package: Callable[..., Path]):
         # The manifest names `echo`, declared by both `smoke` and `twin`: the selection refuses it as
         # ambiguous, naming both candidates, and a whole-method request states no default.
         install_method_package(files={"smoke.mthds": VALID_MTHDS, "twin.mthds": COLLIDING_ECHO_LIST_MTHDS})
-        client = _build_client()
+        client = _build_client(as_operator=True)
         response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
-        detail = _assert_input_422(response, error_type=PIPE_AMBIGUOUS_ERROR)
-        assert response.json()["code"] == "method.pipe_unresolved"
-        assert "manifest" in detail
-        assert "several domains" in detail
-        assert "smoke.echo" in detail
-        assert "twin.echo" in detail
-        assert "not found" not in detail, f"an ambiguous selector must not read as a missing pipe: {detail}"
+        problem = _assert_selection_refusal(response, code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"missing": "echo"})
+        assert problem["diagnostics"]["error_class"] == "EntryPipeAmbiguousError"
+        message = problem["diagnostics"]["message"]
+        assert "manifest" in message
+        assert "several domains" in message
+        assert "smoke.echo" in message
+        assert "twin.echo" in message
+        assert "not found" not in message, f"an ambiguous selector must not read as a missing pipe: {message}"
         body = _valid_arm(client, {"method_ref": STUB_METHOD_REF, "all_pipes": True})
         assert body["pipe_ref"] is None
         assert body["default_pipe_ref"] is None
@@ -249,13 +269,12 @@ class TestPipeIoRoute:
         client = _build_client()
         payload = {"files": _files(VALID_MTHDS, COLLIDING_ECHO_LIST_MTHDS), "pipe_ref": "echo", "all_pipes": all_pipes}
         response = client.post(PIPE_IO_PATH, json=payload)
-        detail = _assert_input_422(response, error_type=PIPE_AMBIGUOUS_ERROR)
-        assert response.json()["code"] == "request.pipe_ambiguous"
-        assert "Pipe 'echo'" in detail
-        assert "several domains" in detail
-        assert "smoke.echo" in detail
-        assert "twin.echo" in detail
-        assert "not found" not in detail, f"an ambiguous selector must not read as a missing pipe: {detail}"
+        # The caller reads which pipes its selector matched, in the code's own sentence.
+        problem = _assert_selection_refusal(
+            response, code=CoreCode.REQUEST_PIPE_AMBIGUOUS, params={"pipe": "echo", "candidates": ["smoke.echo", "twin.echo"]}
+        )
+        assert "smoke.echo" in problem["detail"]
+        assert "twin.echo" in problem["detail"]
 
     def test_runnability_facts_match_validate(self):
         client = _build_client()
@@ -319,60 +338,63 @@ class TestPipeIoRoute:
             assert field_name not in body, f"the invalid arm never carries `{field_name}`"
 
     @pytest.mark.parametrize(
-        ("contents", "request_fields", "refusal", "detail_fragment", "fix_fragment"),
+        ("contents", "request_fields", "code", "params", "operator_reads"),
         [
             pytest.param(
                 (VALID_MTHDS,),
                 {"pipe_ref": "smoke.not_a_pipe"},
-                (PIPE_NOT_FOUND_ERROR, "request.pipe_not_found"),
-                "not found",
-                "Check the pipe code",
+                CoreCode.REQUEST_PIPE_NOT_FOUND,
+                {"pipe": "smoke.not_a_pipe"},
+                ("EntryPipeNotFoundError", "not found"),
                 id="unknown-ref",
             ),
             pytest.param(
                 (VALID_MTHDS,),
                 {"pipe_ref": "smoke.not_a_pipe", "all_pipes": True},
-                (PIPE_NOT_FOUND_ERROR, "request.pipe_not_found"),
-                "not found",
-                "Check the pipe code",
+                CoreCode.REQUEST_PIPE_NOT_FOUND,
+                {"pipe": "smoke.not_a_pipe"},
+                ("EntryPipeNotFoundError", "not found"),
                 id="unknown-ref-under-all-pipes",
             ),
             pytest.param(
                 (NO_MAIN_PIPE_MTHDS,),
                 {},
-                (PIPE_NOT_FOUND_ERROR, "request.pipe_unspecified"),
-                "declares no `main_pipe`",
-                "Send a `pipe_ref` naming the pipe to select",
+                CoreCode.REQUEST_PIPE_UNSPECIFIED,
+                {},
+                ("EntryPipeNotFoundError", "declares no `main_pipe`"),
                 id="no-entry-pipe",
             ),
             pytest.param(
                 (VALID_MTHDS, SECOND_MAIN_PIPE_MTHDS),
                 {},
-                (PIPE_AMBIGUOUS_ERROR, "request.pipe_ambiguous"),
-                "several `main_pipe`s",
-                "one of the declared `main_pipe`s",
+                CoreCode.REQUEST_PIPE_AMBIGUOUS,
+                {"candidates": ["other.shout", "smoke.echo"]},
+                ("EntryPipeAmbiguousError", "several `main_pipe`s"),
                 id="several-entry-pipes",
             ),
         ],
     )
-    def test_selection_refusals_carry_the_entry_lookup_error_type(
-        self, contents: tuple[str, ...], request_fields: dict[str, Any], refusal: tuple[str, str], detail_fragment: str, fix_fragment: str
+    def test_selection_refusals_carry_their_code_and_params(
+        self,
+        contents: tuple[str, ...],
+        request_fields: dict[str, Any],
+        code: CoreCode,
+        params: dict[str, Any],
+        operator_reads: tuple[str, str],
     ):
-        # A selection refusal is an input 422 like a malformed request, but its `error_type` is the
-        # pipelex entry-lookup class that names the failure, so a client branches on it; its problem
-        # `type` names the selection too, and its `user_action` names the fix for this very miss —
-        # a default chain that finds no entry pipe, or several, is no pipe-code typo.
-        error_type, code = refusal
-        client = _build_client()
+        # A selection refusal is an input 422 like a malformed request, but under the registry code that names the
+        # miss, so a client branches on it: its `type` names the selection, its `params` the selector and the
+        # candidates, and its step the fix for this very miss. The operator reads the entry-lookup class that refused
+        # and its message, `operator_reads`.
+        client = _build_client(as_operator=True)
         response = client.post(PIPE_IO_PATH, json={"files": _files(*contents), **request_fields})
-        detail = _assert_input_422(response, error_type=error_type)
-        assert detail_fragment in detail
-        problem = response.json()
-        assert problem["code"] == code
+        problem = _assert_selection_refusal(response, code=code, params=params)
         assert problem["type"] == f"https://mthds.ai/errors/{code}"
         assert problem["type"] != client.post(PIPE_IO_PATH, json={}).json()["type"], "a selection refusal must not share the request-shape type"
-        assert problem["user_action"]["kind"] == "change_input"
-        assert fix_fragment in problem["user_action"]["detail"]
+        assert problem["next_step"]["kind"] == "change_input"
+        entry_lookup_class, message_fragment = operator_reads
+        assert problem["diagnostics"]["error_class"] == entry_lookup_class
+        assert message_fragment in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize(
         "payload",
@@ -422,9 +444,7 @@ class TestPipeIoRoute:
         install_method_package(files={"documents.mthds": NO_MAIN_PIPE_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
         client = _build_client()
         response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
-        detail = _assert_input_422(response, error_type=PIPE_NOT_FOUND_ERROR)
-        assert response.json()["code"] == "request.pipe_unspecified"
-        assert "main_pipe" in detail
+        _assert_selection_refusal(response, code=CoreCode.REQUEST_PIPE_UNSPECIFIED, params={})
 
     @pytest.mark.parametrize(
         ("contents", "request_fields"),

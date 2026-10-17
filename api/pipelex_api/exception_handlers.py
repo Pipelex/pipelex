@@ -219,7 +219,7 @@ def _log_problem(problem: PipelexProblem, *, error: BaseException | None, reques
     a 4xx is client-facing and logs at `warning` without a traceback (caller
     mistakes, a provider's 429 passed through, and the 409 conflict), a 5xx
     logs at `error` with the traceback. `error.code` is the problem's code and
-    `error.type` the class of the error it was built from, which only the
+    `error.type` the class of the exception that escaped, else the class the
     operator view names. `user.id` rides every record when auth bound a caller —
     without it, the storage / pipeline-backend leg of a failure carries only
     `request_id` and `url.path`, and tying the failure to the caller requires
@@ -232,11 +232,13 @@ def _log_problem(problem: PipelexProblem, *, error: BaseException | None, reques
     """
     diagnostics = problem.diagnostics
     error_category = find_inference_error_category_in_chain(error) if error is not None else None
+    # The class that escaped, which for an exception that is not a PipelexError is not the stand-in the problem was
+    # built from; a failure received as a value has its problem's class alone.
     error_class: str | None = None
-    if diagnostics is not None:
-        error_class = diagnostics.error_class
-    elif error is not None:
+    if error is not None:
         error_class = type(error).__name__
+    elif diagnostics is not None:
+        error_class = diagnostics.error_class
     fields: dict[str, Any] = {
         **_request_fields(request),
         "error.code": problem.code,

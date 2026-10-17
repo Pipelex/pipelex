@@ -67,8 +67,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/PipelexVersionInfo'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -151,16 +151,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -447,16 +447,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -464,18 +464,16 @@ paths:
         '403':
           description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
             this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
-            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
-            deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
+            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
+            is a 422 instead, since the method''s author changes it.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
@@ -799,16 +797,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -823,32 +821,30 @@ paths:
         '403':
           description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
             this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
-            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
-            deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
+            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
+            is a 422 instead, since the method''s author changes it.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '409':
-          description: '`PipelineManagerAlreadyExistsError` — the submitted `pipeline_run_id` is still registered for an in-flight
+          description: '`pipelex.run.already_exists` — the submitted `pipeline_run_id` is still registered for an in-flight
             run. Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '501':
-          description: '`AsyncExecutionNotEnabledError` — this deployment does not provide async pipeline execution. Permanent
-            under the current deployment; do not retry.'
+          description: '`runtime.unsupported` — this deployment does not provide async pipeline execution. Permanent under
+            the current deployment; do not retry.'
           content:
             application/problem+json:
               schema:
@@ -880,17 +876,18 @@ paths:
         \ wants the output.\n- **Invalid verdict (200, `is_valid: false`):** the `InvalidReport` arm — `validation_errors[]`\n\
         \  (the structured per-error diagnostics, built by pipelex's one shared builder, incl. one\n  located `dry_run` item\
         \ per pipe whose dry run failed) + `message`, with the structural artifacts absent. The runner\n  returns this as\
-        \ a value (`ErrorReport` with `validation_errors`) regardless of backend — the\n  in-process arm from the bundle's\
-        \ `ValidateBundleError`, the dispatched arm recovered from the\n  worker — so the route maps it to a 200 by matching\
-        \ validation diagnostics, never by catching an\n  exception. Returned `ErrorReport`s without validation diagnostics\
-        \ are backend/config/runtime\n  faults and keep the global RFC 7807 problem response path.\n- **No verdict (non-2xx):**\
-        \ a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither of `mthds_contents` / `method_ref`\
-        \ is a request-shape **422**; a forbidden\n  `orchestration_mode` override is a **403**; a host-wiring programmer\
-        \ error or a genuine\n  orchestrator fault is a **5xx**; auth is **401/403**. A `method_ref` **resolution failure**\n\
-        \  is also a no-verdict condition — never an `is_valid: false`: a malformed reference or a\n  failed fetch is a **422**,\
-        \ no matching package in the repository a **404**, and the\n  custom-Python policy (the sandbox gate, the structures\
-        \ refusal) a **403**, each with the\n  originating error class as `error_type`. All are RFC 7807 `application/problem+json`\n\
-        \  rendered by the global handler in `pipelex_api.exception_handlers` — routes never shape them."
+        \ a value (a `BundleValidationFailure` with `validation_errors`) regardless of backend — the\n  in-process arm from\
+        \ the bundle's `ValidateBundleError`, the dispatched arm recovered from the\n  worker — so the route maps it to a\
+        \ 200 by matching validation diagnostics, never by catching an\n  exception. A returned failure without validation\
+        \ diagnostics is a backend, configuration or runtime\n  fault, and its problem is answered as every raised failure's\
+        \ is.\n- **No verdict (non-2xx):** a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither\
+        \ of `mthds_contents` / `method_ref` is a request-shape **422**; a forbidden\n  `orchestration_mode` override is a\
+        \ **403**; a host-wiring programmer error or a genuine\n  orchestrator fault is a **5xx**; auth is **401/403**. A\
+        \ `method_ref` **resolution failure**\n  is also a no-verdict condition — never an `is_valid: false`: each answers\
+        \ the status its\n  code declares, such as a **422** for a malformed reference, a **502** for a failed fetch, a\n\
+        \  **404** for no matching package in the repository and a **422** for the method's Python\n  structure classes, and\
+        \ the custom-code sandbox gate a **403**. All are\n  `application/problem+json` rendered by the global handlers in\n\
+        \  `pipelex_api.exception_handlers` — routes never shape them."
       operationId: validate_mthds_v1_validate_post
       requestBody:
         content:
@@ -932,16 +929,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -949,18 +946,16 @@ paths:
         '403':
           description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
             this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
-            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
-            deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
+            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
+            is a 422 instead, since the method''s author changes it.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
@@ -1022,23 +1017,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
@@ -1110,23 +1105,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
@@ -1195,23 +1190,23 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '404':
-          description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
-            the requested address by manifest identity. The message lists the packages the repository does contain.'
+          description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
+            address by manifest identity.'
           content:
             application/problem+json:
               schema:
@@ -1268,16 +1263,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -1326,16 +1321,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -1397,16 +1392,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -1485,16 +1480,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -1569,16 +1564,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or an `input`-domain
-            pipelex error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle*
-            is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
+            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
+            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
-            override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
+            error answered as `runtime.unexpected`. Report the `request_id`.
           content:
             application/problem+json:
               schema:
@@ -1760,6 +1755,64 @@ components:
       - size
       title: BlobRef
       description: A blob, named by its SHA-256 in lowercase hexadecimal and its length in bytes.
+    BlockedEntry:
+      properties:
+        entry_id:
+          type: string
+          title: Entry Id
+        to_schema_version:
+          type: integer
+          title: To Schema Version
+        reason:
+          $ref: '#/components/schemas/BlockedEntryReason'
+        detail:
+          type: string
+          title: Detail
+        guidance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Guidance
+        applied_ops:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/DeleteKeyOp'
+            - $ref: '#/components/schemas/DeleteTableOp'
+            - $ref: '#/components/schemas/RenameTableKeyOp'
+            - $ref: '#/components/schemas/MoveKeyOp'
+            - $ref: '#/components/schemas/RemapValueOp'
+            discriminator:
+              propertyName: kind
+              mapping:
+                delete_key: '#/components/schemas/DeleteKeyOp'
+                delete_table: '#/components/schemas/DeleteTableOp'
+                move_key: '#/components/schemas/MoveKeyOp'
+                remap_value: '#/components/schemas/RemapValueOp'
+                rename_table_key: '#/components/schemas/RenameTableKeyOp'
+          type: array
+          title: Applied Ops
+        narrowed_paths:
+          items:
+            type: string
+          type: array
+          title: Narrowed Paths
+      additionalProperties: false
+      type: object
+      required:
+      - entry_id
+      - to_schema_version
+      - reason
+      - detail
+      title: BlockedEntry
+      description: An entry that this file needs and the run would not apply.
+    BlockedEntryReason:
+      type: string
+      enum:
+      - unsafe
+      - conflict
+      - value_domain_narrowed
+      title: BlockedEntryReason
+      description: Why an entry could not be applied to this file.
     BooleanField:
       properties:
         title:
@@ -2513,6 +2566,22 @@ components:
       - range
       title: Diagnostic
       description: Structured lint/format diagnostic returned by `pipelex-tools-py`.
+    DiagnosticCause:
+      properties:
+        error_class:
+          type: string
+          title: Error Class
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
+      additionalProperties: true
+      type: object
+      required:
+      - error_class
+      title: DiagnosticCause
+      description: One error of a failure's cause chain, by its class and the code it carries by itself.
     DocGenFormat:
       type: string
       enum:
@@ -2923,33 +2992,6 @@ components:
       - choices
       title: EnumItem
       description: '`enum` — one of a fixed set of values.'
-    ErrorSpec:
-      properties:
-        error_type:
-          type: string
-          title: Error Type
-        message:
-          type: string
-          title: Message
-        stack:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Stack
-        caller_facing:
-          type: boolean
-          title: Caller Facing
-          default: false
-      additionalProperties: false
-      type: object
-      required:
-      - error_type
-      - message
-      title: ErrorSpec
-      description: 'Error information for failed nodes.
-
-
-        Stack traces are automatically truncated to MAX_STACK_LENGTH.'
     ExtractSetting:
       properties:
         model:
@@ -2977,6 +3019,25 @@ components:
       required:
       - model
       title: ExtractSetting
+    FileBlockedReason:
+      type: string
+      enum:
+      - unreadable
+      - unparseable
+      - unsupported_schema_version
+      - unwritable
+      - changed_during_run
+      - needs_a_hand_edit
+      - state_uncertain
+      title: FileBlockedReason
+      description: 'Why a file could not be processed at all.
+
+
+        One member per *state the file is in*, because that is what decides what the user does next —
+
+        not one per exception the run happened to catch. Every member but `STATE_UNCERTAIN` leaves the
+
+        file exactly as it was found; that one does not, and it says so.'
     FixSafety:
       type: string
       enum:
@@ -4015,6 +4076,159 @@ components:
       - commit_sha
       title: MethodProvenance
       description: 'What a fetched-method run must record: address, tag, and the resolved commit SHA.'
+    MigrationErrorBlock:
+      properties:
+        remedy:
+          type: string
+          title: Remedy
+        would_write:
+          type: boolean
+          title: Would Write
+        needs_attention:
+          type: boolean
+          title: Needs Attention
+        plans:
+          items:
+            $ref: '#/components/schemas/MigrationPlan'
+          type: array
+          title: Plans
+      additionalProperties: false
+      type: object
+      required:
+      - remedy
+      - would_write
+      - needs_attention
+      - plans
+      title: MigrationErrorBlock
+      description: 'A pending configuration migration, reported alongside the error it explains.
+
+
+        The structured half of the answer to *why does my configuration not load*, carried by the operator''s
+
+        ``diagnostics.migration`` and present only when a scan of this machine''s configuration directories found something
+
+        to say. **Consumers branch on its presence**, never on the message text: an absent block means the failure is not
+
+        staleness. It describes the host''s own configuration directories, so only an operator reads it.
+
+
+        ``plans`` is the same shape ``pipelex-agent migrate --dry-run --format json`` emits under its own ``plans`` key,
+
+        deliberately: an agent that reads one has already parsed the other.
+
+
+        > **No value read from a user''s file is ever rendered** here either. The plans carry paths, operation kinds and
+
+        > ledger-supplied values, and nothing else.'
+    MigrationPlan:
+      properties:
+        surface_id:
+          type: string
+          title: Surface Id
+        file_path:
+          type: string
+          format: path
+          title: File Path
+        blocked_reason:
+          anyOf:
+          - $ref: '#/components/schemas/FileBlockedReason'
+          - type: 'null'
+        blocked_detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Blocked Detail
+        steps:
+          items:
+            $ref: '#/components/schemas/MigrationStep'
+          type: array
+          title: Steps
+        blocked:
+          items:
+            $ref: '#/components/schemas/BlockedEntry'
+          type: array
+          title: Blocked
+        unexplained:
+          items:
+            $ref: '#/components/schemas/UnexplainedPath'
+          type: array
+          title: Unexplained
+        backup_path:
+          anyOf:
+          - type: string
+            format: path
+          - type: 'null'
+          title: Backup Path
+        was_written:
+          type: boolean
+          title: Was Written
+          default: false
+      additionalProperties: false
+      type: object
+      required:
+      - surface_id
+      - file_path
+      title: MigrationPlan
+      description: What one file needs, and what this run did to it.
+    MigrationSafety:
+      type: string
+      enum:
+      - safe
+      - unsafe
+      title: MigrationSafety
+      description: 'Whether the applier may act on an entry.
+
+
+        Independent of `guidance`, which any entry may carry whatever its safety.'
+    MigrationStep:
+      properties:
+        entry_id:
+          type: string
+          title: Entry Id
+        to_schema_version:
+          type: integer
+          title: To Schema Version
+        title:
+          type: string
+          title: Title
+        description:
+          type: string
+          title: Description
+        breaking:
+          type: boolean
+          title: Breaking
+        safety:
+          $ref: '#/components/schemas/MigrationSafety'
+        applied_ops:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/DeleteKeyOp'
+            - $ref: '#/components/schemas/DeleteTableOp'
+            - $ref: '#/components/schemas/RenameTableKeyOp'
+            - $ref: '#/components/schemas/MoveKeyOp'
+            - $ref: '#/components/schemas/RemapValueOp'
+            discriminator:
+              propertyName: kind
+              mapping:
+                delete_key: '#/components/schemas/DeleteKeyOp'
+                delete_table: '#/components/schemas/DeleteTableOp'
+                move_key: '#/components/schemas/MoveKeyOp'
+                remap_value: '#/components/schemas/RemapValueOp'
+                rename_table_key: '#/components/schemas/RenameTableKeyOp'
+          type: array
+          title: Applied Ops
+      additionalProperties: false
+      type: object
+      required:
+      - entry_id
+      - to_schema_version
+      - title
+      - description
+      - breaking
+      - safety
+      - applied_ops
+      title: MigrationStep
+      description: One ledger entry that changed this file, and the operations of it that fired.
     MissingBlob:
       properties:
         sha256:
@@ -4411,6 +4625,23 @@ components:
         per-file sources. The **registry form** (any non-address reference) stays reserved and answers
 
         501 until server-side method-registry resolution exists.'
+    NextStep:
+      properties:
+        kind:
+          anyOf:
+          - $ref: '#/components/schemas/StepKind'
+          - type: string
+          title: Kind
+        detail:
+          type: string
+          title: Detail
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - detail
+      title: NextStep
+      description: 'What the reader should do next: a kind from the protocol''s closed list, and the step in one sentence.'
     NodeIOSpec:
       properties:
         inputs:
@@ -4487,8 +4718,13 @@ components:
           $ref: '#/components/schemas/NodeIOSpec'
         error:
           anyOf:
-          - $ref: '#/components/schemas/ErrorSpec'
+          - $ref: '#/components/schemas/PipelexProblem'
           - type: 'null'
+        error_stack:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Error Stack
         tags:
           additionalProperties:
             type: string
@@ -6609,6 +6845,96 @@ components:
         (e.g. `default-small`) legitimately exists in several categories pointing at
 
         different models, so a flat map would silently lose entries on collision.'
+    PipelexProblem:
+      properties:
+        type:
+          type: string
+          title: Type
+        title:
+          type: string
+          title: Title
+        status:
+          anyOf:
+          - type: integer
+            ge: 100
+            le: 599
+          - type: 'null'
+          title: Status
+        detail:
+          type: string
+          title: Detail
+        code:
+          type: string
+          pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$
+          title: Code
+        domain:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemDomain'
+          - type: string
+          title: Domain
+        retry:
+          anyOf:
+          - $ref: '#/components/schemas/RetryVerdict'
+          - type: string
+          title: Retry
+        retry_after:
+          anyOf:
+          - anyOf:
+            - type: integer
+            - type: number
+            ge: 0
+          - type: 'null'
+          title: Retry After
+        next_step:
+          $ref: '#/components/schemas/NextStep'
+        params:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemParams'
+          - type: 'null'
+        location:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemLocation'
+          - type: 'null'
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProblemItem'
+            type: array
+            minItems: 1
+          - type: 'null'
+          title: Errors
+        pipeline_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pipeline Run Id
+        request_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Id
+        run_error:
+          anyOf:
+          - $ref: '#/components/schemas/PipelexProblem'
+          - type: 'null'
+        diagnostics:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemDiagnostics'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - type
+      - title
+      - detail
+      - code
+      - domain
+      - retry
+      - next_step
+      title: PipelexProblem
+      description: "The MTHDS problem document with Pipelex's members.\n\nAttributes:\n    request_id: The request that carried\
+        \ the failure, when known.\n    run_error: On a read of a failed run's results, the run's own problem.\n    diagnostics:\
+        \ What only an operator reads; present in the operator view alone."
     PipelexVersionInfo:
       properties:
         protocol_version:
@@ -6718,6 +7044,109 @@ components:
       - description
       title: PresetMatch
       description: What a preset reference is in one category.
+    ProblemDeleteKeyOp:
+      properties:
+        kind:
+          type: string
+          const: delete_key
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          title: Table Path
+        key:
+          type: string
+          title: Key
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      - key
+      title: DeleteKeyOp
+      description: Remove `key` from the table at `table_path`.
+    ProblemDeleteTableOp:
+      properties:
+        kind:
+          type: string
+          const: delete_table
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          minItems: 1
+          title: Table Path
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      title: DeleteTableOp
+      description: Remove the table at `table_path`, every part of it included.
+    ProblemDiagnostics:
+      properties:
+        error_class:
+          type: string
+          title: Error Class
+        message:
+          type: string
+          title: Message
+        causes:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/DiagnosticCause'
+            type: array
+          - type: 'null'
+          title: Causes
+        params:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Params
+        model:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Model
+        provider:
+          anyOf:
+          - $ref: '#/components/schemas/ProviderDiagnostics'
+          - type: 'null'
+        migration:
+          anyOf:
+          - $ref: '#/components/schemas/MigrationErrorBlock'
+          - type: 'null'
+        runtime_version:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Runtime Version
+        trace_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Trace Id
+        span_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Span Id
+      additionalProperties: true
+      type: object
+      required:
+      - error_class
+      - message
+      title: ProblemDiagnostics
+      description: "What only an operator reads of a problem: the operator view's ``diagnostics`` member.\n\nAttributes:\n\
+        \    error_class: The class of the error the problem was built from, the identity ``error_type`` once was.\n    message:\
+        \ The error's own message, capped.\n    causes: The errors below it on its cause chain, by class and code.\n    params:\
+        \ The parameters the code declares operator-only.\n    model: The model a failed inference call addressed.\n    provider:\
+        \ What the provider said about the call.\n    migration: A pending configuration migration that explains the failure.\n\
+        \    runtime_version: The version of the Pipelex runtime that built the problem.\n    trace_id: The trace of the Pipelex\
+        \ span the failure happened in.\n    span_id: That span."
     ProblemDocument:
       properties:
         type:
@@ -6734,88 +7163,108 @@ components:
         status:
           type: integer
           title: Status
-          description: HTTP status code, repeated in the body per RFC 7807.
+          description: 'HTTP status code, repeated in the body per RFC 9457: the status its `code` declares.'
         detail:
           type: string
           title: Detail
-          description: Human-readable explanation of this specific failure. Redacted under `ERROR_DISCLOSURE=strict`.
-        instance:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Instance
-          description: Path of the request that failed.
-        request_id:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Request Id
-          description: Correlation id, echoed in the `X-Request-ID` response header.
+          description: 'Human-readable explanation of this specific failure, rendered from its code''s template and parameters.
+            Never parsed: a program branches on `code`.'
         code:
           anyOf:
           - type: string
           - type: 'null'
           title: Code
           description: 'Registry code of the error, what a client branches on: a core code of the MTHDS standard (e.g. `request.invalid`)
-            or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises, under every `ERROR_DISCLOSURE`
-            mode; absent on an API-authored error.'
+            or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises; absent on an API-authored
+            error.'
+        domain:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Domain
+          description: 'Who must act, the code''s domain: `input`, `method`, `account`, `operator` or `runtime`.'
+        retry:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Retry
+          description: 'Whether repeating the request can succeed, the code''s verdict: `yes`, `no` or `outcome_unknown`.'
+        retry_after:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Retry After
+          description: Seconds to wait before a retry, when known, on a code whose verdict is `yes`.
+        next_step:
+          anyOf:
+          - $ref: '#/components/schemas/NextStep'
+          - type: 'null'
+          description: 'What the reader should do next: a kind and a sentence, aimed at the caller, or at the operator in
+            the operator view.'
+        params:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemParams'
+          - type: 'null'
+          description: The code's typed parameters, the ones its templates are rendered with.
+        location:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemLocation'
+          - type: 'null'
+          description: 'Where the failure happened: the failing pipe and its path from the entry pipe, an input, a field,
+            a file.'
+        errors:
+          anyOf:
+          - items:
+              $ref: '#/components/schemas/ProblemItem'
+            type: array
+          - type: 'null'
+          title: Errors
+          description: One item per fault, for a refusal with several, such as a method that does not validate. On `/validate`,
+            `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead.
+        pipeline_run_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pipeline Run Id
+          description: The run the failure belongs to.
+        request_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Request Id
+          description: Correlation id, echoed in the `X-Request-ID` response header.
+        diagnostics:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemDiagnostics'
+          - type: 'null'
+          description: 'What only the operator reads: the error''s class and message, its causes, the provider''s answer,
+            the model. Present only when the request was authenticated as the operator''s (`AUTH_MODE=api_key`, or a trusted
+            proxy).'
+        instance:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Instance
+          description: Path of the request that failed, on an API-authored error.
         error_type:
-          type: string
+          anyOf:
+          - type: string
+          - type: 'null'
           title: Error Type
-          description: Stable class name of the originating error (e.g. `ValidateBundleError`, `Unauthenticated`).
+          description: Stable name of an API-authored error (e.g. `Unauthenticated`).
         error_domain:
           anyOf:
           - type: string
           - type: 'null'
           title: Error Domain
-          description: '`input` (caller can fix it → 422), `config` or `runtime` (deployment must fix it → 500). Absent for
-            domain-less errors.'
+          description: 'On an API-authored error: `input` (caller can fix it → 4xx) or `config` (deployment must fix it →
+            5xx).'
         retryable:
           anyOf:
           - type: boolean
           - type: 'null'
           title: Retryable
-          description: 'Whether retrying the same request can plausibly succeed. Always present: on an error carrying a `code`,
-            it is that code''s retry verdict.'
-        error_category:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Error Category
-          description: Finer classification, when the originating error provides one (inference errors).
-        user_action:
-          anyOf:
-          - $ref: '#/components/schemas/UserAction'
-          - type: 'null'
-          description: Structured suggestion of what the caller should do next, when available.
-        model:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Model
-          description: Inference model that failed. Stripped under `ERROR_DISCLOSURE=strict`.
-        provider:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Provider
-          description: Inference provider that failed. Stripped under `ERROR_DISCLOSURE=strict`.
-        provider_metadata:
-          anyOf:
-          - $ref: '#/components/schemas/ProviderErrorMetadata'
-          - type: 'null'
-          description: Upstream provider error metadata. Stripped (bar a curated slice) under `ERROR_DISCLOSURE=strict`.
-        validation_errors:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/ValidationErrorItem'
-            type: array
-          - type: 'null'
-          title: Validation Errors
-          description: Structured per-error diagnostics, carried by a `ValidateBundleError`. Each item may carry a `suggested_fix`.
-            Retained under `ERROR_DISCLOSURE=strict` — it describes the caller's own bundle, not server internals. On `/validate`,
-            `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead, so the items ride the response
-            body there rather than a problem document.
+          description: 'On an API-authored error: whether retrying the same request can plausibly succeed.'
       additionalProperties: true
       type: object
       required:
@@ -6823,22 +7272,343 @@ components:
       - title
       - status
       - detail
-      - error_type
       title: ProblemDocument
-      description: 'An RFC 7807 `application/problem+json` error body — the shape of every failure response.
+      description: 'An RFC 9457 `application/problem+json` error body — the shape of every failure response.
 
 
-        Standard RFC 7807 members (`type`, `title`, `status`, `detail`, `instance`)
+        A pipelex error answers its problem document: the RFC''s members (`type`, `title`, `status`, `detail`), the MTHDS
 
-        plus the extension members pipelex''s classification adds. Only `type`,
+        core''s (`code`, `domain`, `retry`, `next_step`, always present, and `retry_after`, `params`, `location`, `errors`,
 
-        `title`, `status`, `detail`, and `error_type` are always present, and `code`
+        `pipeline_run_id` when they hold a value) and Pipelex''s (`request_id`, and `diagnostics` in the operator view
 
-        on every error the runtime raises: the rest ride along when the originating
+        alone). An API-authored error carries no `code` yet, and is classified by `error_type`, `error_domain` and
 
-        error populates them, so a consumer must treat them as optional.
+        `retryable` instead, with its request path as `instance`. No member is ever written as `null`: a member with no
 
-        `extra="allow"` mirrors RFC 7807''s open-ended extension-member rule.'
+        value is absent. `extra="allow"` mirrors RFC 9457''s open-ended extension-member rule.'
+    ProblemDomain:
+      type: string
+      enum:
+      - input
+      - method
+      - account
+      - operator
+      - runtime
+      title: ProblemDomain
+      description: 'Who must act: the protocol''s closed list of domains.'
+    ProblemEnsureTableOp:
+      properties:
+        kind:
+          type: string
+          const: ensure_table
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          minItems: 1
+          title: Table Path
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      title: EnsureTableOp
+      description: Create the table at `table_path` when it is absent.
+    ProblemFixSafety:
+      type: string
+      enum:
+      - safe
+      - unsafe
+      title: FixSafety
+      description: Whether a suggested fix may be applied without asking anyone.
+    ProblemItem:
+      properties:
+        code:
+          type: string
+          pattern: ^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*){1,2}$
+          title: Code
+        detail:
+          type: string
+          title: Detail
+        params:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemParams'
+          - type: 'null'
+        location:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemLocation'
+          - type: 'null'
+        suggestions:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Suggestions
+        suggested_fix:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemSuggestedFix'
+          - type: 'null'
+      additionalProperties: true
+      type: object
+      required:
+      - code
+      - detail
+      title: ProblemItem
+      description: 'One fault of a problem with several, and one finding of a `/validate` verdict.
+
+
+        An item carries its own code but no verdict; `effective_domain` reads its domain from its code,
+
+        `code_spec` is the code''s registry entry and `params_as` reads the parameters as a model.'
+    ProblemLocation:
+      properties:
+        pipe:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Pipe
+        path:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Path
+        input:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Input
+        field:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Field
+        item:
+          anyOf:
+          - type: integer
+            ge: 0
+          - type: 'null'
+          title: Item
+        attempt:
+          anyOf:
+          - type: integer
+            ge: 1
+          - type: 'null'
+          title: Attempt
+        file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File
+        line:
+          anyOf:
+          - type: integer
+            ge: 1
+          - type: 'null'
+          title: Line
+        column:
+          anyOf:
+          - type: integer
+            ge: 1
+          - type: 'null'
+          title: Column
+      additionalProperties: true
+      type: object
+      title: ProblemLocation
+      description: Where the error happened, in the method, the request or the run; every member is optional.
+    ProblemMoveKeyOp:
+      properties:
+        kind:
+          type: string
+          const: move_key
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          title: Table Path
+        key:
+          type: string
+          title: Key
+        new_table_path:
+          items:
+            type: string
+          type: array
+          title: New Table Path
+        new_key:
+          type: string
+          title: New Key
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      - key
+      - new_table_path
+      - new_key
+      title: MoveKeyOp
+      description: Move `key` from the table at `table_path` into the table at `new_table_path` under `new_key`.
+    ProblemParams:
+      properties:
+        missing_blobs:
+          anyOf:
+          - items:
+              type: string
+              pattern: ^[0-9a-f]{64}$
+            type: array
+          - type: 'null'
+          title: Missing Blobs
+      additionalProperties: true
+      type: object
+      title: ProblemParams
+      description: 'The typed facts a problem''s sentences were written from.
+
+
+        Each code declares its own parameters, and the generated registry gives each core code a model of
+
+        them (`CORE_CODE_SPECS[code].params_model`), which `Problem.params_as` validates into. This model
+
+        types only the parameter the protocol types for every reader, `missing_blobs`; every other
+
+        parameter rides `model_extra` as received.'
+    ProblemRemapValueOp:
+      properties:
+        kind:
+          type: string
+          const: remap_value
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          title: Table Path
+        key:
+          type: string
+          title: Key
+        mapping:
+          additionalProperties:
+            type: string
+          type: object
+          minProperties: 1
+          title: Mapping
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      - key
+      - mapping
+      title: RemapValueOp
+      description: Rewrite the string value of `key` in the table at `table_path` through `mapping`.
+    ProblemRenameTableKeyOp:
+      properties:
+        kind:
+          type: string
+          const: rename_table_key
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          title: Table Path
+        key:
+          type: string
+          title: Key
+        new_key:
+          type: string
+          title: New Key
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      - key
+      - new_key
+      title: RenameTableKeyOp
+      description: Rename `key` to `new_key` within the table at `table_path`.
+    ProblemSetKeyOp:
+      properties:
+        kind:
+          type: string
+          const: set_key
+          title: Kind
+        table_path:
+          items:
+            type: string
+          type: array
+          title: Table Path
+        key:
+          type: string
+          title: Key
+        value:
+          anyOf:
+          - type: boolean
+          - type: integer
+          - type: number
+          - type: string
+          - additionalProperties:
+              anyOf:
+              - type: boolean
+              - type: integer
+              - type: number
+              - type: string
+            type: object
+          title: Value
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      - table_path
+      - key
+      - value
+      title: SetKeyOp
+      description: Write `key = value` in the table at `table_path`.
+    ProblemSuggestedFix:
+      properties:
+        fix_code:
+          type: string
+          pattern: ^[a-z0-9]+(-[a-z0-9]+)*$
+          title: Fix Code
+        description:
+          type: string
+          title: Description
+        safety:
+          anyOf:
+          - $ref: '#/components/schemas/ProblemFixSafety'
+          - type: string
+          title: Safety
+        file:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: File
+        ops:
+          items:
+            oneOf:
+            - $ref: '#/components/schemas/ProblemSetKeyOp'
+            - $ref: '#/components/schemas/ProblemEnsureTableOp'
+            - $ref: '#/components/schemas/ProblemDeleteKeyOp'
+            - $ref: '#/components/schemas/ProblemDeleteTableOp'
+            - $ref: '#/components/schemas/ProblemRenameTableKeyOp'
+            - $ref: '#/components/schemas/ProblemMoveKeyOp'
+            - $ref: '#/components/schemas/ProblemRemapValueOp'
+            - $ref: '#/components/schemas/UnknownFixOp'
+          type: array
+          minItems: 1
+          title: Ops
+      additionalProperties: true
+      type: object
+      required:
+      - fix_code
+      - description
+      - safety
+      - ops
+      title: SuggestedFix
+      description: 'A deterministic fix for one fault: operations over a bundle of the method, addressed by TOML key path.'
     PromptImageDetail:
       type: string
       enum:
@@ -7014,66 +7784,37 @@ components:
       - required
       title: ProseItem
       description: '`prose` — flowing free text.'
-    ProviderErrorMetadata:
+    ProviderDiagnostics:
       properties:
-        provider:
-          $ref: '#/components/schemas/ProviderName'
-        sdk_exception_type:
-          type: string
-          title: Sdk Exception Type
-        message:
-          type: string
-          title: Message
-          default: ''
-        status_code:
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        status:
           anyOf:
           - type: integer
           - type: 'null'
-          title: Status Code
+          title: Status
+        code:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Code
         request_id:
           anyOf:
           - type: string
           - type: 'null'
           title: Request Id
-        retry_after_seconds:
-          anyOf:
-          - type: number
-          - type: 'null'
-          title: Retry After Seconds
-        provider_error_code:
+        message:
           anyOf:
           - type: string
           - type: 'null'
-          title: Provider Error Code
+          title: Message
+      additionalProperties: true
       type: object
-      required:
-      - provider
-      - sdk_exception_type
-      title: ProviderErrorMetadata
-      description: 'Structured SDK metadata attached to inference errors.
-
-
-        Carries information downstream consumers (retry, temporal, CLI) need
-
-        without having to scrape it back from the exception chain.'
-    ProviderName:
-      type: string
-      enum:
-      - openai
-      - anthropic
-      - google
-      - mistral
-      - azure
-      - bedrock
-      - fal
-      - huggingface
-      - gateway
-      - linkup
-      - typesafe
-      - docling
-      - pypdfium2
-      title: ProviderName
-      description: Identifies the inference provider an SDK error originated from.
+      title: ProviderDiagnostics
+      description: What the inference provider said about a failed call, for an operator.
     Quality:
       type: string
       enum:
@@ -7224,6 +7965,14 @@ components:
         fingerprint computed from either surface agrees. Its `fingerprint` and `mthds_version` members
 
         ride inside the crate payload itself.'
+    RetryVerdict:
+      type: string
+      enum:
+      - 'no'
+      - 'yes'
+      - outcome_unknown
+      title: RetryVerdict
+      description: 'Whether repeating the operation can succeed: the protocol''s closed list of verdicts.'
     RunState:
       type: string
       enum:
@@ -7334,6 +8083,25 @@ components:
       - fail
       - continue
       title: SpecialOutcome
+    StepKind:
+      type: string
+      enum:
+      - retry
+      - wait
+      - read_run
+      - refresh
+      - change_input
+      - change_method
+      - change_model
+      - check_credentials
+      - request_access
+      - check_account
+      - fix_configuration
+      - upgrade
+      - contact_owner
+      - report
+      title: StepKind
+      description: 'What the reader does next: the protocol''s closed list of step kinds.'
     StepRole:
       type: string
       enum:
@@ -7812,6 +8580,26 @@ components:
         ``nb_tokens_by_category`` keys) are open sets on the wire, typed as plain strings —
 
         runtime enum churn is non-breaking for clients.'
+    UnexplainedPath:
+      properties:
+        path:
+          type: string
+          title: Path
+        note:
+          type: string
+          title: Note
+      additionalProperties: false
+      type: object
+      required:
+      - path
+      - note
+      title: UnexplainedPath
+      description: 'A path the current schema does not know and no ledger entry removes.
+
+
+        Populated by the downgrade diagnosis, which lands with the commands: the file is either
+
+        carrying a typo or was written by a newer pipelex than the one running.'
     UnknownField:
       properties:
         title:
@@ -7878,6 +8666,18 @@ components:
       - name
       title: UnknownField
       description: '`unknown` at a named position.'
+    UnknownFixOp:
+      properties:
+        kind:
+          type: string
+          title: Kind
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      title: UnknownFixOp
+      description: 'The reader-side catch-all: an operation whose `kind` is none the protocol lists, which an applier never
+        applies.'
     UnknownItem:
       properties:
         title:
@@ -7969,41 +8769,6 @@ components:
       title: UploadTarget
       description: 'Where to upload one blob: send its bytes as the whole body of a request with this method to this URL,
         with exactly these headers.'
-    UserAction:
-      properties:
-        kind:
-          $ref: '#/components/schemas/UserActionKind'
-        detail:
-          type: string
-          title: Detail
-      type: object
-      required:
-      - kind
-      - detail
-      title: UserAction
-      description: 'Structured user-facing advice attached to an inference error.
-
-
-        ``kind`` discriminates the type of action, ``detail`` is the free-form
-
-        provider-specific advice (e.g. a billing URL, a retry hint).'
-    UserActionKind:
-      type: string
-      enum:
-      - wait_and_retry
-      - check_billing
-      - check_credentials
-      - change_input
-      - change_model
-      - contact_support
-      - unknown
-      title: UserActionKind
-      description: 'Discrete categories of advice we surface to the user/agent.
-
-
-        Lets the CLI render consistent guidance and agent JSON stay typed across
-
-        providers. The free-form ``detail`` string carries provider-specific text.'
     ValidReport:
       properties:
         is_valid:
@@ -8446,10 +9211,12 @@ components:
       - category
       - message
       title: ValidationErrorItem
-      description: 'One structured bundle-validation error, projected onto the error wire.
+      description: 'One structured bundle-validation error, as the validation verdicts carry it.
 
 
-        The typed wire item carried by :attr:`ErrorReport.validation_errors`. Its
+        The typed item of an invalid verdict''s ``validation_errors``; the problem document of a refusal carries each as an
+
+        ``errors`` item instead (``pipelex.pipeline.validation_errors.problem_item_of``). Its
 
         fields are the *union* across the three ``ValidateBundleError`` error-data
 
@@ -8468,9 +9235,9 @@ components:
 
         CLI (``extract_validation_errors``) and the API path
 
-        (``ValidateBundleError.to_error_report``) call — so the CLI''s structured
+        (``ValidateBundleError.validation_error_items``) call — so the CLI''s structured
 
-        output and the API''s 422 ``validation_errors`` can never drift. The same
+        output and the API''s invalid verdict can never drift. The same
 
         item type also carries the report''s advisory ``warnings``, built by
 
@@ -8483,13 +9250,11 @@ components:
 
         threads onto the in-memory load path — it hands a consumer the owning file
 
-        for cross-file diagnostics. Lives here, alongside :class:`ErrorReport`,
+        for cross-file diagnostics. Lives here rather than next to the source error-data
 
-        rather than next to the source error-data models because ``ErrorReport``
+        models because ``base_exceptions`` must not import the ``pipelex.core`` error
 
-        references it as a typed field and ``base_exceptions`` must not import the
-
-        ``pipelex.core`` error modules (which import back into this module).'
+        modules (which import back into this module).'
     ValidationResidualErrorType:
       type: string
       enum:

@@ -134,10 +134,10 @@ def _run_git(*, clone_dir: Path, args: list[str], stdin: bytes | None, package_a
         raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.CalledProcessError as exc:
         msg = f"Could not read method package '{package_address}' from its commit: {exc.stderr.decode('utf-8', errors='replace').strip()}"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package_address) from exc
     except subprocess.TimeoutExpired as exc:
         msg = f"Timed out reading method package '{package_address}' from its commit"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package_address) from exc
     return result.stdout
 
 
@@ -166,7 +166,11 @@ def _package_tree_entries(*, package: FetchedMethodPackage) -> list[_GitTreeEntr
             path = raw_path.decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"Method package '{package.full_address}' holds a file whose name is not UTF-8 text, which no method tree can hold."
-            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
+            raise (
+                MethodFetchError(msg)
+                .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
+                .with_params(reason="a file's name is not UTF-8 text, which no method tree can hold")
+            ) from exc
         if not path.startswith(prefix):
             continue
         entries.append(_GitTreeEntry(mode=mode, object_sha=object_sha, path=path.removeprefix(prefix)))
@@ -195,7 +199,7 @@ def _read_git_objects(*, package: FetchedMethodPackage, object_shas: list[str]) 
         header = output[cursor:line_end].decode("ascii").split(" ")
         if len(header) != 3 or header[0] != object_sha:
             msg = f"Could not read the object {object_sha} of method package '{package.full_address}' from its commit."
-            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED)
+            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package.full_address)
         size = int(header[2])
         start = line_end + 1
         contents[object_sha] = output[start : start + size]

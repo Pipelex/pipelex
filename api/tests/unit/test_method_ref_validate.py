@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
@@ -59,7 +60,8 @@ class TestMethodRefValidate:
         assert response.status_code == 404, response.text
         assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
-        assert body["error_type"] == "MethodPackageNotFoundError"
+        assert body["code"] == CoreCode.METHOD_NOT_FOUND
+        assert body["status"] == 404
         # The verdict discipline: no verdict was produced, so nothing here says `is_valid`.
         assert "is_valid" not in body
 
