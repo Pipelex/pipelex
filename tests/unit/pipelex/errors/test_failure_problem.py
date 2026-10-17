@@ -7,7 +7,13 @@ from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.failure_problem import failure_log_fields, failure_problem, format_problem_location, format_problem_verdict
+from pipelex.errors.failure_problem import (
+    MAX_LOGGED_FRAMES,
+    failure_log_fields,
+    failure_problem,
+    format_problem_location,
+    format_problem_verdict,
+)
 from pipelex.errors.problem import ProblemView, make_location
 from pipelex.migration.exceptions import FormerReleaseConfigError
 
@@ -34,6 +40,30 @@ def _chained_failure() -> ValueError:
     raise AssertionError(msg)
 
 
+# A marker on the source line of a raise, which a logged frame never quotes.
+_SOURCE_MARKER = "SOURCE-LINE-MARKER-5512"
+
+
+def _total_of(*, value: str) -> int:
+    planted_local = value
+    raise KeyError(planted_local)  # SOURCE-LINE-MARKER-5512
+
+
+def _raise_a_wrapped_fault(*, value: str) -> None:
+    try:
+        _total_of(value=value)
+    except KeyError as fault:
+        msg = f"the step failed on {value}"
+        raise PipelexError(msg) from fault
+
+
+def _recurse(*, depth: int) -> None:
+    if depth == 0:
+        msg = "the bottom"
+        raise KeyError(msg)
+    _recurse(depth=depth - 1)
+
+
 class TestFailureProblem:
     def test_a_foreign_failure_is_runtime_unexpected_with_its_class_and_capped_message_in_the_diagnostics(self) -> None:
         """The operator view holds the message, capped: it is the terminal's to print, never a log line's."""
@@ -58,8 +88,40 @@ class TestFailureProblem:
 
         fields = failure_log_fields(error=failure, problem=failure_problem(error=failure))
 
+        frames = fields.pop("error.frames")
         assert fields == {"error.code": "runtime.unexpected", "error.type": "ValueError", "error.chain": ["ValueError", "ValidationError"]}
+        assert all(isinstance(frame, str) for frame in frames)
         assert _PLANTED_RUN_DATA not in repr(fields)
+        assert _PLANTED_RUN_DATA not in repr(frames)
+
+    def test_the_log_fields_name_the_frames_down_to_the_fault_without_source_or_locals(self) -> None:
+        """The frames go from where the failure was caught down to where its first exception was raised, by module, line and function."""
+        try:
+            _raise_a_wrapped_fault(value=_PLANTED_RUN_DATA)
+        except PipelexError as caught:
+            failure = caught
+
+        frames = failure_log_fields(error=failure, problem=failure_problem(error=failure))["error.frames"]
+
+        module = __name__
+        assert frames[0].startswith(f"{module}:")
+        assert frames[0].endswith(" in test_the_log_fields_name_the_frames_down_to_the_fault_without_source_or_locals")
+        assert [frame.rsplit(" in ", 1)[1] for frame in frames[1:]] == ["_raise_a_wrapped_fault", "_raise_a_wrapped_fault", "_total_of"]
+        assert all(frame.startswith(f"{module}:") for frame in frames)
+        # No source line, whose comment carries a marker, and no local, which holds the run's data.
+        assert _SOURCE_MARKER not in repr(frames)
+        assert _PLANTED_RUN_DATA not in repr(frames)
+
+    def test_the_frames_keep_the_innermost_of_a_deep_failure(self) -> None:
+        try:
+            _recurse(depth=MAX_LOGGED_FRAMES * 2)
+        except KeyError as caught:
+            failure = caught
+
+        frames = failure_log_fields(error=failure, problem=failure_problem(error=failure))["error.frames"]
+
+        assert len(frames) == MAX_LOGGED_FRAMES
+        assert frames[-1].endswith(" in _recurse")
 
     def test_the_log_fields_of_a_pipelex_failure_carry_its_code(self) -> None:
         try:

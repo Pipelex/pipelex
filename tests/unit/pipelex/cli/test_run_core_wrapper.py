@@ -205,11 +205,15 @@ class TestExecuteRunWrapper:
         assert "RuntimeError: totally unexpected" in output
         assert "Code:      runtime.unexpected (domain runtime, retry no)" in output
         assert "Traceback" not in output
-        log_mock.error.assert_called_once_with(
-            "The pipeline could not be executed",
-            fields={"error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]},
-            include_exception=False,
-        )
+        log_mock.error.assert_called_once()
+        (message,), log_kwargs = log_mock.error.call_args
+        assert message == "The pipeline could not be executed"
+        assert log_kwargs["include_exception"] is False
+        fields = dict(log_kwargs["fields"])
+        frames = fields.pop("error.frames")
+        assert fields == {"error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]}
+        # The failing frame is named, by module, line and function, so the log says where the failure happened.
+        assert any(frame.startswith(f"{RUN_CORE_MODULE}:") for frame in frames)
 
     @pytest.mark.parametrize("sink_kind", ["console", "json"])
     def test_no_exception_text_of_the_chain_reaches_the_log_record(
@@ -251,6 +255,7 @@ class TestExecuteRunWrapper:
             assert record["error.code"] == "runtime.unexpected"
             assert record["error.type"] == "ValueError"
             assert record["error.chain"] == ["ValueError", "KeyError"]
+            assert record["error.frames"][0].startswith(f"{RUN_CORE_MODULE}:")
 
     def test_the_traceback_flag_puts_the_exception_on_the_record(self, wrapper_mocks: dict[str, Any], caplog: pytest.LogCaptureFixture) -> None:
         """Under ``--traceback`` the person running the command asked for every chained text: the record carries the exception."""

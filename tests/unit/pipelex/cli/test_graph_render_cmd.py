@@ -94,11 +94,15 @@ class TestGraphRenderFailure:
         assert "Failed to render graph" in printed.getvalue()
         assert "RuntimeError: the renderer broke" in printed.getvalue()
         assert "Traceback" not in printed.getvalue()
-        log_spy.error.assert_called_once_with(
-            "The graph could not be rendered",
-            fields={"file.path": str(spec_file), "error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]},
-            include_exception=False,
-        )
+        log_spy.error.assert_called_once()
+        (message,), log_kwargs = log_spy.error.call_args
+        assert message == "The graph could not be rendered"
+        assert log_kwargs["include_exception"] is False
+        fields = dict(log_kwargs["fields"])
+        frames = fields.pop("error.frames")
+        assert fields == {"file.path": str(spec_file), "error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]}
+        # The failing frame is named, by module, line and function, so the log says where the failure happened.
+        assert any(frame.startswith(f"{GRAPH_CMD}:") for frame in frames)
 
     @pytest.mark.parametrize("sink_kind", ["console", "json"])
     def test_an_unexpected_error_names_its_cause_on_the_terminal_whatever_the_sink(
@@ -143,3 +147,4 @@ class TestGraphRenderFailure:
             assert EXCEPTION_KEY not in record
             assert record["error.code"] == "runtime.unexpected"
             assert record["error.chain"] == ["RuntimeError"]
+            assert any(frame.startswith(f"{GRAPH_CMD}:") for frame in record["error.frames"])
