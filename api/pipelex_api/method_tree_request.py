@@ -698,7 +698,7 @@ def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:
             raise MethodEntryError(msg) from exc
         with translate_to_validate_bundle_error():
             blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=tree_path)
-        candidates.append(EntryCandidate(tree_path=tree_path, blueprint=blueprint))
+        candidates.append(EntryCandidate.of_blueprint(tree_path=tree_path, blueprint=blueprint))
     manifest = manifest_of(tree=tree, label=f"the method {method_label}")
     return select_entry(candidates=candidates, manifest=manifest, method_label=method_label)
 

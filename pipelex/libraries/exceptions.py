@@ -102,6 +102,15 @@ class MethodTreeLoadError(LibraryLoadingError):
     _authors_caller_facing_message = True
 
 
+class EmptyMethodTreeError(MethodTreeLoadError):
+    """Raised when a folder handed over as a method holds no bundle.
+
+    The membership rule keeps every file of the folder out of its method tree, which holds at least one, or none of the
+    files it keeps is a bundle. A command handed the folder finds nothing to judge and no pipe to start at: it reports
+    the folder as holding no bundle rather than as a method refused.
+    """
+
+
 class HostLibraryTreeError(PipelexError):
     """Raised when a library directory of this host, one a load reads beside a caller's bundles, cannot be read as a method tree.
 

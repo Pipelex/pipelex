@@ -84,10 +84,12 @@ pipelex-agent validate method <NAME> [OPTIONS]
 
 For `bundle`, additional options are available:
 
-- `--pipe` - Require a specific pipe in the bundle
+- `--pipe` - Require a specific pipe in the bundle, and dry-run only that pipe; for a method's folder, the whole tree is still validated
 - `--graph`, `-g` - Generate an execution graph visualization
 - `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
+
+`validate bundle <folder>` reads the folder as its [method tree](../../building-methods/method-trees.md), the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and judges the whole tree, as the MTHDS protocol's validation judges a method: every bundle of it is loaded and every pipe of it dry-run. It needs no pipe to start at, so a folder whose bundles declare several `main_pipe`s, or none, is validated like any other, and `bundle_path` in the envelope names the folder. Only the tree's own pipes are judged: the `-L` directories, a nested package below the folder with its own `METHODS.toml`, and the packages the method depends on all load for its bundles to use, but their own pipes are not judged. A graph, which is drawn from one pipe, is drawn from the pipe named by `--pipe`, else from the pipe a run of the folder starts at, the manifest's `main_pipe` or, with no manifest, the one `main_pipe` its bundles declare; when the folder decides no such pipe, `--graph` and `--view` draw nothing and the envelope carries `graph_unavailable`, a sentence saying why, while the validation stands and exits on its own verdict. A folder holding no `.mthds` bundle produces no verdict: `error_type: EmptyMethodTreeError`, exit code `2`.
 
 !!! note "Signature pipes"
     `pipelex-agent validate` is strict by default — same as `pipelex validate`. A bundle whose dependency graph reaches a `PipeSignature` is rejected unless you pass `--allow-signatures`, which dry-runs signatures as mocks.
@@ -118,7 +120,7 @@ pipelex-agent fix bundle <PATH> [OPTIONS]
 - `--format` - Success output format: `markdown` (default) or `json`
 - `--error-format` - Error output format: `markdown` or `json` (defaults to `--format`'s value)
 
-The result reports `iterations`, `fixes_applied`, `files_written`, and any `remaining_errors`. A fully valid result exits 0; a completed fix attempt that remains invalid exits 1; argument, setup, or unexpected failures exit 2.
+The result reports `iterations`, `fixes_applied`, `files_written`, and any `remaining_errors`. A fully valid result exits 0; a completed fix attempt that remains invalid exits 1; argument, setup, or unexpected failures exit 2, and so does a folder holding no `.mthds` bundle. A folder is fixed whole, as `validate bundle` judges it: every file of its method tree, from the tree's root down, is inside the write scope, a fix lands in the file its error names, and a folder whose bundles declare several `main_pipe`s, or none, is fixed like any other. A folder whose tree cannot be read, such as one past this machine's limits, leaves as the still-invalid verdict, `error_type: FixBundleError` with exit code `1`, its `remaining_errors` carrying the refusal. A configuration that does not validate, which these commands read before the boot for the tree's limits, is reported as the failed boot it would have been, under the configuration error's own `error_type` with the boot's hint.
 
 Rewrite a method's flat `PipeFunc` function names as import paths from its folder, the migration of the retired function registry (see [PipeFunc](../../building-methods/pipes/pipe-operators/PipeFunc.md#migrating-flat-function-names)):
 
@@ -144,7 +146,7 @@ pipelex-agent inputs method <NAME> [OPTIONS]
 - `--format` - Template serialization: `json` (default) or `toml`
 - `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
-For `bundle` and `method`, use `--pipe` to target a specific pipe.
+For `bundle` and `method`, use `--pipe` to target a specific pipe. With no `--pipe`, a method's folder generates the template of the pipe a run of the folder starts at, as `run bundle` selects it; a folder whose bundles declare no `main_pipe`, or several, is refused under `error_type: MethodEntryError` with exit code `1`, and a folder holding no bundle is refused the same way. With `--pipe`, the folder loads as the method's library and the pipe is looked up there, as `run bundle <folder> --pipe` runs it.
 
 The JSON success envelope names the pipe the template was generated for as `pipe_ref`, the qualified `domain.pipe_code` of the pipe that was resolved, whether you named it with a bare code, a qualified ref, or let it default to the bundle's `main_pipe`. A pipe you reached through a dependency alias keeps that alias, `alias->domain.pipe_code`, since that is the ref that selects it again:
 

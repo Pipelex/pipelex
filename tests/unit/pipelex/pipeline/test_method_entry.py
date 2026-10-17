@@ -3,8 +3,10 @@ from pathlib import Path
 import pytest
 from mthds.method_tree.lister import list_method_tree
 
+from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import MethodEntryError
-from pipelex.pipeline.method_entry import select_method_entry
+from pipelex.pipeline.method_entry import read_method_candidates, select_method_entry, select_named_pipe
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def _bundle(*, domain: str, pipe_code: str, main_pipe: str | None) -> str:
@@ -132,3 +134,115 @@ class TestMethodEntry:
 
         with pytest.raises(MethodEntryError, match=r"The METHODS\.toml of the method at .* cannot be read"):
             select_method_entry(tree=list_method_tree(tmp_path))
+
+    def test_a_bundle_whose_pipes_do_not_validate_still_says_where_its_method_starts(self, tmp_path: Path) -> None:
+        """The rule reads the declarations alone, so `fix` can still reach a method whose pipes it has to repair."""
+        _write(
+            directory=tmp_path,
+            files={
+                "broken.mthds": 'domain = "entry_broken"\nmain_pipe = "first"\n\n[pipe.first]\ntype = "PipeNope"\n',
+                "steps.mthds": _bundle(domain="entry_steps", pipe_code="extract", main_pipe=None),
+            },
+        )
+
+        entry = select_method_entry(tree=list_method_tree(tmp_path))
+
+        assert entry.pipe_ref == "entry_broken.first"
+        assert entry.tree_path == "broken.mthds"
+
+    @pytest.mark.parametrize(
+        ("content", "expected"),
+        [
+            ('domain = \nmain_pipe = "first"\n', "TOML syntax error at line 1"),
+            ('domain = 3\nmain_pipe = "first"\n', "Domain code '3' is not a valid domain code"),
+            ('domain = "entry_a"\nmain_pipe = ["first"]\n', "Input should be a valid string"),
+            ('domain = "entry_a"\npipe = 3\n', "Input should be a valid dictionary"),
+        ],
+        ids=["not_toml", "domain_not_a_string", "main_pipe_not_a_string", "pipe_not_a_table"],
+    )
+    def test_a_bundle_whose_declarations_cannot_be_read_is_refused_as_its_parse_refuses_it(self, tmp_path: Path, content: str, expected: str) -> None:
+        _write(directory=tmp_path, files={"a.mthds": content})
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            select_method_entry(tree=list_method_tree(tmp_path))
+
+        assert expected in str(exc_info.value)
+
+    @pytest.mark.parametrize("main_pipe", ["dom.pipe", "camelCase", ""], ids=["qualified_ref", "camel_case", "empty_string"])
+    def test_a_main_pipe_that_is_no_pipe_code_is_refused_at_entry_selection_naming_its_bundle(self, tmp_path: Path, main_pipe: str) -> None:
+        """The bundle's parse holds `main_pipe` to the pipe code syntax, and so does the rule: an empty string declares no pipe and is no absence."""
+        _write(
+            directory=tmp_path,
+            files={
+                "a.mthds": _bundle(domain="entry_a", pipe_code="first", main_pipe=None).replace(
+                    "\n\n[pipe.", f'\nmain_pipe = "{main_pipe}"\n\n[pipe.', 1
+                ),
+                "b.mthds": _bundle(domain="entry_b", pipe_code="second", main_pipe="second"),
+            },
+        )
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            select_method_entry(tree=list_method_tree(tmp_path))
+
+        assert f"Invalid main pipe syntax '{main_pipe}'" in exc_info.value.message
+        items = exc_info.value.validation_errors or []
+        assert [item.error_type for item in items] == [PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX]
+        assert [Path(item.source or "").name for item in items] == ["a.mthds"]
+
+    @pytest.mark.parametrize(
+        ("pipe_ref", "expected_tree_path", "expected_pipe_ref"),
+        [
+            ("extract", "steps/extract.mthds", "entry_steps.extract"),
+            ("entry_report.summarize", "report.mthds", "entry_report.summarize"),
+            ("entry_steps.summarize", "steps/extract.mthds", "entry_steps.summarize"),
+        ],
+        ids=["bare_code", "qualified_ref", "qualified_ref_of_a_shared_code"],
+    )
+    def test_a_named_pipe_is_found_in_the_bundle_defining_it(
+        self, tmp_path: Path, pipe_ref: str, expected_tree_path: str, expected_pipe_ref: str
+    ) -> None:
+        _write(
+            directory=tmp_path,
+            files={
+                "steps/extract.mthds": _bundle(domain="entry_steps", pipe_code="extract", main_pipe=None)
+                + _bundle(domain="entry_steps", pipe_code="summarize", main_pipe=None).split("\n", 2)[2],
+                "report.mthds": _bundle(domain="entry_report", pipe_code="summarize", main_pipe="summarize"),
+            },
+        )
+        tree = list_method_tree(tmp_path)
+
+        entry = select_named_pipe(candidates=read_method_candidates(tree=tree), pipe_ref=pipe_ref, method_label="here")
+
+        assert entry.tree_path == expected_tree_path
+        assert entry.pipe_ref == expected_pipe_ref
+
+    @pytest.mark.parametrize(
+        ("pipe_ref", "expected"),
+        [
+            ("missing", "No bundle of the method here defines the pipe 'missing'. Its bundles: 'report.mthds', 'steps/extract.mthds'."),
+            (
+                "summarize",
+                (
+                    "Several bundles of the method here define the pipe 'summarize': 'report.mthds' in domain 'entry_report', "
+                    "'steps/extract.mthds' in domain 'entry_steps'. Name the pipe as domain.pipe_code."
+                ),
+            ),
+            ("scoring->scoring.compute", "The pipe 'scoring->scoring.compute' belongs to a package the method here depends on"),
+            ("entry_steps..summarize", "'entry_steps..summarize' does not name a pipe of the method here"),
+        ],
+        ids=["undefined", "ambiguous_bare_code", "dependency_pipe", "not_a_pipe_ref"],
+    )
+    def test_a_named_pipe_no_single_bundle_defines_is_refused(self, tmp_path: Path, pipe_ref: str, expected: str) -> None:
+        _write(
+            directory=tmp_path,
+            files={
+                "steps/extract.mthds": _bundle(domain="entry_steps", pipe_code="summarize", main_pipe=None),
+                "report.mthds": _bundle(domain="entry_report", pipe_code="summarize", main_pipe="summarize"),
+            },
+        )
+        tree = list_method_tree(tmp_path)
+
+        with pytest.raises(MethodEntryError) as exc_info:
+            select_named_pipe(candidates=read_method_candidates(tree=tree), pipe_ref=pipe_ref, method_label="here")
+
+        assert expected in exc_info.value.message

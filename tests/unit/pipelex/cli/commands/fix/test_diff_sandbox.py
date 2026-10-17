@@ -4,12 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.cli.commands.fix._diff_sandbox import mirror_bundle_for_preview
+import pytest
+
+from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox, mirror_bundle_for_preview
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_mock import MockerFixture
+
+
+def _entry_copy(sandbox: PreviewSandbox) -> Path:
+    assert sandbox.entry_path is not None
+    return sandbox.entry_path
 
 
 class TestDiffSandbox:
@@ -24,11 +32,11 @@ class TestDiffSandbox:
 
         sandbox = mirror_bundle_for_preview(entry, library_dirs=None, sandbox_root=self._sandbox_root(tmp_path))
 
-        assert sandbox.entry_path != entry.resolve()
-        assert sandbox.entry_path.read_text(encoding="utf-8") == 'domain = "demo"\n'
+        assert _entry_copy(sandbox) != entry.resolve()
+        assert _entry_copy(sandbox).read_text(encoding="utf-8") == 'domain = "demo"\n'
         assert sandbox.library_dirs == []
         assert sandbox.writable_library_dirs == []
-        assert sandbox.to_original(str(sandbox.entry_path)) == str(entry.resolve())
+        assert sandbox.to_original(str(_entry_copy(sandbox))) == str(entry.resolve())
 
     def test_explicit_empty_dirs_stay_empty(self, tmp_path: Path) -> None:
         entry = tmp_path / "bundle.mthds"
@@ -98,9 +106,9 @@ class TestDiffSandbox:
         sandbox = mirror_bundle_for_preview(entry, library_dirs=[libs_dir], sandbox_root=self._sandbox_root(tmp_path))
 
         assert sandbox.library_dirs is not None
-        assert sandbox.entry_path.read_text(encoding="utf-8") == 'domain = "demo"\n'
-        assert not sandbox.entry_path.is_relative_to(sandbox.library_dirs[0])
-        assert sandbox.to_original(str(sandbox.entry_path)) == str(entry.resolve())
+        assert _entry_copy(sandbox).read_text(encoding="utf-8") == 'domain = "demo"\n'
+        assert not _entry_copy(sandbox).is_relative_to(sandbox.library_dirs[0])
+        assert sandbox.to_original(str(_entry_copy(sandbox))) == str(entry.resolve())
         assert sandbox.to_original(str(sandbox.library_dirs[0] / "helper.mthds")) == str((libs_dir / "helper.mthds").resolve())
 
     def test_missing_library_dir_mirrors_as_empty_copy_without_crashing(self, tmp_path: Path) -> None:
@@ -117,7 +125,7 @@ class TestDiffSandbox:
         assert copy_dir.is_dir()
         assert list(copy_dir.iterdir()) == []
         # The entry lives outside the missing dir, so it gets a standalone copy.
-        assert sandbox.entry_path.read_text(encoding="utf-8") == 'domain = "demo"\n'
+        assert _entry_copy(sandbox).read_text(encoding="utf-8") == 'domain = "demo"\n'
         assert sandbox.to_original(str(copy_dir / "would_be.mthds")) == str((missing_dir / "would_be.mthds").resolve())
 
     def test_paths_outside_the_sandbox_pass_through(self, tmp_path: Path) -> None:
@@ -170,3 +178,23 @@ class TestDiffSandbox:
         copied_link = sandbox.library_dirs[0] / "linked"
         assert copied_link.is_symlink()
         assert copied_link.readlink() == external_dir
+
+    def test_a_method_folder_mirrors_with_no_entry_and_finds_its_copy(self, tmp_path: Path) -> None:
+        """A folder judged whole has no entry file: it is mirrored as one of the library dirs, found again by ``to_copy``."""
+        method_dir = tmp_path / "method"
+        (method_dir / "steps").mkdir(parents=True)
+        (method_dir / "a.mthds").write_text('domain = "first"\n', encoding="utf-8")
+        (method_dir / "steps" / "b.mthds").write_text('domain = "second"\n', encoding="utf-8")
+
+        sandbox = mirror_bundle_for_preview(None, library_dirs=[method_dir], sandbox_root=self._sandbox_root(tmp_path))
+
+        copy_dir = sandbox.to_copy(original=method_dir)
+        assert sandbox.entry_path is None
+        assert sandbox.entry_mapping is None
+        assert sandbox.library_dirs == [copy_dir]
+        assert sandbox.writable_library_dirs == [copy_dir]
+        assert (copy_dir / "steps" / "b.mthds").read_text(encoding="utf-8") == 'domain = "second"\n'
+        assert sandbox.to_copy(original=method_dir / "steps" / "b.mthds") == copy_dir / "steps" / "b.mthds"
+        assert sandbox.to_original(str(copy_dir / "a.mthds")) == str((method_dir / "a.mthds").resolve())
+        with pytest.raises(PipelexUnexpectedError, match="lies under none of the directories the preview mirrored"):
+            sandbox.to_copy(original=tmp_path / "elsewhere")
