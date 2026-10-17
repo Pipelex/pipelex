@@ -7,7 +7,8 @@ from packaging.markers import Marker
 from packaging.version import InvalidVersion
 from pytest_mock import MockerFixture
 
-from pipelex.libraries.method_requirements import marker_variables_of, parse_requirements_text, unmet_requirements
+from pipelex.core.method_trees.requirements_file import parse_requirements_text
+from pipelex.libraries.method_requirements import marker_variables_of, unmet_requirements
 from pipelex.libraries.package_environments import InterpreterPackageEnvironment, OfferedPackageEnvironment
 from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
 

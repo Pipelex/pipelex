@@ -7,12 +7,16 @@ import pytest
 
 from pipelex.plugins.contract import PLUGIN_API_VERSION
 from pipelex.plugins.exceptions import DuplicatePipeFuncPackageOfferError
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRegistry
+from pipelex.plugins.pipe_func_package_offer_registry import (
+    PipeFuncPackageOffer,
+    PipeFuncPackageOfferRegistry,
+    PipeFuncPackageOfferRequest,
+    PipeFuncPackageRefusal,
+)
 from pipelex.plugins.registrar import PluginOrigin, PluginRegistrar
 
 if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelexConfig
-    from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 
 _OFFER = PipeFuncPackageOffer(
     environment="the Daytona sandbox snapshot 'pipelex-base-test'",
@@ -25,7 +29,7 @@ def _make_registrar() -> PluginRegistrar:
     return PluginRegistrar(config=cast("PipelexConfig", SimpleNamespace(runtime=SimpleNamespace(plugins=SimpleNamespace(disabled=[])))))
 
 
-def _offer_factory(_config: PipeFuncConfig) -> PipeFuncPackageOffer | None:
+def _offer_factory(_request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
     return _OFFER
 
 
@@ -59,3 +63,10 @@ class TestPipeFuncPackageOfferRegistry:
         """A plugin's statement is closed plain data, so a misspelled field fails at the plugin rather than reading as unstated."""
         with pytest.raises(ValueError, match="extra"):
             PipeFuncPackageOffer.model_validate({**_OFFER.model_dump(), "marker_environments": {}})
+
+    def test_a_refusal_states_where_and_why_and_nothing_else(self) -> None:
+        refusal = PipeFuncPackageRefusal(environment="the Daytona sandbox", reason="no wheel of odfpy for the box")
+
+        assert refusal.model_dump() == {"environment": "the Daytona sandbox", "reason": "no wheel of odfpy for the box"}
+        with pytest.raises(ValueError, match="extra"):
+            PipeFuncPackageRefusal.model_validate({**refusal.model_dump(), "requirements": ["odfpy"]})
