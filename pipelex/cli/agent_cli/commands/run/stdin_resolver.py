@@ -10,7 +10,7 @@ from typing import Any, NamedTuple, cast
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
@@ -173,8 +173,8 @@ def parse_cli_inputs(
     if auto_inputs_dir is not None:
         try:
             auto_inputs_file = find_default_inputs_file(directory=auto_inputs_dir)
-        except AmbiguousInputsFilesError as ambiguity_exc:
-            agent_error(ambiguity_exc.message, error_type="AmbiguousInputsFilesError", cause=ambiguity_exc)
+        except (AmbiguousInputsFilesError, AutoDetectedInputsFileError) as inputs_file_exc:
+            agent_error(inputs_file_exc.message, error_type=type(inputs_file_exc).__name__, cause=inputs_file_exc)
         if auto_inputs_file is not None:
             return _parse_inputs_arg(str(auto_inputs_file))
 

@@ -12,7 +12,7 @@ from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_fil
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.cli.error_handlers import handle_pre_boot_config_error, handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import is_pipelex_file
@@ -172,9 +172,9 @@ def run_bundle_cmd(
         if not inputs:
             try:
                 inputs_file = find_default_inputs_file(directory=target_path)
-            except AmbiguousInputsFilesError as ambiguity_exc:
-                typer.secho(f"Failed to run: {ambiguity_exc.message}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from ambiguity_exc
+            except (AmbiguousInputsFilesError, AutoDetectedInputsFileError) as inputs_file_exc:
+                typer.secho(f"Failed to run: {inputs_file_exc.message}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from inputs_file_exc
             if inputs_file is not None:
                 inputs = str(inputs_file)
                 typer.echo(f"Auto-detected inputs: {inputs}")

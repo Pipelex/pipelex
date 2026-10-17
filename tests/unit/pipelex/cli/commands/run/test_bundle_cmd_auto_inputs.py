@@ -77,3 +77,37 @@ class TestBundleCmdAutoInputs:
         run_bundle_cmd(path=str(bundle_dir), inputs=str(explicit))
 
         assert mock_execute.call_args.kwargs["inputs"] == str(explicit)
+
+    def test_an_auto_detected_link_is_refused(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A link named inputs.json is never followed, so a checked-out method cannot send data from outside its folder."""
+        mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
+        outside = bundle_dir.parent / f"{bundle_dir.name}-outside.json"
+        outside.write_text('{"topic": "outside-sentinel"}', encoding="utf-8")
+        # The folder ignores its inputs file, as a checked-out method may, so its tree never holds the link and the
+        # auto-detection alone judges it.
+        (bundle_dir / ".gitignore").write_text("inputs.json\n", encoding="utf-8")
+        (bundle_dir / "inputs.json").symlink_to(outside)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_dir))
+
+        assert exc_info.value.exit_code == 1
+        stderr = capsys.readouterr().err
+        assert "symbolic link" in stderr
+        assert "--inputs" in stderr
+        mock_execute.assert_not_called()
+
+    def test_an_explicit_inputs_link_is_followed(self, mocker: MockerFixture, bundle_dir: Path) -> None:
+        """An inputs file the caller names is read as given, a link included."""
+        mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
+        outside = bundle_dir.parent / f"{bundle_dir.name}-outside.json"
+        outside.write_text('{"topic": "outside-sentinel"}', encoding="utf-8")
+        # The folder ignores its inputs file, as a checked-out method may, so its tree never holds the link and the
+        # auto-detection alone judges it.
+        (bundle_dir / ".gitignore").write_text("inputs.json\n", encoding="utf-8")
+        link = bundle_dir / "inputs.json"
+        link.symlink_to(outside)
+
+        run_bundle_cmd(path=str(bundle_dir), inputs=str(link))
+
+        assert mock_execute.call_args.kwargs["inputs"] == str(link)

@@ -5,16 +5,18 @@ through the TOML parser, every other suffix (``.json``, extensionless, ...)
 keeps the JSON behavior. Both the main CLI (``pipelex run``) and the agent CLI
 (``pipelex-agent run``) load inputs files through this module so the two
 surfaces cannot drift — same deal for the ``inputs.json`` / ``inputs.toml``
-auto-detect probe and its ambiguity rule.
+auto-detect probe, its ambiguity rule and its refusal of anything but a
+regular file.
 """
 
 from __future__ import annotations
 
 import datetime
+import stat
 from pathlib import Path
 from typing import Any
 
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
@@ -83,6 +85,12 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
 def find_default_inputs_file(*, directory: Path) -> Path | None:
     """Probe a bundle directory for the default inputs file (JSON or TOML).
 
+    Each candidate is judged by ``lstat``, never following a link, and only a regular file is used: the
+    membership rule keeps a run's inputs file out of the method's tree whether it is a file or a symbolic
+    link, so a link named ``inputs.json`` in a checked-out method could otherwise carry JSON from outside
+    the method's folder into the run. An inputs file the caller names with ``--inputs`` never comes
+    through here, and is read as given, a link followed.
+
     Args:
         directory: The bundle/pipeline directory to probe.
 
@@ -91,24 +99,59 @@ def find_default_inputs_file(*, directory: Path) -> Path | None:
         None when neither does.
 
     Raises:
-        AmbiguousInputsFilesError: When both default files exist — the caller
+        AmbiguousInputsFilesError: When an entry of each name exists — the caller
             must pass ``--inputs`` explicitly.
+        AutoDetectedInputsFileError: When the one entry found is a symbolic link,
+            a directory or any other entry that is not a regular file.
     """
     json_file = directory / DEFAULT_INPUTS_FILE_NAME
     toml_file = directory / DEFAULT_INPUTS_TOML_FILE_NAME
-    json_exists = json_file.is_file()
-    toml_exists = toml_file.is_file()
-    if json_exists and toml_exists:
+    json_mode = _entry_mode(path=json_file)
+    toml_mode = _entry_mode(path=toml_file)
+    if json_mode is not None and toml_mode is not None:
         msg = (
             f"Directory '{directory}' holds both '{DEFAULT_INPUTS_FILE_NAME}' and '{DEFAULT_INPUTS_TOML_FILE_NAME}', "
             "so inputs auto-detection is ambiguous. Pass --inputs explicitly to choose one."
         )
         raise AmbiguousInputsFilesError(msg)
-    if json_exists:
+    if json_mode is not None:
+        _refuse_unless_regular_file(path=json_file, mode=json_mode)
         return json_file
-    if toml_exists:
+    if toml_mode is not None:
+        _refuse_unless_regular_file(path=toml_file, mode=toml_mode)
         return toml_file
     return None
+
+
+def _entry_mode(*, path: Path) -> int | None:
+    """The mode of the entry at ``path``, a symbolic link not followed, or None when there is none."""
+    try:
+        return path.lstat().st_mode
+    except (FileNotFoundError, NotADirectoryError):
+        return None
+
+
+def _refuse_unless_regular_file(*, path: Path, mode: int) -> None:
+    """Refuse an auto-detected inputs file that is not a regular file, naming what it is.
+
+    Raises:
+        AutoDetectedInputsFileError: When ``mode`` is not a regular file's.
+    """
+    if stat.S_ISREG(mode):
+        return
+    what: str
+    if stat.S_ISLNK(mode):
+        what = "a symbolic link"
+    elif stat.S_ISDIR(mode):
+        what = "a directory"
+    else:
+        what = "not a regular file"
+    msg = (
+        f"'{path}' was found as the run's inputs because no --inputs was given, but it is {what}. "
+        "An inputs file found automatically must be a regular file, so that a link never carries data from outside "
+        "the method's folder into the run. Replace it with the file itself, or name the inputs with --inputs <path>."
+    )
+    raise AutoDetectedInputsFileError(msg)
 
 
 def _convert_temporal_inputs(inputs_dict: dict[str, Any]) -> dict[str, Any]:

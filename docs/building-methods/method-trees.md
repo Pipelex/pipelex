@@ -22,9 +22,12 @@ A tree holds the regular files under its root, except those its membership rule 
 - every file or folder whose name starts with a dot, such as `.git/`, `.venv/` or `.env`;
 - `__pycache__/` and `node_modules/` folders, and any folder holding a Python virtual environment;
 - a nested repository (a folder holding `.git`) and a nested package (a folder holding its own `METHODS.toml`), each a tree of its own;
+- a run's inputs file, a file named exactly `inputs.json` or `inputs.toml` at any depth, whether a regular file or a symbolic link, which is never followed, while a folder of either name keeps its files;
 - every file a `.gitignore` of the tree ignores, matched as git matches it, and every file the manifest's `[package] exclude` patterns name.
 
-A symbolic link anywhere in the tree refuses the whole tree: a tree holds regular files only, so replace the link with the file it names, or keep it out with a `.gitignore` pattern.
+A symbolic link the membership rule does not keep out refuses the whole tree: a tree holds regular files only, so replace the link with the file it names, or keep it out with a `.gitignore` pattern.
+
+A run's inputs file holds the data of one run, never the method's: [`pipelex run bundle <folder>`](../tools/cli/run.md#auto-detection-and-ambiguity) reads the folder's `inputs.json` or `inputs.toml` as the run's inputs, and the file never travels with the method nor changes its digest. Example inputs meant to ship with a method take any other name, such as `examples/invoice-inputs.json`, and are then ordinary files of its tree.
 
 The tree's `.gitignore` files are what keeps a run's outputs out of the method: every folder `pipelex run` creates for its outputs holds a `.gitignore` ignoring everything in it, so a run started from the method's own folder leaves its tree, and its digest, as they were.
 

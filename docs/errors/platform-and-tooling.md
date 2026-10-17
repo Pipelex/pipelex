@@ -85,6 +85,7 @@ own page. Classes are grouped by subsystem.
 ## CLI
 
 - [`AmbiguousInputsFilesError`](ambiguous-inputs-files-error.md) — Ambiguous inputs files
+- [`AutoDetectedInputsFileError`](auto-detected-inputs-file-error.md) — Auto-detected inputs file is not a regular file
 - [`DriftAckError`](drift-ack-error.md) — Drift ack
 - [`DriftError`](drift-error.md) — Drift
 - [`DriftGitError`](drift-git-error.md) — Drift git
