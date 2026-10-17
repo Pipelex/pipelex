@@ -5,6 +5,7 @@ import shutil
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsEnvVar
@@ -23,8 +24,9 @@ def run_plxt(subcommand: str, *, file_path: str) -> None:
     plxt_path = shutil.which("plxt")
     if plxt_path is None:
         agent_error(
-            message="plxt binary not found. Install via: uv tool install pipelex-tools",
-            error_type="BinaryNotFoundError",
+            "plxt binary not found. Install via: uv tool install pipelex-tools",
+            code=CoreCode.CLIENT_TOOL_MISSING,
+            params={"tool": "plxt"},
         )
 
     # The command's usage statistics are pipelex-agent's own, so the plxt it delegates to reports none of its own.

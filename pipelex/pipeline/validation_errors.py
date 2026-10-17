@@ -3,11 +3,11 @@
 ``build_validation_error_items`` is the single source of truth behind every
 structured-error surface:
 
-- the agent CLI's ``validation_errors`` JSON array (via
-  ``pipelex.cli.agent_cli.commands.agent_output.extract_validation_errors``),
-- the ``/validate`` route's invalid verdict, and
+- the ``/validate`` route's invalid verdict,
 - the problem's ``errors`` (via ``ValidateBundleError.problem_items``, which
-  turns each item into a problem item with :func:`problem_item_of`).
+  turns each item into a problem item with :func:`problem_item_of`), which the
+  agent CLI prints, and
+- the agent CLI's Markdown, which renders the items themselves as prose.
 
 All of them reach it through ``ValidateBundleError.validation_error_items``, so the CLI
 and API structured shapes cannot drift. It takes the error-data lists directly

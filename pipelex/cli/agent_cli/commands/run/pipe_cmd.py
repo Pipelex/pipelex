@@ -12,10 +12,10 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
     agent_success_formatted,
-    run_failure_fields,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
@@ -79,7 +79,7 @@ def run_pipe_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
     runner: Annotated[
         RunExecution | None,
@@ -107,20 +107,21 @@ def run_pipe_cmd(
         pipelex-agent run pipe my_pipe --format json
         pipelex-agent run pipe my_pipe -L my_library/ --runner hosted --inputs data.json
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
     if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
-        agent_error(
+        agent_argument_error(
             f"'{pipe_code}' looks like a file path or directory. "
             f"Use 'run bundle {pipe_code}' for bundles/directories, or 'run pipe <code>' for pipe codes.",
-            error_type="ArgumentError",
+            argument=pipe_code,
+            reason="a path where a pipe code is expected",
         )
 
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
-        agent_error("--mock-inputs requires --dry-run", error_type="ArgumentError")
+        agent_argument_error("--mock-inputs requires --dry-run", argument="--mock-inputs", reason="requires --dry-run")
 
     # Check installed methods' exports for additional library dirs
     try:
@@ -128,7 +129,6 @@ def run_pipe_cmd(
     except ExportedPipeAmbiguousError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
-            error_type="ArgumentError",
             cause=exc,
         )
     if export_dirs:
@@ -148,7 +148,7 @@ def run_pipe_cmd(
         try:
             library_files = hosted_pipe_library_files(library_dirs=library_dir)
         except HostedRunSourceError as exc:
-            agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+            agent_error(exc.message, cause=exc)
         request = HostedRunRequest(
             mthds_files=library_files,
             pipe_code=pipe_code,
@@ -179,7 +179,7 @@ def run_pipe_cmd(
         )
 
     except PipelineExecutionError as exc:
-        agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
+        agent_error(exc.message, cause=exc)
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {
@@ -190,11 +190,11 @@ def run_pipe_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, cause=exc, **availability_extra)
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

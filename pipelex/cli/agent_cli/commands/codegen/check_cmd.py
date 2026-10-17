@@ -18,11 +18,12 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
     agent_success_formatted,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.codegen.check import run_codegen_check
 from pipelex.codegen.exceptions import CodegenLockError
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 def agent_codegen_check_cmd(
@@ -36,7 +37,7 @@ def agent_codegen_check_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Verify generated artifacts are current, offline — no engine, no network, no API key.
@@ -45,7 +46,7 @@ def agent_codegen_check_cmd(
         pipelex-agent codegen check ./generated/
         pipelex-agent codegen check ./generated/ --format json
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     root_path = Path(root).expanduser()
 
     try:
@@ -54,7 +55,8 @@ def agent_codegen_check_cmd(
         if not report.lock_found:
             agent_error(
                 f"No {CODEGEN_LOCK_FILENAME} found in '{root_path}' — nothing to check.",
-                error_type="CodegenLockNotFoundError",
+                code=PipelexErrorCode.CODEGEN_LOCK_NOT_FOUND,
+                params={"path": str(root_path)},
                 exit_code=2,
                 root=str(root_path),
             )
@@ -64,7 +66,8 @@ def agent_codegen_check_cmd(
             drifts = [drift.model_dump(mode="json") for drift in report.drifts]
             agent_error(
                 f"Generated artifacts in '{root_path}' have drifted.",
-                error_type="CodegenDriftError",
+                code=PipelexErrorCode.CODEGEN_DRIFTED,
+                params={"artifacts": [drift.path for drift in report.drifts]},
                 exit_code=1,
                 root=str(root_path),
                 is_current=False,
@@ -83,11 +86,11 @@ def agent_codegen_check_cmd(
 
     except CodegenLockError as exc:
         # No verdict: the lock exists but cannot be read, so nothing can be checked.
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc, exit_code=2, root=str(root_path))
+        agent_error(exc.message, cause=exc, exit_code=2, root=str(root_path))
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
 
 def _format_codegen_check_markdown(result: dict[str, Any]) -> str:

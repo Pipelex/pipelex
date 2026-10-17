@@ -88,9 +88,15 @@ class TestAFormerReleaseMachine:
         assert "FormerReleaseConfigError" in output, output
         assert "pipelex migrate" in output
         assert "pipelex init" in output
-        envelope = json.loads(booted.stderr)
-        assert envelope["error_type"] == "FormerReleaseConfigError"
-        assert "pipelex-agent migrate --dry-run --format json" in envelope["hint"], "an agent is handed the loop it can run"
+        problem = json.loads(booted.stderr)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["diagnostics"]["error_class"] == "FormerReleaseConfigError"
+
+        # The error's advice is a tip the Markdown prints, the stream an agent reads by default.
+        booted_markdown = _run(args=[str(PIPELEX_AGENT_BIN), "models", "--format", "markdown"], env=offline_subprocess_env, cwd=project_dir)
+        assert booted_markdown.returncode != 0
+        assert "💡 " in booted_markdown.stderr
+        assert "pipelex-agent migrate --dry-run --format json" in booted_markdown.stderr, "an agent is handed the loop it can run"
 
     def test_pipelex_migrate_cleans_both_directories_and_the_machine_boots(self, hermetic_home: Path, offline_subprocess_env: dict[str, str]) -> None:
         project_dir, home_config_dir, project_config_dir = _plant_a_former_release_machine(hermetic_home=hermetic_home)

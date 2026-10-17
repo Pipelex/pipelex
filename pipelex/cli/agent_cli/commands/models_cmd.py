@@ -5,7 +5,7 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, use_agent_cli_error_format
 from pipelex.cogt.models.model_listing import ModelCategory, format_models_markdown, list_models
 from pipelex.pipelex import Pipelex
 
@@ -25,7 +25,7 @@ def agent_models_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """List available model presets, aliases, and waterfalls.
@@ -33,7 +33,7 @@ def agent_models_cmd(
     Outputs model configuration that an agent needs to reference when building pipelines.
     Default output is markdown; use --format json for structured JSON.
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     try:
         make_pipelex_for_agent_cli(needs_inference=False)
 
@@ -51,7 +51,7 @@ def agent_models_cmd(
         # JSON documents and a machine consumer parsing it got "Extra data".
         raise
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(f"Failed to list models: {exc}", error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(f"Failed to list models: {exc}", cause=exc)
     finally:
         Pipelex.teardown_if_needed()

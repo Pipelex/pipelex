@@ -20,10 +20,10 @@ from pipelex_sdk.validation_models import ValidationErrorItem
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
+from pipelex.errors.problem import ProblemView
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
@@ -232,16 +232,20 @@ class TestRunHostedEnvelope:
         assert envelope["validation_errors"][0]["source"] == "lib/b.mthds"
         assert envelope["validation_errors"][0]["message"] == "unknown concept Foo"
 
-    def test_a_configuration_that_cannot_be_read_gives_the_boot_hint(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """Reading `[run] execution` meets the configuration a local boot meets, and says what a local boot says."""
-        mocker.patch(f"{EXECUTION_MODULE}.configured_run_execution", side_effect=PipelexConfigError("pipelex.toml is invalid"))
+    def test_a_configuration_that_cannot_be_read_gives_the_boot_s_problem(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Reading `[run] execution` meets the configuration a local boot meets, and reports the problem a local boot reports."""
+        config_error = PipelexConfigError("pipelex.toml is invalid")
+        mocker.patch(f"{EXECUTION_MODULE}.configured_run_execution", side_effect=config_error)
 
         with pytest.raises(typer.Exit):
             run_method_cmd(name=METHOD_REF, output_format=CliOutputFormat.JSON)
 
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "PipelexConfigError"
-        assert envelope["hint"] == AGENT_INIT_FAILURE_HINT
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["domain"] == "operator"
+        assert problem["next_step"] == config_error.to_problem(view=ProblemView.OPERATOR).next_step.model_dump(mode="json", exclude_none=True)
+        assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
+        assert "error_type" not in problem
 
     def test_a_bundle_file_without_a_library_sends_pipelexpath(
         self, monkeypatch: pytest.MonkeyPatch, run_hosted: AsyncMock, tmp_path: Path, capsys: pytest.CaptureFixture[str]

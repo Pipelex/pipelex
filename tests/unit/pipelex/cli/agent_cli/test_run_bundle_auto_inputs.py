@@ -53,7 +53,7 @@ class TestAgentRunBundleAutoInputs:
 
     @pytest.mark.usefixtures("tty_stdin")
     def test_both_inputs_files_error_envelope(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """With both default inputs files present, the command emits the ambiguity envelope and exits."""
+        """With both default inputs files present, the command reports the ambiguity's problem and exits."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         run_core_mock = self._patch_run(mocker, {"answer": "42"})
         (bundle_dir / "inputs.json").write_text('{"topic": "cats"}', encoding="utf-8")
@@ -63,10 +63,11 @@ class TestAgentRunBundleAutoInputs:
             run_bundle_cmd(path=str(bundle_dir), pipe="my_pipe", output_format=CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "AmbiguousInputsFilesError"
-        assert envelope["error_domain"] == "input"
-        assert "--inputs" in envelope["hint"]
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "request.invalid"
+        assert problem["domain"] == "input"
+        assert problem["diagnostics"]["error_class"] == "AmbiguousInputsFilesError"
+        assert "Pass --inputs explicitly" in problem["message"]
         run_core_mock.assert_not_called()
 
     def test_piped_stdin_preempts_ambiguous_auto_detect(

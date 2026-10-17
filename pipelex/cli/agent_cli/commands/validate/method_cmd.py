@@ -7,14 +7,16 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
     agent_error_validate_bundle,
+    agent_file_error,
     agent_success_formatted,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
@@ -54,7 +56,7 @@ def validate_method_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Validate an installed method and output the results.
@@ -68,7 +70,7 @@ def validate_method_cmd(
         pipelex-agent validate method my-method --pipe custom_pipe
         pipelex-agent validate method my-method --allow-signatures
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     try:
         pipe_code, method_library_dirs, method = resolve_method_target(
@@ -79,11 +81,11 @@ def validate_method_cmd(
         )
     except MethodRefError as exc:
         # Method-reference failure (parse, fetch, location, bounds, refusal): no verdict could be
-        # produced, so exit 2 with the structured error envelope (not the human CLI's red text).
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        # produced, so exit 2 with its problem (not the human CLI's red text).
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     if not method.mthds_files:
-        agent_error(f"Method '{name}' has no .mthds bundle files.", error_type="MethodError", exit_code=2)
+        agent_error(f"Method '{name}' has no .mthds bundle files.", code=CoreCode.METHOD_NOT_FOUND, params={"method_ref": name}, exit_code=2)
 
     bundle_path = method.mthds_files[0]
 
@@ -121,11 +123,11 @@ def validate_method_cmd(
             raise typer.Exit(1)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+        agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
-        # Invalid verdict (see bundle_cmd): format-aware failure surface. JSON keeps the exact
-        # structured envelope; markdown renders the items as prose with a fix-aware footer.
+        # Invalid verdict (see bundle_cmd): the method's problem, format-aware; markdown renders the
+        # items as prose with a fix-aware footer.
         agent_error_validate_bundle(exc, bundle_path=bundle_path, library_dirs=library_dirs_paths, allow_signatures=allow_signatures)
 
     except PipeOperatorModelAvailabilityError as exc:
@@ -137,7 +139,7 @@ def validate_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
+        agent_error(exc.message, cause=exc, exit_code=2, **availability_extra)
 
     except typer.Exit:
         # The runnability gate raises typer.Exit(1) after emitting the success envelope; let it
@@ -145,8 +147,8 @@ def validate_method_cmd(
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

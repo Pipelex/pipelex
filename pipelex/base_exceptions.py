@@ -169,9 +169,9 @@ class ValidationErrorItem(BaseModel):
     ``exclude_none`` wire projection.
 
     The error channel is built exclusively by
-    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which both the agent
-    CLI (``extract_validation_errors``) and the API path
-    (``ValidateBundleError.validation_error_items``) call — so the CLI's structured
+    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which the agent
+    CLI's problem (``ValidateBundleError.problem_items``) and the API path
+    (``ValidateBundleError.validation_error_items``) both reach — so the CLI's structured
     output and the API's invalid verdict can never drift. The same
     item type also carries the report's advisory ``warnings``, built by
     ``pipelex.pipeline.advisory_warnings``: a warning is the same shape of

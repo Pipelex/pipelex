@@ -91,7 +91,8 @@ class TestAgentInitExecution:
         exit_code, payload = _init(config={"execution": "elsewhere"})
 
         assert exit_code != 0
-        assert payload["error_type"] == "ArgumentError"
+        assert payload["code"] == "client.argument_invalid"
+        assert payload["params"] == {"argument": "execution", "reason": "unknown execution"}
         assert "elsewhere" in payload["message"]
         assert not target_dir.exists()
 
@@ -100,7 +101,8 @@ class TestAgentInitExecution:
         exit_code, payload = _init(config=config)
 
         assert exit_code != 0
-        assert payload["error_type"] == "ArgumentError"
+        assert payload["code"] == "client.argument_invalid"
+        assert payload["params"]["argument"] in {"backends", "primary_backend"}
         assert not target_dir.exists()
 
     def test_a_global_init_names_a_project_that_overrides_it(self, target_dir: Path, mocker: MockerFixture, tmp_path: Path) -> None:

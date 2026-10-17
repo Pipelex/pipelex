@@ -46,7 +46,7 @@ class TestMakePipelexForAgentCli:
         assert result is mock_pipelex
 
     @pytest.mark.parametrize(
-        ("exc_class", "exc_args", "expected_error_type"),
+        ("exc_class", "exc_args", "expected_error_class"),
         [
             (TelemetryConfigValidationError, ("telemetry config bad",), "TelemetryConfigValidationError"),
         ],
@@ -57,9 +57,9 @@ class TestMakePipelexForAgentCli:
         capsys: pytest.CaptureFixture[str],
         exc_class: type[Exception],
         exc_args: tuple[str, ...],
-        expected_error_type: str,
+        expected_error_class: str,
     ) -> None:
-        """Each initialization exception should produce JSON stderr with the correct error_type."""
+        """Each initialization exception is reported as its problem on stderr, its class in the operator's diagnostics."""
         mocker.patch(
             "pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make",
             side_effect=exc_class(*exc_args),
@@ -70,9 +70,11 @@ class TestMakePipelexForAgentCli:
         assert exc_info.value.exit_code == 1
 
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error"] is True
-        assert parsed["error_type"] == expected_error_type
-        assert "message" in parsed
+        assert parsed["code"] == "pipelex.config.invalid"
+        assert parsed["domain"] == "operator"
+        assert parsed["diagnostics"]["error_class"] == expected_error_class
+        assert parsed["message"] == "telemetry config bad"
+        assert "hint" not in parsed
 
     def test_model_deck_preset_error_includes_structured_fields(
         self,
@@ -96,7 +98,7 @@ class TestMakePipelexForAgentCli:
             make_pipelex_for_agent_cli()
 
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error_type"] == "ModelDeckPresetValidationError"
+        assert parsed["diagnostics"]["error_class"] == "ModelDeckPresetValidationError"
         assert parsed["preset_id"] == "my_preset"
         assert parsed["model_handle"] == "claude-3-opus"
         assert sorted(parsed["enabled_backends"]) == ["anthropic", "openai"]

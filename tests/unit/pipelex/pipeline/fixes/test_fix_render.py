@@ -4,7 +4,7 @@ from typing import Any
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
-from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
+from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_progress_markdown
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -94,9 +94,10 @@ class TestFixRender:
         assert "## Pending Signatures" in rendered
         assert "- `signature_demo.summarize_doc`" in rendered
 
-    def test_still_invalid_renders_applied_fixes_bail_and_remaining_as_prose(self) -> None:
-        """The still-invalid markdown names the partial progress, the bail reason, and the remaining
-        errors as prose items (with their 💡 lines) — not a JSON dump.
+    def test_still_invalid_progress_names_the_applied_fixes_the_bail_and_the_tip(self) -> None:
+        """What follows a still-invalid result's problem names the partial progress, the bail reason and a tip.
+
+        The remaining errors are the problem's own, rendered with it, so this part does not repeat them.
         """
         result = FixBundleResult(
             is_valid=False,
@@ -130,16 +131,13 @@ class TestFixRender:
             bail_reason="Cross-file collision: two files declare pipe 'b'",
         )
 
-        rendered = format_fix_still_invalid_markdown(result, bundle_path="/w/entry.mthds")
+        rendered = format_fix_progress_markdown(result, bundle_path="/w/entry.mthds")
 
-        assert rendered.startswith("# Fix incomplete - bundle still invalid")
-        assert "## Applied Fixes" in rendered
+        assert rendered.startswith("### Applied Fixes")
         assert "- `match-sequence-output` - Set output of pipe 'a' to 'X[]'" in rendered
+        assert "### Files Written" in rendered
         assert "**Stopped:** Cross-file collision: two files declare pipe 'b'" in rendered
-        # Remaining errors render as prose items, with the humanized title and the 💡 suggested-fix line.
-        assert "1. **Unresolved Concept**" in rendered
-        assert "   - Concept: `Missing`" in rendered
-        assert "   - 💡 Suggested fix: Strip the same-domain prefix from pipe 'b'" in rendered
+        assert "Unresolved Concept" not in rendered
         # A remaining fixable item flips the tip toward "not applied", not "no safe fix".
         assert "still show a suggested fix that was not applied" in rendered
 
@@ -159,7 +157,7 @@ class TestFixRender:
             ],
         )
 
-        rendered = format_fix_still_invalid_markdown(result, bundle_path="/w/entry.mthds")
+        rendered = format_fix_progress_markdown(result, bundle_path="/w/entry.mthds")
 
         assert "have no deterministic safe fix" in rendered
-        assert "## Applied Fixes" not in rendered
+        assert "### Applied Fixes" not in rendered

@@ -9,10 +9,10 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
     agent_success_formatted,
-    extract_validation_errors,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_all_core,
@@ -54,7 +54,7 @@ def validate_pipe_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Validate a pipe by code, or all pipes, and output the results.
@@ -68,14 +68,14 @@ def validate_pipe_cmd(
         pipelex-agent validate pipe --all -L ./my_pipes
         pipelex-agent validate pipe my_draft_pipe --allow-signatures
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     # Handle --all flag
     if validate_all:
         if pipe_code:
-            agent_error("--all cannot be used with a pipe code", error_type="ArgumentError", exit_code=2)
+            agent_argument_error("--all cannot be used with a pipe code", argument="--all", reason="contradicts the pipe code given", exit_code=2)
 
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
 
@@ -92,21 +92,18 @@ def validate_pipe_cmd(
                 raise typer.Exit(1)
 
         except ValidateBundleError as exc:
-            # Invalid verdict: structured failure envelope. validation_errors[] is the shared builder's
-            # output (a failing dry run rides one located dry_run item per failing pipe). Signatures are a
-            # runnability fact (pending_signatures + the gate above), not an error, so they never reach this arm.
+            # Invalid verdict: the problem of the method that does not validate, its errors one located item per
+            # fault (a failing dry run gives one per failing pipe). Signatures are a runnability fact
+            # (pending_signatures + the gate above), not an error, so they never reach this arm.
             agent_error(
                 exc.message,
-                error_type="ValidateBundleError",
                 cause=exc,
                 is_valid=False,
-                validation_errors=extract_validation_errors(exc),
             )
 
         except PipeOperatorModelAvailabilityError as exc:
             agent_error(
                 str(exc),
-                error_type="PipeOperatorModelAvailabilityError",
                 cause=exc,
                 pipe_code=exc.pipe_code,
                 model_handle=exc.model_handle,
@@ -119,27 +116,29 @@ def validate_pipe_cmd(
             raise
 
         except Exception as exc:  # ruff: ignore[blind-except]
-            # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-            agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+            # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+            agent_error(str(exc), cause=exc, exit_code=2)
 
         finally:
             Pipelex.teardown_if_needed()
         return
 
     if not pipe_code:
-        agent_error(
+        agent_argument_error(
             "No pipe code specified. Use --all to validate all pipes, or use 'validate bundle <path>' for bundle files.",
-            error_type="ArgumentError",
+            argument="pipe_code",
+            reason="missing without --all",
             exit_code=2,
         )
 
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
     if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
-        agent_error(
+        agent_argument_error(
             f"'{pipe_code}' looks like a file path or directory. "
             f"Use 'validate bundle {pipe_code}' for bundles/directories, or 'validate pipe <code>' for pipe codes.",
-            error_type="ArgumentError",
+            argument=pipe_code,
+            reason="a path where a pipe code is expected",
             exit_code=2,
         )
 
@@ -149,7 +148,6 @@ def validate_pipe_cmd(
     except ExportedPipeAmbiguousError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
-            error_type="ArgumentError",
             cause=exc,
             exit_code=2,
         )
@@ -173,17 +171,15 @@ def validate_pipe_cmd(
         # The label is the real class, not the caught base: the entry-shaped lookup raises
         # EntryPipeNotFoundError, whose INPUT domain and hint already ride this envelope from the
         # report. Hardcoding the base name would attribute them to a class that declares neither.
-        agent_error(error_message, error_type=type(exc).__name__, cause=exc, exit_code=2)
+        agent_error(error_message, cause=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict (see the --all arm): structured failure envelope; validation_errors[] is the
         # shared builder's output (a failing dry run rides one located dry_run item per failing pipe).
         agent_error(
             exc.message,
-            error_type="ValidateBundleError",
             cause=exc,
             is_valid=False,
-            validation_errors=extract_validation_errors(exc),
         )
 
     except PipeOperatorModelAvailabilityError as exc:
@@ -195,14 +191,14 @@ def validate_pipe_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra, exit_code=2)
+        agent_error(exc.message, cause=exc, **availability_extra, exit_code=2)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

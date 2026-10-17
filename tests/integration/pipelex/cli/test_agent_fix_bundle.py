@@ -117,10 +117,10 @@ class TestAgentFixBundle:
 
         assert exc_info.value.exit_code == 1
         payload = json.loads(capsys.readouterr().err)
-        assert payload["error_type"] == "FixBundleError"
+        assert payload["code"] == "method.invalid"
         assert payload["is_valid"] is False
         assert payload["fixes_applied"] == []
-        assert payload["remaining_errors"]
+        assert payload["errors"]
 
     def test_signature_only_bundle_exits_one_after_success_payload(
         self,
