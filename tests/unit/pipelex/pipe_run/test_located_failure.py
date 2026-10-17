@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import logging
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, StepKind
@@ -12,44 +12,27 @@ from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.errors.error_codes import error_code_spec
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, merge_locations
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_location, make_problem_item
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault, make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
 
-if TYPE_CHECKING:
-    from mthds.protocol.problem.models import ProblemLocation
-
 
 class _RecoveredProblemError(PipelexError):
-    """Carries a problem recovered across a transport boundary, and reports it as it is, located where it is told."""
+    """Carries a problem recovered across a transport boundary, which it reports as it is, located where it is told."""
 
     def __init__(self, message: str, *, problem: PipelexProblem):
         super().__init__(message)
-        self.recovered_problem = problem
+        self.carried_problem = problem
 
     @override
-    def to_problem(
-        self,
-        *,
-        view: ProblemView,
-        request_id: str | None = None,
-        pipeline_run_id: str | None = None,
-        failure_location: ProblemLocation | None = None,
-    ) -> PipelexProblem:
-        problem = self.recovered_problem
-        if failure_location is not None:
-            problem = problem.model_copy(update={"location": merge_locations(base=problem.location, override=failure_location)})
-        match view:
-            case ProblemView.OPERATOR:
-                return problem
-            case ProblemView.CALLER:
-                return caller_view_of(problem=problem)
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
 def _locate(failure: PipelexError, *, pipe_stack: list[str]) -> PipeRouterError:
@@ -293,3 +276,77 @@ class TestLocatedFailureProblem:
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "PipeRouterError"
         assert problem.diagnostics.message.endswith("combine failed")
+
+    def test_what_the_wrappers_above_a_coded_cause_give_reaches_its_problem(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A wrapper fills a parameter its coded cause did not give, the nearest one winning, and its items follow the cause's."""
+        carrier = (
+            PipeRunError("the template does not parse", run_mode=PipeRunMode.LIVE, pipe_code="summarize")
+            .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
+            .with_params(template="prompt")
+            .with_items(items=[make_problem_item(code=CoreCode.METHOD_TEMPLATE_INVALID, location=make_location(pipe="carrier"))])
+        )
+        wrapper = PipeRunError("summarize failed", run_mode=PipeRunMode.LIVE, pipe_code="summarize").with_params(
+            finding="unexpected '}'", variable="clause"
+        )
+        wrapper.__cause__ = carrier
+        located = (
+            _locate(wrapper, pipe_stack=["flow", "summarize"])
+            .with_params(finding="overridden by the wrapper nearer the cause")
+            .with_items(items=[make_problem_item(code=CoreCode.METHOD_TEMPLATE_INVALID, location=make_location(pipe="router"))])
+        )
+        run_failure = _wrap_in_runner(located, entry_pipe_code="flow").with_items(
+            items=[make_problem_item(code=CoreCode.METHOD_TEMPLATE_INVALID, location=make_location(pipe="runner"))]
+        )
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            caller = run_failure.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.METHOD_TEMPLATE_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"template": "prompt", "finding": "unexpected '}'", "pipe": "summarize"}
+        assert caller.detail == "The template 'prompt' of pipe 'summarize' is invalid (unexpected '}')."
+        assert [item.location.pipe for item in caller.errors or [] if item.location is not None] == ["carrier", "router", "runner"]
+        # `variable` is no parameter of the cause's code: it is dropped, and the raise site that gave it is logged.
+        assert any(record.getMessage() == "An error gives a parameter its code does not declare" for record in caplog.records)
+        # The wrapper reporting itself reads the same parameters as the run does.
+        assert wrapper.to_problem(view=ProblemView.CALLER).params == caller.params
+
+    def test_a_located_wrapper_over_a_foreign_exception_keeps_the_facts_above_it(self) -> None:
+        """An inner router standing for a foreign exception is no carrier of a recovered problem: the runner reports it with the facts above it."""
+        foreign_fault = ConnectionError("socket closed")
+        inner_router = PipeRouterError(
+            message="Pipe 'summarize' failed: socket closed",
+            run_mode=PipeRunMode.LIVE,
+            pipe_code="summarize",
+            output_name=None,
+            pipe_stack=["flow", "summarize"],
+        )
+        inner_router.__cause__ = foreign_fault
+        attributed = LLMCompletionError(message="the completion failed")
+        attributed.__cause__ = inner_router
+        attributed.fill_model_and_provider("gpt-4o-mini", backend_name="openai")
+        run_failure = _wrap_in_runner(attributed, entry_pipe_code="flow")
+
+        assert find_root_fault(error=run_failure) is inner_router
+        assert inner_router.recovered_problem() is None
+        operator = run_failure.to_problem(view=ProblemView.OPERATOR)
+
+        assert operator.code == CoreCode.RUNTIME_UNEXPECTED
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "PipeRouterError"
+        assert operator.diagnostics.model == "gpt-4o-mini"
+        assert operator.diagnostics.provider is not None
+        assert operator.diagnostics.provider.name == "openai"
+        assert operator.location is not None
+        assert operator.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"]}
+
+    def test_a_carrier_reports_its_problem_with_the_request_and_the_run_it_is_handed(self) -> None:
+        """The hook alone makes a carrier: its problem is reported as it is, filling only the members it does not hold."""
+        leaf_problem = CogtError(message="model refused", error_category=InferenceErrorCategory.CONFIGURATION).to_problem(view=ProblemView.OPERATOR)
+        carrier = _RecoveredProblemError("model refused", problem=leaf_problem)
+
+        operator = carrier.to_problem(view=ProblemView.OPERATOR, request_id="req-1", pipeline_run_id="run-1")
+        caller = carrier.to_problem(view=ProblemView.CALLER, request_id="req-1")
+
+        assert operator.to_wire() == {**leaf_problem.to_wire(), "request_id": "req-1", "pipeline_run_id": "run-1"}
+        assert caller.to_wire() == caller_view_of(problem=leaf_problem.model_copy(update={"request_id": "req-1"})).to_wire()

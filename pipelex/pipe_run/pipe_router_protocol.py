@@ -111,8 +111,9 @@ class PipeRouterProtocol(Protocol):
           `PipelexError` carrying the problem, chained to it. It already names its pipe, so this
           router raises it untouched, and the problem reads exactly as the local run's.
 
-        A `PipelexError` carrying a recovered problem overrides `to_problem` to return it, projected to the view asked
-        for (`pipelex.errors.problem.caller_view_of`), with the location it is given.
+        A `PipelexError` carrying a recovered problem overrides `recovered_problem()` to return it, and its `to_problem`
+        reports it projected to the view asked for (`pipelex.errors.problem.recovered_problem_in_view`), with the
+        location it is given.
         """
         if isinstance(error, PipelexError):
             return error

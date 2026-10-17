@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
@@ -11,7 +10,7 @@ from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMComple
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.exceptions import StuffFactoryError
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, merge_locations
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -60,25 +59,11 @@ class _RecoveredProblemCarrierError(PipelexError):
 
     def __init__(self, message: str, *, problem: PipelexProblem):
         super().__init__(message)
-        self.recovered_problem = problem
+        self.carried_problem = problem
 
     @override
-    def to_problem(
-        self,
-        *,
-        view: ProblemView,
-        request_id: str | None = None,
-        pipeline_run_id: str | None = None,
-        failure_location: ProblemLocation | None = None,
-    ) -> PipelexProblem:
-        problem = self.recovered_problem
-        if failure_location is not None:
-            problem = problem.model_copy(update={"location": merge_locations(base=problem.location, override=failure_location)})
-        match view:
-            case ProblemView.OPERATOR:
-                return problem
-            case ProblemView.CALLER:
-                return caller_view_of(problem=problem)
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
 class _RelocatingHostRouter(_StubPipeRouter):

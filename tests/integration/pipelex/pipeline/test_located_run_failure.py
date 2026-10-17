@@ -10,7 +10,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.config import get_config
 from pipelex.errors.error_codes import error_code_spec
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -23,7 +23,6 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.pipeline.test_data import LocatedRunFailureTestData
 
 if TYPE_CHECKING:
-    from mthds.protocol.problem.models import ProblemLocation
 
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -53,20 +52,11 @@ class _RecoveredProblemError(PipelexError):
 
     def __init__(self, message: str, *, recovered_problem: PipelexProblem):
         super().__init__(message)
-        self.recovered_problem = recovered_problem
+        self.carried_problem = recovered_problem
 
     @override
-    def to_problem(
-        self,
-        *,
-        view: ProblemView,
-        request_id: str | None = None,
-        pipeline_run_id: str | None = None,
-        failure_location: ProblemLocation | None = None,
-    ) -> PipelexProblem:
-        if view.shows_diagnostics:
-            return self.recovered_problem
-        return caller_view_of(problem=self.recovered_problem)
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
 class _RecoveredProblemPipeRun(PipeRunProtocol):

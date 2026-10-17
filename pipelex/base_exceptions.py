@@ -29,6 +29,7 @@ from pipelex.errors.problem import (
     cap_problem_text,
     make_problem,
     merge_locations,
+    recovered_problem_in_view,
     runtime_version,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -479,6 +480,25 @@ class PipelexError(Exception):
         """
         return list(self._given_items) if self._given_items else None
 
+    def recovered_problem(self) -> PipelexProblem | None:
+        """The problem this error carries from across a transport boundary, in the operator's view; ``None`` for any other error.
+
+        A host plugin's carrier of a problem a far worker packed overrides it, and is the only kind of error that does:
+        :meth:`to_problem` then reports that problem rather than one built from the carrier's class
+        (:func:`pipelex.errors.problem.recovered_problem_in_view`), and a located wrapper above the carrier reports it as
+        it is (``pipelex.pipe_run.located_failure``). Overriding :meth:`to_problem` for any other reason makes no carrier.
+        """
+        return None
+
+    def _errors_above(self, *, carrier: "PipelexError") -> list["PipelexError"]:
+        """The errors from this one down to ``carrier``, ``carrier`` left out, this one first; empty when the chain never reaches it."""
+        errors: list[PipelexError] = []
+        for node in iter_pipelex_cause_chain(self):
+            if node is carrier:
+                return errors
+            errors.append(node)
+        return []
+
     def problem_facts(self) -> ProblemFacts:
         """The facts this error itself holds for its problem's diagnostics; a subclass that holds some overrides it."""
         return ProblemFacts()
@@ -533,7 +553,8 @@ class PipelexError(Exception):
         """This error as a problem document, in the view of its reader.
 
         The code is :meth:`resolve_error_code`'s, and everything the code decides is the registry's. The rest is
-        :meth:`problem_reported_by`'s, this error being its own reporter.
+        :meth:`problem_reported_by`'s, this error being its own reporter. An error carrying a problem recovered across a
+        transport boundary (:meth:`recovered_problem`) reports that problem instead, in the view asked for.
 
         Args:
             view: The view of the reader the problem is built for, picked by the identity the boundary authenticated.
@@ -544,6 +565,11 @@ class PipelexError(Exception):
         Returns:
             The problem.
         """
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            return recovered_problem_in_view(
+                problem=recovered, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
+            )
         return self.problem_reported_by(
             reporter=self, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
         )
@@ -563,9 +589,12 @@ class PipelexError(Exception):
         (``pipelex.pipe_run.located_failure``), and those wrappers may know what the root fault does not, so the problem
         is this error's, read along the reporter's chain:
 
-        - the code is this error's (:meth:`resolve_error_code`), and the parameters and the items are those of the error
-          whose code it is (:meth:`code_carrier`) and of the first error along this error's chain that refuses several
-          faults;
+        - the code is this error's (:meth:`resolve_error_code`), and the parameters are those of the error whose code it
+          is (:meth:`code_carrier`): the facts it holds and the parameters its raise site gave, then, for a parameter it
+          gives none of, the one the nearest error between the reporter and it gave with :meth:`with_params`, a
+          parameter its code does not declare being dropped and logged;
+        - the items are those of the first error at or below the error whose code it is that refuses several faults,
+          then those each error between the reporter and it refuses, the nearest it first;
         - the location is assembled from the reporter down to the error whose code it is, each error's own location
           winning over those above it member by member, so a wrapper that knows the pipe, the field or the file a cause
           was met at locates a cause that does not; the location of the failing pipe a run found (``failure_location``)
@@ -586,10 +615,20 @@ class PipelexError(Exception):
         """
         code = self.resolve_error_code()
         carrier = self.code_carrier()
+        # The wrappers between the reporter and the error whose code the problem reports, the reporter first.
+        wrappers = reporter._errors_above(carrier=carrier)
         facts = reporter.chain_facts()
         spec = error_code_spec(code)
-        params = {name: value for name, value in carrier.problem_params().items() if name in spec.param_names}
+        params: dict[str, Any] = {}
+        for wrapper in wrappers:
+            # Given in order from the reporter down, so a wrapper nearer the carrier wins over one above it; checked
+            # against the carrier's code when the problem is built, an undeclared one being dropped and logged.
+            params.update(wrapper.given_params)
+        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names})
         params.update(carrier.given_params)
+        items = list(carrier._chain_items() or [])
+        for wrapper in reversed(wrappers):
+            items.extend(wrapper.problem_items() or [])
         location = reporter.chain_location(carrier=carrier)
         if failure_location is not None:
             location = merge_locations(base=location, override=failure_location)
@@ -604,7 +643,7 @@ class PipelexError(Exception):
             view=view,
             params=params,
             location=location,
-            errors=self._chain_items(),
+            errors=items or None,
             retry_after=facts.retry_after,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,

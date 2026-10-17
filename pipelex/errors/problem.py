@@ -700,6 +700,45 @@ def caller_view_of(*, problem: PipelexProblem) -> PipelexProblem:
     return PipelexProblem.model_validate(members)
 
 
+def recovered_problem_in_view(
+    *,
+    problem: PipelexProblem,
+    view: ProblemView,
+    request_id: str | None = None,
+    pipeline_run_id: str | None = None,
+    failure_location: ProblemLocation | None = None,
+) -> PipelexProblem:
+    """A problem recovered across a transport boundary, as the error carrying it reports it in a view.
+
+    The problem was built on the far side, in the operator's view, so it is taken as it is: the location a run found
+    for it is merged over its own, the run's failing pipe and path winning; the request and the run fill the members
+    it does not hold; and a caller reads its caller view (:func:`caller_view_of`).
+
+    Args:
+        problem: The recovered problem, in the operator's view.
+        view: The view of the reader the problem is reported to.
+        request_id: The request that carried the failure, when known.
+        pipeline_run_id: The run the failure belongs to, when one exists.
+        failure_location: Where a run's failing pipe is, when the failure was located at a pipe.
+
+    Returns:
+        The problem in the view asked for.
+    """
+    update: dict[str, Any] = {}
+    if failure_location is not None:
+        update["location"] = merge_locations(base=problem.location, override=failure_location)
+    if request_id is not None and problem.request_id is None:
+        update["request_id"] = request_id
+    if pipeline_run_id is not None and problem.pipeline_run_id is None:
+        update["pipeline_run_id"] = pipeline_run_id
+    reported = problem.model_copy(update=update) if update else problem
+    match view:
+        case ProblemView.OPERATOR:
+            return reported
+        case ProblemView.CALLER:
+            return caller_view_of(problem=reported)
+
+
 def _unknown_code_caller_step(*, problem: PipelexProblem) -> NextStep:
     """The caller's step of a problem whose code this process's registries do not hold, naming no parameter.
 

@@ -14,10 +14,12 @@ wrong, and each takes its cause's code. The problem of such a failure is therefo
 - its `location` names the failing pipe and its path from the entry pipe, as members rather than a prefix of
   any sentence, and a code that declares a `pipe` parameter is given the failing pipe.
 
-A root fault whose problem was recovered across a transport boundary (a problem carried by a `PipelexError`,
-the way a distributed worker's submitter carries it) is taken as it is: at the runner, with no location on the
-chain, it is reported unchanged, and a host router packs the root fault's own problem with its location rather
-than a located problem (see `PipeRouterProtocol._as_pipelex_failure`), so nothing is located twice.
+A root fault whose problem was recovered across a transport boundary (a problem carried by a `PipelexError` whose
+`recovered_problem()` returns it, the way a distributed worker's submitter carries it) is taken as it is: at the
+runner, with no location on the chain, it is reported unchanged, and a host router packs the root fault's own problem
+with its location rather than a located problem (see `PipeRouterProtocol._as_pipelex_failure`), so nothing is located
+twice. Any other root fault, a located wrapper standing for a foreign exception included, is reported as the outer
+wrapper reports it, so the facts and locations of the errors between the two reach the problem.
 """
 
 from mthds.protocol.problem.models import ProblemLocation
@@ -154,11 +156,12 @@ def located_problem(
 ) -> PipelexProblem:
     """The problem a located wrapper reports: its root fault's, located at the failing pipe.
 
-    A root fault that builds its own problem, by overriding `to_problem` as a carrier of a problem recovered across a
-    transport boundary does, reports that problem as it is, located at `failure_location`. Any other root fault's
-    problem is built as the wrapper reports it (`PipelexError.problem_reported_by`), so the facts and the location the
-    errors between the two hold, such as the model and the backend a worker attributed a failure to on a wrapper that
-    takes its cause's code, reach the problem.
+    A root fault carrying a problem recovered across a transport boundary (`PipelexError.recovered_problem`) reports
+    that problem as it is, located at `failure_location`. Any other root fault's problem is built as the wrapper
+    reports it (`PipelexError.problem_reported_by`), so the facts and the location the errors between the two hold,
+    such as the model and the backend a worker attributed a failure to on a wrapper that takes its cause's code, reach
+    the problem. That holds for a root fault that overrides `to_problem` for another reason too, such as an inner
+    `PipeRouterError` standing for a foreign exception under the runner's `PipelineExecutionError`.
 
     Args:
         wrapper: The located wrapper, a `PipeRouterError` or a `PipelineExecutionError`.
@@ -171,7 +174,7 @@ def located_problem(
     Returns:
         The problem.
     """
-    if type(root_fault).to_problem is not PipelexError.to_problem:
+    if root_fault.recovered_problem() is not None:
         return root_fault.to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location)
     return root_fault.problem_reported_by(
         reporter=wrapper, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
