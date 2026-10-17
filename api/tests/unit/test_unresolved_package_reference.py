@@ -14,7 +14,6 @@ import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ValidationErrorCategory
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -26,7 +25,7 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
-from tests.unit._constants import UNRESOLVED_PACKAGE_MTHDS, UNRESOLVED_PACKAGE_REFERENCE, VENDORED_PROBE_ADDRESS
+from tests.unit._constants import UNRESOLVED_PACKAGE_MTHDS, VENDORED_PROBE_ADDRESS
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -70,15 +69,12 @@ def _build_client(mocker: MockerFixture, *, tmp_path: Path, view: ProblemView, o
 
 
 def _assert_the_package_item(items: list[dict[str, Any]]) -> None:
-    assert len(items) == 1, items
-    item = items[0]
-    assert item["category"] == ValidationErrorCategory.PIPE_VALIDATION
-    assert item["error_type"] == "unresolved_package_dependency"
-    assert item["pipe_code"] == "echo"
-    assert item["domain_code"] == "smoke"
-    assert item["missing_pipe_code"] == UNRESOLVED_PACKAGE_REFERENCE
-    assert item["field_path"] == "pipe.echo.steps[0].pipe"
-    assert "github.com/invented/probe-lib/probe" in item["message"]
+    """The one item of a method calling a package it cannot reach: located on the step, naming the package and why."""
+    (item,) = items
+    assert item["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+    assert item["location"] == {"pipe": "echo", "field": "pipe.echo.steps[0].pipe"}
+    # The caller reads which package the method calls and why it is not there, from the code's parameters.
+    assert item.get("params") == {"kind": "package", "name": VENDORED_PROBE_ADDRESS, "reason": "not_found"}
 
 
 class TestUnresolvedPackageReference:
@@ -91,7 +87,7 @@ class TestUnresolvedPackageReference:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        _assert_the_package_item(body["validation_errors"])
+        _assert_the_package_item(body["errors"])
 
     @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
     @pytest.mark.parametrize("path", ["/v1/execute", "/v1/start"])
@@ -106,11 +102,7 @@ class TestUnresolvedPackageReference:
         body = response.json()
         assert body["code"] == CoreCode.METHOD_INVALID
         assert body["domain"] == "method"
-        (item,) = body["errors"]
-        assert item["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
-        assert item["location"] == {"pipe": "echo", "field": "pipe.echo.steps[0].pipe"}
-        # The caller reads which package the method calls and why it is not there, from the code's parameters.
-        assert item.get("params") == {"kind": "package", "name": VENDORED_PROBE_ADDRESS, "reason": "not_found"}
+        _assert_the_package_item(body["errors"])
         match view:
             case ProblemView.OPERATOR:
                 assert body["diagnostics"]["error_class"] == "ValidateBundleError"

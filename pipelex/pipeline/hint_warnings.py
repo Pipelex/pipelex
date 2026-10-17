@@ -180,21 +180,24 @@ class _HintLinter:
         field_name: str | None = None,
         variable_names: list[str] | None = None,
     ) -> list[ValidationErrorItem]:
-        findings: list[tuple[HintLintErrorType, str]] = []
+        # Each finding with the hint key it is about, elided as its message quotes it.
+        findings: list[tuple[HintLintErrorType, str, str]] = []
         unknown_keys = [key for key in hints if key not in KNOWN_HINT_KEYS]
         for key in unknown_keys[:MAX_HINT_FINDINGS_PER_SITE]:
             unknown_key_message = (
                 f"Hint key '{elide_authored_token(token=key)}' on {site_desc} is not defined by this version of the standard "
                 f"(known keys: {', '.join(sorted(KNOWN_HINT_KEYS))}). The entry is preserved; consumers ignore it."
             )
-            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, unknown_key_message))
+            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, unknown_key_message, elide_authored_token(token=key)))
         overflow = len(unknown_keys) - MAX_HINT_FINDINGS_PER_SITE
         if overflow > 0:
             overflow_message = (
                 f"...and {overflow} more hint key(s) on {site_desc} are not defined by this version of the standard. "
                 f"The entries are preserved; consumers ignore them."
             )
-            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, overflow_message))
+            # The finding stands for every key past the cap, and names the first of them.
+            first_overflow_key = elide_authored_token(token=unknown_keys[MAX_HINT_FINDINGS_PER_SITE])
+            findings.append((HintLintErrorType.HINT_UNKNOWN_KEY, overflow_message, first_overflow_key))
         intent_word = hints.get(INTENT_HINT_KEY)
         if intent_word is not None:
             if not is_intent_word_known(intent_word):
@@ -202,7 +205,7 @@ class _HintLinter:
                     f"Intent word '{elide_authored_token(token=intent_word)}' on {site_desc} is not in this version's vocabulary "
                     f"(prose, label, rating, quantity). The entry is preserved; consumers ignore it."
                 )
-                findings.append((HintLintErrorType.HINT_UNKNOWN_INTENT, unknown_intent_message))
+                findings.append((HintLintErrorType.HINT_UNKNOWN_INTENT, unknown_intent_message, INTENT_HINT_KEY))
             elif not intent_word_applies(known_word := IntentWord(intent_word), site_kind=site_kind):
                 match known_word:
                     case IntentWord.PROSE | IntentWord.LABEL:
@@ -213,7 +216,7 @@ class _HintLinter:
                     f"Intent word '{elide_authored_token(token=intent_word)}' does not apply to {site_desc} (the site is not "
                     f"{needed_kind}-valued). The entry is preserved; consumers ignore it there."
                 )
-                findings.append((HintLintErrorType.HINT_INAPPLICABLE_INTENT, inapplicable_message))
+                findings.append((HintLintErrorType.HINT_INAPPLICABLE_INTENT, inapplicable_message, INTENT_HINT_KEY))
         return [
             ValidationErrorItem(
                 category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
@@ -224,8 +227,9 @@ class _HintLinter:
                 pipe_code=pipe_code,
                 field_name=field_name,
                 variable_names=variable_names,
+                hint_key=hint_key,
             )
-            for error_type, message in findings
+            for error_type, message, hint_key in findings
         ]
 
     # ---- Site classification (spec: Applicability) ------------------------------------------------

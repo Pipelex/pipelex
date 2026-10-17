@@ -33,6 +33,7 @@ from pipelex.errors.problem import (
     runtime_version,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.suggested_fix import SuggestedFix
 from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_span_context_for_logs
 from pipelex.validation_error_types import ValidationErrorType
@@ -56,6 +57,29 @@ def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
         seen.add(id(node))
         yield node
         node = node.__cause__
+
+
+def iter_traceback_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Yield ``exc`` and each exception a traceback of it prints, outermost first, exactly once.
+
+    The walk a traceback makes, where :func:`iter_cause_chain` follows ``__cause__`` alone: an explicit cause
+    (``raise ... from``) is followed, else the exception being handled when it was raised, ``__context__``, unless the
+    raise suppressed it (``from None``). It is for a reader that must account for everything a traceback would print
+    of a failure, such as a log record naming the chain's classes in place of the traceback, or a classifier looking
+    for a transport failure anywhere below the error it received. Cycle-guarded like :func:`iter_cause_chain`, since it
+    runs on the error path.
+    """
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        yield node
+        if node.__cause__ is not None:
+            node = node.__cause__
+        elif node.__suppress_context__:
+            node = None
+        else:
+            node = node.__context__
 
 
 def iter_pipelex_cause_chain(exc: BaseException) -> Iterator["PipelexError"]:
@@ -221,6 +245,9 @@ class ValidationErrorItem(BaseModel):
     # (a defined name, a Table, a cell, a shape, a tag). Optional and additive, like ``declared_concepts``.
     template_file: str | None = None
     template_location: str | None = None
+    # The hint locator, carried by a hint lint item: the hint key the finding is about, elided as its message quotes it,
+    # which its problem item names as the code's ``hint`` parameter. Optional and additive, like ``declared_concepts``.
+    hint_key: str | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.
@@ -283,6 +310,9 @@ class PipelexError(Exception):
     _given_params: dict[str, Any] | None = None
     # The items the raise site gave with :meth:`with_items`, one per fault of a refusal of several.
     _given_items: list[ProblemItem] | None = None
+    # The class of destination a security refusal refused, stated by the raise site with
+    # :meth:`with_security_target_class`; the security event carries it and nothing else about the target.
+    _security_target_class: SecurityTargetClass | None = None
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -368,6 +398,28 @@ class PipelexError(Exception):
     def given_params(self) -> dict[str, Any]:
         """The parameters the raise site gave with :meth:`with_params`."""
         return dict(self._given_params or {})
+
+    def with_security_target_class(self, target_class: SecurityTargetClass | None) -> Self:
+        """State, where a security refusal is decided, which class of destination it refused.
+
+        The security event (:mod:`pipelex.errors.security_event`) names that class, a loopback or a private address,
+        a cloud metadata endpoint, a scheme the runtime does not read, and never the destination itself. Only the
+        raise site knows it: the SSRF guard has the address in hand, the read scope the reason. ``None`` leaves the
+        class unknown, for a site that refused something it cannot classify, such as a name that resolved to nothing.
+
+        Args:
+            target_class: The class of destination refused, or ``None`` when the site cannot tell.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_security_target_class(target_class)``.
+        """
+        self._security_target_class = target_class
+        return self
+
+    @property
+    def security_target_class(self) -> SecurityTargetClass | None:
+        """The class of destination this security refusal refused, ``None`` when nobody stated it."""
+        return self._security_target_class
 
     @property
     def own_error_code(self) -> ErrorCode | None:

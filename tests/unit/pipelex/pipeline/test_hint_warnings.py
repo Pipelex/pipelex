@@ -38,12 +38,16 @@ class TestHintLintFindings:
         assert warning.concept_code == "Essay"
         assert warning.domain_code == "docs"
         assert "emphasis" in warning.message
+        # The key the finding is about, which its problem item names as `method.hint_invalid`'s `hint`.
+        assert warning.hint_key == "emphasis"
 
     def test_unknown_intent_word_warns(self):
         warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints={"intent": "poetry"})}))
         assert len(warnings) == 1
         assert warnings[0].error_type == HintLintErrorType.HINT_UNKNOWN_INTENT
         assert "poetry" in warnings[0].message
+        # An intent finding is about the `intent` key, whatever word it holds.
+        assert warnings[0].hint_key == "intent"
 
     def test_choice_field_is_not_a_text_site(self):
         """Choices dominate the declared type (the deriver emits an enum), so a text intent on a
@@ -153,6 +157,8 @@ class TestHintLintFindings:
         assert len(warnings) == MAX_HINT_FINDINGS_PER_SITE + 1
         assert all(warning.error_type == HintLintErrorType.HINT_UNKNOWN_KEY for warning in warnings)
         assert warnings[-1].message.startswith("...and 4 more hint key(s) on concept 'docs.Essay'")
+        # The tail stands for every key past the cap and names the first of them.
+        assert warnings[-1].hint_key == f"key_{MAX_HINT_FINDINGS_PER_SITE:02d}"
 
     def test_exactly_the_cap_reports_every_key_with_no_tail(self):
         hints = {f"key_{index:02d}": "value" for index in range(MAX_HINT_FINDINGS_PER_SITE)}
@@ -180,6 +186,8 @@ class TestHintLintFindings:
         assert len(warnings) == 1
         assert long_key not in warnings[0].message
         assert f"'{'k' * MAX_AUTHORED_TOKEN_LENGTH}...'" in warnings[0].message
+        # The key rides elided, as the message quotes it.
+        assert warnings[0].hint_key == f"{'k' * MAX_AUTHORED_TOKEN_LENGTH}..."
 
     def test_a_long_authored_intent_value_is_elided_in_the_message(self):
         long_word = "w" * (MAX_AUTHORED_TOKEN_LENGTH + 50)

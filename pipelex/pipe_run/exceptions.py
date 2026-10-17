@@ -10,6 +10,7 @@ from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDecla
 from pipelex.errors.error_codes import ErrorCode, error_code_spec, first_fault_code
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_location, make_problem_item
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.errors.security_event import security_target_kind
 from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -95,9 +96,11 @@ class DryRunError(PipelexError):
     validation reports each as its own ``dry_run`` item, with the error type ``DryRunError``, the pipe's code,
     domain and source, and the sentence the failure's code renders for a caller.
 
-    With failures, its code is the one the answer takes among theirs (``first_fault_code``), and its problem carries
-    one item per failure; a validation answers it as an invalid verdict only when one of them is the method's. Raised
-    elsewhere it may carry no failures, and then it takes the code of its cause, the failure it reports.
+    With failures, its code is the one the answer takes among theirs (``first_fault_code``), a security refusal's
+    before any other, so that a refusal a security rule made is answered under its code wherever it sits among the
+    failures, and its problem carries one item per failure; a validation answers it as an invalid verdict only when one
+    of them is the method's and none is a security refusal. Raised elsewhere it may carry no failures, and then it takes
+    the code of its cause, the failure it reports.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -107,9 +110,15 @@ class DryRunError(PipelexError):
         super().__init__(message)
 
     @property
+    def security_failure_codes(self) -> list[ErrorCode]:
+        """The codes of its failures that a security rule refused, in the order the sweep found them."""
+        return [failure.code for failure in self.failures if security_target_kind(code=failure.code) is not None]
+
+    @property
     @override
     def own_error_code(self) -> ErrorCode | None:
-        return first_fault_code(codes=[failure.code for failure in self.failures]) or super().own_error_code
+        codes = self.security_failure_codes or [failure.code for failure in self.failures]
+        return first_fault_code(codes=codes) or super().own_error_code
 
     @override
     def problem_items(self) -> list[ProblemItem] | None:

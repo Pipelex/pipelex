@@ -12,8 +12,7 @@ from fastapi import APIRouter
 from mthds.protocol.protocol import PROTOCOL_VERSION
 from pipelex.pipeline.runner import PipelexVersionInfo
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_internal_server_error
+from pipelex_api.exceptions import RunnerMisconfiguredError
 from pipelex_api.openapi_responses import PROBLEM_500
 
 router = APIRouter(tags=["discovery"])
@@ -44,7 +43,8 @@ async def get_version() -> PipelexVersionInfo:
         implementation_version = version(IMPLEMENTATION_NAME)
         runtime_version = version("pipelex")
     except PackageNotFoundError as exc:
-        raise_internal_server_error(f"Package metadata is not available: {exc}", error_type=ErrorType.PACKAGE_NOT_FOUND)
+        msg = f"Package metadata is not available: {exc}"
+        raise RunnerMisconfiguredError(msg, component="package_metadata") from exc
     return PipelexVersionInfo(
         protocol_version=PROTOCOL_VERSION,
         runner_version=implementation_version,

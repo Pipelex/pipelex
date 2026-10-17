@@ -19,6 +19,7 @@ from pytest_mock import MockerFixture
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, SIBLING_MTHDS, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 
 def _build_client() -> TestClient:
@@ -55,10 +56,11 @@ class TestResolveRoute:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"], "an invalid verdict must carry a non-empty validation_errors[]"
-        assert body["validation_errors"][0]["message"]
-        # The per-file source threads through to the diagnostics.
-        assert body["validation_errors"][0]["source"] == "broken.mthds"
+        assert body["errors"], "an invalid verdict must carry a non-empty errors[]"
+        assert body["errors"][0]["code"]
+        assert body["errors"][0]["detail"]
+        # The per-file source threads through to the items' location.
+        assert body["errors"][0]["location"]["file"] == "broken.mthds"
         # No crate exists on the invalid arm; the runnability facts are /validate vocabulary, absent here.
         assert "crate" not in body
         assert "is_runnable" not in body
@@ -78,30 +80,27 @@ class TestResolveRoute:
         # The package's real file name rides the crate's provenance map.
         assert crate["source_map"]["smoke.echo"] == "documents.mthds"
 
-    def test_registry_form_method_ref_keeps_the_501(self):
+    def test_registry_form_method_ref_is_an_unsupported_request(self):
         # The registry form (any non-address reference) stays reserved for the packaging
-        # program's closing phase — an honest 501, never a silent empty verdict.
+        # program's closing phase — an honest refusal of the form, never a silent empty verdict.
         client = _build_client()
         response = client.post("/v1/resolve", json={"method_ref": "acme/invoice-tools"})
-        assert response.status_code == 501, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "MethodRefNotSupported"
+        problem = assert_problem(response, status=422, code="request.unsupported")
+        assert problem["params"] == {"field": "method_ref", "reason": "registry_form_method_ref"}
 
     def test_neither_or_both_selectors_is_422_problem_json(self):
         client = _build_client()
         neither = client.post("/v1/resolve", json={})
         both = client.post("/v1/resolve", json={"files": [{"content": VALID_MTHDS}], "method_ref": "acme/x"})
-        for response in (neither, both):
-            assert response.status_code == 422, response.text
-            assert response.headers["content-type"] == "application/problem+json"
-            assert response.json()["error_type"] == "ValidationError"
+        # The model's rule names the field to change, never the body as a whole: the first selector when none is sent,
+        # the second when both are.
+        assert_problem(neither, status=422, code="request.invalid", field="files")
+        assert_problem(both, status=422, code="request.invalid", field="method_ref")
 
     def test_oversized_file_is_422_problem_json(self):
         client = _build_client()
         response = client.post("/v1/resolve", json={"files": [{"content": "a" * (2 * 1024 * 1024)}]})
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid")
 
     def test_resolve_tears_down_its_library(self, mocker: MockerFixture):
         # The engine core leaves the library loaded + current on success (so /codegen can read live

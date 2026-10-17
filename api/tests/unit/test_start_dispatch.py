@@ -5,7 +5,7 @@ Fire-and-forget vs blocking is the ENDPOINT's delivery axis, never configured: `
 checks the resolved `orchestration_mode`'s orchestrator BEFORE any library load: an async-capable
 orchestrator (`supports_fire_and_forget=True`, e.g. `temporal`) acks `202` with its `workflow_id`,
 while a blocking-only orchestrator (`supports_fire_and_forget=False`, e.g. the in-process `direct`
-base) is refused HONESTLY with a `400` (`StartRequiresAsyncOrchestration`) instead of silently
+base) is refused HONESTLY with a `501` (`runtime.unsupported`, naming the capability) instead of silently
 running blocking and acking. This pins both arms end-to-end on `POST /start`, with a stub orchestrator
 registered under the resolved mode (the boot slot is never used).
 """
@@ -22,6 +22,7 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -91,9 +92,9 @@ class TestStartCapabilityGate:
         # /start drives the fire-and-forget `start` arm exactly once — the caller never chooses delivery.
         assert len(stub.calls) == 1
 
-    def test_start_honestly_400s_when_orchestrator_is_blocking_only(self, mocker: MockerFixture) -> None:
+    def test_start_honestly_501s_when_orchestrator_is_blocking_only(self, mocker: MockerFixture) -> None:
         # The orchestrator-agnostic base (`direct`) is blocking-only: /start refuses honestly with a
-        # 400 BEFORE any dispatch (the capability check runs before pipeline_run_setup), so the stub's
+        # 501 BEFORE any dispatch (the capability check runs before pipeline_run_setup), so the stub's
         # `execute` is never awaited — no silent block-and-ack.
         _force_config(mocker, mode="direct")
         # workflow_id is a placeholder: the blocking-only backend is refused before `start` is ever
@@ -106,7 +107,6 @@ class TestStartCapabilityGate:
             json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hello"}},
         )
 
-        assert response.status_code == 400, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert response.json()["error_type"] == "StartRequiresAsyncOrchestration"
+        problem = assert_problem(response, status=501, code="runtime.unsupported")
+        assert problem["params"] == {"capability": "asynchronous execution"}
         assert stub.calls == []

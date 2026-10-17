@@ -8,22 +8,24 @@ one — owns it. `RunRequest` / `StartRequest` are defined here, not imported.
 
 from __future__ import annotations
 
-from ipaddress import ip_address
 from typing import Annotated, Any, Self
 from urllib.parse import urlparse
 
 from mthds.protocol.pipe_output import VariableMultiplicity
 from mthds.protocol.pipeline_inputs import PipelineInputs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.methods.fetching import MethodProvenance
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.reporting.usage_records import TokensUsageRecord
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope
+from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.functional_validators import SkipValidation
 
+from pipelex_api.exceptions import CallbackUrlRefusedError, RequestFieldConflictError
 from pipelex_api.limits import (
     DEFAULT_MAX_RESOURCE_FILE_KIB,
     DEFAULT_MAX_RESOURCES_PER_REQUEST,
@@ -70,9 +72,10 @@ FILES_FIELD_DESCRIPTION = (
     'value is the file\'s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size": ...}` '
     "naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`). The "
     "map is read from the request's JSON text: a key given twice, a key the membership rule keeps out of every tree "
-    "(`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal` names "
-    "the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` "
-    "lists every such hash. Its `.mthds` files are the method's bundles and every other file is one a step may read, "
+    "(`.mthds/` included) and colliding keys are a 422 `method.package_invalid` whose `reason` is the refusal's code and "
+    "whose `path` names the first path, a key leaving the tree is a 422 `security.input_path_refused`, a malformed entry "
+    "is a 422 `request.invalid`, and hash entries the runner does not hold are one 422 `request.blobs_missing` whose "
+    "`missing_blobs` parameter lists every such hash. Its `.mthds` files are the method's bundles and every other file is one a step may read, "
     "such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the "
     "`METHODS.toml` at the tree's root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored "
     "on a sandbox-hosted deployment."
@@ -388,7 +391,8 @@ _ORCHESTRATION_MODE_DESCRIPTION = (
     "plugin-provided token are accepted; an unregistered token is refused at dispatch. The delivery axis "
     "(blocking vs fire-and-forget) is endpoint-set, never requestable. Honored ONLY when the deployment sets "
     "`allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token that differs from "
-    "the deployment default is refused with a 403. Omit it to use the deployment default."
+    "the deployment default is refused with a 422 `pipelex.deployment.orchestration_override_forbidden`. Omit it to use "
+    "the deployment default."
 )
 
 
@@ -396,22 +400,15 @@ _ALLOWED_CALLBACK_SCHEMES = frozenset({"http", "https"})
 
 
 def _is_disallowed_host(host: str) -> bool:
-    """True if `host` looks like a private/loopback/link-local address.
+    """True if `host` is a destination a completion callback must not reach: the runtime's own SSRF rule.
 
-    Used to harden /start callback_urls against SSRF — a malicious
-    client could otherwise aim webhooks at internal services or cloud metadata
-    endpoints (e.g. 169.254.169.254). Best-effort: hostnames that resolve to
-    private addresses at fire time aren't blocked here, only literal IPs.
+    Used to harden /start callback_urls against SSRF — a malicious client could otherwise aim webhooks at internal
+    services or cloud metadata endpoints (e.g. 169.254.169.254). The rule is the one the delivery-time guard applies
+    when the webhook fires, `pipelex.tools.network.host_rules`, so a spelling the guard refuses at fire time (an
+    uppercase or trailing-dot alias, a carrier-grade NAT address) is refused here first. Best-effort: hostnames that
+    resolve to private addresses at fire time aren't blocked here, only literal IPs and the known internal names.
     """
-    if not host:
-        return True
-    if host in {"localhost", "metadata.google.internal", "metadata"}:
-        return True
-    try:
-        addr = ip_address(host)
-    except ValueError:
-        return False
-    return addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_multicast or addr.is_reserved or addr.is_unspecified
+    return is_disallowed_host(host)
 
 
 class PipelineApiExtras(BaseModel):
@@ -493,12 +490,24 @@ class PipelineApiExtras(BaseModel):
                 msg = f"callback URL exceeds {MAX_CALLBACK_URL_LEN} chars"
                 raise ValueError(msg)
             parsed = urlparse(url)
+            # A URL with no scheme or no host is malformed, the shape of the field, which a plain `ValueError` refuses
+            # with no security event. A scheme other than http or https, and a host the SSRF rule refuses, are a security
+            # rule's refusals, so each states the class of destination its security event names.
+            if not parsed.scheme:
+                msg = "callback URL must be an absolute http or https URL, starting with its scheme"
+                raise ValueError(msg)
             if parsed.scheme not in _ALLOWED_CALLBACK_SCHEMES:
                 msg = f"callback URL scheme must be http or https (got {parsed.scheme!r})"
+                raise CallbackUrlRefusedError(msg).with_security_target_class(SecurityTargetClass.SCHEME)
+            host = parsed.hostname
+            # A host of dots alone, such as `.`, is empty once the SSRF rule drops a trailing dot, so it names no host
+            # either, and no class of destination a security event could state.
+            if not host or not host.rstrip("."):
+                msg = "callback URL must name a host"
                 raise ValueError(msg)
-            if _is_disallowed_host(parsed.hostname or ""):
+            if _is_disallowed_host(host):
                 msg = f"callback URL host {parsed.hostname!r} is not allowed (private/loopback/metadata addresses are blocked)"
-                raise ValueError(msg)
+                raise CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
         return value
 
 
@@ -647,12 +656,13 @@ class MthdsFilesRequest(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
+        # Each refusal names the field to change: the second selector when both are sent, the first when none is.
         if (self.files is None) == (self.method_ref is None):
             msg = "provide exactly one of `files` or `method_ref`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="method_ref" if self.method_ref is not None else "files")
         if self.resources and self.method_ref is not None:
             msg = "resources accompany inline `files`; a method_ref's files are the package's own"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="resources")
         return self
 
 
@@ -665,9 +675,8 @@ class MthdsPipeRequest(MthdsFilesRequest):
     entry pipe); otherwise to the closure's declared `main_pipe`, which is what a single-bundle caller
     almost always wants. A closure that declares no `main_pipe` — or several, across domains — cannot
     be defaulted from its own declarations, so when no manifest `main_pipe` settles it a route that
-    needs one pipe refuses the omitted selector with an input 422, `EntryPipeNotFoundError` or
-    `EntryPipeAmbiguousError` (`crate_ops.resolve_requested_pipe`), never the request-shape
-    `ValidationError` of a malformed body.
+    needs one pipe refuses the omitted selector with an input 422 named for its failure
+    (`crate_ops.resolve_requested_pipe`), never the request-shape `request.invalid` of a malformed body.
     """
 
     pipe_ref: str | None = Field(
@@ -746,11 +755,16 @@ class MthdsContentsRequest(BaseModel):
     def _exactly_one_content_selector(self) -> Self:
         # Strict XOR (the addressing design's tooling-route rule): a stateless diagnostic call
         # has no linkage slot, so a second selector could only be ignored — refuse it instead.
-        selectors = [self.mthds_contents, self.files, self.method_ref]
-        if sum(selector is not None for selector in selectors) != 1:
+        # Each refusal names the field to change: the second selector sent, or the first when none is.
+        sent = [
+            name
+            for name, selector in (("mthds_contents", self.mthds_contents), ("files", self.files), ("method_ref", self.method_ref))
+            if selector is not None
+        ]
+        if len(sent) != 1:
             msg = "provide exactly one of `mthds_contents`, `files` or `method_ref`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field=sent[1] if sent else "mthds_contents")
         if self.dependencies is not None and self.files is None:
             msg = "`dependencies` accompany the method's own `files`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="dependencies")
         return self

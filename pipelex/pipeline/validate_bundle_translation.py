@@ -31,7 +31,8 @@ from pipelex.core.pipes.exceptions import (
     refusal_detail,
 )
 from pipelex.core.validation import report_validation_error
-from pipelex.errors.error_codes import code_is_method_domain
+from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
+from pipelex.errors.security_event import security_target_kind
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
@@ -100,9 +101,10 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     belongs to another actor, the runtime's own included, answers its own code, never that the method is
     invalid. A failure of the tool or its environment, a refusal of another actor than the method's author,
     anything that is not a ``PipelexError``, propagates as no verdict, along with the refusals that must
-    keep their own class: ``PipeNotFoundError`` (its
-    dedicated not-found handler), a ``SecurityError`` (never absorbed by a domain handler), a
-    ``ValidateBundleError`` already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
+    keep their own class: ``PipeNotFoundError`` (its dedicated not-found handler), a security refusal, a
+    ``SecurityError`` or any refusal coded in a security family (never absorbed by a domain handler, even
+    when its code is the method's, as ``security.method_path_refused`` is), a ``ValidateBundleError``
+    already produced (never re-wrapped), and a ``BundleResourceNotNamedError`` or a
     ``BundleResourcePathError``, which refuse the files submitted with the bundle rather than the bundle.
     """
     try:
@@ -157,8 +159,8 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         # forward them so the CLI renders the same structured detail it does for the other arms.
         # A library error that is not the method's, such as an invariant of the library manager
         # (`runtime.unexpected`) or library directories configured wrongly (`pipelex.config.invalid`), is no
-        # verdict about the bundle, and propagates as it is.
-        if not code_is_method_domain(code=library_error.resolve_error_code()):
+        # verdict about the bundle, and propagates as it is, as does a security refusal.
+        if not _code_makes_a_verdict(code=library_error.resolve_error_code()):
             raise
         if isinstance(library_error, LibraryLoadingError):
             blueprint_validation_errors = library_error.blueprint_validation_errors
@@ -174,9 +176,9 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     except PipeRunError as pipe_run_error:
         # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe when
         # its fault is the method's, whose text is the sentence its code renders for the caller who reads the
-        # verdict, and otherwise the fault itself, which no verdict carries.
+        # verdict, and otherwise the fault itself, which no verdict carries, a security refusal it wraps included.
         failure_code = pipe_run_error.resolve_error_code()
-        if not code_is_method_domain(code=failure_code):
+        if not _code_makes_a_verdict(code=failure_code):
             raise
         failure_problem = caller_refusal(refusal=pipe_run_error, pipe_code=pipe_run_error.pipe_code)
         failure_params = failure_problem.params.as_wire() if failure_problem.params is not None else None
@@ -197,12 +199,15 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     except DryRunError as dry_run_error:
         # The sweep's failures, one per failing pipe, located at the innermost pipe that failed. A
         # DryRunError raised elsewhere carries none, and stands for one failure, its own. They are a verdict
-        # only when one of them is the method's; otherwise the dry run's fault answers its own code, every
-        # failure riding its items, and never reads as an invalid method.
+        # only when one of them is the method's and none is a security refusal; otherwise the dry run's fault
+        # answers its own code, a security refusal's first (`DryRunError.own_error_code`), every failure riding
+        # its items, and never reads as an invalid method.
         dry_run_failures = dry_run_error.failures or [
             DryRunFailureErrorData(code=dry_run_error.resolve_error_code(), message=refusal_detail(refusal=dry_run_error))
         ]
-        if not any(code_is_method_domain(code=failure.code) for failure in dry_run_failures):
+        if any(security_target_kind(code=failure.code) is not None for failure in dry_run_failures):
+            raise
+        if not any(_code_makes_a_verdict(code=failure.code) for failure in dry_run_failures):
             raise
         raise ValidateBundleError(
             message=dry_run_error.message,
@@ -262,20 +267,34 @@ def reporting_host_library_faults() -> Generator[None, None, None]:
         raise HostLibraryLoadRefusalError(msg) from refusal
 
 
+def _code_makes_a_verdict(*, code: ErrorCode) -> bool:
+    """Whether a refusal coded so is a verdict about the bundle: its code is the method's, and no security refusal's.
+
+    Every arm of the translation asks it, so a security refusal, many of which the method's author acts on
+    (``security.method_path_refused``, ``security.template_refused``), keeps its code and its security event on
+    whichever error carries it, never becoming a verdict's item.
+    """
+    return code_is_method_domain(code=code) and security_target_kind(code=code) is None
+
+
 def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | None:
     """The one-item verdict for a refusal of the caller's input that has no arm of its own, else ``None``.
 
     ``None`` — no verdict — unless the refusal's code is the method's: a refusal another actor must act on,
     the caller's input, the account, the operator or the runtime, is never the bundle's fault, and keeps
-    its own code. The item is ``pipe_validation`` when the library load located the
-    refusal on the pipe it was building (``PipeLoadRefusalError``, with the pipe's code, domain and file),
-    and ``blueprint_validation`` otherwise. It carries no ``error_type``: a refusal with a closed code
-    has its own arm above, and naming one here would claim a diagnosis the refusal does not make.
+    its own code. A security refusal has no verdict either, whatever its class or its domain: a refusal
+    coded in a security family, such as a step's template file that climbs out of its method tree
+    (``security.method_path_refused``), keeps its code and logs its security event, never a verdict's.
+
+    The item is ``pipe_validation`` when the library load located the refusal on the pipe it was building
+    (``PipeLoadRefusalError``, with the pipe's code, domain and file), and ``blueprint_validation`` otherwise.
+    It carries no ``error_type``: a refusal with a closed code has its own arm above, and naming one here
+    would claim a diagnosis the refusal does not make.
 
     The item's text is the sentence the refusal's code renders for a caller, never the refusal's own message:
     the verdict is read by the caller, and the message is the operator's diagnostics.
     """
-    if not code_is_method_domain(code=refusal.resolve_error_code()):
+    if not _code_makes_a_verdict(code=refusal.resolve_error_code()):
         return None
     message = refusal_detail(refusal=refusal)
     if isinstance(refusal, PipeLoadRefusalError):

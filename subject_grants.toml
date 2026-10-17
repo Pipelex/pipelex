@@ -8,6 +8,10 @@ rationale = "Converts its one operand, a registry domain: ErrorDomain.from_probl
 param = "error_code"
 rationale = "Chained at every raise site on its one operand, the chosen code: raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING)."
 
+["pipelex/base_exceptions.py::PipelexError.with_security_target_class"]
+param = "target_class"
+rationale = "Chained at every raise site on its one operand, the class of destination refused: raise SsrfBlockedError(msg).with_security_target_class(target_class)."
+
 ["pipelex/base_exceptions.py::error_domain_is_input"]
 param = "error_domain"
 rationale = "Predicate on the error domain; single operand."
@@ -19,6 +23,10 @@ rationale = "Verb-object: iterates the exception's cause chain; single operand."
 ["pipelex/base_exceptions.py::iter_pipelex_cause_chain"]
 param = "exc"
 rationale = "Verb-object: iterates the Pipelex part of the exception's cause chain; single operand, as iter_cause_chain."
+
+["pipelex/base_exceptions.py::iter_traceback_chain"]
+param = "exc"
+rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
 param = "message"
@@ -4660,10 +4668,6 @@ rationale = "Verb-object: formats the validate result; single operand."
 param = "items"
 rationale = "Verb-object: formats the error items; single operand."
 
-["pipelex/pipeline/validation_render.py::render_invalid_validation_markdown"]
-param = "report"
-rationale = "Verb-object: renders the validation report; single operand."
-
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"
 rationale = "Factory from source: builds the result from the inference_model; single operand."
@@ -6391,6 +6395,10 @@ rationale = "Parses/reads the path; single operand."
 ["pipelex/tools/misc/toml_utils.py::save_toml_to_path"]
 param = "data"
 rationale = "Transforms the data; single operand."
+
+["pipelex/tools/network/host_rules.py::classify_disallowed_host"]
+param = "host"
+rationale = "Reads as classify(host): its one operand is the host the SSRF guard refused, as is_disallowed_host takes it."
 
 ["pipelex/tools/network/host_rules.py::is_disallowed_host"]
 param = "host"

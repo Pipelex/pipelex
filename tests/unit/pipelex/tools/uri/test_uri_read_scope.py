@@ -5,6 +5,7 @@ from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.uri_read_scope import UriReference, authorize_uri_read, authorize_uri_reads
 
@@ -49,6 +50,8 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="image 1 of the prompt")
         assert exc_info.value.reason == UriReadRefusalReason.FOREIGN_STORAGE_KEY
+        # The security event names the class of what was refused, never the key.
+        assert exc_info.value.security_target_class == SecurityTargetClass.FOREIGN_STORAGE_KEY
 
     @pytest.mark.parametrize(
         "uri",
@@ -68,6 +71,34 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="the input 'photo'")
         assert exc_info.value.reason == UriReadRefusalReason.LOCAL_PATH
+        # A path on the server's disk, or a scheme the run does not read, is a refused scheme to the security event.
+        assert exc_info.value.security_target_class == SecurityTargetClass.SCHEME
+
+    @pytest.mark.parametrize(
+        ("reason", "target_class"),
+        [
+            (UriReadRefusalReason.FOREIGN_STORAGE_KEY, SecurityTargetClass.FOREIGN_STORAGE_KEY),
+            (UriReadRefusalReason.LOCAL_PATH, SecurityTargetClass.SCHEME),
+        ],
+    )
+    def test_the_problem_s_target_class_is_the_security_event_s_token(self, reason: UriReadRefusalReason, target_class: SecurityTargetClass) -> None:
+        # `target_class` is a machine-readable parameter: the problem carries the very token its security event carries,
+        # never words, and a local path is the registry's listed `scheme`. The sentence reads the token as it is.
+        as_input = UriReadRefusedError("refused", reason=reason).with_params(input="photo")
+        as_method = UriReadRefusedError("refused", reason=reason).with_error_code(CoreCode.SECURITY_METHOD_URL_REFUSED).with_params(pipe="describe")
+
+        for refusal in (as_input, as_method):
+            assert refusal.security_target_class == target_class
+            for view in ProblemView:
+                params = refusal.to_problem(view=view).params
+                assert params is not None
+                assert params.as_wire()["target_class"] == str(target_class)
+        assert as_input.to_problem(view=ProblemView.CALLER).detail == (
+            f"The URL of the input 'photo' points at a {target_class} target, which a security rule forbids (reason: {reason.desc})."
+        )
+        assert as_method.to_problem(view=ProblemView.CALLER).detail == (
+            f"Pipe 'describe' names a URL that points at a {target_class} target, which a security rule forbids (reason: {reason.desc})."
+        )
 
     def test_a_multi_segment_scope_compares_every_segment(self) -> None:
         authorize_uri_read(uri="pipelex-storage://org_abc/team_1/x.png", read_scope="org_abc/team_1", position="p")

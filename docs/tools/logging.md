@@ -422,6 +422,12 @@ for (operation, model_handle), group in groups.items():
 
 A test runs a small method live, with stand-in workers answering every model call on two models, and computes the cost and the latency of each operation and model from the `json` output alone.
 
+## The security event
+
+A refusal a security rule makes, an address the SSRF guard blocks, a stored file outside the run's read scope, a path escaping its root, a template the sandbox refuses, fails the run under a `security.` code and logs one **security event** beside it. The event is a record of its own kind, on its own logger, `pipelex.errors.security_event`, at **WARNING**, with the fixed message `A security rule refused a request` and the field `event.name` set to `pipelex.security.refusal`, so a host routes it by its logger or by that field without reading any text: to an alert on a hosted deployment, to the client's own sinks on-premises. Its fields name the refusal's code and domain, the kind and class of target refused, the run, the request and each of the run's extras as `run.extras.<key>`, and never the URL, the path, the template or any input value; it carries no traceback. A refusal is logged once however many boundaries it crosses. The [error model](../under-the-hood/error-model.md#security-refusals-and-the-security-event) lists every field and value, and where the event is logged.
+
+The event follows its logger's level like any other record, so a host that raises `pipelex` above `WARNING` with `package_log_levels` drops it too; one that quiets the runtime and still wants its security events sets `pipelex-errors-security_event = "WARNING"` beside that key.
+
 ## Log-call conventions
 
 Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source: the fixed message at INFO and above, the absence of markup, the mechanical rules of [wording a message](#wording-a-message), and no handled exception spliced into the text; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
@@ -552,6 +558,9 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `has_blocked_steps` | boolean | Whether a stale configuration file needs a migration step that cannot be applied for the user |
 | `file_count` | integer | The number of result files a delivery stored |
 | `storage_key` | string | The key a delivery stores a result file under, which ends in the file's name |
+| `storage_scheme` | string or `null` | The kind of storage a deployment's storage provider is, as a `pipelex.storage.*` problem names it: `s3`, `local`; `null` for a storage plugin whose kind the registry does not list |
+| `blob_sha256` | string | The SHA-256 a blob is stored under in the API server's blob store, in lowercase hex: its content's hash, never its content |
+| `blob_size_bytes`, `read_size_bytes` | integer | The size the API server's blob store holds a blob at, and the size of the bytes a read of it returned, in bytes |
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
 | `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |

@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.security_target import SecurityTargetClass
 
 
 class UriReadRefusalReason(StrEnum):
@@ -23,13 +24,13 @@ class UriReadRefusalReason(StrEnum):
                 return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
 
     @property
-    def target_class(self) -> str:
-        """The kind of target the refused URL points at, as the refusal's sentence names it."""
+    def target_class(self) -> SecurityTargetClass:
+        """The class of destination the refusal names in its security event: another tenant's key, or a scheme the run does not read."""
         match self:
             case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
-                return "foreign storage"
+                return SecurityTargetClass.FOREIGN_STORAGE_KEY
             case UriReadRefusalReason.LOCAL_PATH:
-                return "local"
+                return SecurityTargetClass.SCHEME
 
 
 class UriReadRefusedError(SecurityError):
@@ -55,7 +56,12 @@ class UriReadRefusedError(SecurityError):
     def __init__(self, message: str, *, reason: UriReadRefusalReason):
         super().__init__(message)
         self.reason = reason
+        # The reason is the class of destination refused, so the security event names it without the raise site saying so.
+        self.with_security_target_class(reason.target_class)
 
     @override
     def problem_params(self) -> dict[str, Any]:
+        # The problem's `target_class` is a machine-readable parameter, the same token the security event carries for the
+        # refusal: `scheme` for a local path, a value the registry lists, and `foreign_storage_key` for another tenant's key.
+        # The sentence reads it as it is ("points at a scheme target"), since the code's template has no parameter for words.
         return {"reason": self.reason.desc, "target_class": self.reason.target_class}

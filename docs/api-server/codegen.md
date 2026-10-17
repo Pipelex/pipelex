@@ -4,7 +4,7 @@ Resolve a library closure into its **normalized library crate**, and project tha
 
 Both are **Pipelex API extensions**, not MTHDS Protocol routes: they are not tagged `x-mthds-protocol` in the [OpenAPI artifact](openapi/pipelex-api.openapi.yaml), and an MTHDS runner is not required to serve them. The *crate* is a different matter — its shape is the standard's [Library Crate Format](https://mthds.ai), so the wire fields are brand-neutral and any MTHDS tool can read one. What is ours is the HTTP surface that produces it, and the type projection on top (the standard specifies none).
 
-Both endpoints speak the [`POST /v1/validate`](pipe-validate.md) verdict discipline: a **produced verdict is always a `200`** discriminated on `is_valid`; the invalid arm carries the structured `validation_errors[]` from pipelex's one shared builder — each item optionally carrying a [`suggested_fix`](error-responses.md#suggested-fixes). Non-2xx is reserved for *no verdict could be produced*: request-shape errors (an unknown projection `kind`/`target`, a malformed closure selector) are `422` RFC 9457 `application/problem+json`, a registry-form `method_ref` is `501`, an address-form `method_ref` that fails to resolve maps per the [`method_ref` error table](pipe-run.md#running-a-method-by-address-method_ref), auth is `401`/`403`, server faults are `5xx`.
+Both endpoints speak the [`POST /v1/validate`](pipe-validate.md) verdict discipline: a **produced verdict is always a `200`** discriminated on `is_valid`; the invalid arm carries the structured `errors[]`, one problem item per finding from pipelex's one shared builder — each item optionally carrying a [`suggested_fix`](error-responses.md#suggested-fixes). Non-2xx is reserved for *no verdict could be produced*: request-shape errors (an unknown projection `kind`/`target`, a malformed closure selector) are `422` `request.invalid` RFC 9457 `application/problem+json`, a registry-form `method_ref` is a `422` `request.unsupported` whose `reason` is `registry_form_method_ref`, an address-form `method_ref` that fails to resolve maps per the [`method_ref` error table](pipe-run.md#running-a-method-by-address-method_ref), auth is `401`, server faults are `5xx`.
 
 ## Selecting the closure
 
@@ -53,7 +53,7 @@ Resolution is a first-class language operation alongside validation: the closure
 
 `crate` is the canonical JSON encoding of the normalized crate — the same bytes `pipelex resolve --format json` prints, so fingerprints computed from either surface agree.
 
-**Response (invalid verdict):** `200` with `is_valid: false` and `validation_errors[]` (no crate exists).
+**Response (invalid verdict):** `200` with `is_valid: false` and `errors[]` (no crate exists).
 
 ## Codegen
 

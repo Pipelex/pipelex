@@ -34,6 +34,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.security import RequestUser
 from tests.unit._constants import STUB_METHOD_ADDRESS, VALID_MTHDS
+from tests.unit._problems import assert_problem, problem_items_fields
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _DIRECT_VALIDATOR_NS = "pipelex.pipeline.direct_bundle_validator"
@@ -168,16 +169,14 @@ class TestValidationCallerIdentity:
 
         response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS], "analytics_groups": bad_groups})
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        body = response.json()
-        assert body["error_type"] == "InvalidAnalyticsGroups"
-        assert "analytics_groups" in body["detail"]
+        body = assert_problem(response, status=422, code="request.invalid")
+        # The refused field, or a key inside it, which the path names from the field down.
+        assert [field.split(".")[0] for field in problem_items_fields(body)] == ["analytics_groups"]
         assert validator.caller_identities == []
 
-    def test_validate_failing_on_two_fields_gets_the_generic_error_type(self, mocker: MockerFixture) -> None:
+    def test_validate_failing_on_two_fields_names_both(self, mocker: MockerFixture) -> None:
         # Naming one field would send the caller to fix that one and leave the other for the next
-        # request, so the classification falls back to the generic type and the detail names both.
+        # request, so the refusal carries one item per refused field.
         validator = _register_recording_validator(mocker)
         client = _build_client(user_id=_USER_ID)
 
@@ -186,9 +185,6 @@ class TestValidationCallerIdentity:
             json={"mthds_contents": [VALID_MTHDS], "allow_signatures": "not-a-bool", "analytics_groups": {"Organization": "org_acme"}},
         )
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "ValidationError"
-        assert "analytics_groups" in body["detail"]
-        assert "allow_signatures" in body["detail"]
+        body = assert_problem(response, status=422, code="request.invalid")
+        assert sorted(field.split(".")[0] for field in problem_items_fields(body)) == ["allow_signatures", "analytics_groups"]
         assert validator.caller_identities == []

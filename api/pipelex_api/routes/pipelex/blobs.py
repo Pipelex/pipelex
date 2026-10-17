@@ -15,8 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.blob_upload import upload_target_url
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_validation_error
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_tree_request import ensure_within_tree_limits
 from pipelex_api.routes.pipelex.pipeline import resolve_blob_scope
@@ -24,6 +23,9 @@ from pipelex_api.routes.pipelex.pipeline import resolve_blob_scope
 router = APIRouter(tags=["blobs"], route_class=JsonBodyRoute)
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
+# The body field listing the blobs, and the query parameter naming their scope, which a refusal names as its `field`.
+_BLOBS_FIELD = "blobs"
+_READ_SCOPE_FIELD = "read_scope"
 _OCTET_STREAM = "application/octet-stream"
 _SIZE_DESCRIPTION = (
     "The length of the bytes, a JSON integer written without a fraction or an exponent. A size written 13.0 is refused, "
@@ -80,7 +82,7 @@ def _unique_blobs(*, blobs: list[BlobRef]) -> dict[str, int]:
         known = sizes.get(blob.sha256)
         if known is not None and known != blob.size:
             msg = f"The blob {blob.sha256} is listed twice with different sizes, {known} and {blob.size}: one hash names one set of bytes."
-            raise_validation_error(message=msg, error_type=ErrorType.BLOB_MISMATCH)
+            raise RunnerRequestError(msg, field=_BLOBS_FIELD)
         sizes[blob.sha256] = blob.size
     return sizes
 
@@ -109,8 +111,9 @@ async def find_missing_blobs(
     under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
     make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
     file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
-    A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner's
-    tree limits a 422 `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner's own
+    A hash given twice with different sizes is a 422 `request.invalid` naming `blobs`, and a blob or a set of blobs past
+    this runner's tree limits a 422 `method.package_invalid`, both refused before anything is uploaded. Each upload
+    target is this runner's own
     `PUT /v1/blobs/{sha256}`, at `PUBLIC_BASE_URL` when the deployment sets it, its query signed for that hash and
     the caller's scope, valid for `BLOB_UPLOAD_URL_TTL_SECONDS`, to send with exactly the headers it names.
     """
@@ -118,7 +121,7 @@ async def find_missing_blobs(
         try:
             validate_read_scope(value=read_scope)
         except ValueError as exc:
-            raise_validation_error(message=str(exc), error_type=ErrorType.INVALID_READ_SCOPE)
+            raise RunnerRequestError(str(exc), field=_READ_SCOPE_FIELD) from exc
     sizes = _unique_blobs(blobs=request_data.blobs)
     largest_sha256 = max(sizes, key=lambda sha256: sizes[sha256], default=None)
     ensure_within_tree_limits(

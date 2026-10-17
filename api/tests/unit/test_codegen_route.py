@@ -20,6 +20,7 @@ from pytest_mock import MockerFixture
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 
 def _build_client() -> TestClient:
@@ -87,7 +88,8 @@ class TestCodegenRoute:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"], "an invalid verdict must carry a non-empty validation_errors[]"
+        assert body["errors"], "an invalid verdict must carry a non-empty errors[]"
+        assert all(item["code"] for item in body["errors"])
         assert "artifacts" not in body
 
     @pytest.mark.parametrize(
@@ -105,16 +107,19 @@ class TestCodegenRoute:
         payload: dict[str, object] = {"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod"}
         payload.update(payload_patch)
         response = client.post("/v1/codegen", json=payload)
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid")
 
-    def test_method_ref_is_501_problem_json_until_registry_exists(self):
+    def test_a_pipe_ref_on_a_concept_set_wide_kind_names_the_pipe_ref(self):
+        client = _build_client()
+        payload = {"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod", "pipe_ref": "smoke.echo"}
+        response = client.post("/v1/codegen", json=payload)
+        assert_problem(response, status=422, code="request.invalid", field="pipe_ref")
+
+    def test_a_registry_form_method_ref_is_an_unsupported_request_until_registry_exists(self):
         client = _build_client()
         response = client.post("/v1/codegen", json={"method_ref": "acme/methods/x", "kind": "types", "target": "ts-zod"})
-        assert response.status_code == 501, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "MethodRefNotSupported"
+        problem = assert_problem(response, status=422, code="request.unsupported")
+        assert problem["params"] == {"field": "method_ref", "reason": "registry_form_method_ref"}
 
     def test_codegen_tears_down_its_library(self, mocker: MockerFixture):
         # The engine core leaves the library loaded + current on success; the route owns teardown.

@@ -5,15 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mthds.protocol.problem.models import FixOp, ProblemItem, SetKeyOp
+from mthds.protocol.problem.models import SuggestedFix as WireSuggestedFix
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.pipeline.validation_errors import problem_item_of, validation_item_code
 from pipelex.pipeline.validation_render import (
     build_fix_command,
     format_validate_markdown,
     format_validation_error_items_markdown,
-    render_invalid_validation_markdown,
+    render_invalid_verdict_markdown,
     suggested_fix_label,
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.suggested_fix import SetKeyOp as PipelexSetKeyOp
 from pipelex.validation_error_types import PipeValidationErrorType, ValidationResidualErrorType
 
 
@@ -104,54 +111,44 @@ class TestValidationRender:
         assert "✅" not in markdown
         assert "⚠️" not in markdown
 
-    def test_renders_invalid_report_as_prose_with_fix_lines_and_dry_run_residual(self):
-        """The invalid-arm renderer reconstructs the typed items from the report and delegates to
-        the shared prose renderer: category-grouped headings, humanized titles, identity fields,
-        the message, per-item `💡 Suggested fix` lines, and the plain dry_run residual — the same
-        prose the agent CLI and human panel show (no more dict-based `## Errors (N)` list).
+    def test_renders_an_invalid_verdict_from_its_problem_items(self):
+        """The invalid-arm renderer presents the verdict's problem items, the `errors` a host answers: each numbered under
+        its code's title with its code, where it is, its sentence and its suggested fix, and never a validation item's own
+        message, which the reader's view of the items does not carry.
         """
-        report: dict[str, Any] = {
-            "is_valid": False,
-            "message": "MTHDS validation found errors",
-            "validation_errors": [
-                {
-                    "category": "pipe_validation",
-                    "error_type": "inadequate_output_multiplicity",
-                    "message": "Pipe references an unknown concept.",
-                    "pipe_code": "summarize",
-                    "concept_code": "Contractt",
-                    "field_name": "output",
-                    "source": "/fake/method.mthds",
-                    "suggested_fix": {
-                        "fix_code": "match-sequence-output",
-                        "description": "Set output of pipe 'summarize' to 'Contract'",
-                        "safety": "safe",
-                        "ops": [],
-                    },
-                },
-                {
-                    "category": "dry_run",
-                    "error_type": "DryRunError",
-                    "message": "Dry run failed: boom.",
-                },
-            ],
-        }
+        validation_item = ValidationErrorItem(
+            category=ValidationErrorCategory.PIPE_VALIDATION,
+            error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+            message="The operator's own wording of the fault.",
+            pipe_code="summarize",
+            field_name="output",
+            source="/fake/method.mthds",
+            line=7,
+            suggested_fix=SuggestedFix(
+                fix_code="match-sequence-output",
+                description="Set output of pipe 'summarize' to 'Contract'",
+                safety=FixSafety.SAFE,
+                ops=[PipelexSetKeyOp(table_path=["pipe", "summarize"], key="output", value="Contract")],
+            ),
+        )
+        code = validation_item_code(item=validation_item, residual_code=CoreCode.METHOD_SCHEMA_VIOLATION)
+        item = problem_item_of(item=validation_item, code=code)
 
-        markdown = render_invalid_validation_markdown(report)
+        markdown = render_invalid_verdict_markdown(items=[item], message="MTHDS validation found errors")
 
         assert markdown.startswith("# Validation failed")
-        # Prose shape from the shared renderer: category heading + humanized title + identity fields.
-        assert "## Pipe validation errors" in markdown
-        assert "1. **Inadequate Output Multiplicity**" in markdown
+        assert f"1. **{error_code_spec(code).title}** (`{code}`)" in markdown
         assert "   - Pipe: `summarize`" in markdown
-        assert "   - Concept: `Contractt`" in markdown
         assert "   - Field: `output`" in markdown
-        assert "   - Pipe references an unknown concept." in markdown
+        assert "   - File: `/fake/method.mthds:7`" in markdown
+        assert f"   - {item.detail}" in markdown
         assert "   - 💡 Suggested fix: Set output of pipe 'summarize' to 'Contract'" in markdown
-        assert "   - Source: `/fake/method.mthds`" in markdown
-        # The dry_run residual keeps its plain single-message rendering.
-        assert "## Dry run error" in markdown
-        assert "Dry run failed: boom." in markdown
+        assert "operator's own wording" not in markdown
+
+    def test_an_invalid_verdict_with_no_item_shows_its_sentence(self):
+        markdown = render_invalid_verdict_markdown(items=[], message="MTHDS validation found errors")
+
+        assert markdown == "# Validation failed\n\nMTHDS validation found errors"
 
     def test_format_validation_error_items_markdown_groups_categories_and_renders_fix_line(self):
         """The shared items renderer groups by category, humanizes the error_type title, renders
@@ -203,40 +200,30 @@ class TestValidationRender:
         assert suggested_fix_label(fix=safe_fix) == "Suggested fix"
         assert suggested_fix_label(fix=unsafe_fix) == "Suggested fix (unsafe, confirm before applying)"
 
-    def test_invalid_report_markdown_marks_an_unsafe_fix(self):
+    def test_invalid_verdict_markdown_marks_an_unsafe_fix(self):
         """The hosted `rendered_markdown` path labels an unsafe wire fix, next to a safe one left plain."""
-        report: dict[str, Any] = {
-            "is_valid": False,
-            "message": "MTHDS validation found errors",
-            "validation_errors": [
-                {
-                    "category": "pipe_validation",
-                    "error_type": "inadequate_output_multiplicity",
-                    "message": "Output mismatch.",
-                    "pipe_code": "summarize",
-                    "suggested_fix": {
-                        "fix_code": "match-sequence-output",
-                        "description": "Set output of pipe 'summarize' to 'Contract'",
-                        "safety": "safe",
-                        "ops": [],
-                    },
-                },
-                {
-                    "category": "pipe_validation",
-                    "error_type": "unknown_model",
-                    "message": "Model handle 'gpt-5.1' was not found in the model deck",
-                    "pipe_code": "write",
-                    "suggested_fix": {
-                        "fix_code": "rename-model",
-                        "description": "Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5', its one close match in the model deck",
-                        "safety": "unsafe",
-                        "ops": [],
-                    },
-                },
-            ],
-        }
+        ops: list[FixOp] = [SetKeyOp(kind="set_key", table_path=["pipe", "write"], key="model", value="gpt-5")]
+        items = [
+            ProblemItem(
+                code="method.schema_violation",
+                detail="Output mismatch.",
+                suggested_fix=WireSuggestedFix(
+                    fix_code="match-sequence-output", description="Set output of pipe 'summarize' to 'Contract'", safety="safe", ops=ops
+                ),
+            ),
+            ProblemItem(
+                code="model.unknown",
+                detail="The model is not in the deck.",
+                suggested_fix=WireSuggestedFix(
+                    fix_code="rename-model",
+                    description="Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5', its one close match in the model deck",
+                    safety="unsafe",
+                    ops=ops,
+                ),
+            ),
+        ]
 
-        markdown = render_invalid_validation_markdown(report)
+        markdown = render_invalid_verdict_markdown(items=items, message="MTHDS validation found errors")
 
         assert "   - 💡 Suggested fix: Set output of pipe 'summarize' to 'Contract'" in markdown
         assert "   - 💡 Suggested fix (unsafe, confirm before applying): Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5'" in markdown

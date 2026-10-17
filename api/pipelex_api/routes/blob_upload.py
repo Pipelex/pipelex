@@ -13,17 +13,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Path, Query, Request, Response
 from mthds.method_tree.digest import sha256_hex
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.blob_upload import EXPIRES_PARAM, SCOPE_PARAM, SIGNATURE_PARAM, is_upload_authorized
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_forbidden, raise_validation_error
+from pipelex_api.exceptions import RunnerAuthError, RunnerRequestError
 from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES
 from pipelex_api.openapi_responses import PROBLEM_403_BLOB_UPLOAD, PROBLEM_413, PROBLEM_422, PROBLEM_500
 
 router = APIRouter(tags=["blobs"])
 
 SHA256_PATTERN = r"^[0-9a-f]{64}$"
+# What an upload refused for its target lacks, as the `requirement` of its `auth.forbidden`.
+SIGNED_UPLOAD_TARGET_REQUIREMENT = "signed_upload_target"
 
 
 @router.put(
@@ -52,20 +54,24 @@ async def put_blob(
     """Store one blob's bytes under its SHA-256, as the upload target `POST /v1/blobs/missing` named (MTHDS Protocol).
 
     The body is the blob's bytes and nothing else. A target whose signature does not hold, or that has expired, is a
-    403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
-    decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
-    the path's a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
-    changes nothing.
+    403 `auth.forbidden` whose `requirement` is a signed upload target, as is a query that is not one this runner signs,
+    such as an expiry that is not a decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 413 `request.too_large`;
+    and a body whose SHA-256 is not the path's a 422 `request.invalid` naming the body. A blob is never changed:
+    uploading bytes the runner already holds answers 204 and changes nothing.
     """
     if not is_upload_authorized(scope=scope, sha256=sha256, expires=expires, signature=signature) or scope is None:
         msg = "This upload carries no valid target: ask POST /v1/blobs/missing for one, and upload to the URL it names before it expires."
-        raise_forbidden(message=msg, error_type=ErrorType.BLOB_UPLOAD_NOT_AUTHORIZED)
+        raise RunnerAuthError(msg).with_error_code(CoreCode.AUTH_FORBIDDEN).with_params(requirement=SIGNED_UPLOAD_TARGET_REQUIREMENT)
     body = await request.body()
     if len(body) > MAX_METHOD_TREE_FILE_BYTES:
         msg = f"The blob holds {len(body)} bytes, past this runner's limit of {MAX_METHOD_TREE_FILE_BYTES // 1024} KiB for one file of a method tree."
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise (
+            RunnerRequestError(msg, field="body")
+            .with_error_code(CoreCode.REQUEST_TOO_LARGE)
+            .with_params(limit=MAX_METHOD_TREE_FILE_BYTES, size=len(body))
+        )
     if sha256_hex(body) != sha256:
         msg = f"The body's SHA-256 is not {sha256}, the hash the path names: nothing was stored."
-        raise_validation_error(message=msg, error_type=ErrorType.BLOB_MISMATCH)
+        raise RunnerRequestError(msg, field="body")
     await RunnerBlobStore.make_for_scope(scope=scope).store_blob(data=body)
     return Response(status_code=204)

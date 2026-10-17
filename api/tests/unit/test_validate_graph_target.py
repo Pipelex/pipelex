@@ -131,8 +131,8 @@ class TestValidateGraphTarget:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
-        assert body["graph_spec"] is None
+        assert "default_pipe_ref" not in body
+        assert "graph_spec" not in body
 
     def test_a_manifest_naming_a_pipe_the_closure_lacks_gets_no_graph(self, install_method_package: Callable[..., Path]) -> None:
         # The manifest names `shout`; the closure holds only `smoke.echo`. No run by this address
@@ -146,8 +146,8 @@ class TestValidateGraphTarget:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
-        assert body["graph_spec"] is None
+        assert "default_pipe_ref" not in body
+        assert "graph_spec" not in body
 
     def test_inline_contents_graph_the_closures_declaration(self) -> None:
         client = _build_client()
