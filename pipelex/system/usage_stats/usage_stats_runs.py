@@ -123,7 +123,8 @@ def sent_usage_stats_error(*, error: ApiResponseError) -> UsageStatsError | None
     sent no reportable code with a domain.
     """
     decoded = decode_json(error.response_body)
-    document = cast("dict[str, Any]", decoded.value) if decoded.is_json and isinstance(decoded.value, dict) else {}
+    sent: object = decoded.value if decoded.is_json else None
+    document = cast("dict[str, Any]", sent) if isinstance(sent, dict) else {}
     sent_code = document.get("code")
     sent_domain = document.get("domain")
     if not isinstance(sent_code, str) or not isinstance(sent_domain, str) or not is_reportable_error_code(code=sent_code):

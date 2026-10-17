@@ -96,10 +96,9 @@ class TestFailureProblem:
 
     def test_the_log_fields_name_the_frames_down_to_the_fault_without_source_or_locals(self) -> None:
         """The frames go from where the failure was caught down to where its first exception was raised, by module, line and function."""
-        try:
+        with pytest.raises(PipelexError) as caught:
             _raise_a_wrapped_fault(value=_PLANTED_RUN_DATA)
-        except PipelexError as caught:
-            failure = caught
+        failure = caught.value
 
         frames = failure_log_fields(error=failure, problem=failure_problem(error=failure))["error.frames"]
 
@@ -113,10 +112,9 @@ class TestFailureProblem:
         assert _PLANTED_RUN_DATA not in repr(frames)
 
     def test_the_frames_keep_the_innermost_of_a_deep_failure(self) -> None:
-        try:
+        with pytest.raises(KeyError) as caught:
             _recurse(depth=MAX_LOGGED_FRAMES * 2)
-        except KeyError as caught:
-            failure = caught
+        failure = caught.value
 
         frames = failure_log_fields(error=failure, problem=failure_problem(error=failure))["error.frames"]
 
