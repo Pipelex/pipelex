@@ -111,6 +111,32 @@ class TestValidateMethodDir:
         assert [pipe.code for pipe in result.pipes] == ["greet"]
         assert [Path(blueprint.source or "") for blueprint in result.blueprints] == [method_dir / "greet.mthds"]
 
+    @pytest.mark.parametrize("with_library_dir", [False, True], ids=["alone", "beside_a_library_dir"])
+    async def test_a_nested_packages_pipes_load_but_are_never_judged_whatever_loads_beside_the_method(
+        self, tmp_path: Path, with_library_dir: bool
+    ) -> None:
+        """One rule for which pipes are judged: the tree's own, whether or not ``-L`` directories load beside it."""
+        method_dir = tmp_path / "method"
+        nested_dir = method_dir / "vendored"
+        nested_dir.mkdir(parents=True)
+        (method_dir / "greet.mthds").write_bytes(_GREET_MTHDS)
+        (nested_dir / "METHODS.toml").write_text(
+            '[package]\naddress = "github.com/pipelex-tests/vendored"\nversion = "1.0.0"\ndescription = "A package nested in the method"\n',
+            encoding="utf-8",
+        )
+        (nested_dir / "shout.mthds").write_text(_LIBRARY_MTHDS, encoding="utf-8")
+        library_dirs: list[Path] | None = None
+        if with_library_dir:
+            library_dir = tmp_path / "library"
+            library_dir.mkdir()
+            (library_dir / "whisper.mthds").write_text(_LIBRARY_MTHDS.replace('domain = "shouting"', 'domain = "whispering"'), encoding="utf-8")
+            library_dirs = [method_dir, library_dir]
+
+        result = await validate_bundle(method_dir=method_dir, library_dirs=library_dirs, library_dirs_are_callers=with_library_dir)
+
+        assert [pipe.code for pipe in result.pipes] == ["greet"]
+        assert [Path(blueprint.source or "") for blueprint in result.blueprints] == [method_dir / "greet.mthds"]
+
     async def test_a_hosts_library_never_loads_beside_a_method(self, tmp_path: Path) -> None:
         library_dir = tmp_path / "library"
         library_dir.mkdir()

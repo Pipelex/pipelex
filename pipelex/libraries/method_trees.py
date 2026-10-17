@@ -109,6 +109,54 @@ def list_local_method_tree(*, handed_over: Path, limits: TreeLimits | None = Non
         raise MethodTreeLoadError(exc.message) from exc
 
 
+def list_local_method_tree_at_root(*, root: Path, limits: TreeLimits | None = None) -> MethodTree:
+    """List the method tree rooted at a directory itself, with no Manifest Discovery, under this machine's limits.
+
+    For a directory that is a method's root whatever lies above it, such as an entry of a corpus shipped inside an
+    installed package, whose ancestors (a project above `site-packages`) may hold a `METHODS.toml` of their own.
+
+    Raises:
+        EmptyMethodTreeError: The membership rule keeps every file of the directory out of its tree.
+        MethodTreeLoadError: The standard refused the tree otherwise, it passed a limit, or it could not be read.
+    """
+    written = WRITTEN_METHOD_TREES.tree_written_at(directory=root)
+    if written is not None:
+        return written
+    try:
+        return list_method_tree_at_root(root, limits=limits or local_tree_limits())
+    except TreeLimitError as exc:
+        msg = f"{exc.message} {LIMITS_ADVICE}"
+        raise MethodTreeLoadError(msg) from exc
+    except MethodTreeRefusedError as exc:
+        if _is_empty_tree(refusal_error=exc):
+            raise EmptyMethodTreeError(exc.message) from exc
+        raise MethodTreeLoadError(exc.message) from exc
+    except TreeSourceError as exc:
+        raise MethodTreeLoadError(exc.message) from exc
+
+
+def method_tree_root(*, handed_over: Path) -> Path:
+    """The root of the method tree a folder handed over belongs to, resolved, found without listing the tree.
+
+    The nearest directory at or above the folder holding a `METHODS.toml`, else the folder itself, as
+    `list_local_method_tree` roots the tree it lists; the directory a host wrote a tree out as is that tree's root.
+
+    Raises:
+        MethodTreeLoadError: The folder cannot be resolved, or a directory on the way up cannot be looked into.
+    """
+    written = WRITTEN_METHOD_TREES.tree_written_at(directory=handed_over)
+    if written is not None and written.directory is not None:
+        return written.directory
+    try:
+        directory = handed_over.resolve(strict=True)
+        return find_manifest_directory(directory) or directory
+    except OSError as exc:
+        msg = f"Cannot find the root of the method tree of '{handed_over}': {exc}"
+        raise MethodTreeLoadError(msg) from exc
+    except TreeSourceError as exc:
+        raise MethodTreeLoadError(exc.message) from exc
+
+
 def _with_root_named(*, message: str, root: Path, label: str) -> str:
     """`message` with every spelling of `root` it holds replaced by `label`, the longest spelling first."""
     spellings = {str(root), str(root.absolute())}

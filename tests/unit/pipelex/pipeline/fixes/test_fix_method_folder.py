@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.fixes import fix_loop
 from pipelex.pipeline.fixes.fix_loop import fix_method_folder
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -47,6 +48,13 @@ def _seq_output_error(*, source: str | None) -> ValidateBundleError:
             ),
         ],
     )
+
+
+_MANIFEST = """[package]
+address = "github.com/pipelex-tests/folder-fix"
+version = "1.0.0"
+description = "A method whose tree is rooted above the folder a fix is handed"
+"""
 
 
 def _write_method_folder(*, directory: Path) -> tuple[Path, Path]:
@@ -123,3 +131,43 @@ class TestFixMethodFolder:
         assert result.fixes_applied == []
         assert result.files_written == []
         assert ideas_path.read_text(encoding="utf-8") == _IDEAS_MTHDS
+
+    async def test_a_fix_of_a_subfolder_lands_in_a_sibling_bundle_of_its_tree(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The tree is rooted at the `METHODS.toml` above the folder handed over, and a fix may write any bundle of it."""
+        root_dir = tmp_path / "method"
+        sub_dir = root_dir / "sub"
+        sub_dir.mkdir(parents=True)
+        (root_dir / "METHODS.toml").write_text(_MANIFEST, encoding="utf-8")
+        ideas_path = root_dir / "ideas.mthds"
+        ideas_path.write_text(_IDEAS_MTHDS, encoding="utf-8")
+        summary_path = sub_dir / "summary.mthds"
+        summary_path.write_text(_SUMMARY_MTHDS, encoding="utf-8")
+        mocker.patch(
+            "pipelex.pipeline.fixes.fix_loop.validate_bundle",
+            # A file of the tree outside the folder loaded is named by its absolute location, as the load names it.
+            side_effect=[_seq_output_error(source=str(ideas_path.resolve())), None],
+        )
+
+        result = await fix_method_folder(method_dir=sub_dir, library_dirs=[sub_dir], max_iterations=3)
+
+        assert result.is_valid is True
+        assert result.bail_reason is None
+        assert [Path(written) for written in result.files_written] == [ideas_path.resolve()]
+        fixed = tomlkit.loads(ideas_path.read_text(encoding="utf-8")).unwrap()
+        assert fixed["pipe"]["list_ideas"]["output"] == "Idea[]"
+        assert summary_path.read_text(encoding="utf-8") == _SUMMARY_MTHDS
+
+    async def test_a_library_directory_naming_the_folder_otherwise_is_not_loaded_twice(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The folder is left out of the directories beside it however it is spelled, compared resolved."""
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
+        _write_method_folder(directory=method_dir)
+        linked_dir = tmp_path / "linked"
+        linked_dir.symlink_to(method_dir, target_is_directory=True)
+        snapshot_spy = mocker.spy(fix_loop, "_snapshot_loaded_sources")
+        mocker.patch("pipelex.pipeline.fixes.fix_loop.validate_bundle", return_value=None)
+
+        result = await fix_method_folder(method_dir=method_dir, library_dirs=[linked_dir, method_dir], max_iterations=3)
+
+        assert result.is_valid is True
+        assert snapshot_spy.call_args.kwargs["effective_dirs"] == [method_dir]

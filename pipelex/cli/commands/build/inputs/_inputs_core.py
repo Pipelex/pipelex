@@ -48,17 +48,14 @@ async def _generate_inputs_core(
     The file goes to ``output_path``, else into ``default_output_dir`` (a method's folder, where ``run bundle`` finds
     it), else beside the bundle, else under ``results/``.
     """
-    # Set up library so pipes can be found
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dir)
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path)
+            # The bundle loads in one library with the method's whole folder and the -L directories, as `run bundle`
+            # loads it, so a concept or a pipe it takes from a sibling bundle of its method resolves.
+            validate_bundle_result = await validate_bundle(
+                mthds_file_path=bundle_path,
+                library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None,
+            )
             bundle_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
                 main_pipe_code = bundle_blueprint.main_pipe
@@ -82,9 +79,17 @@ async def _generate_inputs_core(
         except PipeInputError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-    elif not pipe_code:
-        typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+    else:
+        # No bundle: the pipe named is found in the library directories, a method's folder among them.
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        effective_dirs, _ = resolve_library_dirs(library_dir)
+        if effective_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        if not pipe_code:
+            typer.secho("Failed to build inputs: no pipe code specified", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
 
     try:
         the_pipe = get_required_entry_pipe(pipe_code=pipe_code)

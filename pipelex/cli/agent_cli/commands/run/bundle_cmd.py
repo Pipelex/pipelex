@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli, report_agent_init_failure
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
@@ -141,6 +142,9 @@ def run_bundle_cmd(
             folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
         except ValidateBundleError as exc:
             agent_error(exc.message, error_type="ValidateBundleError", cause=exc)
+        except PipelexConfigError as exc:
+            # Listing the tree reads its limits from the configuration, before the boot would.
+            report_agent_init_failure(error=exc)
         method_tree = folder_run.tree
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
@@ -167,6 +171,8 @@ def run_bundle_cmd(
             method_tree = list_bundle_file_tree(bundle_file=target_path)
         except ValidateBundleError as exc:
             agent_error(exc.message, error_type="ValidateBundleError", cause=exc)
+        except PipelexConfigError as exc:
+            report_agent_init_failure(error=exc)
     else:
         agent_error(
             f"'{path}' is not a .mthds file or directory. Use 'run pipe <code>' for pipe codes, or 'run bundle <path>' for .mthds files/directories.",

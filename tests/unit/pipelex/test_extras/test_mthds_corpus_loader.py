@@ -49,6 +49,39 @@ class TestMthdsCorpusLoader:
         assert "Corpus entry 'sample_entry' does not resolve to a bundle" in str(exc_info.value)
         assert shape.refusal in str(exc_info.value)
 
+    def test_an_entry_is_its_own_root_whatever_its_ancestors_hold(self, tmp_path: Path) -> None:
+        """No Manifest Discovery: a `METHODS.toml` above the entry, as a project above `site-packages` may hold, is no part of it."""
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        (project_dir / "METHODS.toml").write_text(
+            '[package]\naddress = "github.com/pipelex-tests/project"\nversion = "1.0.0"\ndescription = "A project above the corpus"\n',
+            encoding="utf-8",
+        )
+        (project_dir / "project.mthds").write_text(
+            'domain = "project_notes"\nmain_pipe = "take_note"\n\n[pipe.take_note]\ntype = "PipeLLM"\ndescription = "Take a note"\n'
+            'inputs = { text = "Text" }\noutput = "Text"\nprompt = "Note $text"\n',
+            encoding="utf-8",
+        )
+        shape = MethodFolderShape.ONE_DECLARED_MAIN_PIPE
+        entry_dir = self._entry_dir(tmp_path=project_dir, shape=shape)
+        assert shape.entry is not None
+
+        entry = load_entry(directory=entry_dir)
+
+        assert entry.bundle_path == (entry_dir / shape.entry.tree_path).resolve()
+
+    def test_an_entry_whose_one_bundle_the_rule_cannot_read_is_that_bundle(self, tmp_path: Path) -> None:
+        """An invalid entry authored to trigger the refusal of its own `main_pipe` resolves to the bundle the refusal names."""
+        entry_dir = self._entry_dir(tmp_path=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+        for bundle_file in entry_dir.rglob("*.mthds"):
+            bundle_file.unlink()
+        unreadable = entry_dir / "bundle.mthds"
+        unreadable.write_text('domain = "laundry_tickets"\nmain_pipe = "Not A Pipe Code"\n', encoding="utf-8")
+
+        entry = load_entry(directory=entry_dir)
+
+        assert entry.bundle_path == unreadable.resolve()
+
     @staticmethod
     def _entry_dir(*, tmp_path: Path, shape: MethodFolderShape) -> Path:
         entry_dir = write_method_folder(directory=tmp_path / "sample_entry", shape=shape)

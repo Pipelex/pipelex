@@ -1,47 +1,30 @@
 """Path-to-bundle resolution for agent CLI bundle commands.
 
 ``validate bundle`` and ``fix bundle`` must resolve the user's ``path`` argument identically: fix must patch exactly
-what validate judged, a bundle file or a method's whole folder. The shared core (``pipelex.cli.bundle_target_resolution``)
-owns the decision, the one every command taking a bundle path makes, ``run bundle`` included; this wrapper owns the
-agent error envelopes of a target that names nothing to judge.
+what validate judged, a bundle file or a method's whole folder. The shared core (``pipelex.cli.judged_target``, over
+``pipelex.cli.bundle_target_resolution``) owns the decision, the one every command taking a bundle path makes,
+``run bundle`` included; this wrapper owns the agent error envelopes of a target that names nothing to judge, and of
+a configuration that cannot be read before the boot.
 """
 
-from pathlib import Path
-from typing import NamedTuple
-
-from mthds.method_tree.models import MethodTree
-
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import report_agent_init_failure
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cli.bundle_target_resolution import (
-    BundleTargetResolutionError,
-    FolderReading,
-    resolve_bundle_target_core,
-)
+from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError
+from pipelex.cli.judged_target import JudgedBundleTarget, resolve_judged_target
 from pipelex.libraries.exceptions import EmptyMethodTreeError
 
 
-class AgentBundleTarget(NamedTuple):
-    """What an agent ``validate`` or ``fix`` judges: one bundle file, or a method's whole folder, and its library."""
-
-    #: The file named, or None for a folder.
-    bundle_path: Path | None
-    #: The folder named, judged as its whole method tree, or None for a file.
-    method_dir: Path | None
-    #: The folder's method tree, or None for a file.
-    method_tree: MethodTree | None
-    #: The folder, then the ``-L`` directories, ``~`` expanded; None for a file named with no ``-L``.
-    library_dirs: list[Path] | None
-
-
-def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> AgentBundleTarget:
+def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> JudgedBundleTarget:
     """Resolve the ``path`` argument of ``validate bundle`` or ``fix bundle`` into what the command judges.
 
     A folder is read as its method tree and judged whole, every bundle of it, as the MTHDS protocol's validation judges
-    a method: it needs no pipe to start at. The folder is prepended to the library directories, so its files are in the
-    fix write scope, being user-passed.
+    a method: it needs no pipe to start at. The folder is prepended to the library directories; a fix may write any
+    bundle of its tree, being user-passed.
 
     A folder holding no bundle and a path that is neither a ``.mthds`` file nor a directory produce no verdict: exit 2
-    via ``agent_error``.
+    via ``agent_error``. A configuration that does not validate, read for the tree's limits before the boot, is
+    reported as the failed boot it would have been.
 
     Both ``path`` and each ``library_dir`` entry have ``~`` expanded before resolution, so home-relative inputs behave
     like every other CLI path argument.
@@ -55,9 +38,11 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> AgentB
             which the command renders as its own surface does.
     """
     try:
-        result = resolve_bundle_target_core(path, library_dir=library_dir, reading=FolderReading.WHOLE_TREE)
+        result = resolve_judged_target(path=path, library_dir=library_dir)
     except EmptyMethodTreeError as exc:
         agent_error(exc.message, error_type=type(exc).__name__, cause=exc, exit_code=2)
+    except PipelexConfigError as exc:
+        report_agent_init_failure(error=exc)
 
     if isinstance(result, BundleTargetResolutionError):
         agent_error(
@@ -66,9 +51,4 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> AgentB
             error_type="ArgumentError",
             exit_code=2,
         )
-    return AgentBundleTarget(
-        bundle_path=result.bundle_path,
-        method_dir=result.method_dir,
-        method_tree=result.method_tree,
-        library_dirs=result.library_dirs,
-    )
+    return result

@@ -93,6 +93,39 @@ prompt = "Say hi to $name"
 """
 
 
+_ROOT_MANIFEST = """[package]
+address = "github.com/pipelex-tests/human-fix-tree"
+version = "1.0.0"
+description = "A method whose tree is rooted above the folder a fix is handed"
+"""
+
+_VALID_SUB_MTHDS = """domain = "human_fix_sub"
+main_pipe = "summarize"
+
+[pipe.summarize]
+type = "PipeLLM"
+description = "Summarize a topic."
+inputs = { topic = "Text" }
+output = "Text"
+prompt = "Summarize $topic"
+"""
+
+
+def _write_tree_rooted_above(*, directory: Path) -> tuple[Path, Path]:
+    """A method tree rooted at a `METHODS.toml`, whose fixable bundle is a sibling of the subfolder a fix is handed.
+
+    Returns:
+        The subfolder, and the fixable sibling bundle.
+    """
+    sub_dir = directory / "sub"
+    sub_dir.mkdir(parents=True)
+    (directory / "METHODS.toml").write_text(_ROOT_MANIFEST, encoding="utf-8")
+    sibling_path = directory / "ideas.mthds"
+    sibling_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+    (sub_dir / "summary.mthds").write_text(_VALID_SUB_MTHDS, encoding="utf-8")
+    return sub_dir, sibling_path
+
+
 def _pipes(bundle_path: Path) -> dict[str, Any]:
     parsed = tomlkit.loads(bundle_path.read_text(encoding="utf-8")).unwrap()
     return cast("dict[str, Any]", parsed["pipe"])
@@ -356,3 +389,51 @@ class TestFixBundleHuman:
         output = console.export_text()
         assert "✅ Bundle fixed — valid" in output
         assert _pipes(bundle_path)["list_ideas"]["output"] == "Idea[]"
+
+    def test_fixing_a_subfolder_fixes_a_sibling_bundle_of_its_tree(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """The folder's tree is rooted at the `METHODS.toml` above it, so the fix may write any bundle of it."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        sub_dir, sibling_path = _write_tree_rooted_above(directory=tmp_path / "method")
+
+        fix_bundle_cmd(path=str(sub_dir))
+
+        output = console.export_text()
+        assert "✅ Bundle fixed — valid" in output
+        assert f"Bundle: {sub_dir}" in output
+        assert "outside write scope" not in output
+        assert _pipes(sibling_path)["list_ideas"]["output"] == "Idea[]"
+
+    def test_diff_preview_of_a_subfolder_gives_the_verdict_the_real_fix_gives(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        console: Console,
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """The preview mirrors the tree's root, manifest and siblings included, so it judges the method the real fix judges."""
+        load_empty_library()
+        self._patch_setup(mocker)
+        sub_dir, sibling_path = _write_tree_rooted_above(directory=tmp_path / "method")
+        original_bytes = sibling_path.read_bytes()
+
+        fix_bundle_cmd(path=str(sub_dir), diff=True)
+
+        assert sibling_path.read_bytes() == original_bytes
+        output = console.export_text()
+        assert "✅ Fix preview — these fixes would make the bundle valid" in output
+        assert f"--- {sibling_path.resolve()}" in output
+        assert '+output = "Idea[]"' in output
+        assert f"- {sibling_path.resolve()}" in output
+        assert "pipelex-fix-preview-" not in output
+
+        fix_bundle_cmd(path=str(sub_dir))
+
+        assert "✅ Bundle fixed — valid" in console.export_text()
+        assert _pipes(sibling_path)["list_ideas"]["output"] == "Idea[]"

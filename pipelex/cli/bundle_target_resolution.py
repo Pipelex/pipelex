@@ -37,6 +37,7 @@ from pipelex.pipeline.method_entry import (
     select_named_pipe,
     tree_method_label,
 )
+from pipelex.pipeline.validate_bundle import dirs_beside_method
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
@@ -201,10 +202,8 @@ def resolve_bundle_target_core(
     target_path = Path(path).expanduser()
 
     if target_path.is_dir():
-        if library_dirs is None:
-            library_dirs = [target_path]
-        elif target_path not in library_dirs:
-            library_dirs = [target_path, *library_dirs]
+        # The folder first, then the -L directories that are not the folder, however either is spelled.
+        library_dirs = [target_path, *dirs_beside_method(method_dir=target_path, library_dirs=library_dirs)]
         match reading:
             case FolderReading.ENTRY_PIPE:
                 folder = resolve_method_folder(directory=target_path, pipe_override=pipe_override)

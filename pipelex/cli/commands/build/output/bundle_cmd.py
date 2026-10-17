@@ -72,7 +72,9 @@ def build_output_bundle_cmd(
 
     output_path_path = Path(output_path) if output_path else None
     # A folder is read as its method tree and acts on the pipe a run of it starts at, as `run bundle` reads it.
-    target = resolve_build_bundle_target(path=path, library_dir=library_dir, pipe_override=pipe, not_a_bundle_hint=_NOT_A_BUNDLE_HINT)
+    target = resolve_build_bundle_target(
+        path=path, library_dir=library_dir, pipe_override=pipe, command="build output", not_a_bundle_hint=_NOT_A_BUNDLE_HINT
+    )
 
     execute_generate_output(
         pipe_code=target.pipe_code,

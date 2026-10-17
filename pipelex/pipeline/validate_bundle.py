@@ -28,7 +28,6 @@ from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.method_trees import list_local_method_tree, reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
-from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -384,21 +383,30 @@ def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
         raise ValidateBundleError(message=" ".join(item.message for item in items), pipelex_bundle_blueprint_validation_errors=items)
 
 
-def _is_member_source(*, source: str | None, tree: MethodTree) -> bool:
-    """Whether a loaded bundle's source names a file of the method's tree.
+def _is_member_blueprint(*, blueprint: PipelexBundleBlueprint, tree: MethodTree) -> bool:
+    """Whether a loaded bundle is a file of the method's own tree, by the tree its loader listed it in.
 
-    A bundle of a tree a host holds is named by its tree path, any other by its file on this host's disk, which is a
-    member when it lies under the tree's root at one of the tree's paths.
+    The tree it was listed in is the method's when it is rooted at the same directory, which tells the method's bundles
+    from those of a package nested in it, of a dependency shipped with it, or of a directory loaded beside it, even when
+    one of them holds a bundle at the same tree path, as the trees a host writes out name their bundles.
     """
-    if source is None:
+    tree_bundle = blueprint.tree_bundle
+    if tree_bundle is None or tree_bundle.tree_path is None or tree_bundle.tree_path not in tree.members:
         return False
-    if WRITTEN_METHOD_TREES.holds_tree(tree=tree):
-        return source in tree.members
-    if tree.directory is None:
+    listed_in = tree_bundle.tree.directory
+    if listed_in is None or tree.directory is None:
         return False
-    root = tree.directory.resolve()
-    resolved = Path(source).resolve()
-    return resolved.is_relative_to(root) and resolved.relative_to(root).as_posix() in tree.members
+    return listed_in.resolve() == tree.directory.resolve()
+
+
+def dirs_beside_method(*, method_dir: Path, library_dirs: Sequence[Path] | None) -> list[Path]:
+    """The caller's library directories that load beside a method's folder, the folder itself left out.
+
+    The directories are compared resolved, so `.`, a trailing slash or a symlink naming the folder never loads it twice.
+    Each is kept as the caller gave it, so the files it holds are spelled as the caller spelled the directory.
+    """
+    resolved_method_dir = method_dir.resolve()
+    return [library_dir for library_dir in library_dirs or [] if library_dir.resolve() != resolved_method_dir]
 
 
 async def _validate_method_dir(
@@ -419,8 +427,7 @@ async def _validate_method_dir(
     """
     library_manager = get_library_manager()
     library = library_manager.get_library(library_id=library_id)
-    resolved_method_dir = method_dir.resolve()
-    beside_dirs = [library_dir for library_dir in library_dirs or [] if library_dir.resolve() != resolved_method_dir]
+    beside_dirs = dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)
     with translate_to_validate_bundle_error():
         tree = list_local_method_tree(handed_over=method_dir)
         _ensure_tree_python_parses(tree=tree)
@@ -430,10 +437,12 @@ async def _validate_method_dir(
             methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
         )
         blueprints = library_manager.get_accumulated_blueprints(library_id)
-        if beside_dirs:
-            # The directories beside the method hold what its bundles use, not the method: their pipes are not judged.
-            loaded_pipes = [pipe for pipe in loaded_pipes if _is_member_source(source=library_manager.get_pipe_source(pipe.pipe_ref), tree=tree)]
-            blueprints = [blueprint for blueprint in blueprints if _is_member_source(source=blueprint.source, tree=tree)]
+        # Only the tree's own bundles are the method. The directories beside it, and the packages nested in it that the
+        # load reads as their own trees, hold what its bundles use: their pipes load, so the method's can call them, but
+        # are not judged, so loading a directory beside the method never changes which of its pipes the verdict covers.
+        blueprints = [blueprint for blueprint in blueprints if _is_member_blueprint(blueprint=blueprint, tree=tree)]
+        member_pipe_refs = {f"{blueprint.domain}.{pipe_code}" for blueprint in blueprints for pipe_code in blueprint.pipe or {}}
+        loaded_pipes = [pipe for pipe in loaded_pipes if pipe.pipe_ref in member_pipe_refs]
         if not blueprints:
             msg = "The method holds no .mthds bundle, so it has nothing to validate."
             raise ValidateBundleError(message=msg)

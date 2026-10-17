@@ -3,11 +3,10 @@
 import asyncio
 import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, NoReturn
 
 import typer
 
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
@@ -17,11 +16,12 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     set_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
+from pipelex.cli.judged_target import fix_judged_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file, fix_method_folder
+from pipelex.pipeline.fixes.fix_loop import FixBundleResult, unfixable_method_result
 from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
@@ -76,6 +76,22 @@ def _failure_message(result: FixBundleResult) -> str:
     return message
 
 
+def _emit_still_invalid(*, result: FixBundleResult, bundle_path: str) -> NoReturn:
+    """Emit the still-invalid verdict, format-aware, and exit 1.
+
+    JSON keeps the exact FixBundleError envelope (the result fields + bail_reason via the payload); markdown renders the
+    remaining errors as prose with their 💡 lines (mirroring the human still-invalid panel) instead of a raw JSON dump
+    of the details.
+    """
+    payload = _result_payload(result, bundle_path=bundle_path)
+    match get_agent_cli_error_format():
+        case CliOutputFormat.JSON:
+            agent_error(_failure_message(result), error_type="FixBundleError", exit_code=1, **payload)
+        case CliOutputFormat.MARKDOWN:
+            print(format_fix_still_invalid_markdown(result, bundle_path=str(payload["bundle_path"])), file=sys.stderr)
+            raise typer.Exit(1)
+
+
 def fix_bundle_cmd(
     path: Annotated[
         str,
@@ -123,62 +139,34 @@ def fix_bundle_cmd(
     ignore_codes = _normalize_rule_codes(ignore_codes_raw)
     _reject_invalid_rule_filters(select_codes=select_codes, ignore_codes=ignore_codes)
 
-    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
+    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it. A folder whose tree is
+    # refused is the still-invalid verdict, with nothing to fix, as `validate bundle` gives it the invalid one.
     try:
         target = resolve_bundle_target(path, library_dir=library_dir)
     except ValidateBundleError as exc:
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
-    judged_path: Path
-    if target.method_dir is not None:
-        judged_path = target.method_dir
-    elif target.bundle_path is not None:
-        judged_path = target.bundle_path
-    else:
-        msg = f"The target '{path}' resolved to neither a bundle file nor a method's folder."
-        raise PipelexUnexpectedError(msg)
-    bundle_path = str(judged_path)
+        _emit_still_invalid(result=unfixable_method_result(error=exc), bundle_path=str(Path(path).expanduser()))
+    bundle_path = str(target.judged_path)
     library_dirs = target.library_dirs
 
     try:
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
-        if target.method_dir is not None:
-            result = asyncio.run(
-                fix_method_folder(
-                    method_dir=target.method_dir,
-                    library_dirs=library_dirs,
-                    allow_signatures=allow_signatures,
-                    max_iterations=max_iterations,
-                    select_codes=select_codes,
-                    ignore_codes=ignore_codes,
-                )
+        result = asyncio.run(
+            fix_judged_target(
+                target=target,
+                writable_library_dirs=None,
+                allow_signatures=allow_signatures,
+                max_iterations=max_iterations,
+                select_codes=select_codes,
+                ignore_codes=ignore_codes,
             )
-        else:
-            result = asyncio.run(
-                fix_bundle_file(
-                    judged_path,
-                    library_dirs=library_dirs,
-                    allow_signatures=allow_signatures,
-                    max_iterations=max_iterations,
-                    select_codes=select_codes,
-                    ignore_codes=ignore_codes,
-                )
-            )
-        payload = _result_payload(result, bundle_path=bundle_path)
+        )
         if result.is_valid:
+            payload = _result_payload(result, bundle_path=bundle_path)
             agent_success_formatted({"success": True, **payload}, markdown_renderer=format_fix_markdown, output_format=output_format)
             if not allow_signatures and result.is_runnable is False:
                 raise typer.Exit(1)
             return
-
-        # Still-invalid verdict: format-aware. JSON keeps the exact FixBundleError envelope (the result
-        # fields + bail_reason via **payload); markdown renders the remaining errors as prose with their
-        # 💡 lines (mirroring the human still-invalid panel) instead of a raw JSON dump of the details.
-        match get_agent_cli_error_format():
-            case CliOutputFormat.JSON:
-                agent_error(_failure_message(result), error_type="FixBundleError", exit_code=1, **payload)
-            case CliOutputFormat.MARKDOWN:
-                print(format_fix_still_invalid_markdown(result, bundle_path=str(payload["bundle_path"])), file=sys.stderr)
-                raise typer.Exit(1)
+        _emit_still_invalid(result=result, bundle_path=bundle_path)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)

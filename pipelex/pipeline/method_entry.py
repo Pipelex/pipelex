@@ -29,6 +29,7 @@ from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipe_machinery.validation import is_pipe_code_valid
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -78,13 +79,18 @@ def _entry_of(*, candidate: EntryCandidate, pipe_code: str) -> MethodEntry:
 
 
 def _declared_candidate(*, tree_path: str, bundle_dict: dict[str, Any]) -> EntryCandidate | None:
-    """The candidate a bundle's raw TOML declares, or None when its domain, main_pipe or pipe table has the wrong type."""
+    """The candidate a bundle's raw TOML declares, or None when the full parse must say what is wrong with it.
+
+    That is when its domain or pipe table has the wrong type, or its main_pipe is not a pipe code: a `main_pipe` is
+    held to the rule the bundle's parse holds it to, so `dom.pipe`, `camelCase` and an empty string are refused as the
+    load would refuse them, never read as a pipe to start at nor, for the empty string, as declaring none.
+    """
     domain = bundle_dict.get(_DOMAIN_KEY)
     main_pipe = bundle_dict.get(_MAIN_PIPE_KEY)
     pipe_table = bundle_dict.get(_PIPE_KEY)
     if not isinstance(domain, str):
         return None
-    if main_pipe is not None and not isinstance(main_pipe, str):
+    if main_pipe is not None and not (isinstance(main_pipe, str) and is_pipe_code_valid(main_pipe)):
         return None
     if pipe_table is not None and not isinstance(pipe_table, dict):
         return None
@@ -96,8 +102,8 @@ def read_entry_candidate(*, tree_path: str, bundle_file: Path) -> EntryCandidate
     """What a bundle file declares of where its method starts, read without validating its pipes.
 
     Raises:
-        MthdsParserError: The bundle is not TOML or not UTF-8 text, or its domain, main_pipe or pipe table cannot be
-            read, each located as its full parse locates it.
+        MthdsParserError: The bundle is not TOML or not UTF-8 text, its domain or pipe table cannot be read, or its
+            main_pipe is not a valid pipe code, each located as its full parse locates it.
     """
     try:
         bundle_dict = load_toml_from_path(path=bundle_file)
@@ -176,7 +182,7 @@ def select_entry(*, candidates: list[EntryCandidate], manifest: MethodsManifest 
     if manifest is not None:
         return _manifest_entry(candidates=candidates, manifest=manifest, method_label=method_label, bundle_paths=bundle_paths)
 
-    declaring = [candidate for candidate in candidates if candidate.main_pipe]
+    declaring = [candidate for candidate in candidates if candidate.main_pipe is not None]
     if not declaring:
         msg = (
             f"The method {method_label} has no {MANIFEST_NAME}, and none of its bundles declares a main_pipe "

@@ -10,10 +10,11 @@ import re
 from collections.abc import Iterator
 from pathlib import Path
 
+from mthds.method_tree.discovery import BUNDLE_SUFFIX
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.libraries.exceptions import MethodTreeLoadError
-from pipelex.libraries.method_trees import list_local_method_tree
+from pipelex.libraries.method_trees import list_local_method_tree_at_root
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME
 from pipelex.pipeline.exceptions import MethodEntryError
@@ -55,11 +56,28 @@ def _resolve_bundle_path(*, directory: Path) -> Path:
     (``select_method_entry`` over the folder's method tree) rather than by keeping a corpus copy of it: a copy is how
     the two drift. The rule reads only the bundles' declarations, so an entry whose bundle is deliberately invalid
     resolves as long as it declares its ``main_pipe``. Only the rendering of a failure is ours.
+
+    The rule refuses a bundle whose declarations it cannot read, a ``main_pipe`` that is no pipe code among them, as
+    ``run bundle <dir>`` refuses it. An entry authored to trigger that refusal holds that one bundle, which is the
+    bundle the refusal names, so a single-bundle entry the rule cannot read resolves to its bundle.
+
+    The entry directory is listed as its own root, with no Manifest Discovery: the corpus ships inside an installed
+    package, and a ``METHODS.toml`` in one of its ancestors, such as a project above ``site-packages``, is no part of it.
     """
     try:
-        tree = list_local_method_tree(handed_over=directory)
+        tree = list_local_method_tree_at_root(root=directory)
+    except MethodTreeLoadError as exc:
+        msg = f"Corpus entry '{directory.name}' does not resolve to a bundle: {exc.message}"
+        raise CorpusEntryError(msg) from exc
+    try:
         entry = select_method_entry(tree=tree)
-    except (MethodTreeLoadError, MethodEntryError, MthdsParserError) as exc:
+    except MthdsParserError as exc:
+        bundle_paths = [tree_path for tree_path in tree.tree_paths if tree_path.endswith(BUNDLE_SUFFIX)]
+        if len(bundle_paths) != 1:
+            msg = f"Corpus entry '{directory.name}' does not resolve to a bundle: {exc.message}"
+            raise CorpusEntryError(msg) from exc
+        return tree.file_location(bundle_paths[0])
+    except MethodEntryError as exc:
         msg = f"Corpus entry '{directory.name}' does not resolve to a bundle: {exc.message}"
         raise CorpusEntryError(msg) from exc
     return tree.file_location(entry.tree_path)

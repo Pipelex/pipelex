@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from pipelex.cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.cli.commands.validate._validate_core import COMMAND, execute_validate
+from pipelex.cli.error_handlers import handle_validate_bundle_error
+from pipelex.pipeline.exceptions import ValidateBundleError
 
 _NOT_A_BUNDLE_HINT = (
     "  To validate a pipe by code, use: pipelex validate pipe <code>\n"
@@ -52,12 +55,21 @@ def validate_bundle_cmd(
         pipelex validate bundle my_method/
         pipelex validate bundle my_bundle.mthds --allow-signatures
     """
-    target = resolve_bundle_target(
-        path,
-        library_dir=library_dir,
-        command=COMMAND,
-        not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
-    )
+    try:
+        target = resolve_bundle_target(
+            path,
+            library_dir=library_dir,
+            command=COMMAND,
+            not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
+        )
+    except ValidateBundleError as exc:
+        # A folder whose tree is refused is the invalid verdict, naming the folder.
+        handle_validate_bundle_error(
+            exc,
+            bundle_path=Path(path).expanduser(),
+            library_dirs=[Path(one_dir).expanduser() for one_dir in library_dir] if library_dir else None,
+            allow_signatures=allow_signatures,
+        )
 
     execute_validate(
         pipe_code=None,

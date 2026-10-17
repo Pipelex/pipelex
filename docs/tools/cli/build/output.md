@@ -33,7 +33,7 @@ pipelex build output pipe <PIPE_CODE> [OPTIONS]
 pipelex build output bundle <PATH> [OPTIONS]
 ```
 
-A folder is read as its [method tree](../../../building-methods/method-trees.md), as [`pipelex run bundle`](../run.md#run-bundle) reads it. With no `--pipe`, the representation is for the pipe a run of the folder starts at: the manifest's `main_pipe`, or, with no manifest, the one `main_pipe` its bundles declare. A folder whose bundles declare none, or several, is refused with the message `run bundle` gives, naming each bundle by its path in the tree. With `--pipe`, the folder loads as the method's library and the pipe named is looked up there, as a run naming its pipe does. Either way the file is written in the folder unless `--output` says otherwise.
+A folder is read as its [method tree](../../../building-methods/method-trees.md), as [`pipelex run bundle`](../run.md#run-bundle) reads it. With no `--pipe`, the representation is for the pipe a run of the folder starts at: the manifest's `main_pipe`, or, with no manifest, the one `main_pipe` its bundles declare. A folder whose bundles declare none, or several, is refused with the message `run bundle` gives, naming each bundle by its path in the tree. The bundle defining that pipe loads with the rest of the method's folder and the `-L` directories, as a run loads it, so a concept or a pipe it takes from a sibling bundle resolves. With `--pipe`, the folder loads as the method's library and the pipe named is looked up there, as a run naming its pipe does. A refusal names the command, as in `Failed to build output: ...`. Either way the file is written in the folder unless `--output` says otherwise.
 
 **Arguments:**
 

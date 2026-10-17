@@ -7,7 +7,8 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli, report_agent_init_failure
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError, FolderReading, resolve_bundle_target_core
@@ -61,6 +62,9 @@ def inputs_bundle_cmd(
         agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
     except ValidateBundleError as exc:
         agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
+    except PipelexConfigError as exc:
+        # Listing the tree reads its limits from the configuration, before the boot would.
+        report_agent_init_failure(error=exc)
     if isinstance(target, BundleTargetResolutionError):
         agent_error(
             f"'{path}' is not a .mthds file or directory. "

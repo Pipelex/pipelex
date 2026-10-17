@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Annotated
 
 import typer
 
-from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.base_exceptions import PipelexConfigError, PipelexUnexpectedError
 from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
@@ -13,7 +13,7 @@ from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_ru
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
-from pipelex.cli.error_handlers import handle_validate_bundle_error
+from pipelex.cli.error_handlers import handle_pre_boot_config_error, handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -158,6 +158,9 @@ def run_bundle_cmd(
             folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
         except ValidateBundleError as exc:
             handle_validate_bundle_error(exc, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None)
+        except PipelexConfigError as exc:
+            # Listing the tree reads its limits from the configuration, before the boot would.
+            handle_pre_boot_config_error(exc=exc, command=COMMAND, exit_code=1)
         method_tree = folder_run.tree
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
@@ -191,6 +194,8 @@ def run_bundle_cmd(
             handle_validate_bundle_error(
                 exc, bundle_path=target_path, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None
             )
+        except PipelexConfigError as exc:
+            handle_pre_boot_config_error(exc=exc, command=COMMAND, exit_code=1)
     else:
         typer.secho(
             f"Failed to run: '{path}' is not a .mthds file or directory.\n"

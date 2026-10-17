@@ -8,9 +8,12 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import pytest
 import typer
 
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.cli.agent_cli.commands.inputs.bundle_cmd import inputs_bundle_cmd
+from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -25,6 +28,7 @@ if TYPE_CHECKING:
 VALIDATE_MODULE = "pipelex.cli.agent_cli.commands.validate.bundle_cmd"
 FIX_MODULE = "pipelex.cli.agent_cli.commands.fix.bundle_cmd"
 INPUTS_MODULE = "pipelex.cli.agent_cli.commands.inputs.bundle_cmd"
+JUDGED_TARGET_MODULE = "pipelex.cli.judged_target"
 
 _RESOLVED_SHAPES = [MethodFolderShape.MANIFEST_MAIN_PIPE, MethodFolderShape.ONE_DECLARED_MAIN_PIPE]
 _UNDECIDED_SHAPES = [MethodFolderShape.SEVERAL_MAIN_PIPES, MethodFolderShape.NO_MAIN_PIPE]
@@ -60,6 +64,28 @@ def _invoke_validate_or_fix_for_json(*, command: str, path: Path) -> None:
             raise ValueError(msg)
 
 
+def _invoke_pre_boot_command(*, command: str, path: Path) -> None:
+    """Invoke a command taking a method's folder, its errors in JSON."""
+    match command:
+        case "validate" | "fix":
+            _invoke_validate_or_fix_for_json(command=command, path=path)
+        case "inputs":
+            inputs_bundle_cmd(path=str(path))
+        case "run":
+            run_bundle_cmd(path=str(path), error_format=CliOutputFormat.JSON)
+        case _:
+            msg = f"Unknown command '{command}'"
+            raise ValueError(msg)
+
+
+def _write_folder_with_a_refused_tree(*, directory: Path) -> None:
+    """A method folder whose tree is refused when it is listed: a symbolic link among its files."""
+    write_method_folder(directory=directory, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+    outside_bundle = directory.parent / f"{directory.name}-outside.mthds"
+    outside_bundle.write_text('domain = "outside"\n', encoding="utf-8")
+    (directory / "linked.mthds").symlink_to(outside_bundle)
+
+
 def _patch_validate(mocker: MockerFixture) -> _ValidateMocks:
     """Stub what `validate bundle` boots and runs; return its cores, its graph helpers and its success emitter."""
     mocker.patch(f"{VALIDATE_MODULE}.make_pipelex_for_agent_cli")
@@ -79,8 +105,8 @@ def _patch_fix(mocker: MockerFixture) -> MockType:
     mocker.patch(f"{FIX_MODULE}.Pipelex.teardown_if_needed")
     mocker.patch(f"{FIX_MODULE}.agent_success_formatted")
     result = FixBundleResult(is_valid=True, iterations=0, fixes_applied=[], remaining_errors=[], is_runnable=True)
-    mocker.patch(f"{FIX_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
-    mock_fix: MockType = mocker.patch(f"{FIX_MODULE}.fix_method_folder", new=mocker.AsyncMock(return_value=result))
+    mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
+    mock_fix: MockType = mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_method_folder", new=mocker.AsyncMock(return_value=result))
     return mock_fix
 
 
@@ -166,6 +192,45 @@ class TestAgentFolderEntryCommands:
 
         assert mock_fix.call_args.kwargs["method_dir"] == tmp_path
         assert mock_fix.call_args.kwargs["library_dirs"] == [tmp_path]
+
+    def test_fix_reports_a_folder_whose_tree_is_refused_in_the_fix_envelope(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """The documented FixBundleError envelope, as a fix that could not be made, never a bare refusal."""
+        mock_fix = _patch_fix(mocker)
+        _write_folder_with_a_refused_tree(directory=tmp_path)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            fix_bundle_cmd(path=str(tmp_path), error_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "FixBundleError"
+        assert envelope["is_valid"] is False
+        assert envelope["bundle_path"] == str(tmp_path.resolve())
+        assert envelope["iterations"] == 0
+        assert envelope["fixes_applied"] == []
+        assert envelope["files_written"] == []
+        assert envelope["remaining_errors"]
+        assert any("linked.mthds" in item["message"] for item in envelope["remaining_errors"])
+        mock_fix.assert_not_called()
+
+    @pytest.mark.parametrize("command", ["validate", "fix", "inputs", "run"])
+    def test_a_configuration_that_does_not_validate_before_the_boot_is_the_failed_boot_envelope(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+    ) -> None:
+        """Listing the tree reads its limits from the configuration: a refusal there is the envelope a failed boot gives."""
+        mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            _invoke_pre_boot_command(command=command, path=tmp_path)
+
+        assert exc_info.value.exit_code == 1
+        envelope = json.loads(capsys.readouterr().err)
+        assert envelope["error_type"] == "PipelexConfigError"
+        assert envelope["message"] == "Pipelex initialization failed: the configuration is out of date"
+        assert envelope["hint"] == AGENT_INIT_FAILURE_HINT
 
     @pytest.mark.parametrize("command", ["validate", "fix"])
     def test_validate_and_fix_refuse_a_folder_holding_no_bundle_with_no_verdict(

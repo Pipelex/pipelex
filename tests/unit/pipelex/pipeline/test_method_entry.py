@@ -6,6 +6,7 @@ from mthds.method_tree.lister import list_method_tree
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.method_entry import read_method_candidates, select_method_entry, select_named_pipe
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 def _bundle(*, domain: str, pipe_code: str, main_pipe: str | None) -> str:
@@ -166,6 +167,27 @@ class TestMethodEntry:
             select_method_entry(tree=list_method_tree(tmp_path))
 
         assert expected in str(exc_info.value)
+
+    @pytest.mark.parametrize("main_pipe", ["dom.pipe", "camelCase", ""], ids=["qualified_ref", "camel_case", "empty_string"])
+    def test_a_main_pipe_that_is_no_pipe_code_is_refused_at_entry_selection_naming_its_bundle(self, tmp_path: Path, main_pipe: str) -> None:
+        """The bundle's parse holds `main_pipe` to the pipe code syntax, and so does the rule: an empty string declares no pipe and is no absence."""
+        _write(
+            directory=tmp_path,
+            files={
+                "a.mthds": _bundle(domain="entry_a", pipe_code="first", main_pipe=None).replace(
+                    "\n\n[pipe.", f'\nmain_pipe = "{main_pipe}"\n\n[pipe.', 1
+                ),
+                "b.mthds": _bundle(domain="entry_b", pipe_code="second", main_pipe="second"),
+            },
+        )
+
+        with pytest.raises(MthdsParserError) as exc_info:
+            select_method_entry(tree=list_method_tree(tmp_path))
+
+        assert f"Invalid main pipe syntax '{main_pipe}'" in exc_info.value.message
+        items = exc_info.value.validation_errors or []
+        assert [item.error_type for item in items] == [PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX]
+        assert [Path(item.source or "").name for item in items] == ["a.mthds"]
 
     @pytest.mark.parametrize(
         ("pipe_ref", "expected_tree_path", "expected_pipe_ref"),

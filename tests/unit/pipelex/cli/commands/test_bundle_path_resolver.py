@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING
 import pytest
 import typer
 
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
-from pipelex.cli.commands.bundle_path_resolver import JudgedBundleTarget, resolve_build_bundle_target, resolve_bundle_target
+from pipelex.cli.commands.bundle_path_resolver import resolve_build_bundle_target, resolve_bundle_target
+from pipelex.cli.judged_target import JudgedBundleTarget
 from pipelex.pipeline.exceptions import ValidateBundleError
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
 
@@ -24,7 +26,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 _HINT = "  To fix a bundle, pass a .mthds file or directory: pipelex fix bundle <path>"
-_RESOLVER_MODULE = "pipelex.cli.commands.bundle_path_resolver"
+_METHOD_TREES_MODULE = "pipelex.libraries.method_trees"
 
 
 def _run_refusal(*, directory: Path) -> str:
@@ -41,7 +43,8 @@ class TestHumanBundlePathResolver:
 
         target = resolve_bundle_target(str(bundle_file), library_dir=None, command="fix", not_a_bundle_hint=_HINT)
 
-        assert target == JudgedBundleTarget(bundle_path=bundle_file, method_dir=None, library_dirs=None)
+        assert target == JudgedBundleTarget(bundle_path=bundle_file, method_dir=None, method_tree=None, library_dirs=None)
+        assert target.judged_path == bundle_file
 
     def test_tilde_in_path_is_expanded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("HOME", str(tmp_path))
@@ -72,7 +75,12 @@ class TestHumanBundlePathResolver:
 
         target = resolve_bundle_target(str(tmp_path), library_dir=None, command="validate", not_a_bundle_hint=_HINT)
 
-        assert target == JudgedBundleTarget(bundle_path=None, method_dir=tmp_path, library_dirs=[tmp_path])
+        assert target.bundle_path is None
+        assert target.method_dir == tmp_path
+        assert target.judged_path == tmp_path
+        assert target.library_dirs == [tmp_path]
+        assert target.method_tree is not None
+        assert target.method_tree.directory == tmp_path.resolve()
         assert "main pipe" not in capsys.readouterr().out
 
     def test_directory_is_prepended_to_existing_library_dirs_without_duplication(self, tmp_path: Path) -> None:
@@ -103,21 +111,42 @@ class TestHumanBundlePathResolver:
         assert exc_info.value.exit_code == 2
         assert f"Failed to validate: The folder '{tmp_path}' holds no .mthds bundle." in capsys.readouterr().err
 
-    def test_a_folder_whose_tree_is_refused_is_the_invalid_verdict(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """A symbolic link in the tree is refused when the tree is listed, as `validate` reports an invalid bundle."""
-        mock_handler = mocker.patch(f"{_RESOLVER_MODULE}.handle_validate_bundle_error", side_effect=typer.Exit(1))
+    def test_a_folder_whose_tree_is_refused_is_the_invalid_verdict_each_command_reports(self, tmp_path: Path) -> None:
+        """A symbolic link in the tree is refused when the tree is listed: the verdict leaves for the command to report."""
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
         outside_bundle = tmp_path.parent / f"{tmp_path.name}-outside.mthds"
         outside_bundle.write_text('domain = "outside"\n', encoding="utf-8")
         (tmp_path / "linked.mthds").symlink_to(outside_bundle)
 
-        with pytest.raises(typer.Exit) as exc_info:
+        with pytest.raises(ValidateBundleError) as exc_info:
             resolve_bundle_target(str(tmp_path), library_dir=None, command="fix", not_a_bundle_hint=_HINT)
 
+        assert "linked.mthds" in exc_info.value.message
+
+    def test_a_configuration_that_does_not_validate_before_the_boot_exits_2_as_a_failed_boot(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Listing the tree reads its limits from the configuration: a refusal there is no traceback."""
+        mocker.patch(f"{_METHOD_TREES_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_bundle_target(str(tmp_path), library_dir=None, command="validate", not_a_bundle_hint=_HINT)
+
+        assert exc_info.value.exit_code == 2
+        assert "Failed to validate: the configuration is out of date" in capsys.readouterr().err
+
+    def test_a_build_command_reports_a_configuration_that_does_not_validate_before_the_boot(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        mocker.patch(f"{_METHOD_TREES_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, command="build output", not_a_bundle_hint=_HINT)
+
         assert exc_info.value.exit_code == 1
-        verdict = mock_handler.call_args.args[0]
-        assert isinstance(verdict, ValidateBundleError)
-        assert "linked.mthds" in verdict.message
+        assert "Failed to build output: the configuration is out of date" in capsys.readouterr().err
 
     def test_not_a_bundle_path_exits_2_with_command_hint(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
@@ -136,7 +165,9 @@ class TestHumanBundlePathResolver:
         write_method_folder(directory=tmp_path, shape=shape)
         assert shape.entry is not None
 
-        target = resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, not_a_bundle_hint=_HINT)
+        target = resolve_build_bundle_target(
+            path=str(tmp_path), library_dir=None, pipe_override=None, command="build inputs", not_a_bundle_hint=_HINT
+        )
         assert f"Using the method's main pipe {shape.entry.pipe_ref}, in {shape.entry.tree_path}" in capsys.readouterr().out
 
         assert target.bundle_path == (tmp_path / shape.entry.tree_path).resolve()
@@ -148,7 +179,9 @@ class TestHumanBundlePathResolver:
         """With `--pipe`, several main pipes are no ambiguity, and the pipe is looked up in the method, as a run does."""
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.SEVERAL_MAIN_PIPES)
 
-        target = resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=NAMED_PIPE.pipe_ref, not_a_bundle_hint=_HINT)
+        target = resolve_build_bundle_target(
+            path=str(tmp_path), library_dir=None, pipe_override=NAMED_PIPE.pipe_ref, command="build inputs", not_a_bundle_hint=_HINT
+        )
 
         assert target.bundle_path is None
         assert target.pipe_code == NAMED_PIPE.pipe_ref
@@ -159,7 +192,9 @@ class TestHumanBundlePathResolver:
         bundle_file = tmp_path / "my_bundle.mthds"
         bundle_file.write_text('domain = "demo"\n', encoding="utf-8")
 
-        target = resolve_build_bundle_target(path=str(bundle_file), library_dir=None, pipe_override="my_pipe", not_a_bundle_hint=_HINT)
+        target = resolve_build_bundle_target(
+            path=str(bundle_file), library_dir=None, pipe_override="my_pipe", command="build inputs", not_a_bundle_hint=_HINT
+        )
 
         assert target.bundle_path == bundle_file
         assert target.pipe_code == "my_pipe"
@@ -174,29 +209,32 @@ class TestHumanBundlePathResolver:
         assert shape.refusal is not None
 
         with pytest.raises(typer.Exit) as exc_info:
-            resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, not_a_bundle_hint=_HINT)
+            resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, command="build inputs", not_a_bundle_hint=_HINT)
 
         assert exc_info.value.exit_code == 1
         err = capsys.readouterr().err
-        assert f"Failed to run: {_run_refusal(directory=tmp_path)}" in err
+        assert f"Failed to build inputs: {_run_refusal(directory=tmp_path)}" in err
         assert shape.refusal in err
 
     def test_a_build_command_on_a_folder_holding_no_bundle_exits_1_with_the_message_run_gives(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         with pytest.raises(typer.Exit) as exc_info:
-            resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, not_a_bundle_hint=_HINT)
+            resolve_build_bundle_target(path=str(tmp_path), library_dir=None, pipe_override=None, command="build inputs", not_a_bundle_hint=_HINT)
 
         assert exc_info.value.exit_code == 1
         run_refusal = _run_refusal(directory=tmp_path)
         assert "holds no .mthds bundle, so it has no pipe to start at" in run_refusal
-        assert f"Failed to run: {run_refusal}" in capsys.readouterr().err
+        assert f"Failed to build inputs: {run_refusal}" in capsys.readouterr().err
 
     def test_a_build_command_on_a_path_that_is_no_bundle_exits_1(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:
-            resolve_build_bundle_target(path=str(tmp_path / "nope.txt"), library_dir=None, pipe_override=None, not_a_bundle_hint=_HINT)
+            resolve_build_bundle_target(
+                path=str(tmp_path / "nope.txt"), library_dir=None, pipe_override=None, command="build inputs", not_a_bundle_hint=_HINT
+            )
 
         assert exc_info.value.exit_code == 1
         err = capsys.readouterr().err
-        assert "Failed to run:" in err
+        assert "Failed to build inputs:" in err
+        assert "Failed to run:" not in err
         assert "is not a .mthds file or directory" in err

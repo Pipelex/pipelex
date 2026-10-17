@@ -19,7 +19,7 @@ When `pipelex validate` reports errors that have a deterministic safe fix, each 
 pipelex fix bundle <PATH>
 ```
 
-Fixes a bundle file (`.mthds`) or a method's folder in place. A folder is read as its [method tree](../../building-methods/method-trees.md) and judged whole, every bundle of it, exactly as `pipelex validate bundle` judges it, so fix patches exactly what validate judged; it needs no pipe to start at, so a folder whose bundles declare several `main_pipe`s, or none, is fixed like any other. The folder joins the library directories, so every file of it is inside the fix write scope, and a fix lands in the file its error names.
+Fixes a bundle file (`.mthds`) or a method's folder in place. A folder is read as its [method tree](../../building-methods/method-trees.md) and judged whole, every bundle of it, exactly as `pipelex validate bundle` judges it, so fix patches exactly what validate judged; it needs no pipe to start at, so a folder whose bundles declare several `main_pipe`s, or none, is fixed like any other. The whole method tree is inside the fix write scope, from its root down, so a fix lands in the file its error names even when that file is a bundle above or beside the folder you named, and `--diff` mirrors the same tree into its preview, so the preview proposes exactly what the real run writes. A folder whose tree cannot be read, such as one past this machine's limits or holding a symbolic link, gets the negative verdict: the refusal is reported as the fix's remaining error, naming the folder, with exit code `1`.
 
 **Arguments:**
 

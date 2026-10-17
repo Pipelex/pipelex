@@ -22,8 +22,9 @@ Two scoping rules bound what gets touched:
   loudly, naming the files and the ``-L`` remedy.
 
 A method's folder is fixed the same way (``fix_method_folder``): the loop validates the whole
-method tree, as ``validate_bundle(method_dir=...)`` judges it, with no entry file; the folder
-is in the write scope, and so are the ``library_dirs`` passed beside it.
+method tree, as ``validate_bundle(method_dir=...)`` judges it, with no entry file. The tree is
+rooted at the nearest ``METHODS.toml`` at or above the folder, so its root is in the write scope,
+not only the folder named, and so are the ``library_dirs`` passed beside it.
 """
 
 import os
@@ -47,10 +48,11 @@ from pipelex.fix_ops.file_transaction import (
 )
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import method_tree_root
 from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
-from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
+from pipelex.pipeline.validate_bundle import ValidateBundleResult, dirs_beside_method, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
@@ -108,6 +110,21 @@ def _fix_fingerprint(fix: SuggestedFix) -> str:
 def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
     """Project the error's categorized lists into wire items — same channels as ``to_error_report``."""
     return exc.validation_error_items()
+
+
+def unfixable_method_result(*, error: ValidateBundleError) -> FixBundleResult:
+    """The fix verdict on a method refused before anything of it loads, such as a folder whose tree is refused.
+
+    Invalid, with nothing applied and nothing to fix: the refusal's items are the remaining errors, as they are when
+    the loop itself cannot list the trees it is about to load.
+    """
+    return FixBundleResult(
+        is_valid=False,
+        iterations=0,
+        fixes_applied=[],
+        files_written=[],
+        remaining_errors=_validation_error_items(error),
+    )
 
 
 def _pending_signatures_from_validation_result(validation_result: Any) -> list[str]:
@@ -449,11 +466,26 @@ async def fix_method_folder(
     The loop of ``fix_bundle_file``, validating every bundle of the folder's method tree as ``validate_bundle``
     judges a method's folder (``method_dir``), with the caller's own ``library_dirs`` loaded beside it. There is no
     entry file: every fix names the file it targets, a source-less one being dropped, since the load is never a single
-    file. The folder and the ``library_dirs`` are the write scope, or ``writable_library_dirs`` when given, as the
-    ``--diff`` preview's sandbox gives them.
+    file.
+
+    The tree is rooted at the nearest ``METHODS.toml`` at or above the folder, so a fix may target any bundle of it,
+    such as a sibling of the folder named: the tree's root and the directories beside it are the write scope, or
+    ``writable_library_dirs`` when given, as the ``--diff`` preview's sandbox gives them, having mirrored that root.
+    The snapshot taken before each validation lists the same directories the validation loads, the folder's listing
+    being its whole tree's, so every file a fix can target was snapshotted under the name the load gives it.
     """
-    loaded_dirs = [method_dir, *(library_dir for library_dir in library_dirs or [] if library_dir != method_dir)]
-    write_scope_dirs = loaded_dirs if writable_library_dirs is None else writable_library_dirs
+    beside_dirs = dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)
+    loaded_dirs = [method_dir, *beside_dirs]
+    write_scope_dirs: Sequence[Path]
+    if writable_library_dirs is None:
+        try:
+            with translate_to_validate_bundle_error():
+                tree_root = method_tree_root(handed_over=method_dir)
+        except ValidateBundleError as exc:
+            return unfixable_method_result(error=exc)
+        write_scope_dirs = [tree_root, *beside_dirs]
+    else:
+        write_scope_dirs = writable_library_dirs
 
     async def validate_the_method() -> ValidateBundleResult:
         return await validate_bundle(

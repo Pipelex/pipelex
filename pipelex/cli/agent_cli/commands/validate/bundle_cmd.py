@@ -16,13 +16,14 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     run_failure_fields,
     set_agent_cli_error_format,
 )
-from pipelex.cli.agent_cli.commands.bundle_path_resolver import AgentBundleTarget, resolve_bundle_target
+from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_method_folder_core,
     validate_pipe_in_bundle_core,
 )
 from pipelex.cli.bundle_target_resolution import locate_folder_pipe
+from pipelex.cli.judged_target import JudgedBundleTarget
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
@@ -43,7 +44,7 @@ class _GraphTarget(NamedTuple):
     pipe_code: str | None
 
 
-def _graph_target(*, target: AgentBundleTarget, pipe: str | None) -> _GraphTarget | str:
+def _graph_target(*, target: JudgedBundleTarget, pipe: str | None) -> _GraphTarget | str:
     """Where `--graph` and `--view` draw from, or why no graph is drawn.
 
     A bundle file draws its pipe named, else its own `main_pipe`. A method's folder, judged whole, draws the pipe named,
@@ -138,14 +139,7 @@ def validate_bundle_cmd(
             allow_signatures=allow_signatures,
         )
     # The path judged: the method's folder, or the bundle file.
-    judged_path: Path
-    if target.method_dir is not None:
-        judged_path = target.method_dir
-    elif target.bundle_path is not None:
-        judged_path = target.bundle_path
-    else:
-        msg = f"The target '{path}' resolved to neither a bundle file nor a method's folder."
-        raise PipelexUnexpectedError(msg)
+    judged_path = target.judged_path
     library_dirs = target.library_dirs
 
     # Convert library_dirs to list[str] for graph helper

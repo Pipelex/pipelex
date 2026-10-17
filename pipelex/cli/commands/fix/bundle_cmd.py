@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from pipelex.cli.commands.bundle_path_resolver import resolve_bundle_target
-from pipelex.cli.commands.fix._fix_core import COMMAND, execute_fix
+from pipelex.cli.commands.fix._fix_core import COMMAND, execute_fix, render_refused_method
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
 _NOT_A_BUNDLE_HINT = "  To fix a bundle, pass a .mthds file or directory: pipelex fix bundle <path>"
@@ -87,18 +89,20 @@ def fix_bundle_cmd(
     ignore_codes = tuple(ignore_codes_raw) if ignore_codes_raw else None
     _reject_invalid_rule_filters(select_codes=select_codes, ignore_codes=ignore_codes)
 
-    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
-    target = resolve_bundle_target(
-        path,
-        library_dir=library_dir,
-        command=COMMAND,
-        not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
-    )
+    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it. A folder whose tree is
+    # refused is the fix that fails, with nothing to fix, as `validate bundle` gives it the invalid verdict.
+    try:
+        target = resolve_bundle_target(
+            path,
+            library_dir=library_dir,
+            command=COMMAND,
+            not_a_bundle_hint=_NOT_A_BUNDLE_HINT,
+        )
+    except ValidateBundleError as exc:
+        render_refused_method(error=exc, method_dir=Path(path).expanduser(), allow_signatures=allow_signatures, preview=diff)
 
     execute_fix(
-        bundle_path=target.bundle_path,
-        method_dir=target.method_dir,
-        library_dirs=target.library_dirs,
+        target=target,
         allow_signatures=allow_signatures,
         max_iterations=max_iterations,
         select_codes=select_codes,
