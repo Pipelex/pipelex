@@ -130,17 +130,34 @@ class TestMakePipelexForAgentCli:
         assert "'pipelex-agent migrate --dry-run --format json', shown to the user, then 'pipelex-agent migrate --yes'" in markdown
         assert "'pipelex-agent init' (--global for the home configuration)" in markdown
 
-    def test_a_boot_failure_keeps_its_code_and_class_in_json(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """Under the boot's advice the problem is still the cause's: its code, and its class among the causes."""
-        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=RuntimeError("the disk is full"))
+    @pytest.mark.parametrize(
+        ("failure", "expected_code", "expected_message"),
+        [
+            (RuntimeError("the disk is full"), "runtime.unexpected", "Pipelex initialization failed: the disk is full"),
+            (PipelexSetupError("Pipelex is already initialized"), "runtime.misconfigured", "Pipelex is already initialized"),
+        ],
+    )
+    def test_a_boot_failure_keeps_its_code_and_class(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], failure: Exception, expected_code: str, expected_message: str
+    ) -> None:
+        """Under the boot's tip the problem is the failure's own: its code, and its class as the diagnostics' error class."""
+        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=failure)
 
         with pytest.raises(typer.Exit):
             make_pipelex_for_agent_cli()
 
-        parsed = json.loads(capsys.readouterr().err)
-        assert parsed["code"] == "runtime.unexpected"
-        assert parsed["message"] == "Pipelex initialization failed: the disk is full"
-        assert [cause["error_class"] for cause in parsed["diagnostics"]["causes"]] == ["RuntimeError"]
+        stderr = capsys.readouterr().err
+        parsed = json.loads(stderr)
+        assert parsed["code"] == expected_code
+        assert parsed["message"] == expected_message
+        assert parsed["diagnostics"]["error_class"] == type(failure).__name__
+        assert "AgentBootError" not in stderr
+
+        start_agent_cli_error_format(root_error_format=CliOutputFormat.MARKDOWN)
+        with pytest.raises(typer.Exit):
+            make_pipelex_for_agent_cli()
+
+        assert f"- Error class: `{type(failure).__name__}`" in capsys.readouterr().err
 
     @pytest.mark.parametrize(
         ("migration", "expected_tip"),

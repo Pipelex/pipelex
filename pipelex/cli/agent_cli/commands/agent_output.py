@@ -351,6 +351,7 @@ def agent_error(
     params: Mapping[str, Any] | None = None,
     location: ProblemLocation | None = None,
     exit_code: int = 1,
+    fallback_tip: str | None = None,
     **extra: Any,
 ) -> NoReturn:
     """Report a failure as its problem on stderr, in the active error format, and exit with ``exit_code`` (default 1).
@@ -370,6 +371,8 @@ def agent_error(
         exit_code: Process exit code. 1 (default) marks a produced negative
             verdict; the validate commands pass 2 for no-verdict conditions
             (bad args, unresolvable target, setup error) per the 0/1/2 policy.
+        fallback_tip: The advice the Markdown prints when ``cause``'s chain gives none, such as the recovery path of a
+            boot that failed; like any tip, the JSON problem never carries it.
         **extra: The command's own members, beside the problem's; none replaces a member of the problem.
     """
     problem = agent_problem(cause=cause, code=code, params=params, location=location)
@@ -378,7 +381,7 @@ def agent_error(
         message=message,
         extras=extra,
         validation_items=_problem_validation_items(error=cause, problem=problem),
-        tip=_advice_of(error=cause),
+        tip=_advice_of(error=cause) or fallback_tip,
     )
     raise typer.Exit(exit_code) from cause
 
