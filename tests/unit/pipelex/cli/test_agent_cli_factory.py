@@ -18,7 +18,8 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, start_a
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.validation import MIGRATE_COMMAND
-from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.system.telemetry.exceptions import TelemetryApiKeyMissingError, TelemetryConfigValidationError
 from pipelex.tools.misc.pretty import PrettyPrinter
 
 
@@ -174,3 +175,39 @@ class TestMakePipelexForAgentCli:
         assert (
             "Correct the setting 'runtime.log.level' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime." in markdown
         )
+
+    @pytest.mark.parametrize(
+        ("refusal", "expected_tip"),
+        [
+            (
+                PipelexConfigError("Error loading configuration: no such file", surface="pipelex", file="pipelex.toml").with_error_code(
+                    PipelexErrorCode.CONFIG_FILE_MISSING
+                ),
+                "💡 A configuration file is missing: restore it, or run 'pipelex init' (from an agent, 'pipelex-agent init', with --global",
+            ),
+            (
+                TelemetryApiKeyMissingError("Custom PostHog is enabled in the telemetry configuration, but its API key is not set"),
+                "💡 A variable the configuration reads is not set: set the one the message names",
+            ),
+            (
+                PipelexConfigError("Error loading configuration: bad TOML", surface="pipelex", file="pipelex.toml")
+                .with_error_code(PipelexErrorCode.CONFIG_SYNTAX)
+                .with_params(line=1, column=9),
+                "💡 Run 'pipelex doctor' (from an agent, 'pipelex-agent doctor') to find what in the configuration does not validate",
+            ),
+        ],
+    )
+    def test_a_configuration_refusal_s_tip_follows_its_code(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], refusal: PipelexConfigError, expected_tip: str
+    ) -> None:
+        """A missing file is written by init, a missing variable is set, and only a file that does not validate or parse sends to doctor."""
+        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=refusal)
+        start_agent_cli_error_format(root_error_format=CliOutputFormat.MARKDOWN)
+
+        with pytest.raises(typer.Exit):
+            make_pipelex_for_agent_cli()
+
+        markdown = capsys.readouterr().err
+        assert expected_tip in markdown
+        assert markdown.count("💡") == 1
+
