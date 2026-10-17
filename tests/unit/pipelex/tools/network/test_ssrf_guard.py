@@ -39,13 +39,17 @@ class TestSsrfGuard:
             return _addrinfo("169.254.169.254", 80)
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
-        with pytest.raises(SsrfBlockedError):
+        with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips("attacker.example", port=80)
+        # The host is part of a URL the runtime did not choose, a run's input or a caller's callback: no message names it.
+        assert "attacker.example" not in str(exc_info.value)
+        assert "169.254.169.254" not in str(exc_info.value)
 
     async def test_resolve_blocks_literal_private_host(self) -> None:
         # A literal private IP never needs resolution — blocked by the cheap rule.
-        with pytest.raises(SsrfBlockedError):
+        with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips("10.0.0.5", port=80)
+        assert "10.0.0.5" not in str(exc_info.value)
 
     async def test_resolve_blocks_mixed_public_and_private(self, mocker: MockerFixture) -> None:
         # A host resolving to both a public and a private IP is itself a rebinding
@@ -60,8 +64,9 @@ class TestSsrfGuard:
     async def test_resolution_failure_maps_to_connect_error(self, mocker: MockerFixture) -> None:
         # A genuine DNS failure is not a security event — surface httpx's usual connect error.
         mocker.patch("socket.getaddrinfo", side_effect=socket.gaierror("name or service not known"))
-        with pytest.raises(httpcore.ConnectError):
+        with pytest.raises(httpcore.ConnectError) as exc_info:
             await resolve_to_allowed_ips("nonexistent.invalid", port=80)
+        assert "nonexistent.invalid" not in str(exc_info.value)
 
     async def test_resolution_timeout_maps_to_connect_timeout(self, mocker: MockerFixture) -> None:
         # DNS resolution is bounded by the connect timeout; a slow resolver surfaces as

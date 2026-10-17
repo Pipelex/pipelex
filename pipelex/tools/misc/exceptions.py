@@ -78,10 +78,11 @@ class RemoteFileFetchError(ToolError):
     """A remote file an input or a pipe referenced could not be fetched.
 
     Raised where the fetch happens — inside the operator that consumes the resource, the
-    one honest test that a URL serves what it claims to. The message names the URL and what
-    the server or the network said (an HTTP status, a refused connection, a timeout), and never
-    a resolved address; it reaches the operator's diagnostics, the caller reading the sentence
-    its code renders.
+    one honest test that a URL serves what it claims to. The message names what the server or
+    the network said (an HTTP status, a refused connection, a timeout), and never the URL, which
+    is the run's data, nor a resolved address; it reaches the operator's diagnostics, the caller
+    reading the sentence its code renders, with the URL's host as ``input.url_unreachable``'s
+    ``host`` parameter.
 
     A server that answered but would not serve the file is ``input.file_unreadable`` (the
     default); a timeout or a refused connection, which a retry may get past, is

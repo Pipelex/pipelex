@@ -57,6 +57,9 @@ async def fetch_file_and_content_type_from_url_httpx(
     # bare `None` this signature defaults to left a hanging server able to block a
     # caller forever, and the `TimeoutException` branch below unreachable.
     timeout = Timeout(request_timeout) if request_timeout is not None else USE_CLIENT_DEFAULT
+    # No message names the URL, which is the value an input or a pipe carried, a signed link's credential included: it
+    # says what the server or the network answered, and the code that invites a retry takes the URL's host as its
+    # declared `host` parameter.
     try:
         async with httpx.AsyncClient(headers={"User-Agent": user_agent}, transport=transport) as client:
             response: Response = await client.get(
@@ -67,19 +70,19 @@ async def fetch_file_and_content_type_from_url_httpx(
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
-        msg = f"Could not fetch '{url}': the server answered HTTP {status_code}"
+        msg = f"Could not fetch a remote file: the server answered HTTP {status_code}"
         if status_code in _TRANSIENT_HTTP_STATUSES or status_code >= _HTTP_SERVER_ERROR_FLOOR:
             # The server is there but cannot answer now: a retry may get the file.
-            raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
+            raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
         raise RemoteFileFetchError(msg) from exc
     except httpx.TimeoutException as exc:
-        msg = f"Could not fetch '{url}': the request timed out"
-        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
+        msg = "Could not fetch a remote file: the request timed out"
+        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
     except httpx.ConnectError as exc:
-        msg = f"Could not fetch '{url}': the host could not be reached"
-        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
+        msg = "Could not fetch a remote file: the host could not be reached"
+        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
     except httpx.RequestError as exc:
-        msg = f"Could not fetch '{url}': the request failed ({type(exc).__name__})"
+        msg = f"Could not fetch a remote file: the request failed ({type(exc).__name__})"
         raise RemoteFileFetchError(msg) from exc
 
     declared_content_type: str | None = response.headers.get("content-type")

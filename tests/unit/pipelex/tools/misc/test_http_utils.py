@@ -65,8 +65,10 @@ class TestValidateUrlResourceExists:
         ],
     )
     def test_malformed_http_url_syntax_raises(self, url: str) -> None:
-        with pytest.raises(ValueError, match="not a valid http\\(s\\) URL"):
+        with pytest.raises(ValueError, match="not a valid http\\(s\\) URL") as exc_info:
             validate_http_url_syntax(url=url)
+        # The URL is an input's value, possibly a signed link, which the message never quotes.
+        assert url not in str(exc_info.value)
 
     def test_user_agent_is_product_and_version_only(self) -> None:
         """No URL in parentheses: that crawler signature is what bot walls stall on."""

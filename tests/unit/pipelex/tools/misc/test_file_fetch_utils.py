@@ -28,20 +28,20 @@ class TestFetchFileFromUrl:
         assert raw_bytes == b"%PDF-1.4"
 
     @pytest.mark.parametrize(
-        ("status_code", "expected_code"),
+        ("status_code", "expected_code", "expected_params"),
         [
-            (404, CoreCode.INPUT_FILE_UNREADABLE),
-            (403, CoreCode.INPUT_FILE_UNREADABLE),
-            (429, CoreCode.INPUT_URL_UNREACHABLE),
-            (500, CoreCode.INPUT_URL_UNREACHABLE),
-            (503, CoreCode.INPUT_URL_UNREACHABLE),
+            (404, CoreCode.INPUT_FILE_UNREADABLE, {}),
+            (403, CoreCode.INPUT_FILE_UNREADABLE, {}),
+            (429, CoreCode.INPUT_URL_UNREACHABLE, {"host": "example.com"}),
+            (500, CoreCode.INPUT_URL_UNREACHABLE, {"host": "example.com"}),
+            (503, CoreCode.INPUT_URL_UNREACHABLE, {"host": "example.com"}),
         ],
     )
-    async def test_error_status_raises_an_input_error(self, status_code: int, expected_code: CoreCode) -> None:
-        """A 4xx/5xx becomes an input error, whose message names the URL and the status.
+    async def test_error_status_raises_an_input_error(self, status_code: int, expected_code: CoreCode, expected_params: dict[str, str]) -> None:
+        """A 4xx/5xx becomes an input error, whose message names the status and never the URL, the run's data.
 
         A server that will not serve the file is ``input.file_unreadable``; one that cannot answer now, a 5xx or a
-        429, is ``input.url_unreachable``, which a retry may get past.
+        429, is ``input.url_unreachable``, which a retry may get past and which takes the URL's host as its parameter.
         """
         with pytest.raises(RemoteFileFetchError) as exc_info:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(status_code))
@@ -54,7 +54,8 @@ class TestFetchFileFromUrl:
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert operator.diagnostics is not None
         assert f"HTTP {status_code}" in operator.diagnostics.message
-        assert URL in operator.diagnostics.message
+        assert "example.com" not in operator.diagnostics.message
+        assert (operator.params.as_wire() if operator.params is not None else {}) == expected_params
 
     @pytest.mark.parametrize(
         ("exc", "expected", "expected_code"),
