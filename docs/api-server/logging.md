@@ -72,6 +72,18 @@ Every field in that table is a **record attribute**, which is a different thing 
 
 Disposition follows the HTTP status, not the error domain: a `4xx` is a caller mistake and logs at `WARNING` without a traceback; a `5xx` is a server fault and logs at `ERROR` with one. See [Error Responses](error-responses.md) for the response side of the same failure.
 
+## Security events
+
+A request a security rule refused writes one more line beside its error line: the **security event**, so that whoever runs the server learns that someone tried to reach what a rule forbids, a private address, another tenant's stored file, a path on the server's disk, a template reaching for a private name. It is a record of its own kind, which a query or an alert selects without reading any text: its `logger` is `pipelex.errors.security_event`, its `message` is `A security rule refused a request`, and its `event.name` is `pipelex.security.refusal`. It is written at `WARNING`, with no traceback.
+
+```json
+{"time": "2026-10-17T09:12:03.512Z", "severity": "WARNING", "logger": "pipelex.errors.security_event", "message": "A security rule refused a request", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "event.name": "pipelex.security.refusal", "error.code": "security.input_url_refused", "error.domain": "input", "error.type": "UriReadRefusedError", "security.target": "url", "security.target_class": "scheme", "run.extras.org_id": "org_abc"}
+```
+
+Its keys name the refusal and never its content: the refusal's code under `error.code`, the code's domain under `error.domain`, the class of the error under `error.type`, the kind of thing refused under `security.target`, the class of destination under `security.target_class` when the rule could tell it, the run and the request under `pipeline_run_id` and `request_id`, and each of the run's extras, the body's `analytics_groups`, under a key of its own, `run.extras.<key>`. Never the URL, the path, the template or an input value, which are the caller's content or the method's. The Pipelex documentation's [error model](../under-the-hood/error-model.md#security-refusals-and-the-security-event) lists every value.
+
+A refusal is written once, whichever part of the server saw it: during a run executed in-process, before the run while its inputs are read or its method loads, or in the handler answering the request. A run dispatched to a worker under a distributed `orchestration_mode` is refused in the worker's process, which writes the event in its own logs when its orchestration plugin reports it.
+
 ## Authentication lines
 
 The error line above is the record of every refused request, a `401` included, at `WARNING`. The authentication check before it says why it refused, at a level that depends on who has to act:
