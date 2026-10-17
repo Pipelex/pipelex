@@ -4,6 +4,7 @@ import io
 import json
 import logging
 from contextlib import contextmanager
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -91,16 +92,31 @@ def _chained(*, error: PipelexError, cause: BaseException) -> PipelexError:
     return error
 
 
-def _restate(*, refusal: SsrfBlockedError, suppress_context: bool) -> None:
-    """Raise the refusal anew while handling it, as a layer that chains nothing explicitly does."""
+class _Chaining(StrEnum):
+    """How a refusal raised while another is handled holds the first one."""
+
+    IMPLICIT = "implicit"
+    FROM_NONE = "from_none"
+    FROM_REFUSAL = "from_refusal"
+
+
+def _refuse_again_while_handling(*, refusal: PipelexError, chaining: _Chaining) -> None:
+    """Raise a new refusal of the same code while handling ``refusal``, as a second destination refused in its handler.
+
+    ``chaining`` says how the new refusal holds the first: only as its ``__context__``, not at all, or as its ``__cause__``.
+    """
     try:
         raise refusal
-    except SsrfBlockedError:
-        msg = "Refusing to fetch the input 'photo'."
-        restated = SsrfBlockedError(msg).with_security_target_class(SecurityTargetClass.PRIVATE)
-        if suppress_context:
-            raise restated from None
-        raise restated  # ruff: ignore[raise-without-from-inside-except] — the layer under test chains nothing explicitly
+    except PipelexError as exc:
+        msg = "Refusing to connect to the callback host."
+        second_refusal = SsrfBlockedError(msg).with_security_target_class(SecurityTargetClass.LOOPBACK)
+        match chaining:
+            case _Chaining.IMPLICIT:
+                raise second_refusal  # ruff: ignore[raise-without-from-inside-except] — chained only as its context, on purpose
+            case _Chaining.FROM_NONE:
+                raise second_refusal from None
+            case _Chaining.FROM_REFUSAL:
+                raise second_refusal from exc
 
 
 def _refuse_another_while_handling(*, refusal: SsrfBlockedError) -> None:
@@ -328,22 +344,27 @@ class TestSecurityEvent:
 
         assert len(lines) == 1
 
-    @pytest.mark.parametrize("suppress_context", [False, True], ids=["implicit_chaining", "from_none"])
-    def test_a_refusal_raised_again_without_explicit_chaining_is_not_reported_again(self, suppress_context: bool) -> None:
-        """A layer that raises the same refusal anew, with no `from exc` or with `from None`, keeps it only as `__context__`."""
-        refusal = _ssrf_refusal()
-        with _security_event_lines() as lines:
-            assert emit_security_event(error=refusal)
-            with pytest.raises(SsrfBlockedError) as exc_info:
-                _restate(refusal=refusal, suppress_context=suppress_context)
-            raised_again = exc_info.value
-            wrapper = PipelineInputContentError("The input 'photo' cannot be read.")
-            wrapper.__cause__ = raised_again
-            assert not emit_security_event(error=wrapper)
+    @pytest.mark.parametrize("chaining", list(_Chaining))
+    @pytest.mark.parametrize("reported_as", ["refusal", "wrapper"])
+    def test_a_new_refusal_of_the_same_code_is_reported_however_it_is_chained_to_a_reported_one(self, chaining: _Chaining, reported_as: str) -> None:
+        """A wrapper restates the refusal it wraps; a new refusal is reported on its own, even of the same code.
 
-        assert raised_again.__cause__ is None
-        assert raised_again.__context__ is refusal
-        assert len(lines) == 1
+        Such as a callback URL the delivery refuses while the run's own refusal of an input URL is being handled: both
+        are `security.input_url_refused`, and each is a refusal of its own, whether the second holds the first as its
+        context, not at all, or as its cause, and whether the first was reported bare or under a wrapper.
+        """
+        refusal = _ssrf_refusal()
+        reported: PipelexError = _wrapped(refusal=refusal) if reported_as == "wrapper" else refusal
+        with _security_event_lines() as lines:
+            assert emit_security_event(error=reported)
+            with pytest.raises(SsrfBlockedError) as exc_info:
+                _refuse_again_while_handling(refusal=reported, chaining=chaining)
+            second_refusal = exc_info.value
+            assert emit_security_event(error=_wrapped(refusal=second_refusal))
+            assert not emit_security_event(error=second_refusal)
+
+        assert [line["security.target_class"] for line in lines] == [SecurityTargetClass.PRIVATE, SecurityTargetClass.LOOPBACK]
+        assert [line["error.code"] for line in lines] == [CoreCode.SECURITY_INPUT_URL_REFUSED] * 2
 
     def test_a_distinct_refusal_raised_while_handling_a_reported_one_is_reported(self) -> None:
         """`__context__` only ties a refusal to the one it restates: another code, raised while handling the first, is its own."""

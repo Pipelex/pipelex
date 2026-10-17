@@ -177,6 +177,29 @@ class TestPipeRun:
         assert event_fields["run.extras.org_id"] == "org_abc"
         assert not emit_security_event(error=refusal)
 
+    async def test_a_run_refused_then_its_webhook_refused_logs_both_refusals(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two refusals of one code, two events."""
+        input_refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        webhook_refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(
+            SecurityTargetClass.LOOPBACK
+        )
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=input_refusal)
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock(side_effect=webhook_refusal)
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-both-refused", storage_scope="test/scope", read_scope=None)
+        )
+
+        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError) as exc_info:
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        assert exc_info.value is webhook_refusal
+        events = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
+        assert [event["security.target_class"] for event in events] == [SecurityTargetClass.PRIVATE, SecurityTargetClass.LOOPBACK]
+        assert [event["error.code"] for event in events] == [CoreCode.SECURITY_INPUT_URL_REFUSED] * 2
+
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""
         mock_output = mocker.MagicMock()

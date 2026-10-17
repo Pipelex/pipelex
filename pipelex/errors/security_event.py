@@ -22,8 +22,10 @@ Never the URL, the path, the template, the schema, a prompt, an input value, nor
 quote any of them; never a traceback either, since the failure itself is logged and reported where it is handled.
 
 A refusal is reported once per process, however many boundaries it crosses: the event marks the errors of the
-chain it reported, and a boundary the same failure reaches again, wrapped, finds the mark and logs nothing, also when
-a layer raised it anew without ``from`` and left the reported refusal only as its ``__context__``.
+chain it reported, and a boundary the same failure reaches again, wrapped, finds the refusal marked and logs nothing.
+A refusal is the error that carries or implies the code its failure reports, so a wrapper chained to it with ``from``,
+which takes its code, restates it, while a new refusal is reported on its own, even of the same code, even raised
+while a reported one was being handled or chained to one with ``from``.
 """
 
 from __future__ import annotations
@@ -127,9 +129,9 @@ def emit_security_event(
     """Log the security event of a failure, when its code is a security refusal and nobody reported it yet.
 
     The code is the one the failure reports (:meth:`~pipelex.base_exceptions.PipelexError.resolve_error_code`), so a
-    refusal wrapped by every boundary it crossed is still recognized. A failure whose chain holds an error already
-    reported logs nothing, nor one that restates a reported refusal of the same code, raised anew without ``from``;
-    the errors of the chain are marked once the event is logged.
+    refusal wrapped by every boundary it crossed is still recognized. A failure whose refusal, the error of its chain
+    that carries or implies that code, was reported already logs nothing; the errors of the chain are marked once the
+    event is logged.
 
     Args:
         error: The failure, the outermost error of its chain. One that is not a ``PipelexError`` reports no code
@@ -148,11 +150,12 @@ def emit_security_event(
     target_kind = security_target_kind(code=code)
     if target_kind is None:
         return False
-    if _was_reported(error=error, code=code):
+    refusal = _code_carrier(error=error)
+    if refusal in _REPORTED_ERRORS:
         return False
     log_security_event(
         code=code,
-        error_type=type(_code_carrier(error=error)).__name__,
+        error_type=type(refusal).__name__,
         target_class=_stated_target_class(error=error),
         pipeline_run_id=pipeline_run_id,
         request_id=request_id,
@@ -223,38 +226,14 @@ def log_security_event(
     log.warning(SECURITY_EVENT_MESSAGE, fields=fields)
 
 
-def _was_reported(*, error: PipelexError, code: ErrorCode) -> bool:
-    """Whether the refusal ``error`` reports under ``code`` was logged already, in this process.
-
-    Every error of its ``__cause__`` chain counts, since each boundary that wraps a refusal chains it with ``from``.
-    A layer that raises the refusal anew without ``from``, or with ``from None``, keeps the one it handled only as
-    ``__context__``: an error reached that way counts when it reports the same code, the refusal restated, while a
-    refusal of another code raised while handling a reported one is a refusal of its own and is still reported.
-    """
-    cause_chain = list(iter_cause_chain(error))
-    if any(isinstance(node, PipelexError) and node in _REPORTED_ERRORS for node in cause_chain):
-        return True
-    # The walk below follows both links, guarded against cycles as `iter_cause_chain` is, since it runs on the error path.
-    seen: set[int] = {id(node) for node in cause_chain}
-    stack: list[BaseException] = [node.__context__ for node in cause_chain if node.__context__ is not None]
-    while stack:
-        node = stack.pop()
-        if id(node) in seen:
-            continue
-        seen.add(id(node))
-        if isinstance(node, PipelexError) and node in _REPORTED_ERRORS and node.resolve_error_code() == code:
-            return True
-        stack.extend(link for link in (node.__cause__, node.__context__) if link is not None)
-    return False
-
-
 def _code_carrier(*, error: PipelexError) -> PipelexError:
     """The error of the chain that names the code ``error`` reports, the refusal the wrappers above it report.
 
     It is read in the walk :meth:`~pipelex.base_exceptions.PipelexError.resolve_error_code` makes, so the two cannot
     disagree: the first error down the chain that carries a code by itself, where that walk stops; when none does, the
     deepest error that implies a code, else the deepest that names its fallback, whose code the chain then reports; and
-    the outermost error when none names one.
+    the outermost error when none names one. It is the refusal's identity: two failures report the same refusal when
+    they name the same error here, which is how a wrapper is told from a new refusal of the same code.
     """
     implied_carrier: PipelexError | None = None
     fallback_carrier: PipelexError | None = None
