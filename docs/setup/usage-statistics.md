@@ -24,6 +24,7 @@ Every event is a count, a yes-or-no, or a value from a closed list. No property 
 - the tool and its version (`pipelex`, and the release), and the surface it ran from: the `pipelex` CLI, the `pipelex-agent` CLI, the API server or a Python program;
 - the operating system and processor family, the Python minor version, and whether the process ran in CI or in a container;
 - an anonymous **installation identifier**, a random UUID drawn once per machine and shared by every Pipelex tool on it, never derived from anything about the machine or you.
+- the version of the event contract it follows, `schema`, which is 2 from the release whose events name a failure by its error's code and that code's domain, so that a receiver tells them from an earlier release's events.
 
 The events themselves are:
 

@@ -95,6 +95,23 @@ class TestUsageStatsContract:
         assert load_usage_stats_schema()["schema_version"] == SCHEMA_VERSION
         assert load_usage_stats_schema()["person_profile_property"] == PERSON_PROFILE_PROPERTY
 
+    def test_the_schema_property_s_maximum_is_the_schema_version(self) -> None:
+        """Every `schema` property reaches the contract's version, as the spec's own load check holds, from version 1 on."""
+        schema = load_usage_stats_schema()
+        schema_properties = [schema["common_properties"]["schema"]]
+        schema_properties += [event["properties"]["schema"] for event in schema["events"].values() if "schema" in event["properties"]]
+        assert schema_properties
+        for schema_property in schema_properties:
+            assert schema_property["min"] == 1
+            assert schema_property["max"] == SCHEMA_VERSION
+
+    def test_the_error_contract_is_version_2(self) -> None:
+        """The error's code and the registry's domains replaced what version 1 declared, which only a new version may do."""
+        schema = load_usage_stats_schema()
+        assert SCHEMA_VERSION == 2
+        assert set(schema["events"]["run_completed"]["properties"]["error_domain"]["values"]) == {domain.value for domain in UsageStatsErrorDomain}
+        assert "failures_transient" not in schema["events"]["model_used"]["properties"]
+
     def test_notice_is_the_schemas_text_for_pipelex(self) -> None:
         notice = load_usage_stats_schema()["notice"]
         assert notice["version"] == NOTICE_VERSION

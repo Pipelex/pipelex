@@ -13,7 +13,11 @@ are in `usage_stats_core`, which the sender runs alone; the tests check them aga
 from enum import StrEnum
 from typing import Final, NamedTuple
 
-SCHEMA_VERSION = 1
+#: The version of the contract the events follow, which every event carries as `schema`. 2 since the events name a
+#: failure by its error's code and that code's domain, where version 1 read the runtime's own error domains and counted
+#: a model's failed calls by its inference category: the change removed and renamed what version 1 declared, which only a
+#: new version may do, so a receiver tells the two shapes apart by this number.
+SCHEMA_VERSION = 2
 
 #: The reporting tool's name, the `tool` property and the name of its spool directory.
 TOOL_NAME: Final = "pipelex"
