@@ -223,6 +223,8 @@ When a value cannot be shaped against its declared concept, Pipelex raises a typ
 - **Incompatible explicit concept** — an envelope naming a concept that is not compatible with the declaration.
 - **Null value** — a top-level `null`; absence is expressed by *omitting* the key, not by providing `null`. (An input declared optional with `?` may simply be left out — see [Understanding Optionality](understanding-optionality.md).)
 
+That message, with its expected shape, is what the CLIs print and what whoever runs the runtime reads. A caller of the API reads the refusal's [problem document](../../api-server/error-responses.md) instead, whose `params.input` and `location.input` name the input and whose code's sentence is rendered from what is wrong with it: the expected and provided counts of `input.wrong_multiplicity`, the declared and provided concepts of `input.wrong_concept`, the field at fault of `input.invalid` when the concept's structure names one, and the name of `input.unexpected`.
+
 ## Input files: JSON or TOML
 
 An inputs file is a dictionary of input names to values, accepted as **both JSON and TOML**, discriminated by file extension (`.toml` → TOML, everything else → JSON). Both produce the same dictionary, so every shape above applies to either. TOML's multi-line strings (`"""…"""`) make text-heavy inputs far easier to author, and a top-level TOML date/datetime literal (`hearing = 2026-09-01`) maps directly to the native [`Date`](../concepts/native-concepts.md) concept.

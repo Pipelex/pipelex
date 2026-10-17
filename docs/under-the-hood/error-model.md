@@ -99,7 +99,7 @@ Rendering never fails. A template naming a parameter the problem does not hold m
 
 A code declares its parameters in the registry, each typed, and its generated parameters model validates them. A problem's parameters come from the error whose code it reports:
 
-- **The class's facts.** A subclass holding facts its codes declare overrides `problem_params()` and returns them by the registry's names. A fact the resolved code does not declare is left out silently, since a class's codes declare different parameters.
+- **The class's facts.** A subclass holding facts its codes declare overrides `problem_params()` and returns them by the registry's names. An input-shaping error (`InputShapingError`), for one, gives the input and what its factory found wrong with it, such as the counts of `input.wrong_multiplicity` or the concepts of `input.wrong_concept`, and locates itself at the input. A fact the resolved code does not declare is left out silently, since a class's codes declare different parameters.
 - **The raise site.** `with_params(**params)` gives the parameters only the raise site knows, and overrides a fact of the same name: `raise PipeRunError(...).with_error_code(CoreCode.PIPE_CONDITION_UNMATCHED).with_params(pipe=self.code)`.
 - **What the run found.** A declared parameter neither of them gave is filled from the run: a failure located at a pipe gives a `pipe` parameter the failing pipe, and the model and the provider found along the cause chain give the `model` and `provider` parameters.
 

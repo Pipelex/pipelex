@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex import log
 from pipelex.core.memory.exceptions import (
@@ -15,6 +16,8 @@ from pipelex.core.memory.exceptions import (
 )
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
@@ -118,6 +121,61 @@ ERROR_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, type[InputSh
 ]
 
 
+# (test_name, concept_ref, multiplicity, provided_value, expected_code, expected_params, expected_detail)
+# What the caller reads of a shaping error: its code's sentence, rendered from the input and the facts its factory knew.
+# `None` for the detail is the code's title, which a code whose template needs a fact the refusal does not have falls back on.
+CALLER_VIEW_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, CoreCode, dict[str, Any], str | None]] = [
+    (
+        "count-mismatch",
+        "shaper_test.Question",
+        2,
+        ["a"],
+        CoreCode.INPUT_WRONG_MULTIPLICITY,
+        {"input": "my_input", "expected": "count", "expected_count": 2, "provided_count": 1},
+        "The input 'my_input' gives 1 item or items, which does not fit the multiplicity the method declares (count).",
+    ),
+    (
+        "list-where-singular",
+        "shaper_test.Question",
+        None,
+        ["a", "b", "c"],
+        CoreCode.INPUT_WRONG_MULTIPLICITY,
+        {"input": "my_input", "expected": "single", "provided_count": 3},
+        "The input 'my_input' gives 3 item or items, which does not fit the multiplicity the method declares (single).",
+    ),
+    (
+        "explicit-incompatible",
+        "shaper_test.Priority",
+        None,
+        {"concept": "shaper_test.Question", "content": "hi"},
+        CoreCode.INPUT_WRONG_CONCEPT,
+        {"input": "my_input", "expected": "shaper_test.Priority", "provided": "shaper_test.Question"},
+        "The input 'my_input' is given as 'shaper_test.Question', but the method accepts 'shaper_test.Priority' there.",
+    ),
+    (
+        "choice-bare-string",
+        "native.Choice",
+        None,
+        "billing",
+        CoreCode.INPUT_WRONG_CONCEPT,
+        {"input": "my_input", "expected": "native.Choice", "provided": "native.Text"},
+        "The input 'my_input' is given as 'native.Text', but the method accepts 'native.Choice' there.",
+    ),
+    (
+        "structure-missing-field",
+        "shaper_test.ShaperInvoice",
+        None,
+        {"invoice_number": "INV-1"},
+        CoreCode.INPUT_INVALID,
+        {"input": "my_input", "field": "amount"},
+        "The input 'my_input' does not fit its concept's structure at 'amount'.",
+    ),
+    # `input.invalid` names the field at fault, and a value wrong as a whole has none: its sentence is the code's title.
+    ("wrong-str-for-number", "shaper_test.Priority", None, "42", CoreCode.INPUT_INVALID, {"input": "my_input"}, None),
+    ("null-top-level", "native.Text", None, None, CoreCode.INPUT_INVALID, {"input": "my_input"}, None),
+]
+
+
 class TestInputShaperErrors:
     @pytest.mark.parametrize(
         ("test_name", "concept_ref", "multiplicity", "provided_value", "expected_exception", "error_match"),
@@ -151,3 +209,42 @@ class TestInputShaperErrors:
         message = str(exc_info.value)
         assert "'question'" in message, "Unknown-name error should list the declared inputs"
         assert "'quesion'" in message, "Unknown-name error should name the offending input"
+
+    @pytest.mark.parametrize(
+        ("test_name", "concept_ref", "multiplicity", "provided_value", "expected_code", "expected_params", "expected_detail"),
+        CALLER_VIEW_CASES,
+    )
+    def test_the_caller_reads_the_input_and_what_is_wrong_with_it(
+        self,
+        test_name: str,
+        concept_ref: str,
+        multiplicity: VariableMultiplicity | None,
+        provided_value: Any,
+        expected_code: CoreCode,
+        expected_params: dict[str, Any],
+        expected_detail: str | None,
+    ) -> None:
+        """The message is the operator's: the caller reads the input, and the facts its code declares, as parameters."""
+        log.info(f"Testing the caller view of: {test_name}")
+        input_specs = build_input_specs([("my_input", concept_ref, multiplicity)])
+
+        with pytest.raises(InputShapingError) as exc_info:
+            InputShaper.shape({"my_input": provided_value}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == expected_code
+        assert caller.params is not None
+        assert caller.params.as_wire() == expected_params
+        assert caller.detail == (expected_detail or error_code_spec(expected_code).title)
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"input": "my_input"}
+
+    def test_an_unknown_input_name_is_named_to_the_caller(self) -> None:
+        input_specs = build_input_specs([("question", "native.Text", None)])
+
+        with pytest.raises(UnknownInputNameError) as exc_info:
+            InputShaper.shape({"quesion": "typo"}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_UNEXPECTED
+        assert caller.detail == "The request gives the input 'quesion', which the method does not declare."
