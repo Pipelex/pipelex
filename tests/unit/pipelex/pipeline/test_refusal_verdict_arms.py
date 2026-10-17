@@ -6,16 +6,12 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.validation_error_types import PipeValidationErrorType
-
-
-class _CallerFacingInputRefusalError(PipelexError):
-    error_code = CoreCode.METHOD_INVALID
-    _authors_caller_facing_message = True
 
 
 class _InternalInputRefusalError(PipelexError):
@@ -32,10 +28,9 @@ class _UnclassifiedFaultError(PipelexError):
 
 class _InputSecurityRefusalError(SecurityError):
     error_code = CoreCode.SECURITY_TEMPLATE_REFUSED
-    _authors_caller_facing_message = True
 
 
-# What a non-caller-facing refusal's item reads: its code's title.
+# What the item of a refusal whose raise site gave no parameters reads: its code's title.
 _INTERNAL_REFUSAL_TITLE = error_code_spec(CoreCode.METHOD_SCHEMA_VIOLATION).title
 
 
@@ -44,22 +39,28 @@ def _verdict_items(refusal: BaseException) -> tuple[ValidateBundleError, list[Va
         raise refusal
     verdict = raised.value
     assert verdict.__cause__ is refusal
-    return verdict, list(verdict.to_error_report().validation_errors or [])
+    return verdict, list(verdict.validation_error_items() or [])
 
 
 class TestRefusalVerdictArms:
-    def test_unlocated_caller_facing_input_refusal_is_one_blueprint_item_keeping_its_message(self) -> None:
-        verdict, items = _verdict_items(_CallerFacingInputRefusalError("The tide table names a harbour that does not exist."))
+    def test_unlocated_input_refusal_is_one_blueprint_item_reading_its_code_s_sentence(self) -> None:
+        """The item reads the sentence the refusal's code renders from the parameters its raise site gave, never its message."""
+        refusal = _InternalInputRefusalError("internal detail: registry slot 7 is stale").with_params(
+            field_path="pipe.tide_table", finding="the tide table names a harbour that does not exist"
+        )
 
-        assert items == [
-            ValidationErrorItem(
-                category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
-                message="The tide table names a harbour that does not exist.",
-            )
-        ]
-        assert verdict.message == "The tide table names a harbour that does not exist."
+        verdict, items = _verdict_items(refusal)
 
-    def test_non_caller_facing_input_refusal_is_named_by_its_title(self) -> None:
+        sentence = "The declaration at 'pipe.tide_table' breaks a rule of the language (the tide table names a harbour that does not exist)."
+        assert items == [ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message=sentence)]
+        assert verdict.message == sentence
+        problem = verdict.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        (problem_item,) = problem.errors or []
+        assert problem_item.code == CoreCode.METHOD_SCHEMA_VIOLATION
+        assert "registry slot 7" not in str(problem.to_wire())
+
+    def test_an_input_refusal_with_no_parameters_is_named_by_its_title(self) -> None:
         _, items = _verdict_items(_InternalInputRefusalError("internal detail: registry slot 7 is stale"))
 
         assert [item.message for item in items] == [_INTERNAL_REFUSAL_TITLE]
@@ -76,7 +77,9 @@ class TestRefusalVerdictArms:
                 pipe_code="write_tide_note",
                 domain_code="tide_tables",
                 source="tides.mthds",
-                message=f"Pipe 'write_tide_note' could not be loaded: {_INTERNAL_REFUSAL_TITLE}",
+                message=(
+                    "The declaration at 'pipe.write_tide_note' breaks a rule of the language (the pipe could not be built from its declaration)."
+                ),
             )
         ]
 
@@ -131,7 +134,9 @@ class TestRefusalVerdictArms:
     def test_a_produced_verdict_passes_through_unwrapped(self) -> None:
         verdict = ValidateBundleError(
             message="already a verdict",
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="route_parcel", message="the round has no lane")],
+            dry_run_failures=[
+                DryRunFailureErrorData(pipe_code="route_parcel", message="the round has no lane", code=CoreCode.PIPE_CONDITION_UNMATCHED)
+            ],
         )
 
         with pytest.raises(ValidateBundleError) as raised, translate_to_validate_bundle_error():

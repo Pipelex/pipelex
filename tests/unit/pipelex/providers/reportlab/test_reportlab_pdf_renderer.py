@@ -6,10 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from reportlab.platypus import Table  # type: ignore[import-untyped]
 from reportlab.platypus.doctemplate import BaseDocTemplate, LayoutError  # type: ignore[import-untyped]
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.layout_tree import (
@@ -25,6 +25,7 @@ from pipelex.cogt.doc_gen.layout_tree import (
     TableBlock,
 )
 from pipelex.cogt.doc_gen.render_job import RenderJob
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from tests.unit.pipelex.providers.reportlab.reportlab_test_helpers import (
     TEST_FILENAME,
@@ -131,11 +132,12 @@ class TestReportlabPdfRenderer:
         resources = StubRenderResources(answer=b"<svg xmlns='http://www.w3.org/2000/svg'/>")
         with pytest.raises(DocGenRenderError, match="image 1 of the document") as exc_info:
             render_layout(blocks=[ImageBlock(url="pipelex-storage://run/chart.svg", caption=None)], resources=resources)
-        # The run's data the engine cannot lay out: the caller's to change, and caller-facing.
-        report = exc_info.value.to_error_report()
-        assert report.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.caller_facing_message is True
+        # The run's data the engine cannot lay out: the caller's to change, told which element in the code's sentence.
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "image_unreadable", "element": "image 1 of the document"}
+        assert caller.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
+        assert caller.domain == ProblemDomain.INPUT
 
     def test_a_job_that_is_not_a_pdf_from_the_layout_is_refused(self) -> None:
         job = RenderJob(
@@ -164,11 +166,12 @@ class TestReportlabPdfRenderer:
             f"The PDF engine cannot print '{TEST_FILENAME}': the table 'Line items' does not fit on an A4 page, "
             "as part of it is taller than a page and cannot be split across pages."
         )
-        # The run's data the engine cannot lay out: the caller's to change, and caller-facing.
-        report = exc_info.value.to_error_report()
-        assert report.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.caller_facing_message is True
+        # The run's data the engine cannot lay out: the caller's to change, told which element in the code's sentence.
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "too_tall_for_page", "element": "the table 'Line items'"}
+        assert caller.code == PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE
+        assert caller.domain == ProblemDomain.INPUT
 
     def test_table_cells_print_their_scalars(self) -> None:
         table = TableBlock(

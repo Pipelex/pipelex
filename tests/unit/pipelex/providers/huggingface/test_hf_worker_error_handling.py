@@ -8,8 +8,9 @@ import httpx
 import pytest
 from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.huggingface.huggingface_img_gen_worker import HuggingFaceImgGenWorker
 from tests.unit.pipelex.providers.huggingface.test_data import HuggingFaceErrorHandlingTestData
 
@@ -59,6 +60,12 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.job_params.output_format = None
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -127,8 +134,8 @@ class TestHuggingFaceWorkerErrorHandling:
         assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
 
-    async def test_error_report_includes_category(self, mocker: MockerFixture) -> None:
-        """to_error_report() includes error_category and retryable from the exception."""
+    async def test_problem_includes_category(self, mocker: MockerFixture) -> None:
+        """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_hf_img_gen_worker(mocker)
         sdk_exc = _make_hf_http_error(401, "Invalid token")
         worker.hf_async_client.text_to_image.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -142,10 +149,11 @@ class TestHuggingFaceWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._generate_single_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
-        assert report.retryable is False
-        assert report.error_type == "ImgGenGenerationError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "configuration"
+        assert problem.is_retryable is False
+        assert _diagnostics_of(problem).error_class == "ImgGenGenerationError"
         assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS

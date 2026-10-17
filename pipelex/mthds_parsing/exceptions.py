@@ -50,8 +50,7 @@ class MthdsParserError(PipelexError):
 
     Covers every way the caller's ``.mthds`` source can be rejected — TOML that
     does not parse, and TOML that parses but fails blueprint validation. The
-    message is always caller-facing copy describing a fault in the caller's own
-    input.
+    message always describes a fault in the caller's own input.
 
     The default ``method.invalid`` is the umbrella refusal whose items carry their own codes. A raise site that
     finds one fault chooses its code: ``method.syntax`` for a source that does not parse, ``method.schema_violation``
@@ -71,9 +70,6 @@ class MthdsParserError(PipelexError):
             CoreCode.RUNTIME_UNEXPECTED,
         ),
     )
-    # The parser's messages describe faults in the caller's own .mthds
-    # source — caller-facing copy, kept verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
 
     def __init__(
         self,

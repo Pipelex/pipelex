@@ -38,7 +38,7 @@ class ChosenCodeSite(NamedTuple):
 def constructed_class_name(node: ast.expr) -> str | None:
     """The name of the class an expression constructs, through any chain of methods called on the new instance.
 
-    ``SomeError(msg)``, ``module.SomeError(msg)`` and ``SomeError(msg).with_error_code(code).as_caller_fault()``
+    ``SomeError(msg)``, ``module.SomeError(msg)`` and ``SomeError(msg).with_error_code(code).with_params(name=value)``
     all construct ``SomeError``; a bare name, such as a re-raised variable, constructs nothing.
     """
     current: ast.expr = node

@@ -3,22 +3,25 @@
 A server loads its library directories beside a request's bundles, and those directories are the deployment's, not the
 caller's (`library_dirs_are_callers` False). A pipe there that its factory refuses, or that names a model the deck does
 not define, used to be answered as the caller's invalid input, a 422 carrying the host library's own text. It is now
-`pipelex.config.invalid`, an operator fault, whose message STRICT disclosure withholds. The same refusal in the caller's
-own content stays the caller's: a 422 verdict with one input item.
+`pipelex.config.invalid`, an operator fault, whose message is the operator's diagnostics alone. The same refusal in the
+caller's own content stays the caller's: a 422 verdict with one item.
 """
 
 import json
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, PipelexError
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 
-# Text of the host library's bundles that no STRICT answer may carry.
+# Text of the host library's bundles that no caller's answer may carry.
 _HOST_TEXT = "almanac"
 
 # A factory refusal: a PipeExtract whose input is neither an image nor a document.
@@ -76,18 +79,16 @@ def _host_library_dir(*, directory: Path, refusing_bundle: str) -> Path:
 
 
 def _assert_is_the_deployments_fault(*, error: PipelexError) -> None:
-    report = error.to_error_report()
-    assert report.code == PipelexErrorCode.CONFIG_INVALID
-    assert report.error_domain != ErrorDomain.INPUT
-    assert report.validation_errors is None
-    # Locally the operator reads which method refused; a STRICT caller reads none of the host library's text.
-    assert _HOST_TEXT in report.message
-    strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-    assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
-    assert _HOST_TEXT not in json.dumps(strict_payload)
-    document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-    assert document["status"] == 500
-    assert _HOST_TEXT not in json.dumps(document)
+    caller = error.to_problem(view=ProblemView.CALLER)
+    assert caller.code == PipelexErrorCode.CONFIG_INVALID
+    assert caller.domain == ProblemDomain.OPERATOR
+    assert caller.errors is None
+    assert error_code_spec(PipelexErrorCode.CONFIG_INVALID).status == 500
+    # The operator reads which method refused; the caller reads none of the host library's text.
+    operator = error.to_problem(view=ProblemView.OPERATOR)
+    assert operator.diagnostics is not None
+    assert _HOST_TEXT in operator.diagnostics.message
+    assert _HOST_TEXT not in json.dumps(caller.to_wire())
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -121,10 +122,12 @@ class TestHostLibraryLoadRefusals:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[refusing_bundle])
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)["status"] == 422
-        assert len(report.validation_errors or []) == 1
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        assert problem.domain == ProblemDomain.METHOD
+        assert error_code_spec(CoreCode.METHOD_INVALID).status == 422
+        assert len(problem.errors or []) == 1
+        assert len(exc_info.value.validation_error_items()) == 1
 
     @_REFUSING_BUNDLES
     async def test_a_refusal_in_the_callers_own_library_dirs_stays_the_callers(self, tmp_path: Path, refusing_bundle: str) -> None:
@@ -136,4 +139,4 @@ class TestHostLibraryLoadRefusals:
                 pipe_code="greet", mthds_contents=[_CALLER_BUNDLE], inputs={"name": "Ada"}
             )
 
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.METHOD_INVALID

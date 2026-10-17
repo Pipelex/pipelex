@@ -152,7 +152,7 @@ async def _generate_codegen_response(*, request_data: CodegenRequest, generation
         crate = (await resolve_requested_crate(request_data)).crate
     except ValidateBundleError as validate_error:
         generation_report.declare_failed()
-        return invalid_crate_report_response(validate_error.to_error_report())
+        return invalid_crate_report_response(validate_error)
     generation_report.describe(crate=crate)
     try:
         emitted = emit_types(crate, target=request_data.target)

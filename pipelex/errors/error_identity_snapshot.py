@@ -1,10 +1,9 @@
 """Snapshot of the wire-visible identity of every ``PipelexError`` subclass: its name and its code.
 
-Every ``ErrorReport`` carries the registry ``code`` its error resolved to, and still carries ``error_type``,
-the Python class name verbatim, with no indirection, which external consumers branch on until the problem
-document moves the class name to the operator's diagnostics. Renaming an error class therefore breaks them
-*silently*, and so does changing the code a class raises: their build stays green and the branch simply stops
-matching, falling through to a generic error path.
+Every problem carries the registry ``code`` its error resolved to, and the operator's view carries the Python
+class name verbatim as ``diagnostics.error_class``, which operators' tooling may branch on. Renaming an error class
+therefore breaks it *silently*, and so does changing the code a class raises: its build stays green and the branch
+simply stops matching, falling through to a generic error path.
 
 This module closes that gap the cheap way: it renders every class's name and code declaration (the code, the
 set its raise sites choose from, the cause it takes its code from, or that it is abstract, as

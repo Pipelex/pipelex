@@ -130,7 +130,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 field_name="function_name",
-            ) from exc
+            ).with_params(pipe=self.code, function=self.function_name, finding=exc.message) from exc
         self._is_function_proven = True
 
     @override
@@ -361,9 +361,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )
-            # Not classified as the caller's fault: the function's own exception text can carry
-            # whatever the process holds (a path, a setting, a secret), so it stays redacted under
-            # STRICT disclosure. The wrapper takes its cause's code. What the function raised reads
+            # No parameter carries the function's own exception text, which can carry whatever the
+            # process holds (a path, a setting, a secret): it rides the operator's diagnostics alone.
+            # The wrapper takes its cause's code. What the function raised reads
             # `pipe.function_raised` only because an executor marked it so: the in-process executor
             # raises it as `PipeFuncRaisedError`, and an out-of-process one must report a coded Pipelex
             # error the same way. A failure of the seam (a timeout, a sandbox that cannot run the call)
@@ -489,6 +489,9 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         try:
             return self.bind_function()
         except (PipeFuncFunctionError, TreePythonError) as exc:
+            if isinstance(exc, PipeFuncFunctionError):
+                # The refusal's code is the run failure's, and its sentences name the function and what is wrong with it.
+                exc.with_params(function=self.function_name, finding=exc.message)
             msg = f"PipeFunc '{self.code}' cannot call its function '{self.function_name}': {exc.message}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
         except Exception as exc:
@@ -496,8 +499,10 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # enumerable: an ImportError, the guard's refusal of a file the tree excludes included, or anything the
             # code raises. Wrapped on the step, as a failure of the function itself is, and never swallowed.
             msg = f"PipeFunc '{self.code}' cannot import the module of its function '{self.function_name}': {type(exc).__name__}: {exc}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
-                CoreCode.METHOD_FUNCTION_INVALID
+            raise (
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                .with_error_code(CoreCode.METHOD_FUNCTION_INVALID)
+                .with_params(function=self.function_name, finding=f"importing its module raised {type(exc).__name__}")
             ) from exc
 
     @override

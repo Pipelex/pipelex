@@ -7,9 +7,9 @@ external orchestrator plugin can contribute a worker-dispatched validator under 
 mode token — which core never names.
 
 Verdict-as-value (not raise): ``validate_bundles`` *returns* the verdict — the valid
-report (a ``ValidationReport``) or the invalid ``ErrorReport`` (carrying
-``validation_errors``) — and raises only for a no-verdict infra fault (which a host
-runtime maps to a 5xx). This is the same valid/invalid pair the API maps to its
+report (a ``ValidationReport``) or the invalid ``BundleValidationFailure`` (the refusal's
+problem in the operator's view, with its ``validation_errors``) — and raises only for a
+no-verdict fault, which a host runtime answers with that fault's problem. This is the same valid/invalid pair the API maps to its
 200-always ``/validate`` wire, so the verdict contract is backend-independent.
 
 Seam typed at the MTHDS-protocol level (``ValidationReport``), not the concrete
@@ -28,7 +28,7 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, runtime_checkable
 
 from mthds.protocol.models import ValidationReport
 
-from pipelex.base_exceptions import ErrorReport
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.runtime_bridge.orchestration_mode import OrchestrationMode
 from pipelex.system.caller_identity import CallerIdentity
 
@@ -37,11 +37,11 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 # The verdict a validator returns: valid arm = the protocol validation report (at runtime
-# always the canonical PipelexValidationReport subtype), invalid arm = the structured
-# ErrorReport. Bound at runtime (not just under TYPE_CHECKING) so an external validator
+# always the canonical PipelexValidationReport subtype), invalid arm = the refusal's
+# BundleValidationFailure. Bound at runtime (not just under TYPE_CHECKING) so an external validator
 # plugin can import it to annotate its own validate_bundles. Both arms are leaf types w.r.t.
 # the hub, so this hub-reachable seam stays import-acyclic even with the runtime imports.
-BundleValidationVerdict: TypeAlias = ValidationReport[Any] | ErrorReport
+BundleValidationVerdict: TypeAlias = ValidationReport[Any] | BundleValidationFailure
 
 
 @runtime_checkable

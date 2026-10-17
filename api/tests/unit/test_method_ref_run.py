@@ -7,7 +7,7 @@ written as the run's one library directory, the caller's own; the entry pipe def
 manifest's `main_pipe` (a request `pipe_code` overrides); provenance `{address, tag,
 commit_sha, tree_digest}` lands on the response; the exclusivity rules 422; the
 execution-locus gate refuses Python where it must; and each resolution failure maps to its
-distinct `error_type` + status as RFC 7807 `problem+json`.
+distinct code + status as RFC 7807 `problem+json`, the status being the code's.
 """
 
 import logging
@@ -16,14 +16,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.methods.exceptions import MethodFetchError
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import STUB_METHOD_ADDRESS, STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST, VALID_MTHDS
 
@@ -44,10 +48,13 @@ class Invoice(StructuredContent):
 """
 
 
-def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
-    """Wire an app whose ApiRunner is mocked and records what the run actually saw."""
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> tuple[TestClient, dict[str, Any]]:
+    """Wire an app whose ApiRunner is mocked and records what the run actually saw.
+
+    `as_operator` marks each request as the operator's, whose view carries a refusal's own message in `diagnostics`.
+    """
     app = FastAPI()
-    app.include_router(pipeline_router, prefix="/v1")
+    app.include_router(pipeline_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
 
     snapshot: dict[str, Any] = {}
@@ -184,42 +191,71 @@ class TestMethodRefRun:
 
     def test_method_ref_is_exclusive_with_inline_contents_and_bundles(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         with_contents = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "mthds_contents": [VALID_MTHDS]})
         with_bundle = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "files": {"main.mthds": VALID_MTHDS}})
         for response in (with_contents, with_bundle):
             assert response.status_code == 422, response.text
-            assert "mutually exclusive" in response.json()["detail"]
+            problem = response.json()
+            assert problem["code"] == CoreCode.REQUEST_INVALID
+            assert problem.get("params") == {"field": "method_ref"}
+            assert "mutually exclusive" in problem["diagnostics"]["message"]
 
-    def test_malformed_ref_is_422_with_parse_error_type(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
+    def test_an_address_this_runtime_does_not_fetch_is_a_422_naming_the_field(
+        self, mocker: MockerFixture, install_method_package: Callable[..., Path]
+    ):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post("/v1/execute", json={"method_ref": "gitlab.com/acme/tools", "inputs": {}})
         assert response.status_code == 422, response.text
         assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "MethodRefParseError"
+        problem = response.json()
+        assert problem["code"] == CoreCode.REQUEST_UNSUPPORTED
+        assert problem["domain"] == "input"
+        assert problem.get("params", {}).get("field") == "method_ref"
+        assert problem["diagnostics"]["error_class"] == "MethodRefParseError"
 
     def test_unknown_package_is_404_problem_json(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
-        client, _ = _build_client(mocker)
-        response = client.post("/v1/execute", json={"method_ref": "github.com/pipelex/methods/nonexistent", "inputs": {}})
+        client, _ = _build_client(mocker, as_operator=True)
+        unknown_address = "github.com/pipelex/methods/nonexistent"
+        response = client.post("/v1/execute", json={"method_ref": unknown_address, "inputs": {}})
         assert response.status_code == 404, response.text
         assert response.headers["content-type"] == "application/problem+json"
-        body = response.json()
-        assert body["error_type"] == "MethodPackageNotFoundError"
-        # The message teaches: it lists the packages the repository does contain.
-        assert STUB_METHOD_ADDRESS in body["detail"]
+        problem = response.json()
+        assert problem["code"] == CoreCode.METHOD_NOT_FOUND
+        assert problem.get("params") == {"method_ref": unknown_address}
+        assert problem["diagnostics"]["error_class"] == "MethodPackageNotFoundError"
+        # The operator's message teaches: it lists the packages the repository does contain.
+        assert STUB_METHOD_ADDRESS in problem["diagnostics"]["message"]
 
-    def test_fetch_failure_is_422_with_fetch_error_type(self, mocker: MockerFixture):
+    @pytest.mark.parametrize(
+        ("code", "expected_status"),
+        [
+            (CoreCode.METHOD_FETCH_FAILED, 502),
+            (CoreCode.METHOD_NOT_FOUND, 404),
+            (CoreCode.METHOD_PACKAGE_INVALID, 422),
+            (PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, 500),
+        ],
+    )
+    def test_a_fetch_failure_answers_the_status_of_its_code(self, mocker: MockerFixture, code: ErrorCode, expected_status: int):
+        """A failed fetch answers whatever code its raise site chose, with that code's status from the error registry."""
+        fetch_error = MethodFetchError(f"Failed to fetch method '{STUB_METHOD_ADDRESS}': boom").for_method_ref(method_ref=STUB_METHOD_ADDRESS)
         stub_cache = mocker.MagicMock()
-        stub_cache.pinned_package.side_effect = MethodFetchError("Failed to fetch method 'github.com/pipelex/methods/documents': boom")
+        stub_cache.pinned_package.side_effect = fetch_error.with_error_code(code)
         mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub_cache)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": STUB_METHOD_ADDRESS, "inputs": {}})
-        assert response.status_code == 422, response.text
+        assert response.status_code == expected_status, response.text
         assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "MethodFetchError"
-        assert response.json()["code"] == "method.fetch_failed"
+        problem = response.json()
+        assert error_code_spec(code).status == expected_status
+        assert problem["status"] == expected_status
+        assert problem["code"] == code
+        assert problem["retry"] == error_code_spec(code).retry
+        # The caller's view: the code's sentences, never the fetch's own message.
+        assert "boom" not in response.text
+        assert "diagnostics" not in problem
 
     def test_python_package_forbidden_when_not_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY})
@@ -245,11 +281,15 @@ class TestMethodRefRun:
     def test_structures_package_refused_even_when_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "structures/models.py": _STRUCTURES_PY})
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {}})
-        assert response.status_code == 403, response.text
+        # The method's own structure classes are its author's to change: a 422, the code's status.
+        assert response.status_code == 422, response.text
         assert response.headers["content-type"] == "application/problem+json"
-        body = response.json()
-        assert body["error_type"] == "MethodStructuresRefusedError"
-        # The refusal names the rule and teaches the fix.
-        assert "MTHDS concepts" in body["detail"]
+        problem = response.json()
+        assert problem["code"] == PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED
+        assert problem["domain"] == "method"
+        assert problem["next_step"]["kind"] == "change_method"
+        assert problem["diagnostics"]["error_class"] == "MethodStructuresRefusedError"
+        # The operator's message names the rule and teaches the fix.
+        assert "MTHDS concepts" in problem["diagnostics"]["message"]

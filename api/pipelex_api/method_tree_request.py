@@ -23,7 +23,7 @@ What this module does, in order:
    file at a tree path; other bytes under a path the tree holds are a 422 `InvalidResourcePath` naming it.
 5. Python is honored only on a sandbox-hosted deployment: a method holding a `.py` file is refused with a 403
    `CustomCodeRequiresSandbox` before anything is written, and on a sandbox-hosted deployment a tree declaring a Python
-   structure class is refused (`MethodStructuresRefusedError`, a 403).
+   structure class is refused (`MethodStructuresRefusedError`, a 422).
 6. Each tree read in full is recorded in the blob store, its files then its listing, so the next request can send it
    by hash, and `POST /v1/blobs/missing` answers its digest with one lookup.
 7. The trees are written out into a temporary directory and held as written (`pipelex.libraries.written_trees`), so
@@ -639,7 +639,7 @@ def ensure_python_allowed(*, request_method: RequestMethod, label: str) -> None:
 
     On a deployment that is not sandbox-hosted, any `.py` file is refused (403 `CustomCodeRequiresSandbox`): running it
     would import it in-process. On a sandbox-hosted deployment, the method's own tree declaring a Python structure class
-    is refused (`MethodStructuresRefusedError`, a 403), naming each file by its tree path; a dependency tree is checked
+    is refused (`MethodStructuresRefusedError`, a 422), naming each file by its tree path; a dependency tree is checked
     once written, by its address (`written_method`).
     """
     if not request_method.has_python:
@@ -708,7 +708,7 @@ def written_method(*, request_method: RequestMethod) -> Generator[WrittenMethod,
     The method's own tree is written as one directory, the library directory of the load; each dependency tree as
     `<name>/` in a methods directory of its own, the layout the engine's `methods_dirs` take, so two dependencies sharing
     a name never meet. On a sandbox-hosted deployment, a dependency tree declaring a Python structure class is refused,
-    naming it by its address, as a fetched package is (`MethodStructuresRefusedError`, a 403).
+    naming it by its address, as a fetched package is (`MethodStructuresRefusedError`, a 422).
     """
     with ExitStack() as stack:
         temp_dir = Path(tempfile.mkdtemp(prefix="pipelex-method-"))

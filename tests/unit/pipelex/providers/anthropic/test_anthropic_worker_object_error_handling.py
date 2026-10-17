@@ -18,6 +18,7 @@ if TYPE_CHECKING:
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
 
@@ -282,8 +283,8 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
-    async def test_provider_metadata_is_serialized_in_error_report(self, mocker: MockerFixture) -> None:
-        """``to_error_report()`` must surface ``provider_metadata`` so downstream consumers see it."""
+    async def test_provider_facts_are_serialized_in_the_operator_problem(self, mocker: MockerFixture) -> None:
+        """The operator's problem carries what the provider answered, and the error advises its local reader what to do."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded")
@@ -293,19 +294,20 @@ class TestAnthropicWorkerObjectErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        report_dict = report.to_dict()
-        assert "provider_metadata" in report_dict
-        metadata_dict = report_dict["provider_metadata"]
-        assert isinstance(metadata_dict, dict)
-        assert metadata_dict["provider"] == "anthropic"
-        assert metadata_dict["sdk_exception_type"] == "RateLimitError"
-        assert metadata_dict["status_code"] == 429
-        assert "user_action" in report_dict
-        user_action_dict = report_dict["user_action"]
-        assert isinstance(user_action_dict, dict)
-        assert user_action_dict["kind"] == UserActionKind.CHECK_BILLING
-        assert isinstance(user_action_dict["detail"], str)
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        problem_wire = problem.to_wire()
+        # The provider's `name` is the backend the error names, which the worker leaves to its caller to fill.
+        assert problem_wire["diagnostics"]["provider"] == {
+            "status": 429,
+            "message": "Your account quota has been exceeded",
+        }
+        # What the provider answered is the operator's alone.
+        assert "diagnostics" not in error.to_problem(view=ProblemView.CALLER).to_wire()
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHECK_BILLING
+        assert advice.detail
 
     async def test_real_instructor_transport_error_is_unwrapped(self, mocker: MockerFixture) -> None:
         """End-to-end: drive the real instructor library with an SDK transport exception and verify

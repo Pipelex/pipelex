@@ -10,7 +10,8 @@ from botocore.exceptions import ClientError
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, find_inference_error_category_in_chain
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.bedrock.bedrock_llm_worker import BedrockLLMWorker
 from tests.unit.pipelex.providers.bedrock.test_data import BedrockLLMErrorHandlingTestData
 
@@ -55,6 +56,12 @@ def _make_llm_job(mocker: MockerFixture) -> Any:
     return job
 
 
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestBedrockWorkerErrorHandling:
     """Tests for Bedrock worker ClientError exception handling and error categorization."""
@@ -96,10 +103,10 @@ class TestBedrockWorkerErrorHandling:
             assert exc_info.value.user_action is not None
             assert expected_action_substring in exc_info.value.user_action.detail.lower()
 
-    # ---- to_error_report() integration ----
+    # ---- Problem integration ----
 
-    async def test_error_report_transient_is_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for TRANSIENT Bedrock errors has retryable=True."""
+    async def test_problem_transient_is_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a TRANSIENT Bedrock error invites a retry."""
         worker = _make_bedrock_llm_worker(mocker)
         sdk_exc = _make_bedrock_client_error("ThrottlingException", "Rate exceeded for model")
         worker.bedrock_client_for_text.chat.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -114,13 +121,14 @@ class TestBedrockWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
-        assert report.error_type == "LLMCompletionError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
+        assert _diagnostics_of(problem).error_class == "LLMCompletionError"
 
-    async def test_error_report_capacity_not_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for CAPACITY Bedrock errors has retryable=False."""
+    async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a CAPACITY Bedrock error invites no retry."""
         worker = _make_bedrock_llm_worker(mocker)
         sdk_exc = _make_bedrock_client_error("ServiceQuotaExceededException", "Service quota exceeded")
         worker.bedrock_client_for_text.chat.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -135,12 +143,13 @@ class TestBedrockWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "capacity"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "capacity"
+        assert problem.is_retryable is False
 
-    async def test_error_report_configuration_not_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for CONFIGURATION Bedrock errors has retryable=False."""
+    async def test_problem_configuration_not_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a CONFIGURATION Bedrock error invites no retry."""
         worker = _make_bedrock_llm_worker(mocker)
         sdk_exc = _make_bedrock_client_error("AccessDeniedException", "Access denied")
         worker.bedrock_client_for_text.chat.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -155,6 +164,7 @@ class TestBedrockWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "configuration"
+        assert problem.is_retryable is False

@@ -24,6 +24,7 @@ from pydantic import BaseModel, Field
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_bad_request, raise_internal_server_error, raise_unauthenticated
 from pipelex_api.exceptions import InvalidAuthModeError
+from pipelex_api.problem_view import mark_operator_request
 
 AUTH_MODE_ENV_VAR = "AUTH_MODE"
 
@@ -238,10 +239,11 @@ async def verify_jwt(
         raise_unauthenticated("Invalid token", error_type=ErrorType.INVALID_TOKEN)
 
 
-async def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]) -> str:
+async def verify_api_key(request: Request, credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]) -> str:
     """Validate static API key from Authorization header against API_KEY env var.
 
-    No user identity is available with static API keys — this is a shared developer key.
+    No user identity is available with static API keys — this is a shared developer key. It is the operator's own
+    credential, so a request presenting it reads the operator view of its failures (`pipelex_api.problem_view`).
     """
     if credentials is None:
         # Missing, empty, or non-Bearer `Authorization` header. See the
@@ -260,6 +262,7 @@ async def verify_api_key(credentials: Annotated[HTTPAuthorizationCredentials | N
         log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.API_KEY_MISMATCH})
         raise_unauthenticated("Invalid authentication token", error_type=ErrorType.INVALID_TOKEN)
 
+    mark_operator_request(request)
     return credentials.credentials
 
 
@@ -278,6 +281,10 @@ async def no_auth(request: Request) -> None:
     external client could otherwise forge it when the API is reachable
     directly. With the flag enabled, you are responsible for ensuring your
     proxy strips `X-User-Id` from inbound requests before adding its own.
+
+    With the flag set, the only party that reaches this server is that proxy, the deployment's own hop, so a request it
+    forwards reads the operator view of its failures (`pipelex_api.problem_view`), and the proxy owes its own callers
+    their caller view. Without it, a request reads the caller view: nothing authenticated who sent it.
     """
     if get_optional_env("TRUST_FORWARDED_IDENTITY_HEADERS") != "true":
         return
@@ -306,6 +313,7 @@ async def no_auth(request: Request) -> None:
         raise_bad_request("Forwarded X-User-Id must be a single path-safe segment", error_type=ErrorType.BAD_REQUEST)
 
     _set_request_user(request, user_id=user_id)
+    mark_operator_request(request)
 
 
 async def get_request_user(request: Request) -> RequestUser | None:

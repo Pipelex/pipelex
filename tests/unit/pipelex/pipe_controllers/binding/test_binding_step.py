@@ -1,4 +1,5 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept import Concept
@@ -9,6 +10,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.errors.problem import PipelexProblem
 from pipelex.pipe_controllers.binding import binding_step as binding_step_module
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation, BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
@@ -244,16 +246,15 @@ class TestBindingStep:
             step.skip_untyped_root(working_memory=WorkingMemory(), calling_pipe_code=_SEQUENCE_CODE, run_mode=PipeRunMode.LIVE)
 
     @pytest.mark.parametrize(
-        ("error", "expected_failure"),
+        ("error", "own_text"),
         [
-            (None, ("UnknownError", "the binding step stopped without binding a value", False)),
-            (RuntimeError("the root could not be read"), ("RuntimeError", "the root could not be read", False)),
+            (None, "The binding step stopped without binding a value"),
+            (RuntimeError("the root could not be read"), "the root could not be read"),
         ],
         ids=["stopped_without_an_error", "stopped_by_an_error"],
     )
-    def test_a_stopped_binding_closes_its_node_as_failed_once(
-        self, mocker: MockerFixture, error: BaseException | None, expected_failure: tuple[str, str, bool]
-    ) -> None:
+    def test_a_stopped_binding_closes_its_node_as_failed_once(self, mocker: MockerFixture, error: BaseException | None, own_text: str) -> None:
+        """The node records a fault of ours in the caller's view, located at the path it binds from, and none of the error's text."""
         tracer_manager = mocker.MagicMock()
         mocker.patch.object(binding_step_module.GraphTracerManager, "get_instance", return_value=tracer_manager)
         job_metadata = JobMetadata(
@@ -268,7 +269,13 @@ class TestBindingStep:
         tracer_manager.on_pipe_end_error.assert_called_once()
         call_kwargs = tracer_manager.on_pipe_end_error.call_args.kwargs
         assert (call_kwargs["lookup_key"], call_kwargs["node_id"]) == ("run_binding", "run_binding:node_3")
-        assert (call_kwargs["error_type"], call_kwargs["error_message"], call_kwargs["caller_facing"]) == expected_failure
+        problem = call_kwargs["problem"]
+        assert isinstance(problem, PipelexProblem)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.diagnostics is None
+        assert problem.location is not None
+        assert (problem.location.pipe, problem.location.path) == ("invoice.supplier", ["invoice.supplier"])
+        assert own_text not in str(problem.to_wire())
 
     def test_the_step_is_written_back_as_mthds_writes_it(self) -> None:
         step = BindingStep(from_path="invoice.supplier.address.city", output_name="city")

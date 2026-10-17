@@ -7,12 +7,13 @@ or a cause carries one, so that a transient failure, which the run repeats, neve
 """
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, find_inference_error_category_in_chain
 from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.located_failure import find_root_fault
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
@@ -39,16 +40,17 @@ class TestInferenceErrorDomain:
         _topic: str,
         category: InferenceErrorCategory,
         expected_code: ErrorCode,
-        expected_domain: ErrorDomain,
+        expected_domain: ProblemDomain,
         expected_retryable: bool,
     ) -> None:
         """A failure naming only a category reports the category's code, and that code's domain and retry verdict."""
-        report = LLMCompletionError("boom", error_category=category).to_error_report()
+        error = LLMCompletionError("boom", error_category=category)
+        problem = error.to_problem(view=ProblemView.CALLER)
 
-        assert report.code == expected_code
-        assert report.error_domain == expected_domain
-        assert report.retryable is expected_retryable
-        assert report.error_category == category
+        assert problem.code == expected_code
+        assert problem.domain == expected_domain
+        assert problem.is_retryable is expected_retryable
+        assert find_inference_error_category_in_chain(error) == category
 
     def test_category_code_cases_cover_every_category(self) -> None:
         """The parametrized table is exhaustive — a new category cannot slip in undecided."""
@@ -56,11 +58,11 @@ class TestInferenceErrorDomain:
         assert covered == set(InferenceErrorCategory)
 
     def test_a_retryable_category_never_reports_a_code_no_retry_clears(self) -> None:
-        """The run repeats a call whose category is retryable, so the report of one built with no code must invite a retry too."""
+        """The run repeats a call whose category is retryable, so the problem of one built with no code must invite a retry too."""
         for category in InferenceErrorCategory:
-            report = LLMCompletionError("boom", error_category=category).to_error_report()
+            problem = LLMCompletionError("boom", error_category=category).to_problem(view=ProblemView.CALLER)
             if category.is_retryable:
-                assert report.retryable is True, category
+                assert problem.is_retryable is True, category
 
     def test_a_chosen_code_beats_the_category(self) -> None:
         """The raise site that chose a code knows more than the category."""
@@ -88,10 +90,10 @@ class TestInferenceErrorDomain:
         wrapper = _WrapperError("Pipe 'greet' failed")
         wrapper.__cause__ = failure
 
-        report = wrapper.to_error_report()
+        problem = wrapper.to_problem(view=ProblemView.CALLER)
 
-        assert report.code == CoreCode.PROVIDER_UNAVAILABLE
-        assert report.retryable is True
+        assert problem.code == CoreCode.PROVIDER_UNAVAILABLE
+        assert problem.is_retryable is True
 
     def test_a_cyclic_pair_of_category_failures_reports_without_recursing(self) -> None:
         """Two failures chained to each other report the category's code, under a wrapper too, where the walk of each recursed."""
@@ -103,6 +105,6 @@ class TestInferenceErrorDomain:
         wrapper.__cause__ = outer
 
         assert outer.resolve_error_code() == CoreCode.PROVIDER_UNAVAILABLE
-        assert outer.to_error_report().code == CoreCode.PROVIDER_UNAVAILABLE
-        assert wrapper.to_error_report().code == CoreCode.PROVIDER_UNAVAILABLE
+        assert outer.to_problem(view=ProblemView.OPERATOR).code == CoreCode.PROVIDER_UNAVAILABLE
+        assert wrapper.to_problem(view=ProblemView.OPERATOR).code == CoreCode.PROVIDER_UNAVAILABLE
         assert find_root_fault(error=wrapper) is inner

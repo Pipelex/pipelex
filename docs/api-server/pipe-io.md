@@ -34,14 +34,17 @@ There is no `views` field, because the valid arm always carries all three artifa
 
 The selection chain takes the request's `pipe_ref`; else a fetched package's manifest `main_pipe`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
 
-The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with an input `422` `problem+json`. Its `error_type` is the pipelex entry-lookup class that names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that field:
+The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with a `422` problem whose `code` names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that member:
 
-- `EntryPipeNotFoundError` for a `pipe_ref` that names no pipe of the closure, for a manifest `main_pipe` the closure does not declare, and, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`;
-- `EntryPipeAmbiguousError` for a bare code that matches pipes in several domains, whether the request or the manifest spelled it, and, without `all_pipes`, for a request with no `pipe_ref` whose closure declares several `main_pipe`s.
+- `request.pipe_not_found` for a `pipe_ref` that names no pipe of the closure, with the selection as its `pipe` parameter;
+- `request.pipe_ambiguous` for a bare code that matches pipes in several domains, with the selection as its `pipe` parameter and the qualified refs to choose from as its `candidates`;
+- `request.pipe_unspecified`, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`, or several, whose qualified refs are then its `candidates`;
+- `method.pipe_unresolved` for a manifest `main_pipe` the closure does not declare, the method's own declaration to fix, with the declared selection as its `missing` parameter;
+- `method.ref_ambiguous` for a manifest `main_pipe` that matches pipes in several domains of the closure, the method's own declaration to fix, with the declared selection as its `ref` parameter and the qualified refs it matches as its `candidates`.
 
-The `detail` says which case it is and, for an ambiguity, names the qualified refs to choose from; the candidates are in the `detail` alone, with no structured list, as on the run routes. The problem's `code` tells the cases apart, and its `type` and `title` are the code's: `request.pipe_not_found` for a `pipe_ref` that names no pipe, `request.pipe_ambiguous` for an ambiguous one or a closure declaring several `main_pipe`s, `request.pipe_unspecified` for a request with no `pipe_ref` over a closure declaring none, and `method.pipe_unresolved` for a manifest `main_pipe` the closure does not declare or matches ambiguously. Its `user_action` is the class's too, advising a check of the pipe code, except for a request with no `pipe_ref` whose closure declares no `main_pipe` or several, where it asks for a `pipe_ref` instead.
+The problem's `type`, `title`, sentences and step are the code's: a request's selection asks the caller to select a pipe the method declares, and a manifest's asks the method's author to correct the declaration.
 
-An unknown or ambiguous `pipe_ref` answers the `error_type` the run routes answer for the same `pipe_code`. A closure declaring no `main_pipe`, or several, has no run-route twin: this route refuses both as the pipe-selector design classifies them, while a run over such a closure today fails with a `500` or runs the first declaration.
+An unknown or ambiguous `pipe_ref` answers the code the run routes answer for the same `pipe_code`. A closure declaring no `main_pipe`, or several, has no run-route twin: this route refuses both as the pipe-selector design classifies them, while a run over such a closure today fails with a `500` or runs the first declaration.
 
 A bare `pipe_ref` that matches one pipe (`echo` where `smoke.echo` is meant) is still resolved today, and the valid arm reports the qualified ref.
 
@@ -80,9 +83,10 @@ An invalid closure is the `200` crate verdict `/v1/resolve` gives: `is_valid: fa
 
 ## No verdict
 
-Every non-2xx is RFC 7807 `application/problem+json` (see [Error Responses](error-responses.md)):
+Every non-2xx is RFC 9457 `application/problem+json` (see [Error Responses](error-responses.md)):
 
-- **`422`** for a malformed body, neither or both closure selectors and an over-limit file, all `ValidationError`, and for the selection refusals above, `EntryPipeNotFoundError` or `EntryPipeAmbiguousError`.
-- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `MethodPackageNotFoundError` when no package in the fetched repository matches the address, `422` for a reference that does not parse or a fetch the server cannot accept, and `501` `MethodRefNotSupported` for a registry-form reference. The route reads only a package's `.mthds` files, so the custom-code and structures `403`s of `/v1/validate` and the run routes never arise here.
+- **`422`** for a malformed body, neither or both closure selectors and an over-limit file, all `ValidationError`, and for the selection refusals above, by their codes.
+- **`422` `request.unsupported`** with `params.reason` set to `address_based_dependency` for a closure calling another method by its address, which this route cannot load: the request is what it cannot serve, not the method, so it is no verdict, and the run routes, which fetch such a dependency, run the closure.
+- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `method.not_found` when no package in the fetched repository matches the address, `422` for a reference that does not parse (`request.invalid`) or a package the server cannot accept (`method.ambiguous`, `method.package_invalid`), `502` `method.fetch_failed` when the fetch itself failed, and `501` `MethodRefNotSupported` for a registry-form reference. The route reads only a package's `.mthds` files, so the custom-code and structures `403`s of `/v1/validate` and the run routes never arise here.
 - **`401` / `403`** for authentication, and **`413`** for a body over the size limit.
 - **`500`** when an artifact cannot be derived: a pipe whose input or output JSON Schema cannot be rendered raises `PipeIOContractError`, which answers `500` as it does on `/v1/validate` — a fault of the tool, not a verdict about the method.

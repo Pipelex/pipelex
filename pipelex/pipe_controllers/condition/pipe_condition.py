@@ -4,7 +4,6 @@ from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -415,17 +414,7 @@ class PipeCondition(PipeController):
                     pipe_code=self.code,
                     message=error_msg,
                     run_mode=pipe_run_params.run_mode,
-                )
-                .with_error_code(CoreCode.PIPE_CONDITION_UNMATCHED)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=(
-                            f"Change the expression of PipeCondition '{self.code}' so that it always renders a value: "
-                            "the name of one of its outcomes, or any other value, which takes the default outcome."
-                        ),
-                    )
-                )
+                ).with_error_code(CoreCode.PIPE_CONDITION_UNMATCHED)
             )
 
     @override
@@ -457,12 +446,7 @@ class PipeCondition(PipeController):
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                 .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=f"Fix the expression of PipeCondition '{self.code}': {exc.fault}",
-                    )
-                )
+                .with_params(template="expression", finding=exc.fault)
             ) from exc
 
     async def _evaluate_expression(
@@ -513,9 +497,9 @@ class PipeCondition(PipeController):
         # downstream); it no longer passes through as this pipe's output.
         if SpecialOutcome.is_continue(outcome):
             self._record_resolution(job_metadata=job_metadata, evaluated_expression=evaluated_expression, outcome=outcome)
-            # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it to the caller
-            # under STRICT disclosure, and the value the expression rendered can be literal text of a condition a host
-            # library declared. The execution data above keeps that value.
+            # The reason names only the pipe and the outcome: a pipe that force-unwraps this output quotes it in its
+            # failure, and the value the expression rendered can be literal text of a condition a host library
+            # declared. The execution data above keeps that value.
             self._record_declared_absent_output(
                 working_memory=working_memory,
                 output_name=output_name,
@@ -532,15 +516,7 @@ class PipeCondition(PipeController):
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                 .with_error_code(CoreCode.PIPE_CONDITION_REFUSED)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=(
-                            f"PipeCondition '{self.code}' refuses this run on purpose: change the inputs so that its expression "
-                            "selects another outcome, or map that outcome to a pipe or to 'continue'."
-                        ),
-                    )
-                )
+                .with_params(outcome=outcome)
             )
 
         chosen_pipe = get_required_pipe(pipe_code=outcome)
@@ -568,12 +544,7 @@ class PipeCondition(PipeController):
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                 .with_error_code(CoreCode.PIPE_INPUT_UNRESOLVED)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=f"Provide the missing required inputs of '{outcome}', which PipeCondition '{self.code}' chose: {missing_names_str}.",
-                    )
-                )
+                .with_params(variable=missing_names_str)
             )
 
         # Recorded only now: a choice whose pipe cannot run is a failure of the condition, never an outcome it took.
@@ -685,12 +656,7 @@ class PipeCondition(PipeController):
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                 .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=f"Fix the expression of PipeCondition '{self.code}' so that it parses as a Jinja2 expression.",
-                    )
-                )
+                .with_params(template="expression", finding=describe_expression_parse_failure(error=exc))
             ) from exc.__cause__
 
         # Validate that all values in the outcomes map (appart from special outcomes) do exist as pipe codes
@@ -708,14 +674,7 @@ class PipeCondition(PipeController):
             raise (
                 PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                 .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
-                .as_caller_fault(
-                    user_action=UserAction(
-                        kind=UserActionKind.CHANGE_INPUT,
-                        detail=(
-                            f"Declare the pipes {missing_pipes_str}, or change the outcomes of PipeCondition '{self.code}' to name existing pipes."
-                        ),
-                    )
-                )
+                .with_params(missing=missing_pipes_str)
             )
 
         # A dry run cannot know which outcome a live run takes, so the pipe of every outcome group
@@ -772,12 +731,7 @@ class PipeCondition(PipeController):
                 raise (
                     PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
                     .with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
-                    .as_caller_fault(
-                        user_action=UserAction(
-                            kind=UserActionKind.CHANGE_INPUT,
-                            detail=f"Map at least one outcome of PipeCondition '{self.code}' to a pipe or to 'continue'.",
-                        )
-                    )
+                    .with_params(field_path=f"pipe.{self.code}.outcomes", finding="every outcome and the default map to 'fail'")
                 )
             self._record_declared_absent_output(
                 working_memory=working_memory,

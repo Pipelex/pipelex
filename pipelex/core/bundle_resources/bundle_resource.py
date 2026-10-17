@@ -78,6 +78,6 @@ def canonical_submitted_files(*, files: Mapping[str, bytes]) -> dict[str, bytes]
         canonical_path = canonical_resource_path(path=path)
         if canonical_path in canonical_files:
             msg = f"Two files submitted with the bundle name the same file '{canonical_path}'."
-            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID)
+            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
         canonical_files[canonical_path] = content
     return canonical_files

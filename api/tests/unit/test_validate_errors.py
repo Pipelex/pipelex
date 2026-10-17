@@ -21,6 +21,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexConfigError, ValidationErrorCategory
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
@@ -28,6 +29,8 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 from pytest_mock import MockerFixture
@@ -46,6 +49,11 @@ def _build_client() -> TestClient:
     app.include_router(api_router, prefix="/v1")
     register_exception_handlers(app)
     return TestClient(app)
+
+
+def _failure_of(refusal: ValidateBundleError) -> BundleValidationFailure:
+    """The invalid verdict a validator returns as a value for a refusal: its operator problem and its validation items."""
+    return BundleValidationFailure(problem=refusal.to_problem(view=ProblemView.OPERATOR), validation_errors=refusal.validation_error_items())
 
 
 def _multi_category_error() -> ValidateBundleError:
@@ -180,8 +188,8 @@ class TestValidateErrors:
         # Every structured category lands on the 200 InvalidReport, and collectively the items cover
         # the full ValidationErrorItem field set (so a dropped field would fail here, not silently
         # vanish at the verdict->wire boundary). The runner returns the invalid verdict as a value
-        # (an ErrorReport) — here the ValidateBundleError's own `to_error_report()` projection.
-        mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=_multi_category_error().to_error_report()))
+        # (a BundleValidationFailure) — here the one a validator builds from the ValidateBundleError.
+        mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=_failure_of(_multi_category_error())))
         client = _build_client()
         response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS]})
 
@@ -224,11 +232,17 @@ class TestValidateErrors:
         failing_dry_run = ValidateBundleError(
             message="Dry run failed.",
             dry_run_failures=[
-                DryRunFailureErrorData(pipe_code="summarize", domain_code="legal", source="pipe.mthds", message="Pipe 'summarize' failed: boom."),
-                DryRunFailureErrorData(message="Dry run failed: unlocated."),
+                DryRunFailureErrorData(
+                    code=CoreCode.METHOD_WIRING_INVALID,
+                    pipe_code="summarize",
+                    domain_code="legal",
+                    source="pipe.mthds",
+                    message="Pipe 'summarize' failed: boom.",
+                ),
+                DryRunFailureErrorData(code=CoreCode.METHOD_WIRING_INVALID, message="Dry run failed: unlocated."),
             ],
         )
-        mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=failing_dry_run.to_error_report()))
+        mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=_failure_of(failing_dry_run)))
         client = _build_client()
         response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS]})
 
@@ -249,7 +263,7 @@ class TestValidateErrors:
             assert locator not in unlocated_item, unlocated_item
 
     def test_non_verdict_failure_is_not_a_200_verdict(self, mocker: MockerFixture):
-        # The runner returns a produced verdict (valid report | invalid ErrorReport) as a value; only
+        # The runner returns a produced verdict (valid report | BundleValidationFailure) as a value; only
         # a no-verdict fault propagates. A genuine host-wiring/server fault must reach the global
         # problem+json handler as a 5xx, never be masqueraded as a 200 verdict. (Route invariant: the
         # route maps the returned verdict and lets a raised fault propagate.)

@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem, error_domain_is_input, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem, iter_cause_chain
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.migration.exceptions import FormerReleaseConfigError
@@ -45,6 +45,14 @@ class ErrorContext(StrEnum):
 # global Click context: typer >= 0.26 / click >= 8.4 do not push a global context during
 # subcommand dispatch, so reading the flag there silently lost it on handled errors.
 _traceback_requested: ContextVar[bool] = ContextVar("pipelex_cli_traceback_requested", default=False)
+
+
+def _advice_detail(*, error: PipelexError) -> str | None:
+    """The advice nearest the error along its cause chain, which a panel prints as its tip; ``None`` when none advises."""
+    advised_action = error.advised_action()
+    if advised_action is None or not advised_action.detail:
+        return None
+    return advised_action.detail
 
 
 def set_traceback_requested(*, value: bool) -> None:
@@ -137,8 +145,7 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    report = exc.to_error_report()
-    tip = report.user_action_detail() or (
+    tip = _advice_detail(error=exc) or (
         f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
     )
     display_error_panel(
@@ -171,7 +178,6 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    report = exc.to_error_report()
     fields: list[tuple[str, str]] = [
         ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
         ("Model", f"[yellow]'{escape(exc.model_handle or '')}'[/yellow]"),
@@ -193,11 +199,11 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
         "backend it routes to (see '.pipelex/inference/routing_profiles.toml') is enabled in '.pipelex/inference/backends.toml', "
         "and that you have the necessary credentials"
     )
-    user_action_detail = report.user_action_detail()
+    user_action_detail = _advice_detail(error=exc)
     tip: str
     if user_action_detail is None:
         tip = f"{local_deck_remedy}, or specify a different model in the '{exc.pipe_code}' pipe."
-    elif error_domain_is_input(report.error_domain):
+    elif ErrorDomain.from_problem_domain(exc.resolve_domain()).is_input:
         # The method named a model no entry of the deck names, and the lookup's next step is to
         # change it. A local deck can also be what lacks that model, so the local remedy follows.
         tip = f"{user_action_detail}\n{local_deck_remedy}."
@@ -241,7 +247,6 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidationError, *, conte
     """
     console = get_console()
     print_traceback_if_requested(console=console)
-    report = exc.to_error_report()
     model_handle = exc.model_handle or ""
     fields: list[tuple[str, str]] = [
         ("Preset ID", f"[yellow]'{escape(exc.preset_id)}'[/yellow]"),
@@ -252,7 +257,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidationError, *, conte
         backends_str = ", ".join([f"[yellow]{escape(backend)}[/yellow]" for backend in sorted(exc.enabled_backends)])
         fields.append(("Enabled Backends", backends_str))
 
-    tip_detail = report.user_action_detail()
+    tip_detail = _advice_detail(error=exc)
     if tip_detail is not None:
         tip = escape(tip_detail)
     else:
@@ -380,8 +385,7 @@ def handle_validate_bundle_error(
         allow_signatures: Whether the invocation accepted PipeSignature placeholders; when true,
             the actionable fix command preserves the same leniency.
     """
-    report = exc.to_error_report()
-    items = list(report.validation_errors or [])
+    items = exc.validation_error_items()
     console = get_console()
     print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
@@ -401,7 +405,7 @@ def handle_validate_bundle_error(
             f"[bold green]💡 {fixable_count} of these errors can be fixed automatically[/bold green] — run: [cyan]{escape(fix_command)}[/cyan]"
         )
     else:
-        tip = report.user_action_detail() or (
+        tip = _advice_detail(error=exc) or (
             "Review the error messages above and check your pipeline configuration. "
             "Make sure all required fields are present and correctly formatted."
         )

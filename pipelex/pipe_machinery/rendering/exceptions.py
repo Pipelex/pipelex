@@ -11,4 +11,3 @@ class OutputShapeUnavailableError(PipelexError, ValueError):
     """
 
     error_code = CoreCode.REQUEST_UNSUPPORTED
-    _authors_caller_facing_message = True

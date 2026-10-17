@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import ClassVar
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
@@ -23,9 +22,8 @@ from pipelex.pipeline.bundle_validator import (
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
-class _CallerFacingMethodFaultError(PipelexError):
+class _MethodFaultError(PipelexError):
     error_code = CoreCode.METHOD_WIRING_INVALID
-    _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class _StorageFaultError(PipelexError):
@@ -45,7 +43,7 @@ class TestDryRunFailureLocation:
         """A controller failing because a pipe it ran failed is attributed to that pipe, however it was wrapped."""
         inner_pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
         outer_pipe = self._make_pipe(mocker, pipe_ref="board.run_workshop")
-        inner_error = _CallerFacingMethodFaultError("the combine failed")
+        inner_error = _MethodFaultError("the combine failed")
         outer_error = PipeRouterError(message="the step failed", run_mode=PipeRunMode.DRY, pipe_code="run_workshop", output_name=None, pipe_stack=[])
         outer_error.__cause__ = inner_error
 
@@ -54,14 +52,14 @@ class TestDryRunFailureLocation:
         recorder.record(error=outer_error, pipe=outer_pipe)
 
         assert recorder.find_failing_pipe(error=outer_error) is inner_pipe
-        assert recorder.find_failing_pipe(error=_CallerFacingMethodFaultError("unrelated")) is None
+        assert recorder.find_failing_pipe(error=_MethodFaultError("unrelated")) is None
 
     def test_a_failure_at_a_pipe_allowed_to_fail_is_noted_at_the_next_pipe_outward(self, mocker: MockerFixture) -> None:
         """However deep the controllers, a tolerated pipe's failure is noted once, at the innermost pipe that may not fail."""
         tolerated_pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
         middle_pipe = self._make_pipe(mocker, pipe_ref="board.run_workshop")
         outer_pipe = self._make_pipe(mocker, pipe_ref="board.host_workshop")
-        inner_error = _CallerFacingMethodFaultError("the combine failed")
+        inner_error = _MethodFaultError("the combine failed")
         middle_error = PipeRouterError(message="the step failed", run_mode=PipeRunMode.DRY, pipe_code="run_workshop", output_name=None, pipe_stack=[])
         middle_error.__cause__ = inner_error
 
@@ -76,7 +74,7 @@ class TestDryRunFailureLocation:
     @pytest.mark.asyncio
     async def test_the_sweep_router_notes_the_pipe_a_failure_left(self, mocker: MockerFixture) -> None:
         pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
-        failure = _CallerFacingMethodFaultError("the combine failed")
+        failure = _MethodFaultError("the combine failed")
         mocker.patch.object(_DryRunSweepRouter, "_run_pipe_job", side_effect=failure)
         pipe_job = mocker.MagicMock()
         pipe_job.pipe = pipe
@@ -93,20 +91,40 @@ class TestDryRunFailureLocation:
         assert recorder.find_failing_pipe(error=raised.value) is pipe
 
     @pytest.mark.parametrize(
-        ("error", "expected_text"),
+        ("error", "expected_code", "expected_text", "own_text"),
         [
-            (_CallerFacingMethodFaultError("branch 'ideas' is plural"), "branch 'ideas' is plural"),
-            (_StorageFaultError("bucket s3://internal-bucket refused the write"), error_code_spec(PipelexErrorCode.STORAGE_UNAVAILABLE).title),
+            (
+                _MethodFaultError("branch 'ideas' is plural").with_params(variable_path="ideas", finding="a list fed to a single field"),
+                CoreCode.METHOD_WIRING_INVALID,
+                "Pipe 'analyze_topic' reads 'ideas' in a shape its wiring does not give it (a list fed to a single field).",
+                "branch 'ideas' is plural",
+            ),
+            (
+                _StorageFaultError("bucket s3://internal-bucket refused the write"),
+                PipelexErrorCode.STORAGE_UNAVAILABLE,
+                error_code_spec(PipelexErrorCode.STORAGE_UNAVAILABLE).title,
+                "s3://internal-bucket",
+            ),
             (
                 PipeRunError(message="expression rendered nothing", run_mode=PipeRunMode.DRY, pipe_code="route"),
-                error_code_spec(CoreCode.RUNTIME_UNEXPECTED).title,
+                CoreCode.RUNTIME_UNEXPECTED,
+                error_code_spec(CoreCode.RUNTIME_UNEXPECTED).detail,
+                "expression rendered nothing",
             ),
-            (FactoryException("polyfactory internals"), "The dry run could not generate mock data for this pipe"),
+            (
+                FactoryException("polyfactory internals"),
+                CoreCode.METHOD_MOCK_UNSATISFIABLE,
+                "The dry run could not generate mock data for this pipe",
+                "polyfactory internals",
+            ),
         ],
-        ids=["caller_facing", "config_fault", "not_caller_facing", "foreign"],
+        ids=["method_fault", "config_fault", "uncoded", "foreign"],
     )
     @pytest.mark.asyncio
-    async def test_a_failure_keeps_its_text_only_when_it_is_caller_facing(self, mocker: MockerFixture, error: Exception, expected_text: str) -> None:
+    async def test_a_failure_reads_its_code_s_sentence_never_its_own_text(
+        self, mocker: MockerFixture, error: Exception, expected_code: str, expected_text: str, own_text: str
+    ) -> None:
+        """The failure's message is the sentence its code renders for a caller; its own text is the operator's error message."""
         mocker.patch("pipelex.pipeline.bundle_validator.get_telemetry_manager")
         mocker.patch("pipelex.pipeline.bundle_validator.get_config").return_value.inference.dry_run.allowed_to_fail_pipes = ["board.analyze_topic"]
         mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
@@ -121,12 +139,21 @@ class TestDryRunFailureLocation:
         failure = results["board.analyze_topic"].failure
         assert failure is not None
         assert (failure.pipe_code, failure.domain_code) == ("analyze_topic", "board")
+        assert failure.code == expected_code, failure
         assert failure.message == f"Pipe 'analyze_topic' failed its dry run: {expected_text}"
+        assert own_text not in failure.message
+        error_message = results["board.analyze_topic"].error_message
+        assert error_message is not None
+        assert own_text in error_message
 
     def test_a_failure_reached_through_a_controller_is_kept_once_its_own_preferred(self) -> None:
-        inner_failure_via_outer = DryRunFailureErrorData(pipe_code="analyze_topic", domain_code="board", message="via the sequence")
-        inner_failure_own = DryRunFailureErrorData(pipe_code="analyze_topic", domain_code="board", message="its own")
-        other_failure = DryRunFailureErrorData(pipe_code="publish", domain_code="board", message="publish failed")
+        inner_failure_via_outer = DryRunFailureErrorData(
+            pipe_code="analyze_topic", domain_code="board", message="via the sequence", code=CoreCode.METHOD_WIRING_INVALID
+        )
+        inner_failure_own = DryRunFailureErrorData(
+            pipe_code="analyze_topic", domain_code="board", message="its own", code=CoreCode.METHOD_WIRING_INVALID
+        )
+        other_failure = DryRunFailureErrorData(pipe_code="publish", domain_code="board", message="publish failed", code=CoreCode.RUNTIME_UNEXPECTED)
         unexpected_failures = {
             "board.run_workshop": DryRunOutput(
                 pipe_code="run_workshop", pipe_ref="board.run_workshop", status=DryRunStatus.FAILURE, failure=inner_failure_via_outer
@@ -150,7 +177,7 @@ class TestDryRunFailureLocation:
         mocker.patch("pipelex.pipeline.bundle_validator.get_config").return_value.inference.dry_run.allowed_to_fail_pipes = ["board.analyze_topic"]
         mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
         inner_pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
-        failure = _CallerFacingMethodFaultError("the combine failed")
+        failure = _MethodFaultError("the combine failed")
 
         def _fail_inside_the_inner_pipe(_pipe_job: object) -> None:
             recorder = _failing_pipe_recorder.get()
@@ -178,7 +205,7 @@ class TestDryRunFailureLocation:
         mocker.patch("pipelex.pipeline.bundle_validator.prepare_pipe_job")
         mocker.patch("pipelex.pipeline.bundle_validator.get_library_manager").return_value.get_pipe_source.return_value = Path("board.mthds")
         pipe_run = mocker.MagicMock()
-        pipe_run.run = mocker.AsyncMock(side_effect=_CallerFacingMethodFaultError("the combine failed"))
+        pipe_run.run = mocker.AsyncMock(side_effect=_MethodFaultError("the combine failed"))
         mocker.patch("pipelex.pipeline.bundle_validator.PipeRun", return_value=pipe_run)
         pipe = self._make_pipe(mocker, pipe_ref="board.analyze_topic")
         pipe.is_signature = False

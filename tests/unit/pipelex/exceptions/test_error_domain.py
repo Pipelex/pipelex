@@ -4,8 +4,8 @@ import pytest
 from mthds.protocol.problem.registry import ProblemDomain
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, error_domain_is_input
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from tests.helpers.error_report import make_error_report
 
 
 class _ConfigCodedError(PipelexError):
@@ -28,17 +28,17 @@ class TestErrorDomain:
         assert ErrorDomain.RUNTIME == "runtime"
         assert set(ErrorDomain) == {ErrorDomain.INPUT, ErrorDomain.CONFIG, ErrorDomain.RUNTIME}
 
-    def test_to_error_report_reports_the_fallback_domain_without_a_code(self) -> None:
+    def test_an_error_with_no_code_is_in_the_runtime_domain(self) -> None:
         """A PipelexError that names no code reports runtime.unexpected, and so the runtime domain."""
-        report = PipelexError("plain error").to_error_report()
-        assert report.code == "runtime.unexpected"
-        assert report.error_domain == ErrorDomain.RUNTIME
+        problem = PipelexError("plain error").to_problem(view=ProblemView.CALLER)
+        assert problem.code == "runtime.unexpected"
+        assert ErrorDomain.from_problem_domain(problem.effective_domain) is ErrorDomain.RUNTIME
 
-    def test_to_error_report_reads_the_domain_from_the_code(self) -> None:
-        """A PipelexError subclass's report reads its domain from its code's registry domain."""
-        report = _ConfigCodedError("config broke").to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.error_domain == "config"
+    def test_the_domain_is_read_from_the_code(self) -> None:
+        """A PipelexError subclass reads its domain from its code's registry domain."""
+        error = _ConfigCodedError("config broke")
+        assert error.resolve_domain() == ProblemDomain.OPERATOR
+        assert ErrorDomain.from_problem_domain(error.resolve_domain()) is ErrorDomain.CONFIG
 
     @pytest.mark.parametrize(
         ("problem_domain", "expected_error_domain"),
@@ -51,18 +51,8 @@ class TestErrorDomain:
         ],
     )
     def test_from_problem_domain(self, problem_domain: ProblemDomain, expected_error_domain: ErrorDomain) -> None:
-        """A code's registry domain projects onto the report's domain: the caller's, the operator's or the runtime's."""
+        """A code's registry domain projects onto the envelope's domain: the caller's, the operator's or the runtime's."""
         assert ErrorDomain.from_problem_domain(problem_domain) is expected_error_domain
-
-    def test_to_dict_drops_error_domain_when_none(self) -> None:
-        """ErrorReport.to_dict() omits error_domain when it is None."""
-        report_dict = make_error_report(error_type="X", message="m").to_dict()
-        assert "error_domain" not in report_dict
-
-    def test_to_dict_includes_error_domain_when_set(self) -> None:
-        """ErrorReport.to_dict() includes error_domain when it is set."""
-        report_dict = make_error_report(error_type="X", message="m", error_domain=ErrorDomain.CONFIG).to_dict()
-        assert report_dict["error_domain"] == "config"
 
     @pytest.mark.parametrize(
         ("error_domain", "expected_is_input"),
@@ -90,5 +80,5 @@ class TestErrorDomain:
         ],
     )
     def test_error_domain_is_input(self, error_domain: ErrorDomain | str | None, expected_is_input: bool) -> None:
-        """error_domain_is_input tolerates the serialized str/None shape ErrorReport.error_domain carries."""
+        """error_domain_is_input tolerates the serialized str/None shape a CLI envelope's error_domain carries."""
         assert error_domain_is_input(error_domain) is expected_is_input

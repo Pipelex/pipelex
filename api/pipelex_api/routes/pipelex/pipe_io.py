@@ -143,7 +143,7 @@ async def pipe_io(request_data: PipeIORequest) -> JSONResponse:
     try:
         resolved = await resolve_requested_crate(request_data)
     except ValidateBundleError as validate_error:
-        return invalid_crate_report_response(validate_error.to_error_report())
+        return invalid_crate_report_response(validate_error)
     try:
         default_pipe = select_default_pipe(resolved.crate, manifest_main_pipe=resolved.manifest_main_pipe)
         default_pipe_ref = default_pipe.ref if isinstance(default_pipe, RequestedPipe) else None

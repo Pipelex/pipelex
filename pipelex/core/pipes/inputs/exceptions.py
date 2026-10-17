@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -64,13 +65,9 @@ class OptionalValueAbsentError(PipeRunError):
     ``pipe.forced_input_absent``: the failure is data-dependent — the method's assumption failed
     on this input data, not on the caller's request shape.
 
-    ``_authors_caller_facing_message``: the message and user action describe the caller's own
-    method and data (pipe codes, variable names, ledger reasons — no server internals), and the
-    caller is the only one who can act on them; they must survive STRICT disclosure.
     """
 
     error_code = CoreCode.PIPE_FORCED_INPUT_ABSENT
-    _authors_caller_facing_message = True
 
     def __init__(
         self,
@@ -122,6 +119,10 @@ class OptionalValueAbsentError(PipeRunError):
             variable_name=variable_name,
             absence_record=absence_record,
         )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {**super().problem_params(), "variable": self.variable_name}
 
 
 class NoInputsRequiredError(PipelexError):

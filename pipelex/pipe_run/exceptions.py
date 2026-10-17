@@ -1,13 +1,16 @@
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
+from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, iter_cause_chain
+from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, InheritsCause
+from pipelex.errors.error_codes import ErrorCode, error_code_spec, first_fault_code
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location, make_problem_item
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
-from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
+from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -45,6 +48,10 @@ class AsyncExecutionNotEnabledError(PipelexError):
         that needs async execution when no such backend is enabled.
         """
         return cls(cls.DEFAULT_MESSAGE)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"capability": "asynchronous execution"}
 
 
 class PipeRunParamsError(PipelexError):
@@ -84,13 +91,13 @@ class StorageDeliveryError(DeliveryError):
 class DryRunError(PipelexError):
     """Raised when a dry run fails. The validation sweep raises it with one failure per pipe whose dry run
     failed, located at the innermost failing pipe that is not allowed to fail, so a controller that failed
-    because a pipe it runs failed is reported once, at that pipe. Bundle validation reports each failure as its own ``dry_run``
-    item, with the error type ``DryRunError``, the pipe's code, domain and source, and a message that
-    keeps the failure's own text only when that text is caller-facing and otherwise names the failure's
-    title.
+    because a pipe it runs failed is reported once, at that pipe. Each failure carries its own code, and bundle
+    validation reports each as its own ``dry_run`` item, with the error type ``DryRunError``, the pipe's code,
+    domain and source, and the sentence the failure's code renders for a caller.
 
-    Raised elsewhere it may carry no failures, and validation then reports it as one item. It takes the code of
-    its cause, the failure it reports.
+    With failures, its code is the one the answer takes among theirs (``first_fault_code``), and its problem carries
+    one item per failure; a validation answers it as an invalid verdict only when one of them is the method's. Raised
+    elsewhere it may carry no failures, and then it takes the code of its cause, the failure it reports.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -98,6 +105,23 @@ class DryRunError(PipelexError):
     def __init__(self, message: str, *, failures: list[DryRunFailureErrorData] | None = None):
         self.failures = failures or []
         super().__init__(message)
+
+    @property
+    @override
+    def own_error_code(self) -> ErrorCode | None:
+        return first_fault_code(codes=[failure.code for failure in self.failures]) or super().own_error_code
+
+    @override
+    def problem_items(self) -> list[ProblemItem] | None:
+        items: list[ProblemItem] = []
+        for failure in self.failures:
+            spec = error_code_spec(failure.code)
+            params = dict(failure.params or {})
+            if failure.pipe_code is not None and "pipe" in spec.param_names:
+                params.setdefault("pipe", failure.pipe_code)
+            location = make_location(pipe=failure.pipe_code, file=failure.source)
+            items.append(make_problem_item(code=failure.code, params=params or None, location=location))
+        return items or None
 
 
 class DryRunGraphNotProducedError(DryRunError):
@@ -120,10 +144,10 @@ class PipeRouterError(PipelexError):
     The pipe router raises it around every failure of the pipe it runs, chained to the failure,
     with the pipe's code and a snapshot of its stack taken where it failed. A failure that already
     carries one keeps it as it rises through the routers of the controllers above, so the innermost
-    location is the one reported. Its report is its root fault's, located (see
+    location is the one reported. Its problem is its root fault's, located (see
     `pipelex.pipe_run.located_failure`): a run whose pipe raised `StuffFactoryError` reports
-    `StuffFactoryError`, with a message naming the pipe and its path, never `PipeRouterError`, and its code
-    is the root fault's.
+    `StuffFactoryError`'s code and diagnostics, with a location naming the pipe and its path, never
+    `PipeRouterError`.
     """
 
     error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -164,12 +188,20 @@ class PipeRouterError(PipelexError):
         )
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        return build_located_failure_report(
-            wrapper=self,
-            own_report=super().to_error_report(),
-            pipe_code=self.pipe_code,
-            pipe_stack=self.pipe_stack,
+    def to_problem(
+        self,
+        *,
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        location = failure_location or failure_location_of(pipe_code=self.pipe_code, pipe_stack=self.pipe_stack)
+        root_fault = located_root_fault(wrapper=self)
+        if root_fault is None:
+            return super().to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location)
+        return located_problem(
+            wrapper=self, root_fault=root_fault, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location
         )
 
 

@@ -171,7 +171,14 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v6_plugin])
         assert "written_against_v6" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 7
+
+    def test_a_plugin_written_before_failures_crossed_as_problems_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v7 took HTTP error mappers returning a report; a v7 plugin's mapper would hand the host a report it no longer reads."""
+        v7_plugin = _InferencePlugin(name="written_against_v7", sdk="v7_sdk", targets_api=7)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v7_plugin])
+        assert "written_against_v7" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 8
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

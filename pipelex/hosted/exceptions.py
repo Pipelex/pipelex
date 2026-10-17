@@ -1,7 +1,8 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.validation_models import ValidationErrorItem
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -32,7 +33,6 @@ class HostedBaseUrlError(HostedRunError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Give the hosted API's origin as scheme://host[:port], such as https://api.pipelex.com, in --base-url or PIPELEX_BASE_URL",
     )
-    _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class HostedRunSourceError(HostedRunError):
@@ -44,7 +44,6 @@ class HostedRunSourceError(HostedRunError):
     """
 
     error_code = CoreCode.CLIENT_ARGUMENT_INVALID
-    _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class HostedMethodInvalidError(HostedRunError):
@@ -57,7 +56,6 @@ class HostedMethodInvalidError(HostedRunError):
 
     error_code = CoreCode.METHOD_INVALID
     user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Fix the method as each validation error says, then run it again")
-    _authors_caller_facing_message: ClassVar[bool] = True
 
     def __init__(self, message: str, *, validation_errors: list[ValidationErrorItem]):
         super().__init__(message)
@@ -84,6 +82,10 @@ class HostedRunPollingError(HostedRunError):
                 f"PipelexAPIClient.wait_for_result('{pipeline_run_id}')"
             ),
         )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipeline_run_id": self.pipeline_run_id}
 
 
 class HostedRunOutcomeUnknownError(HostedRunError):
@@ -116,7 +118,6 @@ class HostedRunInterruptedError(HostedRunError):
     """
 
     error_code = ErrorCodeSet(default=CoreCode.CLIENT_OUTCOME_UNKNOWN, others=(CoreCode.CLIENT_FOLLOW_FAILED,))
-    _authors_caller_facing_message: ClassVar[bool] = True
 
     def __init__(self, *, pipeline_run_id: str | None):
         if pipeline_run_id is None:
@@ -138,6 +139,10 @@ class HostedRunInterruptedError(HostedRunError):
         if pipeline_run_id is not None:
             self.with_error_code(CoreCode.CLIENT_FOLLOW_FAILED)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipeline_run_id": self.pipeline_run_id}
+
 
 class HostedLocalFileUploadUnavailableError(HostedRunError):
     """A hosted run's inputs name a local file, and its method calls another method by its address.
@@ -152,4 +157,3 @@ class HostedLocalFileUploadUnavailableError(HostedRunError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass each local file as an https URL the hosted API can fetch, instead of a path on this machine, then run again",
     )
-    _authors_caller_facing_message: ClassVar[bool] = True

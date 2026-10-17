@@ -97,6 +97,9 @@ output = "Summary"
 prompt = "Summarize $topic"
 """
 
+    # Both branches of the parallel give a list to a single field: two multiplicity faults in one combine.
+    PARALLEL_TWO_MULTIPLICITIES_MTHDS: ClassVar[str] = PARALLEL_MTHDS.replace('output = "Summary"', 'output = "Summary[]"')
+
     # A step force-unwraps ('!') an optional input the caller left out: a caller-facing failure.
     FORCE_MTHDS: ClassVar[str] = """
 domain = "located_failure_force"
@@ -118,7 +121,7 @@ template = "Clause: {{ clause }}"
 """
 
 
-class StrictMethodFaultsTestData:
+class RunFaultViewsTestData:
     """Bundles whose runs fail on a fault in the caller's own method, and on faults that are not the caller's."""
 
     # A sequence whose first step needs an input the caller may leave out of the request.
@@ -191,6 +194,50 @@ template = "An idea about $topic"
 type = "PipeCompose"
 description = "Write a one-line overview"
 output = "Overview"
+template = "One idea."
+"""
+
+    # The text a deployment's own structure class writes when its validator refuses a combination, which only the
+    # operator may read: it is the deployment's code talking, not the caller's method.
+    DEPLOYMENT_VALIDATOR_TEXT: ClassVar[str] = "Deployment rule DR-7 refused this review: internal threshold 0.83 not met"
+
+    # A parallel whose output concept takes the structure class a deployment loaded from its own library, the class
+    # named after the concept, whose model validator refuses every combination.
+    DEPLOYMENT_VALIDATOR_MTHDS: ClassVar[str] = """
+domain = "run_fault_views_deployment"
+description = "A parallel whose output's structure class is the deployment's own"
+
+[concept.RunFaultViewsValidatedReview]
+description = "An idea and an overview, validated by the deployment's own structure class"
+
+[pipe.flow]
+type = "PipeSequence"
+description = "Review the topic"
+inputs = { topic = "Text" }
+output = "RunFaultViewsValidatedReview"
+steps = [{ pipe = "analyze", result = "review" }]
+
+[pipe.analyze]
+type = "PipeParallel"
+description = "Draft an idea and an overview at the same time"
+inputs = { topic = "Text" }
+output = "RunFaultViewsValidatedReview"
+branches = [
+  { pipe = "draft_idea", result = "idea" },
+  { pipe = "write_overview", result = "overview" },
+]
+
+[pipe.draft_idea]
+type = "PipeCompose"
+description = "Draft one idea about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "An idea about $topic"
+
+[pipe.write_overview]
+type = "PipeCompose"
+description = "Write a one-line overview"
+output = "Text"
 template = "One idea."
 """
 

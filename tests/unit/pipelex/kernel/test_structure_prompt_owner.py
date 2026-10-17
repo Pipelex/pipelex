@@ -9,6 +9,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.config_cogt import LLMConfig
+from pipelex.errors.problem import ProblemView
 from pipelex.kernel.llm_ops import derive_structure_prompt
 from pipelex.test_extras.registry_test_models import FictionCharacter
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
@@ -29,4 +30,4 @@ class TestStructurePromptOwner:
         with pytest.raises(Jinja2TemplateInvalidError) as exc_info:
             await derive_structure_prompt(output_class=FictionCharacter, templating_style=_TEMPLATING_STYLE)
 
-        assert exc_info.value.to_error_report().code == CoreCode.RUNTIME_UNEXPECTED
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.RUNTIME_UNEXPECTED

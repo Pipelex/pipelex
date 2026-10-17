@@ -54,7 +54,8 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
                 f"{get_native_concept(native_concept=NativeConceptCode.DOCUMENT).concept_ref}. "
                 "Declare this input as an Image or a Document, or as a concept that refines one of them."
             )
-            raise PipeExtractFactoryError(msg)
+            finding = f"the input '{input_name}' is a {input_requirement.concept.concept_ref}, neither an Image nor a Document"
+            raise PipeExtractFactoryError(msg).with_params(field_path=f"pipe.{pipe_code}.inputs.{input_name}", finding=finding)
 
         return PipeExtract(
             domain_code=domain_code,

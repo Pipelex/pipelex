@@ -13,11 +13,11 @@ bundles through ``validate_bundle`` and pin the verdict each refusal produces:
   was a Python repr).
 - **A model served as another type.** A pipe naming a handle the deck serves only as another model type, such as an
   LLM in an image-generation pipe, gets the same ``unknown_model`` item, whose message names the type the pipe needs.
-- **The general arm.** Any other ``input``-domained refusal raised while building a pipe validates to one
-  item located on the pipe and its file, keeping its message only when it is caller-facing; a
-  ``config``-domained fault raised at the same place still propagates as no verdict.
+- **The general arm.** Any other refusal of the method raised while building a pipe validates to one
+  item located on the pipe and its file, reading the sentence its code renders, never its own message; a
+  fault of the operator's configuration raised at the same place still propagates as no verdict.
 - **The run path.** Setting up a run on the unknown-model bundle refuses it with the same verdict, its
-  item naming the pipe, whose STRICT projection is still an HTTP 422 carrying the deck check's sentence.
+  item naming the pipe, whose caller's problem is ``method.invalid``, an HTTP 422 with one ``model.unknown`` item.
 
 The deck is the test session's own, so the suggestion lists are read off it rather than pinned in
 full, except for the one-suggestion alias whose rename fix is the point of its case.
@@ -30,11 +30,12 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, PipelexError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.errors.error_codes import PipelexErrorCode, error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.planner import RENAME_MODEL_FIX_CODE
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -230,16 +231,9 @@ def _write_bundle(*, directory: Path, content: str) -> Path:
 async def _single_item(*, bundle_path: Path) -> ValidationErrorItem:
     with pytest.raises(ValidateBundleError) as raised:
         await validate_bundle(mthds_file_path=bundle_path, library_dirs=[bundle_path.parent])
-    items = raised.value.to_error_report().validation_errors or []
+    items = raised.value.validation_error_items() or []
     assert len(items) == 1, f"expected exactly one item, got {items!r}"
     return items[0]
-
-
-class _CallerFacingRefusalError(PipelexError):
-    """An input refusal whose message was authored for the caller — stands in for any future one."""
-
-    error_code = CoreCode.METHOD_INVALID
-    _authors_caller_facing_message = True
 
 
 class _InternalInputRefusalError(PipelexError):
@@ -346,11 +340,12 @@ class TestValidateBundleLoadRefusals:
         assert len(item.suggestions) > 1
         assert item.suggested_fix is None
 
-    async def test_caller_facing_input_refusal_at_load_is_a_located_item(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        mocker.patch(
-            "pipelex.pipe_operators.llm.pipe_llm.check_llm_choice_with_deck",
-            side_effect=_CallerFacingRefusalError("The harbour board cannot show tides this far upriver."),
+    async def test_input_refusal_at_load_is_a_located_item_reading_its_code_s_sentence(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The item reads the sentence the refusal's code renders from its parameters, never the refusal's own message."""
+        refusal = _InternalInputRefusalError("internal detail: registry slot 7 is stale").with_params(
+            field_path="pipe.write_tide_note.model", finding="the harbour board cannot show tides this far upriver"
         )
+        mocker.patch("pipelex.pipe_operators.llm.pipe_llm.check_llm_choice_with_deck", side_effect=refusal)
         bundle_path = _write_bundle(directory=tmp_path, content=_llm_bundle(model_line='model       = "@best-gpt"'))
 
         item = await _single_item(bundle_path=bundle_path)
@@ -360,7 +355,10 @@ class TestValidateBundleLoadRefusals:
         assert item.pipe_code == "write_tide_note"
         assert item.domain_code == _DOMAIN
         assert item.source == str(bundle_path)
-        assert "The harbour board cannot show tides this far upriver." in item.message
+        assert item.message == (
+            "The declaration at 'pipe.write_tide_note.model' breaks a rule of the language (the harbour board cannot show tides this far upriver)."
+        )
+        assert "registry slot 7" not in item.message
 
     async def test_internal_input_refusal_carries_its_title_not_its_message(self, tmp_path: Path, mocker: MockerFixture) -> None:
         mocker.patch(
@@ -401,16 +399,17 @@ class TestValidateBundleLoadRefusals:
             )
 
         assert isinstance(raised.value.__cause__, PipeOperatorModelChoiceError)
-        report = raised.value.to_error_report()
-        (item,) = report.validation_errors or []
+        (item,) = raised.value.validation_error_items()
         assert item.error_type == PipeValidationErrorType.UNKNOWN_MODEL
         assert item.pipe_code == "write_tide_note"
         assert item.field_name == "model"
-        assert report.http_status == 422
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["error_type"] == "ValidateBundleError"
-        assert strict_payload["error_domain"] == "input"
-        assert "Pipe 'write_tide_note'" in strict_payload["message"]
-        assert "Model handle 'gpt-5.6-lunna' was not found in the model deck" in strict_payload["message"]
-        (strict_item,) = strict_payload["validation_errors"]
-        assert strict_item["error_type"] == "unknown_model"
+        problem = raised.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        assert error_code_spec(CoreCode.METHOD_INVALID).status == 422
+        assert problem.errors is not None
+        (problem_item,) = problem.errors
+        assert problem_item.code == CoreCode.MODEL_UNKNOWN
+        assert problem_item.location is not None
+        assert (problem_item.location.pipe, problem_item.location.field) == ("write_tide_note", "model")
+        # The refusal's own message, which names the deck, stays on the chain for the operator.
+        assert "Model handle 'gpt-5.6-lunna' was not found in the model deck" in str(raised.value.__cause__)

@@ -56,7 +56,7 @@ class TestJobMetadataRequestId:
         Defense-in-depth: an upstream consumer of pipelex that forwards the
         ``X-Request-ID`` header without sanitization cannot inject newlines,
         ANSI escapes, or control characters into the log lines and
-        ``ErrorReport`` envelopes that quote it.
+        problem documents that quote it.
         """
         with pytest.raises(ValidationError):
             JobMetadata(

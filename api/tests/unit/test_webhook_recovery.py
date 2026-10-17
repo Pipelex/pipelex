@@ -1,193 +1,199 @@
-"""Cross-path consistency regression for the API's two error surfaces.
+"""Cross-path consistency of the API's two failure surfaces.
 
-The API surfaces a pipelex `ErrorReport` to clients along two paths:
+A failure reaches a client along two paths:
 
-1. The **synchronous HTTP path** — `POST /execute` (and every other
-   route that propagates a `PipelexError`) renders the report via
-   `build_problem_document(...)` → RFC 7807 `application/problem+json`.
-2. The **asynchronous webhook path** — `POST /start` schedules a
-   Temporal workflow; on completion (success or `FAILED`), pipelex's
-   `DeliveryExecutor._notify_webhook(...)` posts a JSON payload to the
-   caller's callback URL. On `FAILED`, the payload carries
-   `error: <ErrorReport.to_dict(disclosure_mode=VERBOSE)>` — a flat dict, not
-   an RFC 7807 envelope (the receiver chooses how to render it).
+1. The **synchronous HTTP path**: `POST /execute`, and every other route that lets a `PipelexError`
+   propagate, answers the error's problem through `problem_response`, in the view of whoever made
+   the request (`pipelex_api.problem_view`).
+2. The **asynchronous webhook path**: `POST /start` builds each completion webhook's target, and on
+   a failed run pipelex's `DeliveryExecutor` posts the run's problem under `error`, in the view the
+   target carries (`WebhookTarget.problem_view`).
 
-This module pins the **T6 cross-path consistency** invariant: given the same
-source `ErrorReport`, both renderings must surface the same classification
-fields. A client that branches on `error_type` / `error_domain` /
-`retryable` / `user_action` must not get one classification synchronously
-and a different one over the webhook.
-
-The webhook payload itself is composed entirely upstream in
-`pipelex.pipe_run.delivery_executor`; the API never touches the bytes that
-go over the wire. So this test exercises the two rendering helpers directly
-and asserts the classification overlap is exact. Drift here would imply
-either pipelex's `to_dict` / `to_problem_document` diverged in their field
-selection, or the API's `build_problem_document` wrapper started shaping
-the document.
+A completion webhook is the same answer as the synchronous response, delivered later, so the start
+route gives each target the view of its own request, and the payload's `error` is exactly the
+synchronous body in that view, but for `status`, the HTTP envelope's member, which a webhook POST
+does not have. A client branching on `code`, `retry` or `next_step` must not read one answer
+synchronously and another over the webhook, and a caller must never receive over a webhook the
+diagnostics its synchronous view withholds.
 """
 
-from typing import Any
+import asyncio
+import os
+from collections.abc import Callable
+from typing import Any, cast
 
 import pytest
+from fastapi import APIRouter, Depends, FastAPI
+from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import DisclosureMode, ErrorReport
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
-from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.base_exceptions import PipelexConfigError, PipelexError
+from pipelex.errors.problem import ProblemView
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
+from pipelex.pipe_run.delivery_executor import DeliveryExecutor
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
+from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
+from pytest_mock import MockerFixture
 
-from pipelex_api.problem_document import build_problem_document
+from pipelex_api.api_config import ApiConfig
+from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
+from pipelex_api.routes import router as api_router
+from tests.unit._constants import VALID_MTHDS
+from tests.unit.test_data import ProblemTestData, rate_limited_failure
 
-# Classification fields that, when populated on the source `ErrorReport`,
-# must appear with identical values in both renderings. Excluded from this
-# list are: (a) `message` — present in both but under different keys
-# (`message` in `to_dict`, `detail` in `to_problem_document`); checked
-# separately. (b) the RFC 7807 standard slots `type`/`title`/`status` and
-# the request-scoped extension members `instance`/`request_id` — those are
-# rightfully envelope-only.
-_CLASSIFICATION_FIELDS_PRESERVED = (
-    "code",
-    "error_type",
-    "error_domain",
-    "error_category",
-    "retryable",
-    "user_action",
-    "model",
-    "provider",
-    "provider_metadata",
-)
+_PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
+_MODE = "temporal"
+_RUN_ID = "run-webhook-view-1"
 
 
-def _fully_populated_llm_report() -> ErrorReport:
-    """A provider-429 report exercising every classification field at once.
+def _config_failure() -> PipelexError:
+    """An operator's fault, whose step differs between the views and whose message only the operator reads."""
+    return PipelexConfigError("the gateway config is missing")
 
-    Provider/model/provider_metadata ride on `RUNTIME`-domain inference
-    failures, so an `LLMCompletionError` stand-in is the broadest single
-    fixture: it pins the parity contract on the maximum field set the API
-    ever surfaces.
-    """
-    report = ErrorReport.make_for_code(
-        code=CoreCode.PROVIDER_RATE_LIMITED,
-        error_type="LLMCompletionError",
-        message="OpenAI returned 429 (rate_limit_exceeded)",
-        user_action=UserAction(
-            kind=UserActionKind.WAIT_AND_RETRY,
-            detail="The provider is rate-limiting your account. Retry after the indicated delay.",
-        ),
+
+# The failures the two paths are compared on, by id: the problem with the most members, and the operator's fault.
+_FAILURES: dict[str, Callable[[], PipelexError]] = {
+    "provider_rate_limit": rate_limited_failure,
+    "operator_configuration": _config_failure,
+}
+
+
+class _RecordingOrchestrator:
+    """An async-capable orchestrator that records the delivery assignment of every run it is handed."""
+
+    supports_fire_and_forget = True
+
+    def __init__(self) -> None:
+        self.delivery_assignments: list[DeliveryAssignment | None] = []
+
+    async def execute(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeRunOutput:  # noqa: ARG002
+        msg = "These tests dispatch through /start only."
+        raise AssertionError(msg)
+
+    async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:  # noqa: ARG002
+        self.delivery_assignments.append(delivery_assignment)
+        return PipelexPipeDispatchAck(pipeline_run_id=_RUN_ID, workflow_id="wf-webhook-view-1")
+
+
+def _router_dependencies(view: ProblemView) -> list[Any]:
+    """What authentication leaves on a request of `view`: the operator's mark, or nothing for a caller."""
+    match view:
+        case ProblemView.OPERATOR:
+            return [Depends(mark_operator_request)]
+        case ProblemView.CALLER:
+            return []
+
+
+def _start_with_a_callback(mocker: MockerFixture, *, view: ProblemView) -> DeliveryAssignment:
+    """Start a run asking for a completion webhook, as a request of `view`, and return the assignment the run was handed."""
+    mocker.patch.dict(os.environ, {"COMPLETION_CALLBACK_SECRET": ProblemTestData.SYNTHETIC_CALLBACK_SECRET})
+    mocker.patch(f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode=_MODE, allow_request_orchestration_mode_override=False))
+    orchestrator = _RecordingOrchestrator()
+    mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({_MODE: orchestrator}))
+    app = FastAPI()
+    app.include_router(api_router, prefix="/v1", dependencies=_router_dependencies(view))
+    register_exception_handlers(app)
+
+    response = TestClient(app).post(
+        "/v1/start",
+        json={
+            "pipe_code": "echo",
+            "mthds_contents": [VALID_MTHDS],
+            "inputs": {"text": "hello"},
+            "pipeline_run_id": _RUN_ID,
+            "callback_urls": [ProblemTestData.CALLBACK_URL],
+        },
     )
-    return report.model_copy(
-        update={
-            "error_category": "rate_limit",
-            "model": "gpt-4o-mini",
-            "provider": "openai",
-            "provider_metadata": ProviderErrorMetadata(
-                provider=ProviderName.OPENAI,
-                sdk_exception_type="RateLimitError",
-                status_code=429,
-                retry_after_seconds=12.0,
-                request_id="req_provider_abc",
-            ),
-        }
+
+    assert response.status_code == 202, response.text
+    (delivery_assignment,) = orchestrator.delivery_assignments
+    assert delivery_assignment is not None
+    return delivery_assignment
+
+
+def _synchronous_body(*, failure: Callable[[], PipelexError], view: ProblemView) -> dict[str, Any]:
+    """The body the synchronous path answers `failure` with, to a request of `view`."""
+    router = APIRouter()
+
+    async def fail() -> None:
+        raise failure()
+
+    router.add_api_route("/fail", fail, methods=["GET"])
+    app = FastAPI()
+    app.include_router(router, dependencies=_router_dependencies(view))
+    register_exception_handlers(app)
+    body = TestClient(app).get("/fail").json()
+    return cast("dict[str, Any]", body)
+
+
+def _posted_failure(mocker: MockerFixture, *, delivery_assignment: DeliveryAssignment, failure: PipelexError) -> dict[str, Any]:
+    """Deliver `failure` as the run's outcome to the assignment's webhooks, and return the one body the webhook received."""
+    mock_client = mocker.AsyncMock()
+    mock_response = mocker.MagicMock()
+    mock_response.raise_for_status = mocker.Mock()
+    mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+    mock_client.post = mocker.AsyncMock(return_value=mock_response)
+    mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+    asyncio.run(
+        DeliveryExecutor().execute(
+            None,
+            storage_scope="webhook-view-scope",
+            pipeline_run_id=_RUN_ID,
+            delivery_assignment=delivery_assignment,
+            status=DeliveryStatus.FAILED,
+            # A failed run's problem reaches the delivery in the operator's view; each webhook takes its own.
+            problem=failure.to_problem(view=ProblemView.OPERATOR),
+        )
     )
 
-
-def _caller_facing_input_report() -> ErrorReport:
-    """A caller-facing `method.syntax` report, which the caller fixes (the other half of the STRICT contract).
-
-    Complements the LLM fixture: minimal classification but
-    `caller_facing_message=True`, which is the trigger STRICT projection
-    keys its `message` passthrough on. Used here to verify that the parity
-    contract holds across both message-disclosure provenances.
-    """
-    return ErrorReport.make_for_code(
-        code=CoreCode.METHOD_SYNTAX,
-        error_type="MthdsParserError",
-        message="Your .mthds file has a syntax error on line 4",
-        caller_facing_message=True,
-    )
+    mock_client.post.assert_awaited_once()
+    post_call = mock_client.post.await_args
+    assert post_call is not None
+    assert post_call.args == (ProblemTestData.CALLBACK_URL,)
+    payload = post_call.kwargs["json"]
+    return cast("dict[str, Any]", payload)
 
 
 class TestWebhookRecoveryCrossPath:
-    @pytest.mark.parametrize(
-        ("label", "report_factory"),
-        [
-            ("llm_provider_429", _fully_populated_llm_report),
-            ("caller_facing_input", _caller_facing_input_report),
-        ],
-    )
-    def test_classification_fields_match_between_sync_and_webhook(self, label: str, report_factory: Any) -> None:
-        """T6 regression: webhook `error` and sync RFC 7807 body must agree.
+    @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
+    def test_the_webhook_target_takes_the_start_requests_view(self, mocker: MockerFixture, view: ProblemView) -> None:
+        delivery_assignment = _start_with_a_callback(mocker, view=view)
 
-        For every classification field that pipelex populates on the source
-        report, the value in `ErrorReport.to_dict(VERBOSE)` (what the webhook
-        carries under `error`) must be byte-identical to the value rendered
-        in the RFC 7807 problem document (what the sync handler returns).
-        """
-        report = report_factory()
-        webhook_payload = report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
-        problem_doc = build_problem_document(
-            report,
-            instance="/v1/execute",
-            request_id="REQ_T6",
-            disclosure_mode=DisclosureMode.VERBOSE,
-        )
+        (webhook,) = delivery_assignment.webhooks
+        assert webhook.url == ProblemTestData.CALLBACK_URL
+        assert webhook.problem_view == view
 
-        for field in _CLASSIFICATION_FIELDS_PRESERVED:
-            in_webhook = field in webhook_payload
-            in_problem = field in problem_doc
-            assert in_webhook == in_problem, f"{label}: field `{field}` presence mismatch (webhook={in_webhook}, problem={in_problem})"
-            if in_webhook:
-                assert webhook_payload[field] == problem_doc[field], f"{label}: field `{field}` value drift between paths"
+    @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
+    @pytest.mark.parametrize("failure_id", list(_FAILURES))
+    def test_the_failure_payload_is_the_synchronous_answer_in_the_same_view(self, mocker: MockerFixture, view: ProblemView, failure_id: str) -> None:
+        failure = _FAILURES[failure_id]
+        delivery_assignment = _start_with_a_callback(mocker, view=view)
 
-        # `message` rides under different keys by design — pin the bridge.
-        assert problem_doc["detail"] == webhook_payload["message"], (
-            f"{label}: sync `detail` and webhook `message` must carry identical text under VERBOSE"
-        )
+        payload = _posted_failure(mocker, delivery_assignment=delivery_assignment, failure=failure())
 
-    def test_sync_only_envelope_members_are_isolated_to_problem_document(self) -> None:
-        """The RFC 7807 envelope is the sync path's contract, not the webhook's.
+        assert payload["pipeline_run_id"] == _RUN_ID
+        assert payload["state"] == DeliveryStatus.FAILED
+        synchronous_body = _synchronous_body(failure=failure, view=view)
+        # `status` is the HTTP envelope's member: the synchronous body carries it, the webhook's `error` does not.
+        assert "status" not in payload["error"]
+        assert payload["error"] == {member: value for member, value in synchronous_body.items() if member != "status"}
+        match view:
+            case ProblemView.OPERATOR:
+                assert "diagnostics" in payload["error"]
+            case ProblemView.CALLER:
+                assert "diagnostics" not in payload["error"]
 
-        `type` / `status` / `detail` / `instance` / `request_id` are the
-        envelope-only members: pipelex's `to_problem_document` maps them from
-        report fields (`type_uri` → `type`, `http_status` → `status`,
-        `message` → `detail`) or sources them from the caller (`instance`,
-        `request_id`). They never appear on the raw `to_dict` output the
-        webhook carries — the webhook is the structured-data layer (per
-        Phase 4b decision); receivers that want an envelope render one
-        themselves. Pin the asymmetry so a refactor of either path doesn't
-        quietly leak envelope members into the webhook payload or strip them
-        from the sync body. (`title` and `type_uri` ARE direct fields on
-        `ErrorReport`, so they appear in both — not envelope-only.)
-        """
-        report = _fully_populated_llm_report()
-        webhook_payload = report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
-        problem_doc = build_problem_document(
-            report,
-            instance="/v1/execute",
-            request_id="REQ_T6",
-            disclosure_mode=DisclosureMode.VERBOSE,
-        )
+    def test_a_caller_never_receives_the_diagnostics_over_the_webhook(self, mocker: MockerFixture) -> None:
+        """What the caller's synchronous view withholds, the provider's own answer included, its webhook withholds too."""
+        delivery_assignment = _start_with_a_callback(mocker, view=ProblemView.CALLER)
 
-        for envelope_member in ("type", "status", "detail", "instance", "request_id"):
-            assert envelope_member in problem_doc, f"sync path must carry RFC 7807 envelope member `{envelope_member}`"
-            assert envelope_member not in webhook_payload, (
-                f"webhook payload must NOT carry RFC 7807 envelope member `{envelope_member}` (use `to_problem_document` if you need an envelope)"
-            )
+        payload = _posted_failure(mocker, delivery_assignment=delivery_assignment, failure=rate_limited_failure())
 
-    def test_webhook_carries_raw_report_regardless_of_disclosure_mode(self) -> None:
-        """The webhook always renders the report VERBOSE, even when sync is STRICT.
-
-        The receiver decides what to re-expose downstream — pipelex hardcodes
-        `DisclosureMode.VERBOSE` in `_notify_webhook` for exactly this reason.
-        Pin it here so a future refactor that introduces a `disclosure_mode`
-        knob on the webhook path is caught by this test.
-        """
-        report = _fully_populated_llm_report()
-        verbose_payload = report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-
-        # The provider-identifying fields are the cheapest signal that the
-        # projection actually fired: VERBOSE keeps them, STRICT drops them.
-        assert verbose_payload.get("provider") == "openai"
-        assert verbose_payload.get("model") == "gpt-4o-mini"
-        assert "provider" not in strict_payload
-        assert "model" not in strict_payload
+        posted_error = payload["error"]
+        assert posted_error["code"] == CoreCode.PROVIDER_RATE_LIMITED
+        assert posted_error["detail"] == ProblemTestData.RATE_LIMIT_DETAIL
+        for operator_only in (ProblemTestData.RATE_LIMIT_MESSAGE, ProblemTestData.RATE_LIMIT_PROVIDER_REQUEST_ID, "LLMCompletionError"):
+            assert operator_only not in str(posted_error), operator_only

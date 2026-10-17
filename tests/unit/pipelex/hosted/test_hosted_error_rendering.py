@@ -272,8 +272,7 @@ class TestHostedErrorRendering:
 
     def test_a_local_file_for_a_method_with_an_address_dependency_points_at_a_url(self) -> None:
         error = HostedLocalFileUploadUnavailableError(
-            "Local file upload is not available yet for methods with address-based dependencies: the method depends on "
-            "github.com/mthds/scoring-lib/scoring"
+            "Local file upload is not available yet for methods with address-based dependencies, and the inputs name a local file"
         )
 
         view = describe_hosted_error(error=error)

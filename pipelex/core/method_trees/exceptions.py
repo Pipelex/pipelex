@@ -37,11 +37,10 @@ class TreeModuleShadowingError(TreePythonError):
 
     With the tree's root first on `sys.path`, the tree's module would replace the other one for the whole process,
     and the failure would show up far from its cause. The message names the module, the tree file and what it
-    would shadow; it describes the caller's own method, so it is kept under STRICT disclosure.
+    would shadow; it describes the caller's own method.
     """
 
     error_code = CoreCode.METHOD_NAME_CONFLICT
-    _authors_caller_facing_message = True
 
 
 class TreeModuleExcludedError(ImportError):

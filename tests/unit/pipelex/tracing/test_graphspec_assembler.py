@@ -4,8 +4,10 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.graph.graphspec import EdgeKind, ErrorSpec, GraphSpecMode, IOSpec, NodeKind, NodeStatus
+from pipelex.errors.problem import ProblemView, make_location, make_problem
+from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.exceptions import TraceEventModeError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
@@ -751,10 +753,12 @@ class TestGraphSpecAssembler:
                 **_base(_WF_A, 3),
                 node_id=child,
                 ended_at=_time_at(3),
-                error=ErrorSpec(
-                    error_type="LLMError",
-                    message="Model returned an error",
+                error=make_problem(
+                    code=CoreCode.PROVIDER_UNAVAILABLE,
+                    view=ProblemView.CALLER,
+                    location=make_location(pipe="gen_text", path=["parent_pipe", "gen_text"]),
                 ),
+                error_stack="Traceback (most recent call last):\n  File ...",
             ),
             # No end event for parent
         ]
@@ -765,7 +769,10 @@ class TestGraphSpecAssembler:
         assert nodes_by_id[child].status == NodeStatus.FAILED
         child_error = nodes_by_id[child].error
         assert child_error is not None
-        assert child_error.error_type == "LLMError"
+        assert child_error.code == CoreCode.PROVIDER_UNAVAILABLE
+        assert child_error.location is not None
+        assert child_error.location.as_wire() == {"pipe": "gen_text", "path": ["parent_pipe", "gen_text"]}
+        assert nodes_by_id[child].error_stack == "Traceback (most recent call last):\n  File ..."
         assert nodes_by_id[parent].status == NodeStatus.CANCELED
 
     def test_multiple_workflows(self) -> None:

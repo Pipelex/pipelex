@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -52,7 +53,7 @@ class TestRuntimeBootCredentialRefusals:
 
             assert raised.value.__cause__ is refusal
             assert "LIGHTHOUSE_API_KEY" in str(raised.value)
-            assert raised.value.to_error_report().code == expected_code
+            assert raised.value.to_problem(view=ProblemView.OPERATOR).code == expected_code
         finally:
             Pipelex.teardown_if_needed()
             Pipelex.make(integration_mode=_test_integration_mode())

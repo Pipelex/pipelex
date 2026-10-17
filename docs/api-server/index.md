@@ -136,7 +136,7 @@ docker run --name pipelex-api -p 8081:8081 \
 
 ## API Endpoints
 
-Every failure is an RFC 7807 `application/problem+json` problem document — see **[Error Responses →](error-responses.md)**, and the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml) for the statuses each route can produce.
+Every failure is an RFC 9457 `application/problem+json` problem document — see **[Error Responses →](error-responses.md)**, and the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml) for the statuses each route can produce.
 
 ### Health & Version
 

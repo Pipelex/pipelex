@@ -17,10 +17,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pipelex.base_exceptions import DisclosureMode
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -31,6 +32,7 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     STUB_METHOD_ADDRESS,
@@ -103,8 +105,9 @@ def _build_client(
     *,
     tmp_path: Path,
     orchestrator: _RecordingOrchestrator | None = None,
-    disclosure_mode: DisclosureMode = DisclosureMode.STRICT,
+    as_operator: bool = False,
 ) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     mocker.patch("pipelex.cli.installed_methods.GLOBAL_METHODS_DIR", tmp_path / "global-methods")
     mocker.patch("pipelex.cli.installed_methods.PROJECT_METHODS_DIR", tmp_path / "project-methods")
     mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
@@ -115,8 +118,8 @@ def _build_client(
     if orchestrator is not None:
         mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"direct": orchestrator}))
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
-    register_exception_handlers(app, disclosure_mode=disclosure_mode)
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
+    register_exception_handlers(app)
     return TestClient(app)
 
 
@@ -202,18 +205,20 @@ class TestVendoredMethodPackages:
     @pytest.mark.parametrize("broken", list(_UNPARSABLE_PROBE_BUNDLES))
     def test_a_shipped_bundle_that_does_not_parse_is_the_verdict(self, mocker: MockerFixture, tmp_path: Path, broken: str):
         """The package is the caller's own content, so its parse failure is the verdict, located by address, never by host path."""
-        client = _build_client(mocker, tmp_path=tmp_path, disclosure_mode=DisclosureMode.STRICT)
+        client = _build_client(mocker, tmp_path=tmp_path)
         files = {**VENDORED_PROBE_FILES, ".mthds/methods/probe/probe.mthds": _UNPARSABLE_PROBE_BUNDLES[broken]}
 
         response = _execute_vendored(client, files=files)
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "ValidateBundleError"
-        items = body["validation_errors"]
+        assert body["code"] == CoreCode.METHOD_INVALID
+        assert body["domain"] == "method"
+        items = body["errors"]
         assert items, body
-        assert {item["source"] for item in items} == {f"{VENDORED_PROBE_ADDRESS}/probe.mthds"}
-        assert VENDORED_PROBE_ADDRESS in body["detail"]
+        # Each fault is located in the package by its address, the way the caller's tree names it.
+        assert {item["location"]["file"] for item in items} == {f"{VENDORED_PROBE_ADDRESS}/probe.mthds"}
+        assert "diagnostics" not in body
         dump = json.dumps(body)
         assert "pipelex-methods-" not in dump
         for temporary_root in (tempfile.gettempdir(), str(Path(tempfile.gettempdir()).resolve())):
@@ -223,17 +228,20 @@ class TestVendoredMethodPackages:
     def test_a_shipped_structure_class_is_refused_unimported(self, mocker: MockerFixture, tmp_path: Path):
         sentinel = tmp_path / "structures-module-ran"
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator)
+        client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator, as_operator=True)
         files = {**VENDORED_PROBE_FILES, ".mthds/methods/probe/structures.py": _structures_py(sentinel=sentinel)}
 
         response = client.post("/v1/start", json={**_tree_body(files), "inputs": {"text": "hello"}})
 
-        assert response.status_code == 403, response.text
+        assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "MethodStructuresRefusedError"
+        assert body["code"] == PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED
+        # The caller reads the file by the name its tree gives a shipped package's file: the address, then the path inside.
+        assert body.get("params") == {"files": [f"{VENDORED_PROBE_ADDRESS}/structures.py"]}
         # Named as the fetched package's refusal is: by the package's address, and the file by its path inside it.
-        assert f"Method package '{VENDORED_PROBE_ADDRESS}'" in body["detail"]
-        assert "structures.py defines Invoice" in body["detail"]
+        assert body["diagnostics"]["error_class"] == "MethodStructuresRefusedError"
+        assert f"Method package '{VENDORED_PROBE_ADDRESS}'" in body["diagnostics"]["message"]
+        assert "structures.py defines Invoice" in body["diagnostics"]["message"]
         assert not sentinel.exists(), "the structure module was imported"
         assert orchestrator.dispatches == []
 

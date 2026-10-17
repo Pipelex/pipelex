@@ -18,7 +18,7 @@ import typer
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
 from pipelex.cli.exceptions import BundleClosureEmptyError
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.interpreter_hub import get_library_manager, resolve_library_dirs
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_crate import LibraryCrate
@@ -40,7 +40,9 @@ def load_normalized_crate(*, library_dirs: list[Path] | None) -> LibraryCrate:
     crate = get_library_manager().get_crate(library_id)
     if crate is None:
         msg = "no .mthds bundles found in the closure."
-        raise BundleClosureEmptyError(msg)
+        # The local command's own directories, which the person running it named or set as defaults.
+        closure_dirs, _ = resolve_library_dirs(expanded_library_dirs)
+        raise BundleClosureEmptyError(msg).with_params(method_ref=", ".join(str(closure_dir) for closure_dir in closure_dirs))
     # CrateNormalizationError (an internal invariant) is deliberately not caught — it must surface.
     return normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
 

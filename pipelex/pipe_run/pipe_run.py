@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
@@ -66,7 +68,7 @@ class PipeRun(PipeRunProtocol):
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: Exception | None = None
-        error_report: ErrorReport | None = None
+        problem: PipelexProblem | None = None
         closed_graph: GraphSpec | None = None
         # The run's statistics: its inputs are read before the run adds its own outputs to its working memory.
         usage_tally = RunInferenceTally() if self._reports_usage_stats and usage_stats_are_enabled() else None
@@ -85,14 +87,15 @@ class PipeRun(PipeRunProtocol):
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
-            # Always build a report for the FAILED webhook: Pipelex errors carry their own
-            # classification; a bare exception is wrapped in PipelexUnexpectedError so the
-            # webhook still receives an `error` object — matching Temporal mode, where
-            # recover_error_report() is total.
-            if isinstance(exc, PipelexError):
-                error_report = exc.to_error_report()
-            else:
-                error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
+            # Always build a problem for the FAILED webhook, in the operator's view, which each webhook projects to its
+            # own: a Pipelex error carries its own code, and a bare exception stands as a fault of ours, so the webhook
+            # still receives an `error` object.
+            failure = exc if isinstance(exc, PipelexError) else make_unexpected_failure(error=exc)
+            problem = failure.to_problem(
+                view=ProblemView.OPERATOR,
+                pipeline_run_id=pipeline_run_id,
+                request_id=pipe_job.job_metadata.run_metadata.request_id,
+            )
             # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
             # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
@@ -170,7 +173,7 @@ class PipeRun(PipeRunProtocol):
                         pipeline_run_id=pipeline_run_id,
                         delivery_assignment=delivery_assignment,
                         status=status,
-                        error_report=error_report,
+                        problem=problem,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
                 except DeliveryError as delivery_error:

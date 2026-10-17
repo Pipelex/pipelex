@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 from mthds.method_tree.lister import list_method_tree
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.core.method_trees import tree_python
 from pipelex.core.method_trees.exceptions import TreeModuleExcludedError, TreeModuleShadowingError, TreePythonError, TreePythonHeldError
 from pipelex.core.method_trees.tree_python import (
@@ -17,6 +17,7 @@ from pipelex.core.method_trees.tree_python import (
     import_held_tree_module,
     sharing_module_name_checks,
 )
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.typing.module_inspector import import_module_from_file
 
 _LABEL = "the method tree holding probe.mthds"
@@ -203,13 +204,15 @@ class TestTreePython:
         finally:
             sys.modules.pop("tree_probe_site", None)
 
-    def test_the_errors_of_a_tree_name_no_path_of_this_host_under_strict_disclosure(self, tmp_path: Path) -> None:
+    def test_the_errors_of_a_tree_name_no_path_of_this_host(self, tmp_path: Path) -> None:
         shadowing = _write_tree(root=tmp_path / "shadowing", files={"shadowing.mthds": 'domain = "shadowing"\n', "json.py": "X = 1\n"})
         with pytest.raises(TreeModuleShadowingError) as shadowing_info:
             TREE_PYTHON_HOLD.acquire(tree=shadowing, holder="run-shadowing", label="the method tree holding shadowing.mthds")
-        strict_report = json.dumps(shadowing_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT))
-        assert "the method tree holding shadowing.mthds" in strict_report
-        assert "json.py" in strict_report
+        shadowing_problem = shadowing_info.value.to_problem(view=ProblemView.CALLER)
+        assert shadowing_problem.code == CoreCode.METHOD_NAME_CONFLICT
+        operator_report = json.dumps(shadowing_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
+        assert "the method tree holding shadowing.mthds" in operator_report
+        assert "json.py" in operator_report
 
         guarded = _write_tree(
             root=tmp_path / "guarded",
@@ -229,7 +232,9 @@ class TestTreePython:
         with pytest.raises(TreePythonHeldError) as held_info:
             TREE_PYTHON_HOLD.acquire(tree=other, holder="run-other", label="the method tree holding other.mthds")
 
-        for message in (strict_report, excluded_info.value.message, held_info.value.message):
+        # The excluded-module refusal is an ImportError the import machinery raises, read by its message alone.
+        caller_reports = [json.dumps(error.to_problem(view=ProblemView.CALLER).to_wire()) for error in (shadowing_info.value, held_info.value)]
+        for message in (operator_report, excluded_info.value.message, held_info.value.message, *caller_reports):
             for host_path in _host_paths(tmp_path=tmp_path):
                 assert host_path not in message
 

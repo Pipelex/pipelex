@@ -1,8 +1,7 @@
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelDeckChoiceUnresolvedError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
@@ -16,6 +15,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.kernel.prompt_assembly import UserPromptContent
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge, PipeJudgeQuestion
@@ -80,12 +80,18 @@ class TestPipeJudgeDeckDefault:
         assert deck_fault.deck_setting == "judgment.choice_default"
         assert deck_fault.resolve_error_code() == PipelexErrorCode.CONFIG_INVALID
 
-        strict_payload = deck_fault.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["code"] == PipelexErrorCode.CONFIG_INVALID
-        assert strict_payload["error_type"] == "ModelDeckChoiceUnresolvedError"
-        assert strict_payload["error_domain"] == "config"
-        assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
-        assert "validation_errors" not in strict_payload
+        caller = deck_fault.to_problem(view=ProblemView.CALLER)
+        assert caller.code == PipelexErrorCode.CONFIG_INVALID
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert caller.errors is None
+        # The deck's setting is the operator's to fix and to read: the caller reads neither it nor the message.
+        caller_wire = str(caller.to_wire())
+        assert deck_fault.message not in caller_wire
+        assert "choice_default" not in caller_wire
+        operator = deck_fault.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "ModelDeckChoiceUnresolvedError"
+        assert operator.diagnostics.message == deck_fault.message
 
     def test_a_model_the_step_names_is_still_located_on_the_pipe(self) -> None:
         """Only the deck's own miss passes through: a reference the method wrote is the caller's unknown model."""
@@ -102,4 +108,4 @@ class TestPipeJudgeDeckDefault:
         located = exc_info.value
         assert located.__cause__ is not_found
         assert located.field_name == "model"
-        assert located.to_error_report().code == CoreCode.MODEL_UNKNOWN
+        assert located.to_problem(view=ProblemView.CALLER).code == CoreCode.MODEL_UNKNOWN

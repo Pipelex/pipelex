@@ -16,7 +16,7 @@ from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.cli.error_handlers import handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import is_pipelex_file
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 
 if TYPE_CHECKING:
     from mthds.method_tree.models import MethodTree
@@ -158,6 +158,11 @@ def run_bundle_cmd(
             folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
         except ValidateBundleError as exc:
             handle_validate_bundle_error(exc, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None)
+        except MethodEntryError as entry_exc:
+            # No pipe to start at is no verdict on the method, which may be valid: the run names none, and the message
+            # names the folder's bundles by their tree paths and what each declares.
+            typer.secho(f"Failed to run: {entry_exc.message}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from entry_exc
         method_tree = folder_run.tree
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:

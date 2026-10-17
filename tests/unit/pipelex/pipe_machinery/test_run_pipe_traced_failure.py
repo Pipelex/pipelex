@@ -3,10 +3,12 @@
 from typing import Callable
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.errors.problem import PipelexProblem
 from pipelex.pipe_machinery.pipe_abstract import InputPresenceScan
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
@@ -18,13 +20,13 @@ from tests.unit.pipelex.graph.conftest import make_trace_context
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestRunPipeTracedFailure:
-    async def test_a_failure_whose_report_cannot_be_built_fails_the_run_with_the_pipes_own_error(
+    async def test_a_failure_whose_problem_cannot_be_built_fails_the_run_with_the_pipes_own_error(
         self,
         mocker: MockerFixture,
         load_empty_library: Callable[[], str],
     ) -> None:
-        """Building the failure's report runs while the pipe's error is on its way out: when it raises, the node records
-        the error's text, and the run still fails with the pipe's own error, never with the report's.
+        """Building the failure's problem runs while the pipe's error is on its way out: when it raises, the node records
+        a fault of ours, and the run still fails with the pipe's own error, never with the problem's.
         """
         load_empty_library()
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -33,7 +35,7 @@ class TestRunPipeTracedFailure:
             blueprint=PipeLLMBlueprint(description="Greet the user.", output="native.Text", prompt="Say hello."),
         )
         pipe_error = StuffFactoryError("The pipe's own failure")
-        mocker.patch.object(pipe_error, "to_error_report", side_effect=RuntimeError("The report could not be built"))
+        mocker.patch.object(pipe_error, "to_problem", side_effect=RuntimeError("The problem could not be built"))
         empty_presence_scan = InputPresenceScan(missing_names=[], forced_absent=[], liftable=[])
         mocker.patch.object(PipeLLM, "validate_before_run", mocker.AsyncMock(return_value=empty_presence_scan))
         mocker.patch.object(PipeLLM, "live_run_pipe", mocker.AsyncMock(side_effect=pipe_error))
@@ -55,9 +57,10 @@ class TestRunPipeTracedFailure:
         assert exc_info.value is pipe_error
         mock_manager.on_pipe_end_error.assert_called_once()
         end_kwargs = mock_manager.on_pipe_end_error.call_args.kwargs
-        assert (end_kwargs["node_id"], end_kwargs["error_type"], end_kwargs["error_message"], end_kwargs["caller_facing"]) == (
-            "test-run:node_0",
-            "StuffFactoryError",
-            str(pipe_error),
-            False,
-        )
+        assert end_kwargs["node_id"] == "test-run:node_0"
+        problem = end_kwargs["problem"]
+        assert isinstance(problem, PipelexProblem)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.location is not None
+        assert problem.location.pipe == "say_hello"
+        assert str(pipe_error) not in str(problem.to_wire())

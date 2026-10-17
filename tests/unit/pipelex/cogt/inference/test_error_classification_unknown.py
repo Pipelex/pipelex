@@ -7,7 +7,10 @@ to retry) and surfaces a real "we should add this case" signal in telemetry.
 
 from __future__ import annotations
 
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, find_inference_error_category_in_chain
+from pipelex.errors.problem import ProblemView
 
 
 class TestInferenceErrorCategoryUnknown:
@@ -20,10 +23,11 @@ class TestInferenceErrorCategoryUnknown:
     def test_unknown_is_not_retryable(self) -> None:
         assert InferenceErrorCategory.UNKNOWN.is_retryable is False
 
-    def test_error_report_round_trips_unknown(self) -> None:
+    def test_unknown_rides_the_chain_and_its_problem_invites_no_retry(self) -> None:
         err = CogtError("boom", error_category=InferenceErrorCategory.UNKNOWN)
 
-        report = err.to_error_report()
+        problem = err.to_problem(view=ProblemView.CALLER)
 
-        assert report.error_category == "unknown"
-        assert report.retryable is False
+        assert find_inference_error_category_in_chain(err) == InferenceErrorCategory.UNKNOWN
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.is_retryable is False

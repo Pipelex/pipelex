@@ -122,7 +122,7 @@ class TestBindingRefusalRemedy:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_UPPERCASE_ROOT_BUNDLE])
 
-        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        validation_errors = exc_info.value.validation_error_items() or []
         assert [error.error_type for error in validation_errors] == [PipeValidationErrorType.INVALID_INPUT_NAME]
         assert validation_errors[0].variable_names == ["Invoice"]
         message = validation_errors[0].message or ""
@@ -137,7 +137,7 @@ class TestBindingRefusalRemedy:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[mthds_content])
 
-        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        validation_errors = exc_info.value.validation_error_items() or []
         assert [error.error_type for error in validation_errors] == [PipeValidationErrorType.MISSING_INPUT_VARIABLE]
         message = validation_errors[0].message or ""
         assert "Declare 'Invoice'" not in message

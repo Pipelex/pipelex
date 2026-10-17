@@ -10,9 +10,10 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
-from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
 
@@ -180,6 +181,19 @@ async def _validate_and_release(*, mthds_file_path: Path, library_dirs: list[Pat
     return result
 
 
+def _caller_text(error: ValidateBundleError) -> str:
+    """What a caller reads of the refused validation: each item of the invalid verdict, in the sentence its code renders.
+
+    A function the step cannot call is the method's fault, found by the dry run, so the verdict holds one item coded
+    `method.function_invalid`, whose sentence names the function and why it cannot be used.
+    """
+    problem = error.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.METHOD_INVALID
+    assert problem.errors is not None
+    assert [item.code for item in problem.errors] == [CoreCode.METHOD_FUNCTION_INVALID]
+    return " ".join(item.detail for item in problem.errors)
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeFuncValidationErrors:
     """Tests for PipeFunc validation error reporting when @pipe_func decorated functions have issues."""
@@ -207,15 +221,14 @@ class TestPipeFuncValidationErrors:
             py_file.write_text(TestData.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
 
             # Validate the bundle - should fail with a CLEAR error message
-            # Currently raises LibraryError, but ValidateBundleError is also acceptable
-            with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The error should mention the function name
             assert "my_func_no_return_type" in error_message, f"Error message should mention the function name. Got: {error_message}"
@@ -285,14 +298,14 @@ class TestPipeFuncValidationErrors:
             mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Try to validate - should fail with informative error
-            with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The function should be mentioned in the error
             assert "my_func_no_return_type" in error_message
@@ -340,14 +353,14 @@ class TestPipeFuncValidationErrors:
             py_file.write_text(python_code)
 
             # Validate the bundle - should fail with a specific error message
-            with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The error should mention the function name
             assert function_name in error_message, f"Error message should mention the function name '{function_name}'. Got: {error_message}"
@@ -403,14 +416,14 @@ output = "Text"
             py_file.write_text(func_code)
 
             # Validate the bundle - should fail because return type doesn't match concept's structure class
-            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The error should mention the function name
             assert "func_wrong_structure_class" in error_message, f"Error should mention the function name. Got: {error_message}"
@@ -513,14 +526,14 @@ output = "Text[]"
             py_file.write_text(func_code)
 
             # Validate the bundle - should fail with clear error about item type mismatch
-            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The error should mention the function name
             assert "func_returns_wrong_list_content" in error_message, f"Error should mention the function name. Got: {error_message}"
@@ -571,14 +584,14 @@ output = "Text[]"
             py_file.write_text(func_code)
 
             # Validate the bundle - should fail because return type is not ListContent
-            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+            with pytest.raises(ValidateBundleError) as exc_info:
                 await validate_bundle(
                     mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
             error = exc_info.value
-            error_message = str(error)
+            error_message = _caller_text(error)
 
             # The error should mention the function name
             assert "func_returns_single_instead_of_list" in error_message, f"Error should mention the function name. Got: {error_message}"

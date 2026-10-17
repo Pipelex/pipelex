@@ -68,11 +68,10 @@ class Jinja2TemplateBudgetError(ToolError):
     Its template repeated, padded, joined, looped or recursed past what one render may allocate or compute. On a
     method's template that is the method's to fix, `pipe.template_budget_exceeded`, the default; a Pipelex template
     only gets there on data too large to display, which is the caller's input, `input.too_large`. The message names
-    the operation and its size, never the template source or a value, so it is caller-facing either way.
+    the operation and its size, never the template source or a value.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.PIPE_TEMPLATE_BUDGET_EXCEEDED, others=(CoreCode.INPUT_TOO_LARGE,))
-    _authors_caller_facing_message = True
 
 
 class Jinja2StuffError(ToolError):

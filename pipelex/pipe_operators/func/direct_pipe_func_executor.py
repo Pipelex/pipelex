@@ -87,7 +87,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             # Case (2), unbounded code: the function is arbitrary user code whose exception surface cannot be
             # enumerated. Whatever it raised is its failure, a coded Pipelex error a helper raised inside it included.
             msg = f"{type(exc).__name__}: {exc}"
-            raise PipeFuncRaisedError(msg) from exc
+            raise PipeFuncRaisedError(msg).with_params(function=function_name) from exc
         # Outside the function's failure: the kernel's coercion refusing what the function returned is the step's
         # output failing, `FuncOutputTypeError` with `pipe.output_invalid`, whatever shape it refused.
         call_result = coerce_function_output(function=function, function_output=function_output, function_name=function_name)

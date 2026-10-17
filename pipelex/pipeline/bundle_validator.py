@@ -30,8 +30,9 @@ import time
 from contextlib import AbstractContextManager, nullcontext
 from contextvars import ContextVar
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, Field, ValidationError
 from typing_extensions import override
@@ -41,8 +42,9 @@ from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.config import get_config
 from pipelex.core.exceptions import DryRunFailureErrorData
-from pipelex.core.pipes.exceptions import caller_facing_refusal_text
+from pipelex.core.pipes.exceptions import caller_refusal
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.error_codes import ErrorCode
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library,
@@ -109,8 +111,7 @@ class DryRunOutput(BaseModel):
     status: DryRunStatus
     error_message: str | None = None
     # On a FAILURE, the failure located at the innermost pipe that failed and is not allowed to fail,
-    # which is this pipe or one
-    # it runs, with a message the disclosure rule allows onto a verdict item.
+    # which is this pipe or one it runs, with its code and the sentence its code renders for a caller.
     failure: DryRunFailureErrorData | None = None
     # What the pipe's dry run found without failing, each item located at the pipe that found it, which is this
     # pipe or one it runs: today, the warnings of a PipeDocGen step's template check. The composition point of the
@@ -119,8 +120,8 @@ class DryRunOutput(BaseModel):
     warnings: list[ValidationErrorItem] = Field(default_factory=empty_list_factory_of(ValidationErrorItem))
 
 
-# The foreign shapes a dry run can fail with (pydantic and polyfactory, while mock data is built) carry no
-# caller-facing flag, so their item names what failed rather than repeating their text.
+# The foreign shapes a dry run can fail with (pydantic and polyfactory, while mock data is built) carry no code, so
+# their item names what failed rather than repeating their text.
 _MOCK_DATA_FAILURE_TEXT = "The dry run could not generate mock data for this pipe"
 
 
@@ -188,20 +189,30 @@ class _DryRunSweepRouter(PipeRouter):
             raise
 
 
-def _dry_run_failure_text(*, error: Exception) -> str:
-    """The text a dry-run failure puts on its verdict item: the failure's own message only when it is caller-facing.
+class _DryRunFailureFacts(NamedTuple):
+    """The code of a dry-run failure, the sentence its verdict item carries, and the parameters it was rendered from."""
 
-    The text is its root fault's, the innermost ``PipelexError`` on the cause chain, since a wrapper
-    around it neither knows more nor authors caller-facing copy of its own; of two faults of the same
-    class the outer one, which restates the inner with more context, is the root, as a run failure's
-    report takes it (see ``find_root_fault``). A message that is not
-    caller-facing is replaced by the fault's title, because the verdict is caller-facing as a whole
-    and would otherwise carry a configuration or storage failure's internals past STRICT disclosure.
+    code: ErrorCode
+    text: str
+    params: dict[str, Any] | None
+
+
+def _dry_run_failure_facts(*, error: Exception, pipe_code: str) -> _DryRunFailureFacts:
+    """The code a dry-run failure carries, the sentence its verdict item puts after the pipe's name, and its parameters.
+
+    All are its root fault's, the error whose code the failure resolves to, since a wrapper around it neither knows
+    more nor holds a code of its own; of two faults of the same class the outer one, which restates the inner with more
+    context, is the root, as a run failure's problem takes it (see ``find_root_fault``). The sentence is the one the
+    code renders for a caller, the failing pipe ``pipe_code`` naming its pipe parameter, never the fault's own message,
+    because the verdict is read by the caller. A failure with no Pipelex error on its chain is the dry run failing to
+    mock a value: ``method.mock_unsatisfiable``.
     """
     root_fault = find_root_fault(error=error)
     if root_fault is None:
-        return _MOCK_DATA_FAILURE_TEXT
-    return caller_facing_refusal_text(refusal=root_fault)
+        return _DryRunFailureFacts(code=CoreCode.METHOD_MOCK_UNSATISFIABLE, text=_MOCK_DATA_FAILURE_TEXT, params=None)
+    problem = caller_refusal(refusal=root_fault, pipe_code=pipe_code)
+    params = problem.params.as_wire() if problem.params is not None else None
+    return _DryRunFailureFacts(code=root_fault.resolve_error_code(), text=problem.detail, params=params or None)
 
 
 def _disclosed_warnings(*, warnings: list[ValidationErrorItem], source_pipe_refs: frozenset[str] | None) -> list[ValidationErrorItem]:
@@ -581,13 +592,16 @@ class BundleValidator:
             failing_pipe_source: str | None = None
             if source_pipe_refs is None or failing_pipe.pipe_ref in source_pipe_refs:
                 failing_pipe_source = get_library_manager().get_pipe_source(failing_pipe.pipe_ref)
+            failure_facts = _dry_run_failure_facts(error=exc, pipe_code=failing_pipe.code)
             failure = DryRunFailureErrorData(
+                code=failure_facts.code,
                 pipe_code=failing_pipe.code,
                 domain_code=failing_pipe.domain_code,
                 # Compatibility boundary: injected managers written against the previous protocol may still
                 # return ``Path``. Normalize before assigning to the string-only model.
                 source=str(failing_pipe_source) if failing_pipe_source is not None else None,
-                message=f"Pipe '{failing_pipe.code}' failed its dry run: {_dry_run_failure_text(error=exc)}",
+                message=f"Pipe '{failing_pipe.code}' failed its dry run: {failure_facts.text}",
+                params=failure_facts.params,
             )
             return DryRunOutput(
                 pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.FAILURE, error_message=error_message, failure=failure
@@ -628,7 +642,10 @@ class BundleValidator:
         )
         if unexpected_failures:
             failures = cls._located_failures(unexpected_failures=unexpected_failures)
-            details = "\n".join(f"- {failure.message}" for failure in failures)
+            # The message is the operator's diagnostics, so it gives each failure as the dry run met it, such as a
+            # combine's restatement naming the branch to change, which the failures' caller sentences leave out.
+            met_texts = {id(output.failure): output.error_message for output in unexpected_failures.values() if output.failure is not None}
+            details = "\n".join(f"- {met_texts.get(id(failure)) or failure.message}" for failure in failures)
             msg = f"Dry run failed for {len(failures)} pipe(s):\n{details}"
             raise DryRunError(msg, failures=failures)
         return results
@@ -647,6 +664,7 @@ class BundleValidator:
         failures_by_pipe_ref: dict[str, DryRunFailureErrorData] = {}
         for swept_pipe_ref, dry_run_output in unexpected_failures.items():
             failure = dry_run_output.failure or DryRunFailureErrorData(
+                code=CoreCode.RUNTIME_UNEXPECTED,
                 pipe_code=dry_run_output.pipe_code,
                 message=f"Pipe '{dry_run_output.pipe_code}' failed its dry run",
             )

@@ -78,7 +78,7 @@ Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
 
 - `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
-- `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
+- `RunFailedError` is a run that started and failed; `error` holds the error the hosted API stored for the run, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
 - `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
 - `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its `__cause__` is httpx's exception, and its `code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.

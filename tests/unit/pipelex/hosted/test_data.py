@@ -67,15 +67,23 @@ class HostedVersions:
     )
 
 
-class HostedPipeIoVerdicts:
-    """`POST /v1/pipe-io` invalid verdicts, as the runner's crate core builds them."""
+class HostedPipeIoRefusals:
+    """`POST /v1/pipe-io` refusals, as the runner answers them in the caller's view."""
 
     # A method calling a published method by address: the crate core behind pipe-io loads no address-based dependency,
-    # which `/v1/start` fetches and runs. Built from `resolve_crate_from_contents`'s refusal on 2026-10-07.
+    # which `/v1/start` fetches and runs. Built from `resolve_crate_from_contents`'s refusal on 2026-10-17.
     ADDRESS_DEPENDENCY: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [{"category": "blueprint_validation", "message": "In-memory resolve cannot load '
-        "address-based dependency 'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents "
-        'in the request or use directory-based resolution."}], "message": "In-memory resolve cannot load address-based dependency '
-        "'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents in the request or use "
-        'directory-based resolution."}'
+        '{"type": "https://mthds.ai/errors/request.unsupported", "title": "The request uses a form this runtime does not accept", '
+        '"status": 422, "detail": "This runtime does not accept the form the request\'s field \'files\' uses (reason: '
+        'address_based_dependency).", "code": "request.unsupported", "domain": "input", "retry": "no", "next_step": {"kind": '
+        '"change_input", "detail": "Send the field \'files\' in a form this runtime accepts, then send the request again."}, '
+        '"params": {"field": "files", "reason": "address_based_dependency"}, "request_id": "01K7ADDRESSDEPENDENCY0000"}'
+    )
+    # The same code for another reason, which is no address-based dependency.
+    OTHER_UNSUPPORTED_FORM: ClassVar[str] = (
+        '{"type": "https://mthds.ai/errors/request.unsupported", "title": "The request uses a form this runtime does not accept", '
+        '"status": 422, "detail": "This runtime does not accept the form the request\'s field \'extra\' uses (reason: '
+        'hosted_only_extension).", "code": "request.unsupported", "domain": "input", "retry": "no", "next_step": {"kind": '
+        '"change_input", "detail": "Send the field \'extra\' in a form this runtime accepts, then send the request again."}, '
+        '"params": {"field": "extra", "reason": "hosted_only_extension"}}'
     )

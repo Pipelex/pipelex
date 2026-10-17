@@ -11,8 +11,9 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView, ProviderDiagnostics
 from pipelex.providers.openai.openai_img_gen_worker import OpenAIImgGenWorker
 
 
@@ -44,6 +45,19 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.img_gen_prompt.positive_text = "a sunset over mountains"
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
+def _provider_of(problem: PipelexProblem) -> ProviderDiagnostics:
+    """What the provider answered, from the operator's diagnostics."""
+    provider = _diagnostics_of(problem).provider
+    assert provider is not None
+    return provider
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -279,7 +293,7 @@ class TestOpenAIImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata.status_code == 404
         assert exc_info.value.model_handle == "gpt-image-1"
 
-    async def test_error_report_includes_provider_metadata(self, mocker: MockerFixture) -> None:
+    async def test_problem_includes_provider_metadata(self, mocker: MockerFixture) -> None:
         worker = _make_openai_img_gen_worker(mocker)
         sdk_exc = openai.RateLimitError(
             "rate limited",
@@ -297,10 +311,11 @@ class TestOpenAIImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
-        assert report.provider_metadata is not None
-        assert report.provider_metadata.provider == "openai"
-        assert report.provider_metadata.status_code == 429
-        assert report.provider_metadata.retry_after_seconds == 5.0
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
+        # The provider's `name` is the backend the error names, which the worker leaves to its caller to fill.
+        assert _provider_of(problem).name is None
+        assert _provider_of(problem).status == 429
+        assert problem.retry_after == 5.0

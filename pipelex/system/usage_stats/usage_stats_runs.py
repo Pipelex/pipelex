@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.errors.problem import ProblemView
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsErrorDomain, UsageStatsMethodSource
 
 #: The failure categories a `model_used` event counts, the runtime's own `InferenceErrorCategory` values.
@@ -104,10 +105,14 @@ def tallying_inference_calls(*, tally: RunInferenceTally | None) -> Generator[No
 
 
 def usage_stats_error_domain(*, error: BaseException | None) -> UsageStatsErrorDomain:
-    """Who can fix a failure, by the runtime's own error report: `input`, `config`, `runtime`, or `other` when it cannot say."""
+    """Who can fix a failure, by the domain of the runtime's own code: `input`, `config`, `runtime`, or `other` when it cannot say.
+
+    The domain is the failure's problem's, which a cause reporting a problem of its own, such as one recovered across a
+    transport boundary, decides, as every other surface reads it.
+    """
     if not isinstance(error, PipelexError):
         return UsageStatsErrorDomain.OTHER
-    return usage_stats_error_domain_of(domain=error.to_error_report().error_domain)
+    return usage_stats_error_domain_of(domain=ErrorDomain.from_problem_domain(error.to_problem(view=ProblemView.CALLER).effective_domain))
 
 
 def usage_stats_error_domain_of(*, domain: ErrorDomain | str | None) -> UsageStatsErrorDomain:

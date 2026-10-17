@@ -84,7 +84,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 f"Model '{inference_model.desc}' cannot reason on a structured output with structure method "
                 f"'{inference_model.structure_method}': use 'instructor/mistral_tools', or remove the reasoning setting"
             )
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="reasoning on a structured output")
 
     @classmethod
     def _instructor_mode(cls, *, inference_model: InferenceModelSpec) -> "InstructorMode":
@@ -115,13 +115,13 @@ class MistralLLMWorker(LLMWorkerAbstract):
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     msg = f"Model '{inference_model.desc}' does not support reasoning_budget; Mistral uses reasoning_effort instead"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="a reasoning budget")
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         if job_params.reasoning_effort is not None:
             effort = job_params.reasoning_effort
@@ -131,10 +131,10 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     return UNSET if mistral_effort is None else mistral_effort
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         return UNSET
 

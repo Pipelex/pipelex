@@ -21,8 +21,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import ProblemView
 from pipelex.migration.goldens import pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.system.configuration.config_surface import TELEMETRY_CONFIG_SURFACE_ID
@@ -108,15 +110,18 @@ class TestTheErrorSaysWhetherTheFileIsOldOrWrong:
         assert exc.migration.needs_attention is True
         assert [unexplained.path for plan in exc.migration.plans for unexplained in plan.unexplained] == [UNKNOWN_KEY]
 
-    def test_the_domain_comes_from_the_class_and_the_block_rides_the_report(self, global_dir: Path) -> None:
-        """What an agent consumer actually reads: one structured envelope, `config` either way."""
+    def test_the_domain_comes_from_the_class_and_the_block_rides_the_operator_s_problem(self, global_dir: Path) -> None:
+        """What an agent consumer actually reads: one structured envelope, the operator's either way."""
         exc = load_and_capture(config_dir=global_dir, body=f"{old_shape_document()}\n{UNKNOWN_KEY} = true\n")
 
-        report = exc.to_error_report()
+        operator = exc.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_domain == "config"
-        assert report.migration is not None
-        assert report.to_dict()["migration"]["remedy"] == MIGRATE_COMMAND
+        assert operator.domain == ProblemDomain.OPERATOR
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.migration is not None
+        assert operator.to_wire()["diagnostics"]["migration"]["remedy"] == MIGRATE_COMMAND
+        # The block describes this host's own configuration directories: no caller reads it.
+        assert MIGRATE_COMMAND not in str(exc.to_problem(view=ProblemView.CALLER).to_wire())
 
     def test_no_remedy_ever_tells_a_reader_to_start_the_file_over(self, global_dir: Path) -> None:
         """The whole point of the change: a migratable file is never answered with a reset."""

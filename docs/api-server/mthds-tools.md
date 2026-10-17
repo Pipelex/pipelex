@@ -28,7 +28,7 @@ fetch schemas or read local catalog files.
 
 `/lint` is a diagnostic endpoint: malformed `.mthds` content returns HTTP 200
 with diagnostics in the body. Request-shape problems, such as missing `content`
-or a file over the configured per-file limit, return RFC 7807 problem responses.
+or a file over the configured per-file limit, return RFC 9457 problem responses.
 
 ```json
 {
@@ -77,7 +77,7 @@ An empty `diagnostics` array means the file is clean.
 
 Syntax errors return HTTP 200 with the original content unchanged and diagnostics
 describing the blocking issue. Malformed formatter options, such as a non-numeric
-`column_width`, are caller input errors and return RFC 7807 422 responses.
+`column_width`, are caller input errors and return RFC 9457 422 responses.
 
 ```json
 {

@@ -183,7 +183,8 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         if errors:
             listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
             msg = f"PipeDocGen '{pipe_code}': the template file '{template_file.name}' does not fit the step's inputs:\n{listed}"
-            raise PipeDocGenTemplateCheckError(msg)
+            findings_text = "; ".join(finding.message for finding in errors)
+            raise PipeDocGenTemplateCheckError(msg).with_params(template=template_file.name, reason="does_not_fit", finding=findings_text)
 
 
 def _report_template_warning(*, domain_code: str | None, pipe_code: str, template_file: str, finding: TemplateFinding) -> None:

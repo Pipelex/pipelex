@@ -1,13 +1,12 @@
 """RFC 7807 `type` URI and `title` for API-authored errors.
 
-A pipelex `ErrorReport` always carries its own `type_uri` and `title`, both
-required fields and both the registry code's (`ErrorReport.make_for_code`): the
-code's documentation page and the code's title. The global exception handler
-never needs these helpers for a `PipelexError`.
+A pipelex error's problem always carries its own `type` and `title`, both the
+registry code's: the code's documentation page and the code's title. The global
+exception handler never needs these helpers for a `PipelexError`.
 
 They exist for the *other* error source: the API's own 4xx responses
 (`raise_validation_error` and friends in `pipelex_api.errors`), authored from the
-static `pipelex_api.error_types.ErrorType` enum with no `ErrorReport` behind them.
+static `pipelex_api.error_types.ErrorType` enum with no pipelex error behind them.
 `build_problem_document_from_api_error` uses these to give an API-authored
 error an RFC 7807 `type` / `title` pair. Unlike a pipelex error's, that pair
 is still derived from a class name (`URLs.error_docs_base`, `pascal_case_to_kebab`,

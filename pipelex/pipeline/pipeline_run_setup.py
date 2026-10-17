@@ -171,7 +171,7 @@ async def pipeline_run_setup(
     request_id:
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
-        ``ErrorReport`` back to its originating request). Threaded onto
+        problem back to its originating request). Threaded onto
         :attr:`pipelex.system.job_metadata.RunMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
@@ -224,7 +224,7 @@ async def pipeline_run_setup(
     # production. The constant survives for telemetry only.
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
-        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).as_caller_fault()
+        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
 
     # Validate the extras HERE, before this function causes anything observable.
     #
@@ -355,7 +355,7 @@ async def pipeline_run_setup(
                 pipe = get_required_pipe(pipe_code=qualified_main_pipe)
             else:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
-                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).as_caller_fault()
+                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
         elif pipe_code:
             pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:
