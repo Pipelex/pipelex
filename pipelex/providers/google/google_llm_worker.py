@@ -37,6 +37,11 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
 
+# The Google GenAI SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError)
+
+
 class GoogleLLMWorker(LLMWorkerAbstract):
     # Key into inference.llm.effort_to_budget_maps for manual-thinking budget resolution
     reasoning_budget_family: ClassVar[str] = "gemini"
@@ -248,7 +253,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 contents=contents,
                 config=generation_config,
             )
-        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
@@ -342,7 +347,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_google_metadata(underlying_exc, validated_type=schema)
+                metadata = extract_google_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
@@ -352,7 +357,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
             raise self._make_structured_generation_failure(api_name="Google", schema=schema, instructor_exc=instructor_exc) from instructor_exc
-        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(

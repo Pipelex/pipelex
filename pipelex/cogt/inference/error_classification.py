@@ -15,7 +15,7 @@ from http import HTTPStatus
 from typing import Any, TypeAlias, cast
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.tools.typing.pydantic_utils import ValidatedType, describe_exception_without_input
@@ -95,7 +95,9 @@ class ProviderErrorMetadata(BaseModel):
     # Classify step (quota / content-policy discrimination) and the Render step
     # (message composition) read it, so the Extract step must capture it. A
     # pydantic ``ValidationError``, which ends instructor's re-asks, is written by
-    # its locations and reasons alone: its own text quotes the model's answer.
+    # its locations and reasons alone: its own text quotes the model's answer. Any
+    # other failure to parse that answer, such as instructor's assertion carrying a
+    # model's refusal, is written by its class alone.
     message: str = ""
     status_code: int | None = None
     request_id: str | None = None
@@ -402,6 +404,25 @@ def describe_instructor_failure(*, instructor_exc: BaseException) -> str:
     return type(cause).__name__ if cause is not None else type(instructor_exc).__name__
 
 
+# The exception classes a provider's SDK raises as its own, as a worker catches them.
+SdkErrorTypes: TypeAlias = tuple[type[BaseException], ...]
+
+
+def _describe_provider_exception(*, exc: BaseException, validated_type: ValidatedType | None, sdk_error_types: SdkErrorTypes | None) -> str:
+    """The text a provider's metadata carries for ``exc``, which never quotes the model's answer.
+
+    ``sdk_error_types`` is ``None`` when the worker caught ``exc`` as its SDK's own error: its text is the provider's,
+    which the Classify step reads, quota against rate limiting or a content policy, and is kept. A tuple says ``exc``
+    was recovered from ``instructor``'s loop, which ends either on the SDK's own error, an instance of one of these
+    types, or on a failure to parse the model's answer, whose text can quote that answer: a ``ValidationError`` is
+    written by its locations and reasons, located by ``validated_type``, and any other parsing failure by its class
+    alone, such as the ``AssertionError`` that ``instructor``'s OpenAI parser raises with the model's refusal in its text.
+    """
+    if sdk_error_types is not None and not isinstance(exc, (ValidationError, *sdk_error_types)):
+        return type(exc).__name__
+    return describe_exception_without_input(exc=exc, validated_type=validated_type)
+
+
 def parse_retry_after_seconds(value: Any) -> float | None:
     """Parse a ``Retry-After`` header value into a delay in seconds.
 
@@ -447,12 +468,16 @@ def _provider_error_code_from_body(body: Any) -> str | None:
     return None
 
 
-def extract_openai_metadata(exc: BaseException, *, validated_type: ValidatedType | None = None) -> ProviderErrorMetadata:
+def extract_openai_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill an OpenAI SDK exception into a ``ProviderErrorMetadata``.
 
-    ``exc`` can also be the exception that ended instructor's re-asks, most often the ``ValidationError`` of the model's
-    last answer, whose text quotes that answer: it is written by its reasons, located by the schema of
-    ``validated_type``, the class the structured generation asked for, never by the answer's values.
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the SDK's two exception shapes:
 
@@ -489,7 +514,7 @@ def extract_openai_metadata(exc: BaseException, *, validated_type: ValidatedType
     return ProviderErrorMetadata(
         provider=ProviderName.OPENAI,
         sdk_exception_type=type(exc).__name__,
-        message=describe_exception_without_input(exc=exc, validated_type=validated_type),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -498,12 +523,16 @@ def extract_openai_metadata(exc: BaseException, *, validated_type: ValidatedType
     )
 
 
-def extract_anthropic_metadata(exc: BaseException, *, validated_type: ValidatedType | None = None) -> ProviderErrorMetadata:
+def extract_anthropic_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill an Anthropic SDK exception into a ``ProviderErrorMetadata``.
 
-    ``exc`` can also be the exception that ended instructor's re-asks, most often the ``ValidationError`` of the model's
-    last answer, whose text quotes that answer: it is written by its reasons, located by the schema of
-    ``validated_type``, the class the structured generation asked for, never by the answer's values.
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the two exception shapes in the Anthropic SDK:
 
@@ -528,7 +557,7 @@ def extract_anthropic_metadata(exc: BaseException, *, validated_type: ValidatedT
     return ProviderErrorMetadata(
         provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
-        message=describe_exception_without_input(exc=exc, validated_type=validated_type),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -644,12 +673,16 @@ def _google_provider_error_code_from_details(details: Any) -> str | None:
     return None
 
 
-def extract_google_metadata(exc: BaseException, *, validated_type: ValidatedType | None = None) -> ProviderErrorMetadata:
+def extract_google_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill a Google GenAI SDK exception into a ``ProviderErrorMetadata``.
 
-    ``exc`` can also be the exception that ended instructor's re-asks, most often the ``ValidationError`` of the model's
-    last answer, whose text quotes that answer: it is written by its reasons, located by the schema of
-    ``validated_type``, the class the structured generation asked for, never by the answer's values.
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Google's exception shape differs from OpenAI/Anthropic:
 
@@ -676,7 +709,7 @@ def extract_google_metadata(exc: BaseException, *, validated_type: ValidatedType
     return ProviderErrorMetadata(
         provider=ProviderName.GOOGLE,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=describe_exception_without_input(exc=exc, validated_type=validated_type),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -865,12 +898,16 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_mistral_metadata(exc: BaseException, *, validated_type: ValidatedType | None = None) -> ProviderErrorMetadata:
+def extract_mistral_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill a Mistral SDK exception into a ``ProviderErrorMetadata``.
 
-    ``exc`` can also be the exception that ended instructor's re-asks, most often the ``ValidationError`` of the model's
-    last answer, whose text quotes that answer: it is written by its reasons, located by the schema of
-    ``validated_type``, the class the structured generation asked for, never by the answer's values.
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the two shapes the Mistral SDK raises:
 
@@ -908,7 +945,7 @@ def extract_mistral_metadata(exc: BaseException, *, validated_type: ValidatedTyp
     return ProviderErrorMetadata(
         provider=ProviderName.MISTRAL,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=describe_exception_without_input(exc=exc, validated_type=validated_type),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,

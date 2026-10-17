@@ -35,6 +35,11 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 
 
+# The OpenAI SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (openai.APIStatusError, openai.APIConnectionError)
+
+
 class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
@@ -154,7 +159,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
@@ -240,7 +245,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_openai_metadata(underlying_exc, validated_type=schema)
+                metadata = extract_openai_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
@@ -250,7 +255,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
             raise self._make_structured_generation_failure(api_name="OpenAI", schema=schema, instructor_exc=instructor_exc) from instructor_exc
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(

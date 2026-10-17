@@ -25,6 +25,10 @@ class _Tally(BaseModel):
     count: int
 
 
+class _SdkError(Exception):
+    """An error a provider's SDK raises as its own, whose text is the provider's."""
+
+
 def _validation_error_quoting_the_answer(*, schema: type[BaseModel], answer: object) -> ValidationError:
     """The error instructor's own validation raises on the model's answer: it validates with a subclass of the schema."""
     try:
@@ -114,3 +118,25 @@ class TestDescribeInstructorFailure:
 
         assert metadata.message.startswith("items.1.count: Input should be a valid integer")
         assert _ANSWER not in metadata.message
+
+    @pytest.mark.parametrize("extract_metadata", _EXTRACTORS)
+    def test_any_other_parsing_failure_is_named_by_its_class_alone(self, extract_metadata: Callable[..., ProviderErrorMetadata]) -> None:
+        """Instructor's OpenAI parser asserts on a refusal with the model's answer in its text: the recovered assertion is named by its class."""
+        refusal = AssertionError(f"Unable to generate a response due to {_ANSWER}")
+        underlying = extract_underlying_sdk_exception(_wrapped(cause=refusal))
+        assert underlying is refusal
+
+        metadata = extract_metadata(underlying, validated_type=_Tally, sdk_error_types=(_SdkError,))
+
+        assert metadata.message == "AssertionError"
+        assert metadata.sdk_exception_type == "AssertionError"
+
+    @pytest.mark.parametrize("extract_metadata", _EXTRACTORS)
+    def test_a_recovered_sdk_error_keeps_the_provider_s_text(self, extract_metadata: Callable[..., ProviderErrorMetadata]) -> None:
+        """A call that failed in transport ends the loop on the SDK's own error, whose text the classification reads."""
+        sdk_error = _SdkError("You exceeded your current quota")
+        underlying = extract_underlying_sdk_exception(_wrapped(cause=sdk_error))
+
+        metadata = extract_metadata(underlying, validated_type=_Tally, sdk_error_types=(_SdkError,))
+
+        assert metadata.message == "You exceeded your current quota"

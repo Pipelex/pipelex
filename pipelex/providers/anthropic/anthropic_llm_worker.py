@@ -53,6 +53,11 @@ if TYPE_CHECKING:
     from anthropic.types import Message
 
 
+# The Anthropic SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (APIStatusError, APIConnectionError)
+
+
 @pydantic_dataclass
 class _ThinkingParams:
     """Container for thinking-related SDK parameters."""
@@ -368,7 +373,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 **self._request_extras_kwargs(llm_job=llm_job, output_desc=InferenceOutputType.TEXT),
             ) as stream:
                 final_message: Message = await stream.get_final_message()
-        except (APIStatusError, APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
@@ -516,7 +521,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_anthropic_metadata(underlying_exc, validated_type=schema)
+                metadata = extract_anthropic_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 rendered_error = render_inference_error(
                     metadata=metadata,
@@ -528,7 +533,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=underlying_exc) from instructor_exc
             fallback_error = self._make_structured_generation_failure(api_name="Anthropic", schema=schema, instructor_exc=instructor_exc)
             raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
-        except (APIStatusError, APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             rendered_error = render_inference_error(
