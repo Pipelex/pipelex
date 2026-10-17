@@ -6588,10 +6588,6 @@ rationale = "Transforms the value; single operand."
 param = "header"
 rationale = "Validates/checks the header; single operand."
 
-["pipelex/tools/tabular/csv_codec.py::_validation_error_label"]
-param = "error"
-rationale = "Validates/checks the error; single operand."
-
 ["pipelex/tools/tabular/csv_codec.py::assert_supported_table_suffix"]
 param = "path"
 rationale = "File/path op on the path; single operand."

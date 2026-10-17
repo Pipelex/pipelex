@@ -18,7 +18,7 @@ import types
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal, Union, get_args, get_origin
+from typing import Any, Literal, Union, get_args, get_origin
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
@@ -33,10 +33,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvReadError,
 )
 from pipelex.tools.typing.annotation_utils import annotation_admits_none
-from pipelex.tools.typing.pydantic_utils import refusal_reason_without_input
-
-if TYPE_CHECKING:
-    from pydantic_core import ErrorDetails
+from pipelex.tools.typing.pydantic_utils import refusal_reason_without_input, validation_error_locations
 
 # v1 dialect defaults. Configurable via codec params, never auto-guessed (design §9).
 # The user-facing config surface (toml default / --delimiter / --encoding flags) is a
@@ -134,26 +131,34 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
         raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
 
-def _validate_header(header: list[str], *, path: Path) -> None:
-    """Reject an empty header, or a header with a blank or duplicate column."""
+def _csv_subject(*, input_name: str | None) -> str:
+    """How a message names the file it refuses: by the input it was given as, never by its path, which is the caller's."""
+    return f"the CSV file given for input '{input_name}'" if input_name is not None else "the CSV file"
+
+
+def _validate_header(header: list[str], *, subject: str) -> None:
+    """Reject an empty header, or a header with a blank or duplicate column.
+
+    A header cell is the file's own text, which no message quotes: a column is named by its 1-based position.
+    """
     if not header:
         # An empty first row (a leading blank line, or a file that is just a newline) names no
         # columns; treat it as a malformed header rather than letting it surface as a confusing
         # "row wider than header" / missing-required error downstream.
-        msg = f"CSV file {path} has an empty header row; a header naming the columns is required."
+        msg = f"Found an empty header row in {subject}; a header naming the columns is required."
         raise CsvColumnError(msg)
     seen: set[str] = set()
-    for column in header:
+    for column_number, column in enumerate(header, start=1):
         if not column.strip():
-            msg = f"CSV file {path} has a blank header cell; every column needs a non-empty name."
+            msg = f"Found a blank header cell in column {column_number} of {subject}; every column needs a non-empty name."
             raise CsvColumnError(msg)
         if column in seen:
-            msg = f"CSV file {path} has a duplicate header column {column!r}; column names must be unique."
+            msg = f"Column {column_number} of {subject} repeats the name of an earlier column; column names must be unique."
             raise CsvColumnError(msg)
         seen.add(column)
 
 
-def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str], list[tuple[int, list[str]]]]:
+def _read_table(path: Path, *, delimiter: str, encoding: str, subject: str) -> tuple[list[str], list[tuple[int, list[str]]]]:
     """Read a CSV file into a validated header row + the (1-based-line-numbered) data rows.
 
     The shared reader behind ``read_rows`` and ``list_content_from_csv`` — keeps the
@@ -166,6 +171,10 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
     quoting (e.g. an unterminated quoted field) raises ``csv.Error`` at the boundary rather than
     silently merging the following lines into one cell. Wraps every raw
     ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
+
+    No message names the file's path, which the caller gave, nor quotes its content: a decoding error's own text
+    quotes the byte it refused, and an ``OSError``'s the path, so each is written by its reason alone. ``subject``
+    names the file as the input it was given as, when that is known.
     """
     _assert_single_char_delimiter(delimiter)
     # Capture each record's physical line number from ``reader.line_num`` (the count of physical lines
@@ -178,24 +187,25 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
             for row in reader:
                 numbered_rows.append((reader.line_num, row))
     except UnicodeDecodeError as exc:
-        msg = f"Could not decode CSV file {path} as {encoding}: {exc}"
+        msg = f"Could not decode {subject} as {encoding}: {exc.reason}"
         raise CsvReadError(msg) from exc
     except LookupError as exc:
-        msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
+        msg = f"Unknown encoding {encoding!r} for {subject}"
         raise CsvReadError(msg) from exc
     except csv.Error as exc:
-        msg = f"Malformed CSV file {path}: {exc}"
+        # The csv module's own wording, which names the dialect's characters and never a cell.
+        msg = f"Malformed CSV in {subject}: {exc}"
         raise CsvReadError(msg) from exc
     except OSError as exc:
-        msg = f"Could not read CSV file {path}: {exc}"
+        msg = f"Could not read {subject}: {exc.strerror or type(exc).__name__}"
         raise CsvReadError(msg) from exc
 
     if not numbered_rows:
-        msg = f"CSV file {path} is empty; a header row is required."
+        msg = f"Found nothing in {subject}; a header row is required."
         raise CsvReadError(msg)
 
     header = numbered_rows[0][1]
-    _validate_header(header, path=path)
+    _validate_header(header, subject=subject)
 
     data_rows: list[tuple[int, list[str]]] = []
     for line_number, row in numbered_rows[1:]:
@@ -204,7 +214,7 @@ def _read_table(path: Path, *, delimiter: str, encoding: str) -> tuple[list[str]
             continue
         if len(row) > len(header):
             msg = (
-                f"CSV file {path} row {line_number} has {len(row)} fields but the header declares "
+                f"Row {line_number} of {subject} has {len(row)} fields but the header declares "
                 f"{len(header)} column(s); the surplus cells map to no column."
             )
             raise CsvColumnError(msg)
@@ -224,7 +234,7 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     missing/unreadable file, an unknown/wrong encoding, or malformed quoting; raises
     ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=_csv_subject(input_name=None))
     return [_row_to_dict(row, header=header) for _, row in data_rows]
 
 
@@ -249,14 +259,16 @@ def write_rows(
             writer.writerow(headers)
             for row in rows:
                 writer.writerow([row.get(column, "") for column in headers])
+    # The path is the one the caller asked to write; the rows are the run's output, so no message quotes a cell, which
+    # an encoding error's own text does, nor repeats the path, which an `OSError`'s does.
     except LookupError as exc:
-        msg = f"Unknown encoding {encoding!r} for CSV file {path}: {exc}"
+        msg = f"Unknown encoding {encoding!r} for CSV file {path}"
         raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
     except UnicodeEncodeError as exc:
-        msg = f"Could not encode CSV file {path} as {encoding}: {exc}"
+        msg = f"Could not encode CSV file {path} as {encoding}: a cell holds a character {encoding} cannot write ({exc.reason})"
         raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
     except OSError as exc:
-        msg = f"Could not write CSV file {path}: {exc}"
+        msg = f"Could not write CSV file {path}: {exc.strerror or type(exc).__name__}"
         raise CsvError(msg).with_error_code(CoreCode.REQUEST_INVALID) from exc
 
 
@@ -290,13 +302,14 @@ def assert_supported_table_suffix(path: Path) -> None:
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return
+    # The file's name is the caller's own text, which no message carries: its suffix names the format.
     if suffix == ".xlsx":
         msg = (
-            f"Reading/writing Excel files ({path.name}) requires the optional 'pipelex[tabular]' extra, "
-            f"which is not part of v1. Convert to .csv, or install 'pipelex[tabular]' once it ships."
+            "Reading/writing Excel files (.xlsx) requires the optional 'pipelex[tabular]' extra, "
+            "which is not part of v1. Convert to .csv, or install 'pipelex[tabular]' once it ships."
         )
         raise CsvError(msg)
-    msg = f"Unsupported table file format for {path.name!r}: only .csv is supported (got suffix {path.suffix!r})."
+    msg = f"Unsupported table file format: only .csv is supported (got suffix {path.suffix!r})."
     raise CsvError(msg)
 
 
@@ -311,6 +324,7 @@ def list_content_from_csv(
     row_model: type[StuffContentType],
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_READ_ENCODING,
+    input_name: str | None = None,
 ) -> ListContent[StuffContentType]:
     """Read a CSV file into a ``ListContent`` of ``row_model`` instances (one row → one item).
 
@@ -321,28 +335,34 @@ def list_content_from_csv(
     optional fields), but are left out for a defaulted field that refuses ``None``, which then
     takes its default; remaining strings are coerced via
     pydantic's lax validation. A coercion failure raises ``CsvCoercionError`` naming the
-    1-based row/column and field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
+    1-based row and the field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
+
+    The file is the caller's input: no message names its path, quotes a cell, or names a column the concept does not
+    declare, which is the file's own text: a message names the file by ``input_name``, the input it was given as, when
+    the caller knows it.
     """
     assert_supported_table_suffix(path)
     field_names = flat_field_names(row_model)
     field_name_set = set(field_names)
     required_fields = {name for name, field_info in row_model.model_fields.items() if field_info.is_required()}
 
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding)
+    subject = _csv_subject(input_name=input_name)
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=subject)
     header_set = set(header)
 
-    extra_columns = header_set - field_name_set
-    if extra_columns:
+    extra_column_numbers = [column_number for column_number, column in enumerate(header, start=1) if column not in field_name_set]
+    if extra_column_numbers:
         msg = (
-            f"CSV file {path} has column(s) {sorted(extra_columns)} not declared on concept {row_model.__name__!r}. "
-            f"Remove them or project to a matching flat concept."
+            f"Column(s) {', '.join(str(column_number) for column_number in extra_column_numbers)} of {subject} are not declared "
+            f"on concept {row_model.__name__!r}, whose columns are {', '.join(field_names)}. "
+            "Remove them or project to a matching flat concept."
         )
         raise CsvColumnError(msg)
 
-    missing_required = required_fields - header_set
+    missing_required = sorted(required_fields - header_set)
     if missing_required:
-        msg = f"CSV file {path} is missing required column(s) {sorted(missing_required)} for concept {row_model.__name__!r}."
-        raise CsvColumnError(msg)
+        msg = f"Required column(s) {missing_required} of concept {row_model.__name__!r} are missing from {subject}."
+        raise CsvColumnError(msg).with_params(field=missing_required[0])
 
     # A CSV that omits a *nullable* column means "no value" for every row → None (CT2), regardless of
     # the row model's own default. Carrying these as explicit None keeps the contract from silently
@@ -373,14 +393,18 @@ def list_content_from_csv(
         try:
             item = row_model.model_validate(row_data)
         except ValidationError as exc:
-            error_fields = sorted({_validation_error_label(error) for error in exc.errors()})
+            errors = exc.errors(include_url=False, include_input=False)
+            # A row's key the model does not declare is the file's own text: the locations name what the row model's
+            # schema names, and a model-level failure, which has none, is named by its error type.
+            locations = validation_error_locations(validation_error=exc, validated_type=row_model)
+            error_fields = sorted({location or error["type"] for error, location in zip(errors, locations, strict=True)})
             fields_label = ", ".join(error_fields) or "?"
             # Each error's reason without the cell, NOT str(exc): str(exc) appends `input_value=<raw cell>`, and a
             # validator's message can quote the cell too, which would put the cell content, a run's input, into the
             # operator's diagnostics and every log line carrying the message. Row/field identifiers suffice.
-            reasons = "; ".join(sorted({refusal_reason_without_input(error=error) for error in exc.errors()})) or "invalid value"
-            msg = f"Could not coerce CSV row {row_number} of {path} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
-            raise CsvCoercionError(msg) from exc
+            reasons = "; ".join(sorted({refusal_reason_without_input(error=error) for error in errors})) or "invalid value"
+            msg = f"Could not coerce row {row_number} of {subject} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
+            raise CsvCoercionError(msg).with_params(field=locations[0] if locations else None) from exc
         items.append(item)
 
     return ListContent(items=items)
@@ -412,18 +436,6 @@ def csv_from_list_content(
         dumped = item.model_dump(mode="json")
         rows.append({field_name: _to_cell(dumped.get(field_name)) for field_name in headers})
     write_rows(path=path, headers=headers, rows=rows, delimiter=delimiter, encoding=encoding)
-
-
-def _validation_error_label(error: "ErrorDetails") -> str:
-    """Best field label for one pydantic error: the dotted ``loc``, else the error type.
-
-    A model-level failure (e.g. a ``model_validator``) has an empty ``loc``; falling back to
-    the error type keeps the coercion message from naming an unhelpful ``field(s) ?``.
-    """
-    loc = error.get("loc") or ()
-    if loc:
-        return ".".join(str(part) for part in loc)
-    return str(error.get("type", "model"))
 
 
 def _to_cell(value: Any) -> str:

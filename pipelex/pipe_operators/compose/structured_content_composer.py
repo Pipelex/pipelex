@@ -96,7 +96,7 @@ class StructuredContentComposer:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
             # The composed values are the run's data: the refusal names the fields, their reasons and their types, never the values.
-            formatted_error = format_validation_error_without_input(validation_error=exc)
+            formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=self.output_class)
             field_type_summary = self._build_field_type_summary(field_values)
             msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}\n{field_type_summary}"
             raise StructuredContentComposerValidationError(msg) from exc
@@ -553,7 +553,7 @@ class StructuredContentComposer:
                 content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
                 return expected_type.model_validate(content_dict)
             except ValidationError as exc:
-                formatted_error = format_validation_error_without_input(validation_error=exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=expected_type)
                 msg = f"Cannot convert {actual_type.__name__} to {expected_type.__name__}: classes are not compatible. {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
@@ -730,7 +730,7 @@ class StructuredContentComposer:
             try:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
-                formatted_error = format_validation_error_without_input(validation_error=exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=expected_type)
                 msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 

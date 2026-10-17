@@ -150,7 +150,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
                 return validated_content
         except ValidationError as exc:
             # The content is the run's data: the refusal names its fields and reasons, never its values.
-            formatted_error = format_validation_error_without_input(validation_error=exc)
+            formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=content_type)
             raise StuffContentValidationError(
                 original_type=type(content).__name__,
                 target_type=content_type.__name__,

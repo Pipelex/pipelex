@@ -271,7 +271,7 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
         try:
             working_memory.absences[absence_name] = AbsenceRecord.model_validate(absence_raw)
         except ValidationError as exc:
-            msg = f"Failed to hydrate absence record '{absence_name}': {describe_exception_without_input(exc=exc)}"
+            msg = f"Failed to hydrate absence record '{absence_name}': {describe_exception_without_input(exc=exc, validated_type=AbsenceRecord)}"
             raise PipeJobError(msg) from exc
 
     return working_memory

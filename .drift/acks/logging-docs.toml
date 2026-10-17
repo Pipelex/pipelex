@@ -1,9 +1,9 @@
 contract = "logging-docs"
-digest = "sha256:a0e6988c616f9ba5744dd6ef308b55368bdbf082b3b0f72046baca692b2979cd"
+digest = "sha256:7c8cb0e3307ced0fc0f8cbd83108be97faaef2a25cb6f0ed78ab8986378068ed"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T04:11:34Z"
-rationale = "real-catch: error_fields.py now delegates the input-free rendering of a ValidationError to pipelex.tools.typing.pydantic_utils and adds ERROR_CODE_FIELD, which the pipe failure line carries in place of error.message. logging.md was stale on three points and now says them: the field table gains error.code, the Exceptions section gains the rule that a pipe's failure line carries its code and class and never its text, and the ValidationError bullet names InputFreeValueError, whose sentence the rendering keeps. The 'two error keys' wording became 'the error keys'. log-sink-plugins.md states nothing error_fields.py decides, so it needed no change."
+reviewed_at = "2026-10-17T05:17:02Z"
+rationale = "real-catch: error_fields gains validated_type and a ValidationError's locations now name only what the validated model's schema names, a dict's key or an undeclared key written <key>, reasons alone when the model is unknown. logging.md's ValidationError bullet said a forbidden key was located at its parent and gave limits.burst, a dict key, as its example; it now states the schema rule, the <key> placeholder and the validated_type argument. log-sink-plugins.md states nothing error_fields decides, so it needed no change."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
-"pipelex/tools/log/error_fields.py" = "blob:d4ca78056531a3325f9c71f9bcb87d386d732047"
+"pipelex/tools/log/error_fields.py" = "blob:aaaf4eca66b7001ff7b7fce2ca8b3bfebe3ed78b"

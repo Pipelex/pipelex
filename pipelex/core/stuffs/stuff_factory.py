@@ -20,6 +20,7 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
@@ -144,7 +145,7 @@ class StuffFactory:
             # The branches' outputs are the run's data: the refusal names the fields and reasons, never the values.
             msg = (
                 f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: "
-                f"{format_validation_error_without_input(validation_error=exc)}"
+                f"{format_validation_error_without_input(validation_error=exc, validated_type=the_subclass)}"
             )
             raise StuffFactoryError(msg).with_error_code(CoreCode.PIPE_OUTPUT_INVALID) from exc
         return cls.make_stuff(
@@ -260,7 +261,13 @@ class StuffFactory:
             read_scope=read_scope,
             position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
         )
-        return list_content_from_csv(Path(resolved.path), row_model=row_model)
+        try:
+            return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
+        except CsvError as exc:
+            # The codec names the file by the input it was given as, and the code's sentences name it as well.
+            if name is not None and "input" in error_code_spec(exc.resolve_error_code()).param_names:
+                exc.with_params(input=name)
+            raise
 
     @classmethod
     def _resolve_entry_concept(

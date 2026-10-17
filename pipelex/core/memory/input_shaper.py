@@ -55,7 +55,7 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input, validation_error_locations
 from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 
@@ -128,12 +128,14 @@ class InputKind(StrEnum):
                 return False
 
 
-def _first_refused_field(*, validation_error: ValidationError) -> str | None:
-    """The dotted path, inside the value, of the first field a structure's validation refused; ``None`` when it names none."""
-    errors = validation_error.errors(include_url=False, include_input=False)
-    if not errors or not errors[0]["loc"]:
-        return None
-    return ".".join(str(segment) for segment in errors[0]["loc"])
+def _first_refused_field(*, validation_error: ValidationError, structure_class: type[StuffContent]) -> str | None:
+    """The dotted path, inside the value, of the first field a structure's validation refused; ``None`` when it names none.
+
+    The path names what the structure's schema names, a key of the value's own written as the placeholder, since such a
+    key is the caller's data (see ``validation_error_locations``).
+    """
+    locations = validation_error_locations(validation_error=validation_error, validated_type=structure_class)
+    return locations[0] if locations else None
 
 
 class InputShaper:
@@ -813,19 +815,18 @@ class InputShaper:
         declared class is not a malformed *value*, and reporting it as one pointed the author at
         their input instead of at the concept.
         """
+        structure_class = concept_provider.get_structure_class(concept=concept)
         try:
-            return StuffContentFactory.make_content_from_value(
-                stuff_content_subclass=concept_provider.get_structure_class(concept=concept),
-                value=value,
-            )
+            return StuffContentFactory.make_content_from_value(stuff_content_subclass=structure_class, value=value)
         except (ValidationError, StuffContentFactoryError) as exc:
-            # A ValidationError's own text quotes the value it refused, the run's input: the reason names its fields alone.
+            # A ValidationError's own text quotes the value it refused, the run's input: the reason names its fields and
+            # reasons alone, and the fields only as far as the structure's schema names them.
             raise StructureValidationError.make(
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
-                reason=describe_exception_without_input(exc=exc),
+                reason=describe_exception_without_input(exc=exc, validated_type=structure_class),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
-                field=_first_refused_field(validation_error=exc) if isinstance(exc, ValidationError) else None,
+                field=_first_refused_field(validation_error=exc, structure_class=structure_class) if isinstance(exc, ValidationError) else None,
             ) from exc
 
     @classmethod

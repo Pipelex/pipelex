@@ -145,22 +145,41 @@ class TestLogErrorFields:
         assert error_fields(exc=exc, text=text) == {ERROR_TYPE_FIELD: expected[0], ERROR_MESSAGE_FIELD: expected[1]}, topic
 
     def test_a_validation_error_is_written_as_its_locations_and_reasons_never_its_input(self) -> None:
-        """A pydantic error's own text quotes every value it refused, which is payload: a run's input or a model's response."""
+        """A pydantic error's own text quotes every value it refused, which is payload: a run's input or a model's response.
+
+        A dict's key is the input's too, so the location names it by the placeholder.
+        """
         secret_looking = "sk-live-4f9a8b7c6d5e4f3a2b1c"
         with pytest.raises(ValidationError) as caught:
-            _Settings.model_validate({"retries": secret_looking, "limits": {"burst": secret_looking}})
+            _Settings.model_validate({"retries": secret_looking, "limits": {_PAYLOAD: secret_looking}})
         assert secret_looking in str(caught.value)
 
-        fields = error_fields(exc=caught.value)
+        fields = error_fields(exc=caught.value, validated_type=_Settings)
 
         assert fields == {
             ERROR_TYPE_FIELD: "ValidationError",
             ERROR_MESSAGE_FIELD: (
                 "retries: Input should be a valid integer, unable to parse string as an integer; "
-                "limits.burst: Input should be a valid integer, unable to parse string as an integer"
+                "limits.<key>: Input should be a valid integer, unable to parse string as an integer"
             ),
         }
         assert secret_looking not in fields[ERROR_MESSAGE_FIELD]
+        assert _PAYLOAD not in fields[ERROR_MESSAGE_FIELD]
+
+    @pytest.mark.parametrize(
+        ("topic", "validated_type"),
+        [("no model given", None), ("a model the error did not come from", _Diagnosis)],
+    )
+    def test_a_validation_error_whose_model_is_not_known_is_written_as_its_reasons_alone(
+        self, topic: str, validated_type: type[BaseModel] | None
+    ) -> None:
+        """Without the schema, nothing tells a field's name from a key of the input's own, so no location is written."""
+        with pytest.raises(ValidationError) as caught:
+            _Settings.model_validate({"retries": 3, "limits": {_PAYLOAD: "many"}})
+
+        message = error_fields(exc=caught.value, validated_type=validated_type)[ERROR_MESSAGE_FIELD]
+
+        assert message == "Input should be a valid integer, unable to parse string as an integer", topic
 
     def test_a_validation_error_at_the_root_names_its_reason_alone(self) -> None:
         with pytest.raises(ValidationError) as caught:
@@ -182,7 +201,7 @@ class TestLogErrorFields:
             _Diagnosis.model_validate(document)
         assert _PAYLOAD in str(caught.value), topic
 
-        message = error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD]
+        message = error_fields(exc=caught.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD]
 
         assert message == expected, topic
         assert _PAYLOAD not in message, topic
@@ -200,7 +219,7 @@ class TestLogErrorFields:
             DateContent.model_validate({"date": _PAYLOAD})
         assert _PAYLOAD not in caught.value.errors()[0]["msg"]
 
-        assert error_fields(exc=caught.value) == {
+        assert error_fields(exc=caught.value, validated_type=DateContent) == {
             ERROR_TYPE_FIELD: "ValidationError",
             ERROR_MESSAGE_FIELD: "date: Value error, The value is not an extended ISO 8601 calendar date (e.g. '2026-07-07').",
         }
@@ -210,7 +229,7 @@ class TestLogErrorFields:
         with pytest.raises(ValidationError) as caught:
             _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "ward": _PAYLOAD})
 
-        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == (
+        assert error_fields(exc=caught.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD] == (
             "diagnosis: value_error; ward: Value error, A ward is named by its letter and its floor"
         )
 
@@ -219,7 +238,7 @@ class TestLogErrorFields:
         with pytest.raises(ValidationError) as mixed:
             _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "reviewed": "not a boolean"})
 
-        assert error_fields(exc=mixed.value)[ERROR_MESSAGE_FIELD] == (
+        assert error_fields(exc=mixed.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD] == (
             "diagnosis: value_error; reviewed: Input should be a valid boolean, unable to interpret input"
         )
 
@@ -228,8 +247,15 @@ class TestLogErrorFields:
         [
             ("an unknown tag of a discriminated union", _Shipment, {"item": {"kind": _PAYLOAD}}, _PAYLOAD, "item: union_tag_invalid"),
             ("a value that is no UUID", _Record, {"record_id": _PAYLOAD}, "found `o`", "record_id: uuid_parsing"),
-            ("a key a nested model forbids", _StrictSettings, {"limits": {_PAYLOAD: 1}}, None, "limits: Extra inputs are not permitted"),
-            ("a key the root model forbids", _StrictSettings, {_PAYLOAD: 1}, None, "Extra inputs are not permitted"),
+            ("a key a nested model forbids", _StrictSettings, {"limits": {_PAYLOAD: 1}}, None, "limits.<key>: Extra inputs are not permitted"),
+            ("a key the root model forbids", _StrictSettings, {_PAYLOAD: 1}, None, "<key>: Extra inputs are not permitted"),
+            (
+                "a key of a dict",
+                _Settings,
+                {"retries": 1, "limits": {_PAYLOAD: "many"}},
+                None,
+                "limits.<key>: Input should be a valid integer, unable to parse string as an integer",
+            ),
         ],
     )
     def test_a_message_or_a_location_drawn_from_the_input_never_reaches_the_line(
@@ -250,7 +276,7 @@ class TestLogErrorFields:
         else:
             assert _PAYLOAD in [str(part) for part in error["loc"]], topic
 
-        fields = error_fields(exc=caught.value)
+        fields = error_fields(exc=caught.value, validated_type=model)
         fresh, buffer = json_buffer
         fresh.warning("A document was refused", fields=fields)
 
@@ -264,7 +290,7 @@ class TestLogErrorFields:
         with pytest.raises(ValidationError) as caught:
             _Bounded.model_validate({"code": _PAYLOAD})
 
-        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "code: String should have at most 8 characters"
+        assert error_fields(exc=caught.value, validated_type=_Bounded)[ERROR_MESSAGE_FIELD] == "code: String should have at most 8 characters"
 
     def test_a_text_given_for_a_validation_error_is_carried_as_given(self) -> None:
         with pytest.raises(ValidationError) as caught:

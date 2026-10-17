@@ -241,7 +241,7 @@ class DeliveryExecutor:
             # error rides as its fields, never its text or traceback, which quote the values the record held.
             log.error(
                 "The absence record of the main output is malformed",
-                fields=error_fields(exc=validation_error),
+                fields=error_fields(exc=validation_error, validated_type=AbsenceRecord),
             )
             return None
 
@@ -314,6 +314,8 @@ class DeliveryExecutor:
         raw-dict render. A warning is emitted on the fallback path so silent regressions
         on built-in hydration surface in logs.
         """
+        # The class the content validates into, whose schema names a refusal's locations in the warning.
+        structure_class: type[StuffContent] | None = None
         try:
             concept_ref = stuff_raw["concept"]
             if not isinstance(concept_ref, str):
@@ -335,6 +337,7 @@ class DeliveryExecutor:
                         fields={"concept_ref": concept_ref, "structure_class_name": concept.structure_class_name},
                     )
                     return None
+                structure_class = item_class
             content = hydrate_content(concept=concept, raw_content=stuff_raw["content"])
             return Stuff(
                 stuff_code=stuff_raw["stuff_code"],
@@ -345,7 +348,7 @@ class DeliveryExecutor:
         except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
             log.warning(
                 "A delivered result could not be hydrated and was rendered raw",
-                fields=error_fields(exc=exc),
+                fields=error_fields(exc=exc, validated_type=structure_class),
             )
             return None
 
