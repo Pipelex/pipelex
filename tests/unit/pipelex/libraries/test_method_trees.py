@@ -242,7 +242,7 @@ class TestMethodTrees:
         assert sources == {"top_funcs.py": "X = 1\n", "checkouts/reports/models/report.py": "X = 2\n"}
 
     def test_a_directory_named_like_an_inputs_file_is_entered_and_kept(self, tmp_path: Path) -> None:
-        """The run-inputs default excludes a file, never a directory, so the scan enters `inputs.json/` and its bundle loads."""
+        """A directory named like a run's inputs file is an ordinary directory: the scan enters `inputs.json/` and its bundle loads."""
         _touch(directory=tmp_path, tree_path="top.mthds")
         _touch(directory=tmp_path, tree_path="vendor/tool/inputs.json/flow.mthds")
         _touch(directory=tmp_path, tree_path="vendor/tool/inputs.toml/notes.md", content="kept")

@@ -8,7 +8,7 @@ import typer
 from pipelex.base_exceptions import PipelexConfigError, PipelexUnexpectedError
 from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
-from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file
+from pipelex.cli.commands.run._inputs_file_loader import DetectedInputsFile, read_default_inputs_file
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import bundle_main_pipe_code, execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
@@ -145,6 +145,8 @@ def run_bundle_cmd(
 
     pipe_code: str | None = pipe
     bundle_path: str | None = None
+    # `--inputs` as given, or the inputs file auto-detection read from the method's folder.
+    run_inputs: str | DetectedInputsFile | None = inputs
     target_path = Path(path)
 
     # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
@@ -168,16 +170,17 @@ def run_bundle_cmd(
             hosted_pipe_code = folder_run.entry.pipe_ref
             typer.echo(f"Starting at the method's main pipe {folder_run.entry.pipe_ref}, in {folder_run.entry.tree_path}")
 
-        # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided
+        # Auto-detect inputs (inputs.json or inputs.toml) if --inputs not explicitly provided. The run parses the
+        # bytes the probe read without following a link, and never opens the path again.
         if not inputs:
             try:
-                inputs_file = find_default_inputs_file(directory=target_path)
+                detected_inputs = read_default_inputs_file(directory=target_path)
             except (AmbiguousInputsFilesError, AutoDetectedInputsFileError) as inputs_file_exc:
                 typer.secho(f"Failed to run: {inputs_file_exc.message}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from inputs_file_exc
-            if inputs_file is not None:
-                inputs = str(inputs_file)
-                typer.echo(f"Auto-detected inputs: {inputs}")
+            if detected_inputs is not None:
+                run_inputs = detected_inputs
+                typer.echo(f"Auto-detected inputs: {detected_inputs.path}")
 
         # Add directory as library dir
         target_dir_str = str(target_path)
@@ -234,7 +237,7 @@ def run_bundle_cmd(
         execute_hosted_run(
             mthds_files=bundle_files,
             pipe_code=hosted_pipe_code,
-            inputs=inputs,
+            inputs=run_inputs,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             base_url=base_url,
             output_label=run_output_label(pipe_ref=hosted_pipe_code),
@@ -250,7 +253,7 @@ def run_bundle_cmd(
     execute_run(
         pipe_code=pipe_code,
         bundle_path=bundle_path,
-        inputs=inputs,
+        inputs=run_inputs,
         save_working_memory=save_working_memory,
         working_memory_path=working_memory_path,
         save_main_stuff=save_main_stuff,

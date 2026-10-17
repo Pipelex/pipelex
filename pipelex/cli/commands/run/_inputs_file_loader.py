@@ -12,18 +12,37 @@ regular file.
 from __future__ import annotations
 
 import datetime
+import errno
+import os
 import stat
 from pathlib import Path
-from typing import Any
+from typing import Any, NamedTuple
 
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.time_content import TimeContent
 from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
-from pipelex.tools.misc.json_utils import load_json_dict_from_path
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.json_utils import load_json_dict_from_bytes
+from pipelex.tools.misc.toml_utils import load_toml_from_bytes
 
 TOML_SUFFIX = ".toml"
+
+# Opening the auto-detected inputs file: read-only, never following a link in its last component, and never blocking
+# on a named pipe, so the descriptor `fstat` judges is the one the bytes are read from. `O_NOFOLLOW` and `O_NONBLOCK`
+# do not exist on Windows, where the `lstat` check before the open is the only guard; `O_BINARY` exists only there.
+_NO_FOLLOW_READ_FLAGS = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+_READ_CHUNK_BYTES = 1 << 16
+
+
+class DetectedInputsFile(NamedTuple):
+    """The inputs file auto-detection found in a bundle directory, with the bytes read from it.
+
+    The bytes were read from a descriptor opened without following a link, so whoever loads the file parses these
+    bytes and never opens its path again.
+    """
+
+    path: Path
+    data: bytes
 
 
 def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
@@ -46,11 +65,26 @@ def load_inputs_dict_from_path(path: Path) -> dict[str, Any]:
         json.JSONDecodeError: If a JSON file has invalid JSON syntax.
         JsonTypeError: If a JSON file does not hold a dictionary.
     """
+    return load_inputs_dict_from_bytes(data=path.read_bytes(), path=path)
+
+
+def load_inputs_dict_from_bytes(*, data: bytes, path: Path) -> dict[str, Any]:
+    """Load a pipeline-inputs dict from the bytes of a JSON or TOML file, as ``load_inputs_dict_from_path`` loads the file.
+
+    Args:
+        data: The bytes read from the inputs file.
+        path: The file they were read from: its suffix selects the parser, and a parsing error names it.
+
+    Raises:
+        TomlError: If a ``.toml`` file has invalid TOML syntax.
+        json.JSONDecodeError: If a JSON file has invalid JSON syntax.
+        JsonTypeError: If a JSON file does not hold a dictionary.
+    """
     inputs_dict: dict[str, Any]
     if path.suffix.lower() == TOML_SUFFIX:
-        inputs_dict = load_toml_from_path(path)
+        inputs_dict = load_toml_from_bytes(data=data, source=path)
     else:
-        inputs_dict = load_json_dict_from_path(path)
+        inputs_dict = load_json_dict_from_bytes(data=data, source=path)
     return _convert_temporal_inputs(inputs_dict)
 
 
@@ -82,20 +116,22 @@ def resolve_inputs_arg_against_dir(inputs_arg: str | None, *, base_dir: Path) ->
     return str(base_dir / inputs_path)
 
 
-def find_default_inputs_file(*, directory: Path) -> Path | None:
-    """Probe a bundle directory for the default inputs file (JSON or TOML).
+def read_default_inputs_file(*, directory: Path) -> DetectedInputsFile | None:
+    """Probe a bundle directory for the default inputs file (JSON or TOML), and read it.
 
-    Each candidate is judged by ``lstat``, never following a link, and only a regular file is used: the
-    membership rule keeps a run's inputs file out of the method's tree whether it is a file or a symbolic
-    link, so a link named ``inputs.json`` in a checked-out method could otherwise carry JSON from outside
-    the method's folder into the run. An inputs file the caller names with ``--inputs`` never comes
-    through here, and is read as given, a link followed.
+    Each name is looked up by ``lstat``, never following a link, and only a regular file is read: a link named
+    ``inputs.json`` in a checked-out method, which the method's tree can keep out, for instance through a
+    ``.gitignore``, would otherwise carry JSON from outside the method's folder into the run. The file is read through
+    a descriptor opened without following a link and judged by ``fstat``, so an entry swapped for a link or for
+    anything else between the lookup and the read is refused too, and its bytes are returned so that nothing opens the
+    path again. An inputs file the caller names with ``--inputs`` never comes through here, and is read as given, a
+    link followed.
 
     Args:
         directory: The bundle/pipeline directory to probe.
 
     Returns:
-        The path to ``inputs.json`` or ``inputs.toml`` when exactly one exists,
+        The path to ``inputs.json`` or ``inputs.toml`` and the bytes read from it, when exactly one exists,
         None when neither does.
 
     Raises:
@@ -114,13 +150,16 @@ def find_default_inputs_file(*, directory: Path) -> Path | None:
             "so inputs auto-detection is ambiguous. Pass --inputs explicitly to choose one."
         )
         raise AmbiguousInputsFilesError(msg)
+    found: Path
     if json_mode is not None:
         _refuse_unless_regular_file(path=json_file, mode=json_mode)
-        return json_file
-    if toml_mode is not None:
+        found = json_file
+    elif toml_mode is not None:
         _refuse_unless_regular_file(path=toml_file, mode=toml_mode)
-        return toml_file
-    return None
+        found = toml_file
+    else:
+        return None
+    return DetectedInputsFile(path=found, data=_read_regular_file_without_following_link(path=found))
 
 
 def _entry_mode(*, path: Path) -> int | None:
@@ -131,6 +170,30 @@ def _entry_mode(*, path: Path) -> int | None:
         return None
 
 
+def _read_regular_file_without_following_link(*, path: Path) -> bytes:
+    """The bytes of the regular file at ``path``, read from a descriptor opened without following a link.
+
+    Raises:
+        AutoDetectedInputsFileError: When ``path`` is a symbolic link, which fails the open, or the opened entry is
+            not a regular file.
+    """
+    try:
+        descriptor = os.open(path, _NO_FOLLOW_READ_FLAGS)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            # The entry was swapped for a link since it was looked up: `O_NOFOLLOW` refuses to open a link.
+            raise _not_a_regular_file_error(path=path, mode=stat.S_IFLNK) from exc
+        raise
+    try:
+        _refuse_unless_regular_file(path=path, mode=os.fstat(descriptor).st_mode)
+        chunks: list[bytes] = []
+        while chunk := os.read(descriptor, _READ_CHUNK_BYTES):
+            chunks.append(chunk)
+        return b"".join(chunks)
+    finally:
+        os.close(descriptor)
+
+
 def _refuse_unless_regular_file(*, path: Path, mode: int) -> None:
     """Refuse an auto-detected inputs file that is not a regular file, naming what it is.
 
@@ -139,6 +202,11 @@ def _refuse_unless_regular_file(*, path: Path, mode: int) -> None:
     """
     if stat.S_ISREG(mode):
         return
+    raise _not_a_regular_file_error(path=path, mode=mode)
+
+
+def _not_a_regular_file_error(*, path: Path, mode: int) -> AutoDetectedInputsFileError:
+    """The refusal of an auto-detected inputs file of mode ``mode``, which is not a regular file's, naming what it is."""
     what: str
     if stat.S_ISLNK(mode):
         what = "a symbolic link"
@@ -151,7 +219,7 @@ def _refuse_unless_regular_file(*, path: Path, mode: int) -> None:
         "An inputs file found automatically must be a regular file, so that a link never carries data from outside "
         "the method's folder into the run. Replace it with the file itself, or name the inputs with --inputs <path>."
     )
-    raise AutoDetectedInputsFileError(msg)
+    return AutoDetectedInputsFileError(msg)
 
 
 def _convert_temporal_inputs(inputs_dict: dict[str, Any]) -> dict[str, Any]:

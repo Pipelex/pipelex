@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -18,6 +19,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 RUN_BUNDLE_MODULE = "pipelex.cli.agent_cli.commands.run.bundle_cmd"
+_NO_SYMLINKS_ON_WINDOWS = pytest.mark.skipif(
+    sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default"
+)
 
 
 class TestAgentRunBundleAutoInputs:
@@ -103,6 +107,7 @@ class TestAgentRunBundleAutoInputs:
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "toml"}
 
+    @_NO_SYMLINKS_ON_WINDOWS
     @pytest.mark.usefixtures("tty_stdin")
     def test_an_auto_detected_link_is_refused(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """A link named inputs.json is never followed: the command emits the refusal envelope pointing to --inputs and runs nothing."""
@@ -127,6 +132,7 @@ class TestAgentRunBundleAutoInputs:
         assert "outside-sentinel" not in json.dumps(envelope)
         run_core_mock.assert_not_called()
 
+    @_NO_SYMLINKS_ON_WINDOWS
     @pytest.mark.usefixtures("tty_stdin")
     def test_an_explicit_inputs_link_is_followed(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """An inputs file the caller names with --inputs is read as given, through a link."""

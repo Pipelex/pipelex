@@ -5,7 +5,7 @@ Every bundle this host reads from its own disk is read as a member of a method t
 else at the directory itself; the tree of a `.mthds` file named alone, rooted at the nearest `METHODS.toml` at or
 above its folder, else the one-file tree of that file; and a dependency package's tree, rooted at the package's own
 directory. The membership rule decides what a tree holds, so a file it keeps out, a dotfile, a `.gitignore`d file, a
-virtual environment, a run's inputs file, is never loaded and never read by a step.
+virtual environment, is never loaded and never read by a step.
 
 A library directory, such as a `-L` directory or one of `PIPELEXPATH`, is not a method but a place methods are
 found: its own tree is loaded, then each nested package and nested repository the listing kept out of it, each as a
@@ -63,11 +63,6 @@ LIMITS_ADVICE = (
     "Hand over the method's own folder rather than a directory above it, or raise the limits of "
     "interpreter.method_tree_limits in your project's .pipelex/pipelex.toml."
 )
-
-# A run's inputs file, which the membership rule's run-inputs default keeps out of every tree at any depth: an entry of
-# either name that is not a directory, matched byte for byte, so `Inputs.json` is an ordinary member and a directory of
-# either name excludes nothing (`mthds/docs/spec/method-tree.md`, "Run Inputs Files").
-RUN_INPUTS_NAMES = frozenset({"inputs.json", "inputs.toml"})
 
 
 def local_tree_limits() -> TreeLimits:
@@ -286,10 +281,8 @@ def _holds_a_bundle_name(*, directory: Path) -> bool:
     """Whether any file under `directory` is named like a bundle, judged by names alone, before any tree is listed.
 
     A cheap scan: it skips what the membership rule keeps out by name (a dot segment, `__pycache__` and
-    `node_modules`, a virtual environment, a run's inputs file named `inputs.json` or `inputs.toml` at any depth) and
-    reads no `.gitignore`, so it may find a bundle a listing then keeps out, never miss one a listing keeps. A directory
-    named like an inputs file is entered, since the rule excludes nothing for a directory of either name. A directory it
-    cannot read holds nothing it can find.
+    `node_modules`, a virtual environment) and reads no `.gitignore`, so it may find a bundle a listing then keeps out,
+    never miss one a listing keeps. A directory it cannot read holds nothing it can find.
     """
     pending = [directory]
     while pending:
@@ -306,8 +299,6 @@ def _holds_a_bundle_name(*, directory: Path) -> bool:
             if entry.kind.is_directory:
                 if entry.raw_name not in DEFAULT_DIRECTORY_NAMES:
                     pending.append(current / entry.raw_name)
-            elif entry.raw_name in RUN_INPUTS_NAMES:
-                continue
             elif entry.raw_name.endswith(BUNDLE_SUFFIX):
                 return True
     return False

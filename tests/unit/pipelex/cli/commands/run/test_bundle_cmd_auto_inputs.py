@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
 import typer
 
+from pipelex.cli.commands.run._inputs_file_loader import DetectedInputsFile
 from pipelex.cli.commands.run.bundle_cmd import run_bundle_cmd
 
 if TYPE_CHECKING:
@@ -15,6 +17,9 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 BUNDLE_CMD_MODULE = "pipelex.cli.commands.run.bundle_cmd"
+_NO_SYMLINKS_ON_WINDOWS = pytest.mark.skipif(
+    sys.platform == "win32", reason="creating a symbolic link takes a privilege Windows does not grant by default"
+)
 
 _BUNDLE = """
 domain = "auto_inputs_tests"
@@ -37,22 +42,22 @@ class TestBundleCmdAutoInputs:
         return tmp_path
 
     def test_auto_detects_inputs_toml(self, mocker: MockerFixture, bundle_dir: Path) -> None:
-        """With only inputs.toml in the directory, it is auto-detected and forwarded."""
+        """With only inputs.toml in the directory, it is auto-detected and forwarded with the bytes read from it."""
         mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
         (bundle_dir / "inputs.toml").write_text('topic = "cats"\n', encoding="utf-8")
 
         run_bundle_cmd(path=str(bundle_dir))
 
-        assert mock_execute.call_args.kwargs["inputs"] == str(bundle_dir / "inputs.toml")
+        assert mock_execute.call_args.kwargs["inputs"] == DetectedInputsFile(path=bundle_dir / "inputs.toml", data=b'topic = "cats"\n')
 
     def test_auto_detects_inputs_json(self, mocker: MockerFixture, bundle_dir: Path) -> None:
-        """With only inputs.json in the directory, today's auto-detection is unchanged."""
+        """With only inputs.json in the directory, it is auto-detected and forwarded with the bytes read from it."""
         mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
         (bundle_dir / "inputs.json").write_text('{"topic": "cats"}', encoding="utf-8")
 
         run_bundle_cmd(path=str(bundle_dir))
 
-        assert mock_execute.call_args.kwargs["inputs"] == str(bundle_dir / "inputs.json")
+        assert mock_execute.call_args.kwargs["inputs"] == DetectedInputsFile(path=bundle_dir / "inputs.json", data=b'{"topic": "cats"}')
 
     def test_both_inputs_files_error(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """With both inputs.json and inputs.toml present, the command exits telling the user to pass --inputs."""
@@ -78,6 +83,7 @@ class TestBundleCmdAutoInputs:
 
         assert mock_execute.call_args.kwargs["inputs"] == str(explicit)
 
+    @_NO_SYMLINKS_ON_WINDOWS
     def test_an_auto_detected_link_is_refused(self, mocker: MockerFixture, bundle_dir: Path, capsys: pytest.CaptureFixture[str]) -> None:
         """A link named inputs.json is never followed, so a checked-out method cannot send data from outside its folder."""
         mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
@@ -97,6 +103,7 @@ class TestBundleCmdAutoInputs:
         assert "--inputs" in stderr
         mock_execute.assert_not_called()
 
+    @_NO_SYMLINKS_ON_WINDOWS
     def test_an_explicit_inputs_link_is_followed(self, mocker: MockerFixture, bundle_dir: Path) -> None:
         """An inputs file the caller names is read as given, a link included."""
         mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
