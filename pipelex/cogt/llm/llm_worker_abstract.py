@@ -10,7 +10,15 @@ from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, S
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import (
+    CogtError,
+    InferenceErrorCategory,
+    LLMCapabilityError,
+    LLMCompletionError,
+    LLMCompletionRefusedError,
+    LLMCompletionTruncatedError,
+)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, describe_instructor_failure
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -510,6 +518,36 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             max_tokens=max_tokens,
             output_tokens=output_tokens,
         )
+
+    def _make_structured_generation_failure(self, *, api_name: str, schema: type[BaseModel], instructor_exc: BaseException) -> LLMCompletionError:
+        """The error of a structured generation `instructor` gave up on, when no exception could be recovered from it.
+
+        Every worker generating objects through `instructor` raises it in that case, `from` the wrapper. Its message names
+        the class of the wrapper's cause (`describe_instructor_failure`), never `instructor`'s own text, which is the
+        last validation error's and quotes the model's answer, the run's data. The common case, the re-asks ending on a
+        refused answer, recovers that `ValidationError` and is classified from it, located by the same schema.
+
+        Args:
+            api_name: The provider's API, as the message names it, such as `Anthropic`.
+            schema: The class the generation was asked for.
+            instructor_exc: The `InstructorRetryException` that ended the generation.
+
+        Returns:
+            The error, `runtime.unexpected`, for the worker to raise.
+        """
+        reason = describe_instructor_failure(instructor_exc=instructor_exc)
+        msg = (
+            f"{api_name} structured generation via 'instructor' failed with model '{self.inference_model.desc}' "
+            f"trying to generate schema '{schema.__name__}': {reason}"
+        )
+        return LLMCompletionError(
+            msg,
+            error_category=InferenceErrorCategory.UNKNOWN,
+            user_action=UserAction(
+                kind=UserActionKind.CONTACT_SUPPORT,
+                detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+            ),
+        ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks

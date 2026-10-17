@@ -21,13 +21,26 @@ from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of
 from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
-from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD, error_fields
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+
+
+def _secondary_failure_fields(*, exc: Exception) -> dict[str, str]:
+    """The fields of a failure that followed the pipe's own, by its class and, for a Pipelex error, its code.
+
+    Like the line about the pipe's failure, a line about what failed after it never carries the exception's text: a
+    delivery's names the caller's webhook URL or the place it stored to, and an ``OSError``'s the file it could not
+    close, each the run's data.
+    """
+    fields = {ERROR_TYPE_FIELD: type(exc).__name__}
+    if isinstance(exc, PipelexError):
+        fields[ERROR_CODE_FIELD] = str(exc.resolve_error_code())
+    return fields
 
 
 class PipeRun(PipeRunProtocol):
@@ -96,12 +109,20 @@ class PipeRun(PipeRunProtocol):
                 pipeline_run_id=pipeline_run_id,
                 request_id=pipe_job.job_metadata.run_metadata.request_id,
             )
-            # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
-            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
+            # The error rides as identifiers and no traceback: the exception is re-raised below, and its traceback
+            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice. The
+            # line carries the problem's code and the exception's class, never its text: the text can hold the
+            # caller's own words, a function's message or a template's source, and a refused host, which no log line
+            # carries, while the problem the caller receives holds them where the code declares them.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
             log.error(
                 "The execution of a pipe failed",
-                fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
+                fields={
+                    "pipe_code": pipe_job.pipe.code,
+                    "pipe_ref": pipe_job.pipe.pipe_ref,
+                    ERROR_CODE_FIELD: problem.code,
+                    ERROR_TYPE_FIELD: type(exc).__name__,
+                },
             )
         finally:
             tracer_manager = GraphTracerManager.get_instance()
@@ -112,10 +133,11 @@ class PipeRun(PipeRunProtocol):
                     if execution_error is None:
                         raise
                     # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
-                    # its traceback would print the execution error's text, which can quote the run's inputs.
+                    # its traceback would print the execution error's text, which can quote the run's inputs. Its own
+                    # text is not written either: an OSError's names the file of the run's trace.
                     log.error(
                         "The graph tracer could not be closed after the pipe execution failed",
-                        fields=error_fields(exc=close_error),
+                        fields=_secondary_failure_fields(exc=close_error),
                     )
 
             # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
@@ -180,9 +202,10 @@ class PipeRun(PipeRunProtocol):
                     if execution_error is None:
                         raise
                     # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
+                    # By its code and class, never its text, which names the caller's webhook URL or the store it wrote to.
                     log.error(
                         "The delivery also failed after the pipe execution failed",
-                        fields=error_fields(exc=delivery_error),
+                        fields=_secondary_failure_fields(exc=delivery_error),
                     )
 
         if execution_error is not None:

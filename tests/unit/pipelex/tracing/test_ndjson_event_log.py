@@ -1,5 +1,6 @@
 """Tests for NdjsonEventLog."""
 
+import json
 import logging
 import multiprocessing
 from pathlib import Path
@@ -252,6 +253,24 @@ class TestNdjsonEventLog:
             event_log.read_events("run_001")
 
         assert "traced-value" not in str(refusal.value)
+
+    def test_a_refusal_locates_the_field_and_never_quotes_the_value_it_held(self, tmp_path: Path) -> None:
+        """A refused field holding a traced value: the refusal names the field by the event models' schema, never the value."""
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(sequence=0))
+        event_log.close()
+
+        ndjson_file = _only_run_file(tmp_path / "run_001")
+        refused_line = json.loads(make_trace_event(sequence=1).model_dump_json())
+        refused_line["sequence"] = "traced-value-from-the-run"
+        with open(ndjson_file, "a", encoding="utf-8") as fhandle:
+            fhandle.write(json.dumps(refused_line) + "\n")
+
+        with pytest.raises(EventLogSchemaMismatchError) as refusal:
+            event_log.read_events("run_001")
+
+        assert f"{refused_line['event_kind']}.sequence: Input should be a valid integer" in str(refusal.value)
+        assert "traced-value-from-the-run" not in str(refusal.value)
 
     def test_a_line_naming_no_execution_is_refused_with_the_others(self, tmp_path: Path) -> None:
         """A line whose `workflow_id` is empty names no execution: it is counted with the lines the models refuse,

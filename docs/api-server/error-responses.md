@@ -101,7 +101,7 @@ A failure the runtime raised is one problem seen through a view, and the identit
 
 Every text in a problem that the runtime did not write itself, a message, a provider's answer or a parameter, is cut to a bounded length, keeping its head and ending with ` […]`.
 
-The catch-all, a failure no more specific handler matched, answers `runtime.unexpected` with a **500** in both views: the caller reads that code's sentences, and the operator reads the exception's class and message in `diagnostics`. A traceback never reaches a response in either view.
+The catch-all, a failure no more specific handler matched, answers `runtime.unexpected` with a **500** in both views: the caller reads that code's sentences, and the operator reads the exception's class in `diagnostics`, never its text, which can carry anything of a run's data, a pydantic refusal adding its reasons without the values it refused. A traceback never reaches a response in either view.
 
 The server's own record of a failure the runtime raised is built from the operator view, whichever view the response carries, so it names the error's class, its code and what the inference provider answered (see [Logging](logging.md)).
 

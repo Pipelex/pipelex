@@ -378,7 +378,8 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     `PipelexUnexpectedError` (`make_unexpected_failure`) and answered as its
     problem, `runtime.unexpected`, through the same rendering as every other
     failure: the caller reads the code's own sentences and never the exception's
-    text, and the operator reads its class and message in `diagnostics`. A
+    text, and the operator reads its class in `diagnostics`, never its text either,
+    which can carry anything of a run's data. A
     traceback reaches no response — it goes to the operator log, correlated by
     request id.
 

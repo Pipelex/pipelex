@@ -9,6 +9,7 @@ from pipelex.core.stuffs.iso_temporal import parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.misc.string_utils import is_numeric_string
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
@@ -36,10 +37,10 @@ class TimeContent(StuffContent):
         #    accurate "no seconds-since-midnight" wording in place of a generic malformed-ISO one.
         if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Time must be an ISO 8601 string or a time object, never a number (no seconds-since-midnight)."
-            raise ValueError(msg)
+            raise InputFreeValueError(msg)
         if isinstance(value, datetime.datetime):
             msg = "A Time takes a time of day alone, not a datetime; use Date for a date with a time."
-            raise ValueError(msg)  # ruff: ignore[type-check-without-type-error] — must be ValueError so pydantic wraps it into a ValidationError
+            raise InputFreeValueError(msg)
         # Parsing the ISO string here — rather than leaving it to the field's own validation — is what
         # keeps this model usable under the strict validation instructor applies to every LLM response:
         # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because

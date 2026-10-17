@@ -55,6 +55,7 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input, validation_error_locations
 from pipelex.tools.uri.uri_resolver import resolve_local_path_reference
 
 
@@ -127,12 +128,14 @@ class InputKind(StrEnum):
                 return False
 
 
-def _first_refused_field(*, validation_error: ValidationError) -> str | None:
-    """The dotted path, inside the value, of the first field a structure's validation refused; ``None`` when it names none."""
-    errors = validation_error.errors(include_url=False, include_input=False)
-    if not errors or not errors[0]["loc"]:
-        return None
-    return ".".join(str(segment) for segment in errors[0]["loc"])
+def _first_refused_field(*, validation_error: ValidationError, structure_class: type[StuffContent]) -> str | None:
+    """The dotted path, inside the value, of the first field a structure's validation refused; ``None`` when it names none.
+
+    The path names what the structure's schema names, a key of the value's own written as the placeholder, since such a
+    key is the caller's data (see ``validation_error_locations``).
+    """
+    locations = validation_error_locations(validation_error=validation_error, validated_type=structure_class)
+    return locations[0] if locations else None
 
 
 class InputShaper:
@@ -812,18 +815,18 @@ class InputShaper:
         declared class is not a malformed *value*, and reporting it as one pointed the author at
         their input instead of at the concept.
         """
+        structure_class = concept_provider.get_structure_class(concept=concept)
         try:
-            return StuffContentFactory.make_content_from_value(
-                stuff_content_subclass=concept_provider.get_structure_class(concept=concept),
-                value=value,
-            )
+            return StuffContentFactory.make_content_from_value(stuff_content_subclass=structure_class, value=value)
         except (ValidationError, StuffContentFactoryError) as exc:
+            # A ValidationError's own text quotes the value it refused, the run's input: the reason names its fields and
+            # reasons alone, and the fields only as far as the structure's schema names them.
             raise StructureValidationError.make(
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
-                reason=str(exc),
+                reason=describe_exception_without_input(exc=exc, validated_type=structure_class),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
-                field=_first_refused_field(validation_error=exc) if isinstance(exc, ValidationError) else None,
+                field=_first_refused_field(validation_error=exc, structure_class=structure_class) if isinstance(exc, ValidationError) else None,
             ) from exc
 
     @classmethod
@@ -1157,21 +1160,24 @@ class InputShaper:
 
     @classmethod
     def _describe_value(cls, value: Any) -> str:
-        """A short human description of a provided value, for error messages."""
+        """A short human description of a provided value, for error messages: its kind and its size, never the value.
+
+        The value is the run's input, which no message carries, since a message reaches the operator's diagnostics and
+        the log lines. An object's keys are the caller's text too, so it is described by how many it holds.
+        """
         # bool before int: bool is a subclass of int.
         if value is None:
             return "null"
         if isinstance(value, bool):
-            return f"a boolean ({str(value).lower()})"
+            return "a boolean"
         if isinstance(value, float) and not math.isfinite(value):
-            return f"a number JSON cannot hold ({value})"
+            return "a number JSON cannot hold, NaN or an infinity"
         if isinstance(value, str):
-            return f'a string ("{value[:40]}")'
+            return f"a string of {len(value)} character(s)"
         if isinstance(value, (int, float)):
-            return f"a number ({value})"
+            return "a number"
         if isinstance(value, list):
             return f"a list of {len(cast('list[Any]', value))} item(s)"
         if isinstance(value, dict):
-            keys = sorted(str(key) for key in cast("dict[Any, Any]", value))
-            return f"an object with keys [{', '.join(keys)}]"
+            return f"an object of {len(cast('dict[Any, Any]', value))} key(s)"
         return f"a value of type {type(value).__name__}"

@@ -8,6 +8,7 @@ This test fails fast in that case by walking the enum against a registry.
 from collections.abc import Callable
 
 import pytest
+from pydantic import BaseModel, ValidationError
 
 from pipelex.cogt.inference.error_classification import (
     ProviderErrorMetadata,
@@ -46,6 +47,16 @@ _PROVIDER_TO_EXTRACT_FN: dict[ProviderName, Callable[..., ProviderErrorMetadata]
 }
 
 
+class _Verdict(BaseModel):
+    """A structure a model's answer must fit, as instructor validates it."""
+
+    score: int
+
+
+# The model's answer, which a ValidationError's own text quotes and no metadata message may carry.
+_MODEL_ANSWER = "zebra-quartz-ledger-5521"
+
+
 class TestProviderClassificationParity:
     """Walk the registry against the enum to catch unwired providers."""
 
@@ -63,3 +74,21 @@ class TestProviderClassificationParity:
         assert metadata.provider is provider
         assert metadata.sdk_exception_type == "RuntimeError"
         assert metadata.message == "synthetic SDK error for parity check"
+
+    @pytest.mark.parametrize("provider", list(ProviderName))
+    def test_extract_fn_writes_a_refused_answer_without_the_answer(self, provider: ProviderName) -> None:
+        """The validation error that ends instructor's re-asks quotes the model's answer, which the message never carries.
+
+        The provider's metadata does not know the schema the answer was refused by, and a location read without it could
+        quote a key of the answer's own, so the refusal is written by its reasons alone: the step's own message, which
+        knows its output's class, gives the locations.
+        """
+        extract_fn = _PROVIDER_TO_EXTRACT_FN[provider]
+        with pytest.raises(ValidationError) as refusal:
+            _Verdict.model_validate({"score": _MODEL_ANSWER})
+        assert _MODEL_ANSWER in str(refusal.value)
+
+        validation_error = refusal.value
+        metadata = extract_fn(validation_error, provider=provider) if provider.is_local_file_extractor else extract_fn(validation_error)
+
+        assert metadata.message == "Input should be a valid integer, unable to parse string as an integer"

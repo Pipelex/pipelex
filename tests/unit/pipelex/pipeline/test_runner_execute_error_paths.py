@@ -19,7 +19,7 @@ from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionErr
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture, MockType
@@ -145,7 +145,7 @@ class TestRunnerExecuteErrorPaths:
 
     async def test_validation_error_wraps_into_pipe_execution_error(self, mocker: MockerFixture) -> None:
         """A pydantic ValidationError raised by the pipe run becomes a PipeExecutionError
-        whose message names the failing model and embeds the formatted error.
+        whose message names the failing model and the refusal's locations and reasons, never the value it refused.
         """
         env = self._patch_env(mocker)
         with pytest.raises(ValidationError) as validation_exc_info:
@@ -162,5 +162,6 @@ class TestRunnerExecuteErrorPaths:
         wrapped = exc_info.value
         assert wrapped.__cause__ is validation_error
         assert "Input validation failed for '_MiniPayload'" in wrapped.message
-        assert format_pydantic_validation_error(validation_error) in wrapped.message
+        assert format_validation_error_without_input(validation_error=validation_error) in wrapped.message
+        assert "not-a-number" not in wrapped.message
         env.telemetry_manager.track_event.assert_not_called()
