@@ -179,13 +179,15 @@ class TestPipeRouterRun:
         unexpected = exc_info.value.__cause__
         assert isinstance(unexpected, PipelexUnexpectedError)
         assert unexpected.__cause__ is foreign_error
-        assert unexpected.message == "ValueError: unexpected value"
-        assert exc_info.value.message == "Pipe 'stub_pipe' failed: ValueError: unexpected value"
+        # Named by its class, never its text, which can carry anything of the run's data.
+        assert unexpected.message == "ValueError"
+        assert exc_info.value.message == "Pipe 'stub_pipe' failed: ValueError"
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert operator.code == CoreCode.RUNTIME_UNEXPECTED
         assert operator.diagnostics is not None
         assert operator.diagnostics.error_class == "PipelexUnexpectedError"
-        assert operator.diagnostics.message == "ValueError: unexpected value"
+        assert operator.diagnostics.message == "ValueError"
+        assert "unexpected value" not in str(operator.to_wire())
         assert "unexpected value" not in str(exc_info.value.to_problem(view=ProblemView.CALLER).to_wire())
 
     async def test_pydantic_validation_error_is_rendered_without_the_value_it_refused(self) -> None:

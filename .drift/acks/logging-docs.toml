@@ -1,9 +1,10 @@
 contract = "logging-docs"
-digest = "sha256:7c8cb0e3307ced0fc0f8cbd83108be97faaef2a25cb6f0ed78ab8986378068ed"
+digest = "sha256:f07cb29a7da0c4d4f3b462d3cc7879db0de8a1991455e000de153d036e487b4f"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T05:17:02Z"
-rationale = "real-catch: error_fields gains validated_type and a ValidationError's locations now name only what the validated model's schema names, a dict's key or an undeclared key written <key>, reasons alone when the model is unknown. logging.md's ValidationError bullet said a forbidden key was located at its parent and gave limits.burst, a dict key, as its example; it now states the schema rule, the <key> placeholder and the validated_type argument. log-sink-plugins.md states nothing error_fields decides, so it needed no change."
+reviewed_at = "2026-10-17T06:50:19Z"
+rationale = "real-catch: the contract now triggers on pydantic_utils.py, where error_fields writes a ValidationError: its locations, reasons and the new is_authored_input option live there. logging.md now names the TypeAdapter form of validated_type and is_authored_input, the secondary-failure lines logged by class and code, and the instructor records no sink writes; log-sink-plugins.md said a redaction failure was the one case a sink misses an accepted record, and now names the instructor filter as the other."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
-"pipelex/tools/log/error_fields.py" = "blob:aaaf4eca66b7001ff7b7fce2ca8b3bfebe3ed78b"
+"pipelex/tools/log/error_fields.py" = "blob:e58e2a88ebc48c08fdfe1c7d173c9a719346cac0"
+"pipelex/tools/typing/pydantic_utils.py" = "blob:6c469e95f53135d426c00e7b4cfc8711004f518b"

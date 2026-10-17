@@ -16,7 +16,13 @@ from pipelex.tools.misc.base64_utils import (
 class PromptDocumentFactory:
     @classmethod
     def make_prompt_document(
-        cls, *, uri: str | None = None, base64_data: str | None = None, raw_bytes: bytes | None = None, mime_type: str | None = None
+        cls,
+        *,
+        uri: str | None = None,
+        base64_data: str | None = None,
+        raw_bytes: bytes | None = None,
+        mime_type: str | None = None,
+        input_name: str | None = None,
     ) -> PromptDocument:
         """Create a PromptDocument from the provided input.
 
@@ -27,6 +33,8 @@ class PromptDocumentFactory:
             mime_type: The document's MIME type, as run setup established it or the caller declared it.
                 For inline bytes it refines what the bytes alone identify; a data URL's own type is
                 the fallback.
+            input_name: The input the document came from, as a caller writes it, which a failed fetch of its URL
+                names (only used with a uri other than a data URL, which nothing fetches)
 
         Returns:
             A PromptDocument instance (PromptDocumentUri, PromptDocumentBase64, or PromptDocumentBinary)
@@ -45,6 +53,6 @@ class PromptDocumentFactory:
             if extracted is not None:
                 extracted_base64_data, data_url_mime_type = extracted
                 return PromptDocumentBase64(base64_data=extracted_base64_data, mime_type=mime_type or data_url_mime_type)
-            return PromptDocumentUri(uri=uri, mime_type=mime_type)
+            return PromptDocumentUri(uri=uri, mime_type=mime_type, input_name=input_name)
         msg = "PromptDocumentFactory requires one of: uri, base64_data, or raw_bytes"
         raise PromptDocumentFactoryError(msg)

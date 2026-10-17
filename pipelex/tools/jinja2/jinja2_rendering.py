@@ -1,10 +1,12 @@
 import re
 from collections.abc import Awaitable, Callable
-from typing import Any, Protocol, TypeVar
+from typing import Any, NamedTuple, Protocol, TypeVar
 
+from jinja2 import nodes
 from jinja2.exceptions import (
     FilterArgumentError,
     SecurityError,
+    TemplateAssertionError,
     TemplateError,
     TemplateNotFound,
     TemplateRuntimeError,
@@ -22,6 +24,7 @@ from pipelex.tools.jinja2.exceptions import (
     Jinja2TemplateInvalidError,
     Jinja2TemplateRenderError,
     Jinja2TemplateSecurityError,
+    SandboxRefusalError,
 )
 from pipelex.tools.jinja2.jinja2_environment import (
     make_jinja2_env_from_registry,
@@ -29,7 +32,6 @@ from pipelex.tools.jinja2.jinja2_environment import (
 )
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_render_budget import RenderBudgetExceededError
-from pipelex.tools.jinja2.jinja2_sandbox import REFUSED_READ_PATTERN, SANDBOX_REFUSAL_PREFIX
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -97,7 +99,7 @@ def _compile_jinja2_template(
     except TemplateSyntaxError as exc:
         # A filter or test the environment does not define, outside any branch, is a `TemplateAssertionError`
         # that compiling finds; a method's template is only parsed at load, so this is where it surfaces.
-        raise _make_invalid_template_error(template_error=exc, template_owner=template_owner) from exc
+        raise _make_invalid_template_error(template_error=exc, template_source=template_source, template_owner=template_owner) from exc
 
 
 def _prepare_templating_context(
@@ -147,18 +149,70 @@ def template_line_of(*, render_error: BaseException) -> int | None:
     return template_line
 
 
+class SpelledNames(NamedTuple):
+    """The names a template's own source spells, read off the template Jinja2 parses, never off its text.
+
+    ``references`` are the names it reads, stores or reaches as a variable or an attribute: a variable (``invoice``), an
+    attribute (``.total``), a key written as a literal (``['total']``, ``attr('total')``, ``{'total': ...}``), a
+    keyword's name (``namespace(total=...)``), a namespace's attribute it sets and a macro's name. ``filters_and_tests``
+    are the filters and tests it applies. A name the template reaches through a value, ``notes[patient_id]``, is none of
+    them: that name is a value of the run's data.
+    """
+
+    references: frozenset[str]
+    filters_and_tests: frozenset[str]
+
+
+def template_spelled_names(*, template_source: str) -> SpelledNames:
+    """The names ``template_source`` spells (see ``SpelledNames``), none when it does not parse.
+
+    ``template_source`` is the source Jinja2 compiles, after Pipelex's sigils are rewritten into Jinja2's syntax. Parsing
+    runs none of the template.
+    """
+    jinja2_env = make_jinja2_env_without_loader(template_category=TemplateCategory.BASIC, enable_async=False)
+    try:
+        parsed_template = jinja2_env.parse(template_source)
+    except TemplateSyntaxError:
+        return SpelledNames(references=frozenset(), filters_and_tests=frozenset())
+    references: set[str] = set()
+    filters_and_tests: set[str] = set()
+    spelling_nodes = (nodes.Name, nodes.Getattr, nodes.NSRef, nodes.Keyword, nodes.Getitem, nodes.Pair, nodes.Macro, nodes.Filter, nodes.Test)
+    for node in parsed_template.find_all(spelling_nodes):
+        match node:
+            case nodes.Name(name=str() as name) | nodes.Macro(name=str() as name):
+                references.add(name)
+            case nodes.Getattr(attr=str() as attribute) | nodes.NSRef(attr=str() as attribute):
+                references.add(attribute)
+            case nodes.Keyword(key=str() as key):
+                references.add(key)
+            case nodes.Getitem(arg=nodes.Const(value=str() as key)) | nodes.Pair(key=nodes.Const(value=str() as key)):
+                references.add(key)
+            case nodes.Filter(name=str() as filter_name):
+                filters_and_tests.add(filter_name)
+                # `attr('name')` reaches the attribute a literal names.
+                if filter_name == "attr" and node.args and isinstance(node.args[0], nodes.Const) and isinstance(node.args[0].value, str):
+                    references.add(node.args[0].value)
+            case nodes.Test(name=str() as test_name):
+                filters_and_tests.add(test_name)
+            case _:
+                pass
+    return SpelledNames(references=frozenset(references), filters_and_tests=frozenset(filters_and_tests))
+
+
 def undefined_variable_name(*, undefined_error: UndefinedError, template_source: str) -> str | None:
-    """The name an undefined's error says is missing, when the template itself writes it, else ``None``.
+    """The name an undefined's error says is missing, when the template itself spells it, else ``None``.
 
     Jinja2 names what a template reached for, which is the template's own name for ``{{ invoice.total }}``, but the
-    run's value for ``{{ notes[patient_id] }}``, a key of the data: a name is given only when it is an identifier the
-    template's own source spells, so a key drawn from the data, which no message carries, never is.
+    run's value for ``{{ notes[patient_id] }}``, a key of the data: a name is given only when the parsed template spells
+    it as a variable or an attribute (see ``template_spelled_names``), so a key drawn from the data, which no message
+    carries, never is, even when the same word appears elsewhere in the template's text. ``template_source`` is the
+    source Jinja2 compiled, after Pipelex's sigils are rewritten.
     """
     match = _UNDEFINED_NAME_PATTERN.search(undefined_error.message or "")
     if match is None:
         return None
     name = match.group(1)
-    return name if _is_spelled_in_template(name=name, template_source=template_source) else None
+    return name if name in template_spelled_names(template_source=template_source).references else None
 
 
 def _describe_render_error(*, description: str, render_error: BaseException) -> str:
@@ -173,23 +227,19 @@ def _describe_render_error(*, description: str, render_error: BaseException) -> 
     return f"{description} ({type(render_error).__name__}{where})"
 
 
-def _is_spelled_in_template(*, name: str, template_source: str) -> bool:
-    """Whether ``name`` is an identifier the template's own source spells, so that naming it quotes no run's data."""
-    return name.isidentifier() and re.search(rf"(?<![\w]){re.escape(name)}(?![\w])", template_source) is not None
-
-
 def _make_security_error_msg(*, security_error: SecurityError, template_source: str) -> str:
-    """The sandbox's refusal, its own wording kept where it quotes no run's data, a fixed description otherwise.
+    """The sandbox's refusal, worded with the names it quotes where the template spells them all, without them otherwise.
 
-    A refused read names the attribute the template reached for, which a template reading ``obj[key]`` takes from the
-    run's data: the attribute is named only when the template spells it. A refusal worded by Jinja2 itself, not by the
-    sandbox, is written as a fixed description.
+    A refusal names what the template reached for, which a template reading ``obj[key]``, ``obj | attr(key)`` or
+    storing ``namespace({key: value})`` takes from the run's data: the sandbox words each refusal twice
+    (``SandboxRefusalError``), and the wording with the names is kept only when the parsed template spells every one.
+    A refusal worded by Jinja2 itself, not by the sandbox, is written as a fixed description.
     """
-    refusal = security_error.message or ""
-    read_refusal = REFUSED_READ_PATTERN.match(refusal)
-    if read_refusal is not None and not _is_spelled_in_template(name=read_refusal["attribute"], template_source=template_source):
-        refusal = f"A template may not read an unsafe name on a '{read_refusal['type_name']}' value."
-    elif not refusal.startswith(SANDBOX_REFUSAL_PREFIX):
+    if isinstance(security_error, SandboxRefusalError):
+        spelled_references = template_spelled_names(template_source=template_source).references
+        is_spelled = all(name in spelled_references for name in security_error.named)
+        refusal = (security_error.message or "") if is_spelled else security_error.anonymous_message
+    else:
         description = "the template reached for an attribute, a method or a call the sandbox does not allow"
         refusal = _describe_render_error(description=description, render_error=security_error)
     return f"Jinja2 render — refused by the template sandbox: {refusal}"
@@ -206,7 +256,8 @@ def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError) -> str:
 
 
 def _make_own_error_msg(*, error_label: str, error: Jinja2StuffError | Jinja2ContextError) -> str:
-    # A refusal of Pipelex's own filters, whose message, like every raise site's of Pipelex, holds no run's data.
+    # A refusal of Pipelex's own filters, whose message, like every raise site's of Pipelex, holds no run's data: no
+    # argument the template handed the filter, which can be a value of the run's, and no value it refused.
     return f"Jinja2 render — {error_label}: '{error}'"
 
 
@@ -216,19 +267,50 @@ def _make_undefined_error_msg(*, undefined_error: UndefinedError, template_sourc
     return f"Jinja2 render — undefined error: {_describe_render_error(description=description, render_error=undefined_error)}"
 
 
-def _make_invalid_template_error(*, template_error: TemplateError, template_owner: TemplateOwner) -> Jinja2TemplateInvalidError:
+# How Jinja2 words a filter or a test its environment does not define: "No filter named 'frob'." when it compiles the
+# template, "No filter named 'frob' found." when it renders a branch that applies it.
+_UNKNOWN_FILTER_OR_TEST_PATTERN = re.compile(r"^No (?P<kind>filter|test) named '(?P<name>[^']+)'")
+
+
+def _describe_template_fault(*, template_error: TemplateError, template_source: str) -> str:
+    """What Jinja2 refused in a template, as a fixed description and the template's line, never Jinja2's own text.
+
+    A syntax error's text quotes the token Jinja2 stopped at (``expected token 'end of print statement', got 'x'``),
+    which is the template's text, and the template can be the run's data, as Pipelex's own templates render it: the
+    description names the kind of fault and where it is. A filter or a test the environment does not define is named,
+    as the author reads it best, when the parsed template applies it by that name.
+    """
+    unknown = _UNKNOWN_FILTER_OR_TEST_PATTERN.match(template_error.message or "")
+    if unknown is not None:
+        kind = unknown["kind"]
+        if unknown["name"] in template_spelled_names(template_source=template_source).filters_and_tests:
+            description = f"No {kind} named '{unknown['name']}'"
+        else:
+            description = f"the template applies a {kind} its environment does not define"
+    elif isinstance(template_error, TemplateAssertionError):
+        description = "the template uses a construct Jinja2 refuses where it stands"
+    elif isinstance(template_error, TemplateSyntaxError):
+        description = "syntax error"
+    else:
+        description = "the template uses a construct Jinja2 cannot render"
+    template_line = template_error.lineno if isinstance(template_error, TemplateSyntaxError) else template_line_of(render_error=template_error)
+    where = f" at line {template_line}" if template_line else ""
+    return f"{description}{where}."
+
+
+def _make_invalid_template_error(*, template_error: TemplateError, template_source: str, template_owner: TemplateOwner) -> Jinja2TemplateInvalidError:
     """The error of a template that cannot render as written, coded by its owner.
 
-    Its message gives Jinja2's own finding (`TemplateError.message`, which names the filter, test or template the
-    template reached for), never the template source nor the line Jinja2 would quote with it, so on a method's
-    template it can be the ``finding`` parameter its problem shows the caller.
+    Its message gives what Jinja2 refused as a fixed description and the template's line (see
+    ``_describe_template_fault``), never Jinja2's own text, the template source nor the line Jinja2 would quote with
+    it, so on a method's template it can be the ``finding`` parameter its problem shows the caller.
     """
     if isinstance(template_error, TemplateNotFound):
         # A template without a loader (every method template) has nothing to include or extend. The name is left out:
         # an include can name its template by a value of the run's data.
         fault = "template not found: the template includes, imports or extends a template it cannot reach."
     else:
-        fault = template_error.message or type(template_error).__name__
+        fault = _describe_template_fault(template_error=template_error, template_source=template_source)
     msg = f"Jinja2 render — the template cannot render as written: {fault}"
     invalid_error = _coded_by_owner(error=Jinja2TemplateInvalidError(msg, fault=fault, template_owner=template_owner), template_owner=template_owner)
     if template_owner.is_method:
@@ -308,7 +390,7 @@ def _make_render_failure(*, render_error: BaseException, template_source: str, t
         msg = f"Jinja2 render — filter argument error: {_describe_render_error(description=description, render_error=render_error)}"
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, (TemplateSyntaxError, TemplateNotFound, TemplateRuntimeError)):
-        return _make_invalid_template_error(template_error=render_error, template_owner=template_owner)
+        return _make_invalid_template_error(template_error=render_error, template_source=template_source, template_owner=template_owner)
     if isinstance(render_error, ArithmeticError):
         # The template's own arithmetic, the sandbox's range cap included: `range` raises OverflowError past it.
         description = "the template's arithmetic failed, or a range overran the sandbox's limit"

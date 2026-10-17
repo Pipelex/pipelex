@@ -181,6 +181,15 @@ class TestLogErrorFields:
 
         assert message == "Input should be a valid integer, unable to parse string as an integer", topic
 
+    def test_an_authored_document_s_refusal_keeps_its_locations(self) -> None:
+        """A line about a method author's own document, or a value Pipelex built, writes the locations pydantic gives."""
+        with pytest.raises(ValidationError) as caught:
+            _Settings.model_validate({"retries": 3, "limits": {"max_calls": "many"}})
+
+        message = error_fields(exc=caught.value, is_authored_input=True)[ERROR_MESSAGE_FIELD]
+
+        assert message == "limits.max_calls: Input should be a valid integer, unable to parse string as an integer"
+
     def test_a_validation_error_at_the_root_names_its_reason_alone(self) -> None:
         with pytest.raises(ValidationError) as caught:
             _Retries.model_validate("sk-live-4f9a8b7c6d5e4f3a2b1c")

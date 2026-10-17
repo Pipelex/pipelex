@@ -1,3 +1,6 @@
+from collections.abc import Generator
+from contextlib import contextmanager
+
 import httpx
 from httpx import USE_CLIENT_DEFAULT, Response, Timeout
 from mthds.protocol.problem.registry import CoreCode
@@ -130,3 +133,22 @@ async def fetch_file_from_url_httpx(
         transport=transport,
     )
     return raw_bytes
+
+
+@contextmanager
+def fetching_for_input(*, input_name: str | None) -> Generator[None]:
+    """Name ``input_name`` on a :class:`RemoteFileFetchError` the block raises, the input whose URL it fetched.
+
+    A fetch knows the URL alone, which no message names, being the run's data; the caller that knows which input the URL
+    belongs to wraps the fetch, so that a pipe reading several files says which one failed. An error that already names
+    an input keeps it, and ``None``, a URL no input gave, names nothing.
+
+    Raises:
+        RemoteFileFetchError: What the block raised, naming the input.
+    """
+    try:
+        yield
+    except RemoteFileFetchError as exc:
+        if input_name is not None and exc.input_name is None:
+            exc.with_input(input_name=input_name)
+        raise

@@ -33,7 +33,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvReadError,
 )
 from pipelex.tools.typing.annotation_utils import annotation_admits_none
-from pipelex.tools.typing.pydantic_utils import refusal_reason_without_input, validation_error_locations
+from pipelex.tools.typing.pydantic_utils import located_validation_errors, refusal_reason_without_input
 
 # v1 dialect defaults. Configurable via codec params, never auto-guessed (design §9).
 # The user-facing config surface (toml default / --delimiter / --encoding flags) is a
@@ -393,18 +393,20 @@ def list_content_from_csv(
         try:
             item = row_model.model_validate(row_data)
         except ValidationError as exc:
-            errors = exc.errors(include_url=False, include_input=False)
             # A row's key the model does not declare is the file's own text: the locations name what the row model's
-            # schema names, and a model-level failure, which has none, is named by its error type.
-            locations = validation_error_locations(validation_error=exc, validated_type=row_model)
-            error_fields = sorted({location or error["type"] for error, location in zip(errors, locations, strict=True)})
+            # schema names, and a model-level failure, which has none, is named by its error type. The errors are read
+            # once, with their locations.
+            located_errors = located_validation_errors(validation_error=exc, validated_type=row_model)
+            error_fields = sorted({located_error.location or located_error.error["type"] for located_error in located_errors})
             fields_label = ", ".join(error_fields) or "?"
             # Each error's reason without the cell, NOT str(exc): str(exc) appends `input_value=<raw cell>`, and a
             # validator's message can quote the cell too, which would put the cell content, a run's input, into the
             # operator's diagnostics and every log line carrying the message. Row/field identifiers suffice.
-            reasons = "; ".join(sorted({refusal_reason_without_input(error=error) for error in errors})) or "invalid value"
+            reasons = (
+                "; ".join(sorted({refusal_reason_without_input(error=located_error.error) for located_error in located_errors})) or "invalid value"
+            )
             msg = f"Could not coerce row {row_number} of {subject} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
-            raise CsvCoercionError(msg).with_params(field=locations[0] if locations else None) from exc
+            raise CsvCoercionError(msg).with_params(field=located_errors[0].location if located_errors else None) from exc
         items.append(item)
 
     return ListContent(items=items)

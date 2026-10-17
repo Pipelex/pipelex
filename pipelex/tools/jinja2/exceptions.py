@@ -1,3 +1,4 @@
+from jinja2.exceptions import SecurityError as JinjaSecurityError
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.errors.error_code_declaration import ErrorCodeSet
@@ -103,3 +104,20 @@ class Jinja2DetectVariablesError(ToolError):
     """A template whose variables cannot be read because it does not parse; its callers report the method's syntax."""
 
     error_code = CoreCode.METHOD_SYNTAX
+
+
+class SandboxRefusalError(JinjaSecurityError):
+    """A refusal of the template sandbox (`jinja2_sandbox.py`), worded with the names it quotes and without them.
+
+    It is Jinja2's ``SecurityError``, the carrier Jinja2 expects a refusal by, raised at the point of access. Its message
+    names what the template reached for: an attribute it read, the name it stored a callable under in a namespace, the
+    method or function it called. A template reaching ``obj[key]``, ``obj | attr(key)`` or ``namespace({key: value})``
+    takes that name from the run's data, so the refusal also carries the names its message quotes, ``named``, and its
+    wording without them, ``anonymous_message``: the render reporting it keeps the message only when the template's own
+    source spells every name it quotes (`pipelex.tools.jinja2.jinja2_rendering`).
+    """
+
+    def __init__(self, message: str, *, named: tuple[str, ...], anonymous_message: str):
+        super().__init__(message)
+        self.named = named
+        self.anonymous_message = anonymous_message

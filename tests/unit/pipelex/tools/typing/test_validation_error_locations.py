@@ -1,8 +1,11 @@
 from typing import Annotated, Any, Literal
 
 import pytest
-from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, RootModel, ValidationError
+from pydantic import AliasChoices, AliasPath, BaseModel, ConfigDict, Field, RootModel, TypeAdapter, ValidationError
+from pydantic_core import SchemaValidator
+from pytest_mock import MockerFixture
 
+from pipelex.tools.typing import pydantic_utils
 from pipelex.tools.typing.pydantic_utils import (
     PAYLOAD_KEY_PLACEHOLDER,
     empty_dict_factory_of,
@@ -106,3 +109,55 @@ class TestValidationErrorLocations:
             f"entries.{PAYLOAD_KEY_PLACEHOLDER}.score: Input should be a valid integer, unable to parse string as an integer; "
             f"entries.{PAYLOAD_KEY_PLACEHOLDER}.{PAYLOAD_KEY_PLACEHOLDER}: Extra inputs are not permitted"
         )
+
+    def test_an_authored_document_is_located_as_pydantic_gives_it(self) -> None:
+        """A method author's own document, or a value Pipelex built, holds no run's data: its keys are written as they are."""
+        with pytest.raises(ValidationError) as caught:
+            _Outer.model_validate({"entries": {"opening_hours": {"score": "high"}}})
+
+        assert validation_error_locations(validation_error=caught.value, validated_type=None, is_authored_input=True) == [
+            "entries.opening_hours.score"
+        ]
+        assert format_validation_error_without_input(validation_error=caught.value, is_authored_input=True) == (
+            "entries.opening_hours.score: Input should be a valid integer, unable to parse string as an integer"
+        )
+
+    def test_a_type_adapter_locates_what_it_validated(self) -> None:
+        """A type that is no model, such as a list or a union of models, is validated by a TypeAdapter, which locates it the same way."""
+        adapter: TypeAdapter[list[_Outer]] = TypeAdapter(list[_Outer])
+        with pytest.raises(ValidationError) as caught:
+            adapter.validate_python([{}, {"entries": {_PAYLOAD_KEY: {"score": "high"}}}])
+
+        assert validation_error_locations(validation_error=caught.value, validated_type=adapter) == ["1.entries.<key>.score"]
+
+    def test_each_located_reason_is_written_once_in_the_order_it_first_comes(self) -> None:
+        with pytest.raises(ValidationError) as caught:
+            _Outer.model_validate({"items": [{"score": "high"}, {"score": 1, _PAYLOAD_KEY: 2}, {"score": "low"}], "maybe": {"score": "x"}})
+
+        formatted = format_validation_error_without_input(validation_error=caught.value, validated_type=_Outer)
+
+        assert formatted == (
+            "items.0.score: Input should be a valid integer, unable to parse string as an integer; "
+            f"items.1.{PAYLOAD_KEY_PLACEHOLDER}: Extra inputs are not permitted; "
+            "items.2.score: Input should be a valid integer, unable to parse string as an integer; "
+            "maybe.score: Input should be a valid integer, unable to parse string as an integer"
+        )
+        assert format_validation_error_without_input(validation_error=caught.value) == (
+            "Input should be a valid integer, unable to parse string as an integer; Extra inputs are not permitted"
+        )
+
+    def test_a_union_choice_s_label_is_read_once_per_schema(self, mocker: MockerFixture) -> None:
+        """The label of a union's choice is pydantic's title for it, read once for the validated type, not once per error."""
+
+        class _Choices(BaseModel):
+            either: list[int | _Leaf]
+
+        spy = mocker.patch.object(pydantic_utils, "SchemaValidator", wraps=SchemaValidator)
+        with pytest.raises(ValidationError) as caught:
+            _Choices.model_validate({"either": ["a", "b", "c"]})
+
+        first = validation_error_locations(validation_error=caught.value, validated_type=_Choices)
+        second = validation_error_locations(validation_error=caught.value, validated_type=_Choices)
+
+        assert first == second == [f"either.{position}.{choice}" for position in range(3) for choice in ("int", "_Leaf")]
+        assert spy.call_count == 2

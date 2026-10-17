@@ -530,5 +530,6 @@ class DeliveryExecutor:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc
         except httpx.RequestError as exc:
-            msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {exc}"
+            # By the failure's class, never its text, which can quote the caller's webhook URL.
+            msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {type(exc).__name__}"
             raise WebhookDeliveryError(msg) from exc

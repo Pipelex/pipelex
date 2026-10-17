@@ -396,7 +396,10 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 output_name=pipe_job.output_name,
             ) from exc
         except ValidationError as exc:
-            # The run's inputs are the caller's data: the message names where they failed and why, never their values.
+            # The run's inputs are the caller's data: the message names why they failed, never their values. Each site
+            # that validates an input into a known class refuses it there, located by that class's schema; a refusal
+            # that reaches this arm came from a model this frame does not know, and a location read without its schema
+            # could quote a key of the data, so it is named by its model and its reasons alone.
             formatted_error = format_validation_error_without_input(validation_error=exc)
             model_name = exc.title
             msg = f"Input validation failed for '{model_name}': {formatted_error}"

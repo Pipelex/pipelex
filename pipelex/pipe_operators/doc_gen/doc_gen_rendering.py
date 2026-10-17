@@ -11,6 +11,7 @@ from typing import Any
 from jinja2.exceptions import UndefinedError
 from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenUndefinedValueError
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError, Jinja2TemplateRenderError
@@ -56,8 +57,9 @@ async def render_doc_gen_template(
         if isinstance(undefined_error, UndefinedError):
             # Raised from Jinja's own error, so that this is the root fault a verdict or a run's problem names. Its text
             # can quote a key of the run's data the template reached for, so the name is given only when the template
-            # itself spells it, and the line Jinja2 failed at says where.
-            variable_name = undefined_variable_name(undefined_error=undefined_error, template_source=template)
+            # itself spells it, read off the source Jinja2 compiled, its sigils rewritten, and the line Jinja2 failed at
+            # says where.
+            variable_name = undefined_variable_name(undefined_error=undefined_error, template_source=rewrite_template_sigils(template))
             what = f"it reads '{variable_name}', which is not defined" if variable_name else "it reads a value that is not defined"
             template_line = template_line_of(render_error=undefined_error)
             where = f" (line {template_line})" if template_line is not None else ""

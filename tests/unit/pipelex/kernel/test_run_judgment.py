@@ -111,7 +111,7 @@ class TestRunJudgment:
         assert list(assignment.questions) == ["question"]
         assert assignment.questions["question"].instructions == "Is this urgent, given that it says 'The roof is on fire.'?"
         assert assignment.prompt.text == "A message from a customer: The roof is on fire.\nThe photo they sent: [Image 1]"
-        assert assignment.prompt.images == [PromptImageUri(uri=_ROOF_PHOTO, mime_type="image/png")]
+        assert assignment.prompt.images == [PromptImageUri(uri=_ROOF_PHOTO, mime_type="image/png", input_name="photo")]
         assert assignment.prompt.documents == []
         assert result.prompt == assignment.prompt
         assert result.rendered_question == "Is this urgent, given that it says 'The roof is on fire.'?"

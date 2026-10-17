@@ -59,9 +59,9 @@ class TestJinja2RenderOwner:
     @pytest.mark.parametrize(
         ("template_source", "fault"),
         [
-            (_UNKNOWN_FILTER_IN_A_BRANCH, "No filter named 'frob_the_lane' found."),
-            (_UNKNOWN_FILTER_AT_THE_TOP, "No filter named 'frob_the_lane'."),
-            (_UNKNOWN_TEST_IN_A_BRANCH, "No test named 'frobbed' found."),
+            (_UNKNOWN_FILTER_IN_A_BRANCH, "No filter named 'frob_the_lane' at line 1."),
+            (_UNKNOWN_FILTER_AT_THE_TOP, "No filter named 'frob_the_lane' at line 1."),
+            (_UNKNOWN_TEST_IN_A_BRANCH, "No test named 'frobbed' at line 1."),
         ],
         ids=["filter_in_a_branch", "filter_at_compile", "test_in_a_branch"],
     )

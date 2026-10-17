@@ -98,6 +98,13 @@ class TestRunContentStaysOutOfSinks:
         [
             ("a number input given a text", "echo_amount", {"amount": MARKER}, CoreCode.INPUT_INVALID, False),
             ("a structure refusing a field's value", "echo_tally", {"tally": {"count": MARKER}}, CoreCode.INPUT_INVALID, True),
+            (
+                "an explicit envelope its structure refuses",
+                "echo_tally",
+                {"tally": {"concept": "run_content_marker.Tally", "content": {"count": MARKER}}},
+                CoreCode.INPUT_INVALID,
+                True,
+            ),
             ("a date the content factory cannot read", "echo_date", {"when": MARKER}, CoreCode.INPUT_INVALID, False),
             ("a function quoting its input", "file_note", {"note": MARKER}, CoreCode.PIPE_FUNCTION_RAISED, True),
             ("a value the composer copied into a choice", "make_ticket", {"level": MARKER}, CoreCode.PIPE_OUTPUT_INVALID, True),
@@ -142,3 +149,23 @@ class TestRunContentStaysOutOfSinks:
         assert json_lines, topic
         assert [line for line in json_lines if MARKER in line] == [], topic
         assert [record.getMessage() for record in caplog.records if MARKER in str(vars(record))] == [], topic
+
+    async def test_a_library_logging_the_run_s_data_reaches_no_sink(self) -> None:
+        """`instructor` logs each refused answer, which quotes the model's text: no sink of Pipelex writes its records."""
+        buffer = io.StringIO()
+        instructor_logger = logging.getLogger("instructor.core.retry")
+        pipelex_logger = logging.getLogger("pipelex.marker_probe")
+        previous_levels = (instructor_logger.level, pipelex_logger.level)
+        instructor_logger.setLevel(logging.DEBUG)
+        pipelex_logger.setLevel(logging.DEBUG)
+        try:
+            with _json_sink_on_root(buffer=buffer):
+                instructor_logger.error("Validation error on attempt 1: count, input_value='%s'", MARKER)
+                pipelex_logger.error("A line of Pipelex's own reaches the sink")
+        finally:
+            instructor_logger.setLevel(previous_levels[0])
+            pipelex_logger.setLevel(previous_levels[1])
+
+        json_lines = [line for line in buffer.getvalue().splitlines() if line]
+        assert [json.loads(line)["message"] for line in json_lines] == ["A line of Pipelex's own reaches the sink"]
+        assert [line for line in json_lines if MARKER in line] == []

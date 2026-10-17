@@ -24,7 +24,7 @@ from pipelex.errors.error_codes import error_code_spec
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
-from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input, validation_error_locations
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -154,6 +154,29 @@ class StuffFactory:
             name=name,
             code=code,
         )
+
+    @classmethod
+    def _make_content_refusal(
+        cls, *, name: str | None, concept_ref: str, content_class: type[StuffContent], validation_error: ValidationError, what: str
+    ) -> StuffFactoryError:
+        """The refusal of an input's content that its concept's class does not validate, ``input.invalid``.
+
+        The content is the run's data: the message names each refused field as far as the class's schema names it, and
+        its reason, never the value, and the first refused field is the problem's ``field``.
+        """
+        reasons = format_validation_error_without_input(validation_error=validation_error, validated_type=content_class)
+        msg = (
+            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+            f"but {what} does not fit the concept '{concept_ref}': {reasons}"
+        )
+        locations = validation_error_locations(validation_error=validation_error, validated_type=content_class)
+        refused_field = next((location for location in locations if location is not None), None)
+        params: dict[str, str] = {}
+        if name is not None:
+            params["input"] = name
+        if refused_field is not None:
+            params["field"] = refused_field
+        return StuffFactoryError(msg).with_params(**params)
 
     @classmethod
     def _try_make_csv_list_stuff(
@@ -644,11 +667,17 @@ class StuffFactory:
                 )
                 raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
+            try:
+                dict_content = the_class.model_validate(obj=content)
+            except ValidationError as exc:
+                raise cls._make_content_refusal(
+                    name=name, concept_ref=concept.concept_ref, content_class=the_class, validation_error=exc, what="its content"
+                ) from exc
             return cls.make_stuff(
                 name=name,
                 code=code,
                 concept=concept,
-                content=the_class.model_validate(obj=content),
+                content=dict_content,
             )
 
         # Case 2.2/2.2b/2.4/2.5/2.6: content is a list
@@ -725,13 +754,23 @@ class StuffFactory:
                         )
                         raise StuffFactoryError(msg)
 
-                # Create StuffContent objects from dicts
+                # Create StuffContent objects from dicts, with the class the factory validates each one into
+                item_class = get_class_registry().get_class(name=concept.structure_class_name) or TextContent
                 stuff_items: list[StuffContent] = []
-                for item_dict in list_content_2:
-                    stuff_content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                        concept=concept,
-                        value=item_dict,
-                    )
+                for item_index, item_dict in enumerate(list_content_2):
+                    try:
+                        stuff_content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
+                            concept=concept,
+                            value=item_dict,
+                        )
+                    except ValidationError as exc:
+                        raise cls._make_content_refusal(
+                            name=name,
+                            concept_ref=concept.concept_ref,
+                            content_class=item_class,
+                            validation_error=exc,
+                            what=f"the item at index {item_index} of its content",
+                        ) from exc
                     stuff_items.append(stuff_content)
 
                 return cls.make_stuff(

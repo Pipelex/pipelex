@@ -259,7 +259,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth/not-found errors aren't flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_openai_metadata(underlying_exc)
+                metadata = extract_openai_metadata(underlying_exc, validated_type=schema)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,

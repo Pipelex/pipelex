@@ -516,7 +516,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_anthropic_metadata(underlying_exc)
+                metadata = extract_anthropic_metadata(underlying_exc, validated_type=schema)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 rendered_error = render_inference_error(
                     metadata=metadata,

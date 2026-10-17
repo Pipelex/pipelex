@@ -174,13 +174,14 @@ class WorkingMemoryFactory(BaseModel):
                     needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
             except ValidationError as exc:
-                # Fallback to TextContent when the typed stuff spec fails pydantic validation
+                # Fallback to TextContent when the typed stuff spec fails pydantic validation. The spec is the method's
+                # own document, no run's data, so its refusal is located as pydantic gives it.
                 log.warning(
                     "An input whose concept's structure class could not be used was mocked as text",
                     fields={
                         "stuff_name": named_stuff_spec.variable_name,
                         "concept_ref": named_stuff_spec.concept.concept_ref,
-                        **error_fields(exc=exc),
+                        **error_fields(exc=exc, is_authored_input=True),
                     },
                 )
                 text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
@@ -283,13 +284,14 @@ class WorkingMemoryFactory(BaseModel):
                 working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
             except (FactoryException, ValidationError) as exc:
                 # Mock build (polyfactory) or content validation (pydantic) failed for this dynamic
-                # class — fall back to text content. Unexpected errors propagate.
+                # class — fall back to text content. Unexpected errors propagate. The refused value is a mock Pipelex
+                # built, no run's data, so its refusal is located as pydantic gives it.
                 log.warning(
                     "A text stand-in was used for a mock input its structure could not build",
                     fields={
                         "stuff_name": typed_named_stuff_spec.variable_name,
                         "concept_ref": typed_named_stuff_spec.concept.concept_ref,
-                        **error_fields(exc=exc),
+                        **error_fields(exc=exc, is_authored_input=True),
                     },
                 )
                 # Create fallback text content

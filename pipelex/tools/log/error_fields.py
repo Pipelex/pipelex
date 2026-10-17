@@ -17,7 +17,9 @@ rejected, and several of pydantic's own templates quote the input too, an unknow
 character a UUID could not parse, a parser's own complaint. A location quotes the keys of a dict the input holds, and a
 key the model does not declare, which are input by definition, so a location is written only as far as the schema of the
 validated model names it, every other component as ``<key>``; a line that does not know that model, given as
-``validated_type``, writes each error by its reason alone.
+``validated_type``, writes each error by its reason alone. A line about a method author's own document, or a value
+Pipelex built for itself such as a dry run's mock, says so with ``is_authored_input`` and writes its locations as
+pydantic gives them, since no key of it is a run's data.
 
 ``error.type`` is the OpenTelemetry semantic-convention key for the class of error an operation ended with.
 ``error.message`` is the key the conventions gave an error's text before deprecating the general attribute in favour
@@ -25,9 +27,7 @@ of domain-specific ones; it is kept here as ``error.type``'s companion because t
 sinks, which write them for a record that carries the exception itself and prefix a field spelling one.
 """
 
-from pydantic import BaseModel
-
-from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
+from pipelex.tools.typing.pydantic_utils import ValidatedType, describe_exception_without_input
 
 #: The class of the handled exception, by its name.
 ERROR_TYPE_FIELD = "error.type"
@@ -39,7 +39,9 @@ ERROR_MESSAGE_FIELD = "error.message"
 ERROR_CODE_FIELD = "error.code"
 
 
-def error_fields(*, exc: BaseException, text: str | None = None, validated_type: type[BaseModel] | None = None) -> dict[str, str]:
+def error_fields(
+    *, exc: BaseException, text: str | None = None, validated_type: ValidatedType | None = None, is_authored_input: bool = False
+) -> dict[str, str]:
     """The ``error.type`` and ``error.message`` fields of a handled exception, to spread into a call's ``fields``.
 
     Args:
@@ -48,6 +50,8 @@ def error_fields(*, exc: BaseException, text: str | None = None, validated_type:
             chain rather than its own text.
         validated_type: The model whose validation raised ``exc``, when it is a ``ValidationError`` and the line knows
             it, which lets its locations be written.
+        is_authored_input: Whether the input ``exc`` refused is a method author's own document or a value Pipelex
+            built for itself, never a run's data, so that its locations are written as pydantic gives them.
 
     Returns:
         ``{"error.type": <the exception's class name>, "error.message": <its text>}``, the text of a pydantic
@@ -55,5 +59,5 @@ def error_fields(*, exc: BaseException, text: str | None = None, validated_type:
         the values it refused, without a key of the input's own, and without any message that may quote the input, a
         custom validator's or one of pydantic's own, which is written as its error type.
     """
-    message = describe_exception_without_input(exc=exc, validated_type=validated_type) if text is None else text
+    message = describe_exception_without_input(exc=exc, validated_type=validated_type, is_authored_input=is_authored_input) if text is None else text
     return {ERROR_TYPE_FIELD: type(exc).__name__, ERROR_MESSAGE_FIELD: message}

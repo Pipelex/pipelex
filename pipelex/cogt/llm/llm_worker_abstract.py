@@ -520,11 +520,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         )
 
     def _make_structured_generation_failure(self, *, api_name: str, schema: type[BaseModel], instructor_exc: BaseException) -> LLMCompletionError:
-        """The error of a structured generation `instructor` gave up on, when no provider exception could be recovered from it.
+        """The error of a structured generation `instructor` gave up on, when no exception could be recovered from it.
 
         Every worker generating objects through `instructor` raises it in that case, `from` the wrapper. Its message names
-        the reason the wrapper's cause gives (`describe_instructor_failure`), never `instructor`'s own text, which is the
-        last validation error's and quotes the model's answer, the run's data.
+        the class of the wrapper's cause (`describe_instructor_failure`), never `instructor`'s own text, which is the
+        last validation error's and quotes the model's answer, the run's data. The common case, the re-asks ending on a
+        refused answer, recovers that `ValidationError` and is classified from it, located by the same schema.
 
         Args:
             api_name: The provider's API, as the message names it, such as `Anthropic`.
@@ -534,7 +535,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         Returns:
             The error, `runtime.unexpected`, for the worker to raise.
         """
-        reason = describe_instructor_failure(instructor_exc=instructor_exc, validated_type=schema)
+        reason = describe_instructor_failure(instructor_exc=instructor_exc)
         msg = (
             f"{api_name} structured generation via 'instructor' failed with model '{self.inference_model.desc}' "
             f"trying to generate schema '{schema.__name__}': {reason}"

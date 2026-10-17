@@ -40,14 +40,16 @@ class VariableReference:
 def _make_detect_variables_error(
     *, parse_error: Jinja2StuffError | TemplateSyntaxError | UndefinedError, template_category: TemplateCategory
 ) -> Jinja2DetectVariablesError:
-    """The error of a template that could not be parsed to find its variables, naming what Jinja2 refused and where.
+    """The error of a template that could not be parsed to find its variables, naming the kind of fault and where.
 
-    Neither the template source nor the line of it Jinja2 quotes is written: a syntax error's own text ends with that
-    line, which is the method's own text, or for Pipelex's own templates the run's data they render.
+    Neither the template source, the line of it Jinja2 quotes, nor Jinja2's own message is written: a syntax error's
+    message quotes the token Jinja2 stopped at (``expected token 'end of print statement', got 'x'``) and its text ends
+    with the line, both the template's text, which is the method's own, or for Pipelex's own templates the run's data
+    they render.
     """
     if isinstance(parse_error, TemplateSyntaxError):
         where = f" at line {parse_error.lineno}" if parse_error.lineno else ""
-        finding = f"syntax error{where}: '{parse_error.message or type(parse_error).__name__}'"
+        finding = f"syntax error{where} ({type(parse_error).__name__})"
     elif isinstance(parse_error, UndefinedError):
         finding = f"undefined error ({type(parse_error).__name__})"
     else:

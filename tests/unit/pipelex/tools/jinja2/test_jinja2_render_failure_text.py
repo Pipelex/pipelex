@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 import pytest
+from pydantic import BaseModel
 
 from pipelex.errors.problem import ProblemView
 from pipelex.system.exceptions import ToolError
@@ -14,6 +15,14 @@ from pipelex.tools.jinja2.template_owner import TemplateOwner
 
 # A value of the run's data, which no message, parameter or diagnostic carries.
 _PAYLOAD = "confidential-patient-diagnosis"
+# The same value as an identifier, which a template can also write as plain text.
+_PAYLOAD_IDENTIFIER = "confidential_patient_diagnosis"
+
+
+class _Record(BaseModel):
+    """A value whose public methods a template reads but may not call."""
+
+    label: str = "a label"
 
 
 async def _render_failure(*, template_source: str, context: dict[str, Any], is_async: bool) -> ToolError:
@@ -68,6 +77,47 @@ class TestJinja2RenderFailureText:
                 "Jinja2 render — refused by the template sandbox: A template may not read an unsafe name on a 'object' value.",
             ),
             (
+                "a key of the data the template also writes as plain text",
+                f"Patient {_PAYLOAD_IDENTIFIER}:\n{{{{ mapping[lookup].field }}}}",
+                {"mapping": {}, "lookup": _PAYLOAD_IDENTIFIER},
+                Jinja2TemplateRenderError,
+                "Jinja2 render — undefined error: the template reads a value that is not defined (UndefinedError, at line 2 of the template)",
+            ),
+            (
+                "a private name read by a key the template also writes as plain text",
+                f"_{_PAYLOAD_IDENTIFIER} {{{{ record[lookup] }}}}",
+                {"record": object(), "lookup": f"_{_PAYLOAD_IDENTIFIER}"},
+                Jinja2TemplateSecurityError,
+                "Jinja2 render — refused by the template sandbox: A template may not read an unsafe name on a 'object' value.",
+            ),
+            (
+                "a callable stored in a namespace under a key of the data",
+                "{% set ns = namespace({lookup: record.count}) %}{{ ns }}",
+                {"record": [], "lookup": _PAYLOAD},
+                Jinja2TemplateSecurityError,
+                (
+                    "Jinja2 render — refused by the template sandbox: A template may not store a method of a 'list' value in a namespace: "
+                    "a namespace holds data only."
+                ),
+            ),
+            (
+                "a method called by a name of the data",
+                "{{ (record | attr(lookup))() }}",
+                {"record": _Record(), "lookup": "model_dump"},
+                Jinja2TemplateSecurityError,
+                (
+                    "Jinja2 render — refused by the template sandbox: A template may not call a method of a '_Record' value: "
+                    "templates read data and call methods of plain values only."
+                ),
+            ),
+            (
+                "a syntax error at a token of the template",
+                f"{{{{ note {_PAYLOAD_IDENTIFIER} }}}}",
+                {"note": "a note"},
+                Jinja2TemplateInvalidError,
+                "Jinja2 render — the template cannot render as written: syntax error at line 1.",
+            ),
+            (
                 "an operation on a value of the wrong type",
                 "{{ count + lookup }}",
                 {"count": 1, "lookup": _PAYLOAD},
@@ -111,6 +161,30 @@ class TestJinja2RenderFailureText:
                 {"record": object()},
                 "Jinja2 render — refused by the template sandbox: A template may not read '_secret' on a 'object' value.",
             ),
+            (
+                "a private name the template writes as a literal key",
+                "{{ record['_secret'] }}",
+                {"record": object()},
+                "Jinja2 render — refused by the template sandbox: A template may not read '_secret' on a 'object' value.",
+            ),
+            (
+                "a callable stored in a namespace under a name the template spells",
+                "{% set ns = namespace(helper=record.count) %}{{ ns }}",
+                {"record": []},
+                (
+                    "Jinja2 render — refused by the template sandbox: A template may not store the method 'count' of a 'list' value "
+                    "in a namespace, as 'helper': a namespace holds data only."
+                ),
+            ),
+            (
+                "a method the template calls by its name",
+                "{{ record.model_dump() }}",
+                {"record": _Record()},
+                (
+                    "Jinja2 render — refused by the template sandbox: A template may not call the method 'model_dump' of a '_Record' value: "
+                    "templates read data and call methods of plain values only."
+                ),
+            ),
         ],
     )
     async def test_a_name_the_template_spells_is_kept(
@@ -120,3 +194,13 @@ class TestJinja2RenderFailureText:
         error = await _render_failure(template_source=template_source, context=context, is_async=is_async)
 
         assert str(error) == expected_message, topic
+
+    async def test_a_text_format_named_by_the_data_is_never_quoted(self) -> None:
+        """Pipelex's own filter refuses a format it does not know by listing those it knows, never the name it was handed."""
+        error = await _render_failure(template_source="{{ note | format(lookup) }}", context={"note": "a note", "lookup": _PAYLOAD}, is_async=True)
+
+        assert isinstance(error, Jinja2TemplateRenderError)
+        assert (
+            str(error) == "Jinja2 render — context error: 'Invalid text format: the format filter takes one of 'plain', 'markdown', 'html', 'json''"
+        )
+        assert "confidential" not in json.dumps(error.to_problem(view=ProblemView.OPERATOR).to_wire())

@@ -172,6 +172,44 @@ class TestPipeRun:
             assert "error.message" not in vars(record)
             assert caller_words not in str(vars(record))
 
+    @pytest.mark.parametrize("secondary_failure", ["delivery", "tracer_close"])
+    async def test_a_failure_after_the_pipe_s_own_is_logged_by_class_and_code_alone(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, secondary_failure: str
+    ) -> None:
+        """A delivery's text names the caller's webhook URL, an OSError's the trace file: the line names the class and the code."""
+        secret = "https://hooks.example.com/jane-doe/token-4f9a"
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=RuntimeError("router blew up"))
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock()
+        tracer_manager = mocker.MagicMock()
+        tracer_manager.close_tracer.return_value = None
+        mocker.patch.object(pipe_run_module.GraphTracerManager, "get_instance", return_value=tracer_manager)
+        expected_line: str
+        expected_fields: dict[str, str]
+        match secondary_failure:
+            case "delivery":
+                mock_executor.return_value.execute = mocker.AsyncMock(side_effect=WebhookDeliveryError(f"Webhook delivery failed: {secret}"))
+                expected_line = "The delivery also failed after the pipe execution failed"
+                expected_fields = {"error.type": "WebhookDeliveryError", "error.code": str(WebhookDeliveryError(secret).resolve_error_code())}
+            case _:
+                tracer_manager.close_tracer.side_effect = OSError(f"cannot close {secret}")
+                expected_line = "The graph tracer could not be closed after the pipe execution failed"
+                expected_fields = {"error.type": "OSError"}
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-secondary", storage_scope="test/scope", read_scope=None)
+        )
+
+        with pytest.raises(RuntimeError, match="router blew up"), caplog.at_level(logging.ERROR, logger=pipe_run_module.__name__):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        (secondary_record,) = [record for record in caplog.records if record.getMessage() == expected_line]
+        record_fields = vars(secondary_record)
+        assert {key: record_fields[key] for key in expected_fields} == expected_fields
+        assert "error.message" not in record_fields
+        assert secret not in str(record_fields)
+
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""
         mock_output = mocker.MagicMock()
@@ -276,7 +314,8 @@ class TestPipeRun:
         # The problem is the operator's, which each webhook projects to its own view.
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "PipelexUnexpectedError"
-        assert problem.diagnostics.message == "RuntimeError: router blew up"
+        # Named by its class, never its text, which can carry anything of the run's data.
+        assert problem.diagnostics.message == "RuntimeError"
 
     async def test_run_failure_delivers_before_raising(self, mocker: MockerFixture) -> None:
         """Delivery runs BEFORE the error is re-raised."""
