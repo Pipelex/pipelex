@@ -12,7 +12,7 @@ from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from pipelex.pipeline.input_form import PipeInputFormDescriptor, PipeOutputFormDescriptor
 from pipelex.pipeline.method_entry import MethodEntry
 from pipelex.pipeline.validation_errors import warning_problem_items
-from pipelex.pipeline.validation_render import format_validate_markdown, render_invalid_validation_markdown
+from pipelex.pipeline.validation_render import format_validate_markdown, render_invalid_verdict_markdown
 from pipelex.pipeline.validation_report import PipelexValidationReport
 from pipelex.system.storage_scope import validate_read_scope
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -37,7 +37,7 @@ from pipelex_api.method_tree_request import (
     written_method,
 )
 from pipelex_api.middleware import request_id_of
-from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_RUN_POLICY
+from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
 from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id, resolve_blob_scope
 from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
@@ -338,8 +338,9 @@ ValidationResponse = Annotated[Union[ValidReport, InvalidReport], Field(discrimi
     # On top of the composite router's shared 401/413/422/500: the custom-code sandbox gate's 501
     # and the `method_ref` package-not-found 404. Note what is deliberately NOT here: an *invalid
     # bundle* is a produced verdict on a 200, never a 4xx — and a selector-resolution failure is a
-    # non-2xx problem+json, never an `is_valid: false` verdict.
-    responses={404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_RUN_POLICY},
+    # non-2xx problem+json, never an `is_valid: false` verdict. Its 500 names, beside the shared one's codes, a damaged
+    # blob a `files` map names by hash.
+    responses={404: PROBLEM_404_METHOD_PACKAGE, 500: PROBLEM_500_HELD_BLOBS, 501: PROBLEM_501_RUN_POLICY},
     openapi_extra={"x-mthds-protocol": True},
 )
 async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSONResponse:
@@ -529,17 +530,13 @@ def _invalid_report_response(failure: BundleValidationFailure, *, requested_form
             problem = failure.problem
         case ProblemView.CALLER:
             problem = caller_view_of(problem=failure.problem)
-    invalid_report = InvalidReport(errors=list(problem.errors or []), message=problem.detail)
+    items = list(problem.errors or [])
+    invalid_report = InvalidReport(errors=items, message=problem.detail)
     # `exclude_none` drops each item's unset members, as the standard writes a problem item, and the arm's own: none is
     # written as `null`, and `rendered_markdown` stays absent unless explicitly requested below.
     content = invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True)
-    # Opt-in presentation extra (D-D): the Markdown the local channels render, from the validation items the problem
-    # items were built from, one for one, attached only when `markdown` was requested.
+    # Opt-in presentation extra (D-D), attached only when `markdown` was requested: the Markdown of the very items
+    # `errors` holds, in the same view, so it never says what the reader's view leaves out of them.
     if RenderFormat.MARKDOWN in requested_formats:
-        content["rendered_markdown"] = render_invalid_validation_markdown(
-            {
-                "validation_errors": [item.model_dump(mode="json", exclude_none=True) for item in failure.validation_errors],
-                "message": problem.detail,
-            }
-        )
+        content["rendered_markdown"] = render_invalid_verdict_markdown(items=items, message=problem.detail)
     return JSONResponse(content=content)

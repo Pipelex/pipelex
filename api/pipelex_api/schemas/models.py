@@ -500,7 +500,9 @@ class PipelineApiExtras(BaseModel):
                 msg = f"callback URL scheme must be http or https (got {parsed.scheme!r})"
                 raise CallbackUrlRefusedError(msg).with_security_target_class(SecurityTargetClass.SCHEME)
             host = parsed.hostname
-            if not host:
+            # A host of dots alone, such as `.`, is empty once the SSRF rule drops a trailing dot, so it names no host
+            # either, and no class of destination a security event could state.
+            if not host or not host.rstrip("."):
                 msg = "callback URL must name a host"
                 raise ValueError(msg)
             if _is_disallowed_host(host):

@@ -471,7 +471,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`.'
+            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
+            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
+            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -829,7 +831,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`.'
+            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
+            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
+            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -954,7 +958,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`.'
+            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
+            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
+            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:

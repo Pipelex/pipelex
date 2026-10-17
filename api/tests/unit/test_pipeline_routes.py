@@ -14,6 +14,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
@@ -21,6 +22,7 @@ from pytest_mock import MockerFixture
 
 import pipelex_api.routes.pipelex.pipeline as pipeline_module
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exceptions import CallbackUrlRefusedError
 from pipelex_api.json_body import TOO_DEEPLY_NESTED_REASON
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
@@ -431,6 +433,29 @@ class TestPipelineRoutes:
         assert problem["location"] == {"field": "callback_urls"}
         assert bad_url not in response.text
         start_mock.assert_not_awaited()
+
+    @pytest.mark.parametrize("hostless_url", ["http://./hook", "https://../hook"])
+    def test_a_callback_host_of_dots_alone_names_no_host(self, mocker: MockerFixture, hostless_url: str):
+        # Empty once its trailing dots are dropped, as the SSRF rule drops them: a URL naming no host, the shape of the
+        # field, never a security refusal whose sentence names a class of destination it has none of.
+        client, _, start_mock = _build_client(mocker)
+        log_spy = mocker.patch("pipelex.errors.problem._warn")
+        response = client.post("/v1/start", json={"pipe_code": "echo", "callback_urls": [hostless_url]})
+        assert_problem(response, status=422, code="request.invalid", field="callback_urls")
+        log_spy.assert_not_called()
+        start_mock.assert_not_awaited()
+
+    def test_a_callback_refusal_naming_no_class_leaves_the_parameter_out(self, mocker: MockerFixture):
+        # A refusal that states no class of destination gives no `target_class`, rather than a `None` for its code to
+        # refuse, so no parameter is dropped and logged.
+        warn_spy = mocker.patch("pipelex.errors.problem._warn")
+        refusal = CallbackUrlRefusedError("callback URL host is not allowed")
+        assert "target_class" not in refusal.problem_params()
+        problem = refusal.to_problem(view=ProblemView.OPERATOR)
+        assert problem.params is not None
+        assert "target_class" not in problem.params.as_wire()
+        dropped = [call for call in warn_spy.call_args_list if "parameter" in call.kwargs["message"]]
+        assert not dropped, dropped
 
     def test_start_rejects_too_many_callbacks(self, mocker: MockerFixture):
         client, _, start_mock = _build_client(mocker)

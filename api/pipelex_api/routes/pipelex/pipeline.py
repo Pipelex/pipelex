@@ -59,6 +59,7 @@ from pipelex_api.openapi_responses import (
     PROBLEM_404_METHOD_PACKAGE,
     PROBLEM_409_DUPLICATE_RUN,
     PROBLEM_429,
+    PROBLEM_500_HELD_BLOBS,
     PROBLEM_501_RUN_POLICY,
     PROBLEM_501_START,
 )
@@ -909,8 +910,8 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     # it is the only one that can be rate-limited upstream — and the custom-code sandbox gate's 501 on a
     # bundle or a fetched package. NO 409: unlike `/start`, `/execute` takes no client-supplied
     # `pipeline_run_id` (the base runner generates one per call), so a caller cannot collide with an
-    # in-flight run.
-    responses={404: PROBLEM_404_METHOD_PACKAGE, 429: PROBLEM_429, 501: PROBLEM_501_RUN_POLICY},
+    # in-flight run. Its 500 names, beside the shared one's codes, a damaged blob a `files` map names by hash.
+    responses={404: PROBLEM_404_METHOD_PACKAGE, 429: PROBLEM_429, 500: PROBLEM_500_HELD_BLOBS, 501: PROBLEM_501_RUN_POLICY},
     # Documented body = the protocol's RunRequest plus THIS server's own
     # `orchestration_mode` extension (the route honors a per-request override). The
     # body is read through the raw Request (plain JSON with the reserved-key
@@ -981,12 +982,14 @@ async def execute(request: Request) -> JSONResponse:
     # client-supplied run id it (alone) accepts:
     #   404 — a `method_ref` whose repository holds no matching package.
     #   409 — the submitted `pipeline_run_id` is still registered for an in-flight run.
+    #   500 — beside the shared one's codes, a damaged blob a `files` map names by hash.
     #   501 — the resolved orchestrator is blocking-only (the in-process `direct` base), or the
     #         deployment's async execution is not enabled: refuse honestly rather than block-and-ack,
     #         use `/execute`; or the custom-code sandbox gate on a bundle or a fetched package.
     responses={
         404: PROBLEM_404_METHOD_PACKAGE,
         409: PROBLEM_409_DUPLICATE_RUN,
+        500: PROBLEM_500_HELD_BLOBS,
         501: PROBLEM_501_START,
     },
     # Documented body = the protocol's StartRequest plus THIS server's own

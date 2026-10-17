@@ -34,9 +34,10 @@ From this the blob store answers without reading what it does not need:
   is wrong.
   Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
   states, which its census already held to the tree's limits, and each is checked against its hash once read. Bytes
-  that do not hash to their key mean the storage failed the read, a backend cutting it short or an object damaged,
-  which no caller can repair: a 503 `pipelex.storage.unavailable` naming the kind of storage, and an error record,
-  "Stored blob bytes do not match their hash", naming the hash for the operator to clear a damage that persists.
+  that do not hash to their key mean the object stored under it is damaged, which no caller can repair and no retry
+  cures: a 500 `pipelex.storage.not_found` naming the kind of storage, whose verdict is not to retry, and an error
+  record, "Stored blob bytes do not match their hash", naming the hash for the operator to remove the object, after
+  which the blob is uploaded again.
 
 Lookups and reads run a bounded number at a time, so one request naming many blobs never opens them all at once.
 """
@@ -148,19 +149,19 @@ class RunnerBlobStore:
     async def _read_verified(self, *, sha256: str, size: int) -> bytes:
         """The stored bytes of `sha256`, held at `size`, checked against their hash.
 
-        Raises (as a problem document): a 503 `pipelex.storage.unavailable` naming the kind of storage, for bytes that
+        Raises (as a problem document): a 500 `pipelex.storage.not_found` naming the kind of storage, for bytes that
         are not `size` bytes hashing to `sha256`, after an error record naming the hash, the one place the operator
-        reads which object to clear when the damage persists.
+        reads which damaged object to remove.
         """
         data = await self._storage.load(f"{PIPELEX_STORAGE_SCHEME}{self._blob_key(sha256=sha256)}")
         if len(data) != size or sha256_hex(data) != sha256:
             log.error(
                 BLOB_DAMAGED_MESSAGE,
-                fields={"blob.sha256": sha256, "blob.expected_size": size, "blob.read_size": len(data), "storage.scheme": self._scheme},
+                fields={"blob_sha256": sha256, "blob_size_bytes": size, "read_size_bytes": len(data), "storage_scheme": self._scheme},
             )
             msg = (
-                f"The bytes this runner's blob store holds under {sha256} do not hash to it: the storage cut the read "
-                "short or holds a damaged object, which its operator removes for the blob to be uploaded again."
+                f"The bytes this runner's blob store holds under {sha256} do not hash to it: the storage holds a damaged "
+                "object, which its operator removes for the blob to be uploaded again."
             )
             raise BlobStoreDamagedError(msg, scheme=self._scheme)
         return data

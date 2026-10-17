@@ -75,25 +75,29 @@ class TestAuthorizeUriRead:
         assert exc_info.value.security_target_class == SecurityTargetClass.SCHEME
 
     @pytest.mark.parametrize(
-        ("reason", "target_class", "words"),
+        ("reason", "target_class"),
         [
-            (UriReadRefusalReason.FOREIGN_STORAGE_KEY, SecurityTargetClass.FOREIGN_STORAGE_KEY, "foreign storage"),
-            (UriReadRefusalReason.LOCAL_PATH, SecurityTargetClass.SCHEME, "local"),
+            (UriReadRefusalReason.FOREIGN_STORAGE_KEY, SecurityTargetClass.FOREIGN_STORAGE_KEY),
+            (UriReadRefusalReason.LOCAL_PATH, SecurityTargetClass.SCHEME),
         ],
     )
-    def test_the_sentence_reads_the_target_in_words_while_the_event_keeps_its_class(
-        self, reason: UriReadRefusalReason, target_class: SecurityTargetClass, words: str
-    ) -> None:
-        # The security event is searched by its enum; the caller reads the problem's sentence, which names the target in words.
+    def test_the_problem_s_target_class_is_the_security_event_s_token(self, reason: UriReadRefusalReason, target_class: SecurityTargetClass) -> None:
+        # `target_class` is a machine-readable parameter: the problem carries the very token its security event carries,
+        # never words, and a local path is the registry's listed `scheme`. The sentence reads the token as it is.
         as_input = UriReadRefusedError("refused", reason=reason).with_params(input="photo")
         as_method = UriReadRefusedError("refused", reason=reason).with_error_code(CoreCode.SECURITY_METHOD_URL_REFUSED).with_params(pipe="describe")
 
-        assert as_input.security_target_class == target_class
+        for refusal in (as_input, as_method):
+            assert refusal.security_target_class == target_class
+            for view in ProblemView:
+                params = refusal.to_problem(view=view).params
+                assert params is not None
+                assert params.as_wire()["target_class"] == str(target_class)
         assert as_input.to_problem(view=ProblemView.CALLER).detail == (
-            f"The URL of the input 'photo' points at a {words} target, which a security rule forbids (reason: {reason.desc})."
+            f"The URL of the input 'photo' points at a {target_class} target, which a security rule forbids (reason: {reason.desc})."
         )
         assert as_method.to_problem(view=ProblemView.CALLER).detail == (
-            f"Pipe 'describe' names a URL that points at a {words} target, which a security rule forbids (reason: {reason.desc})."
+            f"Pipe 'describe' names a URL that points at a {target_class} target, which a security rule forbids (reason: {reason.desc})."
         )
 
     def test_a_multi_segment_scope_compares_every_segment(self) -> None:

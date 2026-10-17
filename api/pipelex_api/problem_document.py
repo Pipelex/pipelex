@@ -45,23 +45,28 @@ def _retry_after_header(problem: PipelexProblem, *, status: int) -> dict[str, st
     return {"Retry-After": str(max(0, math.ceil(seconds)))}
 
 
-def problem_json_response(problem: PipelexProblem, *, view: ProblemView, headers: dict[str, str] | None = None) -> JSONResponse:
+def problem_json_response(
+    problem: PipelexProblem, *, view: ProblemView, headers: dict[str, str] | None = None, status: int | None = None
+) -> JSONResponse:
     """Render a problem built in the operator's view as the `application/problem+json` response a reader of `view` receives.
 
-    The status is the one the problem's code declares, and the body's `status` member repeats it, as RFC 9457 asks. The
-    caller's view leaves the operator's `diagnostics` out and aims the step at the caller. A 429 carries the `Retry-After`
-    its problem gives. `headers` are added to it, such as the `Allow` header of a 405 or the `WWW-Authenticate` challenge
-    of a 401, which the refusal names only where the deployment reads a bearer credential.
+    The status is the one the problem's code declares, unless `status` names another, and the body's `status` member
+    repeats it, as RFC 9457 asks. The caller's view leaves the operator's `diagnostics` out and aims the step at the
+    caller. A 429 carries the `Retry-After` its problem gives. `headers` are added to it, such as the `Allow` header of a
+    405 or the `WWW-Authenticate` challenge of a 401, which the refusal names only where the deployment reads a bearer
+    credential.
 
     Args:
         problem: The problem, in the operator's view.
         view: The view of whoever receives the response.
         headers: Further headers of the response.
+        status: The status to answer with in place of the code's, which only a refusal the web framework raised with a
+            status no code declares gives, so that it keeps the status it was raised with.
 
     Returns:
         The response.
     """
-    status = problem_status(problem)
+    status = status or problem_status(problem)
     match view:
         case ProblemView.OPERATOR:
             reader_problem = problem

@@ -306,9 +306,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             ``RunMetadata.request_id`` so every log line of the run, on
             whichever worker runs it, and the run's error reports carry it.
             An in-process host hook, like ``delivery_assignment``, not a wire
-            extension. It must be one to 128 printable ASCII characters: any
-            other value is the host's bug, refused with a ``ValueError``
-            before the run is set up.
+            extension. It must be one to 128 ASCII letters, digits, ``_``
+            or ``-`` (``validate_request_id``): any other value is the host's
+            bug, refused with a ``RunParameterError`` before the run is set up.
 
         Returns:
         -------

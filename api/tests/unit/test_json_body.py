@@ -15,14 +15,24 @@ from collections.abc import Callable
 from typing import cast
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.datastructures import Default, DefaultPlaceholder
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 from pytest_mock import MockerFixture
+from starlette.types import Message, Scope
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.exceptions import RunnerRequestError
-from pipelex_api.json_body import INTEGER_TOO_LONG_REASON, TOO_DEEPLY_NESTED_REASON, JsonBodyRoute, decode_json_body, json_nesting_exceeds
+from pipelex_api.json_body import (
+    INTEGER_TOO_LONG_REASON,
+    TOO_DEEPLY_NESTED_REASON,
+    JsonBodyRoute,
+    decode_json_body,
+    holds_content_type_strictly,
+    json_nesting_exceeds,
+)
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH, MAX_REQUEST_BODY_BYTES
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
@@ -268,3 +278,85 @@ class TestJsonBodyNesting:
         assert problem["code"] == "request.malformed"
         assert problem["params"] == {"reason": "not_json"}
         assert isinstance(raised.value.__cause__, RecursionError)
+
+
+class _TypedBody(BaseModel):
+    content: str
+
+
+async def _typed_endpoint(body: _TypedBody) -> dict[str, str]:
+    return {"content": body.content}
+
+
+def _typed_route() -> JsonBodyRoute:
+    return JsonBodyRoute("/typed", _typed_endpoint, methods=["POST"])
+
+
+def _request_declaring_no_content_type(body: bytes) -> Request:
+    """A request to the typed route whose body declares no content type."""
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    scope: Scope = {"type": "http", "method": "POST", "path": "/typed", "raw_path": b"/typed", "query_string": b"", "headers": []}
+    return Request(scope, receive)
+
+
+class TestStrictContentType:
+    """A body that declares no content type is parsed as JSON exactly where FastAPI's own parse would parse it.
+
+    FastAPI 0.132.0 added a route's `strict_content_type`, which the dependency floor (`fastapi>=0.118.0`) does not
+    require, so a release without it must still build and serve the routes, parsing such a body as JSON as it does.
+    """
+
+    @pytest.mark.parametrize(
+        ("setting", "is_strict"),
+        [(Default(True), True), (Default(False), False), (True, True), (False, False)],
+    )
+    def test_reads_the_route_s_setting(self, mocker: MockerFixture, setting: bool | DefaultPlaceholder, is_strict: bool):
+        route = _typed_route()
+        mocker.patch.object(route, "strict_content_type", setting)
+        assert holds_content_type_strictly(route) is is_strict
+
+    def test_a_route_of_a_fastapi_without_the_setting_does_not_hold_to_its_content_type(self):
+        route = _typed_route()
+        del route.strict_content_type  # A route as a FastAPI release older than 0.132.0 builds it.
+        assert holds_content_type_strictly(route) is False
+
+    @pytest.mark.asyncio
+    async def test_a_fastapi_without_the_setting_parses_a_body_declaring_no_content_type(self, mocker: MockerFixture):
+        # Its own parse reads such a body as JSON, so the route parses it first, and refuses one that is not UTF-8 as
+        # the caller's malformed request, never as the bare 400 FastAPI would raise.
+        route = _typed_route()
+        del route.strict_content_type
+        framework_handler = mocker.AsyncMock(return_value=Response())
+        # FastAPI's own handler, which a release without the setting builds without reading it.
+        mocker.patch.object(APIRoute, "get_route_handler", return_value=framework_handler)
+        handler = route.get_route_handler()
+
+        with pytest.raises(RunnerRequestError) as raised:
+            await handler(_request_declaring_no_content_type(b"\xff{}"))
+
+        assert problem_of(raised.value)["params"] == {"reason": "not_utf8"}
+        framework_handler.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("setting", "parses"), [(Default(True), False), (True, False), (Default(False), True), (False, True)])
+    async def test_a_fastapi_with_the_setting_parses_as_the_setting_says(
+        self, mocker: MockerFixture, setting: bool | DefaultPlaceholder, parses: bool
+    ):
+        route = _typed_route()
+        mocker.patch.object(route, "strict_content_type", setting)
+        framework_handler = mocker.AsyncMock(return_value=Response())
+        mocker.patch.object(APIRoute, "get_route_handler", return_value=framework_handler)
+        handler = route.get_route_handler()
+        request = _request_declaring_no_content_type(b"\xff{}")
+
+        if parses:
+            with pytest.raises(RunnerRequestError):
+                await handler(request)
+            framework_handler.assert_not_awaited()
+        else:
+            # A strict route leaves the body to FastAPI, which reads it as raw bytes the model refuses field by field.
+            await handler(request)
+            framework_handler.assert_awaited_once()

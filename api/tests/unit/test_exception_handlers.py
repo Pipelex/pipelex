@@ -284,6 +284,18 @@ async def framework_refusal_route(status: int) -> None:
     raise StarletteHTTPException(status_code=status, detail="There was an error parsing the body")
 
 
+# The headers a framework refusal may be raised with: the challenge FastAPI's security classes name, and a limiter's delay.
+_RAISED_CHALLENGE = 'Bearer realm="pipelex"'
+_RAISED_RETRY_AFTER = "7"
+
+
+@_router.get("/framework-refusal-with-headers/{status}")
+async def framework_refusal_with_headers_route(status: int) -> None:
+    # What a dependency the framework runs raises: a security class's 401 or 403, a rate limiter's 429.
+    headers = {"WWW-Authenticate": _RAISED_CHALLENGE, "Retry-After": _RAISED_RETRY_AFTER, "X-Internal": "not kept"}
+    raise StarletteHTTPException(status_code=status, detail="Not authenticated", headers=headers)
+
+
 class _RequestValidationBody(BaseModel):
     """Trivial schema for `test_request_validation_error_emits_structured_warning_log`.
 
@@ -702,6 +714,50 @@ class TestExceptionHandlers:
         log_spy.error.assert_not_called()
         assert _emitted_fields(log_spy, as_error=False)["error.code"] == "request.malformed"
 
+    def test_a_framework_422_is_the_caller_s_malformed_request_too(self):
+        response = _build_client().get("/framework-refusal/422")
+        body = assert_problem(response, status=422, code="request.malformed")
+        assert body["params"] == {"reason": "unreadable"}
+
+    @pytest.mark.parametrize(
+        ("raised_status", "status", "code", "kept_header"),
+        [
+            # A security class's missing credential, keeping the challenge it named.
+            (401, 401, "auth.missing_credential", "WWW-Authenticate"),
+            (403, 403, "auth.forbidden", None),
+            (413, 413, "request.too_large", None),
+            # No code declares a 415: the refusal keeps its status, under the code whose meaning matches it.
+            (415, 415, "request.unsupported", None),
+            # A rate limiter's refusal, keeping the delay it asked for.
+            (429, 429, "account.rate_limited", "Retry-After"),
+        ],
+    )
+    def test_a_framework_4xx_keeps_its_meaning(self, mocker: MockerFixture, raised_status: int, status: int, code: str, kept_header: str | None):
+        # Only a 400 or a 422 is a request the framework could not read: every other 4xx is answered under the code whose
+        # status and meaning match it, or keeps its status, never as a malformed request.
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get(f"/framework-refusal-with-headers/{raised_status}")
+        assert_problem(response, status=status, code=code)
+        assert "Not authenticated" not in response.text
+        kept = {"WWW-Authenticate": _RAISED_CHALLENGE, "Retry-After": _RAISED_RETRY_AFTER}
+        for header, value in kept.items():
+            if header == kept_header:
+                assert response.headers[header] == value
+            else:
+                assert header not in response.headers
+        assert "X-Internal" not in response.headers
+        log_spy.error.assert_not_called()
+        fields = _emitted_fields(log_spy, as_error=False)
+        assert fields["error.code"] == code
+        assert fields["http.response.status_code"] == status
+        # The refusal stands in for the framework's exception, which the record's chain still names.
+        assert fields[ERROR_CHAIN_FIELD] == [fields["error.type"], "HTTPException"]
+
+    def test_a_framework_401_without_a_challenge_names_none(self):
+        response = _build_client().get("/framework-refusal/401")
+        assert_problem(response, status=401, code="auth.missing_credential")
+        assert "WWW-Authenticate" not in response.headers
+
     def test_a_framework_5xx_is_the_runtime_s_fault(self):
         response = _build_client(raise_server_exceptions=False).get("/framework-refusal/503")
         assert_problem(response, status=500, code="runtime.unexpected")
@@ -852,7 +908,16 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["http.response.status_code"] == 422
         assert fields["error.type"] == "RunnerRequestError"
+        # The refusal stands in for Starlette's exception, chained from it, so the record still names the class that escaped.
+        assert fields[ERROR_CHAIN_FIELD] == ["RunnerRequestError", "ClientDisconnect"]
         log_spy.error.assert_not_called()
+
+    def test_the_operator_reads_the_framework_exception_a_refusal_stands_in_for(self):
+        # The stand-in's diagnostics name the class it answers among its causes, never its text.
+        response = _build_client(as_operator=True).post("/needs-body", json={"wrong": 1})
+        body = assert_problem(response, status=422, code="request.invalid", field="field")
+        assert body["diagnostics"]["error_class"] == "RunnerRequestError"
+        assert [cause["error_class"] for cause in body["diagnostics"]["causes"]] == ["RequestValidationError"]
 
     def test_the_message_is_fixed_and_the_failure_rides_the_fields(self, mocker: MockerFixture):
         # The message is the same sentence on every error line, at either level, so it is the key a
@@ -1010,6 +1075,8 @@ class TestExceptionHandlers:
         assert fields["http.response.status_code"] == 422
         assert fields["error.code"] == "request.invalid"
         assert fields["error.type"] == "RunnerRequestError"
+        # The refusal stands in for FastAPI's exception, chained from it, so the record still names the class that escaped.
+        assert fields[ERROR_CHAIN_FIELD] == ["RunnerRequestError", "RequestValidationError"]
         assert fields["error_domain"] == "input"
         assert "detail" not in fields
         log_spy.error.assert_not_called()

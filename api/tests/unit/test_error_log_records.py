@@ -9,11 +9,13 @@ output takes in production, minus the process stream it is written to.
 
 import json
 import logging
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
 from fastapi import APIRouter, FastAPI
+from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.system.console_target import ConsoleTarget
@@ -21,12 +23,14 @@ from pipelex.tools.log.json_log_sink import JsonLogFormatter
 from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pytest_mock import MockerFixture
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pipelex_api.exception_handlers import (
     ERROR_CHAIN_FIELD,
     ERROR_FRAMES_FIELD,
     ERROR_PARAMS_FIELD_PREFIX,
+    UNRECORDED_FAILURE_MESSAGE,
     AnsweredErrorBarrier,
     register_exception_handlers,
 )
@@ -98,6 +102,18 @@ _PLANTED_MARKER = "planted-marker-7f3a: the patient's diagnosis"
 @_router.get("/planted-failure")
 async def planted_failure_route() -> None:
     raise LookupError(_PLANTED_MARKER)
+
+
+async def _stream_failing_midway() -> AsyncIterator[bytes]:
+    """A body that fails once its first chunk, and so the response's status, has been sent."""
+    yield b"the first chunk"
+    raise LookupError(_PLANTED_MARKER)
+
+
+@_router.get("/stream-failure")
+async def stream_failure_route() -> StreamingResponse:
+    # A response that fails while it streams: the status is sent, so the failure can no longer be answered.
+    return StreamingResponse(_stream_failing_midway(), media_type="text/plain")
 
 
 @_router.get("/caller-mistake/{token:path}")
@@ -287,6 +303,69 @@ class TestErrorLogRecords:
         assert body["code"] == "runtime.unexpected"
         for record in caplog.records:
             assert _PLANTED_MARKER not in JsonLogFormatter().format(record)
+
+    def test_a_failure_the_catch_all_answered_mid_stream_is_recorded_once(self, caplog: pytest.LogCaptureFixture):
+        # Starlette runs the catch-all handler even once the response has started, and it writes the failure's record:
+        # the barrier then drops the exception Starlette raises again, writing nothing more.
+        with caplog.at_level(logging.DEBUG):
+            response = _build_client(with_barrier=True).get("/stream-failure")
+        assert response.status_code == 200
+        assert _api_error_record(caplog).levelno == logging.ERROR
+        assert not [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+
+    def test_a_catch_all_failing_mid_stream_leaves_a_record_naming_the_chain(self, caplog: pytest.LogCaptureFixture, mocker: MockerFixture):
+        # The catch-all handler itself fails while the response streams: Starlette raises the handler's exception, which
+        # no handler recorded, so the barrier records it by class before dropping it, never with any exception's text.
+        handler_bug = KeyError(_PLANTED_MARKER)
+        mocker.patch("pipelex_api.exception_handlers.make_unexpected_failure", side_effect=handler_bug)
+        with caplog.at_level(logging.DEBUG):
+            response = _build_client(with_barrier=True).get("/stream-failure")
+        assert response.status_code == 200
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        assert record.levelno == logging.ERROR
+        payload = _rendered_json(record)
+        assert payload["url.path"] == "/stream-failure"
+        assert payload["http.response.status_code"] == 200
+        assert payload["error.type"] == "KeyError"
+        # Raised while the handler answered the stream's own failure, which the chain names after it.
+        assert payload[ERROR_CHAIN_FIELD] == ["KeyError", "LookupError"]
+        assert ERROR_FRAMES_FIELD not in payload
+        # The request it ended, from the log context the middleware bound, still open around the barrier.
+        assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
+        for any_record in caplog.records:
+            assert any_record.exc_info is None, any_record
+            assert _PLANTED_MARKER not in JsonLogFormatter().format(any_record)
+
+    @pytest.mark.asyncio
+    async def test_the_barrier_records_a_failure_no_handler_saw_after_the_response_started(self, caplog: pytest.LogCaptureFixture):
+        # A failure that reaches the barrier with the response started and no handler's mark on it is recorded, by class.
+        async def failing_app(_scope: Scope, _receive: Receive, send: Send) -> None:
+            await send({"type": "http.response.start", "status": 201, "headers": []})
+            try:
+                _fail_on_run_data()
+            except ValueError as exc:
+                raise RuntimeError(_PLANTED_MARKER) from exc
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        sent: list[Message] = []
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/started", "raw_path": b"/started", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG):
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert [message["type"] for message in sent] == ["http.response.start"]
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        payload = _rendered_json(record)
+        assert payload["http.response.status_code"] == 201
+        assert payload[ERROR_CHAIN_FIELD] == ["RuntimeError", "ValueError"]
+        for any_record in caplog.records:
+            formatted = JsonLogFormatter().format(any_record)
+            assert _PLANTED_MARKER not in formatted
+            assert _RUN_DATA_TEXT not in formatted
 
     def test_a_caller_mistake_records_a_warning_carrying_the_same_identifiers(self, caplog: pytest.LogCaptureFixture):
         # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same message and

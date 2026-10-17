@@ -131,11 +131,13 @@ class TestRunnerBlobStore:
         tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
 
-    async def test_bytes_that_do_not_hash_to_their_key_are_unavailable_storage(self, caplog: pytest.LogCaptureFixture) -> None:
-        """Damaged storage is no caller's doing, and no upload of theirs would change it: storage failed the read.
+    async def test_bytes_that_do_not_hash_to_their_key_are_a_stored_file_gone_and_never_retried(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A damaged object does not heal: a retry reads the same bytes, so the verdict is not to retry.
 
-        Not `runtime.misconfigured`, which tells the operator to change a setting none of which is wrong; the operator
-        finds which object to clear in a record of its own, naming the hash.
+        No caller's doing, and no upload of theirs would change it: the file the runtime stored is no longer in its storage,
+        `pipelex.storage.not_found`, which the caller reports. Not `pipelex.storage.unavailable`, whose retry verdict would
+        send a client round its retry budget, nor `runtime.misconfigured`, which tells the operator to change a setting
+        none of which is wrong; the operator finds which object to remove in a record of its own, naming the hash.
         """
         storage = _CountingStorage()
         blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
@@ -146,12 +148,19 @@ class TestRunnerBlobStore:
             await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map", field="files")
 
         problem = problem_of(exc_info.value)
-        assert problem["status"] == 503
-        assert problem["code"] == "pipelex.storage.unavailable"
+        assert problem["status"] == 500
+        assert problem["code"] == "pipelex.storage.not_found"
+        assert problem["retry"] == "no"
+        assert problem["next_step"]["kind"] == "report"
         assert problem["params"] == {"scheme": "memory"}
         (record,) = [record for record in caplog.records if record.getMessage() == BLOB_DAMAGED_MESSAGE]
         assert record.levelno == logging.ERROR
-        assert carried_attributes(record=record)["blob.sha256"] == sha256_hex(data)
+        assert carried_attributes(record=record) == {
+            "blob_sha256": sha256_hex(data),
+            "blob_size_bytes": len(data),
+            "read_size_bytes": len(b"the damaged!!!"),
+            "storage_scheme": "memory",
+        }
 
     async def test_lookups_and_reads_run_a_bounded_number_at_a_time(self) -> None:
         storage = _CountingStorage()

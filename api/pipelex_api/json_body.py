@@ -247,8 +247,7 @@ class JsonBodyRoute(APIRoute):
         if self.body_field is None or isinstance(self.body_field.field_info, params.Form):
             # No body, or a form body, which FastAPI never hands to `json.loads`.
             return handler
-        strict_content_type = self.strict_content_type
-        is_strict = strict_content_type.value if isinstance(strict_content_type, DefaultPlaceholder) else strict_content_type
+        is_strict = holds_content_type_strictly(self)
 
         async def parsing_handler(request: Request) -> Response:
             parsed_request = _ParsedJsonRequest(request.scope, request.receive)
@@ -259,6 +258,25 @@ class JsonBodyRoute(APIRoute):
             return await handler(parsed_request)
 
         return parsing_handler
+
+
+# FastAPI 0.132.0 added a route's `strict_content_type`, which defaults to `True`. The releases before it, which the
+# dependency floor still admits, have no such attribute and parse a body that declares no content type as JSON, as a
+# route that does not hold to its content type does: this is the value they behave by.
+_STRICT_CONTENT_TYPE_BEFORE_FASTAPI_0_132 = False
+
+
+def holds_content_type_strictly(route: APIRoute) -> bool:
+    """Whether FastAPI refuses to parse a body that declares no content type as JSON on this route.
+
+    Read from the route's `strict_content_type`, the setting FastAPI's own parse reads, a default it was given unwrapped
+    to its value. A FastAPI release older than 0.132.0 has no such setting and always parses that body as JSON, so a
+    route of one reads as not strict.
+    """
+    strict_content_type = getattr(route, "strict_content_type", _STRICT_CONTENT_TYPE_BEFORE_FASTAPI_0_132)
+    if isinstance(strict_content_type, DefaultPlaceholder):
+        return bool(strict_content_type.value)
+    return bool(strict_content_type)
 
 
 def _reads_as_json(*, content_type: str | None, is_strict: bool) -> bool:

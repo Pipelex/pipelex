@@ -4668,10 +4668,6 @@ rationale = "Verb-object: formats the validate result; single operand."
 param = "items"
 rationale = "Verb-object: formats the error items; single operand."
 
-["pipelex/pipeline/validation_render.py::render_invalid_validation_markdown"]
-param = "report"
-rationale = "Verb-object: renders the validation report; single operand."
-
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"
 rationale = "Factory from source: builds the result from the inference_model; single operand."

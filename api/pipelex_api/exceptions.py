@@ -84,7 +84,12 @@ class CallbackUrlRefusedError(PipelexError, ValueError):
                 | None
             ):
                 reason = "host_not_allowed"
-        return {"input": "callback_urls", "target_class": target_class, "reason": reason}
+        params: dict[str, Any] = {"input": "callback_urls", "reason": reason}
+        # A host the rules could not classify has no class to state: the parameter is left out rather than given as a
+        # `None` its code would refuse, and the sentence that names it falls back on the code's generic one.
+        if target_class is not None:
+            params["target_class"] = target_class
+        return params
 
     @override
     def problem_location(self) -> ProblemLocation | None:
@@ -98,8 +103,9 @@ class RunnerRequestError(PipelexError):
     ``field`` parameter and its location. The raise site chooses ``request.malformed`` for a body, or an encoded part of
     one, that cannot be parsed, ``request.too_large`` for a request past one of this runner's size limits,
     ``request.unsupported`` for a form this runner does not accept, ``request.blobs_missing`` for files sent by hash
-    that this runner does not hold, and ``request.not_found`` and ``request.method_not_allowed`` for a request no route
-    serves.
+    that this runner does not hold, ``request.not_found`` and ``request.method_not_allowed`` for a request no route
+    serves, and ``account.rate_limited`` for a request a rate limit in front of a route refused, which only the web
+    framework's own refusal answers (``pipelex_api.exception_handlers.handle_http_exception``).
     """
 
     error_code = ErrorCodeSet(
@@ -111,6 +117,7 @@ class RunnerRequestError(PipelexError):
             CoreCode.REQUEST_BLOBS_MISSING,
             CoreCode.REQUEST_NOT_FOUND,
             CoreCode.REQUEST_METHOD_NOT_ALLOWED,
+            CoreCode.ACCOUNT_RATE_LIMITED,
         ),
     )
 
@@ -189,13 +196,14 @@ class RunnerMisconfiguredError(PipelexError):
 class BlobStoreDamagedError(PipelexError):
     """Bytes the blob store holds under a hash do not hash to it, or are not the size it holds them at.
 
-    The storage failed the read, whether a backend cut it short or an object was damaged, which no caller can repair
-    and no upload of theirs changes: ``pipelex.storage.unavailable``, a 503 a caller retries, while a damage that
-    persists is the operator's to clear. ``scheme`` is the kind of storage the deployment runs, ``None`` for a storage
-    plugin whose kind the registry does not list.
+    The object stored under the hash is damaged, so the file the runtime stored is no longer in its storage. No caller
+    can repair that, no upload of theirs changes it, and a retry reads the same damaged object, which stays until the
+    operator removes it: ``pipelex.storage.not_found``, a 500 whose verdict is not to retry and whose step is to report
+    it. ``scheme`` is the kind of storage the deployment runs, ``None`` for a storage plugin whose kind the registry does
+    not list.
     """
 
-    error_code = PipelexErrorCode.STORAGE_UNAVAILABLE
+    error_code = PipelexErrorCode.STORAGE_NOT_FOUND
 
     def __init__(self, message: str, *, scheme: str | None) -> None:
         super().__init__(message)
