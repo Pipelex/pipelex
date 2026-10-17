@@ -81,13 +81,18 @@ class RemoteFileFetchError(ToolError):
     one honest test that a URL serves what it claims to. The message names what the server or
     the network said (an HTTP status, a refused connection, a timeout), and never the URL, which
     is the run's data, nor a resolved address; it reaches the operator's diagnostics, the caller
-    reading the sentence its code renders, with the URL's host as ``input.url_unreachable``'s
-    ``host`` parameter.
+    reading the sentence its code renders.
 
     A server that answered but would not serve the file is ``input.file_unreadable`` (the
     default); a timeout or a refused connection, which a retry may get past, is
     ``input.url_unreachable``; a file a provider's answer pointed at is
     ``provider.response_invalid``, which the provider's raise site chooses.
+
+    The URL's host, and the input it belongs to, are facts the error holds, not parameters its raise
+    site gives: a catch site can choose another code for it, and the problem takes each fact only for
+    a code that declares it, so ``provider.response_invalid``, which declares neither, is given no
+    parameter it would refuse. The fetch does not know the input; a catch site that does, such as an
+    extract worker, names it with :meth:`with_input`.
     """
 
     error_code = ErrorCodeSet(
@@ -98,6 +103,26 @@ class RemoteFileFetchError(ToolError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Check that the URL serves the file to a plain HTTP client, or upload the file and reference it instead.",
     )
+
+    def __init__(self, message: str, *, host: str | None = None):
+        super().__init__(message)
+        # The host of the URL that could not be fetched, `None` when the URL names none the parser can read.
+        self.host = host
+        # The input the URL belongs to, as a caller writes it, which the catch site that knows it gives.
+        self.input_name: str | None = None
+
+    def with_input(self, *, input_name: str) -> Self:
+        """Name, where it is caught, the input whose URL could not be fetched.
+
+        Returns:
+            This error, so that the catch site can re-raise it.
+        """
+        self.input_name = input_name
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"host": self.host, "input": self.input_name}
 
 
 class SemVerError(ToolError):

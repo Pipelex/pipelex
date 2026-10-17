@@ -1,3 +1,6 @@
+import json
+import logging
+
 import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
@@ -69,6 +72,45 @@ class TestFetchFileFromUrl:
         with pytest.raises(RemoteFileFetchError, match=expected) as exc_info:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_raising(exc))
         assert exc_info.value.resolve_error_code() == expected_code
+
+    async def test_a_url_that_does_not_parse_is_refused_without_quoting_it(self) -> None:
+        """Httpx refuses the URL while it builds the request, with a text quoting the part it refused, the run's data."""
+        unparsable_url = "https://example.com:confidential-patient-diagnosis/report.pdf"
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(url=unparsable_url, transport=_transport_answering(200))
+
+        assert exc_info.value.resolve_error_code() == CoreCode.INPUT_FILE_UNREADABLE
+        assert "confidential" not in exc_info.value.message
+        assert "confidential" not in json.dumps(exc_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
+
+    async def test_the_host_reaches_only_a_code_that_declares_it(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A catch site that re-codes the failure, as a provider's file does, gives its code no parameter it would refuse.
+
+        `provider.response_invalid` declares neither the host nor the input, so neither reaches its problem, and building
+        it logs no parameter dropped for want of a declaration.
+        """
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(503))
+        recoded = exc_info.value.with_input(input_name="scan").with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            operator = recoded.to_problem(view=ProblemView.OPERATOR)
+
+        assert operator.code == CoreCode.PROVIDER_RESPONSE_INVALID
+        assert operator.params is None
+        assert [record.getMessage() for record in caplog.records if "does not declare" in record.getMessage()] == []
+
+    async def test_the_input_a_catch_site_names_completes_the_sentence(self) -> None:
+        """`input.url_unreachable` names the input and the host, which its detail and its steps read."""
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(url=URL, transport=_transport_raising(httpx.ConnectError("boom")))
+
+        caller = exc_info.value.with_input(input_name="scan").to_problem(view=ProblemView.CALLER)
+
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"input": "scan", "host": "example.com"}
+        assert caller.detail == "The URL of the input 'scan', on 'example.com', did not answer or answered with an error."
 
 
 @pytest.mark.asyncio(loop_scope="class")

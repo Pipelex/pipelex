@@ -12,6 +12,14 @@ _TRANSIENT_HTTP_STATUSES = frozenset({408, 425, 429})
 _HTTP_SERVER_ERROR_FLOOR = 500
 
 
+def _host_of(*, url: str) -> str | None:
+    """The host the URL names, or ``None`` when it names none or does not parse, which the request then reports."""
+    try:
+        return httpx.URL(url).host or None
+    except httpx.InvalidURL:
+        return None
+
+
 async def fetch_file_and_content_type_from_url_httpx(
     url: str,
     *,
@@ -44,7 +52,7 @@ async def fetch_file_and_content_type_from_url_httpx(
 
     Raises:
         RemoteFileFetchError: The server answered with an error status, refused the
-            connection, or did not answer in time.
+            connection, or did not answer in time, or the URL does not parse.
         SsrfBlockedError: The destination, or a redirect hop's, is not a globally routable
             address. It is a security error and deliberately not a ``RemoteFileFetchError``,
             so no caller's fallback for a failed download absorbs it.
@@ -58,8 +66,10 @@ async def fetch_file_and_content_type_from_url_httpx(
     # caller forever, and the `TimeoutException` branch below unreachable.
     timeout = Timeout(request_timeout) if request_timeout is not None else USE_CLIENT_DEFAULT
     # No message names the URL, which is the value an input or a pipe carried, a signed link's credential included: it
-    # says what the server or the network answered, and the code that invites a retry takes the URL's host as its
-    # declared `host` parameter.
+    # says what the server or the network answered. The URL's host is a fact the error holds, read once here, so that
+    # the code that invites a retry, `input.url_unreachable`, takes it as its declared `host` parameter, and a code a
+    # catch site chooses instead, which does not declare it, is given nothing it would refuse.
+    host = _host_of(url=url)
     try:
         async with httpx.AsyncClient(headers={"User-Agent": user_agent}, transport=transport) as client:
             response: Response = await client.get(
@@ -73,16 +83,21 @@ async def fetch_file_and_content_type_from_url_httpx(
         msg = f"Could not fetch a remote file: the server answered HTTP {status_code}"
         if status_code in _TRANSIENT_HTTP_STATUSES or status_code >= _HTTP_SERVER_ERROR_FLOOR:
             # The server is there but cannot answer now: a retry may get the file.
-            raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
-        raise RemoteFileFetchError(msg) from exc
+            raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
+        raise RemoteFileFetchError(msg, host=host) from exc
     except httpx.TimeoutException as exc:
         msg = "Could not fetch a remote file: the request timed out"
-        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
+        raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
     except httpx.ConnectError as exc:
         msg = "Could not fetch a remote file: the host could not be reached"
-        raise RemoteFileFetchError(msg).with_error_code(CoreCode.INPUT_URL_UNREACHABLE).with_params(host=httpx.URL(url).host) from exc
+        raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
     except httpx.RequestError as exc:
         msg = f"Could not fetch a remote file: the request failed ({type(exc).__name__})"
+        raise RemoteFileFetchError(msg, host=host) from exc
+    except httpx.InvalidURL as exc:
+        # Raised while the request is built, before anything is sent, and not a `RequestError`: its text quotes the
+        # part of the URL the parser refused, so it is named by what failed alone.
+        msg = "Could not fetch a remote file: the URL does not parse"
         raise RemoteFileFetchError(msg) from exc
 
     declared_content_type: str | None = response.headers.get("content-type")

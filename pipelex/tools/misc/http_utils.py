@@ -24,7 +24,8 @@ def validate_http_url_syntax(*, url: str) -> None:
     except ValidationError as exc:
         # The URL is an input's value, possibly a signed link: the message names the URL parser's reason, a fixed
         # sentence such as "empty host", and never the URL.
-        first_error = exc.errors(include_input=False)[0]["msg"] if exc.errors() else "not a valid http(s) URL"
+        errors = exc.errors(include_url=False, include_input=False)
+        first_error = errors[0]["msg"] if errors else "not a valid http(s) URL"
         msg = f"The URL is not a valid http(s) URL: {first_error}"
         raise UrlSyntaxError(msg) from exc
 
