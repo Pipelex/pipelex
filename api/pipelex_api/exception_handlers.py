@@ -35,6 +35,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pipelex import log
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport, PipelexError
+from pipelex.errors.security_event import emit_security_event
 from pipelex.plugins.registrar import HttpErrorMapperFn
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
@@ -103,6 +104,16 @@ def _pipeline_run_id_of(request: Request) -> str | None:
     backend frame having to forward it.
     """
     return getattr(request.state, "pipeline_run_id", None)
+
+
+def _run_extras_of(request: Request) -> dict[str, str] | None:
+    """Return the run's extras when `_parse_request` bound them on the request.
+
+    The opaque labels a host attaches to a run, which the hosted plane fills with the organization. They ride
+    the security event a refusal answered here logs, so a refusal before any run exists still names whose
+    request it was. `None` for a route that parses no run request, or a body whose extras did not validate.
+    """
+    return getattr(request.state, "run_extras", None)
 
 
 def _request_fields(request: Request) -> dict[str, Any]:
@@ -421,7 +432,12 @@ async def handle_pipelex_error(request: Request, exc: Exception, *, disclosure_m
     transport error (no `PipelexError` in its MRO) is routed to that plugin's
     own mapper-backed handler instead.
     """
-    report = cast("PipelexError", exc).to_error_report()
+    error = cast("PipelexError", exc)
+    # A security refusal logs its security event, once: a run's boundary already reported a refusal it saw, and
+    # one refused before any run exists, or by a route around the runner, is reported here. The request id is
+    # the log context's, which `RequestIdMiddleware` binds for the whole request.
+    emit_security_event(error=error, pipeline_run_id=_pipeline_run_id_of(request), extras=_run_extras_of(request))
+    report = error.to_error_report()
     return _problem_response(report, request=request, disclosure_mode=disclosure_mode)
 
 

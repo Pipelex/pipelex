@@ -783,6 +783,8 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     request.state.pipe_code = _coerce_correlation_field(request_data.get("pipe_code"))
     request.state.pipeline_run_id = _coerce_correlation_field(request_data.get("pipeline_run_id"))
     extras = _validate_extras(request_data)
+    # The run's opaque extras, for the security event a refusal of this request logs before any run carries them.
+    request.state.run_extras = extras.analytics_groups
     try:
         run_request = RunRequest.from_body(request_data)
     except ValidationError as exc:
