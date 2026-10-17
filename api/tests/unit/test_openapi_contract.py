@@ -7,9 +7,10 @@ regenerated from this same `fastapi_app.openapi()`) tells a client about failure
   (`pipelex_api.exception_handlers`), so every documented 4xx/5xx must say so — with a `$ref` to the
   typed `ProblemDocument`, not FastAPI's default `HTTPValidationError` on `application/json`.
 - The statuses a given route can additionally produce (`/execute`'s provider-429, `/start`'s
-  409 duplicate run, `/resolve`'s 501 `method_ref`, …) are documented on that route.
-- The `suggested_fix` surface pipelex's codegen work added reaches the wire: a client reading
-  the artifact can find it from a problem document, not just from `/validate`'s 200 arm.
+  409 duplicate run, the 404 of a method address nothing is fetched from, the 501 of a deployment
+  policy, …) are documented on that route.
+- The `suggested_fix` surface pipelex's codegen work added reaches the wire, on the standard's
+  problem item, which a problem document's `errors[]` and `/validate`'s 200 arms carry alike.
 - `x-mthds-protocol` marks exactly the MTHDS Protocol operations and nothing else — the flag is
   how a conformance suite or a third-party runner extracts the portable subset of this artifact,
   so a Pipelex extension wearing it would misrepresent the standard.
@@ -59,12 +60,12 @@ MTHDS_PROTOCOL_OPERATIONS = {
 
 # The extra statuses each route can produce on top of COMMON_STATUSES.
 ROUTE_EXTRA_STATUSES = {
-    ("/v1/execute", "post"): (403, 429),
-    ("/v1/start", "post"): (400, 403, 409, 501),
-    ("/v1/validate", "post"): (403,),
-    ("/v1/resolve", "post"): (404, 501),
-    ("/v1/pipe-io", "post"): (404, 501),
-    ("/v1/codegen", "post"): (501,),
+    ("/v1/execute", "post"): (404, 429, 501),
+    ("/v1/start", "post"): (404, 409, 501),
+    ("/v1/validate", "post"): (404, 501),
+    ("/v1/resolve", "post"): (404,),
+    ("/v1/pipe-io", "post"): (404,),
+    ("/v1/codegen", "post"): (404,),
 }
 
 
@@ -173,52 +174,51 @@ class TestOpenApiErrorContract:
         rate_limited = openapi_schema["paths"]["/v1/execute"]["post"]["responses"]["429"]
         assert "Retry-After" in rate_limited["headers"]
 
-    def test_problem_document_items_carry_the_standard_s_suggested_fix(self, openapi_schema: dict[str, Any]):
-        """A problem document publishes `errors[]` of the standard's `ProblemItem`, whose fix is the standard's
-        `ProblemSuggestedFix` (naming its file `file`), while a 200 invalid arm's `ValidationErrorItem` keeps Pipelex's
-        `SuggestedFix` (naming it `source`): each under its own name, never a module-qualified one.
+    def test_problem_items_carry_the_standard_s_suggested_fix(self, openapi_schema: dict[str, Any]):
+        """A problem document's `errors[]` and both `/validate` arms' items are the standard's `ProblemItem`, whose fix is
+        the standard's `ProblemSuggestedFix` (naming its file `file`): every schema the standard's item reaches carries the
+        `Problem` prefix, never a module-qualified name, and Pipelex's own `ValidationErrorItem` is off the wire.
         """
         schemas = openapi_schema["components"]["schemas"]
         assert "validation_errors" not in schemas["ProblemDocument"]["properties"]
         errors = schemas["ProblemDocument"]["properties"]["errors"]
         item_refs = [option["items"]["$ref"] for option in errors["anyOf"] if option.get("type") == "array"]
         assert item_refs == ["#/components/schemas/ProblemItem"]
+        assert schemas["InvalidReport"]["properties"]["errors"]["items"]["$ref"] == "#/components/schemas/ProblemItem"
+        assert schemas["ValidReport"]["properties"]["warnings"]["items"]["$ref"] == "#/components/schemas/ProblemItem"
+        assert "ValidationErrorItem" not in schemas
 
-        def _fix_refs(item_schema: str) -> list[str]:
-            return [option["$ref"] for option in schemas[item_schema]["properties"]["suggested_fix"]["anyOf"] if "$ref" in option]
-
-        assert _fix_refs("ProblemItem") == ["#/components/schemas/ProblemSuggestedFix"]
-        assert _fix_refs("ValidationErrorItem") == ["#/components/schemas/SuggestedFix"]
+        fix_refs = [option["$ref"] for option in schemas["ProblemItem"]["properties"]["suggested_fix"]["anyOf"] if "$ref" in option]
+        assert fix_refs == ["#/components/schemas/ProblemSuggestedFix"]
         assert "file" in schemas["ProblemSuggestedFix"]["properties"]
-        assert "source" in schemas["SuggestedFix"]["properties"]
         assert not [name for name in schemas if "__" in name]
 
     def test_suggested_fix_surface_is_published(self, openapi_schema: dict[str, Any]):
-        """The codegen fix planner's output is part of the published contract: a `ValidationErrorItem`
-        may carry a `SuggestedFix`, whose `ops[]` are the machine contract (the rendered diff is not).
+        """The codegen fix planner's output is part of the published contract: a problem item may carry the standard's
+        suggested fix, whose `ops[]` are the machine contract (the rendered diff is not).
 
-        An op is a union discriminated on `kind`, one member model per kind — so a client picks the
-        member off the wire value rather than reading a single open shape whose fields depend on a
-        `kind` enum beside them. The whole vocabulary is published here: this is the `.mthds` fix
-        path, which carries every kind (a ledger carries only the structural subset).
+        Each op is one of the standard's member models, one per kind it lists, plus the reader-side catch-all for a kind it
+        does not; every member is a published schema, so a client that reads an op off the wire lands on a shape the
+        artifact defines.
         """
         schemas = openapi_schema["components"]["schemas"]
-        suggested_fix = schemas["ValidationErrorItem"]["properties"]["suggested_fix"]
-        assert any(option.get("$ref") == "#/components/schemas/SuggestedFix" for option in suggested_fix["anyOf"])
-        fix_properties = schemas["SuggestedFix"]["properties"]
+        fix_properties = schemas["ProblemSuggestedFix"]["properties"]
         assert {"fix_code", "description", "safety", "ops"} <= set(fix_properties)
 
-        op_schema = fix_properties["ops"]["items"]
-        assert op_schema["discriminator"]["propertyName"] == "kind"
-        kind_mapping = op_schema["discriminator"]["mapping"]
-        assert set(kind_mapping) == {"set_key", "ensure_table", "delete_key", "delete_table", "rename_table_key", "move_key", "remap_value"}
-        # Every member the discriminator names is a `oneOf` option AND a published schema, so a
-        # client that resolves a `kind` off the wire always lands on a shape the artifact defines.
-        member_refs = {option["$ref"] for option in op_schema["oneOf"]}
-        assert set(kind_mapping.values()) == member_refs
-        assert all(ref.rsplit("/", 1)[-1] in schemas for ref in member_refs)
-
-        assert set(schemas["FixSafety"]["enum"]) == {"safe", "unsafe"}
+        member_refs = {option["$ref"] for option in fix_properties["ops"]["items"]["oneOf"]}
+        member_names = {ref.rsplit("/", 1)[-1] for ref in member_refs}
+        assert member_names == {
+            "ProblemSetKeyOp",
+            "ProblemEnsureTableOp",
+            "ProblemDeleteKeyOp",
+            "ProblemDeleteTableOp",
+            "ProblemRenameTableKeyOp",
+            "ProblemMoveKeyOp",
+            "ProblemRemapValueOp",
+            "ProblemUnknownFixOp",
+        }
+        assert member_names <= set(schemas)
+        assert set(schemas["ProblemFixSafety"]["enum"]) == {"safe", "unsafe"}
 
     def test_execute_publishes_the_tokens_usage_wire_records(self, openapi_schema: dict[str, Any]):
         """`/execute` returns a `JSONResponse` built from a trimmed dump, so FastAPI never validates

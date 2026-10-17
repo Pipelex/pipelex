@@ -29,8 +29,8 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
-from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exceptions import RequestMethodError
 from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
@@ -44,6 +44,7 @@ from tests.unit._constants import (
     VENDORED_PROBE_MARKER,
     VENDORED_PROBE_MTHDS,
 )
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
@@ -269,12 +270,8 @@ class TestVendoredMethodPackages:
 
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {"text": "hello"}})
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "InvalidMethodFiles"
-        assert f"method package '{STUB_METHOD_ADDRESS}'" in body["detail"]
-        assert VENDORED_PROBE_ADDRESS in body["detail"]
-        assert "'.mthds/methods/b/'" in body["detail"]
+        body = assert_problem(response, status=422, code="method.package_invalid")
+        assert body["params"] == {"reason": "dependency_address_collision", "path": ".mthds/methods/b/"}
 
     def test_a_method_ref_package_keeps_its_shipped_files_apart(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
@@ -321,7 +318,7 @@ class TestVendoredMethodPackages:
 
         assert [item.source for item in tooling.files] == ["smoke.mthds"]
         assert tooling.main_pipe == "echo"
-        with pytest.raises(ApiError, match="unfinished"):
+        with pytest.raises(RequestMethodError, match="unfinished"):
             fetched_method(_METHOD_REF)
 
     def test_validate_by_method_ref_resolves_the_dependency_it_ships(
@@ -349,9 +346,10 @@ class TestVendoredMethodPackages:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert [(item["error_type"], item["missing_pipe_code"]) for item in body["validation_errors"]] == [
-            ("unresolved_package_dependency", UNRESOLVED_PACKAGE_REFERENCE)
-        ]
+        package_address = UNRESOLVED_PACKAGE_REFERENCE.split("->", maxsplit=1)[0]
+        assert [(item["code"], item["params"]) for item in body["errors"]] == [
+            ("method.dependency_missing", {"kind": "package", "name": package_address, "reason": "not_found"})
+        ], body
 
 
 def _package_vendoring_files() -> dict[str, str]:

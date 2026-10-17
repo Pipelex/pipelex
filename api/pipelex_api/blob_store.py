@@ -30,11 +30,12 @@ From this the blob store answers without reading what it does not need:
   another size included, which only a storage that does not publish writes whole could leave short, and which the
   upload then writes over.
 - A run looks up each hash's stored size first. A hash held at another size than an entry states is a 422
-  `BlobMismatch`, never `MissingBlobs`, since uploading those bytes again would change nothing: the entry is wrong.
+  `request.invalid`, never `request.blobs_missing`, since uploading those bytes again would change nothing: the entry
+  is wrong.
   Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
   states, which its census already held to the tree's limits, and each is checked against its hash once read. Bytes
   that do not hash to their key mean the storage itself is damaged, which no caller can repair: a 500
-  `BlobStoreCorrupted`.
+  `runtime.misconfigured` naming the blob store.
 
 Lookups and reads run a bounded number at a time, so one request naming many blobs never opens them all at once.
 """
@@ -52,8 +53,7 @@ from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_internal_server_error
+from pipelex_api.exceptions import RunnerMisconfiguredError
 
 BLOBS_PREFIX = "blobs"
 TREES_PREFIX = "trees"
@@ -63,6 +63,8 @@ _LISTING_CONTENT_TYPE = "text/plain; charset=utf-8"
 # request runs at a time.
 MAX_CONCURRENT_BLOB_LOOKUPS = 16
 MAX_CONCURRENT_BLOB_TRANSFERS = 4
+# What a `runtime.misconfigured` refusing damaged stored bytes names as misconfigured, for the operator.
+BLOB_STORE_COMPONENT = "blob_store"
 
 
 class RunnerBlobStore:
@@ -114,7 +116,8 @@ class RunnerBlobStore:
     async def _read_verified(self, *, sha256: str, size: int) -> bytes:
         """The stored bytes of `sha256`, held at `size`, checked against their hash.
 
-        Raises (as a problem document): a 500 `BlobStoreCorrupted` for bytes that are not `size` bytes hashing to `sha256`.
+        Raises (as a problem document): a 500 `runtime.misconfigured` naming the blob store, for bytes that are not `size`
+        bytes hashing to `sha256`.
         """
         data = await self._storage.load(f"{PIPELEX_STORAGE_SCHEME}{self._blob_key(sha256=sha256)}")
         if len(data) != size or sha256_hex(data) != sha256:
@@ -122,7 +125,7 @@ class RunnerBlobStore:
                 f"The bytes this runner's blob store holds under {sha256} do not hash to it: its storage is damaged, "
                 "and its operator must remove that object for the blob to be uploaded again."
             )
-            raise_internal_server_error(message=msg, error_type=ErrorType.BLOB_STORE_CORRUPTED)
+            raise RunnerMisconfiguredError(msg, component=BLOB_STORE_COMPONENT)
         return data
 
     async def read_held(self, *, sizes: Mapping[str, int]) -> BlobStore:

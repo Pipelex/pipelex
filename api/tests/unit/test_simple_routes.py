@@ -10,9 +10,11 @@ from pytest_mock import MockerFixture
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.limits import MAX_REQUEST_BODY_BYTES
 from pipelex_api.middleware import request_body_size_middleware
 from pipelex_api.routes.health import router as health_router
 from pipelex_api.routes.version import router as version_router
+from tests.unit._problems import assert_problem
 
 
 def _build_client_with_body_cap() -> TestClient:
@@ -46,14 +48,11 @@ class TestSimpleRoutes:
         mocker.patch("pipelex_api.routes.version.version", side_effect=PackageNotFoundError("pipelex"))
         client = _build_client_with_body_cap()
         response = client.get("/v1/version")
-        assert response.status_code == 500
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "PackageNotFound"
+        assert_problem(response, status=500, code="runtime.misconfigured")
 
     def test_request_body_size_rejects_oversized_via_content_length(self):
         client = _build_client_with_body_cap()
         # 200 MiB declared > 100 MiB default cap.
         response = client.get("/health", headers={"content-length": str(200 * 1024 * 1024)})
-        assert response.status_code == 413
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "PayloadTooLarge"
+        problem = assert_problem(response, status=413, code="request.too_large")
+        assert problem["params"] == {"limit": MAX_REQUEST_BODY_BYTES, "size": 200 * 1024 * 1024}

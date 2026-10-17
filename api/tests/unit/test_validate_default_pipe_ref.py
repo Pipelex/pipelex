@@ -49,18 +49,18 @@ class TestValidateDefaultPipeRef:
         # `bundle_blueprint.main_pipe` leaves the caller to reconstruct the domain.
         assert body["default_pipe_ref"] == "smoke.echo"
 
-    def test_a_closure_declaring_no_main_pipe_reports_null(self):
+    def test_a_closure_declaring_no_main_pipe_reports_none(self):
         client = _build_client()
         response = client.post("/v1/validate", json={"mthds_contents": [NO_MAIN_PIPE_MTHDS]})
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
+        assert "default_pipe_ref" not in body
 
-    def test_several_declared_main_pipes_report_the_run_default_not_null(self):
+    def test_several_declared_main_pipes_report_the_run_default(self):
         # The field states the RUN default (`select_primary_blueprint`: first blueprint declaring
         # `main_pipe`), NOT `/pipe-io`'s stricter rule that 422s on several. `/execute` and
-        # `/start` run this closure happily, so reporting null would make a consumer refuse to
+        # `/start` run this closure happily, so reporting none would make a consumer refuse to
         # prepare a method the server would run.
         client = _build_client()
         response = client.post("/v1/validate", json={"mthds_contents": [VALID_MTHDS, SECOND_MAIN_PIPE_MTHDS]})
@@ -106,7 +106,7 @@ class TestValidateDefaultPipeRef:
         assert response.status_code == 200, response.text
         assert response.json()["default_pipe_ref"] == "smoke.echo"
 
-    def test_a_manifest_without_main_pipe_reports_null(self, install_method_package: Callable[..., Path]):
+    def test_a_manifest_without_main_pipe_reports_none(self, install_method_package: Callable[..., Path]):
         # The protocol's entry rule: a method whose manifest declares no `main_pipe` has no pipe to start at, whatever
         # its bundles declare, so a selector-less run is refused and the field says nothing.
         install_method_package(files={"documents.mthds": VALID_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
@@ -115,9 +115,9 @@ class TestValidateDefaultPipeRef:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
+        assert "default_pipe_ref" not in body
 
-    def test_a_manifest_naming_a_pipe_the_closure_lacks_reports_null(self, install_method_package: Callable[..., Path]):
+    def test_a_manifest_naming_a_pipe_the_closure_lacks_reports_none(self, install_method_package: Callable[..., Path]):
         # The manifest names `shout`; the package's closure holds only `smoke.echo`. A selector-less
         # run would pass `shout` and fail to resolve it, so the field must not fall back to the
         # closure's `echo` — that names a pipe no run of this address executes.
@@ -127,7 +127,7 @@ class TestValidateDefaultPipeRef:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
+        assert "default_pipe_ref" not in body
 
     def test_a_manifest_bare_code_two_domains_declare_resolves_in_the_domain_exporting_it(self, install_method_package: Callable[..., Path]):
         # The manifest names `echo`, declared by both `smoke` and `twin`, and exports it from `smoke` alone: the domain

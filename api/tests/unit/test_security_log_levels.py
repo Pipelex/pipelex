@@ -134,7 +134,8 @@ class TestSecurityLogLevels:
         with caplog.at_level(logging.DEBUG, logger=SECURITY_LOGGER):
             response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
 
-        assert response.status_code == 401
+        assert response.status_code == 500
+        assert response.json()["code"] == "pipelex.deployment.token_claims_invalid"
         (record,) = _security_records(caplog)
         assert record.levelno == logging.WARNING
         assert "user_action" in carried_attributes(record=record)

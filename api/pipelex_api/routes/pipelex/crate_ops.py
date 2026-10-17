@@ -17,8 +17,8 @@ from enum import StrEnum
 from typing import Literal, NamedTuple, NoReturn
 
 from fastapi.responses import JSONResponse
+from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
@@ -31,10 +31,12 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
 from pipelex_api.bundle_resources import decode_bundle_resources
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_not_implemented
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.method_source import fetch_method_mthds_files
 from pipelex_api.schemas.models import MthdsFileItem, MthdsFilesRequest
+
+# The `reason` of the `request.unsupported` refusing a registry-form `method_ref`, which no registry here resolves.
+REGISTRY_FORM_METHOD_REF_REASON = "registry_form_method_ref"
 
 
 class GeneratedArtifact(BaseModel):
@@ -45,36 +47,36 @@ class GeneratedArtifact(BaseModel):
 
 
 class CrateInvalidReport(BaseModel):
-    """The 200 **invalid** arm shared by `/resolve` and `/codegen` — the crate-verdict vocabulary.
+    """The 200 **invalid** arm shared by `/resolve`, `/codegen` and `/pipe-io` — the crate-verdict vocabulary.
 
     Same discipline as `/validate`'s `InvalidReport`: an invalid library is the *successful
     product* of a diagnostic call (the request was well-formed; the library was not), so it rides
-    a 200 discriminated on `is_valid`, carrying the same structured `ValidationErrorItem`s the
-    local CLI and `/validate` emit for the identical failure.
+    a 200 discriminated on `is_valid`, carrying the same problem items in `errors` that `/validate`
+    emits for the identical failure.
     """
 
     is_valid: Literal[False] = False
     """Discriminant of the invalid arm (mirrors the valid arms' `Literal[True]`)."""
 
-    validation_errors: list[ValidationErrorItem] = Field(
-        default_factory=empty_list_factory_of(ValidationErrorItem),
-        description="Per-error diagnostics, built by pipelex's one shared builder — non-empty on every invalid verdict.",
+    errors: list[ProblemItem] = Field(
+        default_factory=empty_list_factory_of(ProblemItem),
+        description=(
+            "One problem item per error, each with its own code, its parameters and its location — non-empty on every "
+            "invalid verdict. The items of the verdict's problem, as a refusal's `errors` carry them."
+        ),
     )
     message: str = Field(default="MTHDS library could not be resolved", description="Human-readable summary of the verdict.")
 
 
-def invalid_crate_report_response(validate_error: ValidateBundleError) -> JSONResponse:
+def invalid_crate_report_response(validate_error: ValidateBundleError, *, view: ProblemView) -> JSONResponse:
     """Render a produced "could not resolve" verdict as a 200 `CrateInvalidReport`.
 
-    The items are the error's own (`ValidateBundleError.validation_error_items`) and the message is
-    its problem's `detail`, the sentence its code renders, which reads the same in every view.
-    `exclude_none` drops each item's unset locators so the wire items match the agent CLI's
-    byte-for-byte — the "one error item, two surfaces" guarantee `/validate` already keeps.
+    The items are those of the error's problem in the view of the request's reader (`ValidateBundleError.problem_items`,
+    one per item of pipelex's one shared builder), and the message is its `detail`, the sentence its code renders, which
+    reads the same in every view. `exclude_none` drops each item's unset members, as the standard writes a problem item.
     """
-    invalid_report = CrateInvalidReport(
-        validation_errors=validate_error.validation_error_items(),
-        message=validate_error.to_problem(view=ProblemView.CALLER).detail,
-    )
+    problem = validate_error.to_problem(view=view)
+    invalid_report = CrateInvalidReport(errors=list(problem.errors or []), message=problem.detail)
     return JSONResponse(content=invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True))
 
 
@@ -103,8 +105,8 @@ async def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
     its 501 until the packaging program's registry phase.
 
     Raises:
-        ApiError: 501 for a registry-form `method_ref`; 422 for a fetched package this server
-            cannot accept.
+        RunnerRequestError: 422 `request.unsupported` for a registry-form `method_ref`.
+        RequestMethodError: 422 for a fetched package this server cannot accept.
         MethodRefError subclasses: parse, fetch, location, and bounds failures on the address
             form, rendered as `problem+json` by the global handler.
     """
@@ -113,11 +115,15 @@ async def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
             # The fetch runs git and reads the package from disk, so it runs off the event loop, as a run's does.
             fetched = await asyncio.to_thread(fetch_method_mthds_files, request_data.method_ref)
             return SelectedFiles(files=fetched.files, manifest_main_pipe=fetched.main_pipe)
-        raise_not_implemented(
+        msg = (
             "Registry-form method_ref resolution is not available on this server: no method registry is wired. "
             "Use an address-form reference (a `github.com/...` address, e.g. `github.com/Pipelex/methods/documents@v0.1.0`) "
-            "or submit inline `files[]`.",
-            error_type=ErrorType.METHOD_REF_NOT_SUPPORTED,
+            "or submit inline `files[]`."
+        )
+        raise (
+            RunnerRequestError(msg, field="method_ref")
+            .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+            .with_params(reason=REGISTRY_FORM_METHOD_REF_REASON)
         )
     return SelectedFiles(files=request_data.files or [], manifest_main_pipe=None)
 
@@ -151,7 +157,7 @@ async def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedCl
 
     Raises:
         ValidateBundleError: the produced negative verdict (route maps it to the 200 invalid arm).
-        ApiError: 501 for a registry-form `method_ref` (see `selected_files`).
+        RunnerRequestError: 422 `request.unsupported` for a registry-form `method_ref` (see `selected_files`).
         MethodRefError subclasses: address-form fetch/location failures (see `selected_files`).
     """
     selection = await selected_files(request_data)
@@ -216,7 +222,7 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     failed selection — an unknown ref, an ambiguous one, a chain that finds no entry pipe or several —
     is an input-domain 422 rather than an invalid-crate verdict, since nothing about the *closure* is
     wrong in any of them. It is raised as the engine's own entry-lookup error class (see
-    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the `error_type` the run routes
+    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the code the run routes
     answer for the same `pipe_code`. A chain finding no entry pipe or several has no run-route twin to
     match: this route refuses both the way the pipe-selector design classifies them.
 

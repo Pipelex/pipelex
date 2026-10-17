@@ -3,7 +3,7 @@
 Up to Python 3.13 `json.loads` raised `RecursionError` on a deeply nested body at a fixed count; from 3.14
 it raises only when the thread's stack runs out, so the same body was refused on one host and parsed on
 another. The server now bounds the depth itself, before parsing. These tests pin the scan (exact on valid
-JSON, blind to brackets inside strings, linear at the body cap), the 422 `InvalidJSON` a body past the
+JSON, blind to brackets inside strings, linear at the body cap), the 422 `request.malformed` a body past the
 limit gets on a route with a typed body, and the invariant that every such route of the app is checked.
 The run routes, which parse their raw body, are covered in `test_pipeline_routes.py`.
 """
@@ -19,13 +19,13 @@ from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 
-from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
-from pipelex_api.json_body import JsonBodyRoute, decode_json_body, json_nesting_exceeds
+from pipelex_api.exceptions import RunnerRequestError
+from pipelex_api.json_body import TOO_DEEPLY_NESTED_REASON, JsonBodyRoute, decode_json_body, json_nesting_exceeds
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH, MAX_REQUEST_BODY_BYTES
-from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem, problem_of
 
 # Deep enough to exhaust the parser's recursion budget on Python 3.13 and earlier.
 RECURSION_DEEP = 100_000
@@ -185,12 +185,9 @@ class TestJsonBodyNesting:
             headers={"content-type": "application/json"},
         )
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        problem = response.json()
-        assert problem["error_type"] == "InvalidJSON"
-        assert problem["error_domain"] == "input"
-        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in problem["detail"]
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["domain"] == "input"
+        assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
 
     def test_typed_route_accepts_a_body_at_the_limit(self):
         response = _client().post(
@@ -211,9 +208,8 @@ class TestJsonBodyNesting:
             headers={"content-type": "application/json"},
         )
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        assert response.json()["error_type"] == "InvalidJSON"
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
 
     def test_every_route_with_a_json_body_is_bounded(self):
         # Imported here, as in `test_openapi_contract.py`, so a bad env var fails this test rather than the collection.
@@ -230,9 +226,13 @@ class TestJsonBodyNesting:
         mocker.patch("pipelex_api.json_body.json_nesting_exceeds", return_value=False)
         mocker.patch("pipelex_api.json_body.json.loads", side_effect=RecursionError("maximum recursion depth exceeded"))
 
-        with pytest.raises(ApiError) as raised:
+        with pytest.raises(RunnerRequestError) as raised:
             decode_json_body(b'{"inputs": []}')
 
-        assert raised.value.status_code == 422
-        assert raised.value.document["error_type"] == "InvalidJSON"
-        assert "not valid JSON" in raised.value.document["detail"]
+        # The patch replaces `json.loads` module-wide, and rendering the problem parses JSON too.
+        mocker.stopall()
+        problem = problem_of(raised.value)
+        assert problem["status"] == 422
+        assert problem["code"] == "request.malformed"
+        assert problem["params"] == {"reason": "not_json"}
+        assert isinstance(raised.value.__cause__, RecursionError)

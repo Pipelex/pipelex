@@ -4,7 +4,7 @@
 raise `RecursionError` at a fixed count; from Python 3.14 the guard is the thread's actual stack size,
 so the same body overflows on a small stack and parses on a large one, to be refused later for some
 other reason or accepted. The server therefore bounds the nesting itself, before parsing: a body nested
-deeper than `MAX_JSON_NESTING_DEPTH` answers the same 422 `InvalidJSON` on every interpreter and stack.
+deeper than `MAX_JSON_NESTING_DEPTH` answers the same 422 `request.malformed` on every interpreter and stack.
 
 Every JSON body the server parses goes through `ensure_json_nesting_within_limit`, by one of two doors:
 
@@ -23,10 +23,10 @@ from typing import Any
 
 from fastapi import Request, Response, params
 from fastapi.routing import APIRoute
+from mthds.protocol.problem.registry import CoreCode, RequestMalformedReason
 from typing_extensions import override
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_validation_error
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH
 
 # The two escape sequences that can hide a quote. Once they are gone, every quote left delimits a string.
@@ -128,17 +128,20 @@ def json_nesting_exceeds(body: bytes, *, max_depth: int) -> bool:
     return False
 
 
+# The reason a body nested past the limit is malformed. The code's reasons name no nesting depth, and its reason takes
+# any string beside them, so the runner names this one itself: no size limit of the registry counts levels.
+TOO_DEEPLY_NESTED_REASON = "too_deeply_nested"
+
+
 def ensure_json_nesting_within_limit(body: bytes) -> None:
-    """Refuse a request body nested deeper than `MAX_JSON_NESTING_DEPTH` with a 422 `InvalidJSON`."""
+    """Refuse a request body nested deeper than `MAX_JSON_NESTING_DEPTH` with a 422 `request.malformed`."""
     if json_nesting_exceeds(body, max_depth=MAX_JSON_NESTING_DEPTH):
-        raise_validation_error(
-            message=f"Request body is nested too deeply: its JSON arrays and objects may nest at most {MAX_JSON_NESTING_DEPTH} levels.",
-            error_type=ErrorType.INVALID_JSON,
-        )
+        msg = f"Request body is nested too deeply: its JSON arrays and objects may nest at most {MAX_JSON_NESTING_DEPTH} levels"
+        raise RunnerRequestError(msg).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=TOO_DEEPLY_NESTED_REASON)
 
 
 def decode_json_body(body: bytes) -> Any:
-    """Parse a raw request body as plain JSON, refusing it with a 422 `InvalidJSON` when it cannot be.
+    """Parse a raw request body as plain JSON, refusing it with a 422 `request.malformed` when it cannot be.
 
     For a route that reads its body itself rather than declaring a typed one. The refusals are caller
     mistakes, never a sanitized 500:
@@ -150,12 +153,15 @@ def decode_json_body(body: bytes) -> Any:
     """
     ensure_json_nesting_within_limit(body)
     try:
-        return json.loads(body.decode("utf-8"))
-    except (UnicodeDecodeError, ValueError, RecursionError) as exc:
-        raise_validation_error(
-            message=f"Request body is not valid JSON: {exc!s}",
-            error_type=ErrorType.INVALID_JSON,
-        )
+        text = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        msg = f"Request body is not valid UTF-8: {exc!s}"
+        raise RunnerRequestError(msg).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=RequestMalformedReason.NOT_UTF8) from exc
+    try:
+        return json.loads(text)
+    except (ValueError, RecursionError) as exc:
+        msg = f"Request body is not valid JSON: {exc!s}"
+        raise RunnerRequestError(msg).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=RequestMalformedReason.NOT_JSON) from exc
 
 
 class JsonBodyRoute(APIRoute):
@@ -163,7 +169,7 @@ class JsonBodyRoute(APIRoute):
 
     FastAPI parses a typed body with `json.loads` and turns any failure but a `JSONDecodeError` into a
     bare 400, so the check runs in front of FastAPI's own handler, where its 422 reaches the API's
-    exception handlers like any other `ApiError`. The body it reads is cached on the request, so FastAPI
+    exception handlers like any other `PipelexError`. The body it reads is cached on the request, so FastAPI
     does not read it twice. A route that declares no body, or a form body, is left as it is: one that
     reads its raw body parses it with `decode_json_body`.
     """

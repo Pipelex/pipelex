@@ -2,8 +2,9 @@
 
 `/validate` is a **diagnostic endpoint**: a produced verdict — valid or invalid — always rides a
 **200**, discriminated in the body on `is_valid`. An invalid bundle answers a 200 `InvalidReport`
-carrying a structured `validation_errors[]` list (the per-error diagnostics the VS Code extension
-maps to per-line problems), built by pipelex's one shared builder; the structural artifacts
+carrying `errors[]`, one problem item per finding (the per-error diagnostics the VS Code extension
+maps to per-line problems), each with its registry code, the parameters its sentence is rendered
+from, and its location, built by pipelex's one shared builder; the structural artifacts
 (`bundle_blueprint`, `pipe_io_contracts`, `graph_spec`, `validated_pipes`) are absent on the invalid
 arm. Non-2xx is reserved for *no-verdict* conditions: a malformed body or an
 `mthds_sources`/`mthds_contents` length mismatch is a request-shape **422**; a server fault that
@@ -11,7 +12,7 @@ is not a produced verdict (a host-wiring `PipelexError` / `PipelexUnexpectedErro
 
 When the caller sends `mthds_sources` parallel to `mthds_contents`, each name is threaded onto
 `blueprint.source`, so pipe/concept and blueprint errors name the owning file on BOTH the invalid
-arm (`validation_errors[].source`) and the valid arm (`bundle_blueprint.source`).
+arm (`errors[].location.file`) and the valid arm (`bundle_blueprint.source`).
 
 Asserts the in-process wire response via `TestClient`; the conformance HTTP arm asserts the same
 200-diagnostic contract on the REAL wire (the spec's `<!-- unverified -->` markers point there).
@@ -22,7 +23,7 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import PipelexConfigError, ValidationErrorCategory
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
     PipeFactoryErrorData,
@@ -39,6 +40,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, UNKNOWN_MODEL_MTHDS, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 # Structural artifacts that exist only on the valid arm — the invalid arm must NOT carry them.
 _STRUCTURAL_FIELDS = ("bundle_blueprint", "pipe_io_contracts", "graph_spec", "validated_pipes")
@@ -119,10 +121,12 @@ class TestValidateErrors:
             assert field not in body, f"invalid arm leaked structural field {field!r}: {body}"
         # The retired wire extra is gone — the verdict is `is_valid`, never `success`.
         assert "success" not in body
-        items: list[dict[str, Any]] = body["validation_errors"]
+        items: list[dict[str, Any]] = body["errors"]
         assert isinstance(items, list)
         assert items, body
-        assert all(item["category"] in set(ValidationErrorCategory) and "message" in item for item in items)
+        assert all(item["code"] and item["detail"] for item in items)
+        # An item writes no member as null.
+        assert all(None not in item.values() for item in items)
 
     def test_validation_errors_carry_threaded_source(self):
         client = _build_client()
@@ -134,12 +138,12 @@ class TestValidateErrors:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        items: list[dict[str, Any]] = body["validation_errors"]
+        items: list[dict[str, Any]] = body["errors"]
         # Pins that the dict-seeded blueprint-validation item carries the threaded name (not some
         # coincidental other item): a regression that stopped seeding `source` would fail here.
-        sourced = [item for item in items if item.get("source") == "broken.mthds"]
-        assert sourced, f"no validation_errors item carried the threaded source: {items}"
-        assert any(item["category"] == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in sourced)
+        sourced = [item for item in items if item.get("location", {}).get("file") == "broken.mthds"]
+        assert sourced, f"no errors item carried the threaded source: {items}"
+        assert any(item["code"] == "method.identifier_invalid" for item in sourced)
 
     def test_toml_syntax_errors_carry_threaded_source(self):
         client = _build_client()
@@ -154,11 +158,13 @@ class TestValidateErrors:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        items: list[dict[str, Any]] = body["validation_errors"]
-        sourced = [item for item in items if item.get("source") == "broken.mthds"]
-        assert sourced, f"no validation_errors item carried the threaded source: {items}"
-        assert any(item["category"] == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in sourced)
-        assert any("TOML syntax error" in item["message"] for item in sourced)
+        items: list[dict[str, Any]] = body["errors"]
+        sourced = [item for item in items if item.get("location", {}).get("file") == "broken.mthds"]
+        assert sourced, f"no errors item carried the threaded source: {items}"
+        (item,) = sourced
+        assert item["code"] == "method.syntax"
+        assert item["location"] == {"file": "broken.mthds", "line": 1, "column": 19}
+        assert item["params"]["finding"].startswith("TOML syntax error")
 
     def test_unknown_model_is_a_located_item_of_the_invalid_verdict(self):
         # A model the deck does not define is refused while the pipe is built. That refusal is an
@@ -173,21 +179,18 @@ class TestValidateErrors:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        items: list[dict[str, Any]] = body["validation_errors"]
+        items: list[dict[str, Any]] = body["errors"]
         assert len(items) == 1, items
         item = items[0]
-        assert item["category"] == ValidationErrorCategory.PIPE_VALIDATION
-        assert item["error_type"] == "unknown_model"
-        assert item["pipe_code"] == "echo"
-        assert item["source"] == "echo.mthds"
-        assert item["field_path"] == "pipe.echo.model"
-        assert item["model_reference"] == "no-such-model-in-any-deck"
-        assert item["model_type"] == "llm"
+        assert item["code"] == "model.unknown"
+        assert item["params"] == {"model": "no-such-model-in-any-deck", "model_type": "llm"}
+        assert item["location"] == {"pipe": "echo", "field": "model", "file": "echo.mthds"}
+        assert item["detail"] == "The method names the llm model 'no-such-model-in-any-deck', which no catalog knows."
 
     def test_all_categories_project_onto_invalid_report(self, mocker: MockerFixture):
-        # Every structured category lands on the 200 InvalidReport, and collectively the items cover
-        # the full ValidationErrorItem field set (so a dropped field would fail here, not silently
-        # vanish at the verdict->wire boundary). The runner returns the invalid verdict as a value
+        # Every structured category lands on the 200 InvalidReport as a problem item under its own code, and
+        # collectively the items carry every member of a problem item and every locator (so a dropped one would fail
+        # here, not silently vanish at the verdict->wire boundary). The runner returns the invalid verdict as a value
         # (a BundleValidationFailure) — here the one a validator builds from the ValidateBundleError.
         mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=_failure_of(_multi_category_error())))
         client = _build_client()
@@ -197,31 +200,18 @@ class TestValidateErrors:
         body = response.json()
         assert body["is_valid"] is False
         assert body["is_runnable"] is False
-        items: list[dict[str, Any]] = body["validation_errors"]
-        categories = {item["category"] for item in items}
-        assert categories == {
-            ValidationErrorCategory.BLUEPRINT_VALIDATION,
-            ValidationErrorCategory.PIPE_FACTORY,
-            ValidationErrorCategory.PIPE_VALIDATION,
-        }
-        # The union of populated fields across the items covers every ValidationErrorItem field.
-        populated = {key for item in items for key, value in item.items() if value is not None}
-        assert populated.issuperset(
-            {
-                "category",
-                "message",
-                "error_type",
-                "pipe_code",
-                "concept_code",
-                "domain_code",
-                "source",
-                "field_path",
-                "field_name",
-                "variable_names",
-                "missing_concept_code",
-                "declared_concepts",
-            }
-        ), f"missing fields: {populated}"
+        items: list[dict[str, Any]] = body["errors"]
+        assert [item["code"] for item in items] == [
+            "method.input_undeclared",
+            "method.concept_unresolved",
+            "method.output_concept_mismatch",
+        ]
+        # The union of members across the items covers every member of a problem item and every locator.
+        assert {key for item in items for key in item} == {"code", "detail", "params", "location"}
+        assert {key for item in items for key in item.get("location", {})} == {"pipe", "field", "file"}
+        undeclared, unresolved, _ = items
+        assert undeclared["params"] == {"pipe": "summarize", "variables": ["contract"]}
+        assert unresolved["params"] == {"concept": "Summari"}
 
     def test_dry_run_failures_become_one_located_item_per_failing_pipe(self, mocker: MockerFixture):
         # A failing dry run is one `dry_run` item per failing pipe, located at the innermost pipe
@@ -249,18 +239,15 @@ class TestValidateErrors:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        items: list[dict[str, Any]] = body["validation_errors"]
+        items: list[dict[str, Any]] = body["errors"]
         assert len(items) == 2, items
-        assert all(item["category"] == ValidationErrorCategory.DRY_RUN for item in items)
-        assert all(item["error_type"] == "DryRunError" for item in items)
+        # Each item carries the code the dry-run failure was raised under.
+        assert all(item["code"] == CoreCode.METHOD_WIRING_INVALID for item in items)
         located_item, unlocated_item = items
-        assert located_item["pipe_code"] == "summarize"
-        assert located_item["domain_code"] == "legal"
-        assert located_item["source"] == "pipe.mthds"
-        assert located_item["message"] == "Pipe 'summarize' failed: boom."
-        assert unlocated_item["message"] == "Dry run failed: unlocated."
-        for locator in ("pipe_code", "domain_code", "source"):
-            assert locator not in unlocated_item, unlocated_item
+        assert located_item["location"] == {"pipe": "summarize", "file": "pipe.mthds"}
+        assert located_item["params"]["finding"] == "Pipe 'summarize' failed: boom."
+        assert unlocated_item["params"] == {"finding": "Dry run failed: unlocated."}
+        assert "location" not in unlocated_item, unlocated_item
 
     def test_non_verdict_failure_is_not_a_200_verdict(self, mocker: MockerFixture):
         # The runner returns a produced verdict (valid report | BundleValidationFailure) as a value; only
@@ -288,7 +275,7 @@ class TestValidateErrors:
         body = response.json()
         assert body["is_valid"] is True
         # Valid arm threads the same name, so a client can correlate the report's primary blueprint to
-        # its file exactly as it would a failure's `validation_errors[].source`.
+        # its file exactly as it would a failure's `errors[].location.file`.
         assert body["bundle_blueprint"]["source"] == "api://smoke.mthds"
 
     def test_length_mismatch_is_a_request_error(self):
@@ -299,8 +286,6 @@ class TestValidateErrors:
         )
 
         # Caught at request validation as a 422 — never reaches the runtime (which would 500 on the
-        # mismatch). The validator message rides the problem `detail`. This is a no-verdict
-        # request-shape condition, NOT a content verdict.
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert "mthds_sources" in response.text
+        # mismatch). The model's own rule refuses the body as a whole, and its message rides the operator's
+        # diagnostics alone. This is a no-verdict request-shape condition, NOT a content verdict.
+        assert_problem(response, status=422, code="request.invalid", field="body")

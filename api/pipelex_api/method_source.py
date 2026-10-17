@@ -32,7 +32,7 @@ The routes use it two ways:
 
 The security gate (packaging invariant 7 — execution locus decides) is the request tree's
 (`pipelex_api.method_tree_request.ensure_python_allowed`): on a deployment that is not sandbox-hosted, a package
-carrying any `.py` is refused with a 403 `CustomCodeRequiresSandbox`; on a sandbox-hosted one, PipeFunc `.py` is
+carrying any `.py` is refused with a 501 `pipelex.deployment.custom_code_requires_sandbox`; on a sandbox-hosted one, PipeFunc `.py` is
 acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError`, a 422
 `pipelex.deployment.python_structures_refused`).
 
@@ -59,13 +59,14 @@ from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_validation_error
+from pipelex_api.exceptions import RequestMethodError
 from pipelex_api.limits import MAX_MTHDS_FILE_BYTES
 from pipelex_api.method_cache import get_method_clone_cache
 from pipelex_api.method_tree_request import (
+    NOT_UTF8_FINDING,
     RequestMethod,
     RequestTree,
+    TreeLimitReason,
     add_dependency,
     dependency_address_of,
     ensure_method_within_limits,
@@ -166,11 +167,7 @@ def _package_tree_entries(*, package: FetchedMethodPackage) -> list[_GitTreeEntr
             path = raw_path.decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"Method package '{package.full_address}' holds a file whose name is not UTF-8 text, which no method tree can hold."
-            raise (
-                MethodFetchError(msg)
-                .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-                .with_params(reason="a file's name is not UTF-8 text, which no method tree can hold")
-            ) from exc
+            raise (MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason="file_name_not_utf8")) from exc
         if not path.startswith(prefix):
             continue
         entries.append(_GitTreeEntry(mode=mode, object_sha=object_sha, path=path.removeprefix(prefix)))
@@ -266,8 +263,9 @@ def _read_package_method(*, package: FetchedMethodPackage) -> RequestMethod:
                     continue
                 vendored_label = f"The package '.mthds/methods/{vendored_dir.name}/' of method package '{package.full_address}'"
                 dependency_tree = _read_listed_tree(root=vendored_dir, package_address=vendored_label, label=vendored_label)
-                address = dependency_address_of(tree=dependency_tree, fallback_name=vendored_dir.name, label=vendored_label)
-                add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=vendored_label)
+                root = f".mthds/methods/{vendored_dir.name}/"
+                address = dependency_address_of(tree=dependency_tree, fallback_name=vendored_dir.name, label=vendored_label, root=root)
+                add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=vendored_label, root=root)
         request_method = RequestMethod(tree=tree, dependencies=dependencies)
         ensure_method_within_limits(request_method=request_method, label=label)
         return request_method
@@ -280,8 +278,7 @@ def _fetched_package(method_ref: str) -> Generator[FetchedMethodPackage, None, N
     """Parse the reference and fetch its package through the SHA-keyed clone cache, its clone pinned in the block.
 
     Every failure mode is a distinct pipelex `MethodRefError` subclass, rendered by the
-    global handler as RFC 7807 `problem+json` with the class name as `error_type` and the
-    status the API maps for it (`pipelex_api.exception_handlers._ERROR_TYPE_STATUS_OVERRIDES`).
+    global handler as the `problem+json` document of its code, with the status its code declares.
     """
     ref = parse_method_ref(method_ref)
     with get_method_clone_cache().pinned_package(ref=ref) as package:
@@ -330,7 +327,7 @@ def fetched_method(method_ref: str) -> FetchedMethod:
         MethodRefError subclasses: parse, fetch, location and bounds failures, each rendered as `problem+json` by the
             global handler.
         MethodTreeLoadError: The standard refused the package's tree (a 422 naming the package by its address).
-        ApiError: A tree past this runner's limits, or a shipped package without a manifest (422s).
+        RequestMethodError: A tree past this runner's limits, or a shipped package without a manifest (422s).
     """
     with _fetched_package(method_ref) as package:
         request_method = _read_package_method(package=package)
@@ -352,7 +349,7 @@ def fetch_method_mthds_files(method_ref: str) -> FetchedMthdsFiles:
     Raises:
         MethodRefError subclasses: parse, fetch, location, and bounds failures.
         MethodTreeLoadError: The standard refused the package's tree.
-        ApiError: 422 for a package with no `.mthds` file or one this server cannot accept.
+        RequestMethodError: 422 for a package with no `.mthds` file or one this server cannot accept.
     """
     with _fetched_package(method_ref) as package:
         bundles = _read_package_bundles(package=package)
@@ -361,12 +358,16 @@ def fetch_method_mthds_files(method_ref: str) -> FetchedMthdsFiles:
     for tree_path, data in bundles.items():
         try:
             content = data.decode("utf-8")
-        except UnicodeDecodeError:
-            raise_validation_error(message=f"File '{tree_path}' in method package {label} is not valid UTF-8.")
+        except UnicodeDecodeError as exc:
+            msg = f"File '{tree_path}' in method package {label} is not valid UTF-8."
+            raise RequestMethodError(msg, file=tree_path).with_error_code(CoreCode.METHOD_SYNTAX).with_params(finding=NOT_UTF8_FINDING) from exc
         if len(data) > MAX_MTHDS_FILE_BYTES:
             msg = f"File '{tree_path}' in method package {label} exceeds the {MAX_MTHDS_FILE_BYTES // 1024} KiB per-file limit."
-            raise_validation_error(message=msg)
+            raise RequestMethodError(msg, file=tree_path).with_params(
+                reason=TreeLimitReason.FILE_TOO_LARGE, path=tree_path, limit=MAX_MTHDS_FILE_BYTES
+            )
         items.append(MthdsFileItem(content=content, source=tree_path))
     if not items:
-        raise_validation_error(message=f"Method package {label} contains no {BUNDLE_SUFFIX} file.", error_type=ErrorType.INVALID_BUNDLE)
+        msg = f"Method package {label} contains no {BUNDLE_SUFFIX} file."
+        raise RequestMethodError(msg).with_params(reason="no_bundle")
     return FetchedMthdsFiles(files=items, main_pipe=package.manifest.main_pipe)

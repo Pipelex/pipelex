@@ -42,6 +42,7 @@ from tests.unit._constants import (
     STUB_METHOD_MANIFEST_NOMAIN_ENTRY,
     VALID_MTHDS,
 )
+from tests.unit._problems import assert_problem
 
 PIPE_IO_PATH = "/v1/pipe-io"
 
@@ -51,9 +52,9 @@ STUB_METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 # The three artifact maps the valid arm carries, sharing one key set.
 ARTIFACT_FIELDS = ("pipe_io_contracts", "input_form", "output_form")
 
-# The `error_type` of a malformed request's 422, which the API authors itself; a pipe-selection refusal is the
-# runtime's, answered under its registry code.
-REQUEST_SHAPE_ERROR = "ValidationError"
+# The code of a malformed request's 422, which the runner authors itself; a pipe-selection refusal is answered under the
+# code its failure names.
+REQUEST_SHAPE_CODE = "request.invalid"
 
 # Every field only the valid arm carries: the invalid arm is the crate verdict alone.
 VALID_ARM_ONLY_FIELDS = ("pipe_ref", "default_pipe_ref", *ARTIFACT_FIELDS, "pending_signatures", "is_runnable", "files")
@@ -77,7 +78,7 @@ def _valid_arm(client: TestClient, payload: dict[str, Any]) -> dict[str, Any]:
     assert response.status_code == 200, response.text
     body: dict[str, Any] = response.json()
     assert body["is_valid"] is True, response.text
-    assert "validation_errors" not in body
+    assert "errors" not in body
     return body
 
 
@@ -86,16 +87,12 @@ def _assert_keys(body: dict[str, Any], expected: set[str]) -> None:
         assert set(body[field_name]) == expected, f"`{field_name}` keyed by {sorted(body[field_name])}, expected {sorted(expected)}"
 
 
-def _assert_input_422(response: Any, *, error_type: str) -> str:
-    """Assert an API-authored no-verdict input 422 of the given `error_type`, and return its detail."""
-    assert response.status_code == 422, response.text
-    assert response.headers["content-type"] == "application/problem+json"
-    problem = response.json()
-    assert problem["error_type"] == error_type, response.text
-    assert problem["error_domain"] == "input"
+def _assert_input_422(response: Any, *, code: str) -> dict[str, Any]:
+    """Assert a runner-authored no-verdict input 422 of the given `code`, and return its problem."""
+    problem = assert_problem(response, status=422, code=code)
+    assert problem["domain"] == "input"
     assert "is_valid" not in problem
-    detail: str = problem["detail"]
-    return detail
+    return problem
 
 
 def _assert_selection_refusal(response: Any, *, code: CoreCode, params: dict[str, Any]) -> dict[str, Any]:
@@ -337,8 +334,8 @@ class TestPipeIoRoute:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"]
-        assert body["validation_errors"][0]["source"] == "broken.mthds"
+        assert body["errors"]
+        assert body["errors"][0]["location"]["file"] == "broken.mthds"
         assert body["message"]
         for field_name in VALID_ARM_ONLY_FIELDS:
             assert field_name not in body, f"the invalid arm never carries `{field_name}`"
@@ -413,7 +410,7 @@ class TestPipeIoRoute:
     )
     def test_closure_selector_xor_is_a_request_shape_422(self, payload: dict[str, Any]):
         client = _build_client()
-        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), code=REQUEST_SHAPE_CODE)
 
     @pytest.mark.parametrize(
         "payload",
@@ -424,7 +421,7 @@ class TestPipeIoRoute:
     )
     def test_out_of_bounds_selectors_are_a_request_shape_422(self, payload: dict[str, Any]):
         client = _build_client()
-        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), code=REQUEST_SHAPE_CODE)
 
     def test_a_bare_pipe_code_resolves_but_is_answered_qualified(self):
         # The engine's entry lookup still accepts a bare request code, falling back across domains, until

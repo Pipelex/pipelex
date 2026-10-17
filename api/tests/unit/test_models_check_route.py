@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.pipelex.agent.models import MAX_MODEL_REFERENCE_LENGTH
+from tests.unit._problems import assert_problem
 
 _CHECK_PATH = "/v1/models/check"
 
@@ -91,11 +92,10 @@ class TestModelsCheckRoute:
         assert validation.status_code == 200, validation.text
         report = validation.json()
         assert report["is_valid"] is False
-        (item,) = report["validation_errors"]
-        assert item["error_type"] == "unknown_model"
-        assert item["model_reference"] == llm_handle
-        assert item["model_type"] == "img_gen"
-        assert "but not as an image-generation model" in item["message"]
+        (item,) = report["errors"]
+        assert item["code"] == "model.unknown"
+        assert item["params"] == {"model": llm_handle, "model_type": "img_gen"}
+        assert item["location"]["field"] == "model"
 
     def test_doc_gen_is_a_category_of_the_check(self):
         client = _build_client()
@@ -114,28 +114,25 @@ class TestModelsCheckRoute:
         assert verdict["category"] is None
 
     @pytest.mark.parametrize(
-        ("params", "error_type"),
+        ("params", "field"),
         [
-            pytest.param([], "ValidationError", id="reference-missing"),
-            pytest.param([("reference", "@a"), ("reference", "@b")], "ValidationError", id="reference-repeated"),
-            pytest.param([("reference", "@a"), ("type", "llm"), ("type", "extract")], "ValidationError", id="type-repeated"),
-            pytest.param([("reference", "")], "InvalidModelReference", id="empty"),
-            pytest.param([("reference", "   ")], "InvalidModelReference", id="blank"),
-            pytest.param([("reference", "~")], "InvalidModelReference", id="sigil-alone"),
-            pytest.param([("reference", "handle:")], "InvalidModelReference", id="namespace-alone"),
-            pytest.param([("reference", "@" + "x" * MAX_MODEL_REFERENCE_LENGTH)], "InvalidModelReference", id="past-the-bound"),
-            pytest.param([("reference", "@a"), ("type", "bogus_category")], "InvalidModelCategory", id="type-unknown"),
-            pytest.param([("reference", "@a"), ("type", "")], "InvalidModelCategory", id="type-empty"),
+            pytest.param([], "reference", id="reference-missing"),
+            pytest.param([("reference", "@a"), ("reference", "@b")], "reference", id="reference-repeated"),
+            pytest.param([("reference", "@a"), ("type", "llm"), ("type", "extract")], "type", id="type-repeated"),
+            pytest.param([("reference", "")], "reference", id="empty"),
+            pytest.param([("reference", "   ")], "reference", id="blank"),
+            pytest.param([("reference", "~")], "reference", id="sigil-alone"),
+            pytest.param([("reference", "handle:")], "reference", id="namespace-alone"),
+            pytest.param([("reference", "@" + "x" * MAX_MODEL_REFERENCE_LENGTH)], "reference", id="past-the-bound"),
+            pytest.param([("reference", "@a"), ("type", "bogus_category")], "type", id="type-unknown"),
+            pytest.param([("reference", "@a"), ("type", "")], "type", id="type-empty"),
         ],
     )
-    def test_a_request_with_no_verdict_is_an_input_422(self, params: list[tuple[str, str]], error_type: str):
+    def test_a_request_with_no_verdict_is_an_input_422(self, params: list[tuple[str, str]], field: str):
         client = _build_client()
 
         response = client.get(_CHECK_PATH, params=tuple(params))
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        problem = response.json()
-        assert problem["error_type"] == error_type
-        assert problem["error_domain"] == "input"
+        problem = assert_problem(response, status=422, code="request.invalid", field=field)
+        assert problem["domain"] == "input"
         assert "resolution" not in problem

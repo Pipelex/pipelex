@@ -22,9 +22,8 @@ from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_validation_error
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import ERROR_CHAIN_FIELD, ERROR_FRAMES_FIELD, register_exception_handlers
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 
 _SHIPPED_PIPELEX_CONFIG = Path(__file__).parents[2] / ".pipelex" / "pipelex.toml"
@@ -34,9 +33,38 @@ _router = APIRouter()
 
 @_router.get("/pipelex-failure")
 async def pipelex_failure_route() -> None:
-    # An operator-actionable 500 — the `error`-level branch, with a traceback on the record.
+    # An operator-actionable 500 — the `error`-level branch, with the frames of its chain on the record.
     msg = "the gateway config is missing"
     raise PipelexConfigError(msg)
+
+
+# The text of a foreign exception a run's data can reach, such as a pydantic error quoting an input or a method
+# function's own failure: it must reach no record.
+_RUN_DATA_TEXT = "the patient's record reads: Jane Doe, born 1970-01-01"
+
+
+def _fail_on_run_data() -> None:
+    """A method function failing with a message quoting the run's data."""
+    raise ValueError(_RUN_DATA_TEXT)
+
+
+@_router.get("/chained-failure")
+async def chained_failure_route() -> None:
+    # A Pipelex 500 raised from a foreign exception whose text quotes a run's data, and raised while handling another.
+    try:
+        _fail_on_run_data()
+    except ValueError as exc:
+        msg = f"the step failed: {exc}"
+        raise PipelexConfigError(msg) from exc
+
+
+@_router.get("/implicitly-chained-failure")
+async def implicitly_chained_failure_route() -> None:
+    # A bug of ours raised while handling a foreign failure: the chain is implicit, and the catch-all answers it.
+    try:
+        _fail_on_run_data()
+    except ValueError:
+        raise KeyError(_RUN_DATA_TEXT)  # noqa: B904
 
 
 # The text of an exception that is not a Pipelex error, which may name anything on the host: the operator's alone.
@@ -49,11 +77,12 @@ async def foreign_failure_route() -> None:
     raise RuntimeError(_FOREIGN_FAILURE_TEXT)
 
 
-@_router.get("/caller-mistake")
-async def caller_mistake_route(detail: str) -> None:
-    # A caller-input 422 whose `detail` is exactly what the caller sent — the `warning`-level
-    # branch, and the one field on the record that a caller controls.
-    raise_validation_error(detail, ErrorType.VALIDATION_ERROR)
+@_router.get("/caller-mistake/{token:path}")
+async def caller_mistake_route(token: str) -> None:
+    # A caller-input 422 — the `warning`-level branch. Its path is exactly what the caller sent, and it rides the record
+    # as `url.path`, percent-decoded: the one field on the record that a caller controls.
+    msg = f"the token {token!r} is refused"
+    raise RunnerRequestError(msg, field="token")
 
 
 def _build_client(*, raise_server_exceptions: bool = True) -> TestClient:
@@ -118,11 +147,12 @@ class TestErrorLogRecords:
         assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
         assert getattr(record, "url.path", None) == "/pipelex-failure"
         assert getattr(record, "error.type", None) == "PipelexConfigError"
+        assert getattr(record, ERROR_CHAIN_FIELD, None) == ["PipelexConfigError"]
 
-    def test_an_unexpected_failure_keeps_its_class_and_text_for_the_operator_alone(self, caplog: pytest.LogCaptureFixture):
+    def test_an_unexpected_failure_keeps_its_class_and_where_it_was_raised_for_the_operator(self, caplog: pytest.LogCaptureFixture):
         # The catch-all answers the caller the code's sentences, and the operator's record keeps what escaped: its class
-        # as `error.type`, and its text with its traceback under `exception`, never in a field a caller-supplied value
-        # could share.
+        # as `error.type`, and the frames it was raised through, never its text, which the operator view's diagnostics
+        # carry for whoever reads it.
         with caplog.at_level(logging.WARNING):
             response = _build_client(raise_server_exceptions=False).get("/foreign-failure")
         assert response.status_code == 500
@@ -133,22 +163,55 @@ class TestErrorLogRecords:
         assert record.levelno == logging.ERROR
         assert getattr(record, "error.code", None) == "runtime.unexpected"
         assert getattr(record, "error.type", None) == "RuntimeError"
-        assert record.exc_info is not None
-        assert isinstance(record.exc_info[1], RuntimeError)
+        assert record.exc_info is None
         payload = _rendered_json(record)
-        assert f"RuntimeError: {_FOREIGN_FAILURE_TEXT}" in payload["exception"]
+        assert "exception" not in payload
+        assert payload[ERROR_CHAIN_FIELD] == ["RuntimeError"]
+        assert any(frame.endswith(" in foreign_failure_route") for frame in payload[ERROR_FRAMES_FIELD]), payload
+        assert _FOREIGN_FAILURE_TEXT not in json.dumps(payload)
+
+    @pytest.mark.parametrize(
+        ("route", "chain", "deepest_frame"),
+        [
+            pytest.param("/chained-failure", ["PipelexConfigError", "ValueError"], "_fail_on_run_data", id="explicit-cause"),
+            pytest.param("/implicitly-chained-failure", ["KeyError", "ValueError"], "_fail_on_run_data", id="implicit-context"),
+        ],
+    )
+    def test_a_chained_foreign_exception_text_reaches_no_record(
+        self, caplog: pytest.LogCaptureFixture, route: str, chain: list[str], deepest_frame: str
+    ):
+        # A traceback prints the text of every exception of its chain, and a foreign exception's text can quote a run's
+        # inputs or a model's answer. The handler's record names the chain by class and the deepest exception's frames
+        # instead, so the run's data reaches no record, not even one the handler emits at `error`.
+        with caplog.at_level(logging.DEBUG):
+            response = _build_client(raise_server_exceptions=False).get(route)
+        assert response.status_code == 500
+        assert _RUN_DATA_TEXT not in response.text
+        record = _api_error_record(caplog)
+        assert record.levelno == logging.ERROR
+        assert record.exc_info is None
+        payload = _rendered_json(record)
+        assert payload[ERROR_CHAIN_FIELD] == chain
+        assert payload[ERROR_FRAMES_FIELD][-1].endswith(f" in {deepest_frame}"), payload
+        handler_records = [record for record in caplog.records if record.name.startswith("pipelex_api")]
+        assert handler_records
+        for handler_record in handler_records:
+            assert _RUN_DATA_TEXT not in JsonLogFormatter().format(handler_record)
 
     def test_a_caller_mistake_records_a_warning_carrying_the_same_identifiers(self, caplog: pytest.LogCaptureFixture):
         # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same message and
         # the same two identifiers, so one query over the message returns the whole error stream of a request.
         with caplog.at_level(logging.WARNING):
-            response = _build_client().get("/caller-mistake", params={"detail": "the input is malformed"})
+            response = _build_client().get("/caller-mistake/malformed")
         assert response.status_code == 422
         record = _api_error_record(caplog)
         assert record.levelno == logging.WARNING
         assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
-        assert getattr(record, "url.path", None) == "/caller-mistake"
+        assert getattr(record, "url.path", None) == "/caller-mistake/malformed"
         assert getattr(record, "http.response.status_code", None) == 422
+        assert getattr(record, "error.code", None) == "request.invalid"
+        assert getattr(record, ERROR_CHAIN_FIELD, None) == ["RunnerRequestError"]
+        assert getattr(record, ERROR_FRAMES_FIELD, None) is None
 
     def test_the_json_sink_writes_one_object_per_line_with_the_fields_flat(self, caplog: pytest.LogCaptureFixture):
         # The shape the runner's configured sink puts on stderr: the sink's own keys, then every
@@ -167,47 +230,46 @@ class TestErrorLogRecords:
         # `retryable` is the verdict of the error's code, which every error carries, so it is always
         # written: `pipelex.config.invalid` is no fault a repeat can cure.
         assert payload["retryable"] is False
-        # `time` and `logger` come from the sink itself; an operator-actionable failure carries
-        # its traceback under `exception` rather than spilling it across the line.
+        # `time` and `logger` come from the sink itself. An operator-actionable failure carries its chain by class and
+        # the frames it was raised through as fields, and no traceback, which would print its text.
         assert payload["time"].endswith("Z")
-        assert "PipelexConfigError" in payload["exception"]
+        assert "exception" not in payload
+        assert payload[ERROR_CHAIN_FIELD] == ["PipelexConfigError"]
+        assert any(frame.endswith(" in pipelex_failure_route") for frame in payload[ERROR_FRAMES_FIELD]), payload
 
     @pytest.mark.parametrize(
-        ("crafted_detail", "logged_detail"),
+        ("crafted_segment", "logged_path"),
         [
             # Back when the API flattened its own fields into a `key=value` run, each of these
-            # forged either a sibling field or a whole second line. The API renders nothing now:
-            # the runtime escapes a control character in a field's value and the sink escapes what
-            # it writes, so each must survive as one field's value.
-            ("legit\nstatus=200 event=auth_success", "legit\\nstatus=200 event=auth_success"),
-            ("hijack status=200 event=fake", "hijack status=200 event=fake"),
-            ("legit\rstatus=200", "legit\\rstatus=200"),
-            ('has " a quote = inside', 'has " a quote = inside'),
+            # forged either a sibling field or a whole second line. The API renders nothing now: the
+            # URL parser drops a control character from the path the record carries, and the sink
+            # writes each value inside one string, so each must survive as one field's value.
+            ("legit%0Astatus=200 event=auth_success", "/unserved/legitstatus=200 event=auth_success"),
+            ("hijack status=200 event=fake", "/unserved/hijack status=200 event=fake"),
+            ("legit%0Dstatus=200", "/unserved/legitstatus=200"),
+            ('has " a quote = inside', '/unserved/has " a quote = inside'),
         ],
     )
-    def test_a_crafted_detail_survives_as_one_value_and_forges_nothing(
-        self, caplog: pytest.LogCaptureFixture, crafted_detail: str, logged_detail: str
-    ):
-        # The escaping the API used to do itself is the runtime's job now, in two layers. The
-        # redaction processor every sink sits behind turns a control character in a field's value
-        # into its printable escape, so a newline the caller sent reads `\n` in `detail`; then
-        # `json.dumps` writes each value inside one string, so a quote or an `=` stays part of it.
-        # Either way the line stays one object and the value comes back as one field.
+    def test_a_crafted_path_survives_as_one_value_and_forges_nothing(self, caplog: pytest.LogCaptureFixture, crafted_segment: str, logged_path: str):
+        # The path a caller sends is the one value of the record it controls whatever the route, a path no route serves
+        # included. `json.dumps` writes each value inside one string, so a quote or an `=` stays part of it, and the
+        # line stays one object with the value as one field.
         with caplog.at_level(logging.WARNING):
-            response = _build_client().get("/caller-mistake", params={"detail": crafted_detail})
-        assert response.status_code == 422
+            response = _build_client().get(f"/unserved/{crafted_segment}")
+        assert response.status_code == 404
         payload = _rendered_json(_api_error_record(caplog))
-        assert payload["detail"] == logged_detail
-        assert "event" not in payload, "a crafted detail forged a field"
-        assert payload["http.response.status_code"] == 422, "a crafted detail forged or overwrote a field"
+        assert payload["url.path"] == logged_path
+        assert payload["error.code"] == "request.not_found"
+        assert "event" not in payload, "a crafted path forged a field"
+        assert payload["http.response.status_code"] == 404, "a crafted path forged or overwrote a field"
         assert payload["message"] == _ERROR_MESSAGE, "caller input reached the message"
 
-    def test_a_credential_echoed_into_a_detail_is_redacted_on_the_line(self, caplog: pytest.LogCaptureFixture):
-        # A validation message can echo what the caller sent, header text included. The runtime's
+    def test_a_credential_echoed_into_a_path_is_redacted_on_the_line(self, caplog: pytest.LogCaptureFixture):
+        # A request line can carry what the caller sent, header text included. The runtime's
         # redaction processor scrubs the credential out of the field before the sink writes it, and
         # keeps the scheme, so the line still says which kind of credential went.
         with caplog.at_level(logging.WARNING):
-            response = _build_client().get("/caller-mistake", params={"detail": "rejected Authorization: Bearer placeholder-not-a-token"})
+            response = _build_client().get("/caller-mistake/rejected Authorization: Bearer placeholder-not-a-token")
         assert response.status_code == 422
         payload = _rendered_json(_api_error_record(caplog))
-        assert payload["detail"] == "rejected Authorization: Bearer [REDACTED]"
+        assert payload["url.path"] == "/caller-mistake/rejected Authorization: Bearer [REDACTED]"

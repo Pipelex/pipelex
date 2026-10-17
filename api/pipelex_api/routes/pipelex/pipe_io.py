@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Annotated, Any, Literal, Union
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pipelex.interpreter_hub import get_own_pipes, get_pipe_library
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
@@ -12,7 +12,8 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
+from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE
+from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
     RequestedPipe,
@@ -112,12 +113,12 @@ PipeIOResponse = Annotated[Union[PipeIOValidReport, CrateInvalidReport], Field(d
     "/pipe-io",
     response_model=PipeIOResponse,
     # On top of the composite router's shared 401/413/422/500: the `method_ref` fetch outcomes it
-    # shares with `/resolve`. No structures 403: the route reads only a package's `.mthds` files.
-    responses={404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_METHOD_REF},
+    # shares with `/resolve`. No sandbox 501: the route reads only a package's `.mthds` files.
+    responses={404: PROBLEM_404_METHOD_PACKAGE},
     # NOT tagged `x-mthds-protocol`: it carries the standard's artifacts under their neutral names,
     # but the route is a Pipelex API extension, and the flag marks the standard's five operations alone.
 )
-async def pipe_io(request_data: PipeIORequest) -> JSONResponse:
+async def pipe_io(request: Request, request_data: PipeIORequest) -> JSONResponse:
     """Return a method's pipe I/O contracts, input form and output form, with no dry run (Pipelex API extension).
 
     The closure resolves through the static core `/resolve` rides, a pipe is selected the way the
@@ -133,17 +134,17 @@ async def pipe_io(request_data: PipeIORequest) -> JSONResponse:
     - **Invalid verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or
       statically validated — the crate verdict, carrying no artifact, no selection and no files.
     - **No verdict (non-2xx):** a malformed body and neither or both closure selectors are
-      request-shape 422s (`ValidationError`); a selection refusal is an input 422 named for its failure,
-      `EntryPipeNotFoundError` for an unknown `pipe_ref` or a single-pipe request whose chain finds no
-      entry pipe, `EntryPipeAmbiguousError` for an ambiguous one or a chain that finds several; the
-      `method_ref` fetch outcomes are those of `/resolve` (404, 422, 501);
-      an artifact that cannot be derived (`PipeIOContractError`) is a 500. All RFC 7807
-      `application/problem+json` via the global handlers.
+      request-shape 422s (`request.invalid`); a selection refusal is an input 422 named for its failure,
+      `request.pipe_not_found` for an unknown `pipe_ref` or a single-pipe request whose chain finds no
+      entry pipe, `request.pipe_ambiguous` for an ambiguous one or a chain that finds several; the
+      `method_ref` fetch outcomes are those of `/resolve` (404, 422);
+      an artifact that cannot be derived (`PipeIOContractError`) is a 500. All
+      `application/problem+json` documents with a registry `code`, via the global handlers.
     """
     try:
         resolved = await resolve_requested_crate(request_data)
     except ValidateBundleError as validate_error:
-        return invalid_crate_report_response(validate_error)
+        return invalid_crate_report_response(validate_error, view=problem_view_of(request))
     try:
         default_pipe = select_default_pipe(resolved.crate, manifest_main_pipe=resolved.manifest_main_pipe)
         default_pipe_ref = default_pipe.ref if isinstance(default_pipe, RequestedPipe) else None

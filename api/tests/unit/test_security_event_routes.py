@@ -34,6 +34,7 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes import router as api_router
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _MODE = "temporal"
@@ -107,7 +108,6 @@ class _ServerRefusal(NamedTuple):
 
     route: str
     body: dict[str, Any]
-    error_type: str
     code: ErrorCode
     event_error_type: str
     target: str
@@ -217,9 +217,8 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/execute",
                     body={"inputs": {"photo": {"__class__": "subprocess.Popen", "args": ["id"]}}},
-                    error_type="ReservedObjectKey",
                     code=PipelexErrorCode.SECURITY_RESERVED_KEY,
-                    event_error_type="ReservedObjectKey",
+                    event_error_type="ReservedObjectKeyError",
                     target="object_key",
                     target_class=None,
                     refused_content="__class__",
@@ -230,7 +229,6 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/start",
                     body={"callback_urls": ["http://169.254.169.254/latest/meta-data/"]},
-                    error_type="InvalidCallbackUrls",
                     code=CoreCode.SECURITY_INPUT_URL_REFUSED,
                     event_error_type="CallbackUrlRefusedError",
                     target="url",
@@ -243,7 +241,6 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/start",
                     body={"callback_urls": ["https://10.0.0.5/hooks/done"]},
-                    error_type="InvalidCallbackUrls",
                     code=CoreCode.SECURITY_INPUT_URL_REFUSED,
                     event_error_type="CallbackUrlRefusedError",
                     target="url",
@@ -256,7 +253,6 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/start",
                     body={"callback_urls": ["http://METADATA.google.internal./computeMetadata/v1/"]},
-                    error_type="InvalidCallbackUrls",
                     code=CoreCode.SECURITY_INPUT_URL_REFUSED,
                     event_error_type="CallbackUrlRefusedError",
                     target="url",
@@ -269,7 +265,6 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/start",
                     body={"callback_urls": ["file:///etc/passwd"]},
-                    error_type="InvalidCallbackUrls",
                     code=CoreCode.SECURITY_INPUT_URL_REFUSED,
                     event_error_type="CallbackUrlRefusedError",
                     target="url",
@@ -282,7 +277,6 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/execute",
                     body={"resources": {"../secrets/key.pem": base64.b64encode(b"x").decode("ascii")}},
-                    error_type="InvalidResourcePath",
                     code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
                     event_error_type="BundleResourcePathError",
                     target="path",
@@ -295,9 +289,8 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/execute",
                     body={"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}},
-                    error_type="InvalidMethodFiles",
                     code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
-                    event_error_type="MethodTreeRefusedError",
+                    event_error_type="RequestMethodError",
                     target="path",
                     target_class=None,
                     refused_content="key.pem",
@@ -308,9 +301,8 @@ class TestSecurityEventRoutes:
                 _ServerRefusal(
                     route="/v1/execute",
                     body={"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "/etc/key.pem": "x"}},
-                    error_type="InvalidMethodFiles",
                     code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
-                    event_error_type="MethodTreeRefusedError",
+                    event_error_type="RequestMethodError",
                     target="path",
                     target_class=None,
                     refused_content="key.pem",
@@ -322,9 +314,8 @@ class TestSecurityEventRoutes:
                     _ServerRefusal(
                         route="/v1/execute",
                         body={"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, path: "x"}},
-                        error_type="InvalidMethodFiles",
                         code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
-                        event_error_type="MethodTreeRefusedError",
+                        event_error_type="RequestMethodError",
                         target="path",
                         target_class=None,
                         refused_content=refused_content,
@@ -338,9 +329,8 @@ class TestSecurityEventRoutes:
                     _ServerRefusal(
                         route="/v1/execute",
                         body={"mthds_contents": None, "bundle_b64": _bundle_b64({"main.mthds": _DESCRIBE_IMAGE_MTHDS, path: "x"})},
-                        error_type="InvalidMethodFiles",
                         code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
-                        event_error_type="MethodTreeRefusedError",
+                        event_error_type="RequestMethodError",
                         target="path",
                         target_class=None,
                         refused_content=refused_content,
@@ -354,7 +344,6 @@ class TestSecurityEventRoutes:
                     _ServerRefusal(
                         route="/v1/execute",
                         body={"resources": {path: _b64("x")}},
-                        error_type="InvalidResourcePath",
                         code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
                         event_error_type="BundleResourcePathError",
                         target="path",
@@ -376,8 +365,7 @@ class TestSecurityEventRoutes:
         with _security_event_lines() as lines:
             response = client.post(case.route, json=request_body, headers={REQUEST_ID_HEADER: _REQUEST_ID})
 
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == case.error_type
+        assert_problem(response, status=422, code=case.code)
         (line,) = lines
         assert line["message"] == SECURITY_EVENT_MESSAGE
         assert line["event.name"] == SECURITY_EVENT_NAME
@@ -418,36 +406,36 @@ class TestSecurityEventRoutes:
         assert "passwd" not in json.dumps(line)
 
     @pytest.mark.parametrize(
-        ("route", "body", "error_type"),
+        ("route", "body", "code"),
         [
-            pytest.param("/v1/start", {"callback_urls": [""]}, "InvalidCallbackUrls", id="empty_callback_url"),
-            pytest.param("/v1/start", {"callback_urls": ["https://hooks.example.com/" + "a" * 5000]}, "InvalidCallbackUrls", id="long_callback_url"),
-            pytest.param("/v1/start", {"callback_urls": ["hooks.example.com/done"]}, "InvalidCallbackUrls", id="callback_url_without_scheme"),
-            pytest.param("/v1/start", {"callback_urls": ["http:///done"]}, "InvalidCallbackUrls", id="callback_url_without_host"),
+            pytest.param("/v1/start", {"callback_urls": [""]}, "request.invalid", id="empty_callback_url"),
+            pytest.param("/v1/start", {"callback_urls": ["https://hooks.example.com/" + "a" * 5000]}, "request.invalid", id="long_callback_url"),
+            pytest.param("/v1/start", {"callback_urls": ["hooks.example.com/done"]}, "request.invalid", id="callback_url_without_scheme"),
+            pytest.param("/v1/start", {"callback_urls": ["http:///done"]}, "request.invalid", id="callback_url_without_host"),
             pytest.param(
                 "/v1/execute",
                 {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes//a.txt": "x"}},
-                "InvalidMethodFiles",
+                "method.package_invalid",
                 id="empty_segment_in_a_file_path",
             ),
             pytest.param(
                 "/v1/execute",
                 {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes\\a.txt": "x"}},
-                "InvalidMethodFiles",
+                "method.package_invalid",
                 id="backslash_in_a_file_path",
             ),
             pytest.param(
                 "/v1/execute",
                 {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes:v2.txt": "x"}},
-                "InvalidMethodFiles",
+                "method.package_invalid",
                 id="colon_in_a_file_path",
             ),
-            pytest.param("/v1/execute", {"resources": {"notes\\a.txt": _b64("x")}}, "InvalidResourcePath", id="backslash_in_a_resource_path"),
-            pytest.param("/v1/execute", {"resources": {"notes:v2.txt": _b64("x")}}, "InvalidResourcePath", id="colon_in_a_resource_path"),
-            pytest.param("/v1/execute", {"resources": {"": _b64("x")}}, "InvalidResourcePath", id="empty_resource_path"),
+            pytest.param("/v1/execute", {"resources": {"notes\\a.txt": _b64("x")}}, "request.invalid", id="backslash_in_a_resource_path"),
+            pytest.param("/v1/execute", {"resources": {"notes:v2.txt": _b64("x")}}, "request.invalid", id="colon_in_a_resource_path"),
+            pytest.param("/v1/execute", {"resources": {"": _b64("x")}}, "request.invalid", id="empty_resource_path"),
         ],
     )
-    def test_a_refusal_of_the_request_shape_logs_no_event(self, mocker: MockerFixture, route: str, body: dict[str, Any], error_type: str) -> None:
+    def test_a_refusal_of_the_request_shape_logs_no_event(self, mocker: MockerFixture, route: str, body: dict[str, Any], code: str) -> None:
         """A malformed field is the caller's mistake, not an attempt to reach what a security rule forbids."""
         client = _build_client(mocker)
         request_body = {key: value for key, value in {**_run_body(), **body}.items() if value is not None}
@@ -455,6 +443,5 @@ class TestSecurityEventRoutes:
         with _security_event_lines() as lines:
             response = client.post(route, json=request_body, headers={REQUEST_ID_HEADER: _REQUEST_ID})
 
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == error_type
+        assert_problem(response, status=422, code=code)
         assert lines == []

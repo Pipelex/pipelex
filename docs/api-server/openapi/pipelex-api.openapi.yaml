@@ -67,8 +67,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PipelexVersionInfo'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -85,13 +86,13 @@ paths:
 
         The body is the blob''s bytes and nothing else. A target whose signature does not hold, or that has expired, is a
 
-        403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
+        403 `auth.forbidden` whose `requirement` is a signed upload target, as is a query that is not one this runner signs,
 
-        decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
+        such as an expiry that is not a decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 413 `request.too_large`;
 
-        the path''s a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
+        and a body whose SHA-256 is not the path''s a 422 `request.invalid` naming the body. A blob is never changed:
 
-        changes nothing.'
+        uploading bytes the runner already holds answers 204 and changes nothing.'
       operationId: put_blob_v1_blobs__sha256__put
       parameters:
       - name: sha256
@@ -137,30 +138,35 @@ paths:
         '204':
           description: Successful Response
         '403':
-          description: '`BlobUploadNotAuthorized` — the upload does not carry the signed query an upload target of `POST /v1/blobs/missing`
-            names, its signature does not hold for this hash and scope, or it has expired. Ask `POST /v1/blobs/missing` again
-            for a fresh target.'
+          description: '`auth.forbidden`, whose `params.requirement` is `signed_upload_target` — the upload does not carry
+            the signed query an upload target of `POST /v1/blobs/missing` names, its signature does not hold for this hash
+            and scope, or it has expired. Ask `POST /v1/blobs/missing` again for a fresh target.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -305,13 +311,14 @@ paths:
                     starting with a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or
                     `{"sha256": ..., "size": ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing`
                     then `PUT /v1/blobs/{sha256}`). The map is read from the request''s JSON text: a key given twice, a key
-                    the membership rule keeps out of every tree (`.mthds/` included), colliding keys and a malformed entry
-                    are a 422 `InvalidMethodFiles` whose `tree_refusal` names the code and the paths, and hash entries the
-                    runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` lists every such hash. Its `.mthds`
-                    files are the method''s bundles and every other file is one a step may read, such as a `PipeDocGen` template
-                    or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the `METHODS.toml` at
-                    the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored on
-                    a sandbox-hosted deployment.'
+                    the membership rule keeps out of every tree (`.mthds/` included) and colliding keys are a 422 `method.package_invalid`
+                    whose `reason` is the refusal''s code and whose `path` names the first path, a key leaving the tree is
+                    a 422 `security.input_path_refused`, a malformed entry is a 422 `request.invalid`, and hash entries the
+                    runner does not hold are one 422 `request.blobs_missing` whose `missing_blobs` parameter lists every such
+                    hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read, such as
+                    a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+                    of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom
+                    `.py` is only honored on a sandbox-hosted deployment.'
                 dependencies:
                   anyOf:
                   - additionalProperties:
@@ -372,7 +379,8 @@ paths:
                     any other plugin-provided token are accepted; an unregistered token is refused at dispatch. The delivery
                     axis (blocking vs fire-and-forget) is endpoint-set, never requestable. Honored ONLY when the deployment
                     sets `allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token that differs
-                    from the deployment default is refused with a 403. Omit it to use the deployment default.'
+                    from the deployment default is refused with a 422 `pipelex.deployment.orchestration_override_forbidden`.
+                    Omit it to use the deployment default.'
                 storage_scope:
                   anyOf:
                   - type: string
@@ -429,8 +437,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PipelexApiExecuteResponse'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -441,32 +450,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '403':
-          description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
-            this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
-            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
-            is a 422 instead, since the method''s author changes it.'
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -486,6 +490,15 @@ paths:
               description: Seconds to wait before retrying, when the upstream provider supplied a hint.
               schema:
                 type: integer
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '501':
+          description: '`pipelex.deployment.custom_code_requires_sandbox` — the method (a bundle, or a fetched `method_ref`
+            package, as `params.origin` says) ships custom Python and this deployment is not sandbox-hosted. The refusal of
+            a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`, is a 422 instead,
+            since the method''s author changes it.'
           content:
             application/problem+json:
               schema:
@@ -520,9 +533,9 @@ paths:
 
         `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`, the default)
 
-        the in-process orchestrator is blocking-only, so `/start` is HONEST: it refuses with a `400`
+        the in-process orchestrator is blocking-only, so `/start` is HONEST: it refuses with a `501`
 
-        (`StartRequiresAsyncOrchestration`) — use `/execute` — rather than silently blocking and acking.
+        (`runtime.unsupported`) — use `/execute` — rather than silently blocking and acking.
 
         The completion callback (`callback_urls` / storage delivery) fires on the async path.'
       operationId: start_v1_start_post
@@ -638,13 +651,14 @@ paths:
                     starting with a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or
                     `{"sha256": ..., "size": ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing`
                     then `PUT /v1/blobs/{sha256}`). The map is read from the request''s JSON text: a key given twice, a key
-                    the membership rule keeps out of every tree (`.mthds/` included), colliding keys and a malformed entry
-                    are a 422 `InvalidMethodFiles` whose `tree_refusal` names the code and the paths, and hash entries the
-                    runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` lists every such hash. Its `.mthds`
-                    files are the method''s bundles and every other file is one a step may read, such as a `PipeDocGen` template
-                    or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the `METHODS.toml` at
-                    the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored on
-                    a sandbox-hosted deployment.'
+                    the membership rule keeps out of every tree (`.mthds/` included) and colliding keys are a 422 `method.package_invalid`
+                    whose `reason` is the refusal''s code and whose `path` names the first path, a key leaving the tree is
+                    a 422 `security.input_path_refused`, a malformed entry is a 422 `request.invalid`, and hash entries the
+                    runner does not hold are one 422 `request.blobs_missing` whose `missing_blobs` parameter lists every such
+                    hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read, such as
+                    a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+                    of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom
+                    `.py` is only honored on a sandbox-hosted deployment.'
                 dependencies:
                   anyOf:
                   - additionalProperties:
@@ -724,7 +738,8 @@ paths:
                     any other plugin-provided token are accepted; an unregistered token is refused at dispatch. The delivery
                     axis (blocking vs fire-and-forget) is endpoint-set, never requestable. Honored ONLY when the deployment
                     sets `allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token that differs
-                    from the deployment default is refused with a 403. Omit it to use the deployment default.'
+                    from the deployment default is refused with a 422 `pipelex.deployment.orchestration_override_forbidden`.
+                    Omit it to use the deployment default.'
                 storage_scope:
                   anyOf:
                   - type: string
@@ -779,8 +794,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PipelexApiStartResponse'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -791,39 +807,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '400':
-          description: '`StartRequiresAsyncOrchestration` — this deployment''s orchestrator is blocking-only and cannot honor
-            fire-and-forget delivery. Use `POST /execute` instead.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '403':
-          description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
-            this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
-            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
-            is a 422 instead, since the method''s author changes it.'
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -843,8 +847,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '501':
-          description: '`runtime.unsupported` — this deployment does not provide async pipeline execution. Permanent under
-            the current deployment; do not retry.'
+          description: '`runtime.unsupported` — this deployment cannot honor fire-and-forget delivery: its orchestrator is
+            blocking-only, or its async execution is not enabled. Permanent under the current deployment; use `POST /execute`
+            instead. Or `pipelex.deployment.custom_code_requires_sandbox`, as on `POST /execute`.'
           content:
             application/problem+json:
               schema:
@@ -873,21 +878,23 @@ paths:
         \ fields, keyed like\n  `pipe_io_contracts`; without a token the matching field is absent and the body is\n  byte-identical\
         \ to a request that omits `views`. They are separate tokens because they answer\n  separate questions — a caller building\
         \ a fill-in form wants the inputs, a caller rendering a\n  result or registering a tool signature with a return type\
-        \ wants the output.\n- **Invalid verdict (200, `is_valid: false`):** the `InvalidReport` arm — `validation_errors[]`\n\
-        \  (the structured per-error diagnostics, built by pipelex's one shared builder, incl. one\n  located `dry_run` item\
-        \ per pipe whose dry run failed) + `message`, with the structural artifacts absent. The runner\n  returns this as\
-        \ a value (a `BundleValidationFailure` with `validation_errors`) regardless of backend — the\n  in-process arm from\
-        \ the bundle's `ValidateBundleError`, the dispatched arm recovered from the\n  worker — so the route maps it to a\
-        \ 200 by matching validation diagnostics, never by catching an\n  exception. A returned failure without validation\
+        \ wants the output.\n- **Invalid verdict (200, `is_valid: false`):** the `InvalidReport` arm — `errors[]`, one problem\
+        \ item per\n  error with its own code (incl. one located item per pipe whose dry run failed, with the failure's code),\
+        \ the\n  items of the verdict's problem — + `message`, with the structural artifacts absent. The runner\n  returns\
+        \ this as a value (a `BundleValidationFailure` with validation items) regardless of backend — the\n  in-process arm\
+        \ from the bundle's `ValidateBundleError`, the dispatched arm recovered from the\n  worker — so the route maps it\
+        \ to a 200 by matching validation diagnostics, never by catching an\n  exception. A returned failure without validation\
         \ diagnostics is a backend, configuration or runtime\n  fault, and its problem is answered as every raised failure's\
-        \ is.\n- **No verdict (non-2xx):** a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither\
-        \ of `mthds_contents` / `method_ref` is a request-shape **422**; a forbidden\n  `orchestration_mode` override is a\
-        \ **403**; a host-wiring programmer error or a genuine\n  orchestrator fault is a **5xx**; auth is **401/403**. A\
-        \ `method_ref` **resolution failure**\n  is also a no-verdict condition — never an `is_valid: false`: each answers\
-        \ the status its\n  code declares, such as a **422** for a malformed reference, a **502** for a failed fetch, a\n\
-        \  **404** for no matching package in the repository and a **422** for the method's Python\n  structure classes, and\
-        \ the custom-code sandbox gate a **403**. All are\n  `application/problem+json` rendered by the global handlers in\n\
-        \  `pipelex_api.exception_handlers` — routes never shape them."
+        \ is.\n- **Either arm:** a member with no value is absent rather than `null`, at the arm's top level and in its\n\
+        \  problem items; the structured artifacts of the valid arm keep their own serialization.\n- **No verdict (non-2xx):**\
+        \ a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither of `mthds_contents` / `method_ref`\
+        \ is a request-shape **422**, and so is a forbidden\n  `orchestration_mode` override; a host-wiring programmer error\
+        \ or a genuine orchestrator fault is a\n  **5xx**; auth is **401/403**. A `method_ref` **resolution failure** is also\
+        \ a no-verdict condition —\n  never an `is_valid: false`: each answers the status its code declares, such as a **422**\
+        \ for a\n  malformed reference, a **502** for a failed fetch, a **404** for no matching package in the\n  repository\
+        \ and a **422** for the method's Python structure classes, and the custom-code sandbox gate\n  a **501**. All are\
+        \ `application/problem+json` documents carrying a registry `code`, rendered by the\n  global handlers in `pipelex_api.exception_handlers`\
+        \ — routes never shape them."
       operationId: validate_mthds_v1_validate_post
       requestBody:
         content:
@@ -911,8 +918,9 @@ paths:
                     'True': '#/components/schemas/ValidReport'
                     'False': '#/components/schemas/InvalidReport'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -923,32 +931,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '403':
-          description: 'A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an `orchestration_mode`
-            this deployment does not allow overriding per request (`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox`
-            — the method (a bundle, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted.
-            The refusal of a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`,
-            is a 422 instead, since the method''s author changes it.'
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -956,6 +959,15 @@ paths:
         '404':
           description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
             address by manifest identity.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '501':
+          description: '`pipelex.deployment.custom_code_requires_sandbox` — the method (a bundle, or a fetched `method_ref`
+            package, as `params.origin` says) ships custom Python and this deployment is not sandbox-hosted. The refusal of
+            a method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`, is a 422 instead,
+            since the method''s author changes it.'
           content:
             application/problem+json:
               schema:
@@ -972,10 +984,11 @@ paths:
         \ fingerprint\nset) — the artifact shape the MTHDS standard specifies as the Library Crate Format. It runs no\ndry-run\
         \ sweep — runnability is `/validate`'s vocabulary.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid\
         \ verdict (200, `is_valid: true`):** the crate on the valid arm.\n- **Invalid verdict (200, `is_valid: false`):**\
-        \ the library could not be parsed, loaded, or\n  validated — `validation_errors[]` from pipelex's one shared builder.\n\
-        - **No verdict (non-2xx):** a malformed request body (neither/both closure selectors, an\n  over-limit file) is a\
-        \ request-shape 422; `method_ref` is a 501 until server-side method\n  registry resolution exists; auth is 401/403;\
-        \ server fault is 5xx. All RFC 7807\n  `application/problem+json` via the global handlers."
+        \ the library could not be parsed, loaded, or\n  validated — `errors[]`, one problem item per error.\n- **No verdict\
+        \ (non-2xx):** a malformed request body (neither/both closure selectors, an\n  over-limit file) is a request-shape\
+        \ 422; a registry-form `method_ref` is a 422\n  `request.unsupported` until server-side method registry resolution\
+        \ exists; auth is 401/403;\n  server fault is 5xx. All `application/problem+json` documents with a registry `code`,\
+        \ via the\n  global handlers."
       operationId: resolve_mthds_v1_resolve_post
       requestBody:
         content:
@@ -999,8 +1012,9 @@ paths:
                     'True': '#/components/schemas/ResolveValidReport'
                     'False': '#/components/schemas/CrateInvalidReport'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1011,22 +1025,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1034,14 +1053,6 @@ paths:
         '404':
           description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
             address by manifest identity.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
           content:
             application/problem+json:
               schema:
@@ -1059,11 +1070,11 @@ paths:
         \ `pipe_ref`,\n  beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`, `is_runnable`, and `files` when\n  `include_files`\
         \ is true.\n- **Invalid verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or\n  statically\
         \ validated — the crate verdict, carrying no artifact, no selection and no files.\n- **No verdict (non-2xx):** a malformed\
-        \ body and neither or both closure selectors are\n  request-shape 422s (`ValidationError`); a selection refusal is\
-        \ an input 422 named for its failure,\n  `EntryPipeNotFoundError` for an unknown `pipe_ref` or a single-pipe request\
-        \ whose chain finds no\n  entry pipe, `EntryPipeAmbiguousError` for an ambiguous one or a chain that finds several;\
-        \ the\n  `method_ref` fetch outcomes are those of `/resolve` (404, 422, 501);\n  an artifact that cannot be derived\
-        \ (`PipeIOContractError`) is a 500. All RFC 7807\n  `application/problem+json` via the global handlers."
+        \ body and neither or both closure selectors are\n  request-shape 422s (`request.invalid`); a selection refusal is\
+        \ an input 422 named for its failure,\n  `request.pipe_not_found` for an unknown `pipe_ref` or a single-pipe request\
+        \ whose chain finds no\n  entry pipe, `request.pipe_ambiguous` for an ambiguous one or a chain that finds several;\
+        \ the\n  `method_ref` fetch outcomes are those of `/resolve` (404, 422);\n  an artifact that cannot be derived (`PipeIOContractError`)\
+        \ is a 500. All\n  `application/problem+json` documents with a registry `code`, via the global handlers."
       operationId: pipe_io_v1_pipe_io_post
       requestBody:
         content:
@@ -1087,8 +1098,9 @@ paths:
                     'True': '#/components/schemas/PipeIOValidReport'
                     'False': '#/components/schemas/CrateInvalidReport'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1099,22 +1111,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1122,14 +1139,6 @@ paths:
         '404':
           description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
             address by manifest identity.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
           content:
             application/problem+json:
               schema:
@@ -1145,10 +1154,10 @@ paths:
         \ local projection\nand run the offline drift check. There is deliberately **no** server-side check route: the\ncheck\
         \ is offline by design.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):**\
         \ the artifacts + lock on the valid arm.\n- **Invalid verdict (200, `is_valid: false`):** the library could not be\
-        \ parsed, loaded, or\n  validated — `validation_errors[]` from pipelex's one shared builder; no artifacts exist.\n\
-        - **No verdict (non-2xx):** an unknown projection `kind`/`target`, a `pipe_ref` on a\n  concept-set-wide kind, or\
-        \ a malformed closure selector is a request-shape 422 problem+json;\n  `method_ref` is a 501 until server-side method\
-        \ registry resolution exists; auth is 401/403;\n  server fault is 5xx."
+        \ parsed, loaded, or\n  validated — `errors[]`, one problem item per error; no artifacts exist.\n- **No verdict (non-2xx):**\
+        \ an unknown projection `kind`/`target`, a `pipe_ref` on a\n  concept-set-wide kind, or a malformed closure selector\
+        \ is a request-shape 422 problem+json;\n  a registry-form `method_ref` is a 422 `request.unsupported` until server-side\
+        \ method registry\n  resolution exists; auth is 401/403; server fault is 5xx."
       operationId: codegen_mthds_v1_codegen_post
       requestBody:
         content:
@@ -1172,8 +1181,9 @@ paths:
                     'True': '#/components/schemas/CodegenValidReport'
                     'False': '#/components/schemas/CrateInvalidReport'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1184,22 +1194,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1207,14 +1222,6 @@ paths:
         '404':
           description: '`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested
             address by manifest identity.'
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDocument'
-        '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
-            a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
           content:
             application/problem+json:
               schema:
@@ -1245,8 +1252,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/LintResponse'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1257,22 +1265,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1287,7 +1300,9 @@ paths:
 
         Syntax errors return 200 with diagnostics and unchanged content. Malformed
 
-        formatter options are caller input errors and return RFC 7807 422.'
+        formatter options are caller input errors and return a 422 `request.invalid`
+
+        naming `options`.'
       operationId: format_mthds_v1_format_post
       requestBody:
         content:
@@ -1303,8 +1318,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/FormatResponse'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1315,22 +1331,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1351,9 +1372,7 @@ paths:
 
         param is a SINGLE protocol `ModelCategory` value: repeated `?type=` values
 
-        (arity, `ValidationError`) and unknown categories (`InvalidModelCategory`) are
-
-        both 422s (RFC 7807).'
+        and unknown categories are both 422 `request.invalid` naming `type`.'
       operationId: get_models_v1_models_get
       parameters:
       - name: type
@@ -1374,8 +1393,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/PipelexModelDeck'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1386,22 +1406,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1423,11 +1448,11 @@ paths:
 
         `not_found` it carries the suggestions a failing validation of the same reference offers. A
 
-        request that cannot produce a verdict is an input `422`: `ValidationError` for a missing or
+        request that cannot produce a verdict is an input `422` `request.invalid` naming the parameter: a
 
-        repeated `reference` or a repeated `type`, `InvalidModelReference` for a reference that is blank,
+        missing or repeated `reference`, a repeated `type`, a reference that is blank, a sigil or a namespace
 
-        a sigil or a namespace alone, or too long, and `InvalidModelCategory` for an unknown `type`.'
+        alone, or too long, and an unknown `type`.'
       operationId: check_model_v1_models_check_get
       parameters:
       - name: reference
@@ -1462,8 +1487,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ModelReferenceVerdict'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1474,22 +1500,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -1510,10 +1541,11 @@ paths:
 
         file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
 
-        A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner''s
+        A hash given twice with different sizes is a 422 `request.invalid` naming `blobs`, and a blob or a set of blobs past
 
-        tree limits a 422 `MethodTreeTooLarge`, both refused before anything is uploaded. Each upload target is this runner''s
-        own
+        this runner''s tree limits a 422 `method.package_invalid`, both refused before anything is uploaded. Each upload
+
+        target is this runner''s own
 
         `PUT /v1/blobs/{sha256}`, at `PUBLIC_BASE_URL` when the deployment sets it, its query signed for that hash and
 
@@ -1546,8 +1578,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/MissingBlobsResult'
         '401':
-          description: Missing or invalid bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key`
-            or `AUTH_MODE=jwt`).
+          description: '`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused
+            or expired bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`),
+            or trusts a proxy''s forwarded identity and the proxy forwarded none or one that is not path-safe.'
           headers:
             WWW-Authenticate:
               description: Authentication challenge — always `Bearer`.
@@ -1558,22 +1591,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '413':
-          description: Request body exceeds the deployment's size limit (`MAX_REQUEST_BODY_MIB`, 100 MiB by default).
+          description: '`request.too_large` — the request, or a part of it such as a file it sends, exceeds one of the deployment''s
+            byte limits (`MAX_REQUEST_BODY_MIB`, 100 MiB by default, for the body). `params.limit` and `params.size` give
+            both in bytes.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '422':
-          description: 'The request could not be processed: a malformed body, a field failing validation, or a pipelex error
-            whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic
-            routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
+          description: 'The request could not be processed: a body that does not parse (`request.malformed`), fields the route
+            refuses (`request.invalid`, one item in `errors` per refused field), a security rule''s refusal (such as `pipelex.security.reserved_key`
+            or `security.input_url_refused`), a method tree the runner cannot read (`method.package_invalid`), or a pipelex
+            error whose code the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the
+            diagnostic routes an *invalid bundle* is a **200** verdict, not a 422 — see each route''s response contract.'
           content:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '500':
-          description: A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected
-            error answered as `runtime.unexpected`. Report the `request_id`.
+          description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
+            a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
+            Report the `request_id`.'
           content:
             application/problem+json:
               schema:
@@ -2328,12 +2366,13 @@ components:
           const: false
           title: Is Valid
           default: false
-        validation_errors:
+        errors:
           items:
-            $ref: '#/components/schemas/ValidationErrorItem'
+            $ref: '#/components/schemas/ProblemItem'
           type: array
-          title: Validation Errors
-          description: Per-error diagnostics, built by pipelex's one shared builder — non-empty on every invalid verdict.
+          title: Errors
+          description: One problem item per error, each with its own code, its parameters and its location — non-empty on
+            every invalid verdict. The items of the verdict's problem, as a refusal's `errors` carry them.
         message:
           type: string
           title: Message
@@ -2341,16 +2380,16 @@ components:
           default: MTHDS library could not be resolved
       type: object
       title: CrateInvalidReport
-      description: 'The 200 **invalid** arm shared by `/resolve` and `/codegen` — the crate-verdict vocabulary.
+      description: 'The 200 **invalid** arm shared by `/resolve`, `/codegen` and `/pipe-io` — the crate-verdict vocabulary.
 
 
         Same discipline as `/validate`''s `InvalidReport`: an invalid library is the *successful
 
         product* of a diagnostic call (the request was well-formed; the library was not), so it rides
 
-        a 200 discriminated on `is_valid`, carrying the same structured `ValidationErrorItem`s the
+        a 200 discriminated on `is_valid`, carrying the same problem items in `errors` that `/validate`
 
-        local CLI and `/validate` emit for the identical failure.'
+        emits for the identical failure.'
     DateField:
       properties:
         title:
@@ -2828,30 +2867,6 @@ components:
       - step_role
       title: ElaborationMetadata
       description: Side-table entry recording how a synthetic pipe was generated by the bundle elaborator.
-    EnsureTableOp:
-      properties:
-        table_path:
-          items:
-            type: string
-          type: array
-          minItems: 1
-          title: Table Path
-        kind:
-          type: string
-          const: ensure_table
-          title: Kind
-          default: ensure_table
-      additionalProperties: false
-      type: object
-      required:
-      - table_path
-      title: EnsureTableOp
-      description: 'Create the addressed table when it is absent, leaving an existing one untouched.
-
-
-        Here ``table_path`` addresses the table to create, not its parent, so it cannot be empty:
-
-        the document root always exists.'
     EnumField:
       properties:
         title:
@@ -3038,15 +3053,6 @@ components:
         not one per exception the run happened to catch. Every member but `STATE_UNCERTAIN` leaves the
 
         file exactly as it was found; that one does not, and it says so.'
-    FixSafety:
-      type: string
-      enum:
-      - safe
-      - unsafe
-      title: FixSafety
-      description: 'Whether a fix is safe to auto-apply (SAFE), or a likely correction that needs a person''s or an agent''s
-
-        confirmation (UNSAFE), which ``pipelex fix bundle`` never applies.'
     FormatRequest:
       properties:
         content:
@@ -3247,25 +3253,6 @@ components:
       - message
       title: HealthResponse
       description: Body of `GET /health`.
-    HintLintErrorType:
-      type: string
-      enum:
-      - hint_unknown_key
-      - hint_unknown_intent
-      - hint_inapplicable_intent
-      title: HintLintErrorType
-      description: 'Advisory intent-hints lint findings (spec: intent-hints.md).
-
-
-        Every member is advisory-only: it rides the validation report''s ``warnings`` array and never
-
-        makes a verdict invalid — hints are non-normative, and well-formed unknown content is
-
-        preserved, only warned about. A separate enum rather than new ``PipeValidationErrorType``
-
-        members because hints attach to concepts and structure fields too, so the pipe enum is the
-
-        wrong home.'
     IOMultiplicity:
       type: string
       enum:
@@ -3592,12 +3579,13 @@ components:
           const: false
           title: Is Valid
           default: false
-        validation_errors:
+        errors:
           items:
-            $ref: '#/components/schemas/ValidationErrorItem'
+            $ref: '#/components/schemas/ProblemItem'
           type: array
-          title: Validation Errors
-          description: Per-error diagnostics, built by pipelex's one shared builder — non-empty on every invalid verdict.
+          title: Errors
+          description: One problem item per error, each with its own code, its parameters and its location — non-empty on
+            every invalid verdict. The items of the verdict's problem, as a refusal's `errors` carry them.
         pending_signatures:
           items:
             type: string
@@ -3619,7 +3607,7 @@ components:
           - type: string
           - type: 'null'
           title: Rendered Markdown
-          description: 'Opt-in Pipelex-API presentation extra: a server-rendered Markdown view of the invalid verdict''s `validation_errors`,
+          description: 'Opt-in Pipelex-API presentation extra: a server-rendered Markdown view of the invalid verdict''s errors,
             present only when the request''s `render` includes `markdown`. Absent by default.'
       type: object
       title: InvalidReport
@@ -3636,13 +3624,15 @@ components:
 
         (`bundle_blueprint`, `pipe_io_contracts`, `graph_spec`, `validated_pipes`) do not exist when
 
-        load/parse/wiring failed, so this arm omits them and carries only the per-error diagnostics
+        load/parse/wiring failed, so this arm omits them and carries only the per-error diagnostics,
 
-        plus the runnability facts. The `input_form` and `output_form` views follow them into absence for
+        as the problem items of the verdict''s problem (`errors`), plus the runnability facts. The
 
-        the same reason — both derive from a crate that was never assembled — so neither is declared here and `views`
+        `input_form` and `output_form` views follow them into absence for the same reason — both derive
 
-        has no effect on this arm (unlike `rendered_markdown`, which rides both arms because failure
+        from a crate that was never assembled — so neither is declared here and `views` has no effect
+
+        on this arm (unlike `rendered_markdown`, which rides both arms because failure
 
         text is exactly what a human surface wants).'
     JudgeQuestionBlueprint:
@@ -5563,16 +5553,6 @@ components:
       - description
       - output
       title: PipeExtractBlueprint
-    PipeFactoryErrorType:
-      type: string
-      enum:
-      - unknown_concept
-      - unknown_factory_error
-      title: PipeFactoryErrorType
-      description: 'Types of pipe factory errors.
-
-
-        These error types are raised during pipe creation from blueprints.'
     PipeFuncBlueprint:
       properties:
         source:
@@ -6602,44 +6582,6 @@ components:
       - PipeParallel
       - PipeSequence
       title: PipeType
-    PipeValidationErrorType:
-      type: string
-      enum:
-      - missing_input_variable
-      - extraneous_input_variable
-      - input_stuff_spec_mismatch
-      - inadequate_output_concept
-      - inadequate_output_multiplicity
-      - llm_output_cannot_be_image
-      - llm_setting_refused_by_model
-      - invalid_pipe_code_syntax
-      - invalid_input_name
-      - unknown_pipe_type
-      - missing_pipe_type
-      - batch_item_name_collision
-      - binding_step_invalid
-      - binding_path_unresolved
-      - optional_marker_invalid
-      - optional_not_handled
-      - optional_output_required
-      - optional_input_unguarded
-      - optional_branch_required_field
-      - template_private_name
-      - optional_force_redundant
-      - input_presence_vacuous
-      - native_concept_redeclaration
-      - unresolved_concept
-      - unresolved_pipe_dependency
-      - unresolved_package_dependency
-      - unexported_pipe_dependency
-      - unknown_model
-      - pipe_func_function_refused
-      - unknown_validation_error
-      title: PipeValidationErrorType
-      description: 'Types of pipe validation errors.
-
-
-        These error types are raised during pipe validation from Pipe/Concept classes.'
     PipelexApiExecuteResponse:
       properties:
         pipeline_run_id:
@@ -7152,14 +7094,12 @@ components:
         type:
           type: string
           title: Type
-          description: 'Stable URI of the error''s documentation page: the page of its `code` (`https://mthds.ai/errors/<code>`
-            for a core code, `https://docs.pipelex.com/errors/<code>` for a Pipelex code), or `https://docs.pipelex.com/latest/errors/<kebab-error-type>/`
-            for an API-authored error, which carries no `code` yet.'
+          description: 'Stable URI of the documentation page of the error''s `code`: `https://mthds.ai/errors/<code>` for
+            a core code, `https://docs.pipelex.com/errors/<code>` for a Pipelex code.'
         title:
           type: string
           title: Title
-          description: 'Short, human-readable summary: the title of the error''s `code`, or of its `error_type` when it carries
-            none.'
+          description: 'Short, human-readable summary: the title of the error''s `code`.'
         status:
           type: integer
           title: Status
@@ -7170,23 +7110,16 @@ components:
           description: 'Human-readable explanation of this specific failure, rendered from its code''s template and parameters.
             Never parsed: a program branches on `code`.'
         code:
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: string
           title: Code
           description: 'Registry code of the error, what a client branches on: a core code of the MTHDS standard (e.g. `request.invalid`)
-            or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises; absent on an API-authored
-            error.'
+            or a Pipelex code (e.g. `pipelex.config.invalid`).'
         domain:
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: string
           title: Domain
           description: 'Who must act, the code''s domain: `input`, `method`, `account`, `operator` or `runtime`.'
         retry:
-          anyOf:
-          - type: string
-          - type: 'null'
+          type: string
           title: Retry
           description: 'Whether repeating the request can succeed, the code''s verdict: `yes`, `no` or `outcome_unknown`.'
         retry_after:
@@ -7196,9 +7129,7 @@ components:
           title: Retry After
           description: Seconds to wait before a retry, when known, on a code whose verdict is `yes`.
         next_step:
-          anyOf:
-          - $ref: '#/components/schemas/NextStep'
-          - type: 'null'
+          $ref: '#/components/schemas/NextStep'
           description: 'What the reader should do next: a kind and a sentence, aimed at the caller, or at the operator in
             the operator view.'
         params:
@@ -7219,8 +7150,9 @@ components:
             type: array
           - type: 'null'
           title: Errors
-          description: One item per fault, for a refusal with several, such as a method that does not validate. On `/validate`,
-            `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead.
+          description: One item per fault, for a refusal with several, such as a request whose fields the route refuses. On
+            `/validate`, `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead, whose `errors`
+            are items of this same shape.
         pipeline_run_id:
           anyOf:
           - type: string
@@ -7232,7 +7164,8 @@ components:
           - type: string
           - type: 'null'
           title: Request Id
-          description: Correlation id, echoed in the `X-Request-ID` response header.
+          description: 'Correlation id, echoed in the `X-Request-ID` response header: the caller''s own when valid, else one
+            the runner mints.'
         diagnostics:
           anyOf:
           - $ref: '#/components/schemas/ProblemDiagnostics'
@@ -7240,31 +7173,6 @@ components:
           description: 'What only the operator reads: the error''s class and message, its causes, the provider''s answer,
             the model. Present only when the request was authenticated as the operator''s (`AUTH_MODE=api_key`, or a trusted
             proxy).'
-        instance:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Instance
-          description: Path of the request that failed, on an API-authored error.
-        error_type:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Error Type
-          description: Stable name of an API-authored error (e.g. `Unauthenticated`).
-        error_domain:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Error Domain
-          description: 'On an API-authored error: `input` (caller can fix it → 4xx) or `config` (deployment must fix it →
-            5xx).'
-        retryable:
-          anyOf:
-          - type: boolean
-          - type: 'null'
-          title: Retryable
-          description: 'On an API-authored error: whether retrying the same request can plausibly succeed.'
       additionalProperties: true
       type: object
       required:
@@ -7272,21 +7180,23 @@ components:
       - title
       - status
       - detail
+      - code
+      - domain
+      - retry
+      - next_step
       title: ProblemDocument
       description: 'An RFC 9457 `application/problem+json` error body — the shape of every failure response.
 
 
-        A pipelex error answers its problem document: the RFC''s members (`type`, `title`, `status`, `detail`), the MTHDS
+        Every failure answers its problem document: the RFC''s members (`type`, `title`, `status`, `detail`), the MTHDS
 
         core''s (`code`, `domain`, `retry`, `next_step`, always present, and `retry_after`, `params`, `location`, `errors`,
 
-        `pipeline_run_id` when they hold a value) and Pipelex''s (`request_id`, and `diagnostics` in the operator view
+        `pipeline_run_id` when they hold a value) and Pipelex''s (`request_id`, always present on a response of this server,
 
-        alone). An API-authored error carries no `code` yet, and is classified by `error_type`, `error_domain` and
+        and `diagnostics` in the operator view alone). No member is ever written as `null`: a member with no value is
 
-        `retryable` instead, with its request path as `instance`. No member is ever written as `null`: a member with no
-
-        value is absent. `extra="allow"` mirrors RFC 9457''s open-ended extension-member rule.'
+        absent. `extra="allow"` mirrors RFC 9457''s open-ended extension-member rule.'
     ProblemDomain:
       type: string
       enum:
@@ -7596,7 +7506,7 @@ components:
             - $ref: '#/components/schemas/ProblemRenameTableKeyOp'
             - $ref: '#/components/schemas/ProblemMoveKeyOp'
             - $ref: '#/components/schemas/ProblemRemapValueOp'
-            - $ref: '#/components/schemas/UnknownFixOp'
+            - $ref: '#/components/schemas/ProblemUnknownFixOp'
           type: array
           minItems: 1
           title: Ops
@@ -7609,6 +7519,18 @@ components:
       - ops
       title: SuggestedFix
       description: 'A deterministic fix for one fault: operations over a bundle of the method, addressed by TOML key path.'
+    ProblemUnknownFixOp:
+      properties:
+        kind:
+          type: string
+          title: Kind
+      additionalProperties: true
+      type: object
+      required:
+      - kind
+      title: UnknownFixOp
+      description: 'The reader-side catch-all: an operation whose `kind` is none the protocol lists, which an applier never
+        applies.'
     PromptImageDetail:
       type: string
       enum:
@@ -8024,43 +7946,6 @@ components:
       - message
       title: ServiceIdentity
       description: Body of `GET /` — the service identity banner.
-    SetKeyOp:
-      properties:
-        table_path:
-          items:
-            type: string
-          type: array
-          title: Table Path
-        kind:
-          type: string
-          const: set_key
-          title: Kind
-          default: set_key
-        key:
-          type: string
-          title: Key
-        value:
-          anyOf:
-          - type: string
-          - type: integer
-          - type: number
-          - type: boolean
-          - additionalProperties:
-              anyOf:
-              - type: string
-              - type: integer
-              - type: number
-              - type: boolean
-            type: object
-          title: Value
-      additionalProperties: false
-      type: object
-      required:
-      - table_path
-      - key
-      - value
-      title: SetKeyOp
-      description: Write ``key = value`` in the addressed table, whatever it currently holds.
     SizeTier:
       type: string
       enum:
@@ -8180,59 +8065,6 @@ components:
       required:
       - pipe
       title: SubPipeBlueprint
-    SuggestedFix:
-      properties:
-        fix_code:
-          type: string
-          title: Fix Code
-        description:
-          type: string
-          title: Description
-        safety:
-          $ref: '#/components/schemas/FixSafety'
-        source:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Source
-        ops:
-          items:
-            oneOf:
-            - $ref: '#/components/schemas/SetKeyOp'
-            - $ref: '#/components/schemas/EnsureTableOp'
-            - $ref: '#/components/schemas/DeleteKeyOp'
-            - $ref: '#/components/schemas/DeleteTableOp'
-            - $ref: '#/components/schemas/RenameTableKeyOp'
-            - $ref: '#/components/schemas/MoveKeyOp'
-            - $ref: '#/components/schemas/RemapValueOp'
-            discriminator:
-              propertyName: kind
-              mapping:
-                delete_key: '#/components/schemas/DeleteKeyOp'
-                delete_table: '#/components/schemas/DeleteTableOp'
-                ensure_table: '#/components/schemas/EnsureTableOp'
-                move_key: '#/components/schemas/MoveKeyOp'
-                remap_value: '#/components/schemas/RemapValueOp'
-                rename_table_key: '#/components/schemas/RenameTableKeyOp'
-                set_key: '#/components/schemas/SetKeyOp'
-          type: array
-          title: Ops
-      additionalProperties: false
-      type: object
-      required:
-      - fix_code
-      - description
-      - safety
-      - ops
-      title: SuggestedFix
-      description: 'A deterministic fix for one validation error, ready for a style-preserving applier.
-
-
-        ``fix_code`` is the kebab-case rule id (e.g. ``"match-sequence-output"``). ``source`` is
-
-        the file the ops target, when known (multi-file libraries) — an applier must only apply
-
-        ops to the file they target.'
     TagStyle:
       type: string
       enum:
@@ -8283,25 +8115,6 @@ components:
       - llm_prompt
       - img_gen_prompt
       title: TemplateCategory
-    TemplateCheckErrorType:
-      type: string
-      enum:
-      - template_check_warning
-      title: TemplateCheckErrorType
-      description: 'Advisory findings of a ``PipeDocGen`` step''s template check (the engine''s ``check_template``).
-
-
-        Every member is advisory-only: it rides the validation report''s ``warnings`` array and never makes a
-
-        verdict invalid. An error finding of the same check fails the step''s dry run instead, and is reported as
-
-        the ``DryRunError`` item every failed dry run is. A separate enum rather than a new
-
-        ``PipeValidationErrorType`` member because the finding is not the pipe''s validation: the dry run hands the
-
-        step''s template file to its engine, which reads it in a way only the engine can, and reports in its own
-
-        words. Its locators are the template file and the place in it the engine names.'
     TemplatingStyle:
       properties:
         tag_style:
@@ -8666,18 +8479,6 @@ components:
       - name
       title: UnknownField
       description: '`unknown` at a named position.'
-    UnknownFixOp:
-      properties:
-        kind:
-          type: string
-          title: Kind
-      additionalProperties: true
-      type: object
-      required:
-      - kind
-      title: UnknownFixOp
-      description: 'The reader-side catch-all: an operation whose `kind` is none the protocol lists, which an applier never
-        applies.'
     UnknownItem:
       properties:
         title:
@@ -8778,9 +8579,11 @@ components:
           default: true
         warnings:
           items:
-            $ref: '#/components/schemas/ValidationErrorItem'
+            $ref: '#/components/schemas/ProblemItem'
           type: array
           title: Warnings
+          description: 'Advisory findings on the valid bundle, one problem item each, with the code the finding''s type names:
+            they never flip `is_valid`. The same item shape as the invalid arm''s `errors`.'
         bundle_blueprint:
           $ref: '#/components/schemas/PipelexBundleBlueprint'
         pipe_io_contracts:
@@ -8848,7 +8651,7 @@ components:
             run of THIS request would execute. For a method tree (`files` or a `method_ref`) it is the tree''s entry pipe
             by the MTHDS protocol''s rule: the `main_pipe` of the `METHODS.toml` at its root, else the one `main_pipe` its
             bundles declare. For inline `mthds_contents` it is the closure''s primary blueprint''s `main_pipe` qualified by
-            its domain. `null` when no entry pipe is determined, in which case a selector-less run would be refused too.'
+            its domain. Absent when no entry pipe is determined, in which case a selector-less run would be refused too.'
         rendered_markdown:
           anyOf:
           - type: string
@@ -8873,6 +8676,13 @@ components:
         discriminant. The extras exist for HTTP clients only (the webapp reads back `mthds_contents`);
 
         they are NOT part of the canonical report and no in-process consumer should depend on them.
+
+
+        `warnings` is re-declared as problem items: the canonical report holds the advisory findings as the validation
+
+        items the local channels render, and the wire carries each as the problem item its type''s code makes
+
+        (`pipelex.pipeline.validation_errors.warning_problem_items`), the item shape `errors` has on the invalid arm.
 
 
         Two inherited fields are deliberately re-declared: `input_form` and `output_form`. The canonical
@@ -8931,13 +8741,14 @@ components:
             a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size":
             ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`).
             The map is read from the request''s JSON text: a key given twice, a key the membership rule keeps out of every
-            tree (`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal`
-            names the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs`
-            lists every such hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read,
-            such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
-            of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is
-            only honored on a sandbox-hosted deployment. The whole tree is validated, its Python included, by syntax. Exactly
-            one of `mthds_contents` / `files` / `method_ref`.'
+            tree (`.mthds/` included) and colliding keys are a 422 `method.package_invalid` whose `reason` is the refusal''s
+            code and whose `path` names the first path, a key leaving the tree is a 422 `security.input_path_refused`, a malformed
+            entry is a 422 `request.invalid`, and hash entries the runner does not hold are one 422 `request.blobs_missing`
+            whose `missing_blobs` parameter lists every such hash. Its `.mthds` files are the method''s bundles and every
+            other file is one a step may read, such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`,
+            the run starts at the `main_pipe` of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its
+            bundles declare. Custom `.py` is only honored on a sandbox-hosted deployment. The whole tree is validated, its
+            Python included, by syntax. Exactly one of `mthds_contents` / `files` / `method_ref`.'
         dependencies:
           anyOf:
           - additionalProperties:
@@ -9028,7 +8839,8 @@ components:
             as `/start`). An OPEN string token: `direct` validates in-process; a `temporal` mode dispatches the whole job
             to a worker; any plugin-provided token is accepted and an unregistered one is refused at dispatch. Honored only
             when the deployment sets `allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token
-            that differs from the deployment default is refused with a 403. Omitted → the default.'
+            that differs from the deployment default is refused with a 422 `pipelex.deployment.orchestration_override_forbidden`.
+            Omitted → the default.'
         read_scope:
           anyOf:
           - type: string
@@ -9046,11 +8858,11 @@ components:
 
         file''s path relative to the submitted directory). The runner threads it onto
 
-        `blueprint.source`, so the structured `validation_errors` on a 200 `InvalidReport` carry a real
+        `blueprint.source`, so the problem items in `errors` on a 200 `InvalidReport` carry a real
 
-        `source` the client maps back to the owning file — without it the in-memory load path leaves
+        `location.file` the client maps back to the owning file — without it the in-memory load path
 
-        `source` null and cross-file diagnostics misfire. Omit it and behavior is unchanged.'
+        leaves the file unknown and cross-file diagnostics misfire. Omit it and behavior is unchanged.'
     ValidatedPipeEntry:
       properties:
         pipe_ref:
@@ -9070,217 +8882,6 @@ components:
         The ``pipe_ref`` key carries the namespaced ``pipe_ref`` (``domain.code``) — never the bare code.
 
         ``status`` is a ``DryRunStatus`` (a ``StrEnum``), so it serializes to its plain string value.'
-    ValidationErrorCategory:
-      type: string
-      enum:
-      - blueprint_validation
-      - pipe_factory
-      - pipe_validation
-      - dry_run
-      title: ValidationErrorCategory
-      description: 'Which validation stage produced a :class:`ValidationErrorItem`.
-
-
-        Mirrors the categorized error-data lists aggregated by ``ValidateBundleError``:
-
-        blueprint validation (from the interpreter), pipe-factory failures (e.g. a
-
-        missing concept), pipe/concept validation (e.g. a missing input variable
-
-        or a type mismatch), and ``dry_run`` — one item per pipe whose dry run failed,
-
-        located at the innermost failing pipe. On the report''s advisory ``warnings``,
-
-        ``dry_run`` marks a finding a dry run made without failing, such as a warning of
-
-        a ``PipeDocGen`` step''s template check.'
-    ValidationErrorItem:
-      properties:
-        category:
-          $ref: '#/components/schemas/ValidationErrorCategory'
-        message:
-          type: string
-          title: Message
-        error_type:
-          anyOf:
-          - $ref: '#/components/schemas/PipeValidationErrorType'
-          - $ref: '#/components/schemas/PipeFactoryErrorType'
-          - $ref: '#/components/schemas/ValidationResidualErrorType'
-          - $ref: '#/components/schemas/HintLintErrorType'
-          - $ref: '#/components/schemas/TemplateCheckErrorType'
-          - type: 'null'
-          title: Error Type
-        pipe_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Pipe Code
-        concept_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Concept Code
-        domain_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Domain Code
-        source:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Source
-        field_path:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Field Path
-        field_name:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Field Name
-        variable_names:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Variable Names
-        missing_concept_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Missing Concept Code
-        missing_pipe_code:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Missing Pipe Code
-        declared_concepts:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Declared Concepts
-        line:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Line
-        column:
-          anyOf:
-          - type: integer
-          - type: 'null'
-          title: Column
-        model_reference:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Model Reference
-        model_type:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Model Type
-        suggestions:
-          anyOf:
-          - items:
-              type: string
-            type: array
-          - type: 'null'
-          title: Suggestions
-        template_file:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Template File
-        template_location:
-          anyOf:
-          - type: string
-          - type: 'null'
-          title: Template Location
-        suggested_fix:
-          anyOf:
-          - $ref: '#/components/schemas/SuggestedFix'
-          - type: 'null'
-      additionalProperties: false
-      type: object
-      required:
-      - category
-      - message
-      title: ValidationErrorItem
-      description: 'One structured bundle-validation error, as the validation verdicts carry it.
-
-
-        The typed item of an invalid verdict''s ``validation_errors``; the problem document of a refusal carries each as an
-
-        ``errors`` item instead (``pipelex.pipeline.validation_errors.problem_item_of``). Its
-
-        fields are the *union* across the three ``ValidateBundleError`` error-data
-
-        models (``PipelexBundleBlueprintValidationErrorData``, ``PipeFactoryErrorData``,
-
-        ``PipesAndConceptValidationErrorData``); a given item only populates the
-
-        subset its :attr:`category` produces, and the unset fields drop out of the
-
-        ``exclude_none`` wire projection.
-
-
-        The error channel is built exclusively by
-
-        ``pipelex.pipeline.validation_errors.build_validation_error_items``, which both the agent
-
-        CLI (``extract_validation_errors``) and the API path
-
-        (``ValidateBundleError.validation_error_items``) call — so the CLI''s structured
-
-        output and the API''s invalid verdict can never drift. The same
-
-        item type also carries the report''s advisory ``warnings``, built by
-
-        ``pipelex.pipeline.advisory_warnings``: a warning is the same shape of
-
-        diagnostic, differing only in that it does not make the verdict invalid.
-
-
-        ``source`` is the declaring file path (CLI) or the per-content source the API
-
-        threads onto the in-memory load path — it hands a consumer the owning file
-
-        for cross-file diagnostics. Lives here rather than next to the source error-data
-
-        models because ``base_exceptions`` must not import the ``pipelex.core`` error
-
-        modules (which import back into this module).'
-    ValidationResidualErrorType:
-      type: string
-      enum:
-      - DryRunError
-      title: ValidationResidualErrorType
-      description: 'The ``error_type`` of a failure no validation stage classifies into a code.
-
-
-        There is exactly one that names itself: a dry-run failure is raised as an error object, a
-
-        ``DryRunError`` carrying one located failure per pipe whose dry run failed, so each of its items is
-
-        tagged with that exception''s own class name.
-
-
-        The items no code identifies — the parse-level residual, for a bundle that could not be turned
-
-        into a blueprint at all (a TOML-syntax error, an empty blueprint, an elaborator failure), and a
-
-        pydantic error no categorizer knows — carry no ``error_type`` and therefore no member here. That
-
-        is not an omission: they stand for many distinct underlying errors, and inventing one code for all
-
-        of them would tell a consumer it knows which fault occurred when it does not. Their message is the
-
-        authoritative diagnostic.'
     WaterfallMatch:
       properties:
         category:

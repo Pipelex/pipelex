@@ -1,7 +1,7 @@
 """Integration tests for the global FastAPI exception handlers.
 
 These tests register the production handlers on a throwaway FastAPI app whose
-routes raise straight through — `ApiError`, `RequestValidationError`,
+routes raise straight through — the runner's own refusals, `RequestValidationError`,
 `PipelexError`, a bare orchestrator-SDK transport error (handled via a synthetic
 plugin-contributed mapper, proving the plugin seam without importing any
 orchestrator SDK), and uncaught `Exception` each end up at their respective
@@ -40,15 +40,15 @@ from pytest_mock import MockerFixture
 from starlette.types import Message, Scope
 from typing_extensions import override
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_internal_server_error, raise_validation_error
-from pipelex_api.exception_handlers import problem_response, register_exception_handlers
+from pipelex_api.exception_handlers import ERROR_CHAIN_FIELD, ERROR_FRAMES_FIELD, problem_response, register_exception_handlers
+from pipelex_api.exceptions import RunnerMisconfiguredError, RunnerRequestError
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from pipelex_api.routes.pipelex.tools import router as tools_router
 from pipelex_api.security import RequestUser
+from tests.unit._problems import assert_problem, problem_items_fields
 from tests.unit.test_data import ProblemTestData, rate_limited_failure
 
 # Crockford Base32, 26 chars — the ULID alphabet RequestIdMiddleware mints.
@@ -245,25 +245,36 @@ async def crafted_retry_route(case: str) -> None:
     raise _CraftedRetryError(retry_after=retry_after).with_error_code(code)
 
 
+# The field the runner's own refusal names in these routes.
+_REFUSED_FIELD = "name"
+
+
+def _caller_mistake() -> RunnerRequestError:
+    """A runner refusal of the request, a 422 `request.invalid`."""
+    msg = "a caller-side mistake"
+    return RunnerRequestError(msg, field=_REFUSED_FIELD)
+
+
 @_router.get("/api-input-error")
 async def api_input_error_route() -> None:
-    # An API-authored 422 — the INPUT-domain branch of `handle_api_error`.
-    raise_validation_error("a caller-side mistake")
+    # A runner-authored 422, raised as its coded class like any pipelex error.
+    raise _caller_mistake()
 
 
 @_router.get("/crafted-detail")
 async def crafted_detail_route(detail: str) -> None:
-    # An API-authored 422 whose `detail` is exactly what the caller sent — the real shape of the
-    # `raise_validation_error(str(exc))` sites, where the message is built from caller input.
-    raise_validation_error(detail)
+    # A runner refusal whose message quotes exactly what the caller sent: the real shape of a refusal built from what a
+    # parser said about caller input.
+    msg = f"the value is refused: {detail}"
+    raise RunnerRequestError(msg, field=_REFUSED_FIELD)
 
 
 @_router.get("/api-config-error")
 async def api_config_error_route() -> None:
-    # An API-authored 500 — the CONFIG-domain branch of `handle_api_error`
-    # (the `version.py` `PackageNotFoundError → raise_internal_server_error`
-    # path goes through this same code).
-    raise_internal_server_error("the configuration is broken", error_type=ErrorType.SERVER_MISCONFIGURED)
+    # A runner-authored 500: the runner's own configuration (the `version.py` `PackageNotFoundError` path goes through
+    # this same code).
+    msg = "the configuration is broken"
+    raise RunnerMisconfiguredError(msg, component="API_KEY")
 
 
 class _RequestValidationBody(BaseModel):
@@ -331,7 +342,7 @@ async def authenticated_config_error_route(request: Request) -> None:
 @_router.get("/authenticated-api-input-error")
 async def authenticated_api_input_error_route(request: Request) -> None:
     _bind_test_user(request)
-    raise_validation_error("a caller-side mistake")
+    raise _caller_mistake()
 
 
 @_router.get("/authenticated-unexpected-error")
@@ -351,10 +362,9 @@ async def run_state_pipelex_error_route(request: Request) -> None:
 
 @_router.get("/pipeline-state-api-input-error")
 async def run_state_api_input_error_route(request: Request) -> None:
-    # An API-authored 4xx raised after `_parse_request` bound state — exercises
-    # `_log_api_authored_error`.
+    # A runner-authored 4xx raised after `_parse_request` bound state.
     _bind_test_run_state(request)
-    raise_validation_error("a caller-side mistake")
+    raise _caller_mistake()
 
 
 @_router.get("/pipeline-state-unexpected-error")
@@ -637,11 +647,10 @@ class TestExceptionHandlers:
             ("GET", "/synthetic-transport-error", None, 500),
             ("GET", "/corrupt-error", None, 500),
             ("GET", "/unexpected-error", None, 500),
-            # Cover the API-authored paths (`handle_api_error`) and FastAPI's
-            # automatic-validation path (`handle_request_validation_error`):
-            # the request-id propagation is the same structural property, but
-            # the three branches build the response document differently and
-            # are worth sweeping.
+            # Cover the runner's own refusals and FastAPI's automatic-validation
+            # path (`handle_request_validation_error`): the request-id
+            # propagation is the same structural property, but each is raised
+            # from a different place and is worth sweeping.
             ("GET", "/api-input-error", None, 422),
             ("GET", "/api-config-error", None, 500),
             ("POST", "/needs-body", {"wrong": 1}, 422),
@@ -659,6 +668,22 @@ class TestExceptionHandlers:
         request_id = response.headers[REQUEST_ID_HEADER]
         assert _ULID_RE.match(request_id) is not None
         assert response.json()["request_id"] == request_id
+
+    def test_a_path_no_route_serves_is_a_not_found_problem(self, mocker: MockerFixture):
+        # Starlette's own 404 would be a bare `{"detail": "Not Found"}`: the runner answers its problem instead.
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get("/no-such-route")
+        body = assert_problem(response, status=404, code="request.not_found")
+        assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
+        assert "params" not in body
+        fields = _emitted_fields(log_spy, as_error=False)
+        assert fields["error.code"] == "request.not_found"
+        assert fields["http.response.status_code"] == 404
+
+    def test_a_method_the_route_does_not_accept_is_a_method_not_allowed_problem_keeping_allow(self):
+        response = _build_client().get("/needs-body")
+        assert_problem(response, status=405, code="request.method_not_allowed")
+        assert response.headers["Allow"] == "POST"
 
     def test_inbound_request_id_is_echoed(self):
         response = _build_client().get("/config-error", headers={REQUEST_ID_HEADER: "inbound-correlation-007"})
@@ -682,7 +707,10 @@ class TestExceptionHandlers:
         assert fields["url.path"] == "/config-error"
         # A domain error's record carries no `detail`: the cause is the diagnostics', the body's detail is only its code's sentence.
         assert "detail" not in fields
-        assert log_spy.error.call_args.kwargs["include_exception"] is True
+        # No traceback, which would print the text of every exception of the chain: the chain by class, and the frames.
+        assert "include_exception" not in log_spy.error.call_args.kwargs
+        assert fields[ERROR_CHAIN_FIELD] == ["PipelexConfigError"]
+        assert fields[ERROR_FRAMES_FIELD]
 
     def test_provider_failure_record_carries_the_providers_answer(self, mocker: MockerFixture):
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
@@ -711,52 +739,53 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=True)
         assert fields["error.code"] == CoreCode.RUNTIME_UNEXPECTED
         assert fields["error.type"] == "RuntimeError"
-        assert log_spy.error.call_args.kwargs["include_exception"] is True
+        assert "include_exception" not in log_spy.error.call_args.kwargs
+        assert fields[ERROR_CHAIN_FIELD] == ["RuntimeError"]
+        assert any(frame.endswith(" in unexpected_error_route") for frame in fields[ERROR_FRAMES_FIELD]), fields
 
-    def test_api_authored_500_emits_structured_error_record(self, mocker: MockerFixture):
-        # Without `handle_api_error` logging, an `ApiError`-shaped 500 produces
-        # zero operator output (`/version`'s `PackageNotFoundError →
-        # raise_internal_server_error` is the canonical silent case). Assert
-        # the handler emits one `api_error` record at `error` level whose fields
-        # mirror the response — the same set `_log_problem` ships for a
-        # pipelex-derived 500, so a downstream sink queries them uniformly.
+    def test_runner_authored_500_emits_structured_error_record(self, mocker: MockerFixture):
+        # A runner-authored 500 (`/version`'s `PackageNotFoundError` is the canonical case) is a pipelex error like any
+        # other, so it emits the same record at `error` level, the set `_log_problem` ships for every 500, which a
+        # downstream sink queries uniformly.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/api-config-error")
         assert response.status_code == 500
+        assert response.json()["code"] == "runtime.misconfigured"
         log_spy.error.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=True)
         assert fields["http.response.status_code"] == 500
-        assert fields["error.type"] == "ServerMisconfigured"
+        assert fields["error.code"] == "runtime.misconfigured"
+        assert fields["error.type"] == "RunnerMisconfiguredError"
         assert fields["error_domain"] == "config"
         assert fields["retryable"] is False
         assert fields["url.path"] == "/api-config-error"
-        # The operator-facing cause rides a field of its own and never reaches the message, which
-        # is what stops a crafted value from shaping the rendered line at all.
-        assert fields["detail"] == "the configuration is broken"
-        assert log_spy.error.call_args.kwargs["include_exception"] is True
+        # The operator's message rides the response's diagnostics, never the record.
+        assert "detail" not in fields
+        assert "the configuration is broken" not in json.dumps(fields)
         log_spy.warning.assert_not_called()
 
-    def test_api_authored_4xx_emits_structured_warning_record(self, mocker: MockerFixture):
-        # Mirror at the warning level: an INPUT-domain `ApiError` is a caller
-        # mistake, not an operator fault, so it logs at `warning` without a
-        # traceback — same disposition rule `_log_problem` uses.
+    def test_runner_authored_4xx_emits_structured_warning_record(self, mocker: MockerFixture):
+        # Mirror at the warning level: a refusal of the request is a caller mistake, not an operator fault, so it logs
+        # at `warning` — the same disposition rule every problem follows.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/api-input-error")
-        assert response.status_code == 422
+        body = assert_problem(response, status=422, code="request.invalid", field=_REFUSED_FIELD)
+        assert body["location"] == {"field": _REFUSED_FIELD}
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["http.response.status_code"] == 422
-        assert fields["error.type"] == "ValidationError"
+        assert fields["error.code"] == "request.invalid"
+        assert fields["error.type"] == "RunnerRequestError"
         assert fields["error_domain"] == "input"
         assert fields["retryable"] is False
-        assert fields["detail"] == "a caller-side mistake"
+        assert ERROR_FRAMES_FIELD not in fields
         log_spy.error.assert_not_called()
 
     @pytest.mark.parametrize("path", ["/v1/lint", "/v1/execute"], ids=["typed-body-route", "raw-body-run-route"])
-    def test_client_disconnect_is_a_400_logged_as_a_warning(self, mocker: MockerFixture, path: str):
+    def test_client_disconnect_is_a_422_logged_as_a_warning(self, mocker: MockerFixture, path: str):
         # A client that leaves mid-upload makes the body read raise `ClientDisconnect`, from a typed route's
-        # nesting check or from a run route's own read. It is the caller's failure: a 400 at warning, never a
-        # 500 server fault with a traceback.
+        # nesting check or from a run route's own read. It is the caller's failure: a 422 `request.malformed` at
+        # warning, never a 500 server fault.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         app = FastAPI()
         register_exception_handlers(app)
@@ -793,14 +822,15 @@ class TestExceptionHandlers:
         asyncio.run(app(scope, receive, send))
 
         start = next(message for message in sent if message["type"] == "http.response.start")
-        assert start["status"] == 400
+        assert start["status"] == 422
         body = json.loads(b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body"))
-        assert body["error_type"] == "BadRequest"
-        assert body["error_domain"] == "input"
+        assert body["code"] == "request.malformed"
+        assert body["domain"] == "input"
+        assert body["params"] == {"reason": "body_incomplete"}
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["http.response.status_code"] == 400
-        assert fields["error.type"] == "BadRequest"
+        assert fields["http.response.status_code"] == 422
+        assert fields["error.type"] == "RunnerRequestError"
         log_spy.error.assert_not_called()
 
     def test_the_message_is_fixed_and_the_failure_rides_the_fields(self, mocker: MockerFixture):
@@ -814,7 +844,7 @@ class TestExceptionHandlers:
         assert log_spy.warning.call_args.args[0] == "A request ended in an error response"
         fields = _emitted_fields(log_spy, as_error=True)
         assert fields["http.response.status_code"] == 500
-        assert fields["error.type"] == "ServerMisconfigured"
+        assert fields["error.type"] == "RunnerMisconfiguredError"
         assert "event" not in fields
 
     @pytest.mark.parametrize(
@@ -849,19 +879,16 @@ class TestExceptionHandlers:
         assert fields["error.type"] == "PipelexConfigError"
         assert fields["error.code"] == PipelexErrorCode.CONFIG_INVALID
 
-    def test_user_id_rides_authenticated_api_authored_record(self, mocker: MockerFixture):
-        # `handle_api_error` covers the API-authored 4xx surface (storage's
-        # `raise_bad_request`, `raise_forbidden`, `raise_payload_too_large`;
-        # uploader's same set). It must ride the same `user.id` correlation
-        # `_log_problem` does so the contract is uniform — a caller
-        # mistake and a backend failure both name the caller.
+    def test_user_id_rides_authenticated_runner_authored_record(self, mocker: MockerFixture):
+        # The runner's own refusals ride the same `user.id` correlation every problem does, so the contract is
+        # uniform — a caller mistake and a backend failure both name the caller.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/authenticated-api-input-error")
         assert response.status_code == 422
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["user.id"] == _TEST_USER_ID
-        assert fields["error.type"] == "ValidationError"
+        assert fields["error.type"] == "RunnerRequestError"
 
     def test_user_id_rides_authenticated_unexpected_error_record(self, mocker: MockerFixture):
         # The catch-all 500 (`handle_unexpected_error`) is the one place a
@@ -900,11 +927,9 @@ class TestExceptionHandlers:
         # The bound run id rides the problem too, so a caller can name the run it asks about.
         assert response.json()["pipeline_run_id"] == _TEST_RUN_ID
 
-    def test_run_state_rides_api_authored_record(self, mocker: MockerFixture):
-        # API-authored 4xx surface: `raise_validation_error` raised from a
-        # route that has already bound pipe state must ship the same fields,
-        # so the operator record is uniform across the validation and the
-        # pipelex-domain failure surfaces.
+    def test_run_state_rides_runner_authored_record(self, mocker: MockerFixture):
+        # A runner refusal raised from a route that has already bound pipe state ships the same fields, so the operator
+        # record is uniform across the request refusals and the pipelex-domain failures.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/pipeline-state-api-input-error")
         assert response.status_code == 422
@@ -912,7 +937,7 @@ class TestExceptionHandlers:
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["pipe_code"] == _TEST_PIPE_CODE
         assert fields["pipeline_run_id"] == _TEST_RUN_ID
-        assert fields["error.type"] == "ValidationError"
+        assert fields["error.type"] == "RunnerRequestError"
 
     def test_run_state_rides_unexpected_error_record(self, mocker: MockerFixture):
         # The catch-all 500 is the most operationally expensive case for a
@@ -945,10 +970,9 @@ class TestExceptionHandlers:
         assert "pipeline_run_id" not in response.json()
 
     def test_request_validation_error_emits_structured_warning_record(self, mocker: MockerFixture):
-        # FastAPI's automatic-validation 422 goes through
-        # `handle_request_validation_error`, not `handle_api_error`, but emits
-        # the same `api_error` record so the surface is uniform — whichever code
-        # path rejects a caller-input failure, the operator record is identical.
+        # FastAPI's automatic-validation 422 goes through `handle_request_validation_error`, which answers the
+        # runner's own refusal, so it emits the same record every problem does — whichever code path rejects a
+        # caller-input failure, the operator record is identical.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         # `{"wrong": 1}` triggers FastAPI's automatic validation failure on
         # `_RequestValidationBody`: `field` is missing AND `wrong` is an
@@ -956,15 +980,17 @@ class TestExceptionHandlers:
         # actually fires — Pydantic's default `extra="ignore"` would have
         # left only the missing-field error).
         response = _build_client().post("/needs-body", json={"wrong": 1})
-        assert response.status_code == 422
+        body = assert_problem(response, status=422, code="request.invalid", field="field")
+        # One item per refused field, in the order pydantic reports them, each named as its `field` parameter.
+        assert problem_items_fields(body) == ["field", "wrong"]
+        assert [item["location"] for item in body["errors"]] == [{"field": "field"}, {"field": "wrong"}]
         log_spy.warning.assert_called_once()
         fields = _emitted_fields(log_spy, as_error=False)
         assert fields["http.response.status_code"] == 422
-        assert fields["error.type"] == "ValidationError"
+        assert fields["error.code"] == "request.invalid"
+        assert fields["error.type"] == "RunnerRequestError"
         assert fields["error_domain"] == "input"
-        # The summary covers both per-field failures the request triggered.
-        assert "field" in fields["detail"]
-        assert "wrong" in fields["detail"]
+        assert "detail" not in fields
         log_spy.error.assert_not_called()
 
     @pytest.mark.parametrize(
@@ -982,19 +1008,17 @@ class TestExceptionHandlers:
             'has " a quote = inside',
         ],
     )
-    def test_crafted_detail_stays_one_field_and_shapes_no_other(self, mocker: MockerFixture, crafted_detail: str) -> None:
-        # `_log_api_authored_error` ships `document["detail"]`, and `detail` originates from caller
-        # input on several routes (`raise_validation_error(str(exc))`, callback-URL rejections,
-        # `_summarize_request_validation_error`'s per-field messages). The API renders none of it
-        # any more: the value is handed to the runtime as one field, so it cannot forge a sibling
-        # field and cannot reach the message, and the selected sink is what escapes it on the way
-        # out. Pin that at the handler, so a route shipping some new caller-controlled field later
-        # is covered without re-auditing this surface.
+    def test_crafted_detail_reaches_neither_the_record_nor_the_caller(self, mocker: MockerFixture, crafted_detail: str) -> None:
+        # A refusal's message can quote what the caller sent. It rides the operator view's diagnostics alone: the
+        # record carries the code and the classes, and the caller reads the code's sentence, so a crafted value can
+        # neither forge a field nor reach the message. Pin that at the handler, so a route raising some new refusal
+        # built from caller input later is covered without re-auditing this surface.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/crafted-detail", params={"detail": crafted_detail})
-        assert response.status_code == 422
+        body = assert_problem(response, status=422, code="request.invalid", field=_REFUSED_FIELD)
+        assert crafted_detail not in json.dumps(body)
         fields = _emitted_fields(log_spy, as_error=False)
-        assert fields["detail"] == crafted_detail, f"the value was altered on the way to the record: {fields['detail']!r}"
+        assert crafted_detail not in json.dumps(fields), "caller input reached the record"
         assert fields["http.response.status_code"] == 422, "a crafted detail overwrote a legitimate field"
         message = log_spy.warning.call_args.args[0]
         assert crafted_detail not in message, f"caller input reached the message: {message!r}"

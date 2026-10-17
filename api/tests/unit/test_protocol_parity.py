@@ -7,7 +7,8 @@ shared report keys are byte-identical and the wire extras (`mthds_contents`, `me
 `default_pipe_ref`) appear on the HTTP envelope only. `is_valid` is a canonical report field on both backends (not a
 wire extra — the `success` extra is retired). `graph_spec` is compared by presence/absence,
 not value: it carries run-specific identity (graph id, node timings, random dry-run data),
-so two runs never serialize identically.
+so two runs never serialize identically. The wire writes no member it leaves unset, where the local report holds
+`None`, and it carries the report's `warnings` as problem items, the shape the invalid arm's `errors` have.
 
 Two report fields are gated on the wire rather than dropped: `input_form` and `output_form` are
 opt-in structured views the route attaches only when the request's `views` names them. So the parity
@@ -25,6 +26,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.models import ModelCategory
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validation_errors import warning_problem_items
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
@@ -62,8 +64,12 @@ class TestProtocolParity:
     )
     async def test_validate_parity(self, mthds_contents: list[str], allow_signatures: bool):
         local_report = await PipelexMTHDSProtocol().validate(mthds_contents=mthds_contents, allow_signatures=allow_signatures)
-        # Same serialization options as the route's JSONResponse path.
-        local_dump = local_report.model_dump(mode="json", serialize_as_any=True, by_alias=True)
+        # Same serialization options as the route's JSONResponse path, which writes no unset member, and the warnings
+        # as the problem items the wire carries.
+        local_dump = {
+            key: value for key, value in local_report.model_dump(mode="json", serialize_as_any=True, by_alias=True).items() if value is not None
+        }
+        local_dump["warnings"] = [item.model_dump(mode="json", exclude_none=True) for item in warning_problem_items(warnings=local_report.warnings)]
 
         client = _build_client()
         # Opt into every gated view so the parity claim covers the whole canonical report: a view is
@@ -75,13 +81,16 @@ class TestProtocolParity:
         assert response.status_code == 200, response.text
         body = response.json()
 
-        # The wire extras are HTTP-only — and they are the ONLY divergence in key sets.
+        # The wire extras are HTTP-only — and they are the ONLY divergence in key sets. `default_pipe_ref` is absent
+        # when the request has no default pipe, as every unset member is.
         assert VALIDATE_WIRE_EXTRAS.isdisjoint(local_dump)
         assert set(local_dump) >= VALIDATE_OPT_IN_VIEWS, "an opt-in view must be a canonical report field, not a wire-only invention"
-        assert set(body) == set(local_dump) | VALIDATE_WIRE_EXTRAS
+        assert set(body) - VALIDATE_WIRE_EXTRAS == set(local_dump)
+        assert {"mthds_contents", "message"} <= set(body)
+        assert None not in body.values()
 
         # graph_spec: presence parity (run-specific content — see module docstring).
-        assert (body["graph_spec"] is None) == (local_dump["graph_spec"] is None)
+        assert ("graph_spec" in body) == ("graph_spec" in local_dump)
 
         # Every other shared key is identical between the two backends.
         for key in sorted(set(local_dump) - {"graph_spec"}):

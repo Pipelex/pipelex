@@ -38,6 +38,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import STUB_METHOD_ADDRESS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _RESOURCES_NS = "pipelex_api.bundle_resources"
@@ -195,15 +196,12 @@ def _contents_body(*, route: str, resources: dict[str, str], mthds: str = _INVOI
             return {"files": [{"content": mthds, "source": "invoicing.mthds"}], "resources": resources}
 
 
-def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
-    """An API-authored refusal: its `error_type`, and the `detail` the API wrote from what it checked."""
-    assert response.status_code == status, response.text
-    assert response.headers["content-type"].startswith("application/problem+json")
-    problem = response.json()
-    assert problem["error_type"] == error_type, response.text
+def _assert_refusal(response: Any, *, status: int, code: str, params: dict[str, Any]) -> dict[str, Any]:
+    """A refusal of the request the runner authors itself: its code, and the parameters its sentences are rendered from."""
+    problem = assert_problem(response, status=status, code=code)
+    assert problem.get("params") == params, problem
     assert "is_valid" not in problem
-    detail: str = problem["detail"]
-    return detail
+    return problem
 
 
 def _assert_coded_problem(response: Any, *, code: CoreCode, params: dict[str, Any]) -> dict[str, Any]:
@@ -224,11 +222,12 @@ def _assert_coded_problem(response: Any, *, code: CoreCode, params: dict[str, An
 def _assert_the_verdict_names_the_missing_file(*, verdict: dict[str, Any], file: str, reason: str) -> None:
     """An invalid verdict whose one item is a file of the step missing from the method's tree, in the code's sentence."""
     assert verdict["is_valid"] is False
-    (item,) = verdict["validation_errors"]
-    assert item["category"] == "pipe_validation"
-    assert item["pipe_code"] == "print_invoice"
+    (item,) = verdict["errors"]
+    assert item["code"] == "method.resource_missing", item
+    assert item["params"] == {"file": file, "reason": reason}, item
+    assert item["location"]["pipe"] == "print_invoice", item
     # A verdict is the caller's: its item reads `method.resource_missing`'s sentence, never the runtime's own message.
-    assert item["message"] == f"The file reference '{file}' resolves to no file of the method's tree (reason: {reason})."
+    assert item["detail"] == f"The file reference '{file}' resolves to no file of the method's tree (reason: {reason})."
 
 
 class TestBundleResourcesRoutes:
@@ -268,19 +267,21 @@ class TestBundleResourcesRoutes:
         assert "'templates/logo.png'" in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize(
-        ("path", "reason"),
+        ("path", "code", "params"),
         [
-            ("/etc/invoice.docx", "absolute"),
-            ("../invoice.docx", "'..' segment"),
-            ("templates\\invoice.docx", "backslash"),
-            ("C:invoice.docx", "drive"),
-            ("invoice:v2.docx", "colon"),
+            # A path that would leave the tree is a security rule's refusal, naming the rule it broke.
+            ("/etc/invoice.docx", "security.input_path_refused", {"rule": "absolute"}),
+            ("../invoice.docx", "security.input_path_refused", {"rule": "parent_segment"}),
+            ("C:invoice.docx", "security.input_path_refused", {"rule": "absolute"}),
+            # A path no tree could hold is a malformed field.
+            ("templates\\invoice.docx", "request.invalid", {"field": "resources"}),
+            ("invoice:v2.docx", "request.invalid", {"field": "resources"}),
         ],
     )
-    def test_a_path_that_cannot_name_a_file_inside_the_bundle_is_refused(self, path: str, reason: str) -> None:
+    def test_a_path_that_cannot_name_a_file_inside_the_bundle_is_refused(self, path: str, code: str, params: dict[str, str]) -> None:
         response = _build_client().post("/v1/validate", json={"mthds_contents": [_INVOICE_MTHDS], "resources": {path: _b64(_TEMPLATE_BYTES)}})
 
-        assert reason in _assert_problem(response, status=422, error_type="InvalidResourcePath")
+        _assert_refusal(response, status=422, code=code, params=params)
 
     @pytest.mark.parametrize("second_value", [pytest.param(_b64(b"b"), id="both_base64"), pytest.param("not base64!", id="second_not_base64")])
     def test_two_spellings_of_one_file_are_refused_before_either_is_decoded(self, second_value: str) -> None:
@@ -289,31 +290,52 @@ class TestBundleResourcesRoutes:
             json={"mthds_contents": [_INVOICE_MTHDS], "resources": {_TEMPLATE_PATH: _b64(b"a"), f"./{_TEMPLATE_PATH}": second_value}},
         )
 
-        assert "name the same file" in _assert_problem(response, status=422, error_type="InvalidResourcePath")
+        _assert_refusal(response, status=422, code="request.invalid", params={"field": "resources"})
 
     def test_a_value_that_is_not_base64_is_refused(self) -> None:
         response = _build_client().post("/v1/validate", json={"mthds_contents": [_INVOICE_MTHDS], "resources": {_TEMPLATE_PATH: "not base64!"}})
 
-        _assert_problem(response, status=400, error_type="InvalidBase64")
+        _assert_refusal(response, status=422, code="request.malformed", params={"reason": "bad_base64"})
 
     @pytest.mark.parametrize(
         ("limit_patches", "resources", "expected"),
         [
-            pytest.param({"MAX_RESOURCES_PER_REQUEST": 1}, {"a.docx": _b64(b"a"), "b.docx": _b64(b"b")}, "1-file limit", id="count"),
-            pytest.param({"MAX_RESOURCE_FILE_BYTES": 2048, "_MAX_RESOURCE_B64_CHARS": 1024}, {"a.docx": _b64(bytes(1000))}, "per-file", id="encoded"),
-            pytest.param({"MAX_RESOURCE_FILE_BYTES": 1024}, {"a.docx": _b64(bytes(1025))}, "per-file", id="decoded"),
-            pytest.param({"MAX_RESOURCES_TOTAL_BYTES": 1024}, {"a.docx": _b64(bytes(600)), "b.docx": _b64(bytes(600))}, "total-size", id="total"),
+            pytest.param(
+                {"MAX_RESOURCES_PER_REQUEST": 1},
+                {"a.docx": _b64(b"a"), "b.docx": _b64(b"b")},
+                (422, "request.invalid", {"field": "resources"}),
+                id="count",
+            ),
+            pytest.param(
+                {"MAX_RESOURCE_FILE_BYTES": 2048, "_MAX_RESOURCE_B64_CHARS": 1024},
+                {"a.docx": _b64(bytes(1000))},
+                (413, "request.too_large", {"limit": 1024, "size": len(_b64(bytes(1000)))}),
+                id="encoded",
+            ),
+            pytest.param(
+                {"MAX_RESOURCE_FILE_BYTES": 1024},
+                {"a.docx": _b64(bytes(1025))},
+                (413, "request.too_large", {"limit": 1024, "size": 1025}),
+                id="decoded",
+            ),
+            pytest.param(
+                {"MAX_RESOURCES_TOTAL_BYTES": 1024},
+                {"a.docx": _b64(bytes(600)), "b.docx": _b64(bytes(600))},
+                (413, "request.too_large", {"limit": 1024, "size": 1200}),
+                id="total",
+            ),
         ],
     )
     def test_the_limits_are_enforced_before_the_bundle_loads(
-        self, mocker: MockerFixture, limit_patches: dict[str, int], resources: dict[str, str], expected: str
+        self, mocker: MockerFixture, limit_patches: dict[str, int], resources: dict[str, str], expected: tuple[int, str, dict[str, Any]]
     ) -> None:
+        status, code, params = expected
         for name, value in limit_patches.items():
             mocker.patch(f"{_RESOURCES_NS}.{name}", value)
 
         response = _build_client().post("/v1/validate", json={"mthds_contents": [_INVOICE_MTHDS], "resources": resources})
 
-        assert expected in _assert_problem(response, status=413, error_type="PayloadTooLarge")
+        _assert_refusal(response, status=status, code=code, params=params)
 
     @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute", "/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
     def test_resources_beside_a_method_ref_are_refused(self, route: str) -> None:
@@ -325,12 +347,9 @@ class TestBundleResourcesRoutes:
 
         response = _build_client().post(route, json=body)
 
-        # The run route refuses it in its request model, as the runtime's `request.invalid` naming the field; the crate
-        # routes refuse it themselves, with the API-authored `ValidationError`.
-        if route == "/v1/execute":
-            _assert_coded_problem(response, code=CoreCode.REQUEST_INVALID, params={"field": "resources"})
-        else:
-            assert "method_ref" in _assert_problem(response, status=422, error_type="ValidationError")
+        # The run route refuses it in its request model, the crate routes in theirs: either way, `request.invalid`.
+        problem = assert_problem(response, status=422, code="request.invalid")
+        assert problem["params"]["field"] in {"resources", "body"}, problem
 
     @pytest.mark.parametrize("route", ["/v1/validate", "/v1/pipe-io"])
     def test_a_source_label_naming_a_file_on_the_runner_never_reads_beside_it(self, mocker: MockerFixture, tmp_path: Path, route: str) -> None:
@@ -467,9 +486,7 @@ class TestBundleResourcesRoutes:
             "resources": {_TEMPLATE_PATH: _b64(b"another template")},
         }
 
-        detail = _assert_problem(_build_client().post("/v1/execute", json=body), status=422, error_type="InvalidResourcePath")
-
-        assert f"'{_TEMPLATE_PATH}'" in detail
+        _assert_refusal(_build_client().post("/v1/execute", json=body), status=422, code="request.invalid", params={"field": "resources"})
 
     @pytest.mark.parametrize("sends_the_logo", [True, False])
     def test_a_file_only_a_template_s_relative_url_names_travels_in_the_method_s_tree(self, mocker: MockerFixture, sends_the_logo: bool) -> None:
@@ -557,5 +574,10 @@ class TestBundleResourcesRoutes:
             },
         )
 
-        detail = _assert_problem(response, status=422, error_type="MethodTreeTooLarge")
-        assert f"'{_TEMPLATE_PATH}'" in detail
+        problem = _assert_refusal(
+            response,
+            status=422,
+            code="method.package_invalid",
+            params={"reason": "file_too_large", "path": _TEMPLATE_PATH, "limit": len(_INVOICE_MTHDS.encode("utf-8")) + 1},
+        )
+        assert problem["location"] == {"file": _TEMPLATE_PATH}

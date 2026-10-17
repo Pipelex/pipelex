@@ -51,7 +51,7 @@ class TestValidateRenderedMarkdown:
         assert body["is_valid"] is False
         assert body["rendered_markdown"].startswith("# Validation failed")
         # The structured verdict is still present; markdown is the view, not a replacement.
-        assert body["validation_errors"]
+        assert body["errors"]
 
     def test_invalid_arm_without_render_has_no_rendered_markdown(self):
         client = _build_client()

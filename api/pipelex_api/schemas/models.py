@@ -72,9 +72,10 @@ FILES_FIELD_DESCRIPTION = (
     'value is the file\'s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size": ...}` '
     "naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`). The "
     "map is read from the request's JSON text: a key given twice, a key the membership rule keeps out of every tree "
-    "(`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal` names "
-    "the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs` "
-    "lists every such hash. Its `.mthds` files are the method's bundles and every other file is one a step may read, "
+    "(`.mthds/` included) and colliding keys are a 422 `method.package_invalid` whose `reason` is the refusal's code and "
+    "whose `path` names the first path, a key leaving the tree is a 422 `security.input_path_refused`, a malformed entry "
+    "is a 422 `request.invalid`, and hash entries the runner does not hold are one 422 `request.blobs_missing` whose "
+    "`missing_blobs` parameter lists every such hash. Its `.mthds` files are the method's bundles and every other file is one a step may read, "
     "such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe` of the "
     "`METHODS.toml` at the tree's root, or else at the one `main_pipe` its bundles declare. Custom `.py` is only honored "
     "on a sandbox-hosted deployment."
@@ -390,7 +391,8 @@ _ORCHESTRATION_MODE_DESCRIPTION = (
     "plugin-provided token are accepted; an unregistered token is refused at dispatch. The delivery axis "
     "(blocking vs fire-and-forget) is endpoint-set, never requestable. Honored ONLY when the deployment sets "
     "`allow_request_orchestration_mode_override = true` in its `api.toml`; otherwise a token that differs from "
-    "the deployment default is refused with a 403. Omit it to use the deployment default."
+    "the deployment default is refused with a 422 `pipelex.deployment.orchestration_override_forbidden`. Omit it to use "
+    "the deployment default."
 )
 
 
@@ -670,9 +672,8 @@ class MthdsPipeRequest(MthdsFilesRequest):
     entry pipe); otherwise to the closure's declared `main_pipe`, which is what a single-bundle caller
     almost always wants. A closure that declares no `main_pipe` — or several, across domains — cannot
     be defaulted from its own declarations, so when no manifest `main_pipe` settles it a route that
-    needs one pipe refuses the omitted selector with an input 422, `EntryPipeNotFoundError` or
-    `EntryPipeAmbiguousError` (`crate_ops.resolve_requested_pipe`), never the request-shape
-    `ValidationError` of a malformed body.
+    needs one pipe refuses the omitted selector with an input 422 named for its failure
+    (`crate_ops.resolve_requested_pipe`), never the request-shape `request.invalid` of a malformed body.
     """
 
     pipe_ref: str | None = Field(

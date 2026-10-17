@@ -21,6 +21,7 @@ from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 from pipelex_api.routes.version import router as version_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _TEMPLATE = b"<h1>A template</h1>"
 _NOTES = b"Some notes"
@@ -55,13 +56,10 @@ def _upload(client: TestClient, *, target: dict[str, Any], data: bytes) -> Any:
     return client.request(upload["method"], upload["url"], content=data, headers=upload["headers"])
 
 
-def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
-    assert response.status_code == status, response.text
-    assert response.headers["content-type"].startswith("application/problem+json")
-    problem = response.json()
-    assert problem["error_type"] == error_type, response.text
-    detail: str = problem["detail"]
-    return detail
+def _assert_not_authorized(response: Any) -> None:
+    """The refusal of an upload whose target this runner did not sign: what it lacks is a signed upload target."""
+    problem = assert_problem(response, status=403, code="auth.forbidden")
+    assert problem["params"] == {"requirement": "signed_upload_target"}
 
 
 class TestBlobRoutes:
@@ -99,9 +97,8 @@ class TestBlobRoutes:
         client = _build_client()
         (target,) = _missing(client, _TEMPLATE)
 
-        detail = _assert_problem(_upload(client, target=target, data=_NOTES), status=422, error_type="BlobMismatch")
+        assert_problem(_upload(client, target=target, data=_NOTES), status=422, code="request.invalid", field="body")
 
-        assert sha256_hex(_TEMPLATE) in detail
         assert [blob["sha256"] for blob in _missing(client, _TEMPLATE, _NOTES)] == [sha256_hex(_TEMPLATE), sha256_hex(_NOTES)]
 
     @pytest.mark.parametrize("tampering", ["no_query", "forged_signature", "another_scope", "another_hash"])
@@ -127,7 +124,7 @@ class TestBlobRoutes:
 
         response = client.put(path, params=query, content=data, headers={"content-type": "application/octet-stream"})
 
-        _assert_problem(response, status=403, error_type="BlobUploadNotAuthorized")
+        _assert_not_authorized(response)
         assert len(_missing(client, _TEMPLATE, _NOTES)) == 2
 
     def test_an_expired_target_is_refused(self, mocker: MockerFixture) -> None:
@@ -135,21 +132,20 @@ class TestBlobRoutes:
         client = _build_client()
         (target,) = _missing(client, _TEMPLATE)
 
-        _assert_problem(_upload(client, target=target, data=_TEMPLATE), status=403, error_type="BlobUploadNotAuthorized")
+        _assert_not_authorized(_upload(client, target=target, data=_TEMPLATE))
 
     def test_an_upload_past_the_per_file_limit_is_refused(self, mocker: MockerFixture) -> None:
         client = _build_client()
         (target,) = _missing(client, _TEMPLATE)
         mocker.patch("pipelex_api.routes.blob_upload.MAX_METHOD_TREE_FILE_BYTES", len(_TEMPLATE) - 1)
 
-        _assert_problem(_upload(client, target=target, data=_TEMPLATE), status=422, error_type="MethodTreeTooLarge")
+        problem = assert_problem(_upload(client, target=target, data=_TEMPLATE), status=413, code="request.too_large")
+        assert problem["params"] == {"limit": len(_TEMPLATE) - 1, "size": len(_TEMPLATE)}
 
     def test_one_hash_listed_with_two_sizes_is_refused(self) -> None:
         body = {"blobs": [_blob_ref(_TEMPLATE), {"sha256": sha256_hex(_TEMPLATE), "size": len(_TEMPLATE) + 1}]}
 
-        detail = _assert_problem(_build_client().post("/v1/blobs/missing", json=body), status=422, error_type="BlobMismatch")
-
-        assert sha256_hex(_TEMPLATE) in detail
+        assert_problem(_build_client().post("/v1/blobs/missing", json=body), status=422, code="request.invalid", field="blobs")
 
     @pytest.mark.parametrize("size", [12.0, 12.5, "12", True])
     def test_a_size_that_is_not_a_json_integer_is_refused(self, size: Any) -> None:
@@ -164,7 +160,8 @@ class TestBlobRoutes:
 
         response = _build_client().post("/v1/blobs/missing", json={"blobs": [_blob_ref(_TEMPLATE), _blob_ref(_NOTES)]})
 
-        _assert_problem(response, status=422, error_type="MethodTreeTooLarge")
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "too_many_files", "limit": 1}
 
     def test_one_scopes_blobs_are_not_held_for_another(self) -> None:
         client = _build_client()
@@ -178,7 +175,7 @@ class TestBlobRoutes:
     def test_a_read_scope_that_is_not_a_scope_is_refused(self) -> None:
         response = _build_client().post("/v1/blobs/missing", json={"blobs": []}, params={"read_scope": "../escape"})
 
-        _assert_problem(response, status=422, error_type="InvalidReadScope")
+        assert_problem(response, status=422, code="request.invalid", field="read_scope")
 
     def test_a_tree_read_in_full_is_answered_by_its_digest(self) -> None:
         """Once a request sent the tree, the runner holds its listing, and asking with the tree's digest is one lookup."""
@@ -225,7 +222,7 @@ class TestBlobRoutes:
 
         response = client.put(url.path, params=query, content=_TEMPLATE, headers={"content-type": "application/octet-stream"})
 
-        _assert_problem(response, status=403, error_type="BlobUploadNotAuthorized")
+        _assert_not_authorized(response)
 
     def test_upload_targets_start_with_the_configured_public_base_url(self, mocker: MockerFixture) -> None:
         """Behind a proxy terminating TLS, the URL a request arrived at is not the one a sender reaches."""
@@ -251,7 +248,7 @@ class TestBlobRoutes:
 
         response = _build_client().post("/v1/blobs/missing", json={"blobs": [_blob_ref(_TEMPLATE)]})
 
-        _assert_problem(response, status=500, error_type="ServerMisconfigured")
+        assert_problem(response, status=500, code="runtime.misconfigured")
 
     def test_a_blob_held_at_another_size_is_listed_for_its_upload_to_write_over(self, blob_storage: InMemoryStorageProvider) -> None:
         """Bytes held short, as a storage that does not publish writes whole could leave them, are asked for again and repaired."""

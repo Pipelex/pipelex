@@ -15,8 +15,9 @@ from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstr
 from typing_extensions import override
 
 from pipelex_api.blob_store import MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_TRANSFERS, RunnerBlobStore
-from pipelex_api.errors import ApiError
+from pipelex_api.exceptions import RunnerMisconfiguredError, RunnerRequestError
 from pipelex_api.method_tree_request import RequestTree, read_request_tree
+from tests.unit._problems import problem_of
 
 _SCOPE = "single-tenant"
 
@@ -80,27 +81,24 @@ def _hash_map(entries: dict[str, tuple[bytes, int]]) -> str:
     return json.dumps({tree_path: {"sha256": sha256_hex(data), "size": size} for tree_path, (data, size) in entries.items()})
 
 
-def _problem_of(exc_info: pytest.ExceptionInfo[ApiError]) -> dict[str, object]:
-    document: dict[str, object] = exc_info.value.document
-    return document
-
-
 @pytest.mark.asyncio(loop_scope="class")
 class TestRunnerBlobStore:
     async def test_a_blob_held_at_another_size_is_refused_before_any_byte_is_read(self) -> None:
-        """An entry stating a size other than the held bytes' is a `BlobMismatch`, and the census bounds every read."""
+        """An entry stating a size other than the held bytes' is a `request.invalid`, and the census bounds every read."""
         storage = _CountingStorage()
         blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
         large = b"x" * 4096
         await blob_store.store_blob(data=large)
 
-        with pytest.raises(ApiError) as exc_info:
-            await read_request_tree(document=_hash_map({"large.bin": (large, 0)}), blob_store=blob_store, label="The `files` map")
+        with pytest.raises(RunnerRequestError) as exc_info:
+            await read_request_tree(document=_hash_map({"large.bin": (large, 0)}), blob_store=blob_store, label="The `files` map", field="files")
 
-        problem = _problem_of(exc_info)
-        assert exc_info.value.status_code == 422
-        assert problem["error_type"] == "BlobMismatch"
-        assert problem["mismatched_blobs"] == [{"sha256": sha256_hex(large), "held_size": len(large)}]
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 422
+        assert problem["code"] == "request.invalid"
+        assert problem["params"] == {"field": "files"}
+        # The hash and the size held ride the operator's message alone.
+        assert f"{sha256_hex(large)}" in problem["diagnostics"]["message"]
         assert storage.loaded_keys == []
 
     async def test_a_blob_not_held_is_missing_and_a_held_one_is_read_and_checked(self) -> None:
@@ -110,13 +108,18 @@ class TestRunnerBlobStore:
         absent = b"absent bytes"
         await blob_store.store_blob(data=held)
 
-        with pytest.raises(ApiError) as exc_info:
+        with pytest.raises(RunnerRequestError) as exc_info:
             await read_request_tree(
-                document=_hash_map({"held.txt": (held, len(held)), "absent.txt": (absent, len(absent))}), blob_store=blob_store, label="The map"
+                document=_hash_map({"held.txt": (held, len(held)), "absent.txt": (absent, len(absent))}),
+                blob_store=blob_store,
+                label="The map",
+                field="files",
             )
-        assert _problem_of(exc_info)["missing_blobs"] == [sha256_hex(absent)]
+        problem = problem_of(exc_info.value)
+        assert problem["code"] == "request.blobs_missing"
+        assert problem["params"] == {"missing_blobs": [sha256_hex(absent)]}
 
-        tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map")
+        tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
 
     async def test_bytes_that_do_not_hash_to_their_key_are_a_server_fault(self) -> None:
@@ -126,11 +129,15 @@ class TestRunnerBlobStore:
         data = b"the true bytes"
         storage.objects[_blob_key(data)] = b"the damaged!!!"
 
-        with pytest.raises(ApiError) as exc_info:
-            await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map")
+        with pytest.raises(RunnerMisconfiguredError) as exc_info:
+            await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map", field="files")
 
-        assert exc_info.value.status_code == 500
-        assert _problem_of(exc_info)["error_type"] == "BlobStoreCorrupted"
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 500
+        assert problem["code"] == "runtime.misconfigured"
+        # The component is the operator's to know: it rides the diagnostics alone.
+        assert "params" not in problem
+        assert problem["diagnostics"]["params"] == {"component": "blob_store"}
 
     async def test_lookups_and_reads_run_a_bounded_number_at_a_time(self) -> None:
         storage = _CountingStorage()

@@ -30,9 +30,7 @@ from pipelex.runtime_bridge.orchestration_mode import DIRECT_ORCHESTRATION_MODE
 from pipelex.system.configuration.config_loader import config_manager
 from pydantic import BaseModel, ConfigDict
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_forbidden
-from pipelex_api.exceptions import ApiBootConfigError
+from pipelex_api.exceptions import ApiBootConfigError, OrchestrationOverrideForbiddenError
 
 API_CONFIG_NAME = "api"
 
@@ -95,7 +93,7 @@ def resolve_orchestration_mode(requested: str | None, *, config: ApiConfig) -> s
     override (``allow_request_orchestration_mode_override``). A caller-supplied
     token equal to the default is always honored (it changes nothing). A caller
     trying to FORCE a different mode on a runner whose policy forbids it is refused
-    with a 403 — so a locked-down Temporal runner can never be coerced into
+    with a 422 ``pipelex.deployment.orchestration_override_forbidden`` — so a locked-down Temporal runner can never be coerced into
     ``direct`` (whose whole point would be to bypass distributed execution), and
     vice versa. The token is a plain string compare; an *unregistered* token is
     not rejected here — that surfaces at dispatch as ``MissingOrchestratorError``.
@@ -108,7 +106,7 @@ def resolve_orchestration_mode(requested: str | None, *, config: ApiConfig) -> s
         f"This deployment does not allow overriding orchestration_mode per request "
         f"(configured mode '{config.orchestration_mode}', requested '{requested}')."
     )
-    raise_forbidden(msg, error_type=ErrorType.ORCHESTRATION_MODE_OVERRIDE_FORBIDDEN)
+    raise OrchestrationOverrideForbiddenError(msg, requested_mode=requested)
 
 
 def is_callers_override(*, orchestration_mode: str, config: ApiConfig) -> bool:
