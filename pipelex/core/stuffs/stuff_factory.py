@@ -22,12 +22,18 @@ from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
 from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input, validation_error_locations
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# The schemes of the remote locations Pipelex itself reads, which a refusal of a table given at one names. Any other
+# scheme is the caller's own text, as free as a url's host or path, since `urlsplit` takes whatever precedes the first
+# colon when letters, digits, `+`, `-` and `.` make it up: such a refusal names none.
+_NAMED_REMOTE_SCHEMES: frozenset[str] = frozenset({"http", "https", "s3", "gs", PIPELEX_STORAGE_SCHEME.removesuffix("://")})
 
 
 class StuffBlueprint(BaseModel):
@@ -264,10 +270,12 @@ class StuffFactory:
         # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
         if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
             # The url is the input's value, which no message carries: it can be a signed link whose query holds a
-            # credential, and its host and path are the caller's data. The input's name and the url's scheme identify it.
+            # credential, and its host and path are the caller's data. The input's name identifies it, and so does its
+            # scheme when it is one Pipelex reads: any other scheme is the caller's own text too.
+            in_scheme = f", in the scheme '{url_parts.scheme}'" if url_parts.scheme in _NAMED_REMOTE_SCHEMES else ""
             msg = (
                 f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
-                f"'{concept.concept_ref}' points at a remote or non-local url, in the scheme '{url_parts.scheme}'. "
+                f"'{concept.concept_ref}' points at a remote or non-local url{in_scheme}. "
                 "Download the file locally and reference it by path."
             )
             raise CsvError(msg)
