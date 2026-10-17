@@ -16,16 +16,25 @@ OpenAI-compatible servers send none. Two signals say on their own that the text 
 with them: a Responses API answer whose status is `incomplete` is never normal, an unknown or missing reason being
 taken as a truncation, and a Gemini answer with no candidate whose prompt feedback names a block reason is a refusal.
 
-The classifier only turns a stop that was silently a success into an error. Structured generation is not read
-here: its stops are the structuring library's business, and its configured re-asks are left as they are.
+The Google image worker reads its answer's finish reason with `classify_image_finish_reason`, from Gemini's
+vocabulary alone, the image values included, so a safety filter that refused the image, or an output token limit
+that cut the answer before its image, is told from an empty answer, and the prompt's block reason as the text workers
+read it.
+
+The classifier only turns a stop that was silently a success into an error. Structured generation's stops are read
+by the structuring library, instructor, whose configured re-asks are left as they are: it raises its
+`IncompleteOutputException` for a structured answer cut at its output limit, carrying that answer, and
+`read_incomplete_output` reads the answer's stop value and output tokens, so that the worker raises the same
+truncation a text cut at its limit raises.
 """
 
 from collections.abc import Mapping
 from enum import StrEnum
 from types import MappingProxyType
+from typing import Any, NamedTuple
 
 from pipelex import log
-from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionOutputKind, CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 
 
 class CompletionStopOutcome(StrEnum):
@@ -37,6 +46,24 @@ class CompletionStopOutcome(StrEnum):
     # Cut when the input and the output together filled the model's context window, which no higher output limit lifts
     CONTEXT_WINDOW_EXCEEDED = "context_window_exceeded"
     REFUSED = "refused"
+
+    @property
+    def is_refused(self) -> bool:
+        """Whether the model refused, or a content filter stopped the output."""
+        match self:
+            case CompletionStopOutcome.REFUSED:
+                return True
+            case CompletionStopOutcome.NORMAL | CompletionStopOutcome.TRUNCATED | CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED:
+                return False
+
+    @property
+    def is_truncated(self) -> bool:
+        """Whether an output limit cut the output: the one the request sent, or the model's own when it sent none."""
+        match self:
+            case CompletionStopOutcome.TRUNCATED:
+                return True
+            case CompletionStopOutcome.NORMAL | CompletionStopOutcome.CONTEXT_WINDOW_EXCEEDED | CompletionStopOutcome.REFUSED:
+                return False
 
 
 _NORMAL = CompletionStopOutcome.NORMAL
@@ -236,6 +263,30 @@ def classify_responses_stop(*, status: str | None, incomplete_reason: str | None
     return outcome
 
 
+def classify_image_finish_reason(*, finish_reason: str, model_handle: str) -> CompletionStopOutcome:
+    """Read the finish reason of a Gemini image generation's candidate, which says whether a safety filter refused it.
+
+    The Google image worker receives Gemini's values alone, so it reads Gemini's vocabulary, the image values
+    included, rather than the union the text workers read. A value the classifier does not know is logged at warning
+    level as an image generation's, and taken as normal, so the worker looks for the image as before.
+
+    Args:
+        finish_reason: The candidate's `finish_reason`, as its value.
+        model_handle: The model's deck handle, named by the warning about an unknown value.
+
+    Returns:
+        The outcome the value stands for: normal for an unknown value.
+    """
+    outcome = GEMINI_FINISH_REASONS.get(finish_reason.upper())
+    if outcome is None:
+        log.warning(
+            "An image finish reason was not recognized, so it was taken as normal",
+            fields={"model_handle": model_handle, "finish_reason": finish_reason},
+        )
+        return _NORMAL
+    return outcome
+
+
 def classify_prompt_block_reason(*, block_reason: str, model_handle: str) -> CompletionStopOutcome:
     """Read the block reason of a Gemini answer that holds no candidate, which is always a refusal.
 
@@ -257,6 +308,52 @@ def classify_prompt_block_reason(*, block_reason: str, model_handle: str) -> Com
         )
         return _REFUSED
     return outcome
+
+
+class IncompleteOutput(NamedTuple):
+    """What a structured answer instructor found cut at its output limit says about the cut."""
+
+    # The provider's stop value, None when the answer carries none where instructor reads it
+    stop_reason: str | None
+    # The output tokens the provider counted, None when the answer carries no count
+    output_tokens: int | None
+
+
+def read_incomplete_output(*, last_completion: Any) -> IncompleteOutput:
+    """Read the stop value and the output tokens of the answer instructor's `IncompleteOutputException` carries.
+
+    instructor raises that exception, as its `last_completion`, for an OpenAI-shaped completion whose first choice
+    finished on `length`, Mistral's included, for such a choice by itself, and for an Anthropic message that stopped
+    on `max_tokens`. The answer's type depends on the SDK and on the structuring mode, so it is read where instructor
+    reads it, attribute by attribute: an Anthropic message's `stop_reason`, a choice's `finish_reason`, else the first
+    choice's, and the `usage` its type carries, `output_tokens` for Anthropic and `completion_tokens` for the others.
+
+    Args:
+        last_completion: The answer instructor found cut, as it carries it.
+
+    Returns:
+        The answer's stop value and output tokens, each None when the answer does not carry it.
+    """
+    stop_reason = _read_stop_value(source=last_completion, attribute="stop_reason") or _read_stop_value(
+        source=last_completion, attribute="finish_reason"
+    )
+    if stop_reason is None:
+        choices: Any = getattr(last_completion, "choices", None)
+        if isinstance(choices, list) and choices:
+            stop_reason = _read_stop_value(source=choices[0], attribute="finish_reason")
+    usage: Any = getattr(last_completion, "usage", None)
+    output_tokens: int | None = None
+    for usage_attribute in ("output_tokens", "completion_tokens"):
+        count: Any = getattr(usage, usage_attribute, None)
+        if isinstance(count, int):
+            output_tokens = count
+            break
+    return IncompleteOutput(stop_reason=stop_reason, output_tokens=output_tokens)
+
+
+def _read_stop_value(*, source: Any, attribute: str) -> str | None:
+    value: Any = getattr(source, attribute, None)
+    return value if isinstance(value, str) else None
 
 
 def raise_for_completion_stop(
@@ -297,6 +394,7 @@ def raise_for_completion_stop(
         model_handle=model_handle,
         stop_reason=stop_reason,
         truncation_limit=truncation_limit,
+        output_kind=CompletionOutputKind.TEXT,
         pipe_code=pipe_code,
         max_tokens=max_tokens,
         output_tokens=output_tokens,

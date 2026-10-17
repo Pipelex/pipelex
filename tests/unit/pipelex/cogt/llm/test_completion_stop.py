@@ -11,7 +11,7 @@ from openai.types.chat.chat_completion import Choice
 from openai.types.responses.response import IncompleteDetails
 from types_aiobotocore_bedrock_runtime.literals import StopReasonType
 
-from pipelex.cogt.exceptions import CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import CompletionOutputKind, CompletionTruncationLimit, LLMCompletionRefusedError, LLMCompletionTruncatedError
 from pipelex.cogt.llm import completion_stop
 from pipelex.cogt.llm.completion_stop import (
     ANTHROPIC_STOP_REASONS,
@@ -23,6 +23,7 @@ from pipelex.cogt.llm.completion_stop import (
     OPENAI_RESPONSES_INCOMPLETE_REASONS,
     STOP_REASON_VOCABULARIES,
     CompletionStopOutcome,
+    classify_image_finish_reason,
     classify_prompt_block_reason,
     classify_responses_stop,
     classify_stop_reason,
@@ -112,6 +113,35 @@ class TestCompletionStop:
             fields={"model_handle": "gemini-test", "block_reason": "BRAND_NEW_BLOCK"},
         )
 
+    @pytest.mark.parametrize(
+        ("finish_reason", "expected_outcome"),
+        [
+            ("IMAGE_SAFETY", CompletionStopOutcome.REFUSED),
+            ("image_prohibited_content", CompletionStopOutcome.REFUSED),
+            ("NO_IMAGE", CompletionStopOutcome.NORMAL),
+            ("STOP", CompletionStopOutcome.NORMAL),
+        ],
+    )
+    def test_an_image_finish_reason_reads_from_gemini_vocabulary(
+        self, mocker: MockerFixture, finish_reason: str, expected_outcome: CompletionStopOutcome
+    ) -> None:
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        assert classify_image_finish_reason(finish_reason=finish_reason, model_handle="nano-banana") == expected_outcome
+        warning.assert_not_called()
+
+    def test_an_unknown_image_finish_reason_is_logged_as_an_image_generations(self, mocker: MockerFixture) -> None:
+        """An image job's unknown value warns as an image generation's, never as an LLM's stop reason."""
+        warning = mocker.patch.object(completion_stop.log, "warning")
+
+        outcome = classify_image_finish_reason(finish_reason="IMAGE_BRAND_NEW", model_handle="nano-banana")
+
+        assert outcome == CompletionStopOutcome.NORMAL
+        warning.assert_called_once_with(
+            "An image finish reason was not recognized, so it was taken as normal",
+            fields={"model_handle": "nano-banana", "finish_reason": "IMAGE_BRAND_NEW"},
+        )
+
     def test_the_vocabularies_agree_on_every_shared_value(self) -> None:
         """Read as one table, no two vocabularies may read the same case-folded value differently."""
         readings: dict[str, set[CompletionStopOutcome]] = {}
@@ -162,6 +192,7 @@ class TestCompletionStop:
             )
         assert exc_info.value.stop_reason == stop_reason
         assert exc_info.value.truncation_limit == expected_limit
+        assert exc_info.value.output_kind == CompletionOutputKind.TEXT
         assert exc_info.value.max_tokens == 4096
         assert exc_info.value.output_tokens == 4096
 
