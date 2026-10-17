@@ -29,8 +29,9 @@ class PipeRunProtocol(Protocol):
         Pass `DeliveryAssignment(storage=StorageTarget())` for default storage-only delivery.
 
         An implementation owns the security events of the refusals raised while the job executes: each is logged
-        once, in the process that raised it (`pipelex.errors.security_event`), and the runner that called `run`
-        logs none of them. One that hands the job to another process logs there, and marks with
-        `mark_security_event_emitted` every error it rebuilds from that process's report.
+        once, in the process that raised it (`pipelex.errors.security_event`). One that hands the job to another
+        process logs there, and marks with `mark_security_event_emitted` every error it rebuilds from that process's
+        report, the outermost error of the chain it raises: the runner that called `run` logs any failure it raises
+        unmarked, as a refusal raised in the runner's own process that nobody logged.
         """
         ...

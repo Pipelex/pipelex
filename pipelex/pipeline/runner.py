@@ -17,7 +17,7 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
-from pipelex.errors.security_event import emit_security_event, mark_security_event_emitted
+from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -378,11 +378,13 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             if pipe_job is None:
                 emit_security_event(error=exc, request_id=request_id, extras=self.extras)
                 raise
-            # A refusal raised during the run is logged by the pipe run that executed it, in the process that raised
-            # it: `PipeRun` in this process, or a remote orchestrator's worker, whose failure reaches this process
-            # rebuilt from its report. Either way it is reported, so it is marked and never logged here, which keeps
-            # a remote run's refusal to one event whatever the transport rebuilds, and the handler above logs it no more.
-            mark_security_event_emitted(error=exc)
+            # A refusal raised during the run is logged in the process that raised it, by whoever saw it first: `PipeRun`
+            # logged one its run raised in this process, and a remote orchestrator's worker one raised there, whose
+            # failure reaches this process rebuilt from its report and marked by the orchestrator that rebuilt it. Either
+            # way it is reported, and this logs nothing. What is left is a refusal raised in this process that the pipe
+            # run did not log, such as an input URL the SSRF guard refused while a remote pipe run uploaded the inputs
+            # before it dispatched: it is logged here, naming the run, and the handler above logs it no more.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
