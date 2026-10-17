@@ -47,14 +47,14 @@ from pipelex.errors.problem import (
     ProblemView,
     make_problem,
 )
-from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_usage_stats_error, sent_verdict
+from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.pipeline.fixes.fix_render import format_fix_progress_markdown
 from pipelex.pipeline.validation_errors import problem_item_of, validation_item_code
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.system.usage_stats.usage_stats_client import note_command_error
-from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error, usage_stats_error_of_problem
+from pipelex.system.usage_stats.usage_stats_runs import sent_usage_stats_error, usage_stats_error, usage_stats_error_of_problem
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 

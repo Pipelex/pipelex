@@ -12,7 +12,6 @@ thing.
 from typing import NamedTuple
 
 from mthds.protocol.exceptions import PipelineRequestError
-from mthds.protocol.problem.registry import ProblemDomain
 from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
@@ -34,8 +33,6 @@ from pipelex.base_exceptions import ErrorDomain
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
-from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError
-from pipelex.system.usage_stats.usage_stats_runs import is_reportable_error_code, usage_stats_error_domain_of
 
 #: The command that gets a Pipelex API key and saves it where a hosted run reads it.
 PIPELEX_LOGIN_COMMAND = "pipelex login"
@@ -107,26 +104,6 @@ def sent_verdict(*, error: ApiResponseError) -> SentVerdict:
         error_domain=sent_domain if isinstance(sent_domain, str) and sent_domain else None,
         retryable=sent_retryable if isinstance(sent_retryable, bool) else None,
     )
-
-
-def sent_usage_stats_error(*, error: ApiResponseError) -> UsageStatsError | None:
-    """What the usage statistics say of a hosted refusal: the code and the domain the hosted API sent, nothing inferred.
-
-    The rule `sent_verdict` holds the CLIs' output to: who has to act is only the hosted API's to say, so the domain is
-    the problem document's own `domain` member and never the one pipelex-sdk reads from the status. `None` when the
-    answer sent no code with a domain, as a gateway's error page does not, and the command's statistics then say
-    nothing of its error, as the contract allows.
-    """
-    problem_document = error.problem_document or {}
-    sent_code = problem_document.get("code")
-    sent_domain = problem_document.get("domain")
-    if not isinstance(sent_code, str) or not isinstance(sent_domain, str) or not is_reportable_error_code(code=sent_code):
-        return None
-    try:
-        problem_domain = ProblemDomain(sent_domain)
-    except ValueError:
-        return None
-    return UsageStatsError(code=sent_code, domain=usage_stats_error_domain_of(domain=problem_domain))
 
 
 class HostedErrorView(NamedTuple):

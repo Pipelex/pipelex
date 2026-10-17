@@ -36,6 +36,8 @@ The events themselves are:
 | `method_validated` | once per validation of a method | the verdict, the duration, the number of errors and warnings, and the bundle's size and depth |
 | `code_generated` | once per code generation | what was generated (types, input templates or structure classes), the target language, the outcome, the duration and the bundle's size |
 
+A refusal a server answered, the hosted API's among them, is counted by the code and the domain its answer sent, never by what Pipelex reads from its HTTP status: a command's event then carries none, and a run's, which must name one, the catch-all `runtime.unexpected`.
+
 A run's token totals come from the run's own usage events: when you turn tracing or cost reporting off, the run reports that its usage is unknown and no `model_used` is sent. The statistics never turn tracing on.
 
 ### What is never collected

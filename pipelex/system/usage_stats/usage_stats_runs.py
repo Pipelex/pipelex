@@ -15,10 +15,13 @@ import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import Any, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.answers import decode_json
 from mthds.protocol.problem.models import Problem
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from mthds.runners.api.exceptions import ApiResponseError
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
@@ -111,16 +114,41 @@ def tallying_inference_calls(*, tally: RunInferenceTally | None) -> Generator[No
         _RUN_TALLY.reset(token)
 
 
+def sent_usage_stats_error(*, error: ApiResponseError) -> UsageStatsError | None:
+    """What the usage statistics say of a refusal a server answered: the code and the domain its body sent, nothing inferred.
+
+    The one rule for an answered refusal, every surface's: who has to act is only the server's to say, so the domain is
+    the problem document's own `domain` member, read off the body the server sent, and never the one the client reads
+    from the status when the body names none, as pipelex-sdk does for a gateway's error page. `None` when the answer
+    sent no reportable code with a domain.
+    """
+    decoded = decode_json(error.response_body)
+    document = cast("dict[str, Any]", decoded.value) if decoded.is_json and isinstance(decoded.value, dict) else {}
+    sent_code = document.get("code")
+    sent_domain = document.get("domain")
+    if not isinstance(sent_code, str) or not isinstance(sent_domain, str) or not is_reportable_error_code(code=sent_code):
+        return None
+    try:
+        problem_domain = ProblemDomain(sent_domain)
+    except ValueError:
+        return None
+    return UsageStatsError(code=sent_code, domain=usage_stats_error_domain_of(domain=problem_domain))
+
+
 def usage_stats_error(*, error: BaseException | None) -> UsageStatsError:
     """The code of a failure and its domain, as its problem gives them; `runtime.unexpected` for an error that carries none.
 
     A Pipelex error's code is its problem's, which a cause reporting a problem of its own, such as one recovered across
-    a transport boundary, decides, as every other surface reads it. A request error of the MTHDS client carries the
-    problem it read, which is read as it is. Any other error, and a failure with no error to read, is the catch-all,
-    since every failure has a code.
+    a transport boundary, decides, as every other surface reads it. A refusal a server answered is read by what its body
+    sent alone (:func:`sent_usage_stats_error`), and as the catch-all when it sent nothing, never by the problem the
+    client inferred from the status. Any other request error of the MTHDS client carries the problem the client itself
+    decided, an unreachable runtime or a timeout, which is read as it is. Any other error, and a failure with no error
+    to read, is the catch-all, since every failure has a code.
     """
     if isinstance(error, PipelexError):
         return usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER))
+    if isinstance(error, ApiResponseError):
+        return sent_usage_stats_error(error=error) or UNEXPECTED_USAGE_STATS_ERROR
     if isinstance(error, PipelineRequestError):
         return usage_stats_error_of_problem(problem=error.problem)
     return UNEXPECTED_USAGE_STATS_ERROR
@@ -136,6 +164,8 @@ def usage_stats_failure_domain(*, error: BaseException) -> UsageStatsErrorDomain
         recovered = error.recovered_problem()
         domain = recovered.effective_domain if recovered is not None else error.resolve_domain()
         return usage_stats_error_domain_of(domain=domain)
+    if isinstance(error, ApiResponseError):
+        return (sent_usage_stats_error(error=error) or UNEXPECTED_USAGE_STATS_ERROR).domain
     if isinstance(error, PipelineRequestError):
         return usage_stats_error_domain_of(domain=error.problem.effective_domain)
     return UNEXPECTED_USAGE_STATS_ERROR.domain

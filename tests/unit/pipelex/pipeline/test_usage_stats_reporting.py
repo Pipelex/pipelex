@@ -3,7 +3,9 @@ from typing import Any, cast
 import pytest
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.client_problems import make_client_problem
+from mthds.protocol.problem.answers import read_answer
 from mthds.protocol.problem.registry import CoreCode
+from mthds.runners.api.exceptions import ApiResponseError
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
@@ -26,7 +28,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsProvider,
 )
 from pipelex.system.usage_stats.usage_stats_events import UsageStatsEvent
-from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error, usage_stats_failure_domain
+from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, sent_usage_stats_error, usage_stats_error, usage_stats_failure_domain
 from pipelex.tracing.trace_events import TraceEvent
 from tests.helpers.recovered_problem import make_recovered_url_refusal
 from tests.helpers.usage_stats_run_events import envelope_of, llm_usage_event, pipe_start_event
@@ -105,6 +107,14 @@ def _validate_rendering_the_verdict_then_exit() -> None:
 def _generate_raising(*, error: BaseException) -> None:
     with CodeGenerationReport(artifact=UsageStatsCodegenArtifact.TYPES):
         raise error
+
+
+def _answered_refusal(*, status: int, body: str) -> ApiResponseError:
+    """A refusal a server answered with `body`, carrying the problem the MTHDS client reads from it, inferred from the status when the body names none."""
+    reading = read_answer(status=status, body=body, headers={}, creates_run=False)
+    return ApiResponseError(
+        f"API POST /v1/start failed ({status})", problem=reading.problem, api_url="https://runner.test", status=status, status_text="", response_body=body
+    )
 
 
 class TestUsageStatsReporting:
@@ -264,6 +274,29 @@ class TestUsageStatsReporting:
         )
 
         assert usage_stats_error(error=unreachable) == ("client.unreachable", UsageStatsErrorDomain.RUNTIME)
+
+    @pytest.mark.parametrize(
+        ("body", "expected", "expected_sent"),
+        [
+            # A gateway's page: the client infers `runtime.unavailable` from the 503, which no statistic reports.
+            ("<html>502 Bad Gateway</html>", ("runtime.unexpected", UsageStatsErrorDomain.RUNTIME), None),
+            # A problem document naming its code and its domain is counted by them, on every path.
+            (
+                '{"detail": "The input is invalid", "code": "input.invalid", "domain": "input"}',
+                ("input.invalid", UsageStatsErrorDomain.INPUT),
+                ("input.invalid", UsageStatsErrorDomain.INPUT),
+            ),
+        ],
+    )
+    def test_an_answered_refusal_is_counted_by_what_its_body_sent_alone(
+        self, body: str, expected: tuple[str, UsageStatsErrorDomain], expected_sent: tuple[str, UsageStatsErrorDomain] | None
+    ) -> None:
+        """One rule for a refusal a server answered: its body's code and domain, never the problem the client inferred from the status."""
+        refusal = _answered_refusal(status=503, body=body)
+
+        assert usage_stats_error(error=refusal) == expected
+        assert sent_usage_stats_error(error=refusal) == expected_sent
+        assert usage_stats_failure_domain(error=refusal) == expected[1]
 
     @pytest.mark.parametrize(
         "error",
