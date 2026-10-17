@@ -187,7 +187,8 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
         if response_text is None:
-            msg = f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}"
+            # The response is the model's answer, the run's data: the message names the model and the finish reason alone.
+            msg = f"OpenAI response message content is None (finish reason: {response.choices[0].finish_reason})\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
@@ -248,9 +249,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
+            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
             msg = (
                 f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {instructor_exc}"
+                f"trying to generate schema: {schema} with error: {type(instructor_exc).__name__}"
             )
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
                 CoreCode.RUNTIME_UNEXPECTED

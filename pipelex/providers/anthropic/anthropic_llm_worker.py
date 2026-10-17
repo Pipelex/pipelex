@@ -526,9 +526,10 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     model_handle=self.inference_model.name,
                 )
                 raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=underlying_exc) from instructor_exc
+            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
             msg = (
                 f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {instructor_exc}"
+                f"trying to generate schema: {schema} with error: {type(instructor_exc).__name__}"
             )
             fallback_error = LLMCompletionError(
                 msg,

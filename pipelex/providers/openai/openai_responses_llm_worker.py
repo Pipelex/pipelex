@@ -189,7 +189,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         )
 
         if not response.output_text:
-            msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
+            # The response is the model's answer, the run's data: the message names the model and the status alone.
+            msg = f"OpenAI Responses message content is empty (status: {response.status})\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
@@ -267,9 +268,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
+            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
             msg = (
                 f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {instructor_exc}"
+                f"trying to generate schema: {schema} with error: {type(instructor_exc).__name__}"
             )
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
                 CoreCode.RUNTIME_UNEXPECTED

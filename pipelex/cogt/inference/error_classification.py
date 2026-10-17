@@ -18,6 +18,7 @@ import httpx
 from pydantic import BaseModel, Field
 
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 
 # SDK exception class-name substrings that identify a network/transport failure
 # (no HTTP status reached us). Matched case-insensitively against
@@ -92,7 +93,9 @@ class ProviderErrorMetadata(BaseModel):
     sdk_exception_type: str
     # Human-readable error text from the SDK exception (``str(exc)``). Both the
     # Classify step (quota / content-policy discrimination) and the Render step
-    # (message composition) read it, so the Extract step must capture it.
+    # (message composition) read it, so the Extract step must capture it. A
+    # pydantic ``ValidationError``, which ends instructor's re-asks, is written by
+    # its locations and reasons alone: its own text quotes the model's answer.
     message: str = ""
     status_code: int | None = None
     request_id: str | None = None
@@ -463,7 +466,7 @@ def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.OPENAI,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -498,7 +501,7 @@ def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -642,7 +645,7 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.GOOGLE,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -663,7 +666,7 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return _build_azure_metadata(
         response=getattr(exc, "response", None),
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
     )
 
 
@@ -734,7 +737,7 @@ def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.FAL,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -767,7 +770,7 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.HUGGINGFACE,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -822,7 +825,7 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -870,7 +873,7 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.MISTRAL,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -936,7 +939,7 @@ def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.BEDROCK,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -960,7 +963,7 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.LINKUP,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,
@@ -1030,7 +1033,7 @@ def extract_typesafe_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.TYPESAFE,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id if isinstance(request_id, str) else None,
         retry_after_seconds=retry_after_seconds,
@@ -1072,7 +1075,7 @@ def extract_local_extract_metadata(exc: BaseException, *, provider: ProviderName
     return ProviderErrorMetadata(
         provider=provider,
         sdk_exception_type=normalized_type_name,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,

@@ -354,7 +354,8 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
+            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
+            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {type(instructor_exc).__name__}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,
@@ -375,7 +376,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             ) from sdk_exc
 
         if not isinstance(result_object, schema):
-            msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"
+            msg = f"Google Gemini API returned an object that is not of type {schema}: a {type(result_object).__name__}"
             raise GoogleLLMWorkerError(msg)
 
         # Track token usage if available from completion
