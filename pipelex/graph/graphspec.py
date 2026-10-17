@@ -163,6 +163,11 @@ def _truncate_string(value: str | None, *, max_length: int) -> str | None:
     return value[: max_length - 3] + "..."
 
 
+def cap_error_stack(*, stack: str | None) -> str | None:
+    """A failed pipe's stack trace, capped at MAX_STACK_LENGTH, as every record of it carries it: the node and its event."""
+    return _truncate_string(stack, max_length=MAX_STACK_LENGTH)
+
+
 class PipelineRef(BaseModel):
     """Reference to the pipeline that was executed."""
 
@@ -449,7 +454,7 @@ class NodeSpec(BaseModel):
     @classmethod
     def truncate_error_stack(cls, value: str | None) -> str | None:
         """Truncate the stack trace to MAX_STACK_LENGTH."""
-        return _truncate_string(value, max_length=MAX_STACK_LENGTH)
+        return cap_error_stack(stack=value)
 
 
 class EdgeSpec(BaseModel):

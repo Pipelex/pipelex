@@ -11,12 +11,12 @@ from enum import StrEnum
 from functools import cached_property
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import override
 
 from pipelex.errors.problem import PipelexProblem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
-from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, cap_error_stack
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_key
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -170,7 +170,8 @@ class PipeEndErrorEvent(TraceEvent):
     """Emitted when a pipe fails.
 
     Its `error` is the problem that ended the pipe, in the caller's view, located at the pipe; `error_stack` is the
-    stack trace of the error, when the graph's data inclusion asks for it.
+    stack trace of the error, when the graph's data inclusion asks for it, capped as the graph's node caps it, since
+    the event reaches every trace subscriber before any node is built from it.
     """
 
     event_kind: Literal[TraceEventKind.PIPE_END_ERROR] = TraceEventKind.PIPE_END_ERROR
@@ -181,6 +182,11 @@ class PipeEndErrorEvent(TraceEvent):
     ended_at: datetime
     error: PipelexProblem
     error_stack: str | None = None
+
+    @field_validator("error_stack", mode="after")
+    @classmethod
+    def cap_stack(cls, value: str | None) -> str | None:
+        return cap_error_stack(stack=value)
 
 
 class PipeEndSkippedEvent(TraceEvent):
