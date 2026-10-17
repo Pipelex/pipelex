@@ -27,5 +27,10 @@ class PipeRunProtocol(Protocol):
 
         When `delivery_assignment` is None, no storage or webhook delivery happens.
         Pass `DeliveryAssignment(storage=StorageTarget())` for default storage-only delivery.
+
+        An implementation owns the security events of the refusals raised while the job executes: each is logged
+        once, in the process that raised it (`pipelex.errors.security_event`), and the runner that called `run`
+        logs none of them. One that hands the job to another process logs there, and marks with
+        `mark_security_event_emitted` every error it rebuilds from that process's report.
         """
         ...

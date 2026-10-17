@@ -8,17 +8,22 @@ the finally-block library-restore matrix are pinned by the integration suite
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
+from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -55,6 +60,7 @@ class _ExecuteEnv(NamedTuple):
 
 _RUN_ID = "run-id-123"
 _LIB_ID = "lib-id-456"
+SECURITY_EVENT_LOGGER = "pipelex.errors.security_event"
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -126,6 +132,24 @@ class TestRunnerExecuteErrorPaths:
             },
             run_metadata=env.pipe_job.job_metadata.run_metadata,
         )
+
+    async def test_a_refusal_the_pipe_run_raises_is_logged_by_it_alone(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """The pipe run that executed the run owns its refusals' security events: the runner logs none and marks the failure.
+
+        The stand-in pipe run raises a refusal it never logged, as a failure a remote orchestrator rebuilt from its
+        worker's report arrives: its worker logged the event, so the runner must not, and the API handler above it
+        finds the failure marked.
+        """
+        env = self._patch_env(mocker)
+        refusal = SsrfBlockedError("Refusing to connect to '10.0.0.5'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        runner = PipelexMTHDSProtocol(execution_config=env.execution_config, pipe_run=_RaisingPipeRun(refusal))
+
+        with caplog.at_level(logging.WARNING, logger=SECURITY_EVENT_LOGGER), pytest.raises(PipelineExecutionError) as exc_info:
+            await runner.execute(pipe_code="echo_pipe")
+
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert [record for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE] == []
+        assert not emit_security_event(error=exc_info.value)
 
     async def test_pipelex_error_during_setup_propagates_unwrapped(self, mocker: MockerFixture) -> None:
         """When pipeline_run_setup itself raises (pipe_job is None), the SAME exception

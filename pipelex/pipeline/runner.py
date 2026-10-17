@@ -17,7 +17,7 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
-from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
+from pipelex.errors.security_event import emit_security_event, mark_security_event_emitted
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -373,13 +373,16 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:
             # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
-            # it is not a run failure, and it propagates untouched. A security refusal logs its security event
-            # either way, once: one the direct-mode run already reported is not reported again, and one it never
-            # saw, a refusal before the run, around it or on a remote worker, is reported here.
+            # it is not a run failure, and it propagates untouched. A security refusal raised there, in this
+            # process, logs its security event here.
             if pipe_job is None:
                 emit_security_event(error=exc, request_id=request_id, extras=self.extras)
                 raise
-            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+            # A refusal raised during the run is logged by the pipe run that executed it, in the process that raised
+            # it: `PipeRun` in this process, or a remote orchestrator's worker, whose failure reaches this process
+            # rebuilt from its report. Either way it is reported, so it is marked and never logged here, which keeps
+            # a remote run's refusal to one event whatever the transport rebuilds, and the handler above logs it no more.
+            mark_security_event_emitted(error=exc)
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,

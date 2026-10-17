@@ -55,7 +55,14 @@ class PipeRun(PipeRunProtocol):
         # The run's identifiers ride the payload; here is where a direct-mode run binds them onto every
         # record it emits, the delivery's included. The binding is released when the run returns.
         with pipe_job.job_metadata.log_context():
-            return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            try:
+                return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            except PipelexError as exc:
+                # This run owns the security events of the refusals raised while it executes, in this process; the runner
+                # that dispatched it logs none. A refusal its pipes raised was logged already; one its tail raised, such as a
+                # webhook the SSRF guard refuses at fire time after the run completed, is logged here.
+                emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+                raise
 
     async def _run_bound(
         self,
