@@ -1,8 +1,9 @@
 """Snapshot tests for the Rich CLI error panels.
 
 Pin the exact plain-text layout produced by the shared ``display_error_panel``
-helper, guarding the Phase 7 panel refactor against rendering drift. These are
-not load-bearing for production correctness — they protect the refactor.
+helper, the problem's rows (title, detail, next step, code, location) included,
+guarding the panel against rendering drift. These are not load-bearing for
+production correctness — they protect the layout.
 """
 
 from __future__ import annotations
@@ -32,6 +33,13 @@ EXPECTED_MODEL_CHOICE_PANEL = (
     "\n"
     "Error: model 'gpt-5' not found\n"
     "\n"
+    "Problem:   The method names a model that does not exist\n"
+    "Detail:    The method names the llm model 'gpt-5', which no catalog knows.\n"
+    "Next step: Name a model that exists in place of 'gpt-5', then run the method \n"
+    "again.\n"
+    "Code:      model.unknown (domain method, retry no)\n"
+    "Location:  pipe 'my_pipe', field 'model'\n"
+    "\n"
     "💡 Tip: Check your model configuration in .pipelex/inference/ or specify a \n"
     "different model in the 'my_pipe' pipe.\n"
     "Learn more about the inference backend system: \n"
@@ -50,6 +58,10 @@ EXPECTED_MODEL_AVAILABILITY_PANEL = (
     "Pipe Stack: top_pipe → my_pipe\n"
     "\n"
     "Error: model not available\n"
+    "\n"
+    "Problem:   This deployment serves no backend for the model\n"
+    "Next step: Correct the runtime's configuration, then restart it.\n"
+    "Code:      model.unavailable (domain operator, retry no)\n"
     "\n"
     "💡 Tip: Your local model deck may be out of date: new aliases and presets are \n"
     "added to Pipelex over time, and existing '.pipelex/inference/deck/*.toml' files \n"

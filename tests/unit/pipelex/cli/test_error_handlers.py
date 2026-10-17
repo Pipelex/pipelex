@@ -46,7 +46,7 @@ class TestErrorHandlers:
             handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN)
 
         assert exc_info.value.exit_code == 1
-        spy.assert_called_once()
+        assert spy.called
 
     def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_availability_error should read the advice for its tip and exit with code 1."""
@@ -66,7 +66,7 @@ class TestErrorHandlers:
             handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
 
         assert exc_info.value.exit_code == 1
-        spy.assert_called_once()
+        assert spy.called
 
     def test_handle_model_deck_preset_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error should read the advice for its tip and exit with code 1."""
@@ -84,7 +84,7 @@ class TestErrorHandlers:
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
         assert exc_info.value.exit_code == 1
-        spy.assert_called_once()
+        assert spy.called
 
     def test_handle_validate_bundle_error_exits_and_reads_its_items(self, mocker: MockerFixture) -> None:
         """handle_validate_bundle_error should read the verdict's items and exit with code 1."""
@@ -96,4 +96,4 @@ class TestErrorHandlers:
             handle_validate_bundle_error(exc)
 
         assert exc_info.value.exit_code == 1
-        spy.assert_called_once()
+        assert spy.called

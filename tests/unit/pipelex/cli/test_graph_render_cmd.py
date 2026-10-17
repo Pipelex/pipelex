@@ -68,9 +68,11 @@ class TestGraphRenderFailure:
         assert str(spec_file) in fields["error.message"]
         assert "\\[" not in fields["error.message"]
 
-    def test_an_unexpected_error_logs_its_traceback_once(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """The log line is a fixed message with the file, and carries the exception for every sink to write its traceback,
-        the console under the line; the console prints no traceback of its own, which would show it twice.
+    def test_an_unexpected_error_logs_its_identifiers_and_no_traceback(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The log line is a fixed message with the file, the problem's code and the chain's classes, and no exception.
+
+        The exception's text can quote the graph, a run's traced content, so it reaches the terminal alone; the
+        traceback rides the record only under ``--traceback``.
         """
         mocker.patch(f"{GRAPH_CMD}.make_pipelex_for_cli")
         mocker.patch(f"{GRAPH_CMD}.Pipelex.teardown_if_needed")
@@ -92,7 +94,11 @@ class TestGraphRenderFailure:
         assert "Failed to render graph" in printed.getvalue()
         assert "RuntimeError: the renderer broke" in printed.getvalue()
         assert "Traceback" not in printed.getvalue()
-        log_spy.error.assert_called_once_with("The graph could not be rendered", fields={"file.path": str(spec_file)}, include_exception=True)
+        log_spy.error.assert_called_once_with(
+            "The graph could not be rendered",
+            fields={"file.path": str(spec_file), "error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]},
+            include_exception=False,
+        )
 
     @pytest.mark.parametrize("sink_kind", ["console", "json"])
     def test_an_unexpected_error_names_its_cause_on_the_terminal_whatever_the_sink(
@@ -100,7 +106,7 @@ class TestGraphRenderFailure:
     ) -> None:
         """Under a sink that does not write to the terminal, the CLI's own output was "Failed to render graph" and nothing else.
 
-        The CLI names the exception's type and message itself, and the traceback is printed once, by the log line.
+        The CLI names the exception's type and message itself, and the log line names the failure by its code alone.
         """
         caplog.set_level(logging.INFO, logger=GRAPH_CMD)
         mocker.patch(f"{GRAPH_CMD}.make_pipelex_for_cli")
@@ -126,11 +132,14 @@ class TestGraphRenderFailure:
         assert "RuntimeError: the renderer broke" in terminal
         assert "Traceback" not in terminal
         logged = sink_buffer.getvalue()
+        assert "the renderer broke" not in logged
+        assert "Traceback" not in logged
         if sink_kind == "console":
             assert "The graph could not be rendered" in logged
-            assert logged.count("Traceback") == 1
+            assert "runtime.unexpected" in logged
         else:
             (record,) = [json.loads(line) for line in logged.splitlines() if line and json.loads(line)[LOGGER_KEY] == GRAPH_CMD]
             assert record[MESSAGE_KEY] == "The graph could not be rendered"
-            assert record[EXCEPTION_KEY].startswith("Traceback")
-            assert record[EXCEPTION_KEY].rstrip().endswith("RuntimeError: the renderer broke")
+            assert EXCEPTION_KEY not in record
+            assert record["error.code"] == "runtime.unexpected"
+            assert record["error.chain"] == ["RuntimeError"]

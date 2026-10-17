@@ -29,6 +29,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -54,6 +55,7 @@ class TestErrorHandlersExtended:
             title="Something failed",
             fields=[("Pipe", "'my_pipe'"), ("Model Choice", "'gpt-5'")],
             error_message="model not found",
+            problem=None,
             tip="try another model",
             links=[("Docs", "https://docs.example.com")],
         )
@@ -65,6 +67,35 @@ class TestErrorHandlersExtended:
         assert "💡 Tip: try another model" in output
         assert "Docs: https://docs.example.com" in output
 
+    def test_display_error_panel_prints_the_problem_s_rows(self) -> None:
+        """The problem's title, next step, code with its verdict, location, request id and run follow the error message."""
+        console = Console(width=200, record=True, color_system=None)
+        problem = make_problem(
+            code=CoreCode.RUNTIME_UNEXPECTED,
+            view=ProblemView.OPERATOR,
+            location=make_location(pipe="summarize", path=["main", "summarize"]),
+            request_id="req-123",
+            pipeline_run_id="run-456",
+        )
+        display_error_panel(
+            console=console,
+            title="Something failed",
+            fields=[("Pipe", "'summarize'")],
+            error_message="the step broke",
+            problem=problem,
+            tip="try again",
+            links=[],
+        )
+        output = console.export_text()
+        assert f"Problem:    {problem.title}" in output
+        assert f"Detail:     {problem.detail}" in output
+        assert f"Next step:  {problem.next_step.detail}" in output
+        assert "Code:       runtime.unexpected (domain runtime, retry no)" in output
+        assert "Location:   pipe 'summarize', path main > summarize" in output
+        assert "Request id: req-123" in output
+        assert "Run:        run-456" in output
+        assert output.index("Error: the step broke") < output.index("Problem:") < output.index("💡 Tip: try again")
+
     def test_display_error_panel_omits_error_block_when_none(self) -> None:
         """A None error_message omits the Error block entirely."""
         console = Console(width=120, record=True, color_system=None)
@@ -73,6 +104,7 @@ class TestErrorHandlersExtended:
             title="Soft failure",
             fields=[],
             error_message=None,
+            problem=None,
             tip="a tip",
             links=[],
         )
@@ -88,6 +120,7 @@ class TestErrorHandlersExtended:
             title="Failure",
             fields=[],
             error_message=None,
+            problem=None,
             tip="first line\nsecond line",
             links=[],
         )

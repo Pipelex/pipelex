@@ -100,14 +100,18 @@ class TestRunTruncatedCompletion:
             )
 
         assert exit_info.value.exit_code == 1
-        stderr = capsys.readouterr().err
+        printed = console.export_text()
         pipe_code = TruncatedCompletionRunTestData.PIPE_CODE
         model_handle = TruncatedCompletionRunTestData.MODEL_HANDLE
-        assert f"Failed to execute pipeline '{pipe_code}': Pipe '{pipe_code}' failed: " in stderr
+        assert f"Failed to execute pipeline '{pipe_code}'" in printed
+        assert f"Pipe '{pipe_code}' failed: " in printed
         assert (
             f"The model '{model_handle}' was cut off before it finished the text of pipe '{pipe_code}' "
             "(stop reason 'length', 64 output tokens used, no max_tokens sent), so the text is incomplete. "
             "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
-        ) in stderr
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in stderr
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in console.export_text()
+        ) in printed
+        # The panel names the problem's code and where it happened.
+        assert "Code:      model.output_truncated (domain method, retry no)" in printed
+        assert f"Location:  pipe '{pipe_code}', path {pipe_code}" in printed
+        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in printed
+        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in capsys.readouterr().err

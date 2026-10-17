@@ -23,8 +23,9 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
     handle_validate_bundle_error,
+    is_traceback_requested,
+    print_failure_problem,
     print_traceback_if_requested,
-    print_unexpected_failure,
 )
 from pipelex.config import get_config
 from pipelex.core.concepts.exceptions import ConceptValueError
@@ -33,6 +34,7 @@ from pipelex.core.memory.absence_render import build_absence_json, build_absence
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
+from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -289,13 +291,14 @@ async def _execute_run(
         # that cannot be read) renders it: the panel names the pipe that failed, the model and the stack.
         handle_dedicated_failure_panel(error=exc, context=ErrorContext.PIPE_RUN)
         print_traceback_if_requested(console=get_console())
-        # The message names the pipe that failed and its path; the pipeline named first is the entry pipe.
+        # The message names the pipe that failed and its path; the pipeline named first is the entry pipe. The problem
+        # is the root fault's, located at the failing pipe, with its code and next step.
         entry_pipe_code = exc.pipe_stack[0] if exc.pipe_stack else exc.pipe_code
-        typer.secho(f"Failed to execute pipeline '{entry_pipe_code}': {exc.message}", fg=typer.colors.RED, err=True)
+        print_failure_problem(console=get_console(), title=f"Failed to execute pipeline '{entry_pipe_code}'", error=exc)
         raise typer.Exit(1) from exc
     except PipelexError as exc:
         print_traceback_if_requested(console=get_console())
-        typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+        print_failure_problem(console=get_console(), title=f"Failed to execute pipeline '{pipe_code or bundle_path}'", error=exc)
         raise typer.Exit(1) from exc
 
     # Pretty print the resolved main result unless disabled or in dry run mode. A completed run
@@ -579,20 +582,25 @@ def execute_run(
     except PipelexError as exc:
         console = get_console()
         print_traceback_if_requested(console=console)
-        console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
-        # The message is plain text, a model's description such as `SDK[openai]` or a type such as `list[int]` included
-        console.print(f"  {escape(exc.message)}\n")
+        print_failure_problem(console=console, title="Failed to execute pipeline", error=exc)
         raise typer.Exit(1) from exc
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        # This is the catcher every re-raised failure hands its traceback to, so the traceback rides the log record,
-        # where the `console` sink renders it under the line and the `json` and `otlp` sinks write it to the log
-        # store; printing it on the console as well would show it twice. The CLI's own output names the exception's
-        # type and message, so the terminal says why the run failed whatever the sink and the level. The console
-        # renders no locals unless the configuration asks it to, since they hold the run's working memory.
-        print_unexpected_failure(console=get_console(), title="Failed to execute pipeline", exc=exc)
-        log.error("The pipeline could not be executed", include_exception=True)
+        # The CLI's own output is the failure's problem, the exception's type and its message capped, so the terminal
+        # says why the run failed whatever the sink and the level. The log line carries identifiers only, the problem's
+        # code and the classes along the chain: an exception's text, and every chained one's, can quote the run's data,
+        # a foreign `ValidationError` the values it refused or a method function's exception what it was given. The
+        # traceback, which prints every one of those texts, rides the record only under `--traceback`, where the
+        # `console` sink renders it under the line and the `json` and `otlp` sinks write it to the log store; printing
+        # it on the console as well would show it twice. The console renders no locals unless the configuration asks
+        # it to, since they hold the run's working memory.
+        problem = print_failure_problem(console=get_console(), title="Failed to execute pipeline", error=exc)
+        log.error(
+            "The pipeline could not be executed",
+            fields=failure_log_fields(error=exc, problem=problem),
+            include_exception=is_traceback_requested(),
+        )
         raise typer.Exit(1) from exc
 
     finally:
