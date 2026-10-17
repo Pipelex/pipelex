@@ -24,7 +24,7 @@ from mthds.protocol.problem.models import ProblemLocation
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, iter_cause_chain
-from pipelex.errors.problem import make_location
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 # Joins the pipe codes of a failure's path from the entry pipe down to the pipe that failed.
@@ -141,3 +141,38 @@ def located_root_fault(*, wrapper: PipelexError) -> PipelexError | None:
     if wrapper.own_error_code is not None:
         return None
     return _find_root_fault_below(wrapper=wrapper)
+
+
+def located_problem(
+    *,
+    wrapper: PipelexError,
+    root_fault: PipelexError,
+    view: ProblemView,
+    request_id: str | None,
+    pipeline_run_id: str | None,
+    failure_location: ProblemLocation | None,
+) -> PipelexProblem:
+    """The problem a located wrapper reports: its root fault's, located at the failing pipe.
+
+    A root fault that builds its own problem, by overriding `to_problem` as a carrier of a problem recovered across a
+    transport boundary does, reports that problem as it is, located at `failure_location`. Any other root fault's
+    problem is built as the wrapper reports it (`PipelexError.problem_reported_by`), so the facts and the location the
+    errors between the two hold, such as the model and the backend a worker attributed a failure to on a wrapper that
+    takes its cause's code, reach the problem.
+
+    Args:
+        wrapper: The located wrapper, a `PipeRouterError` or a `PipelineExecutionError`.
+        root_fault: The root fault below it (`located_root_fault`).
+        view: The view of the reader the problem is built for.
+        request_id: The request that carried the failure, when known.
+        pipeline_run_id: The run the failure belongs to, when one exists.
+        failure_location: Where the failing pipe is, when the failure was located at a pipe.
+
+    Returns:
+        The problem.
+    """
+    if type(root_fault).to_problem is not PipelexError.to_problem:
+        return root_fault.to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location)
+    return root_fault.problem_reported_by(
+        reporter=wrapper, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
+    )

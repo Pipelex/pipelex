@@ -7,6 +7,9 @@ import pytest
 from mthds.protocol.problem.registry import CORE_CODE_SPECS, CoreCode, ProblemDomain, RetryVerdict
 
 from pipelex.base_exceptions import PipelexConfigError, PipelexError, PipelexUnexpectedError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import error_code_spec, parse_error_code
 from pipelex.errors.problem import PipelexProblem, ProblemView
@@ -94,6 +97,28 @@ class TestErrorCodeResolution:
         error = _raise_chain(_WrapperError("outer"), _InputWrapperError("inner"), KeyError("raw"))
         assert isinstance(error, PipelexError)
         assert error.resolve_error_code() == CoreCode.INPUT_INVALID
+
+    def test_nothing_crosses_a_foreign_exception(self) -> None:
+        """An earlier failure below a foreign exception lends the error above it no fact and no advice."""
+        earlier_failure = LLMCompletionError(
+            "an earlier rate limit",
+            error_category=InferenceErrorCategory.TRANSIENT,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a minute."),
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI, sdk_exception_type="RateLimitError", status_code=429, retry_after_seconds=30.0
+            ),
+        )
+        earlier_failure.fill_model_and_provider("gpt-4o-mini", backend_name="openai")
+        error = _raise_chain(_ProviderError("slow down").with_error_code(CoreCode.PROVIDER_RATE_LIMITED), KeyError("raw"), earlier_failure)
+        assert isinstance(error, PipelexError)
+
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+
+        assert problem.retry_after is None
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.model is None
+        assert problem.diagnostics.provider is None
+        assert error.advised_action() is None
 
     def test_no_code_anywhere_is_the_catch_all(self) -> None:
         assert _AbstractBaseError("raised by mistake").resolve_error_code() == CoreCode.RUNTIME_UNEXPECTED

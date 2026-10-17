@@ -7,8 +7,12 @@ from mthds.protocol.problem.registry import CoreCode, StepKind
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError, ModelChoiceNotFoundError
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, merge_locations
@@ -226,6 +230,57 @@ class TestLocatedFailureProblem:
         assert problem.diagnostics == leaf_problem.diagnostics
         assert problem.location is not None
         assert problem.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"]}
+
+    def test_a_wrapper_attributing_its_coded_cause_reaches_the_run_problem(self) -> None:
+        """A worker fills the model and the backend on a wrapper that takes its cause's code: the run's problem names both."""
+        provider_refusal = LLMCompletionError(
+            message="429 from the provider",
+            error_category=InferenceErrorCategory.TRANSIENT,
+            provider_metadata=ProviderErrorMetadata(
+                provider=ProviderName.OPENAI, sdk_exception_type="RateLimitError", status_code=429, retry_after_seconds=7.0, request_id="req_abc"
+            ),
+        ).with_error_code(CoreCode.PROVIDER_RATE_LIMITED)
+        attributed = LLMCompletionError(message="the completion failed")
+        attributed.__cause__ = provider_refusal
+        attributed.fill_model_and_provider("gpt-4o-mini", backend_name="openai")
+        run_failure = _wrap_in_runner(_locate(attributed, pipe_stack=["flow", "summarize"]), entry_pipe_code="flow")
+
+        operator = run_failure.to_problem(view=ProblemView.OPERATOR)
+        caller = run_failure.to_problem(view=ProblemView.CALLER)
+
+        assert operator.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "LLMCompletionError"
+        assert operator.diagnostics.message == "429 from the provider"
+        assert operator.diagnostics.model == "gpt-4o-mini"
+        assert operator.diagnostics.provider is not None
+        # The wrapper names the backend, and the cause keeps what the provider answered.
+        assert operator.diagnostics.provider.name == "openai"
+        assert operator.diagnostics.provider.status == 429
+        assert operator.diagnostics.provider.request_id == "req_abc"
+        assert operator.retry_after == 7.0
+        assert caller.detail == "The provider 'openai' is rate limiting this deployment's calls to the model 'gpt-4o-mini'."
+        assert caller.retry_after == 7.0
+
+    def test_a_wrapper_locating_its_coded_cause_keeps_its_location(self) -> None:
+        """A pipe's refusal of an unknown model is located on the pipe, the field and the file, run or no run."""
+        deck_refusal = ModelChoiceNotFoundError("no model 'gpt-9' in the deck", model_type=ModelType.LLM, model_choice="gpt-9")
+        located_refusal = PipeOperatorModelChoiceError.make_from_model_choice_not_found(
+            model_choice_error=deck_refusal, pipe_type="PipeLLM", pipe_code="summarize", domain_code="docs", field_name="model"
+        )
+        located_refusal.source = "docs.mthds"
+        located_refusal.__cause__ = deck_refusal
+
+        problem = located_refusal.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.MODEL_UNKNOWN
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "summarize", "field": "model", "file": "docs.mthds"}
+
+        run_problem = _wrap_in_runner(_locate(located_refusal, pipe_stack=["flow", "summarize"]), entry_pipe_code="flow").to_problem(
+            view=ProblemView.CALLER
+        )
+        assert run_problem.location is not None
+        assert run_problem.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"], "field": "model", "file": "docs.mthds"}
 
     def test_a_cyclic_chain_reports_the_wrapper_as_itself(self) -> None:
         """A chain that loops back to the wrapper cannot make the problem recurse."""

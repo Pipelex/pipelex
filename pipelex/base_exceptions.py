@@ -57,6 +57,19 @@ def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
         node = node.__cause__
 
 
+def iter_pipelex_cause_chain(exc: BaseException) -> Iterator["PipelexError"]:
+    """Yield ``exc`` and each Pipelex error below it along its ``__cause__`` chain, stopping at the first that is not one.
+
+    A foreign exception raised from an earlier failure is a new failure, raised by code of its own, so nothing below it
+    belongs to the error above it: neither a code, a fact, a location, an item nor a piece of advice. Every walk that
+    reads an error's chain for its problem reads it through this one, over the cycle-guarded :func:`iter_cause_chain`.
+    """
+    for node in iter_cause_chain(exc):
+        if not isinstance(node, PipelexError):
+            return
+        yield node
+
+
 class ErrorDomain(StrEnum):
     """The three-way reading of who acts that the CLIs' error output and the usage statistics still carry.
 
@@ -237,6 +250,13 @@ class ProblemFacts(NamedTuple):
     retry_after: float | None = None
 
 
+def _merged_provider(*, nearer: ProviderDiagnostics | None, farther: ProviderDiagnostics | None) -> ProviderDiagnostics | None:
+    """What two errors of one chain say about the provider, member by member, the nearer error's winning."""
+    if nearer is None or farther is None:
+        return nearer or farther
+    return ProviderDiagnostics.model_validate({**farther.model_dump(exclude_none=True), **nearer.model_dump(exclude_none=True)})
+
+
 class PipelexError(Exception):
     """The root of every error Pipelex raises, each carrying a registry code, and each becoming a problem document.
 
@@ -320,8 +340,8 @@ class PipelexError(Exception):
 
     def advised_action(self) -> UserAction | None:
         """The advice nearest this error along its cause chain, which a local CLI prints as a tip; never part of a problem."""
-        for node in iter_cause_chain(self):
-            if isinstance(node, PipelexError) and node.user_action is not None:
+        for node in iter_pipelex_cause_chain(self):
+            if node.user_action is not None:
                 return node.user_action
         return None
 
@@ -369,9 +389,7 @@ class PipelexError(Exception):
         """
         implied_code: ErrorCode | None = None
         fallback: ErrorCode | None = None
-        for node in iter_cause_chain(self):
-            if not isinstance(node, PipelexError):
-                break
+        for node in iter_pipelex_cause_chain(self):
             own_code = node.own_error_code
             if own_code is not None:
                 return own_code
@@ -392,9 +410,7 @@ class PipelexError(Exception):
         implies one; else this error, whose code is a fallback.
         """
         implied_node: PipelexError | None = None
-        for node in iter_cause_chain(self):
-            if not isinstance(node, PipelexError):
-                break
+        for node in iter_pipelex_cause_chain(self):
             if node.own_error_code is not None:
                 return node
             if node.implied_error_code is not None:
@@ -412,13 +428,27 @@ class PipelexError(Exception):
 
     def _chain_items(self) -> list[ProblemItem] | None:
         """The items of the first error along the cause chain that refuses several faults at once."""
-        for node in iter_cause_chain(self):
-            if not isinstance(node, PipelexError):
-                break
+        for node in iter_pipelex_cause_chain(self):
             items = node.problem_items()
             if items:
                 return items
         return None
+
+    def chain_location(self, *, carrier: "PipelexError") -> ProblemLocation | None:
+        """The location this error and the errors below it know, down to ``carrier``, the nearest the fault winning.
+
+        A wrapper that takes its cause's code often knows where its cause was met, the pipe, the field or the file, which
+        the cause does not: each error's own location is merged over the ones above it, member by member, so a member
+        the error whose code the problem reports knows wins, and the wrappers fill the members it lacks.
+        """
+        location: ProblemLocation | None = None
+        for node in iter_pipelex_cause_chain(self):
+            node_location = node.problem_location()
+            if node_location is not None:
+                location = merge_locations(base=location, override=node_location)
+            if node is carrier:
+                break
+        return location
 
     def problem_location(self) -> ProblemLocation | None:
         """Where this error happened, when it knows; a subclass that holds a place overrides it."""
@@ -432,18 +462,20 @@ class PipelexError(Exception):
         """The facts this error itself holds for its problem's diagnostics; a subclass that holds some overrides it."""
         return ProblemFacts()
 
-    def _chain_facts(self) -> ProblemFacts:
-        """For each fact, the one nearest this error along its cause chain."""
+    def chain_facts(self) -> ProblemFacts:
+        """For each fact, the one nearest this error along its cause chain, which ends at the first foreign exception.
+
+        The provider's answer is merged member by member, the nearest error's winning: a wrapper a worker attributed
+        to its backend names the provider, while the cause it wraps keeps what the provider answered.
+        """
         model: str | None = None
         provider: ProviderDiagnostics | None = None
         migration: MigrationErrorBlock | None = None
         retry_after: float | None = None
-        for node in iter_cause_chain(self):
-            if not isinstance(node, PipelexError):
-                continue
+        for node in iter_pipelex_cause_chain(self):
             facts = node.problem_facts()
             model = model or facts.model
-            provider = provider or facts.provider
+            provider = _merged_provider(nearer=provider, farther=facts.provider)
             migration = migration or facts.migration
             retry_after = retry_after if retry_after is not None else facts.retry_after
         return ProblemFacts(model=model, provider=provider, migration=migration, retry_after=retry_after)
@@ -479,12 +511,8 @@ class PipelexError(Exception):
     ) -> PipelexProblem:
         """This error as a problem document, in the view of its reader.
 
-        The code is :meth:`resolve_error_code`'s, and everything the code decides is the registry's. The parameters and
-        the location are those of the error whose code it is (:meth:`code_carrier`), the location of the failing pipe a
-        run found (``failure_location``) taking precedence for the pipe and its path, and naming the pipe parameter of a
-        code that declares one. The items are those of the first error along the chain that refuses several faults.
-        The operator view adds the diagnostics: this error's class and message, its causes, and the facts nearest it on
-        its chain.
+        The code is :meth:`resolve_error_code`'s, and everything the code decides is the registry's. The rest is
+        :meth:`problem_reported_by`'s, this error being its own reporter.
 
         Args:
             view: The view of the reader the problem is built for, picked by the identity the boundary authenticated.
@@ -495,17 +523,57 @@ class PipelexError(Exception):
         Returns:
             The problem.
         """
+        return self.problem_reported_by(
+            reporter=self, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
+        )
+
+    def problem_reported_by(
+        self,
+        *,
+        reporter: "PipelexError",
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        """This error's problem as ``reporter`` reports it: this error itself, or a wrapper above it that located it.
+
+        A run failure is reported as its root fault under the wrappers that located or carried it
+        (``pipelex.pipe_run.located_failure``), and those wrappers may know what the root fault does not, so the problem
+        is this error's, read along the reporter's chain:
+
+        - the code is this error's (:meth:`resolve_error_code`), and the parameters and the items are those of the error
+          whose code it is (:meth:`code_carrier`) and of the first error along this error's chain that refuses several
+          faults;
+        - the location is assembled from the reporter down to the error whose code it is, each error's own location
+          winning over those above it member by member, so a wrapper that knows the pipe, the field or the file a cause
+          was met at locates a cause that does not; the location of the failing pipe a run found (``failure_location``)
+          then takes precedence for the pipe and its path, and the pipe names the pipe parameter of a code that declares one;
+        - the facts are the nearest the reporter along its chain, so a fact a wrapper above this error holds, such as
+          the model and the backend a worker attributed it to, overrides its cause's;
+        - the operator view's diagnostics name this error: its class, its message and its causes.
+
+        Args:
+            reporter: This error, or an error above it on whose cause chain it sits.
+            view: The view of the reader the problem is built for, picked by the identity the boundary authenticated.
+            request_id: The request that carried the failure, when known.
+            pipeline_run_id: The run the failure belongs to, when one exists.
+            failure_location: Where a run's failing pipe is, when the failure was located at a pipe.
+
+        Returns:
+            The problem.
+        """
         code = self.resolve_error_code()
         carrier = self.code_carrier()
-        facts = self._chain_facts()
+        facts = reporter.chain_facts()
         spec = error_code_spec(code)
         params = {name: value for name, value in carrier.problem_params().items() if name in spec.param_names}
         params.update(carrier.given_params)
-        location = carrier.problem_location()
+        location = reporter.chain_location(carrier=carrier)
         if failure_location is not None:
             location = merge_locations(base=location, override=failure_location)
-            if failure_location.pipe is not None and "pipe" in spec.param_names:
-                params.setdefault("pipe", failure_location.pipe)
+        if location is not None and location.pipe is not None and "pipe" in spec.param_names:
+            params.setdefault("pipe", location.pipe)
         if facts.model is not None and "model" in spec.param_names:
             params.setdefault("model", facts.model)
         if facts.provider is not None and facts.provider.name is not None and "provider" in spec.param_names:

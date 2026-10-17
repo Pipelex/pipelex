@@ -208,8 +208,9 @@ class CogtError(PipelexError):
     def problem_facts(self) -> ProblemFacts:
         """The model and the provider this failure names, what the provider answered, and how long it asked to wait.
 
-        Each fact is the nearest one set along the cause chain (``PipelexError._chain_facts``), so a wrapper that
-        set a fact overrides its cause's, and one that did not leaves the cause's in place. The provider's answer
+        Each fact is the nearest one set along the cause chain (``PipelexError.chain_facts``), so a wrapper that
+        set a fact overrides its cause's, and one that did not leaves the cause's in place; the provider is merged
+        member by member, so a wrapper naming the backend keeps the status its cause recorded. The provider's answer
         rides only the operator's diagnostics, its message capped, since it is the provider's text and may quote
         anything the request held.
         """

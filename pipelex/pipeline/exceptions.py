@@ -19,7 +19,7 @@ from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
 from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
-from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_root_fault
+from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
 from pipelex.pipeline.validation_errors import build_validation_error_items, problem_item_of, validation_item_code
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -106,7 +106,9 @@ class PipelineExecutionError(PipelexError):
         root_fault = located_root_fault(wrapper=self)
         if root_fault is None:
             return super().to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location)
-        return root_fault.to_problem(view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location)
+        return located_problem(
+            wrapper=self, root_fault=root_fault, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=location
+        )
 
 
 class PipeStackOverflowError(PipelexError):
