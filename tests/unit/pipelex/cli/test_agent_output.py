@@ -34,11 +34,13 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from tests.helpers.recovered_problem import make_recovered_url_refusal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -307,6 +309,19 @@ class TestAgentOutput:
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_code"] == CoreCode.INPUT_URL_UNREACHABLE
+
+    def test_agent_error_classifies_a_recovered_problem_by_its_own_code(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A cause reporting a problem it recovered gives its code, domain and verdict together with its step, never its class's."""
+        cause = make_recovered_url_refusal()
+        problem = cause.to_problem(view=ProblemView.OPERATOR)
+        with pytest.raises(typer.Exit):
+            agent_error("the run failed on the worker", error_type="RecoveredProblemError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_code"] == CoreCode.INPUT_URL_UNREACHABLE
+        assert parsed["error_domain"] == "input"
+        assert parsed["retryable"] is True
+        assert parsed["hint"] == problem.next_step.detail
 
     def test_agent_error_has_no_error_code_without_a_coded_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A builtin cause carries no registry code, so the envelope names none rather than inventing one."""

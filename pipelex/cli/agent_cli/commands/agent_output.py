@@ -31,7 +31,6 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorItem, iter_cause_chain
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
-from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
 from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
 from pipelex.pipe_run.located_failure import find_root_fault
@@ -234,16 +233,17 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
     report_extras: dict[str, Any] = {}
 
     if isinstance(cause, PipelexError):
+        # Every classification is read off the one problem, so a cause that reports a problem of its own, such as one
+        # recovered across a transport boundary, gives its code, its domain and its verdict together with its step.
         problem = cause.to_problem(view=ProblemView.OPERATOR)
-        code_spec = error_code_spec(cause.resolve_error_code())
         advised_action = cause.advised_action()
         report_hint = advised_action.detail if advised_action is not None and advised_action.detail else None
         # The code's next step, as the operator reads it, which whoever runs this CLI is: the hint when nothing advises.
         report_next_step = problem.next_step.detail
-        report_retryable = code_spec.invites_retry
+        report_retryable = problem.is_retryable
         report_category = find_inference_error_category_in_chain(cause)
-        report_domain = ErrorDomain.from_problem_domain(code_spec.domain)
-        report_code = code_spec.code
+        report_domain = ErrorDomain.from_problem_domain(problem.effective_domain)
+        report_code = problem.code
         diagnostics = problem.diagnostics
         if diagnostics is not None and diagnostics.model:
             report_extras["model"] = diagnostics.model

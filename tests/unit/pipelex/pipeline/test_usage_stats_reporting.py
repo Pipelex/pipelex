@@ -17,6 +17,7 @@ from pipelex.pipeline.usage_stats_reporting import (
 from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsCodegenArtifact,
     UsageStatsCodegenTarget,
+    UsageStatsErrorDomain,
     UsageStatsEventName,
     UsageStatsOutcome,
     UsageStatsProvider,
@@ -24,6 +25,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
 from pipelex.system.usage_stats.usage_stats_events import UsageStatsEvent
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error_domain
 from pipelex.tracing.trace_events import TraceEvent
+from tests.helpers.recovered_problem import make_recovered_url_refusal
 from tests.helpers.usage_stats_run_events import envelope_of, llm_usage_event, pipe_start_event
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
 
@@ -249,6 +251,10 @@ class TestUsageStatsReporting:
         else:
             assert "error_domain" not in run
         assert "secret" not in str(envelope)
+
+    def test_a_recovered_problem_is_counted_in_its_own_domain(self) -> None:
+        """A failure reporting a problem recovered from a worker is counted by that problem's domain, not by its carrier's class."""
+        assert usage_stats_error_domain(error=make_recovered_url_refusal()) == UsageStatsErrorDomain.INPUT
 
     @pytest.mark.parametrize(
         ("backend_name", "model_handle", "provider", "model"),
