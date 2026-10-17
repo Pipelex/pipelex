@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
-from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import (
     Jinja2StuffError,
     Jinja2TemplateBudgetError,
@@ -42,8 +42,9 @@ async def _render_failure(
     context: dict[str, Any] | None = None,
     category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     is_undefined_strict: bool = False,
-) -> ToolError:
-    with pytest.raises(ToolError) as exc_info:
+) -> PipelexError:
+    # A render fails with a `ToolError`, or with the sandbox's refusal, which is a `SecurityError`.
+    with pytest.raises(PipelexError) as exc_info:
         await render_jinja2_async(
             template_source=template_source,
             template_category=category,
@@ -173,7 +174,7 @@ class TestJinja2RenderOwner:
         template_source: str,
         context: dict[str, Any],
         is_undefined_strict: bool,
-        error_class: type[ToolError],
+        error_class: type[PipelexError],
         method_code: ErrorCode,
         pipelex_code: ErrorCode,
     ) -> None:

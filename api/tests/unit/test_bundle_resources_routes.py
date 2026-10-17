@@ -273,7 +273,8 @@ class TestBundleResourcesRoutes:
             ("/etc/invoice.docx", "absolute"),
             ("../invoice.docx", "'..' segment"),
             ("templates\\invoice.docx", "backslash"),
-            ("C:invoice.docx", "colon"),
+            ("C:invoice.docx", "drive"),
+            ("invoice:v2.docx", "colon"),
         ],
     )
     def test_a_path_that_cannot_name_a_file_inside_the_bundle_is_refused(self, path: str, reason: str) -> None:
