@@ -64,7 +64,7 @@ from markupsafe import Markup
 from typing_extensions import override
 
 from pipelex.tools.jinja2.exceptions import SandboxRefusalError
-from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, active_render_budget, compare_weight
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, DescribedOperation, active_render_budget, compare_weight
 from pipelex.tools.jinja2.jinja2_render_charging import (
     INTERNAL_FILTERS,
     BudgetedContext,
@@ -251,6 +251,16 @@ def _describe_callable(*, obj: object) -> _CallableDescription:
     return _CallableDescription(text=value_description, anonymous_text=value_description, named=())
 
 
+def _describe_call(*, obj: object) -> DescribedOperation:
+    """A call the render budget refused, described with the callable's name and without it (see `_describe_callable`)."""
+    callable_description = _describe_callable(obj=obj)
+    return DescribedOperation(
+        text=f"calling {callable_description.text}",
+        anonymous_text=f"calling {callable_description.anonymous_text}",
+        named=callable_description.named,
+    )
+
+
 class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     """The Jinja2 environment every Pipelex template renders under. The module docstring states its policy.
 
@@ -360,8 +370,9 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
             )
             raise SandboxRefusalError(msg, named=callable_description.named, anonymous_message=anonymous_msg)
         # A callable the sandbox lets a template call is a method of code, a plain value's or one a type declares, or the
-        # template's own macro, so the budget's message names it.
-        return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: f"calling {_describe_callable(obj=obj).text}")
+        # template's own macro, so the budget's message names it, but only where the template spells its name: one read
+        # by `obj[key]` or `obj | attr(key)` is named by a value of the run's data.
+        return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: _describe_call(obj=obj))
 
     @override
     def call_binop(self, context: Context, operator: str, left: Any, right: Any) -> Any:

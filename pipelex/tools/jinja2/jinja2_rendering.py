@@ -227,6 +227,14 @@ def _describe_render_error(*, description: str, render_error: BaseException) -> 
     return f"{description} ({type(render_error).__name__}{where})"
 
 
+def _spells_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
+    """Whether the parsed template spells every name a refusal quotes (see ``template_spelled_names``)."""
+    if not named:
+        return True
+    spelled_references = template_spelled_names(template_source=template_source).references
+    return all(name in spelled_references for name in named)
+
+
 def _make_security_error_msg(*, security_error: SecurityError, template_source: str) -> str:
     """The sandbox's refusal, worded with the names it quotes where the template spells them all, without them otherwise.
 
@@ -236,8 +244,7 @@ def _make_security_error_msg(*, security_error: SecurityError, template_source: 
     A refusal worded by Jinja2 itself, not by the sandbox, is written as a fixed description.
     """
     if isinstance(security_error, SandboxRefusalError):
-        spelled_references = template_spelled_names(template_source=template_source).references
-        is_spelled = all(name in spelled_references for name in security_error.named)
+        is_spelled = _spells_every_name(named=security_error.named, template_source=template_source)
         refusal = (security_error.message or "") if is_spelled else security_error.anonymous_message
     else:
         description = "the template reached for an attribute, a method or a call the sandbox does not allow"
@@ -250,9 +257,16 @@ def _make_security_error_msg(*, security_error: SecurityError, template_source: 
 _RECURSION_MSG = "Jinja2 render — refused by the render budget: the template nests calls deeper than Python allows."
 
 
-def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError) -> str:
-    # Like a refusal, the message names the operation and its size, never the template source or a value.
-    return f"Jinja2 render — refused by the render budget: {budget_error}"
+def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError, template_source: str) -> str:
+    """The budget's refusal, which names the operation and its size, never the template source or a value.
+
+    A refused call names the callable it called, which a template reading it by ``obj[key]`` or ``obj | attr(key)`` names
+    by a value of the run's data: as for the sandbox's refusals, the wording with the names is kept only when the parsed
+    template spells every one (``RenderBudgetExceededError``).
+    """
+    is_spelled = _spells_every_name(named=budget_error.named, template_source=template_source)
+    refusal = (budget_error.message or "") if is_spelled else budget_error.anonymous_message
+    return f"Jinja2 render — refused by the render budget: {refusal}"
 
 
 def _make_own_error_msg(*, error_label: str, error: Jinja2StuffError | Jinja2ContextError) -> str:
@@ -367,7 +381,11 @@ def _make_render_failure(*, render_error: BaseException, template_source: str, t
         security_msg = _make_security_error_msg(security_error=render_error, template_source=template_source)
         return _coded_by_owner(error=Jinja2TemplateSecurityError(security_msg), template_owner=template_owner)
     if isinstance(render_error, (RenderBudgetExceededError, RecursionError)):
-        budget_msg = _make_budget_error_msg(budget_error=render_error) if isinstance(render_error, RenderBudgetExceededError) else _RECURSION_MSG
+        budget_msg = (
+            _make_budget_error_msg(budget_error=render_error, template_source=template_source)
+            if isinstance(render_error, RenderBudgetExceededError)
+            else _RECURSION_MSG
+        )
         match template_owner:
             case TemplateOwner.METHOD:
                 return Jinja2TemplateBudgetError(budget_msg)
