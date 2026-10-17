@@ -27,7 +27,13 @@ from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import kit_default_routing_profile_name
 from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_OVERRIDE_FILE_NAME
+from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.system.configuration.config_loader import (
+    BACKENDS_FILE_NAME,
+    INFERENCE_DIR_NAME,
+    ROUTING_PROFILES_OVERRIDE_FILE_NAME,
+    config_manager,
+)
 from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -114,6 +120,29 @@ class TestAFormerReleaseHomeAtBoot:
         )
         assert str(home_config_dir) not in problem.next_step.detail
         assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
+
+    def test_the_refusal_carries_what_pipelex_migrate_would_do(self, home_config_dir: Path) -> None:
+        """A JSON reader, who gets no tip, reads the remedy off `diagnostics.migration`: the cleanup would write, and needs nobody."""
+        assert home_config_dir.is_dir()
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        wire = refused.value.to_problem(view=ProblemView.OPERATOR).to_wire()
+        assert wire["diagnostics"]["error_class"] == "FormerReleaseConfigError"
+        assert wire["diagnostics"]["migration"] == {"remedy": MIGRATE_COMMAND, "would_write": True, "needs_attention": False, "plans": []}
+        assert "diagnostics" not in refused.value.to_problem(view=ProblemView.CALLER).to_wire()
+
+    def test_a_refusal_the_walk_cannot_reach_needs_attention(self, home_config_dir: Path, mocker: MockerFixture) -> None:
+        """When `pipelex migrate` walks no directory holding the blockers, the block says the command repairs nothing."""
+        assert home_config_dir.is_dir()
+        mocker.patch.object(type(config_manager), "existing_config_dirs", new_callable=mocker.PropertyMock, return_value=[])
+
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        migration = refused.value.to_problem(view=ProblemView.OPERATOR).to_wire()["diagnostics"]["migration"]
+        assert migration["would_write"] is False
+        assert migration["needs_attention"] is True
 
     def test_a_home_whose_overrides_moved_it_off_the_gateway_boots(self, home_config_dir: Path) -> None:
         """Only what stops the boot is refused: what is inert is left for `pipelex migrate` and the doctor to report."""

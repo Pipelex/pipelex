@@ -51,11 +51,13 @@ from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import Comment, Item, Null, Table, Whitespace
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.errors.problem import MigrationErrorBlock
 from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileLibraryBlueprint
 from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.fix_ops.applier import apply_fix_ops, delete_literally
 from pipelex.fix_ops.file_transaction import FileSnapshot, read_file_snapshot
 from pipelex.migration.engine import apply_ops_over_text
+from pipelex.migration.exceptions import MigrationError
 from pipelex.migration.former_release import (
     ACTIVE_KEY,
     MODEL_SPECS_SECTION_KEY,
@@ -223,6 +225,37 @@ def clean_former_release(*, config_dirs: Sequence[Path], dry_run: bool, moment: 
             ensure_config_dir_gitignore(directory=findings.config_dir)
     files = [_write(prepared_file=prepared_file, moment=stamp_moment) for prepared_file in prepared]
     return FormerReleaseCleanup(dry_run=False, files=files, still_blocking=what_stops_the_boot(config_dirs=directories))
+
+
+def former_release_pending_migration(*, config_dirs: Sequence[Path]) -> MigrationErrorBlock | None:
+    """What `pipelex migrate` would do about what a former release left, as the pending migration a boot refusal carries.
+
+    The cleanup's own dry run over the directories the command walks, so the refusal says what the command would do,
+    as its `diagnostics.migration`: whether it would rewrite or remove a file (`would_write`), and whether something is
+    a person's to resolve (`needs_attention`), a file it would leave for a hand edit or a boot it would still not start.
+    A refusal whose blockers the walk does not reach, which the dry run finds nothing in, needs attention too: the
+    command cannot repair them. The plans are empty: the cleanup's files are the command's `former_release` key.
+
+    Runs on the failure path only. **A failure inside the dry run never becomes the failure the user sees**, which
+    names what to run: it gives no block, and the catch stays narrow, so a bug in the cleanup surfaces as itself.
+
+    Args:
+        config_dirs: The directories `pipelex migrate` walks, as `ConfigLoader.existing_config_dirs` lists them.
+
+    Returns:
+        The block, or `None` when the dry run could not be made.
+    """
+    try:
+        cleanup = clean_former_release(config_dirs=config_dirs, dry_run=True)
+    except (MigrationError, OSError):
+        return None
+    would_write = any(not file.is_blocked for file in cleanup.files)
+    return MigrationErrorBlock(
+        remedy=MIGRATE_COMMAND,
+        would_write=would_write,
+        needs_attention=cleanup.needs_attention or not would_write,
+        plans=[],
+    )
 
 
 def what_stops_the_boot(*, config_dirs: Sequence[Path], contents: Mapping[Path, str | None] | None = None) -> list[str]:

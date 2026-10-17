@@ -1,10 +1,12 @@
 from typing import ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError, PipelexSetupError
+from pipelex.base_exceptions import PipelexError, PipelexSetupError, ProblemFacts
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, InheritsCause
+from pipelex.errors.problem import MigrationErrorBlock
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
@@ -82,3 +84,13 @@ class FormerReleaseConfigError(PipelexSetupError):
             "(its 'former_release' key), show the user, then run 'pipelex-agent migrate --yes'."
         ),
     )
+
+    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+        super().__init__(message)
+        # What `pipelex migrate` would do about it, from the cleanup's dry run, so a JSON reader of the problem, which
+        # carries no tip, branches on `diagnostics.migration` as it does for a stale configuration.
+        self.migration = migration
+
+    @override
+    def problem_facts(self) -> ProblemFacts:
+        return ProblemFacts(migration=self.migration)
