@@ -50,6 +50,7 @@ plain data instead.
 from __future__ import annotations
 
 import inspect
+import re
 import types
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
@@ -144,6 +145,16 @@ _JINJA_CALLABLE_INSTANCE_TYPES: tuple[type, ...] = (Macro, LoopContext, BlockRef
 _JINJA_METHOD_OWNER_TYPES: tuple[type, ...] = (LoopContext, Cycler, BlockReference)
 
 _MISSING = object()
+
+#: How the sandbox words a refused read. The attribute is the template's own name for ``.name``, but can be a value of
+#: the run's data for ``obj[key]`` or ``obj | attr(key)``: the render reporting the refusal keeps it only when the
+#: template spells it (`pipelex.tools.jinja2.jinja2_rendering`), reading it back with ``REFUSED_READ_PATTERN``.
+REFUSED_READ_TEMPLATE = "A template may not read '{attribute}' on a '{type_name}' value."
+REFUSED_READ_PATTERN = re.compile(r"^A template may not read '(?P<attribute>.*)' on a '(?P<type_name>[^']+)' value\.$", re.DOTALL)
+
+#: How every refusal of the sandbox's own begins: what follows names a callable's or a class's name in code, or a name
+#: the template spells, never a value of the run's data, apart from a refused read's attribute.
+SANDBOX_REFUSAL_PREFIX = "A template may not "
 
 
 def _is_private_name(*, name: str) -> bool:
@@ -307,7 +318,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
 
     @override
     def unsafe_undefined(self, obj: Any, attribute: str) -> NoReturn:
-        msg = f"A template may not read '{attribute}' on a '{type(obj).__name__}' value."
+        msg = REFUSED_READ_TEMPLATE.format(attribute=attribute, type_name=type(obj).__name__)
         raise JinjaSecurityError(msg)
 
     @override

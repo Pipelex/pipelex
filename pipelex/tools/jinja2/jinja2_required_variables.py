@@ -37,6 +37,25 @@ class VariableReference:
     filters: list[str] = field(default_factory=list[str])
 
 
+def _make_detect_variables_error(
+    *, parse_error: Jinja2StuffError | TemplateSyntaxError | UndefinedError, template_category: TemplateCategory
+) -> Jinja2DetectVariablesError:
+    """The error of a template that could not be parsed to find its variables, naming what Jinja2 refused and where.
+
+    Neither the template source nor the line of it Jinja2 quotes is written: a syntax error's own text ends with that
+    line, which is the method's own text, or for Pipelex's own templates the run's data they render.
+    """
+    if isinstance(parse_error, TemplateSyntaxError):
+        where = f" at line {parse_error.lineno}" if parse_error.lineno else ""
+        finding = f"syntax error{where}: '{parse_error.message or type(parse_error).__name__}'"
+    elif isinstance(parse_error, UndefinedError):
+        finding = f"undefined error ({type(parse_error).__name__})"
+    else:
+        finding = f"stuff error: '{parse_error}'"
+    msg = f"Jinja2 detect variables — {finding}, template_category: {template_category}"
+    return Jinja2DetectVariablesError(msg)
+
+
 def detect_jinja2_required_variables(
     *,
     template_category: TemplateCategory,
@@ -62,17 +81,8 @@ def detect_jinja2_required_variables(
 
     try:
         parsed_ast = jinja2_env.parse(template_source)
-    except Jinja2StuffError as stuff_error:
-        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}', template_category: {template_category}, template_source:\n{template_source}"
-        raise Jinja2DetectVariablesError(msg) from stuff_error
-    except TemplateSyntaxError as syntax_error:
-        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}', template_category: {template_category}, template_source:\n{template_source}"
-        raise Jinja2DetectVariablesError(msg) from syntax_error
-    except UndefinedError as undef_error:
-        msg = (
-            f"Jinja2 detect variables — undefined error: '{undef_error}', template_category: {template_category}, template_source:\n{template_source}"
-        )
-        raise Jinja2DetectVariablesError(msg) from undef_error
+    except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
+        raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
 
     paths: set[str] = set()
 
@@ -140,17 +150,8 @@ def detect_jinja2_variable_references(
 
     try:
         parsed_ast = jinja2_env.parse(template_source)
-    except Jinja2StuffError as stuff_error:
-        msg = f"Jinja2 detect variables — stuff error: '{stuff_error}', template_category: {template_category}, template_source:\n{template_source}"
-        raise Jinja2DetectVariablesError(msg) from stuff_error
-    except TemplateSyntaxError as syntax_error:
-        msg = f"Jinja2 detect variables — syntax error: '{syntax_error}', template_category: {template_category}, template_source:\n{template_source}"
-        raise Jinja2DetectVariablesError(msg) from syntax_error
-    except UndefinedError as undef_error:
-        msg = (
-            f"Jinja2 detect variables — undefined error: '{undef_error}', template_category: {template_category}, template_source:\n{template_source}"
-        )
-        raise Jinja2DetectVariablesError(msg) from undef_error
+    except (Jinja2StuffError, TemplateSyntaxError, UndefinedError) as parse_error:
+        raise _make_detect_variables_error(parse_error=parse_error, template_category=template_category) from parse_error
 
     references: dict[str, VariableReference] = {}
 
