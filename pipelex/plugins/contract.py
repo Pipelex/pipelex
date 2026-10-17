@@ -81,6 +81,11 @@ if TYPE_CHECKING:
 # reads under the run's read scope (``BundleValidatorProtocol``). A validator written against v7 would be called with a
 # keyword it does not accept on its first validation; the bump turns that into a discovery-time mismatch naming the
 # plugin.
+#
+# The PipeFunc package-offer factory changed under v8 too, before any release carried v8: a
+# ``PipeFuncPackageOfferFactoryFn`` receives a ``PipeFuncPackageOfferRequest``, the pipe_func config and the requirements
+# of the one method being judged, where it received the config alone, and may answer a ``PipeFuncPackageRefusal``
+# beside an offer or ``None``. A factory written against v7 would read the request as the config it expected.
 PLUGIN_API_VERSION: int = 8
 
 

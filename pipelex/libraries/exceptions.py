@@ -153,8 +153,9 @@ class MethodRequirementsNotMetError(MethodRequirementsError):
     """Raised when the Python environment a method's PipeFunc steps run in does not satisfy its `requirements.txt`.
 
     Locally that environment is the interpreter Pipelex runs in, which Pipelex never installs anything into; on a
-    sandbox-hosted deployment it is the package set the deployment states for its PipeFunc sandbox, which is the whole
-    offer. The message names each requirement not met and why.
+    sandbox-hosted deployment it is the package set the deployment states its PipeFunc sandbox offers for the method's
+    requirements, which is the whole offer. The message names each requirement not met and why, or, when the deployment
+    refuses the requirements because no environment it can build holds them, carries the deployment's own reason.
     """
 
 
