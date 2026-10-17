@@ -185,6 +185,7 @@ LogSinkHeaderValueError | Log sink header value holds a line break | https://doc
 LogSinkVariableError | Log sink variable did not resolve | https://docs.pipelex.com/latest/errors/log-sink-variable-error/
 MarkdownFormattingBudgetError | Markdown formatting budget exceeded | https://docs.pipelex.com/latest/errors/markdown-formatting-budget-error/
 MethodDependencyFetchError | Method dependency fetch | https://docs.pipelex.com/latest/errors/method-dependency-fetch-error/
+MethodDependencyNotShippedError | Method dependency not shipped | https://docs.pipelex.com/latest/errors/method-dependency-not-shipped-error/
 MethodEntryError | Method entry | https://docs.pipelex.com/latest/errors/method-entry-error/
 MethodFetchDisabledError | Method fetch disabled | https://docs.pipelex.com/latest/errors/method-fetch-disabled-error/
 MethodFetchError | Method fetch | https://docs.pipelex.com/latest/errors/method-fetch-error/

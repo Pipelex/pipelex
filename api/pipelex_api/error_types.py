@@ -48,6 +48,9 @@ class ErrorType(StrEnum):
     # A run request's `read_scope` extra is not one to three path-safe segments, or the run's storage
     # scope does not lie under it, so the run could not read back what it writes.
     INVALID_READ_SCOPE = "InvalidReadScope"
+    # A caller authenticated by its own token (`AUTH_MODE=jwt`) sent a `read_scope` that does not lie under its own id.
+    # A 403: the scope is well formed, but this caller may not read under it.
+    READ_SCOPE_FORBIDDEN = "ReadScopeForbidden"
     # A run request's `analytics_groups` extra is not a mapping of group type to group key within
     # the runtime's charset and entry cap (`pipelex.system.run_extras`).
     INVALID_ANALYTICS_GROUPS = "InvalidAnalyticsGroups"

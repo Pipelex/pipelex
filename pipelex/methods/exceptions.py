@@ -56,3 +56,7 @@ class MethodFetchDisabledError(MethodRefError):
 
 class MethodDependencyFetchError(MethodRefError):
     """An address-referenced method is not installed and fetching it failed (or its address is not fetchable)."""
+
+
+class MethodDependencyNotShippedError(MethodRefError):
+    """An address-referenced method the caller did not ship, under a resolution that reads nothing installed and fetches nothing."""
