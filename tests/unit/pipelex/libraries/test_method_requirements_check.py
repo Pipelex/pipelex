@@ -18,6 +18,7 @@ from pipelex.libraries.method_requirements import (
     ensure_method_requirements_met,
     ensure_package_requirements_met,
     ensure_served_method_requirements_met,
+    requirements_needed_in,
 )
 from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import OfferedPackageEnvironment
@@ -181,6 +182,38 @@ class TestMethodRequirementsCheck:
         assert "line 1 'pandas>=4' (pandas 3.0.1 is there)" in message
         assert "pipelex-env-pandas" not in message
         assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", 1)]
+
+    def test_a_factory_refusing_only_what_its_sandbox_needs_lets_a_false_marker_requirement_load(
+        self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
+    ) -> None:
+        """The factory sees every requirement, markers unevaluated, and rests a refusal only on those its sandbox needs."""
+        base = MethodRequirementsTestData.sandbox_offer()
+        asked: list[list[str]] = []
+
+        def offer_or_refuse(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            asked.append([line.text for line in request.requirements])
+            needed = requirements_needed_in(requirements=request.requirements, marker_environment=base.marker_environment)
+            beyond = [line.text for line in needed if line.requirement.name not in base.distributions]
+            if beyond:
+                return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=f"no environment holds {', '.join(beyond)}")
+            return base
+
+        sandbox_offering(offers={"daytona": offer_or_refuse})
+        windows_only = list_method_tree(
+            _method(directory=tmp_path / "windows-only", requirements="pandas>=2\npywin32>=306; sys_platform == 'win32'\n")
+        )
+        everywhere = list_method_tree(_method(directory=tmp_path / "everywhere", requirements="pandas>=2\npywin32>=306\n"))
+
+        ensure_method_requirements_met(trees=[windows_only], names_host_paths=False)
+        assert asked == [["pandas>=2", "pywin32>=306; sys_platform == 'win32'"]]
+
+        with pytest.raises(MethodRequirementsNotMetError) as exc_info:
+            ensure_method_requirements_met(trees=[everywhere], names_host_paths=False)
+
+        assert exc_info.value.message == (
+            "The method needs Python packages that the Daytona sandbox cannot offer, "
+            "as its requirements.txt declares: no environment holds pywin32>=306"
+        )
 
     def test_a_deployment_refusing_the_requirements_refuses_the_method_with_its_reason(
         self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]

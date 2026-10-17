@@ -27,7 +27,7 @@ directory of its own names no path on the host at all (`ensure_served_method_req
 """
 
 import re
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
@@ -87,8 +87,8 @@ def marker_variables_of(*, marker: Marker) -> set[str]:
     return {word for word in _MARKER_WORD.findall(unquoted) if word in _MARKER_VARIABLES or word == "extra"}
 
 
-def _evaluate_marker(*, marker: Marker, environment: PythonPackageEnvironment, extra: str) -> bool:
-    """A marker's value in the environment, reading `extra` as given.
+def _evaluate_marker(*, marker: Marker, marker_environment: Mapping[str, str], extra: str) -> bool:
+    """A marker's value in the marker environment, reading `extra` as given.
 
     Raises:
         UndefinedComparison: The marker compares values that are not versions.
@@ -96,7 +96,7 @@ def _evaluate_marker(*, marker: Marker, environment: PythonPackageEnvironment, e
         InvalidVersion: The marker compares, as versions, a value that is not one; releases of `packaging` before 22
             raise it where later ones compare the values as strings.
     """
-    return marker.evaluate(environment={**environment.marker_environment, "extra": extra})
+    return marker.evaluate(environment={**marker_environment, "extra": extra})
 
 
 def _unmet_reason(
@@ -153,8 +153,8 @@ def _unmet_extra_reason(
         if dependency.marker is None:
             continue
         try:
-            needed_by_extra = _evaluate_marker(marker=dependency.marker, environment=environment, extra=extra)
-            needed_anyway = _evaluate_marker(marker=dependency.marker, environment=environment, extra="")
+            needed_by_extra = _evaluate_marker(marker=dependency.marker, marker_environment=environment.marker_environment, extra=extra)
+            needed_anyway = _evaluate_marker(marker=dependency.marker, marker_environment=environment.marker_environment, extra="")
         except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion):
             continue
         if not needed_by_extra or needed_anyway:
@@ -175,6 +175,33 @@ def unmet_requirements(*, requirements: Iterable[RequirementLine], environment: 
     return unmet
 
 
+def requirements_needed_in(*, requirements: Iterable[RequirementLine], marker_environment: Mapping[str, str]) -> list[RequirementLine]:
+    """The requirements a place with this PEP 508 marker environment needs, in the order given: all but those whose marker is false there.
+
+    The check skips a requirement whose marker is false in the environment it judges against, as not needed there, so
+    a package-offer factory refusing a method's requirements rests its refusal on these alone, read in the marker
+    environment of the place it would run the method in, never on a requirement the place does not need. A requirement
+    whose marker reads a variable the marker environment does not state, or cannot be evaluated, is kept: the check
+    refuses it there rather than skipping it.
+    """
+    needed: list[RequirementLine] = []
+    for requirement_line in requirements:
+        marker = requirement_line.requirement.marker
+        if marker is None or not _is_marker_false(marker=marker, marker_environment=marker_environment):
+            needed.append(requirement_line)
+    return needed
+
+
+def _is_marker_false(*, marker: Marker, marker_environment: Mapping[str, str]) -> bool:
+    """Whether a marker is judged false in the marker environment, as the check judges it: one it cannot judge is not."""
+    if marker_variables_of(marker=marker) - set(marker_environment) - {"extra"}:
+        return False
+    try:
+        return not _evaluate_marker(marker=marker, marker_environment=marker_environment, extra="")
+    except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion):
+        return False
+
+
 def _requirement_line_unmet_reason(*, requirement_line: RequirementLine, environment: PythonPackageEnvironment) -> str | None:
     marker = requirement_line.requirement.marker
     if marker is not None:
@@ -182,7 +209,7 @@ def _requirement_line_unmet_reason(*, requirement_line: RequirementLine, environ
         if unstated:
             return f"its marker reads {', '.join(unstated)}, which {environment.description} does not state"
         try:
-            if not _evaluate_marker(marker=marker, environment=environment, extra=""):
+            if not _evaluate_marker(marker=marker, marker_environment=environment.marker_environment, extra=""):
                 return None
         except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion) as exc:
             return f"its marker cannot be evaluated: {exc}"

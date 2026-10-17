@@ -8,7 +8,7 @@ from packaging.version import InvalidVersion
 from pytest_mock import MockerFixture
 
 from pipelex.core.method_trees.requirements_file import parse_requirements_text
-from pipelex.libraries.method_requirements import marker_variables_of, unmet_requirements
+from pipelex.libraries.method_requirements import marker_variables_of, requirements_needed_in, unmet_requirements
 from pipelex.libraries.package_environments import InterpreterPackageEnvironment, OfferedPackageEnvironment
 from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
 
@@ -62,6 +62,29 @@ class TestMethodRequirementsJudgment:
         else:
             (reason,) = reasons
             assert expected_reason in reason, topic
+
+    @pytest.mark.parametrize(
+        ("topic", "line", "is_needed"),
+        [
+            ("no marker", "pandas>=2", True),
+            ("marker true there", 'polars; sys_platform == "linux"', True),
+            ("marker false there", 'pywin32; sys_platform == "win32"', False),
+            ("a line names no extra", 'polars; extra == "fast"', False),
+            ("marker variable not stated", 'pandas; platform_release >= "6"', True),
+            ("marker that cannot be evaluated", 'pandas; python_version ~= "abc"', True),
+        ],
+    )
+    def test_a_place_needs_every_requirement_its_marker_environment_does_not_rule_out(self, topic: str, line: str, is_needed: bool) -> None:
+        """What a factory may refuse for: the check skips exactly the requirements dropped here, and refuses the ones it cannot judge."""
+        parsed = parse_requirements_text(text=f"# first\n{line}\n")
+
+        needed = requirements_needed_in(requirements=parsed.requirements, marker_environment=MethodRequirementsTestData.SANDBOX_MARKER_ENVIRONMENT)
+
+        assert needed == (parsed.requirements if is_needed else []), topic
+        environment = OfferedPackageEnvironment(
+            offer=MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-none", distributions={})
+        )
+        assert bool(unmet_requirements(requirements=parsed.requirements, environment=environment)) is is_needed, topic
 
     def test_a_marker_value_spelled_like_a_variable_is_not_read_as_one(self) -> None:
         """Only the marker's variables are checked against what an environment states, never its quoted values."""
