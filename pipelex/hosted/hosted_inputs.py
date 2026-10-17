@@ -255,6 +255,10 @@ def _address_dependency_refusal(*, refusal: ApiResponseError) -> HostedLocalFile
     `ADDRESS_DEPENDENCY_UNSUPPORTED_REASON`: the request is what it cannot serve, not the method, which the run route
     fetches the dependency of. The refusal's own advice, to send the dependency's contents, is meant for the API's
     callers, so the error leaves it out.
+
+    The error does not name the dependency, because the problem does not carry it: `request.unsupported` declares only
+    `field` and `reason`, and the sentence naming the dependency's address is the server's message, which reaches its
+    operator alone. Naming it would need a parameter of the error registry for the address.
     """
     if refusal.code not in _ADDRESS_DEPENDENCY_REFUSAL_CODES:
         return None
