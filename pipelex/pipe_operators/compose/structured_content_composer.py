@@ -27,7 +27,7 @@ from pipelex.tools.misc.string_utils import find_private_path_segment
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date | datetime.time
 """The native Python scalar types a content wrapper can be unwrapped into."""
@@ -95,7 +95,8 @@ class StructuredContentComposer:
         try:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
-            formatted_error = format_pydantic_validation_error(exc)
+            # The composed values are the run's data: the refusal names the fields, their reasons and their types, never the values.
+            formatted_error = format_validation_error_without_input(validation_error=exc)
             field_type_summary = self._build_field_type_summary(field_values)
             msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}\n{field_type_summary}"
             raise StructuredContentComposerValidationError(msg) from exc
@@ -440,8 +441,9 @@ class StructuredContentComposer:
         elif isinstance(stuff_content, DateContent):
             if expected_type is datetime.date:
                 if stuff_content.time is not None:
+                    # The date is the run's data, so the message says what it carries, never its value.
                     msg = (
-                        f"Cannot copy a Date carrying a time of day ({stuff_content.rendered_plain()}) into a bare `date` field: "
+                        "Cannot copy a Date carrying a time of day into a bare `date` field: "
                         "it would silently drop the time and its UTC offset. Target a Date-typed field to keep the time."
                     )
                     raise StructuredContentComposerTypeError(msg)
@@ -551,7 +553,7 @@ class StructuredContentComposer:
                 content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
                 return expected_type.model_validate(content_dict)
             except ValidationError as exc:
-                formatted_error = format_pydantic_validation_error(exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc)
                 msg = f"Cannot convert {actual_type.__name__} to {expected_type.__name__}: classes are not compatible. {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
@@ -728,7 +730,7 @@ class StructuredContentComposer:
             try:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
-                formatted_error = format_pydantic_validation_error(exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc)
                 msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 

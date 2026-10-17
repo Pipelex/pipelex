@@ -32,7 +32,8 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
         if not stuff.stuff_name:
-            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff}"
+            # A stuff's own text carries its content, the run's data: the message names it by its header, its code and concept.
+            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff.header}"
             raise WorkingMemoryFactoryError(msg)
         stuff_dict: StuffDict = {stuff.stuff_name: stuff}
         return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
@@ -51,7 +52,8 @@ class WorkingMemoryFactory(BaseModel):
             if not name:
                 if is_ignore_unnamed:
                     continue
-                msg = f"Stuff {stuff} has no name"
+                # A stuff's own text carries its content, the run's data: the message names it by its header, its code and concept.
+                msg = f"Stuff {stuff.header} has no name"
                 raise WorkingMemoryFactoryError(msg)
             stuff_dict[name] = stuff
         aliases: dict[str, str] = {}

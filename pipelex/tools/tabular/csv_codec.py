@@ -33,6 +33,7 @@ from pipelex.tools.tabular.exceptions import (
     CsvReadError,
 )
 from pipelex.tools.typing.annotation_utils import annotation_admits_none
+from pipelex.tools.typing.pydantic_utils import refusal_reason_without_input
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -374,10 +375,10 @@ def list_content_from_csv(
         except ValidationError as exc:
             error_fields = sorted({_validation_error_label(error) for error in exc.errors()})
             fields_label = ", ".join(error_fields) or "?"
-            # Use pydantic's per-error `msg` (e.g. "Input should be a valid integer"), NOT str(exc):
-            # str(exc) appends `input_value=<raw cell>`, which would put the cell content, a run's input, into
-            # the operator's diagnostics and every log line carrying the message. Row/field identifiers suffice.
-            reasons = "; ".join(sorted({str(error.get("msg", "")) for error in exc.errors()})) or "invalid value"
+            # Each error's reason without the cell, NOT str(exc): str(exc) appends `input_value=<raw cell>`, and a
+            # validator's message can quote the cell too, which would put the cell content, a run's input, into the
+            # operator's diagnostics and every log line carrying the message. Row/field identifiers suffice.
+            reasons = "; ".join(sorted({refusal_reason_without_input(error=error) for error in exc.errors()})) or "invalid value"
             msg = f"Could not coerce CSV row {row_number} of {path} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
             raise CsvCoercionError(msg) from exc
         items.append(item)

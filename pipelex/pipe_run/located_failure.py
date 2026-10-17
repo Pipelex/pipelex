@@ -27,7 +27,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, iter_cause_chain
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 # Joins the pipe codes of a failure's path from the entry pipe down to the pipe that failed.
 PIPE_PATH_SEPARATOR = " → "
@@ -112,10 +112,10 @@ def make_unexpected_failure(*, error: Exception) -> PipelexUnexpectedError:
 
     Its message names the original class, and it is chained to the original so its traceback
     survives. Its message only ever reaches an operator, since a foreign exception's text can carry
-    anything, a server path or a secret included. A pydantic `ValidationError` keeps the readable
-    rendering the runner gives one.
+    anything, a server path or a secret included. A pydantic `ValidationError` is written as its
+    locations and reasons, never the values it refused, which are the run's data.
     """
-    detail = format_pydantic_validation_error(error) if isinstance(error, ValidationError) else (str(error) or repr(error))
+    detail = format_validation_error_without_input(validation_error=error) if isinstance(error, ValidationError) else (str(error) or repr(error))
     unexpected_error = PipelexUnexpectedError(f"{type(error).__name__}: {detail}")
     unexpected_error.__cause__ = error
     unexpected_error.__suppress_context__ = True

@@ -46,7 +46,7 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
 from pipelex.tools.jinja2.jinja2_unknown_names import find_unknown_filters_and_tests
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -347,8 +347,9 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 # Not classified as the caller's fault, here or on the object path below, where an
                 # output the model could not fit to the structure surfaces as `LLMCompletionError`:
                 # whether a model's output fits depends on what the model produced this time.
+                # The refused value is the model's answer, the run's data: the message names its fields and reasons alone.
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = format_pydantic_validation_error(exc)
+                error_details = format_validation_error_without_input(validation_error=exc)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
                     CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
@@ -443,11 +444,11 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
     def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
-        """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
+        """Format an LLMCompletionError, with any ValidationError in its chain written without the model's answer it refused."""
         error_details = str(exc)
         for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
-                error_details += f"\n{format_pydantic_validation_error(current_exc)}"
+                error_details += f"\n{format_validation_error_without_input(validation_error=current_exc)}"
                 break
         return f"{error_details}\nLLM settings: {settings}"
 

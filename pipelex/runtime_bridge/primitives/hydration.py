@@ -23,6 +23,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 
 
 def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
@@ -258,7 +259,8 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
             msg = f"Failed to hydrate stuff '{stuff_name}': missing key {exc} in raw dict"
             raise PipeJobError(msg) from exc
         except (ValidationError, KajsonException) as exc:
-            msg = f"Failed to hydrate stuff '{stuff_name}': {exc}"
+            # The content is the run's data: a ValidationError is written by its locations and reasons, never its values.
+            msg = f"Failed to hydrate stuff '{stuff_name}': {describe_exception_without_input(exc=exc)}"
             raise PipeJobError(msg) from exc
         working_memory.root[stuff_name] = stuff
 
@@ -269,7 +271,7 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
         try:
             working_memory.absences[absence_name] = AbsenceRecord.model_validate(absence_raw)
         except ValidationError as exc:
-            msg = f"Failed to hydrate absence record '{absence_name}': {exc}"
+            msg = f"Failed to hydrate absence record '{absence_name}': {describe_exception_without_input(exc=exc)}"
             raise PipeJobError(msg) from exc
 
     return working_memory

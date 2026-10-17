@@ -27,7 +27,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.tools.misc.pretty import PrettyRenderable
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
-from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_validation_error_without_input
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
@@ -149,7 +149,8 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
                 log.verbose(f"A {type(content).__name__} content was validated and converted to {content_type.__name__}")
                 return validated_content
         except ValidationError as exc:
-            formatted_error = format_pydantic_validation_error(exc)
+            # The content is the run's data: the refusal names its fields and reasons, never its values.
+            formatted_error = format_validation_error_without_input(validation_error=exc)
             raise StuffContentValidationError(
                 original_type=type(content).__name__,
                 target_type=content_type.__name__,
