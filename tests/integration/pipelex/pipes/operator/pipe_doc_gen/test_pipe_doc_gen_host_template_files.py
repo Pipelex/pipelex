@@ -1,17 +1,23 @@
-import json
 from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
+    StubEngines,
+    caller_text,
+    only_problem_item,
+    refusal_messages,
+    write_bundle,
+)
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _HOST_TEMPLATE_FILE = "templates/host-invoice.docx"
@@ -31,20 +37,20 @@ def restore_the_outer_library() -> Iterator[None]:
         clear_current_library()
 
 
-async def _caller_verdict(*, mthds_content: str, host_dir: Path) -> str:
-    """The invalid verdict, as JSON, of submitted content validated beside a host's library directory."""
+async def _caller_verdict(*, mthds_content: str, host_dir: Path) -> ValidateBundleError:
+    """The invalid verdict of submitted content validated beside a host's library directory."""
     with pytest.raises(ValidateBundleError) as exc_info:
         await validate_bundles_in_process(mthds_contents=[mthds_content], library_dirs=[host_dir])
-    return exc_info.value.to_error_report().model_dump_json()
+    return exc_info.value
 
 
 async def _host_fault_strict_payload(*, mthds_content: str, host_dir: Path) -> str:
-    """The STRICT payload, as JSON, of a host's library refusing to load beside submitted content: the deployment's fault."""
+    """The caller's problem, as text, of a host's library refusing to load beside submitted content: the deployment's fault."""
     with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
         await validate_bundles_in_process(mthds_contents=[mthds_content], library_dirs=[host_dir])
-    report = exc_info.value.to_error_report()
-    assert report.code == PipelexErrorCode.CONFIG_INVALID
-    return json.dumps(report.to_dict(disclosure_mode=DisclosureMode.STRICT))
+    problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+    assert problem.code == PipelexErrorCode.CONFIG_INVALID
+    return str(problem.to_wire())
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -58,9 +64,11 @@ class TestPipeDocGenHostTemplateFiles:
 
         verdict = await _caller_verdict(mthds_content=PipeDocGenTestData.CALLER_BUNDLE_MTHDS, host_dir=tmp_path)
 
-        assert "invoice.totl" in verdict
-        assert HOST_LIBRARY_FILE_PLACEHOLDER in verdict
-        assert "host-invoice" not in verdict
+        assert only_problem_item(verdict).code == PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
+        report = caller_text(verdict)
+        assert "invoice.totl" in report
+        assert HOST_LIBRARY_FILE_PLACEHOLDER in report
+        assert "host-invoice" not in report
 
     @pytest.mark.parametrize(
         "step_fields",
@@ -82,7 +90,7 @@ class TestPipeDocGenHostTemplateFiles:
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_host_step_naming_its_template_file_by_an_absolute_path_names_no_host_path(self, tmp_path: Path) -> None:
-        """A host step naming its template file by an absolute path is the host's fault, whose STRICT payload carries nothing of the host's disk."""
+        """A host step naming its template file by an absolute path is the host's fault, whose caller's problem carries nothing of the host's disk."""
         (tmp_path / "invoice.docx").write_bytes(b"docx bytes")
         write_bundle(directory=tmp_path, step_fields=f'format = "docx"\ntemplate_file = "{(tmp_path / "invoice.docx").resolve()}"')
 
@@ -100,6 +108,8 @@ class TestPipeDocGenHostTemplateFiles:
 
         verdict = await _caller_verdict(mthds_content=own_bundle, host_dir=tmp_path)
 
-        assert "which was not supplied with its bundle" in verdict
-        assert "'invoice.docx'" in verdict
-        assert HOST_LIBRARY_FILE_PLACEHOLDER not in verdict
+        assert only_problem_item(verdict).code == CoreCode.METHOD_RESOURCE_MISSING
+        assert "which was not supplied with its bundle" in refusal_messages(verdict)
+        report = caller_text(verdict)
+        assert "'invoice.docx'" in report
+        assert HOST_LIBRARY_FILE_PLACEHOLDER not in report

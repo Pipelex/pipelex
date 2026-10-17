@@ -1,8 +1,9 @@
 import httpx
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import DisclosureMode
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx, fetch_file_from_url_httpx
 
@@ -36,8 +37,8 @@ class TestFetchFileFromUrl:
             (503, CoreCode.INPUT_URL_UNREACHABLE),
         ],
     )
-    async def test_error_status_raises_caller_facing_error(self, status_code: int, expected_code: CoreCode) -> None:
-        """A 4xx/5xx becomes an input error naming the URL and the status, kept under STRICT disclosure.
+    async def test_error_status_raises_an_input_error(self, status_code: int, expected_code: CoreCode) -> None:
+        """A 4xx/5xx becomes an input error, whose message names the URL and the status.
 
         A server that will not serve the file is ``input.file_unreadable``; one that cannot answer now, a 5xx or a
         429, is ``input.url_unreachable``, which a retry may get past.
@@ -46,9 +47,14 @@ class TestFetchFileFromUrl:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(status_code))
 
         assert exc_info.value.resolve_error_code() == expected_code
-        strict = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert f"HTTP {status_code}" in strict["message"]
-        assert URL in strict["message"]
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == expected_code
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.is_retryable is error_code_spec(expected_code).invites_retry
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert f"HTTP {status_code}" in operator.diagnostics.message
+        assert URL in operator.diagnostics.message
 
     @pytest.mark.parametrize(
         ("exc", "expected", "expected_code"),
@@ -58,7 +64,7 @@ class TestFetchFileFromUrl:
             pytest.param(httpx.RemoteProtocolError("bad"), "request failed", CoreCode.INPUT_FILE_UNREADABLE, id="protocol"),
         ],
     )
-    async def test_network_failure_raises_caller_facing_error(self, exc: httpx.RequestError, expected: str, expected_code: CoreCode) -> None:
+    async def test_network_failure_raises_an_input_error(self, exc: httpx.RequestError, expected: str, expected_code: CoreCode) -> None:
         with pytest.raises(RemoteFileFetchError, match=expected) as exc_info:
             await fetch_file_from_url_httpx(url=URL, transport=_transport_raising(exc))
         assert exc_info.value.resolve_error_code() == expected_code

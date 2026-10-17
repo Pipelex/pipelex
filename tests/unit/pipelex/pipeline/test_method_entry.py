@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.lister import list_method_tree
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.method_entry import select_method_entry
 
@@ -72,7 +74,7 @@ class TestMethodEntry:
         assert entry.tree_path == "steps/extract.mthds"
 
     @pytest.mark.parametrize(
-        ("files", "expected"),
+        ("files", "expected", "expected_code"),
         [
             (
                 {
@@ -80,6 +82,7 @@ class TestMethodEntry:
                     "b/b.mthds": _bundle(domain="entry_b", pipe_code="second", main_pipe=None),
                 },
                 "none of its bundles declares a main_pipe ('a.mthds', 'b/b.mthds')",
+                CoreCode.REQUEST_PIPE_UNSPECIFIED,
             ),
             (
                 {
@@ -87,6 +90,7 @@ class TestMethodEntry:
                     "b/b.mthds": _bundle(domain="entry_b", pipe_code="second", main_pipe="second"),
                 },
                 "several of its bundles declare a main_pipe: 'a.mthds' declares 'first', 'b/b.mthds' declares 'second'",
+                CoreCode.REQUEST_PIPE_AMBIGUOUS,
             ),
             (
                 {
@@ -97,6 +101,7 @@ class TestMethodEntry:
                     "declares no main_pipe, so the method has no pipe to start at. Declare main_pipe under [package], or name the pipe to run. "
                     "Its bundles: 'a.mthds'."
                 ),
+                CoreCode.REQUEST_PIPE_UNSPECIFIED,
             ),
             (
                 {
@@ -104,16 +109,18 @@ class TestMethodEntry:
                     "a.mthds": _bundle(domain="entry_a", pipe_code="first", main_pipe="first"),
                 },
                 "declares the main_pipe 'missing', exported by 'entry_a', which none of its bundles defines in that domain: 'a.mthds'.",
+                CoreCode.METHOD_PIPE_UNRESOLVED,
             ),
             (
                 {"notes.md": "# Notes\n"},
                 "holds no .mthds bundle, so it has no pipe to start at",
+                CoreCode.METHOD_INVALID,
             ),
         ],
         ids=["no_main_pipe", "several_main_pipes", "manifest_without_main_pipe", "manifest_main_pipe_undefined", "no_bundle"],
     )
     def test_a_method_with_no_single_entry_is_refused_naming_its_bundles_by_tree_path(
-        self, tmp_path: Path, files: dict[str, str], expected: str
+        self, tmp_path: Path, files: dict[str, str], expected: str, expected_code: CoreCode
     ) -> None:
         _write(directory=tmp_path, files=files)
 
@@ -121,7 +128,9 @@ class TestMethodEntry:
             select_method_entry(tree=list_method_tree(tmp_path))
 
         assert expected in exc_info.value.message
-        assert exc_info.value.to_error_report().error_domain == "input"
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == expected_code
+        assert problem.domain != ProblemDomain.OPERATOR
 
     def test_a_manifest_that_does_not_validate_is_an_entry_refusal(self, tmp_path: Path) -> None:
         """A manifest the lister can read but the standard refuses, here one with no address, gives no entry."""

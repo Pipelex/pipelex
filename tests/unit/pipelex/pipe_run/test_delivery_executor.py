@@ -8,8 +8,8 @@ from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture, MockType
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorReport
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
@@ -30,6 +30,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none, get_library_manager, scoped_current_library
 from pipelex.pipe_run import delivery_executor as delivery_executor_module
@@ -60,6 +61,22 @@ def _mock_webhook_client(mocker: MockerFixture) -> None:
     mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
     mock_client.post = mocker.AsyncMock(return_value=mock_response)
     mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+
+
+def _make_failed_run_problem() -> PipelexProblem:
+    """A failed run's problem in the operator's view: a provider rate limit, with the provider's own answer among its diagnostics."""
+    error = LLMCompletionError(
+        message="provider returned 429",
+        error_category=InferenceErrorCategory.TRANSIENT,
+        provider_metadata=ProviderErrorMetadata(
+            provider=ProviderName.OPENAI,
+            sdk_exception_type="RateLimitError",
+            message="429 Too Many Requests",
+            status_code=429,
+            retry_after_seconds=2.5,
+        ),
+    ).with_error_code(CoreCode.PROVIDER_RATE_LIMITED)
+    return error.to_problem(view=ProblemView.OPERATOR, pipeline_run_id="plr-failed")
 
 
 def _make_main_stuff() -> Stuff:
@@ -872,8 +889,12 @@ class TestDeliveryExecutor:
         assert "Page 1 contents" in json_text
         assert "https://example.com/img.png" in json_text
 
-    async def test_webhook_includes_error_report_on_failed_status(self, mocker: MockerFixture) -> None:
-        """A FAILED delivery with an ``ErrorReport`` includes a VERBOSE ``error`` dict the receiver can rehydrate."""
+    @pytest.mark.parametrize("problem_view", [ProblemView.OPERATOR, ProblemView.CALLER])
+    async def test_webhook_includes_the_problem_in_its_own_view_on_failed_status(self, mocker: MockerFixture, problem_view: ProblemView) -> None:
+        """A FAILED delivery sends the run's problem in the webhook's own view, which the receiver can rehydrate.
+
+        The operator's webhook reads the diagnostics, the provider's own message among them; a caller's never does.
+        """
         mock_client = mocker.AsyncMock()
         mock_response = mocker.MagicMock()
         mock_response.raise_for_status = mocker.Mock()
@@ -882,28 +903,10 @@ class TestDeliveryExecutor:
         mock_client.post = mocker.AsyncMock(return_value=mock_response)
         mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
 
-        error_report = ErrorReport.make_for_code(
-            code=CoreCode.PROVIDER_RATE_LIMITED,
-            error_type="LLMCompletionError",
-            message="provider returned 429",
-            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Wait a moment and retry"),
-        ).model_copy(
-            update={
-                "error_category": "transient",
-                "model": "gpt-4o-mini",
-                "provider": "openai",
-                "provider_metadata": ProviderErrorMetadata(
-                    provider=ProviderName.OPENAI,
-                    sdk_exception_type="RateLimitError",
-                    message="429 Too Many Requests",
-                    status_code=429,
-                    retry_after_seconds=2.5,
-                ),
-            }
-        )
+        problem = _make_failed_run_problem()
 
         executor = DeliveryExecutor()
-        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback")])
+        assignment = DeliveryAssignment(webhooks=[WebhookTarget(url="https://example.com/callback", problem_view=problem_view)])
 
         await executor.execute(
             pipe_output=None,
@@ -911,17 +914,28 @@ class TestDeliveryExecutor:
             pipeline_run_id="plr-failed",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
-            error_report=error_report,
+            problem=problem,
         )
 
         payload = mock_client.post.call_args.kwargs["json"]
         assert payload["status"] == DeliveryStatus.FAILED
-        assert "error" in payload, "FAILED webhook must include the structured error report"
-        rehydrated = ErrorReport.from_dict(payload["error"])
-        assert rehydrated == error_report, "VERBOSE payload must round-trip through from_dict"
+        assert "error" in payload, "FAILED webhook must include the run's problem"
+        rehydrated = PipelexProblem.model_validate(payload["error"])
+        assert rehydrated.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert rehydrated.retry_after == 2.5
+        match problem_view:
+            case ProblemView.OPERATOR:
+                assert rehydrated == problem, "the operator's payload must round-trip to the problem itself"
+                assert rehydrated.diagnostics is not None
+                assert rehydrated.diagnostics.message == "provider returned 429"
+            case ProblemView.CALLER:
+                assert rehydrated == caller_view_of(problem=problem)
+                assert rehydrated.diagnostics is None
+                assert "provider returned 429" not in json.dumps(payload["error"])
+                assert "429 Too Many Requests" not in json.dumps(payload["error"])
 
-    async def test_webhook_omits_error_when_report_is_none(self, mocker: MockerFixture) -> None:
-        """A completed delivery (no report) must not introduce an ``error`` field in the payload."""
+    async def test_webhook_omits_error_when_problem_is_none(self, mocker: MockerFixture) -> None:
+        """A completed delivery (no problem) must not introduce an ``error`` field in the payload."""
         mock_client = mocker.AsyncMock()
         mock_response = mocker.MagicMock()
         mock_response.raise_for_status = mocker.Mock()
@@ -945,13 +959,13 @@ class TestDeliveryExecutor:
         assert payload["status"] == DeliveryStatus.COMPLETED
         assert "error" not in payload
 
-    async def test_webhook_omits_error_when_failed_status_with_none_report(self, mocker: MockerFixture) -> None:
-        """A FAILED delivery with ``error_report=None`` must not introduce an ``error`` field in the payload.
+    async def test_webhook_omits_error_when_failed_status_with_none_problem(self, mocker: MockerFixture) -> None:
+        """A FAILED delivery with ``problem=None`` must not introduce an ``error`` field in the payload.
 
-        The COMPLETED case is pinned by ``test_webhook_omits_error_when_report_is_none``,
+        The COMPLETED case is pinned by ``test_webhook_omits_error_when_problem_is_none``,
         but the FAILED case is not — a future regression defaulting ``error`` to ``{}``
         on FAILED would slip through. ``_notify_webhook`` only writes
-        ``payload["error"]`` when ``error_report is not None``, regardless of status.
+        ``payload["error"]`` when ``problem is not None``, regardless of status.
         """
         mock_client = mocker.AsyncMock()
         mock_response = mocker.MagicMock()
@@ -967,10 +981,10 @@ class TestDeliveryExecutor:
         await executor.execute(
             pipe_output=None,
             storage_scope="test-user",
-            pipeline_run_id="plr-failed-no-report",
+            pipeline_run_id="plr-failed-no-problem",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
-            error_report=None,
+            problem=None,
         )
 
         payload = mock_client.post.call_args.kwargs["json"]
@@ -1010,23 +1024,16 @@ class TestDeliveryExecutor:
         assert vars(record)["file_count"] > 0
 
     @pytest.mark.parametrize(
-        ("status", "error_report"),
+        ("status", "has_problem"),
         [
-            (DeliveryStatus.COMPLETED, None),
-            (
-                DeliveryStatus.FAILED,
-                ErrorReport.make_for_code(
-                    code=CoreCode.PROVIDER_RATE_LIMITED,
-                    error_type="LLMCompletionError",
-                    message="provider returned 429",
-                ).model_copy(update={"error_category": "transient"}),
-            ),
+            (DeliveryStatus.COMPLETED, False),
+            (DeliveryStatus.FAILED, True),
         ],
     )
     async def test_the_webhook_completion_line_names_the_run_and_the_receiver_host(
-        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, status: DeliveryStatus, error_report: ErrorReport | None
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, status: DeliveryStatus, has_problem: bool
     ) -> None:
-        """The webhook line carries the run's identifiers from the context, on a failed run with its error report as on a
+        """The webhook line carries the run's identifiers from the context, on a failed run with its problem as on a
         completed one, and names the receiver by its host alone: the URL is the caller's, and its path or query may carry
         a credential.
         """
@@ -1040,7 +1047,7 @@ class TestDeliveryExecutor:
                 pipeline_run_id="plr-webhook-req",
                 delivery_assignment=DeliveryAssignment(webhooks=[WebhookTarget(url=webhook_url)]),
                 status=status,
-                error_report=error_report,
+                problem=_make_failed_run_problem() if has_problem else None,
                 request_id="req-xyz-789",
             )
 

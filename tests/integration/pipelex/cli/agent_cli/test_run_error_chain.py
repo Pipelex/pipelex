@@ -25,6 +25,7 @@ from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import ParsedCliInputs
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -34,6 +35,7 @@ ERROR_CHAIN_LIBRARY_DIR = Path("tests/integration/pipelex/cli/agent_cli")
 WORKER_ERROR_MESSAGE = "LLM provider connection reset"
 WORKER_MODEL = "gpt-4o-mini"
 WORKER_PROVIDER = "openai"
+WORKER_ADVICE = "Wait a moment and retry"
 
 
 class TestRunErrorChain:
@@ -48,7 +50,12 @@ class TestRunErrorChain:
         mocker.patch(f"{RUN_PIPE_MODULE}.resolve_pipe_from_exports", return_value=[])
         mocker.patch(f"{RUN_PIPE_MODULE}.parse_cli_inputs", return_value=ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None))
 
-        transient_error = LLMCompletionError(WORKER_ERROR_MESSAGE, error_category=InferenceErrorCategory.TRANSIENT)
+        # The advice a worker's classification attaches to a transient failure, which every wrapper lets through as the hint.
+        transient_error = LLMCompletionError(
+            WORKER_ERROR_MESSAGE,
+            error_category=InferenceErrorCategory.TRANSIENT,
+            user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail=WORKER_ADVICE),
+        )
         # model_handle / backend_name are declared on CogtError; a real worker fills them at
         # its public-method chokepoint. This test mocks above the worker, so set them directly.
         transient_error.model_handle = WORKER_MODEL
@@ -83,6 +90,7 @@ class TestRunErrorChain:
         # LLMCompletionError and must survive every wrapping layer.
         assert payload["error_category"] == "transient"
         assert payload["retryable"] is True
+        assert payload["hint"] == WORKER_ADVICE
         assert payload["error_domain"] == "runtime"
         assert payload["model"] == WORKER_MODEL
         assert payload["provider"] == WORKER_PROVIDER
@@ -124,6 +132,7 @@ class TestRunErrorChain:
         assert markdown.startswith("# Error: PipelineExecutionError")
         assert WORKER_ERROR_MESSAGE in markdown
         assert "💡" in markdown  # hint callout
+        assert WORKER_ADVICE in markdown
         assert "error_category" in markdown
         assert "transient" in markdown
         # The whole stack-trace section is gone. The stack-frame format from

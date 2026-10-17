@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-    from pipelex.base_exceptions import ErrorReport
+    from pipelex.base_exceptions import PipelexError
     from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
     from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
     from pipelex.plugins.contract import PipelexPlugin
@@ -84,7 +84,7 @@ def _add_inference_backend(registrar: PluginRegistrar) -> None:
 
 
 def _add_http_error_mapper(registrar: PluginRegistrar) -> None:
-    registrar.add_http_error_mapper(exc_type_provider=lambda: TimeoutError, to_error_report=cast("Callable[..., ErrorReport]", object))
+    registrar.add_http_error_mapper(exc_type_provider=lambda: TimeoutError, to_pipelex_error=cast("Callable[..., PipelexError]", object))
 
 
 def _add_teardown(registrar: PluginRegistrar) -> None:

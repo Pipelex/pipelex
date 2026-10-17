@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from rich.console import Console
 
 from pipelex.cli.error_handlers import handle_validate_bundle_error
@@ -227,7 +228,12 @@ class TestValidateSuggestedFixRendering:
             message="validation failed",
             pipe_validation_errors=[_non_fixable_pipe_error()],
             dry_run_failures=[
-                DryRunFailureErrorData(pipe_code="third_pipe", domain_code="demo", message="Pipe 'third_pipe' failed its dry run: exploded")
+                DryRunFailureErrorData(
+                    code=CoreCode.PIPE_OUTPUT_INVALID,
+                    pipe_code="third_pipe",
+                    domain_code="demo",
+                    message="Pipe 'third_pipe' failed its dry run: exploded",
+                )
             ],
         )
 

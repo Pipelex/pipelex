@@ -125,22 +125,18 @@ prompt = "Say hi"
 
 
 def _pipe_channel_items(exc: ValidateBundleError, *, error_type: PipeValidationErrorType) -> list[ValidationErrorItem]:
-    report = exc.to_error_report()
-    assert report.validation_errors is not None
-    return [item for item in report.validation_errors if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type == error_type]
+    items = exc.validation_error_items()
+    return [item for item in items if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type == error_type]
 
 
 def _input_drift_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
-    report = exc.to_error_report()
-    assert report.validation_errors is not None
+    items = exc.validation_error_items()
     input_drift_types = {
         PipeValidationErrorType.MISSING_INPUT_VARIABLE,
         PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE,
         PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
     }
-    return [
-        item for item in report.validation_errors if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type in input_drift_types
-    ]
+    return [item for item in items if item.category == ValidationErrorCategory.PIPE_VALIDATION and item.error_type in input_drift_types]
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -188,9 +184,8 @@ class TestValidateBundleSourceThreading:
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_INVALID_MAIN_PIPE_MTHDS], mthds_sources=["broken.mthds"])
-        report = exc_info.value.to_error_report()
-        assert report.validation_errors is not None
-        seeded_items = [item for item in report.validation_errors if item.source == "broken.mthds"]
+        items = exc_info.value.validation_error_items()
+        seeded_items = [item for item in items if item.source == "broken.mthds"]
         assert seeded_items, "no validation_errors item carried the threaded source"
         assert any(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in seeded_items)
 
@@ -208,10 +203,10 @@ class TestValidateBundleSourceThreading:
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_MALFORMED_TOML_MTHDS], mthds_sources=["broken.mthds"])
-        report = exc_info.value.to_error_report()
-        assert report.validation_errors, "a parse-level failure must still carry a non-empty validation_errors[]"
-        assert all(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in report.validation_errors)
-        assert [item.source for item in report.validation_errors] == ["broken.mthds"]
+        items = exc_info.value.validation_error_items()
+        assert items, "a parse-level failure must still carry a non-empty list of validation items"
+        assert all(item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION for item in items)
+        assert [item.source for item in items] == ["broken.mthds"]
 
     async def test_length_mismatch_is_a_host_contract_error(
         self,
@@ -219,7 +214,7 @@ class TestValidateBundleSourceThreading:
     ) -> None:
         """A ``mthds_sources``/``mthds_contents`` length mismatch is a host wiring bug, not user input.
 
-        It must raise an internal error (→ 500, redacted under STRICT), not a caller-facing
+        It must raise an internal error (→ 500, its message the operator's alone), not a
         ``ValidateBundleError`` (→ 422) — ``mthds_sources`` is never supplied by the end caller.
         """
         load_empty_library()

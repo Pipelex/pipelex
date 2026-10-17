@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
@@ -120,6 +121,9 @@ class TestBindingGraph:
 
         binding_node = _node(_in_process_graph(teardown_spy), pipe_code="invoice.total")
         assert binding_node.status == NodeStatus.FAILED
+        # The node records the caller's view: a fault of ours, located at the binding, and none of the error's text.
         assert binding_node.error is not None
-        assert binding_node.error.error_type == "ValueError"
-        assert binding_node.error.message == "the content failed its validation"
+        assert binding_node.error.code == CoreCode.RUNTIME_UNEXPECTED
+        assert binding_node.error.location is not None
+        assert binding_node.error.location.pipe == "invoice.total"
+        assert "the content failed its validation" not in str(binding_node.error.to_wire())

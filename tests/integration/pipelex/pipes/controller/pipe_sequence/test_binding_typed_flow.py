@@ -662,7 +662,7 @@ class TestBindingTypedFlow:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=entry_directory / "bundle.mthds", library_dirs=[entry_directory])
 
-        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        validation_errors = exc_info.value.validation_error_items() or []
         assert len(validation_errors) == 1
         message = validation_errors[0].message or ""
         for fragment in message_fragments:

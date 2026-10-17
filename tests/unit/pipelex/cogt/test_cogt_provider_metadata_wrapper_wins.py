@@ -1,14 +1,10 @@
 """Pin: a wrapper ``CogtError``'s ``provider_metadata`` wins, even when the cause carries richer fields.
 
-Both cause-enrichment sites that merge ``provider_metadata`` use a whole-object
-``or`` — :meth:`CogtError.to_error_report` (``pipelex/cogt/exceptions.py``) and
-:meth:`PipelexError._enrich_error_report_from_cause`
-(``pipelex/base_exceptions.py``). A :class:`ProviderErrorMetadata` instance is
-always truthy regardless of internal state, so a wrapper that attached
-attribution-only metadata (``status_code=None``, ``retry_after_seconds=None``)
-discards the cause's actionable ``status_code=429`` / ``retry_after_seconds``
-— the very hints the STRICT-disclosure curated subset is designed to
-preserve.
+The operator's ``diagnostics.provider`` is the nearest provider fact along the cause chain, merged with a
+whole-object ``or`` in :meth:`PipelexError._chain_facts` (``pipelex/base_exceptions.py``) over each error's
+:meth:`CogtError.problem_facts` (``pipelex/cogt/exceptions.py``). A :class:`ProviderDiagnostics` instance is
+always truthy regardless of internal state, so a wrapper that attached attribution-only metadata
+(``status_code=None``) discards the cause's actionable ``status_code=429``.
 
 No in-tree wrapper triggers this today (grep confirms only leaf workers set
 non-None ``provider_metadata``), but the trap is latent. This test pins the
@@ -21,6 +17,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.problem import ProblemView, ProviderDiagnostics
 
 
 class _WrapperCogtError(CogtError):
@@ -63,10 +60,13 @@ class TestCogtProviderMetadataWrapperWins:
             except LLMCompletionError as cause:
                 raise _WrapperCogtError(message="wrapped while doing the thing") from cause
         except _WrapperCogtError as wrapper:
-            report = wrapper.to_error_report()
-        # Wrapper-wins: the merged provider_metadata is the wrapper's, not the cause's.
-        # The cause's actionable status_code=429 / retry_after_seconds=12.0 are dropped.
-        assert report.provider_metadata is not None
-        assert report.provider_metadata.sdk_exception_type == "WrapperAttributionOnlyError"
-        assert report.provider_metadata.status_code is None
-        assert report.provider_metadata.retry_after_seconds is None
+            problem = wrapper.to_problem(view=ProblemView.OPERATOR)
+        # Wrapper-wins: the merged provider facts are the wrapper's, not the cause's.
+        # The cause's actionable status_code=429 is dropped.
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "_WrapperCogtError"
+        provider = problem.diagnostics.provider
+        # The wrapper names no backend and no status, so its facts are empty, and the cause's 429 is not among them.
+        assert provider == ProviderDiagnostics()
+        assert provider is not None
+        assert provider.status is None

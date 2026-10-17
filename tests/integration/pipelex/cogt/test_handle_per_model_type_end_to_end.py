@@ -11,12 +11,14 @@ import shutil
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.errors.problem import ProblemView
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -163,7 +165,13 @@ class TestHandlePerModelTypeEndToEnd:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[judging_the_llm_only_model])
 
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert LLM_ONLY_HANDLE in report
-        assert "'unknown_model'" in report
-        assert "'model_type': 'judgment'" in report
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_INVALID
+        assert caller.errors is not None
+        (item,) = caller.errors
+        assert item.code == CoreCode.MODEL_UNKNOWN
+        assert item.params is not None
+        assert item.params.as_wire()["model"] == LLM_ONLY_HANDLE
+        assert item.params.as_wire()["model_type"] == ModelType.JUDGMENT
+        assert item.location is not None
+        assert item.location.pipe == "judge_it"

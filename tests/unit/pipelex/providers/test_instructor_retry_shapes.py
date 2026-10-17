@@ -29,13 +29,15 @@ import openai
 import pytest
 from instructor import Mode, from_anthropic, from_openai
 from instructor.core import FailedAttempt, InstructorRetryException
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pydantic import ValidationError
 from tenacity import RetryError
 
-from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
-from pipelex.cogt.inference.error_classification import UserActionKind, extract_underlying_sdk_exception
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError, find_inference_error_category_in_chain
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_underlying_sdk_exception
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -45,6 +47,8 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from pytest_mock import MockerFixture
+
+    from pipelex.base_exceptions import PipelexError
 
 _ORIGIN = "https://gateway.example.com"
 _MAX_ATTEMPTS = 3
@@ -177,6 +181,19 @@ _SPENT_BUDGET_SHAPES = [
 ]
 
 
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
+def _advice_of(error: PipelexError) -> UserAction:
+    """The advice nearest the error on its chain, which a local CLI prints as its tip."""
+    advice = error.advised_action()
+    assert advice is not None
+    return advice
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestInstructorRetryShapes:
     @pytest.mark.parametrize(("raised_by", "responses", "sdk_exception_class", "nb_parse_failures"), _API_ERROR_SHAPES)
@@ -290,15 +307,20 @@ class TestInstructorRetryShapes:
             pipe_stack=["score_lead"],
         )
         located.__cause__ = failure
-        report = located.to_error_report()
+        problem = located.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "LLMCompletionError"
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.error_category == InferenceErrorCategory.CONFIGURATION
-        assert report.retryable is False
-        assert report.http_status == 500
-        assert report.user_action is not None
-        assert report.user_action.kind == UserActionKind.CHANGE_MODEL
-        assert f"'{_MODEL_HANDLE}'" in report.user_action.detail
-        assert _WIRE_ID not in report.user_action.detail
-        assert report.message.startswith("Pipe 'score_lead' failed: ")
+        # The deployment does not serve the model to this integration: the operator's to fix, the caller's to work around.
+        assert problem.code == CoreCode.MODEL_UNAVAILABLE
+        assert problem.domain == ProblemDomain.OPERATOR
+        assert error_code_spec(CoreCode.MODEL_UNAVAILABLE).status == 501
+        # The problem is the root fault's, located at the pipe the router wrapped it for.
+        assert _diagnostics_of(problem).error_class == "LLMCompletionError"
+        assert problem.location is not None
+        assert problem.location.pipe == "score_lead"
+        assert find_inference_error_category_in_chain(located) == InferenceErrorCategory.CONFIGURATION
+        assert problem.is_retryable is False
+        advice = _advice_of(located)
+        assert advice.kind == UserActionKind.CHANGE_MODEL
+        assert f"'{_MODEL_HANDLE}'" in advice.detail
+        assert _WIRE_ID not in advice.detail
+        assert "HTTP 412" in _diagnostics_of(problem).message

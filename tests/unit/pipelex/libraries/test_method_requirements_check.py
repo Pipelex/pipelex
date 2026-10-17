@@ -4,9 +4,12 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.lister import list_method_tree
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorDomain, ValidationErrorCategory
+from pipelex.base_exceptions import PipelexError, ValidationErrorCategory
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import (
     HostLibraryRequirementsError,
     HostLibraryTreeError,
@@ -47,6 +50,17 @@ def _method(*, directory: Path, requirements: str | bytes | None, with_python: b
     return directory
 
 
+def _assert_the_host_s_fault(*, error: PipelexError) -> None:
+    """The host's library is the operator's configuration: its code is the operator's, and its message the operator's alone."""
+    caller = error.to_problem(view=ProblemView.CALLER)
+    assert caller.code == PipelexErrorCode.CONFIG_INVALID
+    assert caller.domain == ProblemDomain.OPERATOR
+    assert error.message not in str(caller.to_wire())
+    operator = error.to_problem(view=ProblemView.OPERATOR)
+    assert operator.diagnostics is not None
+    assert operator.diagnostics.message == error.message
+
+
 class TestMethodRequirementsCheck:
     @pytest.mark.parametrize(
         ("topic", "requirements", "with_python", "nested_requirements"),
@@ -82,7 +96,9 @@ class TestMethodRequirementsCheck:
         assert "line 4 'name @ https://example.com/x.whl'" in message
         items = exc_info.value.blueprint_validation_errors
         assert [(item.source, item.line) for item in items] == [("requirements.txt", 2), ("requirements.txt", 4)]
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_PACKAGE_INVALID
+        assert problem.domain == ProblemDomain.METHOD
 
     def test_a_file_that_is_not_utf8_is_refused(self, tmp_path: Path) -> None:
         _method(directory=tmp_path, requirements=b"pandas\xff\n")
@@ -157,16 +173,14 @@ class TestMethodRequirementsCheck:
         with pytest.raises(ValidateBundleError) as exc_info, translate_to_validate_bundle_error():
             ensure_served_method_requirements_met(library_dirs=[tmp_path])
 
-        report = exc_info.value.to_error_report()
-        assert report.validation_errors is not None
-        (item,) = report.validation_errors
+        (item,) = exc_info.value.validation_error_items()
         assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
         assert item.source == "requirements.txt"
         assert item.line == 1
         assert f"The requirement '{_ABSENT_PACKAGE}' is not met" in item.message
 
-    def test_under_strict_disclosure_a_served_method_refused_in_direct_mode_names_no_host_path(self, tmp_path: Path) -> None:
-        """This interpreter, read for real in the direct mode: the caller reads the method, its lines and the packages, and no path on the host."""
+    def test_a_served_method_refused_in_direct_mode_names_no_host_path_to_its_caller(self, tmp_path: Path) -> None:
+        """This interpreter, read for real in the direct mode: the caller reads the method's lines, and no path on the host."""
         method_dir = _method(directory=tmp_path / "request-files", requirements=f"pydantic>=2\n{_ABSENT_PACKAGE}>=1\n")
 
         with pytest.raises(MethodRequirementsNotMetError) as refusal_info:
@@ -174,14 +188,17 @@ class TestMethodRequirementsCheck:
         with pytest.raises(ValidateBundleError) as verdict_info, translate_to_validate_bundle_error():
             ensure_served_method_requirements_met(library_dirs=[method_dir])
 
-        refusal = refusal_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        verdict = verdict_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        message = refusal["message"]
+        # The refusal's message, which names the packages and the command that installs them, names no host path either.
+        message = refusal_info.value.message
         assert message.startswith("The method needs Python packages that the Python interpreter Pipelex runs in does not have")
         assert f"line 2 '{_ABSENT_PACKAGE}>=1' ({_ABSENT_PACKAGE} is missing)" in message
         assert f"uv pip install '{_ABSENT_PACKAGE}>=1'" in message
-        assert [(item["source"], item["line"]) for item in verdict["validation_errors"]] == [("requirements.txt", 2)]
-        for disclosed in (str(refusal), str(verdict)):
+        refusal = refusal_info.value.to_problem(view=ProblemView.CALLER)
+        assert refusal.code == CoreCode.METHOD_DEPENDENCY_MISSING
+        verdict_items = verdict_info.value.validation_error_items()
+        assert [(item.source, item.line) for item in verdict_items] == [("requirements.txt", 2)]
+        verdict = verdict_info.value.to_problem(view=ProblemView.CALLER)
+        for disclosed in (message, str(refusal.to_wire()), str(verdict.to_wire()), str(verdict_items)):
             for host_path in (str(tmp_path), str(tmp_path.resolve()), sys.executable):
                 assert host_path not in disclosed, host_path
 
@@ -192,9 +209,7 @@ class TestMethodRequirementsCheck:
         with pytest.raises(HostLibraryTreeError) as exc_info:
             ensure_served_method_requirements_met(library_dirs=[method_dir])
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        _assert_the_host_s_fault(error=exc_info.value)
 
     def test_around_a_hosts_library_directories_a_refusal_is_the_hosts_fault(self, tmp_path: Path) -> None:
         _method(directory=tmp_path, requirements=f"{_ABSENT_PACKAGE}\n")
@@ -203,9 +218,7 @@ class TestMethodRequirementsCheck:
             ensure_method_requirements_met(trees=[list_method_tree(tmp_path)], names_host_paths=True)
 
         assert isinstance(exc_info.value.__cause__, MethodRequirementsNotMetError)
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        _assert_the_host_s_fault(error=exc_info.value)
 
     def test_a_dependency_package_is_named_by_its_address(self, tmp_path: Path) -> None:
         package_dir = _method(directory=tmp_path / "installed" / "invoicing", requirements=f"-r base.txt\n{_ABSENT_PACKAGE}\n")

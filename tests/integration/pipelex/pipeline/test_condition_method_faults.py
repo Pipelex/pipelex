@@ -1,9 +1,9 @@
-"""Pin: a `PipeCondition`'s own refusals are the caller's faults, and their reason reaches every surface.
+"""Pin: a `PipeCondition`'s own refusals are the method's faults, and their sentence reaches every surface.
 
 The condition's expression and outcomes are the caller's own method, so when it refuses a run, the refusal
-is the caller's to fix: its message names the pipe and the reason, locally and under STRICT disclosure, where
-it used to be an unclassified `PipeRunError` that a validation verdict named by its title, "Pipe run", and a
-hosted run answered with `An internal error occurred.`.
+is the method's to fix: the caller reads the sentence of its code, naming the pipe, and the operator its reason,
+where it used to be an unclassified `PipeRunError` that a validation verdict named by its title, "Pipe run", and
+a hosted run answered with `An internal error occurred.`.
 """
 
 from __future__ import annotations
@@ -12,22 +12,20 @@ import json
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ValidationErrorCategory
+from pipelex.base_exceptions import ValidationErrorCategory
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.integration.pipelex.pipeline.test_data import ConditionMethodFaultsTestData
 
 _EMPTY_EXPRESSION_REASON = "PipeCondition 'route_parcel': Conditional expression returned no result"
-_EMPTY_EXPRESSION_NEXT_STEP = (
-    "Change the expression of PipeCondition 'route_parcel' so that it always renders a value: "
-    "the name of one of its outcomes, or any other value, which takes the default outcome."
-)
-_ALL_FAIL_REASON = (
-    "PipeCondition 'route_parcel' maps every outcome (and the default) to 'fail': every live run of this pipe raises. "
-    "Map at least one outcome to a pipe or to 'continue'."
-)
+# The sentences the condition's refusals render for a caller, naming the pipe and no text of the expression.
+_UNMATCHED_SENTENCE = "The condition of pipe 'route_parcel' rendered a value that no outcome maps."
+_ALL_FAIL_SENTENCE = "The declaration at 'pipe.route_parcel.outcomes' breaks a rule of the language (every outcome and the default map to 'fail')."
 
 
 def _routing_bundle(*, inputs: str, expression: str, outcomes: str, default_outcome: str) -> str:
@@ -71,58 +69,69 @@ async def _failed_run(*, bundle: str, inputs: dict[str, Any]) -> PipelineExecuti
     return exc_info.value
 
 
+def _assert_the_condition_s_refusal(*, error: PipelineExecutionError, code: CoreCode, domain: ProblemDomain, detail: str, message: str) -> None:
+    """The caller reads the code's sentence at the condition, a 422 of its domain; the condition's own reason is the operator's."""
+    caller = error.to_problem(view=ProblemView.CALLER)
+    assert caller.code == code, caller.to_wire()
+    assert caller.domain == domain
+    assert caller.detail == detail, caller.to_wire()
+    assert caller.location is not None
+    assert caller.location.pipe == "route_parcel"
+    assert error_code_spec(code).status == 422
+    operator = error.to_problem(view=ProblemView.OPERATOR)
+    assert operator.diagnostics is not None
+    assert operator.diagnostics.message == message
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestConditionMethodFaults:
     @pytest.mark.parametrize(
-        ("bundle", "reason"),
+        ("bundle", "code", "sentence"),
         [
-            (_EMPTY_EXPRESSION_BUNDLE, _EMPTY_EXPRESSION_REASON),
-            (_ALL_FAIL_BUNDLE, _ALL_FAIL_REASON),
+            (_EMPTY_EXPRESSION_BUNDLE, CoreCode.PIPE_CONDITION_UNMATCHED, _UNMATCHED_SENTENCE),
+            (_ALL_FAIL_BUNDLE, CoreCode.METHOD_SCHEMA_VIOLATION, _ALL_FAIL_SENTENCE),
         ],
         ids=["expression_renders_nothing", "every_outcome_fails"],
     )
-    async def test_a_dry_run_refusal_is_an_item_with_its_reason(self, bundle: str, reason: str) -> None:
-        """The verdict item names the pipe and the reason, locally and in the STRICT payload, never the title "Pipe run"."""
+    async def test_a_dry_run_refusal_is_an_item_with_its_code_s_sentence(self, bundle: str, code: CoreCode, sentence: str) -> None:
+        """The verdict item names the pipe and reads the sentence of the refusal's code, never the title "Pipe run"."""
         verdict = await _verdict(bundle=bundle)
 
-        (item,) = verdict.to_error_report().validation_errors or []
+        (item,) = verdict.validation_error_items() or []
         assert item.category == ValidationErrorCategory.DRY_RUN
         assert item.pipe_code == "route_parcel"
-        assert item.message == f"Pipe 'route_parcel' failed its dry run: {reason}"
+        assert item.message == f"Pipe 'route_parcel' failed its dry run: {sentence}"
+        problem = verdict.to_problem(view=ProblemView.CALLER)
+        (problem_item,) = problem.errors or []
+        assert problem_item.code == code
+        assert problem_item.detail == sentence
 
-        strict_payload = verdict.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        (strict_item,) = strict_payload["validation_errors"]
-        assert strict_item["message"] == f"Pipe 'route_parcel' failed its dry run: {reason}"
-
-    async def test_an_expression_that_renders_nothing_is_the_callers_fault_under_strict(self) -> None:
-        """A run whose condition expression renders nothing: HTTP 422, the reason at the condition, and the next step."""
+    async def test_an_expression_that_renders_nothing_is_the_methods_fault(self) -> None:
+        """A run whose condition expression renders nothing: HTTP 422, the code's sentence at the condition."""
         error = await _failed_run(bundle=_EMPTY_EXPRESSION_BUNDLE, inputs={"parcel": "a box of books"})
 
-        document = error.to_error_report().to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["status"] == 422
-        assert document["error_domain"] == "input"
-        assert document["error_type"] == "PipeRunError"
-        assert document["detail"] == f"Pipe 'route_parcel' failed: {_EMPTY_EXPRESSION_REASON}"
-        assert document["user_action"] == {"kind": "change_input", "detail": _EMPTY_EXPRESSION_NEXT_STEP}
+        _assert_the_condition_s_refusal(
+            error=error,
+            code=CoreCode.PIPE_CONDITION_UNMATCHED,
+            domain=ProblemDomain.METHOD,
+            detail=_UNMATCHED_SENTENCE,
+            message=_EMPTY_EXPRESSION_REASON,
+        )
 
-    async def test_a_fail_outcome_is_the_callers_fault_under_strict(self) -> None:
-        """A run whose lane the method maps to 'fail': HTTP 422, naming the pipe, never the value its expression rendered."""
+    async def test_a_fail_outcome_refuses_the_inputs(self) -> None:
+        """A run whose lane the method maps to 'fail': a refusal of these inputs, naming the pipe, never the value its expression rendered."""
         error = await _failed_run(bundle=_LANE_BUNDLE, inputs={"parcel": "a box of books", "lane": "reject"})
 
-        document = error.to_error_report().to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["status"] == 422
-        assert document["error_domain"] == "input"
-        assert document["error_type"] == "PipeRunError"
-        assert document["detail"] != INTERNAL_ERROR_PLACEHOLDER
-        # The rendered value can be text of a condition a host library declared, so no message carries it.
-        assert document["detail"] == "Pipe 'route_parcel' failed: PipeCondition 'route_parcel' failed with outcome: fail."
-        assert document["user_action"] == {
-            "kind": "change_input",
-            "detail": (
-                "PipeCondition 'route_parcel' refuses this run on purpose: change the inputs so that its expression "
-                "selects another outcome, or map that outcome to a pipe or to 'continue'."
-            ),
-        }
+        # The rendered value can be text of a condition a host library declared, so no reader's text carries it.
+        _assert_the_condition_s_refusal(
+            error=error,
+            code=CoreCode.PIPE_CONDITION_REFUSED,
+            domain=ProblemDomain.INPUT,
+            detail="Pipe 'route_parcel' chose the outcome 'fail', which the method maps to a refusal of these inputs.",
+            message="PipeCondition 'route_parcel' failed with outcome: fail.",
+        )
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert "reject" not in json.dumps(error.to_problem(view=view).to_wire())
 
     async def test_a_continue_outcome_leaves_its_rendered_value_out_of_the_absence_reason(self) -> None:
         """A step force-unwrapping a result the condition resolved to 'continue' fails naming the condition, never the value it rendered."""
@@ -132,16 +141,17 @@ class TestConditionMethodFaults:
                 mthds_contents=[ConditionMethodFaultsTestData.CONTINUE_THEN_FORCE_MTHDS],
                 inputs={"parcel": "a box of books", "lane": "hold"},
             )
-        report = exc_info.value.to_error_report()
+        error = exc_info.value
 
-        assert report.error_type == "OptionalValueAbsentError"
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "OptionalValueAbsentError"
         assert (
             "Absence origin: pipe 'route_parcel' produced no value — \"PipeCondition 'route_parcel' resolved to its 'continue' outcome\""
-            in report.message
+            in operator.diagnostics.message
         )
-        assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in report.message
-
-        # The message is caller-facing, so STRICT disclosure keeps it, and nothing in the STRICT answer quotes the expression.
-        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["detail"] == report.message
-        assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in json.dumps(document)
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_FORCED_INPUT_ABSENT
+        # Neither reader's text quotes the expression's rendered value.
+        for text in (error.message, json.dumps(caller.to_wire()), json.dumps(operator.to_wire())):
+            assert ConditionMethodFaultsTestData.HELD_LANE_LITERAL not in text

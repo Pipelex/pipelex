@@ -2,9 +2,8 @@ import json
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
-from pydantic import ValidationError
 
-from pipelex.base_exceptions import ErrorReport, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -21,14 +20,16 @@ from pipelex.cogt.exceptions import (
     ModelWaterfallError,
     SearchJobFailureError,
     SearchModelNotFoundError,
+    find_inference_error_category_in_chain,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from tests.unit.pipelex.cogt.test_data import ExceptionTestData
 
 
 class TestErrorCategoryInfrastructure:
-    """Tests for the InferenceErrorCategory enum, CogtError fields, and to_error_report()."""
+    """Tests for the InferenceErrorCategory enum, CogtError fields, and to_problem()."""
 
     # --- InferenceErrorCategory enum ---
 
@@ -131,104 +132,106 @@ class TestErrorCategoryInfrastructure:
         assert err.user_action.kind is UserActionKind.CHECK_CREDENTIALS
         assert err.user_action.detail == "Check that the required API key environment variable is set"
 
-    # --- to_error_report() ---
+    # --- to_problem() ---
 
-    def test_to_error_report_pipelex_error_minimal(self) -> None:
-        """PipelexError.to_error_report returns an ErrorReport with error_type and message, and the fallback code's verdict."""
+    def test_to_problem_pipelex_error_minimal(self) -> None:
+        """A bare PipelexError reports the fallback code and its verdict, its class and message for the operator alone."""
         err = PipelexError("basic error")
-        report = err.to_error_report()
-        assert report.error_type == "PipelexError"
-        assert report.message == "basic error"
-        assert report.code == CoreCode.RUNTIME_UNEXPECTED
-        assert report.error_category is None
-        assert report.retryable is False
+        problem = err.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.is_retryable is False
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "PipelexError"
+        assert problem.diagnostics.message == "basic error"
+        assert find_inference_error_category_in_chain(err) is None
 
-    def test_to_error_report_cogt_error_no_category(self) -> None:
-        """A failure with no category and no cause reports its class's fallback code, and None for the optional fields."""
+    def test_to_problem_cogt_error_no_category(self) -> None:
+        """A failure with no category and no cause reports its class's fallback code, and no advice, model or provider."""
         err = LLMCompletionError("plain error")
-        report = err.to_error_report()
-        assert report.error_type == "LLMCompletionError"
-        assert report.message == "plain error"
-        assert report.code == CoreCode.RUNTIME_UNEXPECTED
-        assert report.error_category is None
-        assert report.retryable is False
-        assert report.user_action is None
-        assert report.model is None
-        assert report.provider is None
+        problem = err.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.is_retryable is False
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "LLMCompletionError"
+        assert problem.diagnostics.message == "plain error"
+        assert problem.diagnostics.model is None
+        assert problem.diagnostics.provider is None
+        assert find_inference_error_category_in_chain(err) is None
+        assert err.advised_action() is None
 
-    def test_to_error_report_with_category(self) -> None:
-        """A report includes the category, and a content failure with no code keeps its class's fallback."""
+    def test_to_problem_with_category(self) -> None:
+        """The category stays on the chain, and a content failure with no code keeps its class's fallback."""
         err = LLMCompletionError("oops", error_category=InferenceErrorCategory.CONTENT)
-        report = err.to_error_report()
-        assert report.error_category == "content"
-        assert report.code == CoreCode.RUNTIME_UNEXPECTED
-        assert report.retryable is False
+        problem = err.to_problem(view=ProblemView.CALLER)
+        assert find_inference_error_category_in_chain(err) == InferenceErrorCategory.CONTENT
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.is_retryable is False
 
-    def test_to_error_report_with_all_cogt_fields(self) -> None:
-        """Report includes user_action when set, and a transient failure with no code reports a code that invites a retry."""
+    def test_to_problem_with_all_cogt_fields(self) -> None:
+        """The advice rides the error, never the problem, and a transient failure with no code reports a code that invites a retry."""
         err = LLMCompletionError(
             "oops",
             error_category=InferenceErrorCategory.TRANSIENT,
             user_action=UserAction(kind=UserActionKind.WAIT_AND_RETRY, detail="Retry in a moment"),
         )
-        report = err.to_error_report()
-        assert report.error_category == "transient"
-        assert report.code == CoreCode.PROVIDER_UNAVAILABLE
-        assert report.retryable is True
-        assert report.user_action is not None
-        assert report.user_action.kind is UserActionKind.WAIT_AND_RETRY
-        assert report.user_action.detail == "Retry in a moment"
+        problem = err.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(err) == InferenceErrorCategory.TRANSIENT
+        assert problem.code == CoreCode.PROVIDER_UNAVAILABLE
+        assert problem.is_retryable is True
+        advice = err.advised_action()
+        assert advice is not None
+        assert advice.kind is UserActionKind.WAIT_AND_RETRY
+        assert advice.detail == "Retry in a moment"
+        assert "Retry in a moment" not in json.dumps(problem.to_wire())
 
-    def test_to_error_report_with_model_handle(self) -> None:
-        """Report includes model field for errors with model_handle."""
+    def test_to_problem_with_model_handle(self) -> None:
+        """The operator's diagnostics name the model of an error carrying a model_handle."""
         err = LLMModelNotFoundError(message="missing", model_handle="gpt-4o")
-        report = err.to_error_report()
-        assert report.model == "gpt-4o"
-        assert report.error_category == "configuration"
+        problem = err.to_problem(view=ProblemView.OPERATOR)
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.model == "gpt-4o"
+        assert find_inference_error_category_in_chain(err) == InferenceErrorCategory.CONFIGURATION
 
-    def test_to_error_report_with_provider(self) -> None:
-        """Report includes provider field for errors with backend_name."""
+    def test_to_problem_with_provider(self) -> None:
+        """The operator's diagnostics name the provider of an error carrying a backend_name, which the caller never reads."""
         err = InferenceBackendCredentialsError(
             credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
             backend_name="openai",
             message="key missing",
             key_name="OPENAI_API_KEY",
         )
-        report = err.to_error_report()
-        assert report.provider == "openai"
-        assert report.error_category == "configuration"
+        problem = err.to_problem(view=ProblemView.OPERATOR)
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.provider is not None
+        assert problem.diagnostics.provider.name == "openai"
+        assert find_inference_error_category_in_chain(err) == InferenceErrorCategory.CONFIGURATION
+        assert err.to_problem(view=ProblemView.CALLER).diagnostics is None
 
-    def test_to_error_report_to_dict_omits_none(self) -> None:
-        """to_dict() omits None-valued fields."""
+    def test_to_problem_to_wire_omits_none(self) -> None:
+        """to_wire() omits every member that holds no value, and the caller's view carries no diagnostics."""
         err = LLMCompletionError("plain error")
-        report_dict = err.to_error_report().to_dict()
-        assert "error_category" not in report_dict
-        assert "user_action" not in report_dict
-        assert "model" not in report_dict
-        assert "provider" not in report_dict
-        assert report_dict == {
-            "code": "runtime.unexpected",
-            "error_type": "LLMCompletionError",
-            "message": "plain error",
+        assert err.to_problem(view=ProblemView.CALLER).to_wire() == {
+            "type": "https://mthds.ai/errors/runtime.unexpected",
             "title": "An unexpected error occurred",
-            "type_uri": "https://mthds.ai/errors/runtime.unexpected",
-            "error_domain": "runtime",
-            "retryable": False,
+            "detail": "The runtime met an unexpected error.",
+            "code": "runtime.unexpected",
+            "domain": "runtime",
+            "retry": "no",
+            "next_step": {"kind": "report", "detail": "Report this to whoever runs the runtime."},
         }
+        operator_wire = err.to_problem(view=ProblemView.OPERATOR).to_wire()
+        assert operator_wire["diagnostics"]["error_class"] == "LLMCompletionError"
+        assert operator_wire["diagnostics"]["message"] == "plain error"
+        assert "model" not in operator_wire["diagnostics"]
+        assert "provider" not in operator_wire["diagnostics"]
 
-    def test_to_error_report_to_dict_json_serializable(self) -> None:
-        """to_dict() output can be serialized to JSON."""
+    def test_to_problem_to_wire_json_serializable(self) -> None:
+        """to_wire() output can be serialized to JSON and read back as the same problem."""
         err = LLMModelNotFoundError(message="not found", model_handle="gpt-4o")
-        report_dict = err.to_error_report().to_dict()
-        serialized = json.dumps(report_dict)
-        deserialized = json.loads(serialized)
-        assert deserialized == report_dict
-
-    def test_error_report_is_frozen(self) -> None:
-        """ErrorReport is immutable."""
-        report = ErrorReport.make_for_code(code=CoreCode.PROVIDER_FAILED, error_type="LLMCompletionError", message="test")
-        with pytest.raises(ValidationError):
-            report.message = "mutated"  # type: ignore[misc]
+        problem_wire = err.to_problem(view=ProblemView.OPERATOR).to_wire()
+        deserialized = json.loads(json.dumps(problem_wire))
+        assert deserialized == problem_wire
+        assert PipelexProblem.model_validate(deserialized).to_wire() == problem_wire
 
     def test_from_exc_chain_preserved(self) -> None:
         """Exception cause chain is preserved with from exc."""
@@ -237,8 +240,8 @@ class TestErrorCategoryInfrastructure:
         with pytest.raises(CogtError) as exc_info:
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from original
         assert exc_info.value.__cause__ is original
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
+        assert find_inference_error_category_in_chain(exc_info.value) == InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).is_retryable is True
 
     # --- ModelNotFoundError hierarchy: the load-bearing reroute invariant ---
 

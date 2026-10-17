@@ -8,9 +8,9 @@ so its format is not checked.
 """
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractInputFormatError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job import ExtractJob
@@ -21,6 +21,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -82,7 +83,7 @@ class TestExtractInputFormatCheck:
             "Input 'transcripts[0]' is a Word document (.docx), which model 'azure-document-intelligence' cannot extract: "
             "it reads PDF and images. Give a file in one of those formats, or use an extract model that reads this one."
         )
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.INPUT
         assert worker.nb_provider_calls == 0
 
     async def test_a_file_with_no_input_name_is_named_as_the_file_to_extract(self):

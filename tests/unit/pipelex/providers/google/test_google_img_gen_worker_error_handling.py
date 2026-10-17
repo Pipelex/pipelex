@@ -16,10 +16,11 @@ from google.genai import errors as genai_errors
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView, ProviderDiagnostics
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 
 
@@ -60,6 +61,19 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.img_gen_prompt.positive_text = "a cute cat"
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
+def _provider_of(problem: PipelexProblem) -> ProviderDiagnostics:
+    """What the provider answered, from the operator's diagnostics."""
+    provider = _diagnostics_of(problem).provider
+    assert provider is not None
+    return provider
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -221,7 +235,7 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata.sdk_exception_type == expected_sdk_type
         assert exc_info.value.__cause__ is sdk_exc
 
-    async def test_to_error_report_serializes_metadata(self, mocker: MockerFixture) -> None:
+    async def test_the_operator_problem_carries_the_provider_facts(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_client_error(429, "Resource has been exhausted", status="RESOURCE_EXHAUSTED")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -229,9 +243,10 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "capacity"
-        assert report.retryable is False
-        assert report.provider_metadata is not None
-        assert report.provider_metadata.provider == "google"
-        assert report.provider_metadata.status_code == 429
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "capacity"
+        assert problem.is_retryable is False
+        # The provider's `name` is the backend the error names, which the worker leaves to its caller to fill.
+        assert _provider_of(problem).name is None
+        assert _provider_of(problem).status == 429

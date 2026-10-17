@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain
 from pipelex.cogt.exceptions import (
     CompletionTruncationLimit,
     InferenceErrorCategory,
     LLMCompletionError,
     LLMCompletionRefusedError,
     LLMCompletionTruncatedError,
+    find_inference_error_category_in_chain,
 )
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.helpers.completion_stop import STOP_TEST_PARTIAL_TEXT
@@ -136,50 +139,80 @@ class TestLLMCompletionStopErrors:
         )
 
     @pytest.mark.parametrize(
-        ("error_type", "error", "user_action_detail"),
+        ("error_class", "error", "expected_code", "expected_domain", "user_action_detail"),
         [
-            ("LLMCompletionTruncatedError", _truncated_error(), "Raise the pipe's max_tokens, or shorten its input."),
-            ("LLMCompletionTruncatedError", _context_window_error(), CONTEXT_WINDOW_NEXT_STEP),
-            ("LLMCompletionRefusedError", _refused_error(), "Revise the pipe's prompt or its input."),
+            (
+                "LLMCompletionTruncatedError",
+                _truncated_error(),
+                CoreCode.MODEL_OUTPUT_TRUNCATED,
+                ProblemDomain.METHOD,
+                "Raise the pipe's max_tokens, or shorten its input.",
+            ),
+            ("LLMCompletionTruncatedError", _context_window_error(), CoreCode.MODEL_CONTEXT_EXCEEDED, ProblemDomain.INPUT, CONTEXT_WINDOW_NEXT_STEP),
+            (
+                "LLMCompletionRefusedError",
+                _refused_error(),
+                CoreCode.MODEL_CONTENT_REFUSED,
+                ProblemDomain.INPUT,
+                "Revise the pipe's prompt or its input.",
+            ),
         ],
     )
-    def test_the_report_carries_the_fields_an_agent_branches_on(self, error_type: str, error: LLMCompletionError, user_action_detail: str) -> None:
-        """A content error in the input domain, not retryable, its next step a change of input, its type its own."""
+    def test_the_problem_carries_the_fields_an_agent_branches_on(
+        self,
+        error_class: str,
+        error: LLMCompletionError,
+        expected_code: ErrorCode,
+        expected_domain: ProblemDomain,
+        user_action_detail: str,
+    ) -> None:
+        """A content error no retry clears, its code and domain its stop's, its class and model for the operator, its advice a change of input."""
         assert isinstance(error, LLMCompletionError)
-        report = error.to_error_report()
+        problem = error.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == error_type
-        assert report.error_category == InferenceErrorCategory.CONTENT
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.retryable is False
-        assert report.model == "claude-5-sonnet"
-        assert report.user_action is not None
-        assert report.user_action.kind == UserActionKind.CHANGE_INPUT
-        assert report.user_action.detail == user_action_detail
-        assert report.http_status == 422
+        assert problem.code == expected_code
+        assert problem.domain == expected_domain
+        assert problem.is_retryable is False
+        assert error_code_spec(expected_code).status == 422
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == error_class
+        assert problem.diagnostics.model == "claude-5-sonnet"
+        assert find_inference_error_category_in_chain(error) == InferenceErrorCategory.CONTENT
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHANGE_INPUT
+        assert advice.detail == user_action_detail
 
     @pytest.mark.parametrize("error", [_truncated_error(), _context_window_error(), _refused_error()])
-    def test_the_message_survives_strict_disclosure_without_the_partial_text(self, error: LLMCompletionError) -> None:
-        payload = error.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
+    def test_the_caller_reads_the_model_without_the_partial_text(self, error: LLMCompletionError) -> None:
+        """The caller's problem names the model in the code's parameters, and no view carries the partial text."""
+        caller = error.to_problem(view=ProblemView.CALLER)
+        operator = error.to_problem(view=ProblemView.OPERATOR)
 
-        assert payload["message"] == error.message
-        assert payload["user_action"]["kind"] == "change_input"
-        assert payload["error_domain"] == "input"
-        assert payload["retryable"] is False
-        assert STOP_TEST_PARTIAL_TEXT not in payload["message"]
+        assert caller.params is not None
+        assert caller.params.as_wire()["model"] == "claude-5-sonnet"
+        assert caller.is_retryable is False
+        assert caller.diagnostics is None
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == error.message
+        assert STOP_TEST_PARTIAL_TEXT not in str(caller.to_wire())
+        assert STOP_TEST_PARTIAL_TEXT not in str(operator.to_wire())
 
     def test_a_run_failure_located_at_the_pipe_reports_the_truncation(self) -> None:
-        """The pipe router's located report keeps the truncation's identity, classification and caller-facing message."""
+        """The pipe router's located problem keeps the truncation's code, its class and message for the operator, and the pipe's location."""
         truncation = _truncated_error()
         located = PipeRouterError.make_located(
             failure=truncation, run_mode=PipeRunMode.LIVE, pipe_code="ui_designer", output_name=None, pipe_stack=["flow", "ui_designer"]
         )
         located.__cause__ = truncation
 
-        report = located.to_error_report()
+        problem = located.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "LLMCompletionTruncatedError"
-        assert report.message == f"Pipe 'ui_designer' failed (flow → ui_designer): {TRUNCATED_MESSAGE}"
-        assert report.retryable is False
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == report.message
+        assert problem.code == CoreCode.MODEL_OUTPUT_TRUNCATED
+        assert problem.domain == ProblemDomain.METHOD
+        assert problem.is_retryable is False
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "ui_designer", "path": ["flow", "ui_designer"]}
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "LLMCompletionTruncatedError"
+        assert problem.diagnostics.message == TRUNCATED_MESSAGE

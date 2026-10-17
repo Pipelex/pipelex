@@ -2,6 +2,7 @@ import inspect
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import (
@@ -10,6 +11,7 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER, withholding_host_library_files
@@ -56,12 +58,19 @@ class TestValidateBundleErrorWithholding:
                     message=_mentioning_the_host_file(label="instantiation"), source="api://bundle-0.mthds", field_path=""
                 )
             ],
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="post_notice", message=_mentioning_the_host_file(label="dry run"), source=_HOST_FILE)],
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    pipe_code="post_notice",
+                    message=_mentioning_the_host_file(label="dry run"),
+                    source=_HOST_FILE,
+                    code=CoreCode.METHOD_WIRING_INVALID,
+                )
+            ],
         )
 
         withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
 
-        items = withheld.to_error_report().validation_errors or []
+        items = withheld.validation_error_items() or []
         assert [item.message for item in items] == [
             f"blueprint in '{HOST_LIBRARY_FILE_PLACEHOLDER}'",
             f"factory in '{HOST_LIBRARY_FILE_PLACEHOLDER}'",
@@ -73,6 +82,11 @@ class TestValidateBundleErrorWithholding:
         assert [item.source for item in items] == [None, None, None, "api://bundle-0.mthds", None]
         assert [item.field_path for item in items] == [None, None, None, None, None]
         assert _HOST_FILE not in withheld.message
+        # The withheld verdict's problem keeps its items' codes and names the withheld file in no reader's view.
+        problem_items = withheld.to_problem(view=ProblemView.CALLER).errors or []
+        assert problem_items[-1].code == CoreCode.METHOD_WIRING_INVALID
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert _HOST_FILE not in str(withheld.to_problem(view=view).to_wire())
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:
         # A host library directory listed relatively names its files relatively, so a host file's name can be the
@@ -106,7 +120,7 @@ class TestValidateBundleErrorWithholding:
         with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path], caller_sources=[callers_source]):
             raise verdict
 
-        (item,) = raised.value.to_error_report().validation_errors or []
+        (item,) = raised.value.validation_error_items() or []
         assert item.source == callers_source
 
     def test_the_host_s_files_and_the_template_files_its_steps_name_are_found_in_one_walk(self, tmp_path: Path, mocker: MockerFixture) -> None:

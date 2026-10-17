@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd as agent_validate_bundle_cmd
@@ -41,7 +42,11 @@ def _make_dry_run_verdict() -> ValidateBundleError:
     """The verdict the cascade makes of a failing dry run: one located dry_run item for the failing pipe."""
     return ValidateBundleError(
         "pipe dry-run failed",
-        dry_run_failures=[DryRunFailureErrorData(pipe_code="my_pipe", domain_code="test", message="Pipe 'my_pipe' failed its dry run: Pipe run")],
+        dry_run_failures=[
+            DryRunFailureErrorData(
+                code=CoreCode.PIPE_OUTPUT_INVALID, pipe_code="my_pipe", domain_code="test", message="Pipe 'my_pipe' failed its dry run: Pipe run"
+            )
+        ],
     )
 
 
@@ -167,7 +172,10 @@ class TestValidateExitCodes:
         mocker.patch(
             f"{AGENT_BUNDLE_MODULE}.validate_bundle_core",
             new=mocker.AsyncMock(
-                side_effect=ValidateBundleError("Bundle is invalid", dry_run_failures=[DryRunFailureErrorData(pipe_code="my_pipe", message="boom")])
+                side_effect=ValidateBundleError(
+                    "Bundle is invalid",
+                    dry_run_failures=[DryRunFailureErrorData(code=CoreCode.PIPE_OUTPUT_INVALID, pipe_code="my_pipe", message="boom")],
+                )
             ),
         )
         with pytest.raises(typer.Exit) as exc_info:

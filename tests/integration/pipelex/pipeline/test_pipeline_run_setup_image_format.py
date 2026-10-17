@@ -10,9 +10,11 @@ import base64
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import ErrorDomain, error_domain_to_http_status
 from pipelex.config import get_config
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineInputNotAnImageError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 
@@ -67,11 +69,12 @@ class TestPipelineRunSetupImageFormat:
                 },
             )
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert error_domain_to_http_status(report.error_domain) == 422
-        assert report.http_status == 422
-        assert f"Input '{refused_input}' expects an image, but the file is a PDF document (.pdf)" in report.message
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+        assert problem.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.INPUT_FILE_TYPE_UNSUPPORTED).status == 422
+        assert problem.to_wire().get("params", {}).get("input") == refused_input, problem.to_wire()
+        assert f"Input '{refused_input}' expects an image, but the file is a PDF document (.pdf)" in exc_info.value.message
 
     async def test_images_pass_setup(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)

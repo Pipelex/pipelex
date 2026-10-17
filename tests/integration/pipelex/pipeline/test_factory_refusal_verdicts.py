@@ -2,19 +2,24 @@
 
 A pipe factory refuses a blueprint it cannot build, such as a ``PipeExtract`` whose input is neither an
 image nor a document. Its error classes declared no domain, so the validation translation did not
-recognise them and they escaped every validator raw. They are now the author's input, caller-facing, so
-the refusal validates to one item located on the pipe and its file, carrying the next step. The agent
+recognise them and they escaped every validator raw. They are now the method's fault, so the refusal
+validates to one item located on the pipe and its file, which reads the sentence its code renders; the
+refusal's own message, naming the input and the next step, stays on the verdict's cause chain. The agent
 CLI's ``validate_all_core`` translated its load only after the failed library was torn down, so its items
 lost their file; they keep it now.
 """
 
+import json
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, StepKind
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.validate._validate_core import validate_all_core
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_controllers.condition.exceptions import PipeConditionFactoryError
 from pipelex.pipe_controllers.parallel.exceptions import PipeParallelFactoryError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeFactoryError
@@ -93,19 +98,25 @@ def _assert_located_extract_item(*, items: list[ValidationErrorItem], bundle_pat
     assert item.pipe_code == "read_almanac_pages"
     assert item.domain_code == _DOMAIN
     assert item.source == str(bundle_path)
-    assert "The input 'almanac_text' of PipeExtract 'read_almanac_pages' is a native.Text" in item.message
-    assert _NEXT_STEP in item.message
+    # The code's sentence names the refused input: the parameters the raise site gives.
+    assert "almanac_text" in item.message
+
+
+def _caller_payload(error: ValidateBundleError) -> str:
+    """What a caller reads of a verdict: its problem in the caller's view and its validation items."""
+    items = [item.model_dump(mode="json", exclude_none=True) for item in error.validation_error_items()]
+    return json.dumps({"problem": error.to_problem(view=ProblemView.CALLER).to_wire(), "validation_errors": items})
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestFactoryRefusalVerdicts:
     @pytest.mark.parametrize("error_class", _FACTORY_REFUSAL_CLASSES, ids=[error_class.__name__ for error_class in _FACTORY_REFUSAL_CLASSES])
-    async def test_factory_refusal_is_the_authors_caller_facing_input(self, error_class: type[PipelexError]) -> None:
-        report = error_class("The pipe cannot be built from this blueprint.").to_error_report()
+    async def test_factory_refusal_is_the_method_s_fault(self, error_class: type[PipelexError]) -> None:
+        problem = error_class("The pipe cannot be built from this blueprint.").to_problem(view=ProblemView.CALLER)
 
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.caller_facing_message
-        assert report.http_status == 422
+        assert problem.domain == ProblemDomain.METHOD
+        assert problem.next_step.kind == StepKind.CHANGE_METHOD
+        assert error_code_spec(CoreCode(problem.code)).status == 422
 
     async def test_validate_bundle_locates_the_extract_refusal_with_its_next_step(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path)
@@ -115,10 +126,15 @@ class TestFactoryRefusalVerdicts:
 
         assert isinstance(raised.value.__cause__, PipeLoadRefusalError)
         assert isinstance(raised.value.__cause__.__cause__, PipeExtractFactoryError)
-        report = raised.value.to_error_report()
-        _assert_located_extract_item(items=report.validation_errors or [], bundle_path=bundle_path)
-        (strict_item,) = report.to_dict(disclosure_mode=DisclosureMode.STRICT)["validation_errors"]
-        assert _NEXT_STEP in strict_item["message"]
+        _assert_located_extract_item(items=raised.value.validation_error_items(), bundle_path=bundle_path)
+        problem = raised.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        (problem_item,) = problem.errors or []
+        assert problem_item.code == CoreCode.METHOD_SCHEMA_VIOLATION
+        # The factory's own message, naming the input and the next step, is on the chain for the operator.
+        refusal_message = str(raised.value.__cause__.__cause__)
+        assert "The input 'almanac_text' of PipeExtract 'read_almanac_pages' is a native.Text" in refusal_message
+        assert _NEXT_STEP in refusal_message
 
     async def test_agent_validate_all_locates_a_wiring_refusal_on_its_file(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path, content=_SEQUENCE_OUTPUT_MISMATCH_BUNDLE)
@@ -126,7 +142,7 @@ class TestFactoryRefusalVerdicts:
         with pytest.raises(ValidateBundleError) as raised:
             await validate_all_core(library_dirs=[tmp_path])
 
-        (item,) = raised.value.to_error_report().validation_errors or []
+        (item,) = raised.value.validation_error_items() or []
         assert item.pipe_code == "summarize_almanac"
         assert item.source == str(bundle_path)
 
@@ -138,8 +154,7 @@ class TestFactoryRefusalVerdicts:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
 
         # Jinja2's diagnosis names the unknown tag; the verdict must not.
-        strict_report = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert "quay_ledger" not in str(strict_report)
+        assert "quay_ledger" not in _caller_payload(raised.value)
 
     async def test_an_inherited_system_prompt_refusal_names_the_domain(self, tmp_path: Path) -> None:
         bundle_path = _write_bundle(directory=tmp_path, content=_INHERITED_SYSTEM_PROMPT_BUNDLE)
@@ -147,11 +162,14 @@ class TestFactoryRefusalVerdicts:
         with pytest.raises(ValidateBundleError) as raised:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
 
-        (item,) = raised.value.to_error_report().validation_errors or []
+        (item,) = raised.value.validation_error_items() or []
         assert item.pipe_code == "write_note"
         assert item.source == str(bundle_path)
-        assert "system prompt of domain 'almanac_notes', which it inherits, for pipe 'write_note' in domain" in item.message
-        assert item.message.endswith("it does not parse at line 1 of that prompt.")
-        # The inherited prompt may be a host's, so its text never rides the caller-facing verdict.
-        strict_report = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert "harbour users" not in str(strict_report)
+        # The item reads the code's sentence over the pipe and the parse failure; the refusal names the domain for the operator.
+        assert "'write_note'" in item.message
+        assert "line 1" in item.message
+        refusal_message = str(raised.value.__cause__.__cause__ if raised.value.__cause__ else None)
+        assert "system prompt of domain 'almanac_notes', which it inherits, for pipe 'write_note' in domain" in refusal_message
+        assert refusal_message.endswith("it does not parse at line 1 of that prompt.")
+        # The inherited prompt may be a host's, so its text never rides the verdict the caller reads.
+        assert "harbour users" not in _caller_payload(raised.value)

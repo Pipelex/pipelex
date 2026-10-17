@@ -1,14 +1,17 @@
-"""Unit tests for ``ValidateBundleError.to_error_report`` — structured errors on the wire.
+"""Unit tests for the problem of an invalid verdict — structured errors on the wire.
 
-The override attaches the shared ``build_validation_error_items`` output onto
-``ErrorReport.validation_errors``, so the RFC 7807 problem document the API emits
-on a 422 carries machine-mappable per-error diagnostics (with ``source``) instead
-of only a single ``detail`` string. The cause-chain enrichment from the base
-``to_error_report`` is preserved.
+``ValidateBundleError`` is ``method.invalid``, and its problem lists one item per underlying error under ``errors``,
+each with its own code and its location (the file included), so the problem document the API emits carries
+machine-mappable per-error diagnostics instead of only a single ``detail`` string. The validation items the shared
+``build_validation_error_items`` builds ride beside it, one per problem item.
 """
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ValidationErrorCategory
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict, StepKind
+
+from pipelex.base_exceptions import ValidationErrorCategory
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView, caller_view_of
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -36,47 +39,57 @@ def _error_with_two_categories() -> ValidateBundleError:
     )
 
 
-class TestValidateBundleErrorReport:
-    def test_to_error_report_populates_validation_errors(self) -> None:
-        """``to_error_report`` attaches one structured item per underlying error."""
-        report = _error_with_two_categories().to_error_report()
-        assert report.validation_errors is not None
-        sources = sorted(item.source or "" for item in report.validation_errors)
-        assert sources == ["helpers.mthds", "main.mthds"]
+class TestValidateBundleErrorProblem:
+    def test_the_problem_lists_one_item_per_underlying_error(self) -> None:
+        """Each underlying error is an item with its own code and its file, in the order the validation items list them."""
+        error = _error_with_two_categories()
+        problem = error.to_problem(view=ProblemView.CALLER)
 
-    def test_report_keeps_caller_facing_input_classification(self) -> None:
-        """The base classification (INPUT domain, caller-facing message) still holds."""
-        report = _error_with_two_categories().to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.caller_facing_message is True
-        assert report.error_type == "ValidateBundleError"
+        assert problem.errors is not None
+        assert [(item.code, item.location.file if item.location else None) for item in problem.errors] == [
+            (CoreCode.METHOD_IDENTIFIER_INVALID, "main.mthds"),
+            (CoreCode.METHOD_INPUT_UNDECLARED, "helpers.mthds"),
+        ]
+        assert [item.source for item in error.validation_error_items()] == ["main.mthds", "helpers.mthds"]
+
+    def test_the_verdict_is_the_method_s_fault(self) -> None:
+        """An invalid verdict is the method's to fix and is never retried; its class is the operator's diagnostics."""
+        error = _error_with_two_categories()
+        caller = error.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.METHOD_INVALID
+        assert caller.domain == ProblemDomain.METHOD
+        assert caller.retry == RetryVerdict.NO
+        assert caller.next_step.kind == StepKind.CHANGE_METHOD
+        assert error_code_spec(CoreCode.METHOD_INVALID).status == 422
+        assert caller.diagnostics is None
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "ValidateBundleError"
 
     def test_message_only_error_surfaces_a_residual_item(self) -> None:
-        """No categorized errors → a ``blueprint_validation`` residual still rides the wire (invariant is total).
+        """No categorized errors → a ``blueprint_validation`` residual still rides the verdict (the invariant is total).
 
-        ``to_error_report`` passes ``fallback_message=self.message``, so a parse-level failure that
-        carries only a message (TOML syntax, an empty blueprint, a bundle elaborator) projects one
-        residual item rather than a bare ``detail`` with an empty ``validation_errors[]``.
+        ``validation_error_items`` passes ``fallback_message=self.message``, so a parse-level failure that carries
+        only a message (TOML syntax, an empty blueprint, a bundle elaborator) projects one residual item, and its
+        problem one ``method.schema_violation`` item, rather than a bare ``detail`` with no items.
         """
-        report = ValidateBundleError(message="generic failure").to_error_report()
-        assert report.validation_errors is not None
-        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
-        assert report.validation_errors[0].message == "generic failure"
+        error = ValidateBundleError(message="generic failure")
 
-    def test_problem_document_carries_validation_errors_with_source(self) -> None:
-        """The 422 problem document rides ``validation_errors[]`` as an extension member."""
-        document = _error_with_two_categories().to_error_report().to_problem_document()
-        assert document["status"] == 422
-        items = document["validation_errors"]
-        assert {item["source"] for item in items} == {"main.mthds", "helpers.mthds"}
-        assert {item["category"] for item in items} == {"blueprint_validation", "pipe_validation"}
+        items = error.validation_error_items()
+        assert [item.category for item in items] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
+        assert items[0].message == "generic failure"
+        problem = error.to_problem(view=ProblemView.CALLER)
+        assert problem.errors is not None
+        assert [item.code for item in problem.errors] == [CoreCode.METHOD_SCHEMA_VIOLATION]
 
-    def test_strict_problem_document_retains_validation_errors(self) -> None:
-        """STRICT disclosure keeps ``validation_errors`` — they are the caller's own bundle diagnostics.
+    def test_the_caller_view_of_the_operator_s_record_keeps_the_items(self) -> None:
+        """The items are the caller's own bundle diagnostics, so the caller view of the operator's problem keeps every one."""
+        operator = _error_with_two_categories().to_problem(view=ProblemView.OPERATOR)
 
-        ``ValidateBundleError`` is a caller-facing INPUT error, so STRICT also
-        keeps the ``detail`` message; the structured items ride alongside it.
-        """
-        document = _error_with_two_categories().to_error_report().to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert "validation_errors" in document
-        assert len(document["validation_errors"]) == 2
+        caller = caller_view_of(problem=operator)
+
+        assert caller.diagnostics is None
+        assert caller.errors == operator.errors
+        wire_errors = caller.to_wire()["errors"]
+        assert {item["location"]["file"] for item in wire_errors} == {"main.mthds", "helpers.mthds"}

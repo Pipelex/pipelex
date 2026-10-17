@@ -28,8 +28,8 @@ if TYPE_CHECKING:
 class TestErrorHandlers:
     """Tests for Rich error handler functions."""
 
-    def test_handle_model_choice_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_choice_error should call to_error_report() and exit with code 1."""
+    def test_handle_model_choice_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_choice_error should read the advice for its tip and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_console")
         exc = PipeOperatorModelChoiceError(
             message="model 'gpt-5' not found",
@@ -40,7 +40,7 @@ class TestErrorHandlers:
             model_type=ModelType.LLM,
             model_choice="gpt-5",
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN)
@@ -48,8 +48,8 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_model_availability_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_availability_error should call to_error_report() and exit with code 1."""
+    def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_availability_error should read the advice for its tip and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_console")
         exc = PipeOperatorModelAvailabilityError(
             message="model not available",
@@ -60,7 +60,7 @@ class TestErrorHandlers:
             model_handle="gpt-4o",
             fallback_list=["gpt-4o-mini"],
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
@@ -68,8 +68,8 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_model_deck_preset_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_deck_preset_error should call to_error_report() and exit with code 1."""
+    def test_handle_model_deck_preset_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_deck_preset_error should read the advice for its tip and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_console")
         exc = ModelDeckPresetValidationError(
             message="preset references unavailable model",
@@ -78,7 +78,7 @@ class TestErrorHandlers:
             model_handle="gpt-5",
             enabled_backends={"openai"},
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
@@ -86,11 +86,11 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_validate_bundle_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_validate_bundle_error should call to_error_report() and exit with code 1."""
+    def test_handle_validate_bundle_error_exits_and_reads_its_items(self, mocker: MockerFixture) -> None:
+        """handle_validate_bundle_error should read the verdict's items and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_console")
         exc = ValidateBundleError(message="validation failed")
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "validation_error_items")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_validate_bundle_error(exc)

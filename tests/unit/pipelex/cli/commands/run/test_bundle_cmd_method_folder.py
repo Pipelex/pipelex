@@ -63,15 +63,19 @@ class TestBundleCmdMethodFolder:
         assert kwargs["pipe_code"] == "folder_b.second"
         assert kwargs["bundle_path"] is None
 
-    def test_a_folder_with_no_single_entry_is_refused(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_a_folder_with_no_single_entry_is_refused(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """No single pipe to start at is the run's refusal, printed with its message, and no verdict on the method."""
         mock_execute = mocker.patch(f"{BUNDLE_CMD_MODULE}.execute_run")
         mock_handler = mocker.patch(f"{BUNDLE_CMD_MODULE}.handle_validate_bundle_error", side_effect=typer.Exit(1))
         (tmp_path / "a.mthds").write_text(_bundle(domain="folder_a", pipe_code="first", main_pipe="first"), encoding="utf-8")
         (tmp_path / "b.mthds").write_text(_bundle(domain="folder_b", pipe_code="second", main_pipe="second"), encoding="utf-8")
 
-        with pytest.raises(typer.Exit):
+        with pytest.raises(typer.Exit) as exc_info:
             run_bundle_cmd(path=str(tmp_path))
 
-        verdict = mock_handler.call_args.args[0]
-        assert "several of its bundles declare a main_pipe: 'a.mthds' declares 'first', 'b.mthds' declares 'second'" in verdict.message
+        assert exc_info.value.exit_code == 1
+        printed = capsys.readouterr().err
+        assert printed.startswith("Failed to run: ")
+        assert "several of its bundles declare a main_pipe: 'a.mthds' declares 'first', 'b.mthds' declares 'second'" in printed
+        mock_handler.assert_not_called()
         mock_execute.assert_not_called()

@@ -2,9 +2,11 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.models import TreeLimits
+from mthds.protocol.problem.registry import ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import HostLibraryTreeError, MethodTreeLoadError
 from pipelex.libraries.method_trees import (
     LIMITS_ADVICE,
@@ -194,9 +196,10 @@ class TestMethodTrees:
         with pytest.raises(HostLibraryTreeError) as exc_info, reporting_host_library_tree_faults():
             list_library_bundle_files(library_dirs=[tmp_path / "lib"])
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.caller_facing_message is False
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == PipelexErrorCode.CONFIG_INVALID
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert exc_info.value.message not in str(caller.to_wire())
         assert isinstance(exc_info.value.__cause__, MethodTreeLoadError)
 
     def test_every_bundle_file_under_a_directory_is_found_whatever_the_membership_rule(self, tmp_path: Path) -> None:

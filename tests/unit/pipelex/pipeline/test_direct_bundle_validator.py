@@ -2,8 +2,9 @@
 
 Pins the wrapper's two branches with the in-process sweep mocked out (its own report shaping is
 covered by test_validation_report.py / the integration test_protocol_validate.py): a successful
-sweep is returned verbatim as the valid arm; a ``ValidateBundleError`` is converted to its
-structured ``ErrorReport`` (the invalid arm) rather than propagated. Also pins argument
+sweep is returned verbatim as the valid arm; a ``ValidateBundleError`` is converted to a
+``BundleValidationFailure`` (the invalid arm: its problem in the operator's view, and its validation
+items) rather than propagated. Also pins argument
 passthrough, including the ``library_dirs`` host context, the explicit ``graph_pipe_code`` target
 and the ``log_context`` label.
 """
@@ -14,8 +15,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import ErrorReport
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.direct_bundle_validator import DirectBundleValidator
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.caller_identity import CallerIdentity
@@ -62,7 +65,7 @@ class TestDirectBundleValidator:
         )
 
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
-        """An invalid bundle's ValidateBundleError is converted to its ErrorReport, not propagated."""
+        """An invalid bundle's ValidateBundleError is converted to the invalid arm, its operator's problem and its items, not propagated."""
         error = ValidateBundleError("bundle is invalid")
         mocker.patch(
             "pipelex.pipeline.direct_bundle_validator.validate_bundles_in_process",
@@ -81,9 +84,12 @@ class TestDirectBundleValidator:
             methods_dirs=None,
         )
 
-        assert isinstance(verdict, ErrorReport)
-        assert verdict.error_type == ValidateBundleError.__name__
-        assert verdict == error.to_error_report()
+        assert isinstance(verdict, BundleValidationFailure)
+        assert verdict.problem == error.to_problem(view=ProblemView.OPERATOR)
+        assert verdict.problem.code == CoreCode.METHOD_INVALID
+        assert verdict.problem.diagnostics is not None
+        assert verdict.problem.diagnostics.error_class == ValidateBundleError.__name__
+        assert verdict.validation_errors == error.validation_error_items()
 
     async def test_other_errors_propagate_as_no_verdict_faults(self, mocker: MockerFixture) -> None:
         """A non-ValidateBundleError (a genuine infra fault) propagates — the host maps it to a 5xx."""

@@ -17,8 +17,10 @@ from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMCompletionError,
     LLMModelNotFoundError,
+    find_inference_error_category_in_chain,
 )
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.mistral.mistral_extract_worker import MistralExtractWorker
 from pipelex.providers.mistral.mistral_llm_worker import MistralLLMWorker
 from tests.unit.pipelex.providers.mistral.test_data import (
@@ -89,6 +91,12 @@ def _make_llm_job(mocker: MockerFixture) -> Any:
     job.job_report.llm_tokens_usage = None
     job.llm_prompt.system_text = "system"
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -243,10 +251,10 @@ class TestMistralWorkerErrorHandling:
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_MODEL
         assert exc_info.value.__cause__ is sdk_exc
 
-    # ---- to_error_report() integration ----
+    # ---- Problem integration ----
 
-    async def test_llm_error_report_transient_is_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for TRANSIENT LLM errors has retryable=True."""
+    async def test_llm_problem_transient_is_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a TRANSIENT LLM error invites a retry."""
         worker = _make_mistral_llm_worker(mocker)
         sdk_exc = _make_mistral_error(429, "Rate limit exceeded")
         worker.mistral_client_for_text.chat.complete_async.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -254,13 +262,14 @@ class TestMistralWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
-        assert report.error_type == "LLMCompletionError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
+        assert _diagnostics_of(problem).error_class == "LLMCompletionError"
 
-    async def test_llm_error_report_capacity_not_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for CAPACITY LLM errors has retryable=False."""
+    async def test_llm_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a CAPACITY LLM error invites no retry."""
         worker = _make_mistral_llm_worker(mocker)
         sdk_exc = _make_mistral_error(402, "Payment required: insufficient credits")
         worker.mistral_client_for_text.chat.complete_async.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -268,12 +277,13 @@ class TestMistralWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "capacity"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "capacity"
+        assert problem.is_retryable is False
 
-    async def test_extract_error_report_includes_category(self, mocker: MockerFixture) -> None:
-        """to_error_report() for Extract errors includes error_category."""
+    async def test_extract_problem_includes_category(self, mocker: MockerFixture) -> None:
+        """An extract error keeps its category on the chain."""
         worker = _make_mistral_extract_worker(mocker)
         sdk_exc = _make_mistral_error(401, "Invalid API key")
         worker.mistral_client.ocr.process_async.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -289,6 +299,7 @@ class TestMistralWorkerErrorHandling:
                 extract_job_params=mocker.MagicMock(max_nb_images=None, image_min_size=None),
             )
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "configuration"
+        assert problem.is_retryable is False

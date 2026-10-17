@@ -3,8 +3,10 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
+from pipelex.errors.problem import PipelexProblem
 from pipelex.pipe_run import pipe_run as pipe_run_module
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
@@ -212,10 +214,10 @@ class TestPipeRun:
         assert call_kwargs["status"] == "FAILED"
         assert call_kwargs["pipe_output"] is None
 
-    async def test_run_failure_bare_exception_synthesizes_report(self, mocker: MockerFixture) -> None:
-        """A bare (non-Pipelex) exception still delivers a structured error report.
+    async def test_run_failure_bare_exception_synthesizes_problem(self, mocker: MockerFixture) -> None:
+        """A bare (non-Pipelex) exception still delivers a problem, a fault of ours.
 
-        Direct mode must match Temporal mode, where ``recover_error_report`` is total:
+        Direct mode must match Temporal mode, where the recovered problem is total:
         the FAILED webhook always carries an ``error`` object so receivers can
         rehydrate a failed run uniformly, whichever mode produced it.
         """
@@ -243,10 +245,14 @@ class TestPipeRun:
             await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
 
         mock_executor_instance.execute.assert_called_once()
-        error_report = mock_executor_instance.execute.call_args.kwargs["error_report"]
-        assert error_report is not None
-        assert error_report.error_type == "PipelexUnexpectedError"
-        assert "router blew up" in error_report.message
+        problem = mock_executor_instance.execute.call_args.kwargs["problem"]
+        assert isinstance(problem, PipelexProblem)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.pipeline_run_id == "plr-bare"
+        # The problem is the operator's, which each webhook projects to its own view.
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "PipelexUnexpectedError"
+        assert problem.diagnostics.message == "RuntimeError: router blew up"
 
     async def test_run_failure_delivers_before_raising(self, mocker: MockerFixture) -> None:
         """Delivery runs BEFORE the error is re-raised."""

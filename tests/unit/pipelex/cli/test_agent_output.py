@@ -36,6 +36,7 @@ from pipelex.cogt.inference.error_classification import UserAction, UserActionKi
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 
@@ -269,11 +270,11 @@ class TestAgentOutput:
         assert "no traceback" in parsed["error_source"][0]
 
     # -------------------------------------------------------------------------
-    # to_error_report() integration tests
+    # to_problem() integration tests
     # -------------------------------------------------------------------------
 
     def test_agent_error_uses_report_hint_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should use user_action from to_error_report() as the hint field."""
+        """agent_error should use the next step from to_problem() as the hint field."""
         cause = CogtError(
             "inference failed",
             user_action=UserAction(kind=UserActionKind.CHECK_CREDENTIALS, detail="Check your API key and try again"),
@@ -316,7 +317,7 @@ class TestAgentOutput:
         assert "error_code" not in parsed
 
     def test_agent_error_uses_report_error_category(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include error_category from to_error_report()."""
+        """agent_error should include error_category from to_problem()."""
         cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
         with pytest.raises(typer.Exit):
             agent_error("bad config", error_type="CogtError", cause=cause)
@@ -343,6 +344,17 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
         assert parsed["hint"] == AGENT_ERROR_HINTS["PipeExecutionError"]
+
+    def test_agent_error_falls_back_to_the_code_s_next_step(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """With no advice on the chain and no table entry, the hint is the code's next step as the operator reads it."""
+        cause = MissingOrchestratorError(mode="temporal")
+        with pytest.raises(typer.Exit):
+            agent_error(cause.message, error_type="MissingOrchestratorError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == (
+            "Install a plugin that provides 'temporal' for the setting 'orchestration_mode', or choose a value an installed plugin provides."
+        )
 
     def test_agent_error_report_hint_overrides_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
         """When cause has user_action, it should override the lookup dict hint."""
@@ -371,7 +383,7 @@ class TestAgentOutput:
         assert parsed["hint"] == "custom override"
 
     def test_agent_error_includes_model_and_provider_from_report(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include model and provider from to_error_report()."""
+        """agent_error should include model and provider from to_problem()."""
         cause = InferenceBackendCredentialsError(
             credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
             backend_name="openai",
@@ -432,7 +444,7 @@ class TestAgentOutput:
         assert parsed["error_category"] == "configuration"
 
     def test_agent_error_uses_report_error_domain(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include error_domain from to_error_report() for a PipelexError cause."""
+        """agent_error should include error_domain from to_problem() for a PipelexError cause."""
         cause = PipelexConfigError("bad config")
         with pytest.raises(typer.Exit):
             agent_error("bad config", error_type="PipelexConfigError", cause=cause)

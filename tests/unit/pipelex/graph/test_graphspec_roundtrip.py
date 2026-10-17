@@ -1,15 +1,17 @@
 """Unit tests for GraphSpec JSON round-trip serialization."""
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
-    ErrorSpec,
     GraphSpec,
     GraphSpecMode,
     GraphUsageSpec,
@@ -171,12 +173,13 @@ class TestGraphSpecRoundtrip:
         # Verify meta
         assert restored.meta == {"mode": GraphSpecMode.LIVE, "extra": "value", "format": "mthds"}
 
-    def test_roundtrip_with_error_spec(self) -> None:
-        """Test round-trip for a graph with a failed node containing error info."""
-        error = ErrorSpec(
-            error_type="PipeRunError",
-            message="LLM generation failed",
-            stack="Traceback (most recent call last):\n  File ...\nPipeRunError: LLM generation failed",
+    def test_roundtrip_with_error_problem(self) -> None:
+        """Test round-trip for a graph with a failed node carrying its problem and its stack."""
+        error = make_problem(
+            code=CoreCode.INPUT_MISSING,
+            view=ProblemView.CALLER,
+            params={"input": "topic"},
+            location=make_location(pipe="failed_pipe", path=["flow", "failed_pipe"]),
         )
 
         node = NodeSpec(
@@ -186,6 +189,7 @@ class TestGraphSpecRoundtrip:
             pipe_type="PipeLLM",
             status=NodeStatus.FAILED,
             error=error,
+            error_stack="Traceback (most recent call last):\n  File ...\nPipeRunError: LLM generation failed",
         )
 
         graph = GraphSpec(
@@ -201,9 +205,11 @@ class TestGraphSpecRoundtrip:
 
         assert restored.nodes[0].status == NodeStatus.FAILED
         assert restored.nodes[0].error is not None
-        assert restored.nodes[0].error.error_type == "PipeRunError"
-        assert restored.nodes[0].error.message == "LLM generation failed"
-        assert "Traceback" in (restored.nodes[0].error.stack or "")
+        assert restored.nodes[0].error == error
+        assert restored.nodes[0].error.detail == "The request does not give the input 'topic', which the method requires."
+        assert restored.nodes[0].error_stack == "Traceback (most recent call last):\n  File ...\nPipeRunError: LLM generation failed"
+        # The graph writes its node's problem as the wire does, with no member written as null.
+        assert json.loads(json_str)["nodes"][0]["error"] == error.to_wire()
 
     def test_roundtrip_file_save_load(self, tmp_path: Path) -> None:
         """Test save/load to file produces identical GraphSpec."""
@@ -279,18 +285,22 @@ class TestGraphSpecRoundtrip:
             assert io_spec.preview.endswith("...")
 
     def test_stack_truncation_on_creation(self) -> None:
-        """Test that long stack traces are truncated on ErrorSpec creation."""
+        """Test that a long stack trace is truncated on the failed node's creation."""
         long_stack = PreviewTruncationData.LONG_STACK_TEXT
-        error_spec = ErrorSpec(
-            error_type="TestError",
-            message="Test message",
-            stack=long_stack,
+        node = NodeSpec(
+            node_id="failed_node_001",
+            kind=NodeKind.OPERATOR,
+            pipe_code="failed_pipe",
+            pipe_type="PipeLLM",
+            status=NodeStatus.FAILED,
+            error=make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER),
+            error_stack=long_stack,
         )
 
-        # Stack should be truncated to max length
-        assert len(error_spec.stack or "") <= PreviewTruncationData.MAX_STACK_LENGTH
-        if error_spec.stack and len(long_stack) > PreviewTruncationData.MAX_STACK_LENGTH:
-            assert error_spec.stack.endswith("...")
+        assert len(long_stack) > PreviewTruncationData.MAX_STACK_LENGTH
+        assert node.error_stack is not None
+        assert len(node.error_stack) <= PreviewTruncationData.MAX_STACK_LENGTH
+        assert node.error_stack.endswith("...")
 
     def test_roundtrip_with_usage_preserves_none_cost(self) -> None:
         """An unrated node round-trips as unrated — never as $0.00 (NodeUsageSpec invariant 2)."""
@@ -477,7 +487,7 @@ class TestGraphSpecRoundtrip:
                     pipe_code=f"pipe_{status}",
                     pipe_type="TestType",
                     status=status,
-                    error=ErrorSpec(error_type="TestError", message="Test"),
+                    error=make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER),
                 )
             nodes.append(node)
 

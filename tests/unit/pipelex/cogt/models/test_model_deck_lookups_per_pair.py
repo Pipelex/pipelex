@@ -1,13 +1,14 @@
 """One handle, one model per model type: every lookup of the deck goes by the pair, so each pipe family reaches its own spec."""
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, StepKind
 
 from pipelex.cogt.exceptions import ModelNotFoundError
-from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.errors.problem import ProblemView
 from tests.unit.pipelex.cogt.models.model_deck_per_pair_utils import TWIN_HANDLE, build_deck_manager, make_backend
 
 
@@ -45,15 +46,16 @@ class TestLookupsPerPair:
         """The load-time check does not look into an inline setting, so the run-time lookup is what reports it.
 
         `verdict` is served as a judgment model only, and nothing of the deck's LLM half names it.
-        The report names the type the pipe asked for, never the type the deck serves the handle as.
+        The caller's problem names the type the pipe asked for, never the type the deck serves the handle as.
         """
         inline_setting = LLMSetting(model="verdict", temperature=0.5)
 
         with pytest.raises(ModelNotFoundError) as exc_info:
             self._twin_manager().get_inference_model(inline_setting.model, model_type=ModelType.LLM)
 
-        report = exc_info.value.to_error_report()
-        assert report.user_action is not None
-        assert report.user_action.kind is UserActionKind.CHANGE_MODEL
-        assert "an LLM" in report.user_action.detail
-        assert "judgment" not in report.user_action.detail
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_UNKNOWN
+        assert caller.next_step.kind == StepKind.CHANGE_MODEL
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": "verdict", "model_type": ModelType.LLM}
+        assert "judgment" not in str(caller.to_wire())
