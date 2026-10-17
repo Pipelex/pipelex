@@ -37,9 +37,10 @@ The selection chain takes the request's `pipe_ref`; else a fetched package's man
 The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with a `422` problem whose `code` names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that member:
 
 - `request.pipe_not_found` for a `pipe_ref` that names no pipe of the closure, with the selection as its `pipe` parameter;
-- `request.pipe_ambiguous` for a bare code that matches pipes in several domains and, without `all_pipes`, for a request with no `pipe_ref` whose closure declares several `main_pipe`s, with the selection as its `pipe` parameter and the qualified refs to choose from as its `candidates`;
-- `request.pipe_unspecified`, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`;
-- `method.pipe_unresolved` for a manifest `main_pipe` the closure does not declare or matches ambiguously, the method's own declaration to fix, with the declared selection as its `missing` parameter.
+- `request.pipe_ambiguous` for a bare code that matches pipes in several domains, with the selection as its `pipe` parameter and the qualified refs to choose from as its `candidates`;
+- `request.pipe_unspecified`, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`, or several, whose qualified refs are then its `candidates`;
+- `method.pipe_unresolved` for a manifest `main_pipe` the closure does not declare, the method's own declaration to fix, with the declared selection as its `missing` parameter;
+- `method.ref_ambiguous` for a manifest `main_pipe` that matches pipes in several domains of the closure, the method's own declaration to fix, with the declared selection as its `ref` parameter and the qualified refs it matches as its `candidates`.
 
 The problem's `type`, `title`, sentences and step are the code's: a request's selection asks the caller to select a pipe the method declares, and a manifest's asks the method's author to correct the declaration.
 

@@ -259,8 +259,9 @@ class TestPipelineBundle:
 
         assert response.status_code == 422, response.text
         problem = response.json()
-        # Both bundles declare a main_pipe, so the run that names no pipe has several to start at.
-        assert problem["code"] == CoreCode.REQUEST_PIPE_AMBIGUOUS
+        # Both bundles declare a main_pipe, so the run that names no pipe has several to start at, which it names.
+        assert problem["code"] == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        assert problem["params"] == {"candidates": ["other.echo", "smoke.echo"]}
         assert problem["domain"] == "input"
         assert problem["diagnostics"]["error_class"] == "MethodEntryError"
         assert "'a.mthds'" in problem["diagnostics"]["message"]

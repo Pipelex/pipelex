@@ -247,10 +247,13 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
 
     The code says who must act, which is where the selector came from. A selector the request named that
     misses is the caller's (`request.pipe_not_found`, `request.pipe_ambiguous`), and so is a request naming no
-    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified` when it
-    declares none, `request.pipe_ambiguous` when it declares several). A `main_pipe` the method itself
-    declares, in the fetched package's manifest or in the closure, that names no pipe of the closure is the
-    method's (`method.pipe_unresolved`), whose author fixes the declaration.
+    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified`, naming as its
+    `candidates` the `main_pipe`s the closure declares when it declares several, since there is then no selector
+    for `request.pipe_ambiguous` to name). A `main_pipe` the method itself declares, in the fetched package's
+    manifest or in the closure, is the method's, whose author fixes the declaration: one that names no pipe of
+    the closure is `method.pipe_unresolved`, naming it as the `missing` pipe, and one that matches pipes in
+    several domains is `method.ref_ambiguous`, naming it as the `ref` with its `candidates`, so the refusal
+    never says a pipe that exists twice does not exist.
     """
     match miss.kind:
         case PipeSelectionMissKind.NOT_FOUND:
@@ -263,14 +266,24 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
                     raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED))
         case PipeSelectionMissKind.AMBIGUOUS:
             match miss.origin:
-                case SelectorOrigin.REQUEST | None:
+                case SelectorOrigin.REQUEST:
                     raise (
                         EntryPipeAmbiguousError(miss.message)
                         .with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
                         .with_params(pipe=miss.selector, candidates=miss.candidates)
                     )
+                case None:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+                        .with_params(candidates=miss.candidates)
+                    )
                 case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
-                    raise (EntryPipeAmbiguousError(miss.message).with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED).with_params(missing=miss.selector))
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
+                        .with_params(ref=miss.selector, candidates=miss.candidates)
+                    )
 
 
 def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) -> RequestedPipe | PipeSelectionMiss:

@@ -567,9 +567,10 @@ class MethodEntryError(PipelexError):
     a pipe no bundle defines, and a method with no manifest whose bundles declare none or several, are refused, with
     the bundles named by their tree paths. The method is the caller's own, so the message is theirs to read.
 
-    Its code defaults to ``request.pipe_unspecified``, a run naming no pipe of a method that declares no
-    ``main_pipe``; the raise site chooses ``request.pipe_ambiguous`` when several pipes qualify,
-    ``method.pipe_unresolved`` when the manifest names a pipe no bundle defines, ``method.package_invalid``
+    Its code defaults to ``request.pipe_unspecified``, a run naming no pipe of a method that declares no single
+    ``main_pipe``, which names the bundles' ``main_pipe``s as its candidates when they declare several; the raise site
+    chooses ``method.pipe_unresolved`` when the manifest names a pipe no bundle defines, ``method.ref_ambiguous`` when
+    several bundles define the pipe the manifest names, ``method.package_invalid``
     when the manifest cannot be read, ``method.syntax`` when a bundle is not text, and ``method.invalid`` when
     the method holds no bundle at all.
     """
@@ -577,7 +578,7 @@ class MethodEntryError(PipelexError):
     error_code = ErrorCodeSet(
         default=CoreCode.REQUEST_PIPE_UNSPECIFIED,
         others=(
-            CoreCode.REQUEST_PIPE_AMBIGUOUS,
+            CoreCode.METHOD_REF_AMBIGUOUS,
             CoreCode.METHOD_PIPE_UNRESOLVED,
             CoreCode.METHOD_PACKAGE_INVALID,
             CoreCode.METHOD_SYNTAX,

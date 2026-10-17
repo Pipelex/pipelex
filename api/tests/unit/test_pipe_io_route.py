@@ -252,7 +252,13 @@ class TestPipeIoRoute:
         install_method_package(files={"smoke.mthds": VALID_MTHDS, "twin.mthds": COLLIDING_ECHO_LIST_MTHDS})
         client = _build_client(as_operator=True)
         response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
-        problem = _assert_selection_refusal(response, code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"missing": "echo"})
+        # The author's manifest names a pipe that exists twice: an ambiguous reference of the method, never a missing pipe.
+        problem = _assert_selection_refusal(
+            response, code=CoreCode.METHOD_REF_AMBIGUOUS, params={"ref": "echo", "candidates": ["smoke.echo", "twin.echo"]}
+        )
+        assert problem["domain"] == "method"
+        assert problem["detail"] == "The reference 'echo' matches several declarations: smoke.echo, twin.echo."
+        assert "does not exist" not in problem["title"]
         assert problem["diagnostics"]["error_class"] == "EntryPipeAmbiguousError"
         message = problem["diagnostics"]["message"]
         assert "manifest" in message
@@ -367,7 +373,8 @@ class TestPipeIoRoute:
             pytest.param(
                 (VALID_MTHDS, SECOND_MAIN_PIPE_MTHDS),
                 {},
-                CoreCode.REQUEST_PIPE_AMBIGUOUS,
+                # No selector to name: the caller is told to pick one of the declared entry pipes.
+                CoreCode.REQUEST_PIPE_UNSPECIFIED,
                 {"candidates": ["other.shout", "smoke.echo"]},
                 ("EntryPipeAmbiguousError", "several `main_pipe`s"),
                 id="several-entry-pipes",

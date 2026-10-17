@@ -64,8 +64,9 @@ class EntryPipeAmbiguousError(PipeLibraryError):
 
     Raised only by the entry lookup, which searches a bare code across domains precisely because a
     human typed it. Refusing to guess is the right answer, but it is the caller who picks the winner
-    — ``request.pipe_ambiguous``, same reasoning as :class:`EntryPipeNotFoundError`; several entry pipes the method
-    itself declares choose ``method.pipe_unresolved``.
+    — ``request.pipe_ambiguous``, same reasoning as :class:`EntryPipeNotFoundError`. A request naming no pipe of a
+    method declaring several entry pipes chooses ``request.pipe_unspecified`` with those pipes as its candidates, and
+    an entry pipe the method itself declares that matches pipes in several domains chooses ``method.ref_ambiguous``.
 
     The message names the caller's own `pipe_code` and the qualified `pipe_ref`s of bundles they
     loaded themselves, the candidates being the only thing that makes the error actionable, and a raise
@@ -76,7 +77,7 @@ class EntryPipeAmbiguousError(PipeLibraryError):
     library would put host `pipe_ref`s in this message.
     """
 
-    error_code = ErrorCodeSet(default=CoreCode.REQUEST_PIPE_AMBIGUOUS, others=(CoreCode.METHOD_PIPE_UNRESOLVED,))
+    error_code = ErrorCodeSet(default=CoreCode.REQUEST_PIPE_AMBIGUOUS, others=(CoreCode.REQUEST_PIPE_UNSPECIFIED, CoreCode.METHOD_REF_AMBIGUOUS))
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         # Both spellings, because both raise sites reach this one detail: the bare-code arm is fixed by

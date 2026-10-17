@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pytest
 from mthds.method_tree.lister import list_method_tree
@@ -74,7 +75,7 @@ class TestMethodEntry:
         assert entry.tree_path == "steps/extract.mthds"
 
     @pytest.mark.parametrize(
-        ("files", "expected", "expected_code"),
+        ("files", "expected", "expected_code", "expected_params"),
         [
             (
                 {
@@ -83,6 +84,7 @@ class TestMethodEntry:
                 },
                 "none of its bundles declares a main_pipe ('a.mthds', 'b/b.mthds')",
                 CoreCode.REQUEST_PIPE_UNSPECIFIED,
+                None,
             ),
             (
                 {
@@ -90,7 +92,8 @@ class TestMethodEntry:
                     "b/b.mthds": _bundle(domain="entry_b", pipe_code="second", main_pipe="second"),
                 },
                 "several of its bundles declare a main_pipe: 'a.mthds' declares 'first', 'b/b.mthds' declares 'second'",
-                CoreCode.REQUEST_PIPE_AMBIGUOUS,
+                CoreCode.REQUEST_PIPE_UNSPECIFIED,
+                {"candidates": ["entry_a.first", "entry_b.second"]},
             ),
             (
                 {
@@ -102,6 +105,7 @@ class TestMethodEntry:
                     "Its bundles: 'a.mthds'."
                 ),
                 CoreCode.REQUEST_PIPE_UNSPECIFIED,
+                None,
             ),
             (
                 {
@@ -110,17 +114,36 @@ class TestMethodEntry:
                 },
                 "declares the main_pipe 'missing', exported by 'entry_a', which none of its bundles defines in that domain: 'a.mthds'.",
                 CoreCode.METHOD_PIPE_UNRESOLVED,
+                {"missing": "missing"},
+            ),
+            (
+                {
+                    "METHODS.toml": _manifest(main_pipe="first", exports={"entry_a": ["first"], "entry_b": ["first"]}),
+                    "a.mthds": _bundle(domain="entry_a", pipe_code="first", main_pipe=None),
+                    "b/b.mthds": _bundle(domain="entry_b", pipe_code="first", main_pipe=None),
+                },
+                "declares the main_pipe 'first', which several of its bundles define: 'a.mthds' in domain 'entry_a', 'b/b.mthds' in domain 'entry_b'",
+                CoreCode.METHOD_REF_AMBIGUOUS,
+                {"ref": "first", "candidates": ["entry_a.first", "entry_b.first"]},
             ),
             (
                 {"notes.md": "# Notes\n"},
                 "holds no .mthds bundle, so it has no pipe to start at",
                 CoreCode.METHOD_INVALID,
+                None,
             ),
         ],
-        ids=["no_main_pipe", "several_main_pipes", "manifest_without_main_pipe", "manifest_main_pipe_undefined", "no_bundle"],
+        ids=[
+            "no_main_pipe",
+            "several_main_pipes",
+            "manifest_without_main_pipe",
+            "manifest_main_pipe_undefined",
+            "manifest_main_pipe_twice",
+            "no_bundle",
+        ],
     )
     def test_a_method_with_no_single_entry_is_refused_naming_its_bundles_by_tree_path(
-        self, tmp_path: Path, files: dict[str, str], expected: str, expected_code: CoreCode
+        self, tmp_path: Path, files: dict[str, str], expected: str, expected_code: CoreCode, expected_params: dict[str, Any] | None
     ) -> None:
         _write(directory=tmp_path, files=files)
 
@@ -131,6 +154,8 @@ class TestMethodEntry:
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == expected_code
         assert problem.domain != ProblemDomain.OPERATOR
+        # The refusal gives the parameters its sentences name: the pipes to choose from, the missing one, the ambiguous one.
+        assert problem.to_wire().get("params") == expected_params
 
     def test_a_manifest_that_does_not_validate_is_an_entry_refusal(self, tmp_path: Path) -> None:
         """A manifest the lister can read but the standard refuses, here one with no address, gives no entry."""
