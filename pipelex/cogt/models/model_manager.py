@@ -30,7 +30,7 @@ from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import describe_former_release_boot_refusal, former_release_boot_blockers
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.tools.misc.file_utils import find_files_in_dir, path_label
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -96,7 +96,7 @@ class ModelManager(ModelManagerAbstract):
             msg = describe_former_release_boot_refusal(blockers=blockers)
             # The step names the first of them, the backend library's before the routing profiles'.
             first_blocker = blockers[0]
-            raise FormerReleaseConfigError(msg).with_params(surface="inference", file=str(first_blocker.file_path), setting=first_blocker.setting)
+            raise FormerReleaseConfigError(msg).with_params(surface="inference", file=path_label(path=first_blocker.file_path), setting=first_blocker.setting)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_paths=resolved_backends_library_paths,

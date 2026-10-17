@@ -25,10 +25,11 @@ from pipelex.interpreter_hub import get_library_manager, get_pipe_library, get_r
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import get_console, get_models_manager, get_secrets_provider, get_telemetry_manager
-from pipelex.system.configuration.config_loader import CONFIG_NAME, config_manager
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.exceptions import TomlError
+from pipelex.tools.misc.file_utils import path_label
 from pipelex.tools.misc.package_utils import get_package_version
 
 if TYPE_CHECKING:
@@ -46,16 +47,19 @@ def do_show_config() -> None:
         final_config = config_manager.load_config()
         pretty_print(final_config, title="Pipelex configuration")
     except TomlError as exc:
+        # The configuration is layered, the packaged file then the home and the project ones, so the refusal names the
+        # layer that does not parse, which the line and column belong to; a document read from no file names none.
         msg = f"Error loading configuration: {exc}"
+        failed_file = path_label(path=exc.path) if exc.path is not None else None
         raise (
-            PipelexConfigError(msg, surface="pipelex", file=CONFIG_NAME)
+            PipelexConfigError(msg, surface="pipelex", file=failed_file)
             .with_error_code(PipelexErrorCode.CONFIG_SYNTAX)
             .with_params(line=exc.lineno, column=exc.colno)
         ) from exc
     except OSError as exc:
         msg = f"Error loading configuration: {exc}"
-        missing_file = str(exc.filename) if exc.filename is not None else CONFIG_NAME
-        raise PipelexConfigError(msg, surface="pipelex", file=missing_file).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from exc
+        failed_file = path_label(path=Path(str(exc.filename))) if exc.filename is not None else None
+        raise PipelexConfigError(msg, surface="pipelex", file=failed_file).with_error_code(PipelexErrorCode.CONFIG_FILE_MISSING) from exc
 
 
 def do_list_pipes() -> None:

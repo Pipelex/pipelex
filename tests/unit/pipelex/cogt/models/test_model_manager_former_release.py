@@ -107,10 +107,12 @@ class TestAFormerReleaseHomeAtBoot:
 
         with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
             problem = refused.value.to_problem(view=ProblemView.OPERATOR)
-        backends_path = home_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
+        # The file is named under the home directory as `~/…`: a step an agent reads, prints and logs names no account.
+        backends_label = f"~/{CONFIG_DIR_NAME}/{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}"
         assert problem.next_step.detail == (
-            f"Correct the setting 'pipelex_gateway' in the file '{backends_path}' of the inference configuration, then restart the runtime."
+            f"Correct the setting 'pipelex_gateway' in the file '{backends_label}' of the inference configuration, then restart the runtime."
         )
+        assert str(home_config_dir) not in problem.next_step.detail
         assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
 
     def test_a_home_whose_overrides_moved_it_off_the_gateway_boots(self, home_config_dir: Path) -> None:
