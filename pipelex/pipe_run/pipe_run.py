@@ -21,7 +21,7 @@ from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of
 from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
-from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD, error_fields
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -96,12 +96,20 @@ class PipeRun(PipeRunProtocol):
                 pipeline_run_id=pipeline_run_id,
                 request_id=pipe_job.job_metadata.run_metadata.request_id,
             )
-            # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
-            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
+            # The error rides as identifiers and no traceback: the exception is re-raised below, and its traceback
+            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice. The
+            # line carries the problem's code and the exception's class, never its text: the text can hold the
+            # caller's own words, a function's message or a template's source, and a refused host, which no log line
+            # carries, while the problem the caller receives holds them where the code declares them.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
             log.error(
                 "The execution of a pipe failed",
-                fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
+                fields={
+                    "pipe_code": pipe_job.pipe.code,
+                    "pipe_ref": pipe_job.pipe.pipe_ref,
+                    ERROR_CODE_FIELD: problem.code,
+                    ERROR_TYPE_FIELD: type(exc).__name__,
+                },
             )
         finally:
             tracer_manager = GraphTracerManager.get_instance()

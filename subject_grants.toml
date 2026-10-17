@@ -5684,25 +5684,9 @@ rationale = "Transforms the templating_context; single operand."
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_non_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
 ["pipelex/tools/jinja2/jinja2_rendering.py::_prepare_templating_context"]
 param = "templating_context"
 rationale = "Jinja op on the templating_context; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_async"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_sync"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::render_jinja2_async"]
 param = "template_source"

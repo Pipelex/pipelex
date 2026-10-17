@@ -122,12 +122,13 @@ def _prepare_templating_context(
     return prepared_templating_context
 
 
-def _make_type_error_msg(template_source: str, *, templating_context: dict[str, Any], type_error: TypeError) -> str:
+def _make_type_error_msg(*, templating_context: dict[str, Any], type_error: TypeError) -> str:
+    # The template source is left out, like every render failure's: a method's template is the caller's own text and
+    # Pipelex's own templates render the run's data, and the message reaches the operator's diagnostics and the logs.
     context_vars = ", ".join(f"'{key}'" for key in templating_context)
     return (
         f"Jinja2 render — type error: '{type_error}'. "
         f"This often happens when trying to iterate over a method or accessing an attribute incorrectly. "
-        f"Template source:\n{template_source}\n"
         f"Available context variables: {context_vars}"
     )
 
@@ -148,12 +149,12 @@ def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError) -> str:
 
 
 def _make_non_type_error_msg(
-    template_source: str,
     *,
     error_label: str,
     error: Jinja2StuffError | UndefinedError | Jinja2ContextError | FilterArgumentError | ArithmeticError,
 ) -> str:
-    return f"Jinja2 render — {error_label}: '{error}', template_source:\n{template_source}"
+    # The template source is left out: a method's template is the caller's own text, which no log line carries.
+    return f"Jinja2 render — {error_label}: '{error}'"
 
 
 def _make_invalid_template_error(*, template_error: TemplateError, template_owner: TemplateOwner) -> Jinja2TemplateInvalidError:
@@ -208,9 +209,7 @@ _RENDER_FAILURES: tuple[type[BaseException], ...] = (
 )
 
 
-def _make_render_failure(
-    *, template_source: str, render_error: BaseException, templating_context: dict[str, Any], template_owner: TemplateOwner
-) -> ToolError:
+def _make_render_failure(*, render_error: BaseException, templating_context: dict[str, Any], template_owner: TemplateOwner) -> ToolError:
     """Translate what a render raised into the error the render reports, coded by the template's owner.
 
     The order of the arms matters: a refusal of the sandbox, an undefined value and a filter refusing its argument are
@@ -230,53 +229,45 @@ def _make_render_failure(
                 # Pipelex's own template only overspends on data too large to display.
                 return Jinja2TemplateBudgetError(budget_msg).with_error_code(CoreCode.INPUT_TOO_LARGE)
     if isinstance(render_error, Jinja2ContextError):
-        msg = _make_non_type_error_msg(template_source=template_source, error_label="context error", error=render_error)
+        msg = _make_non_type_error_msg(error_label="context error", error=render_error)
         return _make_context_render_error(msg=msg, context_error=render_error, template_owner=template_owner)
     if isinstance(render_error, Jinja2StuffError):
-        msg = _make_non_type_error_msg(template_source=template_source, error_label="stuff error", error=render_error)
+        msg = _make_non_type_error_msg(error_label="stuff error", error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, UndefinedError):
-        msg = _make_non_type_error_msg(template_source=template_source, error_label="undefined error", error=render_error)
+        msg = _make_non_type_error_msg(error_label="undefined error", error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, FilterArgumentError):
         # A filter refusing its argument may be refusing this run's value (`reverse` on a value that is not iterable)
         # as well as the template's own literal, which nothing here tells apart, so it is not the template's alone.
-        msg = _make_non_type_error_msg(template_source=template_source, error_label="filter argument error", error=render_error)
+        msg = _make_non_type_error_msg(error_label="filter argument error", error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, (TemplateSyntaxError, TemplateNotFound, TemplateRuntimeError)):
         return _make_invalid_template_error(template_error=render_error, template_owner=template_owner)
     if isinstance(render_error, ArithmeticError):
         # The template's own arithmetic, the sandbox's range cap included: `range` raises OverflowError past it.
-        msg = _make_non_type_error_msg(template_source=template_source, error_label="arithmetic error", error=render_error)
+        msg = _make_non_type_error_msg(error_label="arithmetic error", error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     if isinstance(render_error, TypeError):
-        msg = _make_type_error_msg(template_source=template_source, templating_context=templating_context, type_error=render_error)
+        msg = _make_type_error_msg(templating_context=templating_context, type_error=render_error)
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     msg = f"Jinja2 render — {type(render_error).__name__} is not a failure the render translates"
     raise PipelexUnexpectedError(msg) from render_error
 
 
-def _render_template_sync(
-    template_source: str, *, template: _Jinja2Template, templating_context: dict[str, Any], template_owner: TemplateOwner
-) -> str:
+def _render_template_sync(*, template: _Jinja2Template, templating_context: dict[str, Any], template_owner: TemplateOwner) -> str:
     try:
         generated_text: str = template.render(**templating_context)
     except _RENDER_FAILURES as exc:
-        raise _make_render_failure(
-            template_source=template_source, render_error=exc, templating_context=templating_context, template_owner=template_owner
-        ) from exc
+        raise _make_render_failure(render_error=exc, templating_context=templating_context, template_owner=template_owner) from exc
     return generated_text
 
 
-async def _render_template_async(
-    template_source: str, *, template: _Jinja2Template, templating_context: dict[str, Any], template_owner: TemplateOwner
-) -> str:
+async def _render_template_async(*, template: _Jinja2Template, templating_context: dict[str, Any], template_owner: TemplateOwner) -> str:
     try:
         generated_text: str = await template.render_async(**templating_context)
     except _RENDER_FAILURES as exc:
-        raise _make_render_failure(
-            template_source=template_source, render_error=exc, templating_context=templating_context, template_owner=template_owner
-        ) from exc
+        raise _make_render_failure(render_error=exc, templating_context=templating_context, template_owner=template_owner) from exc
     return generated_text
 
 
@@ -303,7 +294,6 @@ def render_jinja2_sync(
         template_owner=template_owner,
     )
     return _render_template_sync(
-        template_source=template_source,
         template=template,
         templating_context=prepared_templating_context,
         template_owner=template_owner,
@@ -339,7 +329,6 @@ async def render_jinja2_async(
         template_owner=template_owner,
     )
     return await _render_template_async(
-        template_source=template_source,
         template=template,
         templating_context=prepared_templating_context,
         template_owner=template_owner,

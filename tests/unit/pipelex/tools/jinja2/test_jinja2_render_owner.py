@@ -177,7 +177,10 @@ class TestJinja2RenderOwner:
         method_code: ErrorCode,
         pipelex_code: ErrorCode,
     ) -> None:
-        """The same failure is the method's on a method's template and ours, or the data's, on Pipelex's own."""
+        """The same failure is the method's on a method's template and ours, or the data's, on Pipelex's own.
+
+        Its message never quotes the template, which is the caller's own text on a method's template.
+        """
         for template_owner, expected_code in ((TemplateOwner.METHOD, method_code), (TemplateOwner.PIPELEX, pipelex_code)):
             error = await _render_failure(
                 template_source,
@@ -188,6 +191,7 @@ class TestJinja2RenderOwner:
             )
             assert type(error) is error_class, topic
             assert error.to_problem(view=ProblemView.CALLER).code == expected_code, f"{topic} on a {template_owner} template"
+            assert template_source not in error.message, f"{topic} on a {template_owner} template"
 
     def test_the_sync_render_is_coded_alike(self) -> None:
         with pytest.raises(Jinja2TemplateInvalidError) as exc_info:

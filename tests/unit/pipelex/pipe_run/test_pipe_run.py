@@ -145,8 +145,32 @@ class TestPipeRun:
         assert record_fields["pipe_code"] == "describe_company"
         assert record_fields["pipe_ref"] == "company.describe_company"
         assert record_fields["error.type"] == "RuntimeError"
-        assert record_fields["error.message"] == "router blew up"
+        assert record_fields["error.code"] == "runtime.unexpected"
         assert failure_record.exc_info is None
+
+    async def test_the_failure_line_carries_the_code_and_never_the_exception_s_text(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An exception's text can hold the caller's own words or a refused host: the line names its code and class alone."""
+        caller_words = "the caller's own words, which no log line carries"
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=RuntimeError(caller_words))
+        mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_job = mocker.MagicMock()
+        mock_job.pipe.code = "describe_company"
+        mock_job.pipe.pipe_ref = "company.describe_company"
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-failure-text", storage_scope="test/scope", read_scope=None)
+        )
+
+        with pytest.raises(RuntimeError), caplog.at_level(logging.DEBUG, logger=pipe_run_module.__name__):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job)
+
+        own_records = [record for record in caplog.records if record.name == pipe_run_module.__name__]
+        assert own_records
+        for record in own_records:
+            assert "error.message" not in vars(record)
+            assert caller_words not in str(vars(record))
 
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""
