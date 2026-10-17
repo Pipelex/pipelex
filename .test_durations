@@ -6972,7 +6972,7 @@
     "tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py::TestCogtDependencyBoundaries::test_import_target_resolves_a_submodule_but_not_a_symbol[from pipelex.providers.anthropic.anthropic_config import AnthropicConfig-expected3]": 0.0017,
     "tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py::TestCogtDependencyBoundaries::test_import_target_resolves_a_submodule_but_not_a_symbol[from pydantic import BaseModel-expected5]": 0.0007,
     "tests/unit/pipelex/cogt/test_cogt_dependency_boundaries.py::TestCogtDependencyBoundaries::test_import_target_resolves_a_submodule_but_not_a_symbol[import pipelex.providers.openai.openai_config-expected6]": 0.0007,
-    "tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py::TestCogtProviderMetadataWrapperWins::test_wrapper_provider_metadata_wins_even_when_cause_has_richer_metadata": 0.9254,
+    "tests/unit/pipelex/cogt/test_cogt_provider_facts_merge.py::TestCogtProviderFactsMerge::test_a_wrapper_keeps_what_its_cause_recorded_of_the_provider_answer": 0.9254,
     "tests/unit/pipelex/cogt/test_error_classification.py::TestErrorClassification::test_is_content_policy_violation[blocked_by_safety-The response was blocked by safety systems-True]": 0.0003,
     "tests/unit/pipelex/cogt/test_error_classification.py::TestErrorClassification::test_is_content_policy_violation[case_insensitive-Content_Policy violation detected-True]": 0.0004,
     "tests/unit/pipelex/cogt/test_error_classification.py::TestErrorClassification::test_is_content_policy_violation[content_filter-content_filter triggered for this request-True]": 0.0009,
