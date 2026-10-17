@@ -5,10 +5,11 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, NoReturn
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cli.exceptions import AgentBootError
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
@@ -153,6 +154,16 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
+def _report_boot_failure(*, message: str, cause: BaseException) -> NoReturn:
+    """Report a boot failure whose chain gives no advice, under :class:`AgentBootError`, whose advice is the recovery path.
+
+    The problem keeps the cause's code, which the boot error takes; the Markdown tip is the boot's advice.
+    """
+    boot_error = AgentBootError(message)
+    boot_error.__cause__ = cause
+    agent_error(message, cause=boot_error)
+
+
 def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
     """Initialize Pipelex for agent CLI commands, a failure reported as its problem.
 
@@ -211,11 +222,14 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
         )
     except PipelexError as exc:
         # A configuration that does not load, telemetry and a former release's leftovers included, reports its own code,
-        # its next step and, when the migration history explains it, the pending migration in its diagnostics.
+        # its next step, its advice and, when the migration history explains it, the pending migration in its diagnostics.
+        # A failure whose chain gives no advice is reported under the boot's own, which names the recovery path.
+        if exc.advised_action() is None:
+            _report_boot_failure(message=exc.message, cause=exc)
         agent_error(exc.message, cause=exc)
     except Exception as exc:  # ruff: ignore[blind-except]
         # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
-        agent_error(f"Pipelex initialization failed: {exc}", cause=exc)
+        _report_boot_failure(message=f"Pipelex initialization failed: {exc}", cause=exc)
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the
     # structured success/error envelope. Defense-in-depth on top of the init-time

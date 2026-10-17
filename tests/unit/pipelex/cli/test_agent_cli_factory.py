@@ -12,9 +12,12 @@ import typer
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import MigrationErrorBlock, PipelexConfigError, PipelexSetupError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, start_agent_cli_error_format
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.misc.pretty import PrettyPrinter
 
@@ -102,3 +105,72 @@ class TestMakePipelexForAgentCli:
         assert parsed["preset_id"] == "my_preset"
         assert parsed["model_handle"] == "claude-3-opus"
         assert sorted(parsed["enabled_backends"]) == ["anthropic", "openai"]
+
+    @pytest.mark.parametrize(
+        ("failure", "expected_code"),
+        [
+            (RuntimeError("the disk is full"), "runtime.unexpected"),
+            (PipelexSetupError("Pipelex is already initialized"), "runtime.misconfigured"),
+        ],
+    )
+    def test_a_boot_failure_with_no_advice_tips_the_recovery_path(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], failure: Exception, expected_code: str
+    ) -> None:
+        """A boot failure whose chain advises nothing is tipped with the recovery path an agent can run, and keeps its code."""
+        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=failure)
+        start_agent_cli_error_format(root_error_format=CliOutputFormat.MARKDOWN)
+
+        with pytest.raises(typer.Exit):
+            make_pipelex_for_agent_cli()
+
+        markdown = capsys.readouterr().err
+        assert f"- Code: `{expected_code}`" in markdown
+        assert "💡 Run 'pipelex-agent doctor' to diagnose the installation and its configuration." in markdown
+        assert "'pipelex-agent migrate --dry-run --format json', shown to the user, then 'pipelex-agent migrate --yes'" in markdown
+        assert "'pipelex-agent init' (--global for the home configuration)" in markdown
+
+    def test_a_boot_failure_keeps_its_code_and_class_in_json(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Under the boot's advice the problem is still the cause's: its code, and its class among the causes."""
+        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=RuntimeError("the disk is full"))
+
+        with pytest.raises(typer.Exit):
+            make_pipelex_for_agent_cli()
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["code"] == "runtime.unexpected"
+        assert parsed["message"] == "Pipelex initialization failed: the disk is full"
+        assert [cause["error_class"] for cause in parsed["diagnostics"]["causes"]] == ["RuntimeError"]
+
+    @pytest.mark.parametrize(
+        ("migration", "expected_tip"),
+        [
+            (None, "💡 Run 'pipelex doctor' (from an agent, 'pipelex-agent doctor') to find what in the configuration does not validate"),
+            (
+                MigrationErrorBlock(remedy=MIGRATE_COMMAND, would_write=True, needs_attention=False, plans=[]),
+                "then run 'pipelex-agent migrate --yes'",
+            ),
+            (
+                MigrationErrorBlock(remedy=MIGRATE_COMMAND, would_write=False, needs_attention=True, plans=[]),
+                "💡 A migration would rewrite nothing here: correct by hand what the migration's plans name",
+            ),
+        ],
+    )
+    def test_a_configuration_that_does_not_load_tips_its_own_advice(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], migration: MigrationErrorBlock | None, expected_tip: str
+    ) -> None:
+        """A configuration error advises by its migration: doctor, migrate, or correct by hand; its step names the setting."""
+        refusal = PipelexConfigError(
+            "Could not setup config because of: bad", migration=migration, surface="pipelex", file="pipelex.toml", setting="runtime.log.level"
+        )
+        mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", side_effect=refusal)
+        start_agent_cli_error_format(root_error_format=CliOutputFormat.MARKDOWN)
+
+        with pytest.raises(typer.Exit):
+            make_pipelex_for_agent_cli()
+
+        markdown = capsys.readouterr().err
+        assert expected_tip in markdown
+        assert "Run 'pipelex-agent doctor' to diagnose the installation" not in markdown
+        assert (
+            "Correct the setting 'runtime.log.level' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime." in markdown
+        )

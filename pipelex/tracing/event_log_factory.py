@@ -1,6 +1,7 @@
 """Factory for creating event log backends from configuration."""
 
 from pipelex.base_exceptions import PipelexConfigError
+from pipelex.system.configuration.config_loader import CONFIG_NAME
 from pipelex.system.configuration.configs import TracingBackend, TracingConfig
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
 from pipelex.tracing.event_log_protocol import EventLogProtocol
@@ -18,12 +19,12 @@ def make_event_log(tracing_config: TracingConfig, *, writer_id: str = "primary")
         case TracingBackend.NDJSON:
             if tracing_config.ndjson is None:
                 msg = "ndjson config is required when backend is 'ndjson'"
-                raise PipelexConfigError(msg)
+                raise PipelexConfigError(msg, surface="pipelex", file=CONFIG_NAME, setting="runtime.tracing.ndjson")
             return NdjsonEventLog(traces_dir=tracing_config.ndjson.traces_dir, writer_id=writer_id)
         case TracingBackend.DYNAMODB:
             if tracing_config.dynamodb is None:
                 msg = "dynamodb config is required when backend is 'dynamodb'"
-                raise PipelexConfigError(msg)
+                raise PipelexConfigError(msg, surface="pipelex", file=CONFIG_NAME, setting="runtime.tracing.dynamodb")
             return DynamoDBEventLog(
                 table_name=tracing_config.dynamodb.table_name,
                 region=tracing_config.dynamodb.region,

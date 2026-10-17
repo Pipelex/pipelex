@@ -1010,7 +1010,7 @@ class TestABootFailureCarriesThePendingMigration:
         config_file.write_text(planted + config_file.read_text(encoding="utf-8"), encoding="utf-8")
         return config_file
 
-    def test_the_agent_boot_error_carries_the_config_domain_and_the_block(
+    def test_the_agent_boot_error_carries_the_operator_domain_and_the_block(
         self,
         hermetic_home: Path,
         offline_subprocess_env: dict[str, str],
@@ -1028,6 +1028,9 @@ class TestABootFailureCarriesThePendingMigration:
         assert problem["code"] == "pipelex.config.invalid"
         assert problem["domain"] == "operator", "the operator's configuration, which only the operator can fix"
         assert problem["next_step"]["kind"] == "fix_configuration"
+        assert problem["next_step"]["detail"] == (
+            "Correct the setting 'posthog_project_key' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime."
+        )
 
         block: dict[str, Any] = problem["diagnostics"]["migration"]
         assert block["remedy"] == "pipelex migrate"

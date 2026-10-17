@@ -11,6 +11,7 @@
 # Generated — do not hand-edit. Regenerate with `make generate-error-identity` (alias `make gei`).
 # Verified by tests/unit/pipelex/errors/test_error_identity_snapshot.py.
 
+AgentBootError | inherits cause, else runtime.unexpected
 AmbiguousInputsFilesError | request.invalid
 AnthropicFactoryError | one of pipelex.config.invalid, runtime.unexpected
 AnthropicModelListingError | provider.response_invalid

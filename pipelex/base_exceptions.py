@@ -8,7 +8,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import UserAction
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import (
     ABSTRACT_ERROR,
     AbstractError,
@@ -657,17 +657,85 @@ class PipelexUnexpectedError(PipelexError):
     error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.RUNTIME_UNEXPECTED
 
 
+#: The advice a configuration that does not validate gives when no pending migration explains it.
+CONFIG_DOCTOR_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "Run 'pipelex doctor' (from an agent, 'pipelex-agent doctor') to find what in the configuration does not "
+        "validate, correct it, then run the command again."
+    ),
+)
+
+#: The advice a stale configuration gives, which a migration brings up to date.
+CONFIG_MIGRATE_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "The configuration is out of date: run 'pipelex migrate' to bring it up to date, which keeps a copy of each file it "
+        "changes. From an agent, run 'pipelex-agent migrate --dry-run --format json' to see what it would change, show the "
+        "user, then run 'pipelex-agent migrate --yes'. 'pipelex-agent init' (with --global for the home configuration) "
+        "writes a fresh configuration instead, discarding its settings."
+    ),
+)
+
+#: The advice a configuration gives when a migration has something to say but would write nothing.
+CONFIG_MIGRATE_BY_HAND_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A migration would rewrite nothing here: correct by hand what the migration's plans name (the problem's "
+        "'diagnostics.migration', or 'pipelex-agent migrate --dry-run --format json'), then run the command again. "
+        "Do not write a fresh configuration over it, which would discard settings a migration keeps."
+    ),
+)
+
+
+def config_refusal_advice(*, migration: MigrationErrorBlock | None) -> UserAction:
+    """The advice a refused configuration gives, read off the migration that explains it, when one does.
+
+    No migration: the configuration is wrong, and ``doctor`` finds what. A migration that would write: it is old, and a
+    migration brings it up to date. One that would write nothing: the plans are a diagnosis, to act on by hand.
+    """
+    if migration is None:
+        return CONFIG_DOCTOR_ADVICE
+    if migration.would_write:
+        return CONFIG_MIGRATE_ADVICE
+    return CONFIG_MIGRATE_BY_HAND_ADVICE
+
+
 class PipelexConfigError(PipelexError):
-    """A configuration this process cannot use, optionally with the migration that explains it."""
+    """A configuration this process cannot use, optionally with the migration that explains it.
+
+    Its raise site names what its code's step reads, as far as it knows them: the part of the configuration at fault
+    (``surface``), the file (``file``) and the setting (``setting``). Its advice, the tip a local CLI prints, is read
+    off the migration (:func:`config_refusal_advice`): run ``doctor``, or migrate, or correct what the plans name.
+    """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
         default=PipelexErrorCode.CONFIG_INVALID,
         others=(PipelexErrorCode.CONFIG_SYNTAX, PipelexErrorCode.CONFIG_FILE_MISSING),
     )
+    user_action = CONFIG_DOCTOR_ADVICE
 
-    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        migration: MigrationErrorBlock | None = None,
+        surface: str | None = None,
+        file: str | None = None,
+        setting: str | None = None,
+    ):
         super().__init__(message)
         self.migration = migration
+        self.surface = surface
+        self.file = file
+        self.setting = setting
+        if migration is not None:
+            # A pending migration changes the advice; without one, the class's own stands.
+            self.user_action = config_refusal_advice(migration=migration)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {name: value for name, value in {"surface": self.surface, "file": self.file, "setting": self.setting}.items() if value is not None}
 
     @override
     def problem_facts(self) -> ProblemFacts:

@@ -12,6 +12,7 @@ files laid over it, copied from that release's wheel.
 
 from __future__ import annotations
 
+import logging
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -20,6 +21,7 @@ import pytest
 
 from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.errors.problem import ProblemView
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import kit_default_routing_profile_name
@@ -93,6 +95,23 @@ class TestAFormerReleaseHomeAtBoot:
         message = str(refused.value)
         assert "'all_pipelex_gateway'" in message
         assert "enables the 'pipelex_gateway' backend" not in message
+        # The step names the first blocker: the routing profile file making the Gateway's profile active.
+        step = refused.value.to_problem(view=ProblemView.OPERATOR).next_step.detail
+        assert step.startswith("Correct the setting 'active' in the file '")
+        assert step.endswith("' of the inference configuration, then restart the runtime.")
+
+    def test_the_refusal_s_step_names_the_first_blocker(self, home_config_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """The code's step renders from the first blocker, the enabled Gateway table, and never falls back on the generic sentence."""
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = refused.value.to_problem(view=ProblemView.OPERATOR)
+        backends_path = home_config_dir / INFERENCE_DIR_NAME / BACKENDS_FILE_NAME
+        assert problem.next_step.detail == (
+            f"Correct the setting 'pipelex_gateway' in the file '{backends_path}' of the inference configuration, then restart the runtime."
+        )
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
 
     def test_a_home_whose_overrides_moved_it_off_the_gateway_boots(self, home_config_dir: Path) -> None:
         """Only what stops the boot is refused: what is inert is left for `pipelex migrate` and the doctor to report."""

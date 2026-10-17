@@ -94,7 +94,9 @@ class ModelManager(ModelManagerAbstract):
             routing_profile_library_paths=resolved_routing_profile_library_paths,
         ):
             msg = describe_former_release_boot_refusal(blockers=blockers)
-            raise FormerReleaseConfigError(msg)
+            # The step names the first of them, the backend library's before the routing profiles'.
+            first_blocker = blockers[0]
+            raise FormerReleaseConfigError(msg).with_params(surface="inference", file=str(first_blocker.file_path), setting=first_blocker.setting)
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_paths=resolved_backends_library_paths,
