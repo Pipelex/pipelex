@@ -225,16 +225,26 @@ class _FileWithholding(NamedTuple):
             if isinstance(error, PipesAndConceptValidationErrorData) and error.field_path in self.names:
                 update["field_path"] = ""
             if isinstance(error, DryRunFailureErrorData) and error.params:
-                update["params"] = {name: self._withheld_value(value=value) for name, value in error.params.items()}
+                update["params"] = self.withheld_params(params=error.params)
             withheld.append(error.model_copy(update=update))
         return withheld
 
+    def withheld_params(self, *, params: dict[str, Any]) -> dict[str, Any]:
+        """Parameters reading the placeholder where a text of them named a withheld file."""
+        return {name: self._withheld_value(value=value) for name, value in params.items()}
+
+    def withheld_item(self, *, item: ProblemItem) -> ProblemItem:
+        """A problem item reading the placeholder where a text of it, its sentence, a parameter or a locator, named a withheld file."""
+        return ProblemItem.model_validate(self._withheld_value(value=item.as_wire()))
+
     def _withheld_value(self, *, value: Any) -> Any:
-        """A parameter's value reading the placeholder where a text of it named a withheld file."""
+        """A value reading the placeholder where a text of it, at any depth, named a withheld file."""
         if isinstance(value, str):
             return self.withheld_text(text=value)
         if isinstance(value, list):
             return [self._withheld_value(value=item) for item in cast("list[Any]", value)]
+        if isinstance(value, dict):
+            return {key: self._withheld_value(value=item) for key, item in cast("dict[str, Any]", value).items()}
         return value
 
 
@@ -334,7 +344,9 @@ class ValidateBundleError(PipelexError):
         items' and the verdict's own, reads ``placeholder`` where it named one of them standing on its own,
         never inside a longer name. Everything else is kept, the items' locators included, so it is the same
         answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
-        it must be added here too, which ``test_validate_bundle_error_withholding`` pins. A validator of
+        it must be added here too, which ``test_validate_bundle_error_withholding`` pins. So is what the raise site chose
+        after building it: the code it chose (:meth:`with_error_code`), and the parameters and items it gave
+        (:meth:`with_params`, :meth:`with_items`), withheld as the messages are. A validator of
         submitted content uses it to keep the files of the host's own library directories, paths on the host,
         out of a verdict the caller reads.
 
@@ -346,7 +358,7 @@ class ValidateBundleError(PipelexError):
             A new verdict; this one is left as it is.
         """
         withholding = _FileWithholding.make_from_names(names=withheld_files, placeholder=placeholder)
-        return ValidateBundleError(
+        withheld = ValidateBundleError(
             message=withholding.withheld_text(text=self.message),
             pipelex_bundle_blueprint_validation_errors=withholding.withheld_errors(errors=self.pipelex_bundle_blueprint_validation_errors),
             pipe_factory_errors=[
@@ -356,6 +368,13 @@ class ValidateBundleError(PipelexError):
             pipe_concept_instantiation_errors=withholding.withheld_errors(errors=self.pipe_concept_instantiation_errors),
             dry_run_failures=withholding.withheld_errors(errors=self.dry_run_failures),
         )
+        if self._chosen_error_code is not None:
+            withheld.with_error_code(self._chosen_error_code)
+        if self.given_params:
+            withheld.with_params(**withholding.withheld_params(params=self.given_params))
+        if self._given_items:
+            withheld.with_items(items=[withholding.withheld_item(item=item) for item in self._given_items])
+        return withheld
 
     @property
     def pipe_validation_error_data(self) -> list[PipesAndConceptValidationErrorData]:

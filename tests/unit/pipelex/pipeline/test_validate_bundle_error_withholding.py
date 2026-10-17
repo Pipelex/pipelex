@@ -11,7 +11,8 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
-from pipelex.errors.problem import ProblemView
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import ProblemView, make_location, make_problem_item
 from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER, withholding_host_library_files
@@ -87,6 +88,29 @@ class TestValidateBundleErrorWithholding:
         assert problem_items[-1].code == CoreCode.METHOD_WIRING_INVALID
         for view in (ProblemView.CALLER, ProblemView.OPERATOR):
             assert _HOST_FILE not in str(withheld.to_problem(view=view).to_wire())
+
+    def test_what_the_raise_site_chose_is_carried(self) -> None:
+        """The code a raise site chose, and the parameters and items it gave, survive the withholding, withheld as the messages are."""
+        item = make_problem_item(code=CoreCode.METHOD_SYNTAX, params={"finding": _mentioning_the_host_file(label="item")}, location=make_location(file=_HOST_FILE))
+        verdict = (
+            ValidateBundleError(message=_mentioning_the_host_file(label="raw"))
+            .with_error_code(CoreCode.REQUEST_INVALID)
+            .with_params(field=_mentioning_the_host_file(label="field"))
+            .with_items(items=[item])
+        )
+
+        withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+
+        assert withheld.resolve_error_code() == CoreCode.REQUEST_INVALID
+        assert withheld.given_params == {"field": f"field in '{HOST_LIBRARY_FILE_PLACEHOLDER}'"}
+        (withheld_item,) = PipelexError.problem_items(withheld) or []
+        assert withheld_item.code == CoreCode.METHOD_SYNTAX
+        assert withheld_item.location is not None
+        assert withheld_item.location.file == HOST_LIBRARY_FILE_PLACEHOLDER
+        assert _HOST_FILE not in str(withheld_item.as_wire())
+        caller = withheld.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.REQUEST_INVALID
+        assert caller.detail == f"The request's field 'field in '{HOST_LIBRARY_FILE_PLACEHOLDER}'' does not match the route's schema."
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:
         # A host library directory listed relatively names its files relatively, so a host file's name can be the
