@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:d8e4561aedfb833f18e1fba9a420805e8d185908d98aac910be1809eeb9ccb67"
+digest = "sha256:5b36bd2432f08657874710eaa40fe90d249f86dd14b55bf24711eaf3b8f5ffe5"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T00:39:20Z"
-rationale = "real-catch: the agent CLI and run docs said a folder with no single main_pipe is refused as a ValidateBundleError; both now say it is the run's refusal, request.pipe_unspecified or request.pipe_ambiguous, with no verdict, and agent-cli.md says where an envelope's hint comes from when the chain gives no advice."
+reviewed_at = "2026-10-17T01:53:35Z"
+rationale = "real-catch: the agent CLI guide and agent-cli.md said the envelope's code decides its domain and verdict without saying where the code is read; both now say the code, domain and verdict are read off the cause's problem, so a recovered problem's classification rides with its step."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -11,7 +11,7 @@ rationale = "real-catch: the agent CLI and run docs said a folder with no single
 "pipelex/cli/agent_cli/_agent_cli.py" = "blob:8146c939ab6558e90f6c62f51d1d50a83c559bf9"
 "pipelex/cli/agent_cli/commands/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/agent_cli_factory.py" = "blob:c3a483565275e1dd4f70ada5644accaa31b53543"
-"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:e69185b908a148f05c123eb00033279a02101c89"
+"pipelex/cli/agent_cli/commands/agent_output.py" = "blob:d840a0f8dcbce5eb9b53b9d92d36b3441eaa53ad"
 "pipelex/cli/agent_cli/commands/bundle_path_resolver.py" = "blob:a1904517c731afb72af7d49adf6d217dc50b2660"
 "pipelex/cli/agent_cli/commands/check_model_cmd.py" = "blob:3a9c93daecadf266b3eba466904b3d005d448d40"
 "pipelex/cli/agent_cli/commands/codegen/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"

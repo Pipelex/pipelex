@@ -16,6 +16,10 @@ rationale = "Predicate on the error domain; single operand."
 param = "exc"
 rationale = "Verb-object: iterates the exception's cause chain; single operand."
 
+["pipelex/base_exceptions.py::iter_pipelex_cause_chain"]
+param = "exc"
+rationale = "Verb-object: iterates the Pipelex part of the exception's cause chain; single operand, as iter_cause_chain."
+
 ["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
 param = "message"
 rationale = "Builds the error JSON around the message; single operand."
