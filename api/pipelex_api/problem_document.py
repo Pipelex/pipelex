@@ -21,9 +21,6 @@ PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 # The HTTP status of a problem whose code the registry gives none, which only a client's own failure has.
 _FALLBACK_PROBLEM_STATUS = 500
 
-# The challenge every 401 carries (RFC 9110, section 15.5.2): this runner authenticates with a bearer credential.
-_BEARER_CHALLENGE = {"WWW-Authenticate": "Bearer"}
-
 
 def problem_status(problem: PipelexProblem) -> int:
     """The HTTP status of the response a problem is the body of: its code's, from the error registry."""
@@ -52,9 +49,9 @@ def problem_json_response(problem: PipelexProblem, *, view: ProblemView, headers
     """Render a problem built in the operator's view as the `application/problem+json` response a reader of `view` receives.
 
     The status is the one the problem's code declares, and the body's `status` member repeats it, as RFC 9457 asks. The
-    caller's view leaves the operator's `diagnostics` out and aims the step at the caller. A 401 carries the bearer
-    challenge, and a 429 the `Retry-After` its problem gives. `headers` are added to those, such as the `Allow` header of a
-    405.
+    caller's view leaves the operator's `diagnostics` out and aims the step at the caller. A 429 carries the `Retry-After`
+    its problem gives. `headers` are added to it, such as the `Allow` header of a 405 or the `WWW-Authenticate` challenge
+    of a 401, which the refusal names only where the deployment reads a bearer credential.
 
     Args:
         problem: The problem, in the operator's view.
@@ -71,8 +68,6 @@ def problem_json_response(problem: PipelexProblem, *, view: ProblemView, headers
         case ProblemView.CALLER:
             reader_problem = caller_view_of(problem=problem)
     response_headers = {**(headers or {}), **_retry_after_header(problem, status=status)}
-    if status == 401:
-        response_headers.update(_BEARER_CHALLENGE)
     return JSONResponse(
         status_code=status,
         content=reader_problem.model_copy(update={"status": status}).to_wire(),

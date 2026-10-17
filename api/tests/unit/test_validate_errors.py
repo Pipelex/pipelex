@@ -286,6 +286,6 @@ class TestValidateErrors:
         )
 
         # Caught at request validation as a 422 — never reaches the runtime (which would 500 on the
-        # mismatch). The model's own rule refuses the body as a whole, and its message rides the operator's
+        # mismatch). The model's own rule names the field to correct, and its message rides the operator's
         # diagnostics alone. This is a no-verdict request-shape condition, NOT a content verdict.
-        assert_problem(response, status=422, code="request.invalid", field="body")
+        assert_problem(response, status=422, code="request.invalid", field="mthds_sources")

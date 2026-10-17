@@ -16,7 +16,7 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import AnsweredErrorBarrier, register_exception_handlers
 from pipelex_api.limits import MAX_REQUEST_BODY_BYTES
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, request_body_size_middleware
 from pipelex_api.routes import router as api_router
@@ -32,15 +32,15 @@ FILE_HASH = "cccccccc-cccc-4ccc-cccc-cccccccccccc"
 def _build_client(*, user: RequestUser | None = None, with_auth: bool = False) -> TestClient:
     """Wire a production-faithful app: real routers, handlers, both middlewares.
 
-    `RequestIdMiddleware` wraps the whole app exactly as in `pipelex_api.main`, so the
-    request-id contextvars are bound and `X-Request-ID` is stamped on every
-    response. `get_request_user` is overridden so routes see the caller
+    `RequestIdMiddleware` wraps the whole app, through `AnsweredErrorBarrier`, exactly as
+    in `pipelex_api.main`, so the request-id contextvars are bound and `X-Request-ID` is
+    stamped on every response. `get_request_user` is overridden so routes see the caller
     identity the test wants.
 
-    `with_auth` mounts the composite router behind the SAME `auth_dependency`
-    `pipelex_api.main` uses, which is the only way to reach a real 401 — every
-    `raise_unauthenticated` lives in the verifiers that dependency runs, not in
-    a route body.
+    `with_auth` mounts the composite router behind an authentication dependency
+    `pipelex_api.main` can select, the API key's verifier, which is the only way to reach
+    a real 401: every authentication refusal, a `RunnerAuthError`, is raised by the
+    verifier that dependency runs, not in a route body.
     """
     app = FastAPI(redirect_slashes=False)
     app.add_middleware(BaseHTTPMiddleware, dispatch=request_body_size_middleware)
@@ -55,7 +55,7 @@ def _build_client(*, user: RequestUser | None = None, with_auth: bool = False) -
         return user
 
     app.dependency_overrides[get_request_user] = _override_user
-    return TestClient(RequestIdMiddleware(app))
+    return TestClient(RequestIdMiddleware(AnsweredErrorBarrier(app)))
 
 
 class TestErrorResponses:

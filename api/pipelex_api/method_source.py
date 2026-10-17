@@ -59,14 +59,13 @@ from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
 
-from pipelex_api.exceptions import RequestMethodError
+from pipelex_api.exceptions import MethodPackageReason, RequestMethodError
 from pipelex_api.limits import MAX_MTHDS_FILE_BYTES
 from pipelex_api.method_cache import get_method_clone_cache
 from pipelex_api.method_tree_request import (
     NOT_UTF8_FINDING,
     RequestMethod,
     RequestTree,
-    TreeLimitReason,
     add_dependency,
     dependency_address_of,
     ensure_method_within_limits,
@@ -167,7 +166,9 @@ def _package_tree_entries(*, package: FetchedMethodPackage) -> list[_GitTreeEntr
             path = raw_path.decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"Method package '{package.full_address}' holds a file whose name is not UTF-8 text, which no method tree can hold."
-            raise (MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason="file_name_not_utf8")) from exc
+            raise (
+                MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason=MethodPackageReason.FILE_NAME_NOT_UTF8)
+            ) from exc
         if not path.startswith(prefix):
             continue
         entries.append(_GitTreeEntry(mode=mode, object_sha=object_sha, path=path.removeprefix(prefix)))
@@ -364,10 +365,10 @@ def fetch_method_mthds_files(method_ref: str) -> FetchedMthdsFiles:
         if len(data) > MAX_MTHDS_FILE_BYTES:
             msg = f"File '{tree_path}' in method package {label} exceeds the {MAX_MTHDS_FILE_BYTES // 1024} KiB per-file limit."
             raise RequestMethodError(msg, file=tree_path).with_params(
-                reason=TreeLimitReason.FILE_TOO_LARGE, path=tree_path, limit=MAX_MTHDS_FILE_BYTES
+                reason=MethodPackageReason.MTHDS_FILE_TOO_LARGE, path=tree_path, limit=MAX_MTHDS_FILE_BYTES
             )
         items.append(MthdsFileItem(content=content, source=tree_path))
     if not items:
         msg = f"Method package {label} contains no {BUNDLE_SUFFIX} file."
-        raise RequestMethodError(msg).with_params(reason="no_bundle")
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.NO_BUNDLE)
     return FetchedMthdsFiles(files=items, main_pipe=package.manifest.main_pipe)

@@ -21,9 +21,16 @@ from pipelex.tools.log.json_log_sink import JsonLogFormatter
 from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pipelex_api.exception_handlers import ERROR_CHAIN_FIELD, ERROR_FRAMES_FIELD, register_exception_handlers
-from pipelex_api.exceptions import RunnerRequestError
+from pipelex_api.exception_handlers import (
+    ERROR_CHAIN_FIELD,
+    ERROR_FRAMES_FIELD,
+    ERROR_PARAMS_FIELD_PREFIX,
+    AnsweredErrorBarrier,
+    register_exception_handlers,
+)
+from pipelex_api.exceptions import RunnerMisconfiguredError, RunnerRequestError
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 
 _SHIPPED_PIPELEX_CONFIG = Path(__file__).parents[2] / ".pipelex" / "pipelex.toml"
@@ -77,6 +84,22 @@ async def foreign_failure_route() -> None:
     raise RuntimeError(_FOREIGN_FAILURE_TEXT)
 
 
+@_router.get("/misconfigured")
+async def misconfigured_route() -> None:
+    # A runner-authored 500 naming the component misconfigured, a parameter only the operator reads.
+    msg = "the API key is not set"
+    raise RunnerMisconfiguredError(msg, component="API_KEY")
+
+
+# A marker planted in the text of a foreign exception that reaches the catch-all, which no record may carry.
+_PLANTED_MARKER = "planted-marker-7f3a: the patient's diagnosis"
+
+
+@_router.get("/planted-failure")
+async def planted_failure_route() -> None:
+    raise LookupError(_PLANTED_MARKER)
+
+
 @_router.get("/caller-mistake/{token:path}")
 async def caller_mistake_route(token: str) -> None:
     # A caller-input 422 — the `warning`-level branch. Its path is exactly what the caller sent, and it rides the record
@@ -85,16 +108,18 @@ async def caller_mistake_route(token: str) -> None:
     raise RunnerRequestError(msg, field="token")
 
 
-def _build_client(*, raise_server_exceptions: bool = True) -> TestClient:
+def _build_client(*, raise_server_exceptions: bool = True, with_barrier: bool = False) -> TestClient:
     """Wire a throwaway app with the production handlers and the request-id middleware.
 
     `raise_server_exceptions` must be `False` for a route whose exception reaches the catch-all handler, which
-    Starlette's `ServerErrorMiddleware` runs and then re-raises.
+    Starlette's `ServerErrorMiddleware` runs and then re-raises, unless `with_barrier` wraps the app as
+    `pipelex_api.main` does, in the `AnsweredErrorBarrier` that stops that exception before the server.
     """
     app = FastAPI()
     register_exception_handlers(app)
     app.include_router(_router)
-    return TestClient(RequestIdMiddleware(app), raise_server_exceptions=raise_server_exceptions)
+    asgi_app: ASGIApp = AnsweredErrorBarrier(app) if with_barrier else app
+    return TestClient(RequestIdMiddleware(asgi_app), raise_server_exceptions=raise_server_exceptions)
 
 
 # The message every error line carries, whichever handler produced it: the key the error stream is selected by.
@@ -197,6 +222,71 @@ class TestErrorLogRecords:
         assert handler_records
         for handler_record in handler_records:
             assert _RUN_DATA_TEXT not in JsonLogFormatter().format(handler_record)
+
+    def test_a_caller_view_record_names_the_operator_only_parameters(self, caplog: pytest.LogCaptureFixture):
+        # A caller's response leaves the diagnostics out, so the record is the one place the operator reads which
+        # component is misconfigured; the message, which may quote anything, still reaches no record.
+        with caplog.at_level(logging.WARNING):
+            response = _build_client().get("/misconfigured")
+        assert response.status_code == 500
+        assert "diagnostics" not in response.json()
+        assert "API_KEY" not in response.text
+        payload = _rendered_json(_api_error_record(caplog))
+        assert payload["error.code"] == "runtime.misconfigured"
+        assert payload[f"{ERROR_PARAMS_FIELD_PREFIX}component"] == "API_KEY"
+        assert "the API key is not set" not in json.dumps(payload)
+
+    def test_a_caller_parameter_is_no_operator_field(self, caplog: pytest.LogCaptureFixture):
+        # Only the parameters the registry declares operator-only ride the record: a caller's refusal names its field
+        # in the response, and the record adds nothing under `error.params.`.
+        with caplog.at_level(logging.WARNING):
+            _build_client().get("/caller-mistake/malformed")
+        payload = _rendered_json(_api_error_record(caplog))
+        assert not [key for key in payload if key.startswith(ERROR_PARAMS_FIELD_PREFIX)], payload
+
+    def test_an_answered_exception_reaches_no_record_and_no_server(self, caplog: pytest.LogCaptureFixture):
+        # Starlette's `ServerErrorMiddleware` raises the exception again once the catch-all answered it, for the server
+        # to log with its traceback, which prints the exception's text. The barrier stops it: the test client, which
+        # raises whatever leaves the app, receives the answer, and no record anywhere carries the planted text.
+        with caplog.at_level(logging.DEBUG):
+            response = _build_client(with_barrier=True).get("/planted-failure")
+        assert response.status_code == 500
+        assert response.json()["code"] == "runtime.unexpected"
+        assert _PLANTED_MARKER not in response.text
+        assert _api_error_record(caplog).levelno == logging.ERROR
+        for record in caplog.records:
+            assert record.exc_info is None, record
+            assert _PLANTED_MARKER not in JsonLogFormatter().format(record)
+
+    def test_without_the_barrier_the_answered_exception_leaves_the_app(self):
+        # What the barrier stops: the exception, its text included, reaching whatever runs the app.
+        with pytest.raises(LookupError, match="planted-marker"):
+            _build_client().get("/planted-failure")
+
+    @pytest.mark.asyncio
+    async def test_the_barrier_answers_a_failure_no_handler_answered(self, caplog: pytest.LogCaptureFixture):
+        # A failure that started no response, which only a failure of the handlers themselves leaves, is answered and
+        # recorded here like any other, by class.
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        sent: list[Message] = []
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/", "raw_path": b"/", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG):
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert sent[0]["type"] == "http.response.start"
+        assert sent[0]["status"] == 500
+        body = json.loads(b"".join(message.get("body", b"") for message in sent if message["type"] == "http.response.body"))
+        assert body["code"] == "runtime.unexpected"
+        for record in caplog.records:
+            assert _PLANTED_MARKER not in JsonLogFormatter().format(record)
 
     def test_a_caller_mistake_records_a_warning_carrying_the_same_identifiers(self, caplog: pytest.LogCaptureFixture):
         # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same message and

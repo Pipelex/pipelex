@@ -1,6 +1,5 @@
 """ASGI middleware shared across the FastAPI app."""
 
-import re
 import secrets
 import time
 from collections.abc import Awaitable, Callable
@@ -10,6 +9,7 @@ from fastapi.responses import JSONResponse
 from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
 from pipelex.errors.problem import ProblemView
+from pipelex.system.job_metadata import is_valid_request_id
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -113,13 +113,6 @@ _ULID_LENGTH = 26
 _ULID_RANDOM_BITS = 80
 _ULID_TIMESTAMP_MASK = (1 << 48) - 1
 
-# An inbound X-Request-ID is reflected into response headers, logs, and error
-# bodies, so a client-supplied value is never trusted verbatim: it must be a
-# bounded run of injection-safe characters or it is discarded. ULIDs and UUIDs
-# both satisfy this.
-_REQUEST_ID_MAX_LENGTH = 128
-_REQUEST_ID_CHARSET = re.compile(r"\A[A-Za-z0-9_-]+\Z")
-
 
 def generate_request_id() -> str:
     """Generate a fresh ULID: a 26-char, time-sortable, URL-safe identifier.
@@ -137,21 +130,20 @@ def generate_request_id() -> str:
     return "".join(digits)
 
 
-def _is_valid_request_id(candidate: str) -> bool:
-    """Return whether a client-supplied request id is safe to reflect back verbatim."""
-    return 0 < len(candidate) <= _REQUEST_ID_MAX_LENGTH and _REQUEST_ID_CHARSET.match(candidate) is not None
-
-
 def _resolve_request_id(scope: Scope) -> str:
     """Return the request id for this request.
 
     Reuses a valid inbound `X-Request-ID` header; otherwise — absent,
-    malformed, or over-long — mints a fresh ULID.
+    malformed, or over-long — mints a fresh ULID. An inbound id is reflected
+    into response headers, logs and error bodies, so it is never trusted
+    verbatim: it must pass the runtime's one request id rule
+    (`pipelex.system.job_metadata.is_valid_request_id`), the one a run applies
+    to the id it is handed, or it is discarded. ULIDs and UUIDs both pass.
     """
     for name, value in scope.get("headers", []):
         if name == b"x-request-id":
             candidate: str = value.decode("latin-1").strip()
-            if _is_valid_request_id(candidate):
+            if is_valid_request_id(value=candidate):
                 return candidate
             break
     return generate_request_id()

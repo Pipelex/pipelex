@@ -24,6 +24,15 @@ class UriReadRefusalReason(StrEnum):
                 return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
 
     @property
+    def sentence_target(self) -> str:
+        """The kind of target the refused URL points at, in the words the problem's sentence reads: "points at a {it} target"."""
+        match self:
+            case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
+                return "foreign storage"
+            case UriReadRefusalReason.LOCAL_PATH:
+                return "local"
+
+    @property
     def target_class(self) -> SecurityTargetClass:
         """The class of destination the refusal names in its security event: another tenant's key, or a scheme the run does not read."""
         match self:
@@ -61,5 +70,6 @@ class UriReadRefusedError(SecurityError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        # The same class rides the problem's `target_class` parameter, so the problem and the security event agree.
-        return {"reason": self.reason.desc, "target_class": self.reason.target_class}
+        # The problem's `target_class` is the word its sentence reads, "a foreign storage target" or "a local target", while
+        # the security event keeps the enum the event stream is searched by (`reason.target_class`).
+        return {"reason": self.reason.desc, "target_class": self.reason.sentence_target}

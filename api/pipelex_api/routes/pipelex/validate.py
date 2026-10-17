@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.exception_handlers import problem_response
-from pipelex_api.exceptions import CustomCodeOrigin, RunnerRequestError
+from pipelex_api.exceptions import CustomCodeOrigin, RequestFieldConflictError, RunnerRequestError
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_source import fetched_method
 from pipelex_api.method_tree_request import (
@@ -163,17 +163,17 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
         # two is a request-shape bug → 422.
         if self.mthds_sources is not None and self.mthds_contents is None:
             msg = "mthds_sources accompanies inline mthds_contents; the files of a method tree are named by their tree paths"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="mthds_sources")
         # `resources` are the files the inline contents' steps read; a `method_ref`'s files are the package's own.
         if self.resources and self.method_ref is not None:
             msg = "resources accompany inline mthds_contents; a method_ref's files are the package's own"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="resources")
         # A caller-supplied length mismatch is a request-shape bug → caught here as a 422.
         # Without this guard it reaches the runtime's `validate_bundle`, which treats the
         # mismatch as an internal host error (500) — the wrong status for caller input.
         if self.mthds_sources is not None and self.mthds_contents is not None and len(self.mthds_sources) != len(self.mthds_contents):
             msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="mthds_sources")
         return self
 
 

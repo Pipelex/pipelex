@@ -37,6 +37,7 @@ from pipelex.plugins.registrar import HttpErrorMapperFn, PluginOrigin, PluginReg
 from pipelex.system.exceptions import EnvVarNotFoundError
 from pydantic import BaseModel, ConfigDict
 from pytest_mock import MockerFixture
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Message, Scope
 from typing_extensions import override
 
@@ -275,6 +276,12 @@ async def api_config_error_route() -> None:
     # this same code).
     msg = "the configuration is broken"
     raise RunnerMisconfiguredError(msg, component="API_KEY")
+
+
+@_router.get("/framework-refusal/{status}")
+async def framework_refusal_route(status: int) -> None:
+    # What the framework raises while it reads a request: FastAPI's bare 400 for a body its parse fails on.
+    raise StarletteHTTPException(status_code=status, detail="There was an error parsing the body")
 
 
 class _RequestValidationBody(BaseModel):
@@ -684,6 +691,20 @@ class TestExceptionHandlers:
         response = _build_client().get("/needs-body")
         assert_problem(response, status=405, code="request.method_not_allowed")
         assert response.headers["Allow"] == "POST"
+
+    def test_a_framework_4xx_is_the_caller_s_malformed_request_never_a_500(self, mocker: MockerFixture):
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
+        response = _build_client().get("/framework-refusal/400")
+        body = assert_problem(response, status=422, code="request.malformed")
+        assert body["params"] == {"reason": "unreadable"}
+        assert "There was an error parsing the body" not in response.text
+        # A caller's mistake: a warning, never the error level of a fault of the server.
+        log_spy.error.assert_not_called()
+        assert _emitted_fields(log_spy, as_error=False)["error.code"] == "request.malformed"
+
+    def test_a_framework_5xx_is_the_runtime_s_fault(self):
+        response = _build_client(raise_server_exceptions=False).get("/framework-refusal/503")
+        assert_problem(response, status=500, code="runtime.unexpected")
 
     def test_inbound_request_id_is_echoed(self):
         response = _build_client().get("/config-error", headers={REQUEST_ID_HEADER: "inbound-correlation-007"})

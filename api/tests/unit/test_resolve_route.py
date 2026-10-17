@@ -92,8 +92,10 @@ class TestResolveRoute:
         client = _build_client()
         neither = client.post("/v1/resolve", json={})
         both = client.post("/v1/resolve", json={"files": [{"content": VALID_MTHDS}], "method_ref": "acme/x"})
-        for response in (neither, both):
-            assert_problem(response, status=422, code="request.invalid")
+        # The model's rule names the field to change, never the body as a whole: the first selector when none is sent,
+        # the second when both are.
+        assert_problem(neither, status=422, code="request.invalid", field="files")
+        assert_problem(both, status=422, code="request.invalid", field="method_ref")
 
     def test_oversized_file_is_422_problem_json(self):
         client = _build_client()

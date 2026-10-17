@@ -7,15 +7,24 @@ written over by the next upload, and a tree whose listing is held is recorded wi
 
 import asyncio
 import json
+import logging
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
+from pipelex.tools.log.log_fields import carried_attributes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 from typing_extensions import override
 
-from pipelex_api.blob_store import MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_TRANSFERS, RunnerBlobStore
-from pipelex_api.exceptions import RunnerMisconfiguredError, RunnerRequestError
+from pipelex_api.blob_store import (
+    BLOB_DAMAGED_MESSAGE,
+    MAX_CONCURRENT_BLOB_LOOKUPS,
+    MAX_CONCURRENT_BLOB_TRANSFERS,
+    RunnerBlobStore,
+    problem_scheme_of,
+)
+from pipelex_api.exceptions import BlobStoreDamagedError, RunnerRequestError
 from pipelex_api.method_tree_request import RequestTree, read_request_tree
 from tests.unit._problems import problem_of
 
@@ -86,7 +95,7 @@ class TestRunnerBlobStore:
     async def test_a_blob_held_at_another_size_is_refused_before_any_byte_is_read(self) -> None:
         """An entry stating a size other than the held bytes' is a `request.invalid`, and the census bounds every read."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         large = b"x" * 4096
         await blob_store.store_blob(data=large)
 
@@ -103,7 +112,7 @@ class TestRunnerBlobStore:
 
     async def test_a_blob_not_held_is_missing_and_a_held_one_is_read_and_checked(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         held = b"held bytes"
         absent = b"absent bytes"
         await blob_store.store_blob(data=held)
@@ -122,26 +131,31 @@ class TestRunnerBlobStore:
         tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
 
-    async def test_bytes_that_do_not_hash_to_their_key_are_a_server_fault(self) -> None:
-        """Damaged storage is no caller's doing, and no upload of theirs would change it: a 500 naming the hash."""
+    async def test_bytes_that_do_not_hash_to_their_key_are_unavailable_storage(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Damaged storage is no caller's doing, and no upload of theirs would change it: storage failed the read.
+
+        Not `runtime.misconfigured`, which tells the operator to change a setting none of which is wrong; the operator
+        finds which object to clear in a record of its own, naming the hash.
+        """
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         data = b"the true bytes"
         storage.objects[_blob_key(data)] = b"the damaged!!!"
 
-        with pytest.raises(RunnerMisconfiguredError) as exc_info:
+        with caplog.at_level(logging.ERROR), pytest.raises(BlobStoreDamagedError) as exc_info:
             await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map", field="files")
 
         problem = problem_of(exc_info.value)
-        assert problem["status"] == 500
-        assert problem["code"] == "runtime.misconfigured"
-        # The component is the operator's to know: it rides the diagnostics alone.
-        assert "params" not in problem
-        assert problem["diagnostics"]["params"] == {"component": "blob_store"}
+        assert problem["status"] == 503
+        assert problem["code"] == "pipelex.storage.unavailable"
+        assert problem["params"] == {"scheme": "memory"}
+        (record,) = [record for record in caplog.records if record.getMessage() == BLOB_DAMAGED_MESSAGE]
+        assert record.levelno == logging.ERROR
+        assert carried_attributes(record=record)["blob.sha256"] == sha256_hex(data)
 
     async def test_lookups_and_reads_run_a_bounded_number_at_a_time(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         blobs = [f"file number {index_blob}".encode() for index_blob in range(3 * MAX_CONCURRENT_BLOB_LOOKUPS)]
         for data in blobs:
             storage.objects[_blob_key(data)] = data
@@ -156,7 +170,7 @@ class TestRunnerBlobStore:
     async def test_a_short_object_is_not_held_and_the_next_upload_writes_it_over(self) -> None:
         """A storage that does not publish writes whole may leave a blob cut short: it is asked for again, then repaired."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         data = b"the whole blob, of which a failed write kept only a part"
         storage.objects[_blob_key(data)] = data[:10]
 
@@ -168,7 +182,7 @@ class TestRunnerBlobStore:
 
     async def test_a_tree_whose_listing_is_held_is_recorded_without_a_lookup_per_file(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {f"file_{index_file}.txt": f"content {index_file}".encode() for index_file in range(5)}
         request_tree = RequestTree.make_from_contents(contents=contents)
         await blob_store.record_tree(tree=request_tree.tree, contents=request_tree.contents)
@@ -181,10 +195,27 @@ class TestRunnerBlobStore:
 
     async def test_a_listing_that_is_not_the_digest_s_holds_no_tree(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {"a.txt": b"a"}
         digest = digest_of_contents(contents)
         other_listing = tree_listing(tree_files_from_contents({"b.txt": b"b"}))
         storage.objects[f"{_SCOPE}/trees/{digest.removeprefix('sha256:')}"] = other_listing
 
         assert await blob_store.tree_hashes(tree_digest=digest) is None
+
+
+class TestProblemScheme:
+    @pytest.mark.parametrize(
+        ("storage_method", "scheme"),
+        [
+            (StorageMethod.LOCAL, "local"),
+            (StorageMethod.IN_MEMORY, "memory"),
+            (StorageMethod.S3, "s3"),
+            (StorageMethod.GCP, "gcs"),
+            ("azure", None),
+        ],
+    )
+    def test_the_problem_names_the_kind_of_storage_as_the_registry_spells_it(self, storage_method: str, scheme: str | None) -> None:
+        assert problem_scheme_of(storage_method=storage_method) == scheme
+        params = problem_of(BlobStoreDamagedError("damaged", scheme=scheme)).get("params")
+        assert params == ({"scheme": scheme} if scheme is not None else None)

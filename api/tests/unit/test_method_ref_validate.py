@@ -71,12 +71,13 @@ class TestMethodRefValidate:
         client = _build_client()
         both = client.post("/v1/validate", json={"method_ref": _METHOD_REF, "mthds_contents": [VALID_MTHDS]})
         neither = client.post("/v1/validate", json={})
-        for response in (both, neither):
-            # The request model's own rule refuses the body as a whole; its message is the operator's to read.
-            assert_problem(response, status=422, code="request.invalid", field="body")
+        # The request model's own rule names the field to change: the second selector sent, or the first when none is.
+        # Its message is the operator's to read.
+        assert_problem(both, status=422, code="request.invalid", field="method_ref")
+        assert_problem(neither, status=422, code="request.invalid", field="mthds_contents")
 
     def test_mthds_sources_do_not_accompany_a_method_ref(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
         client = _build_client()
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF, "mthds_sources": ["main.mthds"]})
-        assert_problem(response, status=422, code="request.invalid", field="body")
+        assert_problem(response, status=422, code="request.invalid", field="mthds_sources")

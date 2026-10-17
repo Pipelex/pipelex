@@ -25,7 +25,7 @@ from pipelex.tools.network.host_rules import classify_disallowed_host, is_disall
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.functional_validators import SkipValidation
 
-from pipelex_api.exceptions import CallbackUrlRefusedError
+from pipelex_api.exceptions import CallbackUrlRefusedError, RequestFieldConflictError
 from pipelex_api.limits import (
     DEFAULT_MAX_RESOURCE_FILE_KIB,
     DEFAULT_MAX_RESOURCES_PER_REQUEST,
@@ -654,12 +654,13 @@ class MthdsFilesRequest(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
+        # Each refusal names the field to change: the second selector when both are sent, the first when none is.
         if (self.files is None) == (self.method_ref is None):
             msg = "provide exactly one of `files` or `method_ref`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="method_ref" if self.method_ref is not None else "files")
         if self.resources and self.method_ref is not None:
             msg = "resources accompany inline `files`; a method_ref's files are the package's own"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="resources")
         return self
 
 
@@ -752,11 +753,16 @@ class MthdsContentsRequest(BaseModel):
     def _exactly_one_content_selector(self) -> Self:
         # Strict XOR (the addressing design's tooling-route rule): a stateless diagnostic call
         # has no linkage slot, so a second selector could only be ignored — refuse it instead.
-        selectors = [self.mthds_contents, self.files, self.method_ref]
-        if sum(selector is not None for selector in selectors) != 1:
+        # Each refusal names the field to change: the second selector sent, or the first when none is.
+        sent = [
+            name
+            for name, selector in (("mthds_contents", self.mthds_contents), ("files", self.files), ("method_ref", self.method_ref))
+            if selector is not None
+        ]
+        if len(sent) != 1:
             msg = "provide exactly one of `mthds_contents`, `files` or `method_ref`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field=sent[1] if sent else "mthds_contents")
         if self.dependencies is not None and self.files is None:
             msg = "`dependencies` accompany the method's own `files`"
-            raise ValueError(msg)
+            raise RequestFieldConflictError(msg, field="dependencies")
         return self

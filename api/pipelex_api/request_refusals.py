@@ -7,8 +7,11 @@ one `RunnerRequestError`: `request.invalid`, with one item per refused field, ea
 parameter and its location, and the first field as the problem's own. A body that is not JSON at all is
 `request.malformed` instead, since no field of it could be read.
 
-Only each fault's location and pydantic's message are read. The message, which may quote what the caller sent, rides the
-operator's diagnostics alone: a caller reads each item's sentence, which its code renders from the field's name.
+Only each fault's location and pydantic's message are read, and the field a model validator's refusal names: a
+validator that judges several fields together reports a fault of the body as a whole, located at no field, so it raises a
+`RequestFieldConflictError` naming the field to change, which pydantic keeps in the fault's context and the item names.
+The message, which may quote what the caller sent, rides the operator's diagnostics alone: a caller reads each item's
+sentence, which its code renders from the field's name.
 """
 
 from collections.abc import Mapping, Sequence
@@ -17,12 +20,12 @@ from typing import Any
 from mthds.protocol.problem.registry import CoreCode, RequestMalformedReason
 from pipelex.errors.problem import make_location, make_problem_item
 
-from pipelex_api.exceptions import CallbackUrlRefusedError, RunnerRequestError
+from pipelex_api.exceptions import CallbackUrlRefusedError, RequestFieldConflictError, RunnerRequestError
 
 # The first segment of the location FastAPI gives a fault, naming the part of the request it is in rather than a field.
 _REQUEST_PARTS = frozenset({"body", "query", "path", "header", "cookie"})
 
-# The field a fault of the body as a whole is about, such as a model validator's refusal, which names no field.
+# The field a fault of the body as a whole is about, which names no field: a model validator's refusal names its own.
 WHOLE_BODY_FIELD = "body"
 
 # The type pydantic gives a body that is not JSON, which FastAPI reports as a fault of the body.
@@ -57,11 +60,20 @@ def refused_field_path(*, loc: Sequence[Any], located_by_request_part: bool) -> 
     return path
 
 
+def _fault_field_path(*, fault: Mapping[str, Any], located_by_request_part: bool) -> str:
+    """The path of the field a fault refused: the one its validator names, else the one its location gives."""
+    context: Mapping[str, Any] = fault.get("ctx") or {}
+    error: object = context.get("error")
+    if isinstance(error, RequestFieldConflictError):
+        return error.field
+    return refused_field_path(loc=fault.get("loc", ()), located_by_request_part=located_by_request_part)
+
+
 def _summary(*, faults: Sequence[Mapping[str, Any]], located_by_request_part: bool) -> str:
     """Every fault as `<field>: <message>`, joined: the operator's account of the refusal."""
     described: list[str] = []
     for fault in faults:
-        path = refused_field_path(loc=fault.get("loc", ()), located_by_request_part=located_by_request_part)
+        path = _fault_field_path(fault=fault, located_by_request_part=located_by_request_part)
         described.append(f"{path}: {fault.get('msg') or 'Invalid input'}")
     return "; ".join(described) or "Request validation failed"
 
@@ -82,7 +94,7 @@ def refused_request_error(*, faults: Sequence[Mapping[str, Any]], located_by_req
         return RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=RequestMalformedReason.NOT_JSON)
     paths: list[str] = []
     for fault in faults:
-        path = refused_field_path(loc=fault.get("loc", ()), located_by_request_part=located_by_request_part)
+        path = _fault_field_path(fault=fault, located_by_request_part=located_by_request_part)
         if path not in paths and len(paths) < MAX_REFUSED_FIELDS:
             paths.append(path)
     if not paths:

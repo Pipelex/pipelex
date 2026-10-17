@@ -14,7 +14,7 @@ code its class declares with ``with_error_code`` and gives the code's parameters
 ``detail`` and ``next_step`` are the code's sentences, while the message stays the operator's, in ``diagnostics``.
 """
 
-from enum import StrEnum
+from enum import StrEnum, unique
 from typing import Any
 
 from mthds.protocol.problem.models import ProblemLocation
@@ -25,6 +25,25 @@ from pipelex.errors.problem import make_location
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.errors.security_target import SecurityTargetClass
 from typing_extensions import override
+
+
+class RequestFieldConflictError(PipelexError, ValueError):
+    """A request whose fields contradict each other, refused by its model's validator, naming the field to change.
+
+    Also a ``ValueError``, since a model validator raises it, which pydantic reports as a fault of the body as a whole,
+    located at no field. The request's refusal reads it from the fault's context (``pipelex_api.request_refusals``) and
+    names its ``field`` instead, so the `request.invalid` item tells the caller which field to change or drop.
+    """
+
+    error_code = CoreCode.REQUEST_INVALID
+
+    def __init__(self, message: str, *, field: str) -> None:
+        super().__init__(message)
+        self.field = field
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"field": self.field}
 
 
 class ApiBootConfigError(PipelexError):
@@ -137,6 +156,18 @@ class RunnerAuthError(PipelexError):
         ),
     )
 
+    def __init__(self, message: str, *, challenge: str | None = None) -> None:
+        """Build the refusal of a request's authentication.
+
+        Args:
+            message: What the authentication refused, for the operator's diagnostics.
+            challenge: The `WWW-Authenticate` challenge the response carries, naming the scheme of the credential the
+                deployment reads, `Bearer` for a token or an API key; `None` where it reads no credential of the
+                request, as behind a trusted proxy, which a challenge would ask for one the deployment never reads.
+        """
+        super().__init__(message)
+        self.challenge = challenge
+
 
 class RunnerMisconfiguredError(PipelexError):
     """The runner's own configuration or installation cannot serve the request: a setting is missing or wrong.
@@ -153,6 +184,28 @@ class RunnerMisconfiguredError(PipelexError):
     @override
     def problem_params(self) -> dict[str, Any]:
         return {"component": self.component}
+
+
+class BlobStoreDamagedError(PipelexError):
+    """Bytes the blob store holds under a hash do not hash to it, or are not the size it holds them at.
+
+    The storage failed the read, whether a backend cut it short or an object was damaged, which no caller can repair
+    and no upload of theirs changes: ``pipelex.storage.unavailable``, a 503 a caller retries, while a damage that
+    persists is the operator's to clear. ``scheme`` is the kind of storage the deployment runs, ``None`` for a storage
+    plugin whose kind the registry does not list.
+    """
+
+    error_code = PipelexErrorCode.STORAGE_UNAVAILABLE
+
+    def __init__(self, message: str, *, scheme: str | None) -> None:
+        super().__init__(message)
+        self.scheme = scheme
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        if self.scheme is None:
+            return {}
+        return {"scheme": self.scheme}
 
 
 class OrchestrationOverrideForbiddenError(PipelexError):
@@ -202,6 +255,39 @@ class ReservedObjectKeyError(PipelexError):
     @override
     def problem_params(self) -> dict[str, Any]:
         return {"keys": self.keys}
+
+
+@unique
+class MethodPackageReason(StrEnum):
+    """The `reason` of a `method.package_invalid` this runner raises itself, one member per rule and one per limit.
+
+    Beside them, a refusal of the standard's tree rule gives the standard's own refusal code (`TreeRefusalCode`) as its
+    reason. A limit's refusal also gives its `limit`, and each limit has its own reason, so a caller reads which one the
+    method passed: a tree's, a request's, a `bundle_b64` archive's or a fetched package's `.mthds` file's.
+    """
+
+    # The limits of one method tree.
+    TOO_MANY_FILES = "too_many_files"
+    FILE_TOO_LARGE = "file_too_large"
+    TREE_TOO_LARGE = "tree_too_large"
+    # The limits of a request's trees together.
+    TOO_MANY_DEPENDENCIES = "too_many_dependencies"
+    METHOD_TOO_LARGE = "method_too_large"
+    # The limits of a `bundle_b64` archive, on its members and on its decompressed size.
+    BUNDLE_TOO_MANY_FILES = "bundle_too_many_files"
+    BUNDLE_TOO_LARGE = "bundle_too_large"
+    # The limit on one `.mthds` file of a package fetched by `method_ref` for a tooling route.
+    MTHDS_FILE_TOO_LARGE = "mthds_file_too_large"
+    # The method's own tree holds no `.mthds` bundle.
+    NO_BUNDLE = "no_bundle"
+    # The manifest of a shipped package or of a dependency tree.
+    MANIFEST_MISSING = "manifest_missing"
+    MANIFEST_INVALID = "manifest_invalid"
+    PACKAGE_NAME_INVALID = "package_name_invalid"
+    # Two dependencies a reference could not tell apart.
+    DEPENDENCY_ADDRESS_COLLISION = "dependency_address_collision"
+    # A fetched package holds a file whose name is not UTF-8 text.
+    FILE_NAME_NOT_UTF8 = "file_name_not_utf8"
 
 
 class RequestMethodError(PipelexError):

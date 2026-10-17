@@ -109,6 +109,12 @@ class TestCodegenRoute:
         response = client.post("/v1/codegen", json=payload)
         assert_problem(response, status=422, code="request.invalid")
 
+    def test_a_pipe_ref_on_a_concept_set_wide_kind_names_the_pipe_ref(self):
+        client = _build_client()
+        payload = {"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod", "pipe_ref": "smoke.echo"}
+        response = client.post("/v1/codegen", json=payload)
+        assert_problem(response, status=422, code="request.invalid", field="pipe_ref")
+
     def test_a_registry_form_method_ref_is_an_unsupported_request_until_registry_exists(self):
         client = _build_client()
         response = client.post("/v1/codegen", json={"method_ref": "acme/methods/x", "kind": "types", "target": "ts-zod"})

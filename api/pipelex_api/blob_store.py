@@ -34,8 +34,9 @@ From this the blob store answers without reading what it does not need:
   is wrong.
   Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
   states, which its census already held to the tree's limits, and each is checked against its hash once read. Bytes
-  that do not hash to their key mean the storage itself is damaged, which no caller can repair: a 500
-  `runtime.misconfigured` naming the blob store.
+  that do not hash to their key mean the storage failed the read, a backend cutting it short or an object damaged,
+  which no caller can repair: a 503 `pipelex.storage.unavailable` naming the kind of storage, and an error record,
+  "Stored blob bytes do not match their hash", naming the hash for the operator to clear a damage that persists.
 
 Lookups and reads run a bounded number at a time, so one request naming many blobs never opens them all at once.
 """
@@ -46,14 +47,17 @@ from functools import partial
 from mthds.method_tree.digest import DIGEST_PREFIX, sha256_hex, tree_listing
 from mthds.method_tree.file_entry import BlobStore, InMemoryBlobStore
 from mthds.method_tree.models import MethodTree
+from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.method_trees.method_files import TreeListing
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.async_utils import gather_bounded
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
 
-from pipelex_api.exceptions import RunnerMisconfiguredError
+from pipelex_api.exceptions import BlobStoreDamagedError
 
 BLOBS_PREFIX = "blobs"
 TREES_PREFIX = "trees"
@@ -63,21 +67,49 @@ _LISTING_CONTENT_TYPE = "text/plain; charset=utf-8"
 # request runs at a time.
 MAX_CONCURRENT_BLOB_LOOKUPS = 16
 MAX_CONCURRENT_BLOB_TRANSFERS = 4
-# What a `runtime.misconfigured` refusing damaged stored bytes names as misconfigured, for the operator.
-BLOB_STORE_COMPONENT = "blob_store"
+# The message of the error record a blob read whose bytes do not match their hash writes, for the operator to search.
+BLOB_DAMAGED_MESSAGE = "Stored blob bytes do not match their hash"
+
+
+def problem_scheme_of(*, storage_method: str) -> str | None:
+    """The kind of storage a `pipelex.storage.*` problem names for a configured storage method, as the registry spells it.
+
+    `None` for a storage plugin's own method, which the registry's kinds do not list.
+    """
+    match storage_method:
+        case StorageMethod.LOCAL:
+            return "local"
+        case StorageMethod.IN_MEMORY:
+            return "memory"
+        case StorageMethod.S3:
+            return "s3"
+        case StorageMethod.GCP:
+            return "gcs"
+        case _:
+            # An external storage plugin's method token: the configured method is an open string.
+            return None
 
 
 class RunnerBlobStore:
     """The blobs and tree listings of one caller's scope, over the deployment's storage provider."""
 
-    def __init__(self, *, scope: str, storage: StorageProviderAbstract) -> None:
+    def __init__(self, *, scope: str, storage: StorageProviderAbstract, scheme: str | None) -> None:
+        """Build the blob store of one scope.
+
+        Args:
+            scope: The prefix of the scope's blobs and listings.
+            storage: The storage provider holding them.
+            scheme: The kind of storage the provider is, as a `pipelex.storage.*` problem names it (`problem_scheme_of`).
+        """
         self._scope = scope
         self._storage = storage
+        self._scheme = scheme
 
     @classmethod
     def make_for_scope(cls, *, scope: str) -> "RunnerBlobStore":
         """The blob store of `scope`, over the storage provider the runtime booted with."""
-        return cls(scope=scope, storage=get_storage_provider())
+        scheme = problem_scheme_of(storage_method=get_config().runtime.storage.method)
+        return cls(scope=scope, storage=get_storage_provider(), scheme=scheme)
 
     @property
     def scope(self) -> str:
@@ -116,16 +148,21 @@ class RunnerBlobStore:
     async def _read_verified(self, *, sha256: str, size: int) -> bytes:
         """The stored bytes of `sha256`, held at `size`, checked against their hash.
 
-        Raises (as a problem document): a 500 `runtime.misconfigured` naming the blob store, for bytes that are not `size`
-        bytes hashing to `sha256`.
+        Raises (as a problem document): a 503 `pipelex.storage.unavailable` naming the kind of storage, for bytes that
+        are not `size` bytes hashing to `sha256`, after an error record naming the hash, the one place the operator
+        reads which object to clear when the damage persists.
         """
         data = await self._storage.load(f"{PIPELEX_STORAGE_SCHEME}{self._blob_key(sha256=sha256)}")
         if len(data) != size or sha256_hex(data) != sha256:
-            msg = (
-                f"The bytes this runner's blob store holds under {sha256} do not hash to it: its storage is damaged, "
-                "and its operator must remove that object for the blob to be uploaded again."
+            log.error(
+                BLOB_DAMAGED_MESSAGE,
+                fields={"blob.sha256": sha256, "blob.expected_size": size, "blob.read_size": len(data), "storage.scheme": self._scheme},
             )
-            raise RunnerMisconfiguredError(msg, component=BLOB_STORE_COMPONENT)
+            msg = (
+                f"The bytes this runner's blob store holds under {sha256} do not hash to it: the storage cut the read "
+                "short or holds a damaged object, which its operator removes for the blob to be uploaded again."
+            )
+            raise BlobStoreDamagedError(msg, scheme=self._scheme)
         return data
 
     async def read_held(self, *, sizes: Mapping[str, int]) -> BlobStore:

@@ -6,7 +6,7 @@ from pipelex.core.bundle_resources.bundle_resource import (
     canonical_resource_path_or_none,
     canonical_submitted_files,
     path_refusal_params,
-    root_escape_rule,
+    root_escape_of,
 )
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 
@@ -64,7 +64,11 @@ class TestCanonicalResourcePath:
         assert exc_info.value.resolve_error_code() == code
         assert exc_info.value.given_params == params
         assert path_refusal_params(path=path) == params
-        assert root_escape_rule(path=path) == params.get("rule")
+        escape = root_escape_of(path=path)
+        assert (escape.rule if escape is not None else None) == params.get("rule")
+        if escape is not None:
+            # The one classifier gives both the message's reason and the security rule.
+            assert escape.desc in exc_info.value.message
         assert canonical_resource_path_or_none(path=path) is None
 
 

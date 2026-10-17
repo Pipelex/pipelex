@@ -24,6 +24,10 @@ rationale = "Verb-object: iterates the exception's cause chain; single operand."
 param = "exc"
 rationale = "Verb-object: iterates the Pipelex part of the exception's cause chain; single operand, as iter_cause_chain."
 
+["pipelex/base_exceptions.py::iter_traceback_chain"]
+param = "exc"
+rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
+
 ["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
 param = "message"
 rationale = "Builds the error JSON around the message; single operand."

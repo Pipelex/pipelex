@@ -38,7 +38,6 @@ import shutil
 import tempfile
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, NamedTuple, NoReturn, cast
 
@@ -55,7 +54,7 @@ from mthds.package.manifest.schema import MethodsManifest
 from mthds.protocol.problem.registry import CoreCode, MethodResourceMissingReason, RequestMalformedReason
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD, root_escape_rule
+from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD, root_escape_of
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -66,7 +65,7 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
-from pipelex_api.exceptions import CustomCodeOrigin, CustomCodeRequiresSandboxError, RequestMethodError, RunnerRequestError
+from pipelex_api.exceptions import CustomCodeOrigin, CustomCodeRequiresSandboxError, MethodPackageReason, RequestMethodError, RunnerRequestError
 from pipelex_api.limits import (
     MAX_METHOD_DEPENDENCIES,
     MAX_METHOD_REQUEST_TOTAL_BYTES,
@@ -89,8 +88,6 @@ REQUEST_METHOD_LABEL = "sent in the request"
 VENDORED_METHODS_PREFIX = ".mthds/methods/"
 # A file the membership rule judges a directory by, which stands in for any file inside a directory being judged.
 _ANY_FILE_NAME = "file"
-# The `reason` of a `method.package_invalid` refusing a manifest that cannot be read.
-_MANIFEST_INVALID_REASON = "manifest_invalid"
 # The `finding` of a `method.syntax` refusing a bundle that is not text.
 NOT_UTF8_FINDING = "the bundle is not UTF-8 text"
 
@@ -271,32 +268,22 @@ def wire_name(name: str) -> str:
     return name.encode("utf-8", errors="backslashreplace").decode("utf-8")
 
 
-class TreeLimitReason(StrEnum):
-    """The `reason` of a `method.package_invalid` refusing a method past one of this runner's limits, which `limit` gives."""
-
-    TOO_MANY_FILES = "too_many_files"
-    FILE_TOO_LARGE = "file_too_large"
-    TREE_TOO_LARGE = "tree_too_large"
-    TOO_MANY_DEPENDENCIES = "too_many_dependencies"
-    METHOD_TOO_LARGE = "method_too_large"
-
-
 def ensure_within_tree_limits(*, file_count: int, total_bytes: int, largest_path: str | None, largest_bytes: int, label: str) -> None:
     """Refuse a tree past one of this runner's limits with a 422 `method.package_invalid`, its `reason` naming the limit."""
     if file_count > MAX_METHOD_TREE_FILES:
         msg = f"{label} holds {file_count} files, past this runner's limit of {MAX_METHOD_TREE_FILES} files in a method tree."
-        raise RequestMethodError(msg).with_params(reason=TreeLimitReason.TOO_MANY_FILES, limit=MAX_METHOD_TREE_FILES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TOO_MANY_FILES, limit=MAX_METHOD_TREE_FILES)
     if largest_path is not None and largest_bytes > MAX_METHOD_TREE_FILE_BYTES:
         msg = (
             f"{label} holds the file '{wire_name(largest_path)}' of {largest_bytes} bytes, past this runner's limit of "
             f"{MAX_METHOD_TREE_FILE_BYTES // 1024} KiB for one file of a method tree."
         )
         raise RequestMethodError(msg, file=wire_name(largest_path)).with_params(
-            reason=TreeLimitReason.FILE_TOO_LARGE, path=wire_name(largest_path), limit=MAX_METHOD_TREE_FILE_BYTES
+            reason=MethodPackageReason.FILE_TOO_LARGE, path=wire_name(largest_path), limit=MAX_METHOD_TREE_FILE_BYTES
         )
     if total_bytes > MAX_METHOD_TREE_TOTAL_BYTES:
         msg = f"{label} holds {total_bytes} bytes, past this runner's limit of {MAX_METHOD_TREE_TOTAL_BYTES // 1024} KiB for a method tree."
-        raise RequestMethodError(msg).with_params(reason=TreeLimitReason.TREE_TOO_LARGE, limit=MAX_METHOD_TREE_TOTAL_BYTES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TREE_TOO_LARGE, limit=MAX_METHOD_TREE_TOTAL_BYTES)
 
 
 def ensure_tree_within_limits(*, tree: RequestTree, label: str) -> None:
@@ -323,13 +310,13 @@ def ensure_trees_within_request_limits(*, dependency_count: int, total_bytes: in
     """
     if dependency_count > MAX_METHOD_DEPENDENCIES:
         msg = f"{label} carries {dependency_count} dependencies, past this runner's limit of {MAX_METHOD_DEPENDENCIES} dependency trees."
-        raise RequestMethodError(msg).with_params(reason=TreeLimitReason.TOO_MANY_DEPENDENCIES, limit=MAX_METHOD_DEPENDENCIES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TOO_MANY_DEPENDENCIES, limit=MAX_METHOD_DEPENDENCIES)
     if total_bytes > MAX_METHOD_REQUEST_TOTAL_BYTES:
         msg = (
             f"{label} holds {total_bytes} bytes across its tree and its dependency trees, past this runner's limit of "
             f"{MAX_METHOD_REQUEST_TOTAL_BYTES // 1024} KiB for a method and its dependencies."
         )
-        raise RequestMethodError(msg).with_params(reason=TreeLimitReason.METHOD_TOO_LARGE, limit=MAX_METHOD_REQUEST_TOTAL_BYTES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.METHOD_TOO_LARGE, limit=MAX_METHOD_REQUEST_TOTAL_BYTES)
 
 
 def ensure_method_within_limits(*, request_method: "RequestMethod", label: str) -> None:
@@ -347,7 +334,7 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str, field: str
 
     Hashes this runner does not hold are `request.blobs_missing`, listing every one to upload. A key that is not a tree
     path and tries to leave the tree is the security refusal `security.input_path_refused`, by the runtime's one rule for
-    a caller's path that leaves its root (`root_escape_rule`): absolute, naming a drive or a network share, or climbing
+    a caller's path that leaves its root (`root_escape_of`): absolute, naming a drive or a network share, or climbing
     with a `..` segment, read with either separator, whether the caller sent it as a key of `files` or as a member of
     `bundle_b64`, as it is under `resources`. An entry of the wrong shape is the request's own, `request.invalid` naming
     the field the map rides. A file reference that names no file of the tree, or that leaves it, is
@@ -374,10 +361,12 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str, field: str
             ) from refusal_error
         case TreeRefusalCode.INVALID_TREE_PATH:
             for name in refusal.names:
-                rule = root_escape_rule(path=name)
-                if rule is not None:
+                escape = root_escape_of(path=name)
+                if escape is not None:
                     raise (
-                        RequestMethodError(msg, file=wire_name(name)).with_error_code(CoreCode.SECURITY_INPUT_PATH_REFUSED).with_params(rule=rule)
+                        RequestMethodError(msg, file=wire_name(name))
+                        .with_error_code(CoreCode.SECURITY_INPUT_PATH_REFUSED)
+                        .with_params(rule=escape.rule)
                     ) from refusal_error
             raise RequestMethodError(msg, file=first_name).with_params(reason=refusal.code, path=first_name) from refusal_error
         case TreeRefusalCode.MALFORMED_ENTRY:
@@ -503,14 +492,14 @@ def manifest_of(*, tree: RequestTree, label: str, root: str) -> MethodsManifest 
         raise (
             MethodEntryError(msg)
             .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-            .with_params(reason=_MANIFEST_INVALID_REASON, path=f"{root}{MANIFEST_NAME}")
+            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=f"{root}{MANIFEST_NAME}")
         ) from exc
     except ManifestError as exc:
         msg = f"The {MANIFEST_NAME} of {label} is not a valid manifest: {exc.message}"
         raise (
             MethodEntryError(msg)
             .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-            .with_params(reason=_MANIFEST_INVALID_REASON, path=f"{root}{MANIFEST_NAME}")
+            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=f"{root}{MANIFEST_NAME}")
         ) from exc
 
 
@@ -541,7 +530,7 @@ def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str, 
     manifest = manifest_of(tree=tree, label=label, root=root)
     if manifest is None:
         msg = f"{label} holds no {MANIFEST_NAME} at its root, so no reference could find it as a package."
-        raise RequestMethodError(msg).with_params(reason="manifest_missing", path=f"{root}{MANIFEST_NAME}")
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.MANIFEST_MISSING, path=f"{root}{MANIFEST_NAME}")
     if manifest.name is not None:
         return f"{manifest.address}/{manifest.name}"
     if not is_package_dir_name(fallback_name):
@@ -549,7 +538,7 @@ def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str, 
             f"{label} declares no name in its {MANIFEST_NAME}, so it takes the last segment of its address, "
             f"'{wire_name(fallback_name)}', which cannot name a package's directory: declare the package's name in its {MANIFEST_NAME}."
         )
-        raise RequestMethodError(msg).with_params(reason="package_name_invalid", path=f"{root}{MANIFEST_NAME}")
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.PACKAGE_NAME_INVALID, path=f"{root}{MANIFEST_NAME}")
     return f"{manifest.address}/{fallback_name}"
 
 
@@ -570,7 +559,7 @@ def add_dependency(*, dependencies: dict[str, RequestTree], address: str, tree: 
                 f"{label} declares the address '{wire_name(address)}', which another dependency of the request declares too: a reference "
                 "matches a package by its address without regard to case, so it could not tell them apart."
             )
-            raise RequestMethodError(msg).with_params(reason="dependency_address_collision", path=root)
+            raise RequestMethodError(msg).with_params(reason=MethodPackageReason.DEPENDENCY_ADDRESS_COLLISION, path=root)
     dependencies[address] = tree
 
 
@@ -733,7 +722,7 @@ def ensure_method_holds_a_bundle(*, request_method: RequestMethod, label: str) -
         msg = f"{label} holds no .mthds bundle of its own."
         if request_method.dependencies:
             msg += " The packages it carries are dependencies: the method's own bundles go in its own tree."
-        raise RequestMethodError(msg).with_params(reason="no_bundle")
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.NO_BUNDLE)
 
 
 def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:

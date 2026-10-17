@@ -11,10 +11,11 @@ from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_codes import error_code_spec
-from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, SECURITY_EVENT_NAME
+from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, SECURITY_EVENT_NAME, emit_security_event
 from pipelex.errors.security_target import SecurityTargetClass, SecurityTargetKind
-from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE
 from pipelex.tools.log.json_log_sink import JsonLogSink
@@ -142,6 +143,19 @@ class TestSecurityRefusalEvent:
         serialized = json.dumps(line)
         assert "_owner" not in serialized
         assert SecurityRefusalTestData.TOPIC not in serialized
+
+    async def test_a_template_the_sandbox_refuses_in_a_validation_sweep_is_no_verdict(self) -> None:
+        """The sweep's dry run meets the refusal: it keeps its security code and its one event, never a verdict's item."""
+        with _security_event_lines() as lines, pytest.raises(PipelexError) as exc_info:
+            await validate_bundle(mthds_contents=[_compose_bundle(template=SecurityRefusalTestData.PRIVATE_READ_TEMPLATE)])
+
+        error = exc_info.value
+        assert not isinstance(error, ValidateBundleError)
+        assert error.resolve_error_code() == CoreCode.SECURITY_TEMPLATE_REFUSED
+        (line,) = lines
+        assert line["error.code"] == CoreCode.SECURITY_TEMPLATE_REFUSED
+        # The sweep's own failure carries the refusal the dry run reported already, so no boundary reports it again.
+        assert not emit_security_event(error=error)
 
     async def test_a_failure_no_security_rule_made_logs_no_event(self) -> None:
         runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, storage_scope=LOCAL_STORAGE_SCOPE, extras=SecurityRefusalTestData.EXTRAS)

@@ -45,6 +45,7 @@ from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import caller_refusal
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.security_event import mark_security_event_emitted
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library,
@@ -647,7 +648,12 @@ class BundleValidator:
             met_texts = {id(output.failure): output.error_message for output in unexpected_failures.values() if output.failure is not None}
             details = "\n".join(f"- {met_texts.get(id(failure)) or failure.message}" for failure in failures)
             msg = f"Dry run failed for {len(failures)} pipe(s):\n{details}"
-            raise DryRunError(msg, failures=failures)
+            dry_run_error = DryRunError(msg, failures=failures)
+            if dry_run_error.security_failure_codes:
+                # The pipe run that met each refusal logged its security event (`PipeRun.run`), and this error, which
+                # reports the first under its code, is new: marked, so the boundary it reaches does not log it twice.
+                mark_security_event_emitted(error=dry_run_error)
+            raise dry_run_error
         return results
 
     @classmethod

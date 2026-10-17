@@ -57,14 +57,17 @@ class TestProblemDocument:
         assert diagnostics["error_class"] == "RunnerMisconfiguredError"
         assert "API_KEY is not set" in json.dumps(operator_body)
 
-    def test_a_401_carries_the_bearer_challenge(self):
+    def test_a_401_carries_the_challenge_its_raise_site_names_and_no_other(self):
+        """The challenge names the credential the deployment reads, which only the refusal knows: none behind a proxy."""
         problem = RunnerAuthError("no credential").with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL).to_problem(view=ProblemView.OPERATOR)
 
-        response = problem_json_response(problem, view=ProblemView.CALLER)
+        bare = problem_json_response(problem, view=ProblemView.CALLER)
+        challenged = problem_json_response(problem, view=ProblemView.CALLER, headers={"WWW-Authenticate": "Bearer"})
 
-        assert response.status_code == 401
-        assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert _body_of(response.body)["code"] == "auth.missing_credential"
+        assert bare.status_code == 401
+        assert "WWW-Authenticate" not in bare.headers
+        assert challenged.headers["WWW-Authenticate"] == "Bearer"
+        assert _body_of(challenged.body)["code"] == "auth.missing_credential"
 
     def test_further_headers_are_added_to_the_response(self):
         problem = RunnerRequestError("method not allowed").with_error_code(CoreCode.REQUEST_METHOD_NOT_ALLOWED).to_problem(view=ProblemView.OPERATOR)

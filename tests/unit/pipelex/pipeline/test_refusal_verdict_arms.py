@@ -4,13 +4,15 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexError, SecurityError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData
-from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
+from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError, PipeRunError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import LibraryError
+from pipelex.pipe_run.exceptions import DryRunError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -130,6 +132,38 @@ class TestRefusalVerdictArms:
         with pytest.raises(type(fault)) as raised, translate_to_validate_bundle_error():
             raise fault
         assert raised.value is fault
+
+    def test_a_pipe_run_failure_wrapping_a_security_refusal_is_no_verdict(self) -> None:
+        """The refusal is the method's to act on, yet a security rule made it: the wrapper keeps its code, never a verdict."""
+        refusal = _InputSecurityRefusalError("a template read a private name")
+        wrapper = PipeRunError("Pipe 'say' failed", run_mode=PipeRunMode.DRY, pipe_code="say")
+        wrapper.__cause__ = refusal
+
+        with pytest.raises(PipeRunError) as raised, translate_to_validate_bundle_error():
+            raise wrapper
+
+        assert raised.value is wrapper
+        assert wrapper.resolve_error_code() == CoreCode.SECURITY_TEMPLATE_REFUSED
+
+    def test_a_sweep_with_a_security_refusal_among_its_failures_is_no_verdict(self) -> None:
+        """One method fault beside one security refusal: the sweep answers the refusal's code, never an invalid verdict."""
+        sweep = DryRunError(
+            "Dry run failed for 2 pipe(s)",
+            failures=[
+                DryRunFailureErrorData(pipe_code="route_parcel", message="the round has no lane", code=CoreCode.PIPE_CONDITION_UNMATCHED),
+                DryRunFailureErrorData(pipe_code="say", message="a template was refused", code=CoreCode.SECURITY_TEMPLATE_REFUSED),
+            ],
+        )
+
+        with pytest.raises(DryRunError) as raised, translate_to_validate_bundle_error():
+            raise sweep
+
+        assert raised.value is sweep
+        assert sweep.resolve_error_code() == CoreCode.SECURITY_TEMPLATE_REFUSED
+        assert [item.code for item in sweep.to_problem(view=ProblemView.CALLER).errors or []] == [
+            CoreCode.PIPE_CONDITION_UNMATCHED,
+            CoreCode.SECURITY_TEMPLATE_REFUSED,
+        ]
 
     def test_a_produced_verdict_passes_through_unwrapped(self) -> None:
         verdict = ValidateBundleError(

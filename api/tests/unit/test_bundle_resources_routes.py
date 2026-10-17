@@ -347,9 +347,9 @@ class TestBundleResourcesRoutes:
 
         response = _build_client().post(route, json=body)
 
-        # The run route refuses it in its request model, the crate routes in theirs: either way, `request.invalid`.
-        problem = assert_problem(response, status=422, code="request.invalid")
-        assert problem["params"]["field"] in {"resources", "body"}, problem
+        # The run route refuses it in its request model, the crate routes in theirs: either way, `request.invalid` naming
+        # the field to drop.
+        assert_problem(response, status=422, code="request.invalid", field="resources")
 
     @pytest.mark.parametrize("route", ["/v1/validate", "/v1/pipe-io"])
     def test_a_source_label_naming_a_file_on_the_runner_never_reads_beside_it(self, mocker: MockerFixture, tmp_path: Path, route: str) -> None:

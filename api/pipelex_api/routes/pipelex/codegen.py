@@ -15,6 +15,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE
 from pipelex_api.problem_view import problem_view_of
@@ -79,7 +80,7 @@ class CodegenRequest(MthdsFilesRequest):
             case CodegenRouteKind.TYPES:
                 if self.pipe_ref is not None:
                     msg = "pipe_ref is not accepted for kind='types' (a concept-set-wide projection)"
-                    raise ValueError(msg)
+                    raise RequestFieldConflictError(msg, field="pipe_ref")
         return self
 
 

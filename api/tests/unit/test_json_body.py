@@ -10,6 +10,7 @@ The run routes, which parse their raw body, are covered in `test_pipeline_routes
 
 import json
 import random
+import sys
 from collections.abc import Callable
 from typing import cast
 
@@ -21,7 +22,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.exceptions import RunnerRequestError
-from pipelex_api.json_body import TOO_DEEPLY_NESTED_REASON, JsonBodyRoute, decode_json_body, json_nesting_exceeds
+from pipelex_api.json_body import INTEGER_TOO_LONG_REASON, TOO_DEEPLY_NESTED_REASON, JsonBodyRoute, decode_json_body, json_nesting_exceeds
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH, MAX_REQUEST_BODY_BYTES
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
@@ -210,6 +211,37 @@ class TestJsonBodyNesting:
 
         problem = assert_problem(response, status=422, code="request.malformed")
         assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
+
+    @pytest.mark.parametrize("route", ["/v1/format", "/v1/validate"])
+    def test_typed_route_refuses_a_body_that_is_not_utf8_as_the_caller_s(self, route: str):
+        # FastAPI's own parse turned the decode error into a bare 400 the handlers could only read as a fault of the
+        # server, a 500; the route now parses first and names the reason.
+        response = _client().post(route, content=b"\xff{}", headers={"content-type": "application/json"})
+
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": "not_utf8"}
+
+    @pytest.mark.parametrize("route", ["/v1/format", "/v1/validate"])
+    def test_typed_route_refuses_an_integer_past_the_digit_limit_as_the_caller_s(self, route: str):
+        # `json.loads` refuses an integer literal longer than `sys.get_int_max_str_digits()` with a plain `ValueError`.
+        too_long = "1" * (sys.get_int_max_str_digits() + 1)
+        response = _client().post(route, content=f'{{"content": "", "padding": {too_long}}}'.encode(), headers={"content-type": "application/json"})
+
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": INTEGER_TOO_LONG_REASON}
+
+    def test_typed_route_reads_a_body_that_is_not_json_as_fastapi_does(self):
+        # A body whose content type is not JSON is handed to the model as raw bytes, which it refuses field by field:
+        # the route parses only what FastAPI would.
+        response = _client().post("/v1/format", content=b"\xff{}", headers={"content-type": "text/plain"})
+
+        assert_problem(response, status=422, code="request.invalid")
+
+    def test_typed_route_reads_a_utf16_body_as_fastapi_does(self):
+        body = json.dumps({"content": VALID_MTHDS}).encode("utf-16")
+        response = _client().post("/v1/lint", content=body, headers={"content-type": "application/json"})
+
+        assert response.status_code == 200, response.text
 
     def test_every_route_with_a_json_body_is_bounded(self):
         # Imported here, as in `test_openapi_contract.py`, so a bad env var fails this test rather than the collection.

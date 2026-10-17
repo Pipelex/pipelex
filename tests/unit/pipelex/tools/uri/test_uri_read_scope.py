@@ -74,6 +74,28 @@ class TestAuthorizeUriRead:
         # A path on the server's disk, or a scheme the run does not read, is a refused scheme to the security event.
         assert exc_info.value.security_target_class == SecurityTargetClass.SCHEME
 
+    @pytest.mark.parametrize(
+        ("reason", "target_class", "words"),
+        [
+            (UriReadRefusalReason.FOREIGN_STORAGE_KEY, SecurityTargetClass.FOREIGN_STORAGE_KEY, "foreign storage"),
+            (UriReadRefusalReason.LOCAL_PATH, SecurityTargetClass.SCHEME, "local"),
+        ],
+    )
+    def test_the_sentence_reads_the_target_in_words_while_the_event_keeps_its_class(
+        self, reason: UriReadRefusalReason, target_class: SecurityTargetClass, words: str
+    ) -> None:
+        # The security event is searched by its enum; the caller reads the problem's sentence, which names the target in words.
+        as_input = UriReadRefusedError("refused", reason=reason).with_params(input="photo")
+        as_method = UriReadRefusedError("refused", reason=reason).with_error_code(CoreCode.SECURITY_METHOD_URL_REFUSED).with_params(pipe="describe")
+
+        assert as_input.security_target_class == target_class
+        assert as_input.to_problem(view=ProblemView.CALLER).detail == (
+            f"The URL of the input 'photo' points at a {words} target, which a security rule forbids (reason: {reason.desc})."
+        )
+        assert as_method.to_problem(view=ProblemView.CALLER).detail == (
+            f"Pipe 'describe' names a URL that points at a {words} target, which a security rule forbids (reason: {reason.desc})."
+        )
+
     def test_a_multi_segment_scope_compares_every_segment(self) -> None:
         authorize_uri_read(uri="pipelex-storage://org_abc/team_1/x.png", read_scope="org_abc/team_1", position="p")
         with pytest.raises(UriReadRefusedError):

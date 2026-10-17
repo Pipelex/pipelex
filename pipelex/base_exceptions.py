@@ -59,6 +59,29 @@ def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
         node = node.__cause__
 
 
+def iter_traceback_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Yield ``exc`` and each exception a traceback of it prints, outermost first, exactly once.
+
+    The walk a traceback makes, where :func:`iter_cause_chain` follows ``__cause__`` alone: an explicit cause
+    (``raise ... from``) is followed, else the exception being handled when it was raised, ``__context__``, unless the
+    raise suppressed it (``from None``). It is for a reader that must account for everything a traceback would print
+    of a failure, such as a log record naming the chain's classes in place of the traceback, or a classifier looking
+    for a transport failure anywhere below the error it received. Cycle-guarded like :func:`iter_cause_chain`, since it
+    runs on the error path.
+    """
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        yield node
+        if node.__cause__ is not None:
+            node = node.__cause__
+        elif node.__suppress_context__:
+            node = None
+        else:
+            node = node.__context__
+
+
 def iter_pipelex_cause_chain(exc: BaseException) -> Iterator["PipelexError"]:
     """Yield ``exc`` and each Pipelex error below it along its ``__cause__`` chain, stopping at the first that is not one.
 

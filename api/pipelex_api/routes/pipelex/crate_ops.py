@@ -3,7 +3,7 @@
 They all select a closure the same way (inline `files[]` XOR `method_ref`), resolve it through the
 same engine core (`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`), and speak the same
 verdict vocabulary as `POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with
-the invalid arm carrying the structured `validation_errors[]` built by pipelex's one shared builder.
+the invalid arm carrying the structured `errors[]` built by pipelex's one shared builder.
 This module holds the pieces they share so the envelopes cannot drift.
 
 The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s runnability facts

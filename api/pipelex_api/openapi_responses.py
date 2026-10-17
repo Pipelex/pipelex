@@ -127,10 +127,13 @@ def _problem(description: str, *, headers: dict[str, Any] | None = None) -> dict
 PROBLEM_401: dict[str, Any] = _problem(
     "`auth.missing_credential`, `auth.invalid_credential` or `auth.credential_expired` — a missing, refused or expired "
     "bearer token. Only reachable when the deployment enables auth (`AUTH_MODE=api_key` or `AUTH_MODE=jwt`), or trusts a "
-    "proxy's forwarded identity and the proxy forwarded none or one that is not path-safe.",
+    "proxy's forwarded identity and the proxy forwarded none.",
     headers={
         "WWW-Authenticate": {
-            "description": "Authentication challenge — always `Bearer`.",
+            "description": (
+                "Authentication challenge, `Bearer`, where the deployment reads a bearer token (`AUTH_MODE=api_key` or "
+                "`AUTH_MODE=jwt`). Absent behind a trusted proxy, which reads no credential of the request."
+            ),
             "schema": {"type": "string"},
         }
     },

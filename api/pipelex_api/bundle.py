@@ -20,7 +20,7 @@ from mthds.protocol.problem.registry import CoreCode, RequestMalformedReason
 from pipelex import log
 from pipelex.tools.log.error_fields import error_fields
 
-from pipelex_api.exceptions import RequestMethodError, RunnerRequestError
+from pipelex_api.exceptions import MethodPackageReason, RequestMethodError, RunnerRequestError
 from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES
 
 # The request field the archive rides, which the refusals of its encoding name.
@@ -39,13 +39,13 @@ def _guard_count(count: int) -> None:
         raise RunnerRequestError(msg, field=_BUNDLE_FIELD)
     if count > MAX_BUNDLE_FILES:
         msg = f"Bundle exceeds the {MAX_BUNDLE_FILES}-file limit (got {count})"
-        raise RequestMethodError(msg).with_params(reason="too_many_files", limit=MAX_BUNDLE_FILES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.BUNDLE_TOO_MANY_FILES, limit=MAX_BUNDLE_FILES)
 
 
 def _guard_running_total(total_bytes: int) -> None:
     if total_bytes > MAX_BUNDLE_TOTAL_BYTES:
         msg = f"Bundle exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB decompressed-size limit"
-        raise RequestMethodError(msg).with_params(reason="bundle_too_large", limit=MAX_BUNDLE_TOTAL_BYTES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.BUNDLE_TOO_LARGE, limit=MAX_BUNDLE_TOTAL_BYTES)
 
 
 def decode_bundle_archive(*, bundle_b64: str) -> list[tuple[str, bytes]]:

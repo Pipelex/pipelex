@@ -66,7 +66,8 @@ class TestBundleArchive:
         problem = problem_of(exc.value)
         assert problem["status"] == 422
         assert problem["code"] == "method.package_invalid"
-        assert problem["params"] == {"reason": "too_many_files", "limit": 2}
+        # The archive's own limit on its members, which the reason tells from a tree's limit on its files.
+        assert problem["params"] == {"reason": "bundle_too_many_files", "limit": 2}
 
     def test_zip_bomb_bounded_by_total_size(self, mocker: MockerFixture):
         # A highly compressible entry that decompresses well past the (patched) ceiling must be
