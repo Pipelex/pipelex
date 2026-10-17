@@ -56,9 +56,9 @@ Each entry says, about one code:
 |-------|---------|
 | `code` | the code as the service puts it on the wire, which the worker's Extract step recovers into `ProviderErrorMetadata.provider_error_code` |
 | `category` | the `InferenceErrorCategory`, which decides whether the call is repeated within the run |
-| `error_code` | the public registry code the rendered error reports, which decides its domain, the HTTP status it answers on a server and whether its report invites a retry. It is one of the codes every family's failure class declares (`INFERENCE_FAILURE_CODES` in `pipelex.cogt.exceptions`) |
-| `user_action_kind` | the kind of advice the caller gets |
-| `detail` | the advice itself, rendered beside the service's own message: what the caller, or whoever operates the service, should do. The service's message already names the specifics, so the advice need not repeat them |
+| `error_code` | the public registry code the rendered error carries, which decides its problem: its domain, the HTTP status it answers on a server, whether a retry can succeed, and the sentences and the step every reader of it gets. It is one of the codes every family's failure class declares (`INFERENCE_FAILURE_CODES` in `pipelex.cogt.exceptions`) |
+| `user_action_kind` | the kind of the error's advice |
+| `detail` | the advice itself: what the caller, or whoever operates the service, should do. The local CLIs print it as a tip beside the error; a problem never carries it, since its step is the code's. The service's message already names the specifics, so the advice need not repeat them |
 | `is_model_not_found` | set for a code that means the service does not know the model at all: it selects the family's `*ModelNotFoundError` class, which the pipe layer re-raises as a model-availability error carrying the model handle, and its `error_code` is then `model.unavailable` |
 
 ## How the runtime reads them
