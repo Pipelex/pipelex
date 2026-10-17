@@ -18,3 +18,21 @@ class AmbiguousInputsFilesError(PipelexError):
     )
     # The message describes a fault in the caller's own bundle directory — caller-facing copy.
     _authors_caller_facing_message = True
+
+
+class AutoDetectedInputsFileError(PipelexError):
+    """Raised when the inputs file auto-detection finds in a bundle directory is not a regular file.
+
+    Auto-detection reads ``inputs.json`` or ``inputs.toml`` only when it is a regular file, judged without
+    following a link, so a symbolic link in a method's folder never carries data from outside the folder
+    into a run; a directory or any other entry of either name is refused the same way.
+    """
+
+    _declared_title = "Auto-detected inputs file is not a regular file"
+    error_domain = ErrorDomain.INPUT
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Replace it with the file itself, or name the inputs file with --inputs <path>",
+    )
+    # The message describes a fault in the caller's own bundle directory — caller-facing copy.
+    _authors_caller_facing_message = True

@@ -15,6 +15,7 @@ AnthropicSDKUnsupportedError | Anthropic SDK unsupported | https://docs.pipelex.
 AnthropicWorkerConfigurationError | Anthropic worker configuration | https://docs.pipelex.com/latest/errors/anthropic-worker-configuration-error/
 ArgumentTypeError | Argument type | https://docs.pipelex.com/latest/errors/argument-type-error/
 AsyncExecutionNotEnabledError | Async execution not enabled | https://docs.pipelex.com/latest/errors/async-execution-not-enabled-error/
+AutoDetectedInputsFileError | Auto-detected inputs file is not a regular file | https://docs.pipelex.com/latest/errors/auto-detected-inputs-file-error/
 AwsCredentialsError | Aws credentials | https://docs.pipelex.com/latest/errors/aws-credentials-error/
 AzureCredentialsError | Azure credentials | https://docs.pipelex.com/latest/errors/azure-credentials-error/
 BatchParamsError | Batch params | https://docs.pipelex.com/latest/errors/batch-params-error/

@@ -21,6 +21,7 @@
 
 ### Security
 
+- **An auto-detected inputs file must be a regular file (Breaking)**: `pipelex run bundle <folder>` and `pipelex-agent run bundle <folder>` read the folder's `inputs.json` or `inputs.toml` only when it is a regular file, opened without following a link and judged on the descriptor its bytes are read from, and refuse a symbolic link, a directory or any other entry of either name with the new `AutoDetectedInputsFileError`, an input error pointing to `--inputs`; they used to follow a link the method's tree keeps out, such as one its `.gitignore` ignores, so a method you checked out could point its inputs at data outside its folder. An inputs file named with `--inputs` is read as given, a link followed.
 - **A `jwt` caller's `read_scope` is bound to its own id (Breaking)**: on a deployment with `AUTH_MODE=jwt`, every route taking a `read_scope` (the run routes, `/v1/validate`, `/v1/resolve`, `/v1/codegen`, `/v1/pipe-io` and `POST /v1/blobs/missing`) refuses a scope that does not lie under the caller's token `user_id` with a `403 ReadScopeForbidden`, so a caller holding its own token can no longer read another caller's blobs or run under another's scope. With `AUTH_MODE=none` or `api_key`, the caller is a trusted host or a single tenant, and the scope is taken as before.
 
 ## [v0.88.0] - 2026-10-16
