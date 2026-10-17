@@ -18,7 +18,7 @@ from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, suggested_fix_label, validation_item_title
-from pipelex.runtime_hub import get_console
+from pipelex.runtime_hub import get_error_console
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.urls import URLs
 
@@ -240,7 +240,7 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, *, context: Err
             this handler: an unknown model is an invalid verdict there, rendered by
             :func:`handle_validate_bundle_error`.
     """
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     tip = _advice_detail(error=exc) or (
         f"Check your model configuration in .pipelex/inference/ or specify a different model in the '{exc.pipe_code}' pipe."
@@ -274,7 +274,7 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, *, 
             but no enabled backend serves is a setup fault of this machine, so no verdict, unlike
             an unknown model, which is an invalid verdict there. Other contexts keep the default 1.
     """
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     fields: list[tuple[str, str]] = [
         ("Pipe", f"[yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]"),
@@ -344,7 +344,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidationError, *, conte
         exc: The model deck preset validation error exception
         context: Context for the error message
     """
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     model_handle = exc.model_handle or ""
     fields: list[tuple[str, str]] = [
@@ -486,7 +486,7 @@ def handle_validate_bundle_error(
             the actionable fix command preserves the same leniency.
     """
     items = exc.validation_error_items()
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
@@ -536,7 +536,7 @@ def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError
     Args:
         exc: The telemetry config validation error exception
     """
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Telemetry configuration could not be loaded[/bold red]\n")
 
@@ -572,7 +572,7 @@ def handle_former_release_config_error(*, exc: FormerReleaseConfigError) -> NoRe
     Args:
         exc: The former release configuration error.
     """
-    console = get_console()
+    console = get_error_console()
     print_traceback_if_requested(console=console)
     console.print("\n[bold red]❌ Configuration left by a former release[/bold red]\n")
     console.print(escape(exc.message))

@@ -56,7 +56,7 @@ main_pipe   = "write_tide_notice"
 def console(mocker: MockerFixture) -> Console:
     """A recording console patched into the error handlers, so the panel can be read back."""
     recorded_console = Console(width=200, record=True, color_system=None)
-    mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+    mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
 
 

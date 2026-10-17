@@ -44,7 +44,7 @@ class TestErrorHandlersExtended:
     def console(self, mocker: MockerFixture) -> Console:
         """Recorded console patched into the error handlers module."""
         recorded_console = Console(width=120, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
         return recorded_console
 
     def test_display_error_panel_full_layout(self) -> None:

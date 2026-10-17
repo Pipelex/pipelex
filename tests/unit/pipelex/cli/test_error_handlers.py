@@ -30,7 +30,7 @@ class TestErrorHandlers:
 
     def test_handle_model_choice_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_choice_error should read the advice for its tip and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = PipeOperatorModelChoiceError(
             message="model 'gpt-5' not found",
             pipe_type="llm_text",
@@ -50,7 +50,7 @@ class TestErrorHandlers:
 
     def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_availability_error should read the advice for its tip and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = PipeOperatorModelAvailabilityError(
             message="model not available",
             run_mode=PipeRunMode.LIVE,
@@ -70,7 +70,7 @@ class TestErrorHandlers:
 
     def test_handle_model_deck_preset_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error should read the advice for its tip and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = ModelDeckPresetValidationError(
             message="preset references unavailable model",
             model_type=ModelType.LLM,
@@ -93,7 +93,7 @@ class TestErrorHandlers:
         rows from, since ``to_problem`` builds its ``errors`` through ``problem_items``. Both reads are the same builder
         over the same error data, so the sections and the problem cannot disagree.
         """
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = ValidateBundleError(message="validation failed")
         spy = mocker.spy(exc, "validation_error_items")
         problem_items_spy = mocker.spy(exc, "problem_items")

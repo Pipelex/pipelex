@@ -177,7 +177,7 @@ def _write_bundle(*, directory: Path, content: str) -> Path:
 def console(mocker: MockerFixture) -> Console:
     """A recording console patched into the error handlers, so the panel can be read back."""
     recorded_console = Console(width=400, record=True, color_system=None)
-    mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+    mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
 
 

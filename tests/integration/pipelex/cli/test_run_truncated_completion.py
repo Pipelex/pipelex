@@ -82,7 +82,7 @@ class TestRunTruncatedCompletion:
         # The output console, stdout, is recorded to show the failure never reaches it; the report goes to stderr,
         # wide enough that no sentence of it wraps.
         console = Console(width=400, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=console)
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
         monkeypatch.setenv("COLUMNS", "400")
         bundle_path = tmp_path / "truncated_completion.mthds"

@@ -87,7 +87,7 @@ class TestErrorHandlersSnapshot:
     def _render(self, mocker: MockerFixture, render: Callable[[], None]) -> str:
         """Render a handler to plain text via a fixed-width, color-free Rich console."""
         console = Console(width=80, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=console)
         with pytest.raises(typer.Exit) as exit_info:
             render()
         assert exit_info.value.exit_code == 1
