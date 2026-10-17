@@ -16,11 +16,11 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
+from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.models import Problem
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.error_codes import error_code_spec, parse_error_code
 from pipelex.errors.problem import ProblemView
 from pipelex.system.usage_stats.usage_stats_contract import (
     ERROR_CODE_MAX_LENGTH,
@@ -112,15 +112,38 @@ def tallying_inference_calls(*, tally: RunInferenceTally | None) -> Generator[No
 
 
 def usage_stats_error(*, error: BaseException | None) -> UsageStatsError:
-    """The code of a failure and its domain, as its problem gives them; `runtime.unexpected` for an error that is no Pipelex error.
+    """The code of a failure and its domain, as its problem gives them; `runtime.unexpected` for an error that carries none.
 
-    The code is the failure's problem's, which a cause reporting a problem of its own, such as one recovered across a
-    transport boundary, decides, as every other surface reads it. A failure with no error to read is the catch-all too,
+    A Pipelex error's code is its problem's, which a cause reporting a problem of its own, such as one recovered across
+    a transport boundary, decides, as every other surface reads it. A request error of the MTHDS client carries the
+    problem it read, which is read as it is. Any other error, and a failure with no error to read, is the catch-all,
     since every failure has a code.
     """
-    if not isinstance(error, PipelexError):
-        return UNEXPECTED_USAGE_STATS_ERROR
-    return usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER))
+    if isinstance(error, PipelexError):
+        return usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER))
+    if isinstance(error, PipelineRequestError):
+        return usage_stats_error_of_problem(problem=error.problem)
+    return UNEXPECTED_USAGE_STATS_ERROR
+
+
+def usage_stats_failure_domain(*, error: BaseException) -> UsageStatsErrorDomain:
+    """Who must act on a failure, read off its code alone, without building its problem.
+
+    The cheap reading a hot path takes, such as a failed inference call's: the code the error resolves to, and the
+    domain the registry gives it, the same domain :func:`usage_stats_error` reads off the problem.
+    """
+    if isinstance(error, PipelexError):
+        recovered = error.recovered_problem()
+        domain = recovered.effective_domain if recovered is not None else error.resolve_domain()
+        return usage_stats_error_domain_of(domain=domain)
+    if isinstance(error, PipelineRequestError):
+        return usage_stats_error_domain_of(domain=error.problem.effective_domain)
+    return UNEXPECTED_USAGE_STATS_ERROR.domain
+
+
+def is_reportable_error_code(*, code: str) -> bool:
+    """Whether a code fits the contract's pattern and length, as every registry's does."""
+    return len(code) <= ERROR_CODE_MAX_LENGTH and re.fullmatch(ERROR_CODE_PATTERN, code) is not None
 
 
 def usage_stats_error_of_problem(*, problem: Problem) -> UsageStatsError:
@@ -128,20 +151,9 @@ def usage_stats_error_of_problem(*, problem: Problem) -> UsageStatsError:
 
     A code the contract's pattern refuses, which no registry gives, reads as the catch-all rather than losing the event.
     """
-    code = problem.code
-    if len(code) > ERROR_CODE_MAX_LENGTH or re.fullmatch(ERROR_CODE_PATTERN, code) is None:
+    if not is_reportable_error_code(code=problem.code):
         return UNEXPECTED_USAGE_STATS_ERROR
-    return UsageStatsError(code=code, domain=usage_stats_error_domain_of(domain=problem.effective_domain))
-
-
-def usage_stats_error_of_code(*, code: str | None) -> UsageStatsError | None:
-    """The code and the domain of a code another runtime's answer named, when this runtime's registries know it; else `None`."""
-    if code is None:
-        return None
-    known_code = parse_error_code(code)
-    if known_code is None:
-        return None
-    return UsageStatsError(code=known_code, domain=usage_stats_error_domain_of(domain=error_code_spec(known_code).domain))
+    return UsageStatsError(code=problem.code, domain=usage_stats_error_domain_of(domain=problem.effective_domain))
 
 
 def usage_stats_error_domain_of(*, domain: ProblemDomain) -> UsageStatsErrorDomain:

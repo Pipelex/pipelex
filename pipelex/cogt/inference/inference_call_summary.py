@@ -41,7 +41,7 @@ from pipelex import log
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.cogt.usage.usage_cost import compute_tokens_usage_cost
 from pipelex.system.telemetry.otel_constants import GenAISpanAttr
-from pipelex.system.usage_stats.usage_stats_runs import current_run_tally, usage_stats_error
+from pipelex.system.usage_stats.usage_stats_runs import current_run_tally, usage_stats_failure_domain
 from pipelex.tools.log.console_layouts import LogLayout
 from pipelex.tools.log.summary_event import SummaryEvent
 from pipelex.tools.log.summary_fields import COST_USD_FIELD
@@ -148,7 +148,7 @@ class InferenceCallSummary(SummaryEvent):
         run_tally.note_call(
             model_handle=inference_model.name if inference_model is not None else self._model_handle,
             backend_name=inference_model.backend_name if inference_model is not None else None,
-            failure_domain=usage_stats_error(error=error).domain if isinstance(error, Exception) else None,
+            failure_domain=usage_stats_failure_domain(error=error) if isinstance(error, Exception) else None,
             images_generated=self._images_generated,
             pages_extracted=self._pages_extracted,
         )

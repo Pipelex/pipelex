@@ -96,6 +96,19 @@ class TestAgentInitExecution:
         assert "elsewhere" in payload["message"]
         assert not target_dir.exists()
 
+    def test_a_config_file_that_cannot_be_read_is_a_file_refusal(self, target_dir: Path, tmp_path: Path) -> None:
+        """A --config path naming a directory is `client.file_unreadable` with the system's reason, never the catch-all."""
+        config_dir = tmp_path / "config.json"
+        config_dir.mkdir()
+
+        result = CliRunner().invoke(_app, ["--format", "json", "--config", str(config_dir)])
+
+        assert result.exit_code != 0
+        payload = json.loads(result.stderr)
+        assert payload["code"] == "client.file_unreadable"
+        assert payload["params"] == {"path": str(config_dir), "reason": "is a directory"}
+        assert not target_dir.exists()
+
     @pytest.mark.parametrize("config", [{"execution": "hosted", "backends": ["openai"]}, {"execution": "hosted", "primary_backend": "openai"}])
     def test_hosted_refuses_the_backend_keys(self, target_dir: Path, config: dict[str, Any]) -> None:
         exit_code, payload = _init(config=config)

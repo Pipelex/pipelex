@@ -14,6 +14,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_file_error,
     agent_success_formatted,
+    file_read_failure_reason,
     use_agent_cli_error_format,
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
@@ -62,6 +63,9 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
             agent_file_error(f"Config file not found: {config_arg}", path=config_arg, reason="not found", cause=exc)
         except json.JSONDecodeError as exc:
             agent_argument_error(f"Failed to parse config file JSON: {exc}", argument="--config", reason="the file is not valid JSON", cause=exc)
+        except (OSError, UnicodeDecodeError) as exc:
+            reason = file_read_failure_reason(error=exc)
+            agent_file_error(f"Config file cannot be read: {config_arg}: {reason}", path=config_arg, reason=reason, cause=exc)
 
     return {}
 

@@ -8,7 +8,7 @@ Pipelex collects **anonymous usage statistics**: counts of commands, runs, pipe 
 
 They are on by default, and you can turn them off at any time, for one command, one project or the whole machine, as [Turning them off](#turning-them-off) explains.
 
-The first time a Pipelex tool runs with statistics on, it prints this notice on stderr, once per machine. A command whose stderr a program reads rather than a person, `pipelex-agent` with JSON errors (`--error-format json`, or `--format json` with no `--error-format`), neither prints nor records it, and still sends its statistics; the next command whose stderr a person reads prints it:
+The first time a Pipelex tool runs with statistics on, it prints this notice on stderr, once per machine. A command whose stderr a program reads rather than a person, `pipelex-agent` with JSON errors (the command's `--error-format json`, the program's `--error-format json` given before the command, or `--format json` with no `--error-format`), neither prints nor records it, and still sends its statistics; the next command whose stderr a person reads prints it:
 
 > Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `pipelex usage-stats disable` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
 

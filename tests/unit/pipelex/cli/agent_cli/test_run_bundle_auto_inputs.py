@@ -103,3 +103,18 @@ class TestAgentRunBundleAutoInputs:
 
         capsys.readouterr()
         assert run_core_mock.call_args.kwargs["inputs"] == {"topic": "toml"}
+
+    @pytest.mark.usefixtures("tty_stdin")
+    def test_a_bundle_that_is_not_text_is_a_file_refusal(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A bundle file the command cannot read as text is `client.file_unreadable` naming it, never the catch-all."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        self._patch_run(mocker, {"answer": "42"})
+        bundle_file = tmp_path / "bundle.mthds"
+        bundle_file.write_bytes(b"\xff\xfe domain = 'x'\n")
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), output_format=CliOutputFormat.JSON)
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.file_unreadable"
+        assert problem["params"] == {"path": str(bundle_file), "reason": "not UTF-8 text"}

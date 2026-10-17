@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import Any, NoReturn, cast
 
 import typer
-from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.errors import ApiResponseError
@@ -48,14 +47,14 @@ from pipelex.errors.problem import (
     ProblemView,
     make_problem,
 )
-from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_verdict
+from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusal_next_step, sent_usage_stats_error, sent_verdict
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.pipeline.fixes.fix_render import format_fix_progress_markdown
 from pipelex.pipeline.validation_errors import problem_item_of, validation_item_code
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.system.usage_stats.usage_stats_client import note_command_error
-from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error_of_problem
+from pipelex.system.usage_stats.usage_stats_runs import usage_stats_error, usage_stats_error_of_problem
 from pipelex.tools.misc.json_utils import clean_json_dumps
 
 
@@ -150,16 +149,23 @@ def _advice_of(*, error: BaseException | None) -> str | None:
     return advice.detail if advice is not None else None
 
 
-def _chain_validation_error_items(*, error: BaseException | None) -> list[ValidationErrorItem]:
-    """The items of the first invalid verdict along ``error``'s cause chain, ``error`` itself included; empty when none.
+def _problem_validation_items(*, error: BaseException | None, problem: PipelexProblem) -> list[ValidationErrorItem]:
+    """The items of the invalid verdict the problem's errors are, to render as ``validate``'s prose; empty otherwise.
 
-    The walk stops at the first exception that is not a Pipelex error, as every walk reading a failure's chain does: a
-    foreign exception raised from an earlier, handled verdict is a new failure, whose problem lists none of its items.
+    The Markdown and the JSON report the one problem. The first invalid verdict along ``error``'s cause chain renders
+    its items in place of the problem's errors only when it gave every one of them, item for item, so the prose lists
+    the faults the JSON's ``errors`` list. Any other problem, one whose errors a wrapper added to or another error gave,
+    renders its errors as they are. The walk stops at the first exception that is not a Pipelex error, as every walk
+    reading a failure's chain does.
     """
-    if error is None:
+    if error is None or not problem.errors:
         return []
     for node in iter_pipelex_cause_chain(error):
         if isinstance(node, ValidateBundleError):
+            verdict_items = node.problem_items() or []
+            verdict_faults = [(item.code, item.detail) for item in verdict_items]
+            if verdict_faults != [(item.code, item.detail) for item in problem.errors]:
+                return []
             return node.validation_error_items()
     return []
 
@@ -278,7 +284,7 @@ def render_problem_markdown(
         problem: The problem, in the operator's view.
         message: The command's own sentence.
         extras: The command's own members.
-        validation_items: The items of an invalid verdict on the failure's chain, rendered in place of the problem's.
+        validation_items: The items of the invalid verdict the problem's errors are, rendered in their place as prose.
         tip: The advice nearest the error along its cause chain (:meth:`PipelexError.advised_action`), which a local CLI
             prints and no problem carries.
 
@@ -371,7 +377,7 @@ def agent_error(
         problem=problem,
         message=message,
         extras=extra,
-        validation_items=_chain_validation_error_items(error=cause),
+        validation_items=_problem_validation_items(error=cause, problem=problem),
         tip=_advice_of(error=cause),
     )
     raise typer.Exit(exit_code) from cause
@@ -411,6 +417,13 @@ def agent_file_error(
     agent_error(
         message, cause=cause, code=CoreCode.CLIENT_FILE_UNREADABLE, params={"path": str(path), "reason": reason}, exit_code=exit_code, **extra
     )
+
+
+def file_read_failure_reason(*, error: OSError | UnicodeDecodeError) -> str:
+    """Why a local file could not be read, in the few words ``client.file_unreadable`` names: the system's own reason."""
+    if isinstance(error, UnicodeDecodeError):
+        return "not UTF-8 text"
+    return error.strerror.lower() if error.strerror else "cannot be opened"
 
 
 def agent_success(result: dict[str, Any]) -> None:
@@ -575,14 +588,6 @@ def _build_error_source(exc: BaseException) -> list[str]:
     return sources
 
 
-def _note_hosted_failure(*, error: BaseException) -> None:
-    """Note a hosted run's failure for the command's usage statistics, by the problem its error carries."""
-    if isinstance(error, PipelexError):
-        note_command_error(error=usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER)))
-    elif isinstance(error, PipelineRequestError):
-        note_command_error(error=usage_stats_error_of_problem(problem=error.problem))
-
-
 # Payload keys that the markdown renderer treats specially (heading / body /
 # tip) or omits entirely rather than listing under the "Details" section.
 # ``error_source`` is dropped from markdown — it's internal stack frames that
@@ -652,9 +657,10 @@ def _print_hosted_envelope(*, payload: dict[str, Any]) -> None:
 def agent_error_hosted_envelope(message: str, *, error_type: str, cause: BaseException, exit_code: int = 1, **extra: Any) -> NoReturn:
     """Report a hosted run's failure in the envelope a hosted run had before the problem, and exit with ``exit_code``.
 
-    ``error: true``, ``error_type`` and ``message``, then, for a Pipelex error, the ``error_code``, ``error_domain`` and
-    ``retryable`` (only when true) its code decides, the client-side ``error_source``, and the fields read off the hosted
-    plane's answer in ``extra``, which win.
+    ``error: true``, ``error_type`` and ``message``, then the ``hint``: the advice nearest the error along its chain, else
+    its code's next step, ``runtime.unexpected``'s for an error that is no Pipelex error. For a Pipelex error, the
+    ``error_code``, ``error_domain`` and ``retryable`` (only when true) its code decides; then the client-side
+    ``error_source``, and the fields read off the hosted plane's answer in ``extra``, which win.
 
     Args:
         message: The failure's sentence.
@@ -663,16 +669,21 @@ def agent_error_hosted_envelope(message: str, *, error_type: str, cause: BaseExc
         exit_code: Process exit code.
         **extra: The fields read off the hosted plane's answer.
     """
-    payload: dict[str, Any] = {"error": True, "error_type": error_type, "message": message}
+    problem = agent_problem(cause=cause)
+    payload: dict[str, Any] = {
+        "error": True,
+        "error_type": error_type,
+        "message": message,
+        "hint": _advice_of(error=cause) or problem.next_step.detail,
+    }
     if isinstance(cause, PipelexError):
-        problem = cause.to_problem(view=ProblemView.OPERATOR)
         if problem.is_retryable:
             payload["retryable"] = True
         payload["error_domain"] = ErrorDomain.from_problem_domain(problem.effective_domain)
         payload["error_code"] = problem.code
     payload["error_source"] = _build_error_source(cause)
     payload.update(extra)
-    _note_hosted_failure(error=cause)
+    note_command_error(error=usage_stats_error(error=cause))
     _print_hosted_envelope(payload=payload)
     raise typer.Exit(exit_code) from cause
 
@@ -759,6 +770,8 @@ def agent_error_api_response(*, error: ApiResponseError) -> NoReturn:
         error: The refusal pipelex-sdk's ``PipelexAPIClient`` raised.
     """
     payload = api_response_error_payload(error=error)
-    _note_hosted_failure(error=error)
+    # The statistics say what the envelope says: what the hosted API sent, never what the SDK inferred from the status.
+    if (sent_error := sent_usage_stats_error(error=error)) is not None:
+        note_command_error(error=sent_error)
     _print_hosted_envelope(payload=payload)
     raise typer.Exit(1) from error

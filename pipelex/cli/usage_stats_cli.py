@@ -11,7 +11,7 @@ commands never send, queue or print the notice.
 
 import time
 from collections.abc import Callable, Sequence
-from typing import Any, NamedTuple, Protocol, TypeVar, runtime_checkable
+from typing import Any, NamedTuple, Protocol, TypeVar, cast, runtime_checkable
 
 import click
 
@@ -39,6 +39,8 @@ INTERRUPTED_EXIT_CODE = 130
 _FORMAT_OPTION = "--format"
 _ERROR_FORMAT_OPTION = "--error-format"
 _JSON = "json"
+#: The formats a `pipelex-agent` error stream is written in, which a command's `--format` must offer for its errors to follow it.
+_ERROR_FORMATS = frozenset({"json", "markdown"})
 
 ResultT = TypeVar("ResultT")
 
@@ -98,23 +100,35 @@ def _default_of(*, command: click.Command, option: str) -> str | None:
     return str(param.default)
 
 
-def _errors_are_json(*, command: click.Command, args: Sequence[str]) -> bool:
-    """Whether a `pipelex-agent` command's errors are JSON: `--error-format`, else `--format`, else its defaults.
+def _format_feeds_errors(*, param: click.Parameter | None) -> bool:
+    """Whether a command's `--format` decides its errors when nothing else does: a presentation format, markdown or json.
 
-    A command with neither option is one of the JSON-only commands, whose errors are always the JSON envelope.
+    `inputs`' `--format` chooses a template's serialization, json or toml, and its errors never follow it.
     """
-    has_error_format = _find_param(command=command, token=_ERROR_FORMAT_OPTION) is not None
-    has_format = _find_param(command=command, token=_FORMAT_OPTION) is not None
-    if not has_error_format and not has_format:
-        return True
-    chosen = _option_value(args=args, option=_ERROR_FORMAT_OPTION) if has_error_format else None
-    if chosen is None and has_format:
-        chosen = _option_value(args=args, option=_FORMAT_OPTION)
-    if chosen is None and has_error_format:
-        chosen = _default_of(command=command, option=_ERROR_FORMAT_OPTION)
-    if chosen is None and has_format:
-        chosen = _default_of(command=command, option=_FORMAT_OPTION)
-    return chosen is not None and chosen.strip().lower() == _JSON
+    if param is None:
+        return False
+    param_type: click.ParamType = param.type
+    if not isinstance(param_type, click.Choice):
+        return False
+    choices = cast("click.Choice[Any]", param_type).choices
+    return frozenset(str(choice) for choice in choices) == _ERROR_FORMATS
+
+
+def _errors_are_json(*, command: click.Command, args: Sequence[str], root_error_format: str | None) -> bool:
+    """Whether a `pipelex-agent` command's errors are JSON, with the precedence the command itself settles them by.
+
+    The command's own `--error-format`, else the program's (`root_error_format`, given before the command), else the
+    command's `--format` when it is a presentation format, given or by default, else JSON: the order
+    `pipelex.cli.agent_cli.commands.agent_output.use_agent_cli_error_format` applies, so the notice is kept off a
+    stream that will carry a JSON problem, wherever the flag that made it JSON was written.
+    """
+    chosen: str | None = None
+    if _find_param(command=command, token=_ERROR_FORMAT_OPTION) is not None:
+        chosen = _option_value(args=args, option=_ERROR_FORMAT_OPTION) or _default_of(command=command, option=_ERROR_FORMAT_OPTION)
+    chosen = chosen or root_error_format
+    if chosen is None and _format_feeds_errors(param=_find_param(command=command, token=_FORMAT_OPTION)):
+        chosen = _option_value(args=args, option=_FORMAT_OPTION) or _default_of(command=command, option=_FORMAT_OPTION)
+    return chosen is None or chosen.strip().lower() == _JSON
 
 
 def _allowed_commands(*, surface: UsageStatsSurface) -> frozenset[str]:
@@ -140,12 +154,15 @@ def resolve_invocation(*, root: click.Group, args: Sequence[str], surface: Usage
 
     The command is its path of names in the tree, aliases and a group's default routing resolved, `other` when the schema
     does not list it (or no command has that name), and `None` when nothing is counted: help, the version, no command at
-    all, or the statistics group.
+    all, or the statistics group. The only values read are the formats the errors will be written in, the program's
+    `--error-format` and the command's own options, so a notice is never printed ahead of a JSON problem.
     """
     not_counted = CliInvocation(command=None, is_statistics_group=False, is_machine_read=False)
     help_names = {"--help"}
     current: click.Command = root
     path: list[str] = []
+    # The program's own `--error-format`, given before the command, which the command's errors follow unless it has its own.
+    root_error_format: str | None = None
     index_arg = 0
     while isinstance(current, click.Group):
         if isinstance(current, RoutesToDefaultCommand):
@@ -168,13 +185,17 @@ def resolve_invocation(*, root: click.Group, args: Sequence[str], surface: Usage
                 # `--version` and `-V`: they print and exit before any command runs.
                 return not_counted
             consumed = 2 if param is not None and "=" not in token and _takes_value(param=param) else 1
+            if param is not None and _ERROR_FORMAT_OPTION in param.opts:
+                root_error_format = _option_value(args=args[index_arg : index_arg + consumed], option=_ERROR_FORMAT_OPTION)
             index_arg += consumed
             continue
         if not path and token == STATISTICS_GROUP_NAME:
             return CliInvocation(command=None, is_statistics_group=True, is_machine_read=False)
         subcommand = current.commands.get(token)
         if subcommand is None:
-            return CliInvocation(command=OTHER_COMMAND, is_statistics_group=False, is_machine_read=_is_machine_read_surface(surface=surface))
+            # An unknown command is refused in the program's error format, JSON unless `--error-format` said otherwise.
+            is_unknown_machine_read = _is_machine_read_surface(surface=surface) and (root_error_format or _JSON).strip().lower() == _JSON
+            return CliInvocation(command=OTHER_COMMAND, is_statistics_group=False, is_machine_read=is_unknown_machine_read)
         path.append(token)
         current = subcommand
         index_arg += 1
@@ -185,7 +206,9 @@ def resolve_invocation(*, root: click.Group, args: Sequence[str], surface: Usage
         return not_counted
     command_path = " ".join(path)
     command = command_path if command_path in _allowed_commands(surface=surface) else OTHER_COMMAND
-    is_machine_read = _is_machine_read_surface(surface=surface) and _errors_are_json(command=current, args=leaf_args)
+    is_machine_read = _is_machine_read_surface(surface=surface) and _errors_are_json(
+        command=current, args=leaf_args, root_error_format=root_error_format
+    )
     return CliInvocation(command=command, is_statistics_group=False, is_machine_read=is_machine_read)
 
 

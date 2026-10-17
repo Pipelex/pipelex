@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.error_models import RunErrorReport
 from pipelex_sdk.errors import MissingMainStuffError, RunFailedError, RunTimeoutError
 from pipelex_sdk.runs import RunResults, RunStatus
@@ -23,7 +24,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
-from pipelex.errors.problem import ProblemView
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
@@ -149,6 +150,8 @@ class TestRunHostedEnvelope:
         envelope = json.loads(capsys.readouterr().err)
         assert envelope["error"] is True
         assert envelope["error_type"] == "ValidationError"
+        # The catch-all's code, `runtime.unexpected`, gives the next step an agent reads as the hint.
+        assert envelope["hint"] == make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR).next_step.detail
 
     def test_a_hosted_verdict_that_the_failure_is_not_retryable_wins_over_the_local_table(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]

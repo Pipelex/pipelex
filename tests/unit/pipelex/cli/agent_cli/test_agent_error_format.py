@@ -4,7 +4,9 @@ import json
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
@@ -12,6 +14,9 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 )
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.errors.problem import make_problem_item
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validation_render import format_validation_error_items_markdown
 
 
 class TestAgentErrorFormat:
@@ -59,3 +64,39 @@ class TestAgentErrorFormat:
         assert "- **pipe_code:** my_pipe" in err
         assert "error_source" not in err
         assert "Traceback" not in err
+
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_both_formats_list_the_one_problem_s_errors(self, capsys: pytest.CaptureFixture[str], error_format: CliOutputFormat) -> None:
+        """A wrapper adding a fault of its own above a verdict: both formats list the verdict's item and the wrapper's."""
+        set_agent_cli_error_format(error_format)
+        verdict = ValidateBundleError(message="the verdict's own fault")
+        wrapper = PipelexError("several faults")
+        wrapper.with_items(items=[make_problem_item(code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"pipe": "summarize", "missing": "condense"})])
+        wrapper.__cause__ = verdict
+
+        with pytest.raises(typer.Exit):
+            agent_error("the run was refused", cause=wrapper)
+
+        printed = capsys.readouterr().err
+        missing_pipe = "Pipe 'summarize' names the pipe 'condense', which does not exist."
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert [item["code"] for item in problem["errors"]] == ["method.schema_violation", "method.pipe_unresolved"]
+                assert problem["errors"][1]["detail"] == missing_pipe
+            case CliOutputFormat.MARKDOWN:
+                assert "### Errors" in printed
+                assert f"- `method.pipe_unresolved`: {missing_pipe}" in printed
+                assert "- `method.schema_violation`: " in printed
+
+    def test_markdown_renders_a_verdict_s_own_errors_as_validate_s_prose(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """When the problem's errors are exactly the verdict's, the Markdown renders them as the prose `validate` prints."""
+        set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
+        verdict = ValidateBundleError(message="the verdict's own fault")
+
+        with pytest.raises(typer.Exit):
+            agent_error("the bundle does not validate", cause=verdict)
+
+        printed = capsys.readouterr().err
+        assert "### Errors" not in printed
+        assert format_validation_error_items_markdown(verdict.validation_error_items()) in printed

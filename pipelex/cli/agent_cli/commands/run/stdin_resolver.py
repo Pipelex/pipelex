@@ -9,7 +9,7 @@ from typing import Any, NamedTuple, cast
 
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_argument_error, agent_error, agent_file_error
+from pipelex.cli.agent_cli.commands.agent_output import agent_argument_error, agent_error, agent_file_error, file_read_failure_reason
 from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
@@ -60,7 +60,8 @@ def _extract_stuff_entry(stuff_data: dict[str, Any], *, stuff_name: str) -> dict
         # a consumer hunting for trailing commas.
         agent_argument_error(
             f"stdin envelope has invalid 'working_memory.root.{stuff_name}.concept': "
-            f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}",
+            f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}. "
+            "Replace the concept object with its ref, or re-pipe the output of a current 'pipelex-agent run --with-memory'.",
             argument="stdin",
             reason=f"working_memory.root.{stuff_name}.concept is not a concept ref string",
         )
@@ -217,11 +218,17 @@ def _parse_inputs_arg(inputs_arg: str) -> ParsedCliInputs:
     except FileNotFoundError as exc:
         agent_file_error(f"Input file not found: {inputs_arg}", path=inputs_arg, reason="not found", cause=exc)
     except json.JSONDecodeError as exc:
+        # A subclass of ValueError, never of the read failures below.
         agent_argument_error(
             f"Input file contains invalid JSON: {inputs_arg}: {exc}", argument="--inputs", reason="the file is not valid JSON", cause=exc
         )
+    except (OSError, UnicodeDecodeError) as exc:
+        reason = file_read_failure_reason(error=exc)
+        agent_file_error(f"Input file cannot be read: {inputs_arg}: {reason}", path=inputs_arg, reason=reason, cause=exc)
     except JsonTypeError as exc:
-        agent_error(f"Input file must be a valid JSON dictionary: {inputs_arg}", cause=exc)
+        agent_argument_error(
+            f"Input file must be a valid JSON dictionary: {inputs_arg}", argument="--inputs", reason="the file does not hold a JSON object", cause=exc
+        )
     except TomlError as exc:
         # The inputs file is the caller's request, not the runtime's configuration.
         agent_error(exc.message, cause=exc.with_error_code(CoreCode.REQUEST_MALFORMED))

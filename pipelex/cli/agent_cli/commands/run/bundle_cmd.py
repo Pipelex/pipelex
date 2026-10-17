@@ -17,6 +17,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_file_error,
     agent_success_formatted,
+    file_read_failure_reason,
     use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
@@ -202,7 +203,8 @@ def run_bundle_cmd(
         except FileNotFoundError as exc:
             agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
-            agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", cause=exc)
+            reason = file_read_failure_reason(error=exc)
+            agent_file_error(f"Failed to read bundle file '{bundle_path}': {reason}", path=bundle_path, reason=reason, cause=exc)
         except ValidateBundleError as exc:
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc.message}", cause=exc)
 

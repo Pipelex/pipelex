@@ -1,6 +1,9 @@
 from typing import Any, cast
 
 import pytest
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.client_problems import make_client_problem
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
@@ -23,7 +26,7 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsProvider,
 )
 from pipelex.system.usage_stats.usage_stats_events import UsageStatsEvent
-from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error
+from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error, usage_stats_failure_domain
 from pipelex.tracing.trace_events import TraceEvent
 from tests.helpers.recovered_problem import make_recovered_url_refusal
 from tests.helpers.usage_stats_run_events import envelope_of, llm_usage_event, pipe_start_event
@@ -252,6 +255,32 @@ class TestUsageStatsReporting:
     def test_a_recovered_problem_is_counted_by_its_own_code(self) -> None:
         """A failure reporting a problem recovered from a worker is counted by that problem's code and domain, not by its carrier's class."""
         assert usage_stats_error(error=make_recovered_url_refusal()) == ("input.url_unreachable", UsageStatsErrorDomain.INPUT)
+
+    def test_a_request_error_is_counted_by_the_problem_it_carries(self) -> None:
+        """An MTHDS client's request error is no Pipelex error, and carries its problem: it is counted by that, not as the catch-all."""
+        unreachable = PipelineRequestError(
+            "the runner could not be reached",
+            problem=make_client_problem(CoreCode.CLIENT_UNREACHABLE, params={"base_url": "https://runner.test"}),
+        )
+
+        assert usage_stats_error(error=unreachable) == ("client.unreachable", UsageStatsErrorDomain.RUNTIME)
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            make_recovered_url_refusal(),
+            PipelexError("a fault of ours"),
+            PipelineRequestError("refused", problem=make_client_problem(CoreCode.CLIENT_NOT_CONFIGURED, params={"setting": "base_url"})),
+            RuntimeError("no Pipelex error at all"),
+        ],
+    )
+    def test_a_failed_call_s_domain_is_read_off_its_code_alone(self, mocker: MockerFixture, error: Exception) -> None:
+        """The cheap reading a failed inference call takes agrees with the problem's, and builds no problem to get it."""
+        expected_domain = usage_stats_error(error=error).domain
+        to_problem_spy = mocker.patch.object(PipelexError, "to_problem")
+
+        assert usage_stats_failure_domain(error=error) == expected_domain
+        to_problem_spy.assert_not_called()
 
     def test_a_failed_run_carries_its_error_s_code_and_domain(self, mocker: MockerFixture) -> None:
         """A failed run's `run_completed` names its error's code and that code's domain, which the gate accepts."""

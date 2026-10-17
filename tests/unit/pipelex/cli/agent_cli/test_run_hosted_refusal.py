@@ -34,6 +34,7 @@ from pipelex.hosted.error_rendering import (
     HOSTED_SERVER_FAULT_NEXT_STEP,
 )
 from pipelex.hosted.run_config import RunExecution
+from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
 from tests.unit.pipelex.cli.agent_cli.test_data import RefusalCase, RefusalCases, RefusedRunBodies
 from tests.unit.pipelex.hosted.test_data import HostedVersions
 
@@ -448,3 +449,32 @@ class TestRunHostedRefusal:
         assert unprocessable["hint"] == HOSTED_REFUSAL_CALLER_NEXT_STEP
         for payload in (not_found, unprocessable):
             assert "retryable" not in payload
+
+    @pytest.mark.parametrize(
+        ("status", "body", "expected"),
+        [
+            # A gateway's page: pipelex-sdk reads a problem from the status, which the envelope never prints.
+            (502, RefusedRunBodies.GATEWAY_HTML, None),
+            # The platform's own code, outside the standard's pattern, and no domain sent.
+            (429, RefusedRunBodies.PLATFORM_RATE_LIMITED, None),
+            # A problem document naming its code and its domain.
+            (
+                422,
+                json.dumps({"detail": "The input 'topic' is invalid", "code": "input.invalid", "domain": "input", "error_domain": "input"}),
+                ("input.invalid", UsageStatsErrorDomain.INPUT),
+            ),
+        ],
+    )
+    def test_the_statistics_record_what_the_hosted_api_sent(
+        self, mocker: MockerFixture, status: int, body: str, expected: tuple[str, UsageStatsErrorDomain] | None
+    ) -> None:
+        """The command's statistics say what the envelope says: the code and domain the hosted API sent, never the SDK's inference."""
+        noted = mocker.patch("pipelex.cli.agent_cli.commands.agent_output.note_command_error")
+
+        with pytest.raises(typer.Exit):
+            agent_error_api_response(error=_refusal(status=status, body=body))
+
+        if expected is None:
+            noted.assert_not_called()
+        else:
+            noted.assert_called_once_with(error=UsageStatsError(code=expected[0], domain=expected[1]))
