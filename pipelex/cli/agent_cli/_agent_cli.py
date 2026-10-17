@@ -6,11 +6,12 @@ from typing import Annotated, Any
 
 import typer
 from click import Command, Context
+from mthds.protocol.problem.registry import CoreCode
 from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, start_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.codegen.app import codegen_app
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
@@ -82,10 +83,15 @@ class PipelexAgentCLI(TyperGroup):
         if cmd is None:
             from pipelex.cli.agent_cli.commands.agent_output import agent_error  # ruff: ignore[import-outside-top-level]
 
+            # Click resolves the command before it runs the app callback, so the program's own --error-format, already
+            # parsed, is read here.
+            root_error_format = ctx.params.get("error_format")
+            start_agent_cli_error_format(root_error_format=CliOutputFormat(root_error_format) if root_error_format else None)
             valid_commands = super().list_commands(ctx)
             agent_error(
                 f"Unknown command: {cmd_name}",
-                error_type="UnknownCommandError",
+                code=CoreCode.CLIENT_ARGUMENT_INVALID,
+                params={"argument": cmd_name, "reason": "not a command of pipelex-agent"},
                 valid_commands=valid_commands,
             )
         return cmd
@@ -111,7 +117,7 @@ def version_callback(value: bool) -> None:  # kw-only: ignore — click invokes 
 #: docstring, which is written for this module's maintainers.
 AGENT_CLI_HELP = (
     "The machine-oriented Pipelex CLI, for AI agents, IDE extensions and automation: no prompts and no logs, results on stdout "
-    "(Markdown or JSON for most commands), and errors as a structured envelope on stderr."
+    "(Markdown or JSON for most commands), and errors as a problem document on stderr (Markdown or JSON with --error-format)."
 )
 
 
@@ -127,11 +133,21 @@ def app_callback(
             is_eager=True,
         ),
     ] = False,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option(
+            "--error-format",
+            help=(
+                "Error output format for every command: markdown or json. "
+                "A command's own --error-format wins; without either, a command's --format decides."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Agent CLI callback - no logo, minimal output.
 
     Note: there is no ``--log-level`` flag. ``pipelex-agent`` is machine-consumed:
-    stdout is reserved for the success envelope and stderr for the error envelope.
+    stdout is reserved for the success envelope and stderr for the problem a failure reports.
     Free-floating logs would corrupt those channels, so Python's logging system is
     cut off process-wide via ``silence_logging_for_agent_cli`` as the very first
     action in this callback — covering every subcommand invocation (including ones
@@ -146,10 +162,11 @@ def app_callback(
     # ``make_pipelex_for_agent_cli`` and ``agent_doctor_cmd`` are kept as defense-in-depth
     # for direct library callers that bypass this Typer entry point.
     silence_logging_for_agent_cli()
-    # Reset the error-format ContextVar at the single choke point every command passes through, so
-    # a markdown command cannot leak markdown into a later JSON-only command in the same process.
-    # --format / --error-format commands override this afterwards; JSON-only commands keep the JSON default.
-    set_agent_cli_error_format(CliOutputFormat.JSON)
+    # Start the error-format ContextVar at the single choke point every command passes through, from the program's own
+    # --error-format, so a markdown command cannot leak markdown into a later JSON-only command in the same process.
+    # A command's own --error-format, then this one, then its --format settle it afterwards; commands without either
+    # keep this one, else JSON.
+    start_agent_cli_error_format(root_error_format=error_format)
 
 
 app.command(name="init", help="Initialize Pipelex configuration (non-interactive)")(agent_init_cmd)

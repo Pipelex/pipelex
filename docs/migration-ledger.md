@@ -505,7 +505,7 @@ Two rules govern how an entry appears, and both exist so that a report is never 
 
 That is a mechanical rule rather than a list of credential-shaped key names, because such a list is a guess that eventually misses one. The single deliberate exception is the backup file, which contains the user's values by definition and is protected by inheriting the source file's mode rather than the process umask.
 
-When migration is reported through a validation error, the error keeps `error_domain: "config"` and gains a structured `migration` block carrying the plan, the remedy and the diagnosis. Consumers branch on the presence of that block, never on wording: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
+When migration is reported through a validation error, the error gains a structured `migration` block carrying the plan, the remedy and the diagnosis, which its problem carries as `diagnostics.migration`. Consumers branch on the presence of that block, never on wording: the structured fields are the contract, and Markdown, exit codes and HTTP statuses are presentation.
 
 ## The commands
 
@@ -542,7 +542,7 @@ load user files  →  deep-merge  →  validate (extra="forbid")
       → re-merge → re-run the loader's own post-merge step → re-validate
            ok    → WARNING naming the file and, where the command reaches it, the `pipelex migrate` remedy → boot
            fails → unsafe entries, CONFLICT, or unexplained paths → validation error
-                   with error_domain "config" and the `migration` block
+                   coded pipelex.config.invalid, with the `migration` block
 ```
 
 The rules this encodes:
@@ -580,7 +580,7 @@ A validation error cannot answer that by itself. It is raised against the merged
 
 The answer rides the error twice, and the two halves are not interchangeable:
 
-- **`error_domain` stays `"config"`.** It does not become a domain of its own. `ErrorDomain` is a closed cross-repo enum and the agent-hook specification routes any domain it does not know to BLOCK, so a stale configuration reported under a new domain would stop an agent rather than tell it what to run.
+- **The code stays `pipelex.config.invalid`.** A stale configuration is no code of its own: it is the same refusal, one only the operator can act on (`"domain": "operator"`), and the block rides its problem as `diagnostics.migration`, the operator's view, which is the view `pipelex` and `pipelex-agent` print, since whoever runs them runs the runtime. A caller of a hosted runtime is shown no block, having no configuration of that runtime to migrate.
 - **The structured `migration` block is the contract, and consumers branch on its presence.** Absent means the failure is not staleness. Present, it carries `remedy` (the command), `would_write` (whether that command would rewrite any of these files), `needs_attention` (whether anything here is a person's rather than the tool's), and `plans` — the same `MigrationPlan` shape `pipelex-agent migrate --dry-run --format json` emits under its own `plans` key, so an agent that parses one has already parsed the other. Only the files the scan found something in are listed: unlike the commands' report, which answers *what did the walk visit*, the block answers *what is wrong with this machine*.
 - **The message is presentation.** It carries the refusal — the pydantic analysis where the surface's own model refused, or, for the two libraries the boot reports on, the loader's own sentence, kept whole because it names *which model, which backend, which file* before quoting that analysis, and a directory holds a dozen files with the same field names — followed by a paragraph naming the files, what the command would carry forward, and what it cannot do for anyone. Nothing branches on its wording.
 
@@ -598,9 +598,9 @@ A configuration error reaches a user through several surfaces at once — the hu
 
 So no surface holds its own answer any more:
 
-- Every configuration surface's refusal goes through `report_validation_error`, so the `migration` block reaches the error wherever it is caught. Most surfaces do it in the loader; the inference backend definitions do it one frame out, in the boot that catches the library's own error, because that library refuses after the main configuration is already up and the boot has a message of its own to build. `TelemetryConfigError` is a `PipelexConfigError` for this reason — it carries `error_domain = CONFIG` from the class rather than from the agent CLI's lookup table, and it can carry a block.
+- Every configuration surface's refusal goes through `report_validation_error`, so the `migration` block reaches the error wherever it is caught. Most surfaces do it in the loader; the inference backend definitions do it one frame out, in the boot that catches the library's own error, because that library refuses after the main configuration is already up and the boot has a message of its own to build. `TelemetryConfigError` is a `PipelexConfigError` for this reason — it carries the code `pipelex.config.invalid` from the class, and it can carry a block.
 - The **human handler** prints the fields the model refused and then names `pipelex migrate` when the block says it would write, the dry run when it says it would not, and an edit when there is no block at all.
-- The **agent envelope** carries `migration` as a field and its hint says which of the three readings applies — no block, a block that would write, a block that would not; an agent branches on the fields, never on the sentence.
+- The **agent CLI's problem** carries the block as `diagnostics.migration`, and the three readings — no block, a block that would write, a block that would not — are its absence, `would_write: true` and `would_write: false`; an agent branches on those fields, never on the sentence.
 - The **`doctor` row** carries a *finding* — `healthy`, `not_found`, `unparseable`, `out_of_date`, `invalid` — and every caller reads that instead of the row's wording. This one is a correctness fix and not only a tidy-up: `--fix` used to decide what it could repair by searching the message for `"format has changed"`, so rewording the row would have switched the whole repair path off in silence. The finding answers for the one file the row is about: the scan behind `out_of_date` runs over the directory that file lives in — which also holds the `telemetry_*.toml` tier — and the verdict is read off that file's own plan, so a stale tier file beside a wrong base file leaves the base file `invalid`, and the fields the model refused stay on the row. **`out_of_date` means the plan would rewrite that file**, not merely that it is unclean: a file the migration would leave untouched is `invalid`, which is the finding that routes to a person and which `--fix` does not offer to run a command over, and the row keeps the dry run's pointer so the diagnosis is not lost with the finding.
 
 > **Writing a fresh file repairs exactly one finding: a missing one.** There is nothing in a file that is not there to lose. Every other unhealthy state has the user's own settings in it, so an out-of-date file is offered `pipelex migrate` and a broken one is left to a person. Regeneration is still reachable, and it is described as what it is — a way to start over that discards the file.

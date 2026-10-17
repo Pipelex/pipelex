@@ -10,6 +10,8 @@ from pipelex.system.usage_stats.usage_stats_contract import (
     CONTAINER_CGROUP_WORDS,
     CONTAINER_MARKER_FILES,
     CONTAINER_MARKER_VARIABLES,
+    ERROR_CODE_MAX_LENGTH,
+    ERROR_CODE_PATTERN,
     FALSY_VALUES,
     MODEL_HANDLE_PATTERN,
     NOTICE_DETAILS_URL,
@@ -93,6 +95,23 @@ class TestUsageStatsContract:
         assert load_usage_stats_schema()["schema_version"] == SCHEMA_VERSION
         assert load_usage_stats_schema()["person_profile_property"] == PERSON_PROFILE_PROPERTY
 
+    def test_the_schema_property_s_maximum_is_the_schema_version(self) -> None:
+        """Every `schema` property reaches the contract's version, as the spec's own load check holds, from version 1 on."""
+        schema = load_usage_stats_schema()
+        schema_properties = [schema["common_properties"]["schema"]]
+        schema_properties += [event["properties"]["schema"] for event in schema["events"].values() if "schema" in event["properties"]]
+        assert schema_properties
+        for schema_property in schema_properties:
+            assert schema_property["min"] == 1
+            assert schema_property["max"] == SCHEMA_VERSION
+
+    def test_the_error_contract_is_version_2(self) -> None:
+        """The error's code and the registry's domains replaced what version 1 declared, which only a new version may do."""
+        schema = load_usage_stats_schema()
+        assert SCHEMA_VERSION == 2
+        assert set(schema["events"]["run_completed"]["properties"]["error_domain"]["values"]) == {domain.value for domain in UsageStatsErrorDomain}
+        assert "failures_transient" not in schema["events"]["model_used"]["properties"]
+
     def test_notice_is_the_schemas_text_for_pipelex(self) -> None:
         notice = load_usage_stats_schema()["notice"]
         assert notice["version"] == NOTICE_VERSION
@@ -160,6 +179,8 @@ class TestUsageStatsContract:
         assert patterns["release_version"]["regex"] == RELEASE_VERSION_PATTERN
         assert patterns["installation_id"]["regex"] == INSTALLATION_ID_PATTERN
         assert patterns["model_handle"]["regex"] == MODEL_HANDLE_PATTERN
+        assert patterns["error_code"]["regex"] == ERROR_CODE_PATTERN
+        assert patterns["error_code"]["max_length"] == ERROR_CODE_MAX_LENGTH
 
     def test_enums_are_the_schemas_values(self) -> None:
         assert {event.value for event in UsageStatsEventName} <= set(load_usage_stats_schema()["events"])

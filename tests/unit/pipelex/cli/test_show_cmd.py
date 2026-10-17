@@ -6,6 +6,7 @@ Covers the do_* functions directly with mocked hub getters — the Typer wrapper
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
@@ -16,12 +17,13 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.show_cmd import do_list_pipes, do_show_backends, do_show_config, do_show_pipe
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.system.configuration.config_loader import CONFIG_NAME
+from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from pytest_mock import MockerFixture
 
 
@@ -110,6 +112,50 @@ class TestShowCmd:
         with pytest.raises(PipelexConfigError, match=f"Error loading configuration: {expected_message}") as exc_info:
             do_show_config()
         assert exc_info.value.resolve_error_code() == expected_code
+
+    @pytest.mark.usefixtures("no_pipelex_home")
+    @pytest.mark.parametrize(
+        ("broken_layer", "expected_file"),
+        [
+            ("project", ".pipelex/pipelex.toml"),
+            ("home", "~/.pipelex/pipelex.toml"),
+        ],
+    )
+    def test_do_show_config_names_the_layer_that_does_not_parse(
+        self, mocker: MockerFixture, tmp_path: Path, broken_layer: str, expected_file: str
+    ) -> None:
+        """A syntax error names the layer at fault, where its line and column are, without the home directory."""
+        home_dir = tmp_path / "home"
+        project_dir = home_dir / "project"
+        (project_dir / ".git").mkdir(parents=True)
+        broken_dir = (project_dir if broken_layer == "project" else home_dir) / CONFIG_DIR_NAME
+        broken_dir.mkdir(parents=True, exist_ok=True)
+        (broken_dir / CONFIG_NAME).write_text("[pipelex\n", encoding="utf-8")
+        mocker.patch.object(Path, "home", return_value=home_dir)
+        mocker.patch.object(Path, "cwd", return_value=project_dir)
+
+        with pytest.raises(PipelexConfigError) as exc_info:
+            do_show_config()
+
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_SYNTAX
+        assert exc_info.value.file == expected_file
+        step = exc_info.value.to_problem(view=ProblemView.OPERATOR).next_step.detail
+        assert step.startswith(f"Fix the TOML of the file '{expected_file}' of the pipelex configuration at line 1, column ")
+        assert str(tmp_path) not in step
+
+    @pytest.mark.usefixtures("no_pipelex_home")
+    def test_do_show_config_names_the_file_it_cannot_read(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A file the load cannot open is named as the OS named it, without the home directory, never as the base file's name."""
+        home_dir = tmp_path / "home"
+        unreadable = home_dir / CONFIG_DIR_NAME / "pipelex_override.toml"
+        mocker.patch.object(Path, "home", return_value=home_dir)
+        mocked_manager = mocker.patch("pipelex.cli.commands.show_cmd.config_manager")
+        mocked_manager.load_config.side_effect = PermissionError(13, "Permission denied", str(unreadable))
+
+        with pytest.raises(PipelexConfigError) as exc_info:
+            do_show_config()
+
+        assert exc_info.value.file == "~/.pipelex/pipelex_override.toml"
 
     def test_do_list_pipes_tracks_pipe_count(self, mocker: MockerFixture, telemetry: Any) -> None:
         """Listing pipes delegates to the library and reports the count to telemetry."""

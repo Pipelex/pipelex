@@ -786,3 +786,15 @@ def get_console() -> "Console":
         return runtime_hub.get_console()
     else:
         return _make_console(stderr=True)
+
+
+def get_error_console() -> "Console":
+    """The Rich console the CLI prints a failure's report through: always stderr, whatever boot's print target.
+
+    ``get_console()`` prints to stdout by default, the stream a person pipes a command's data from, so a failure printed
+    there would be read as the command's output; its report, and the traceback ``--traceback`` asks for, go to stderr.
+
+    Raises:
+        MissingDependencyError: If Rich is not installed.
+    """
+    return _make_console(stderr=True)

@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:79d4e68f7ae4755f1a027bc882f105c1985a5ecf291bd888dd3792269162951b"
+digest = "sha256:dd59159853d97c98d62d3fcb2c38c8f0b4a10807033c5ac43a17a13bcaa37e85"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-16T05:26:39Z"
-rationale = "real-catch: runtime_hub.py gains the method file store and the template file stage, and interpreter_hub.py drops does_pipe_run_leave_process with set_pipe_run's leaves_process; docs/contribute/hub-layering.md now lists get_method_file_store and get_template_file_stage, no longer lists does_pipe_run_leave_process, and says how the template file stage is installed by the interpreter's boot and released at teardown. No import crosses the boundary."
+reviewed_at = "2026-10-17T05:54:29Z"
+rationale = "real-catch: runtime_hub.py gains get_error_console, the stderr console a CLI prints a failure's report through; docs/contribute/hub-layering.md lists it beside get_console. No import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:e1a4b941820aeb8affbb6c70b7f81eb29e4cc191"
-"pipelex/runtime_hub.py" = "blob:ca642e419aeac8eee7bd0dba2b5784feb0059e82"
+"pipelex/runtime_hub.py" = "blob:48f34feea22c29a56910f4a2fbb317a1d0a1e492"

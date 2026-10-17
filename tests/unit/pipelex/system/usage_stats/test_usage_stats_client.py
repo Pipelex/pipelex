@@ -19,6 +19,7 @@ from pipelex.system.usage_stats.usage_stats_client import (
     get_usage_stats_client,
 )
 from pipelex.system.usage_stats.usage_stats_contract import (
+    SCHEMA_VERSION,
     TOOL_NAME,
     UsageStatsEnvVar,
     UsageStatsEventName,
@@ -120,7 +121,7 @@ class TestUsageStatsClient:
         assert_envelope_is_valid(envelope)
         properties = envelope["properties"]
         assert properties["$process_person_profile"] is False
-        assert properties["schema"] == 1
+        assert properties["schema"] == SCHEMA_VERSION
         assert properties["tool"] == "pipelex"
         assert properties["surface"] == "pipelex"
         assert properties["integration"] == "cli"

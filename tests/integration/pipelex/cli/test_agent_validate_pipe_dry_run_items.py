@@ -58,11 +58,9 @@ class TestAgentValidatePipeDryRunItems:
         assert exc_info.value.exit_code == 1
         envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
         assert envelope["is_valid"] is False
-        assert envelope["error_type"] == "ValidateBundleError"
-        (item,) = envelope["validation_errors"]
-        assert item["category"] == "dry_run"
-        assert item["error_type"] == "DryRunError"
-        assert item["pipe_code"] == "analyze_topic"
-        assert item["domain_code"] == ValidationDetailBundles.DOMAIN
-        assert item["source"] == str(library_dir / "bundle.mthds")
-        assert not any(marker in item["message"] for marker in ValidationDetailBundles.RECORD_REPR_MARKERS)
+        assert envelope["code"] == "method.invalid"
+        (item,) = envelope["errors"]
+        assert item["location"]["pipe"] == "analyze_topic"
+        assert item["location"]["file"] == str(library_dir / "bundle.mthds")
+        assert not any(marker in item["detail"] for marker in ValidationDetailBundles.RECORD_REPR_MARKERS)
+        assert not any(marker in envelope["message"] for marker in ValidationDetailBundles.RECORD_REPR_MARKERS)

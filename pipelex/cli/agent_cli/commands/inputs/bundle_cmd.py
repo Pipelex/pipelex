@@ -7,9 +7,17 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_argument_error,
+    agent_error,
+    agent_file_error,
+    agent_unreadable_file_error,
+    use_agent_cli_error_format,
+)
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
@@ -41,11 +49,15 @@ def inputs_bundle_cmd(
         bool,
         typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
     ] = False,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to json)"),
+    ] = None,
 ) -> None:
     """Generate an example inputs template from a bundle file (.mthds) or pipeline directory.
 
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, JSON to stderr on error with exit code 1.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
 
     Examples:
         pipelex-agent inputs bundle my_bundle.mthds
@@ -55,6 +67,7 @@ def inputs_bundle_cmd(
         pipelex-agent inputs bundle pipeline_01/ --format toml
         pipelex-agent inputs bundle pipeline_01/ --explicit
     """
+    use_agent_cli_error_format(error_format=error_format)
     bundle_path: str | None = None
     target_path = Path(path)
 
@@ -66,13 +79,14 @@ def inputs_bundle_cmd(
         else:
             mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
             if len(mthds_files) == 0:
-                agent_error(f"No .mthds bundle file found in directory '{path}'", error_type="FileNotFoundError")
+                agent_error(f"No .mthds bundle file found in directory '{path}'", code=CoreCode.METHOD_NOT_FOUND, params={"method_ref": path})
             if len(mthds_files) > 1:
                 mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                agent_error(
+                agent_argument_error(
                     f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
                     f"Pass the .mthds file directly instead.",
-                    error_type="ArgumentError",
+                    argument=path,
+                    reason="the directory holds several .mthds files",
                 )
             bundle_path = str(mthds_files[0])
 
@@ -86,10 +100,11 @@ def inputs_bundle_cmd(
     elif is_pipelex_file(target_path):
         bundle_path = path
     else:
-        agent_error(
+        agent_argument_error(
             f"'{path}' is not a .mthds file or directory. "
             f"Use 'inputs pipe <code>' for pipe codes, or 'inputs bundle <path>' for .mthds files/directories.",
-            error_type="ArgumentError",
+            argument=path,
+            reason="not a .mthds file or a directory",
         )
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
@@ -100,16 +115,19 @@ def inputs_bundle_cmd(
         emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
+        agent_file_error(f"Bundle file not found: {bundle_path}", path=str(bundle_path), reason="not found", cause=exc)
+
+    except OSError as exc:
+        # A method file this machine would not let the command read: the file, never a fault of the method.
+        agent_unreadable_file_error(error=exc, path=str(bundle_path))
 
     except ValidateBundleError as exc:
-        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
+        # A failing dry run is the problem's errors, one located item per failing pipe.
+        agent_error(exc.message, cause=exc)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -125,14 +143,14 @@ def inputs_bundle_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, cause=exc, **availability_extra)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

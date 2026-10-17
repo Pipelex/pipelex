@@ -39,6 +39,9 @@ from pipelex.tools.secrets.exceptions import UnknownVarPrefixError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.secrets.secrets_utils import substitute_vars
 
+#: The part of the configuration a telemetry refusal names, as `pipelex.config.invalid`'s step reads it.
+TELEMETRY_SURFACE = "telemetry"
+
 
 def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> TelemetryConfig:
     """Load telemetry configuration from a TOML file with variable substitution.
@@ -89,7 +92,7 @@ def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> Telem
     except UnknownVarPrefixError as exc:
         paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"
-        raise TelemetryConfigValidationError(msg) from exc
+        raise TelemetryConfigValidationError(msg, surface=TELEMETRY_SURFACE, file=TELEMETRY_CONFIG_FILE_NAME) from exc
 
     try:
         telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
@@ -112,7 +115,9 @@ def load_telemetry_config(*, secrets_provider: SecretsProviderAbstract) -> Telem
         report = report_validation_error(validation_error=exc, surface_id=TELEMETRY_CONFIG_SURFACE_ID)
         paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Invalid telemetry configuration in '{paths_str}':\n{report.message}"
-        raise TelemetryConfigValidationError(msg, migration=report.migration) from exc
+        raise TelemetryConfigValidationError(
+            msg, migration=report.migration, surface=TELEMETRY_SURFACE, file=TELEMETRY_CONFIG_FILE_NAME, setting=report.setting
+        ) from exc
     return telemetry_config
 
 

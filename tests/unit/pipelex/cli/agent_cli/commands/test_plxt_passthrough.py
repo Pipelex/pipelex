@@ -21,12 +21,12 @@ if TYPE_CHECKING:
 class TestPlxtPassthrough:
     """Tests for run_plxt(), fmt_cmd(), and lint_cmd() delegation to the plxt binary."""
 
-    def test_run_plxt_raises_binary_not_found_error_when_plxt_missing(
+    def test_run_plxt_reports_the_missing_tool_when_plxt_missing(
         self,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """run_plxt exits with code 1 and BinaryNotFoundError when plxt is not on PATH."""
+        """run_plxt exits with code 1 and the client.tool_missing problem naming plxt when plxt is not on PATH."""
         mocker.patch("shutil.which", return_value=None)
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -34,7 +34,8 @@ class TestPlxtPassthrough:
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error_type"] == "BinaryNotFoundError"
+        assert parsed["code"] == "client.tool_missing"
+        assert parsed["params"] == {"tool": "plxt"}
 
     def test_error_message_references_uv_tool_install(
         self,

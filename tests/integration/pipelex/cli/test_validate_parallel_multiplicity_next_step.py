@@ -177,7 +177,7 @@ def _write_bundle(*, directory: Path, content: str) -> Path:
 def console(mocker: MockerFixture) -> Console:
     """A recording console patched into the error handlers, so the panel can be read back."""
     recorded_console = Console(width=400, record=True, color_system=None)
-    mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+    mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
 
 
@@ -266,15 +266,14 @@ class TestValidateParallelMultiplicityNextStep:
             set_agent_cli_error_format(CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["is_valid"] is False
-        assert envelope["error_domain"] == "input"
-        assert envelope["error_code"] == CoreCode.METHOD_INVALID
-        assert envelope["hint"].startswith(_TOP_LEVEL_NEXT_STEP)
-        (item,) = envelope["validation_errors"]
-        assert item["category"] == "dry_run"
-        assert item["pipe_code"] == "analyze_topics"
-        assert item["message"] == f"Pipe 'analyze_topics' failed its dry run: {_LIST_INTO_SINGLE_SENTENCE}"
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["is_valid"] is False
+        assert problem["domain"] == "method"
+        assert problem["code"] == CoreCode.METHOD_INVALID
+        assert problem["next_step"]["kind"] == "change_method"
+        (item,) = problem["errors"]
+        assert item["location"]["pipe"] == "analyze_topics"
+        assert item["detail"] == _LIST_INTO_SINGLE_SENTENCE
 
     def test_the_verdict_problem_carries_both_next_steps(self, tmp_path: Path) -> None:
         """The problem every surface draws from: the item names the fault, the top level points at the items."""

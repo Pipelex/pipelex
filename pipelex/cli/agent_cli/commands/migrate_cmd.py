@@ -35,9 +35,9 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import silence_logging_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
-    agent_error,
+    agent_argument_error,
     agent_success_formatted,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.commands.migrate_cmd import describe_op
 from pipelex.migration.former_release_cleanup import FormerReleaseCleanup, FormerReleaseFileCleanup, clean_former_release
@@ -60,7 +60,7 @@ def agent_migrate_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Migrate this machine's Pipelex configuration files to the current schema.
@@ -69,12 +69,13 @@ def agent_migrate_cmd(
     surface's ledger over every file it claims, and — with ``--yes`` — rewrites what changed,
     backing up each original beside itself.
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     silence_logging_for_agent_cli()
     if dry_run and yes:
-        agent_error(
+        agent_argument_error(
             "--dry-run and --yes contradict each other: one refuses to write, the other authorizes it",
-            error_type="ArgumentError",
+            argument="--yes",
+            reason="contradicts --dry-run",
             exit_code=2,
         )
 

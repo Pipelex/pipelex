@@ -61,7 +61,7 @@ _DRY_RUN_FAILURE_PIPE = "route_parcel"
 def console(mocker: MockerFixture) -> Console:
     """A recording console patched into the error handlers, so the panel can be read back."""
     recorded_console = Console(width=200, record=True, color_system=None)
-    mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+    mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
 
 
@@ -100,7 +100,7 @@ class TestValidateLoadRefusalsCli:
         assert "Path: pipe.write_tide_note.model" in output
         assert "Traceback" not in output
 
-    def test_agent_validate_bundle_emits_the_invalid_verdict_envelope(
+    def test_agent_validate_bundle_emits_the_invalid_verdict_s_problem(
         self,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
@@ -119,19 +119,14 @@ class TestValidateLoadRefusalsCli:
             set_agent_cli_error_format(CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["is_valid"] is False
-        assert envelope["error_type"] == "ValidateBundleError"
-        assert envelope["error_domain"] == "input"
-        (item,) = envelope["validation_errors"]
-        assert item["category"] == "pipe_validation"
-        assert item["error_type"] == "unknown_model"
-        assert item["pipe_code"] == "write_tide_note"
-        assert item["domain_code"] == "tide_tables"
-        assert item["source"] == str(unknown_model_bundle)
-        assert item["field_path"] == "pipe.write_tide_note.model"
-        assert item["model_reference"] == "gpt-5.6-lunna"
-        assert item["model_type"] == "llm"
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["is_valid"] is False
+        assert problem["code"] == "method.invalid"
+        assert problem["domain"] == "method"
+        (item,) = problem["errors"]
+        assert item["code"] == "model.unknown"
+        assert item["location"] == {"pipe": "write_tide_note", "field": "model", "file": str(unknown_model_bundle)}
+        assert "gpt-5.6-lunna" in json.dumps(item["params"])
         assert item["suggestions"]
 
     @pytest.mark.usefixtures("restore_current_library")

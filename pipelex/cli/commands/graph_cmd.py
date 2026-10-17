@@ -20,13 +20,14 @@ from rich.markup import escape
 
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext, print_unexpected_failure
+from pipelex.cli.error_handlers import ErrorContext, is_traceback_requested, print_failure_problem
 from pipelex.config import get_config
+from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.exceptions import GraphSpecValidationError
 from pipelex.graph.graph_rendering import render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipelex import Pipelex
-from pipelex.runtime_hub import get_console, get_telemetry_manager
+from pipelex.runtime_hub import get_error_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
@@ -203,19 +204,24 @@ def graph_render_cmd(
         log.error(
             "The graph spec was refused and no graph was rendered", fields={OTelLogAttr.FILE_PATH: str(input_file), **error_fields(exc=spec_error)}
         )
-        console = get_console()
-        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
+        get_error_console().print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
         raise typer.Exit(1) from spec_error
 
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
-        # An unexpected failure is a bug, and this is the catcher that owns its traceback, so the traceback rides the
-        # log record: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it to the
-        # log store, which a traceback printed on the console alone never reached. The CLI's own output names the
-        # exception's type and message, so the terminal says why the render failed whatever the sink and the level.
-        # The console renders no locals unless the configuration asks it to, since they would print the loaded graph.
-        print_unexpected_failure(console=get_console(), title="Failed to render graph", exc=exc)
-        log.error("The graph could not be rendered", fields={OTelLogAttr.FILE_PATH: str(input_file)}, include_exception=True)
+        # The CLI's own output is the failure's problem, the exception's type and its message capped, so the terminal
+        # says why the render failed whatever the sink and the level. The log line carries identifiers only, the
+        # problem's code and the classes along the chain, since an exception's text can quote the graph, which holds
+        # a run's traced content. The traceback, which prints every chained exception's text, rides the record only
+        # under `--traceback`: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it
+        # to the log store. The console renders no locals unless the configuration asks it to, since they would print
+        # the loaded graph.
+        problem = print_failure_problem(console=get_error_console(), title="Failed to render graph", error=exc)
+        log.error(
+            "The graph could not be rendered",
+            fields={OTelLogAttr.FILE_PATH: str(input_file), **failure_log_fields(error=exc, problem=problem)},
+            include_exception=is_traceback_requested(),
+        )
         raise typer.Exit(1) from exc
 
     finally:

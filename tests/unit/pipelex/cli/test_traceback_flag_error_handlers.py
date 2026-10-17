@@ -37,7 +37,7 @@ class TestTracebackFlagInErrorHandlers:
     def test_handler_prints_traceback_when_flag_active(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error prints traceback when --traceback is set."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=mock_console)
 
         exc = _deck_preset_error()
         ctx = click.Context(click.Command("test"), obj={"traceback": True})
@@ -55,7 +55,7 @@ class TestTracebackFlagInErrorHandlers:
     def test_handler_does_not_print_traceback_when_flag_absent(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error does NOT print traceback without --traceback."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=mock_console)
 
         exc = _deck_preset_error()
         ctx = click.Context(click.Command("test"), obj={"traceback": False})

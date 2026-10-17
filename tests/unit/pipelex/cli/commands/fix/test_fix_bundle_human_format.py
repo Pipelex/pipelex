@@ -20,6 +20,7 @@ from pipelex.cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.helpers.fix_results import fix_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -193,7 +194,7 @@ class TestFixBundleHumanFormat:
         console: Console,
     ) -> None:
         bundle_path = self._bundle_file(tmp_path)
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=2,
             fixes_applied=[_applied_fix(str(bundle_path))],
@@ -226,7 +227,7 @@ class TestFixBundleHumanFormat:
     ) -> None:
         """A remaining error still showing a 💡 suggested fix (skipped/out-of-scope) must not be told it has 'no deterministic safe fix'."""
         bundle_path = self._bundle_file(tmp_path)
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=0,
             fixes_applied=[],
@@ -303,7 +304,7 @@ class TestFixBundleHumanFormat:
             source=str(sandbox_path),
             field_path="pipe → output",
         )
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=0,
             fixes_applied=[],

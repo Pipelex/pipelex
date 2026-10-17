@@ -3,6 +3,10 @@
 The run commands share this module for every step that differs from a local run: where the run executes (the
 flags, then `[run] execution`), the flags a hosted run refuses, the run itself through `pipelex.hosted`, and the
 envelope its result or its failure is reported in. Nothing here boots the local runtime.
+
+A refusal decided here, before anything is sent, is a problem like any local failure. A failure of the hosted run
+itself keeps the envelope it had before the problem, read off the hosted plane's answer, until the hosted plane
+answers problems.
 """
 
 from __future__ import annotations
@@ -14,12 +18,13 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex_sdk.errors import ApiResponseError, RunFailedError
 
-from pipelex.base_exceptions import PipelexConfigError, PipelexError
-from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
     agent_error_api_response,
+    agent_error_hosted_envelope,
     agent_success_formatted,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
@@ -55,18 +60,21 @@ def resolve_agent_run_execution(*, runner: RunExecution | None, hosted: bool | N
     from_flag = RunExecution.from_hosted_flag(hosted=hosted)
     requested = runner or from_flag
     if runner is not None and from_flag is not None and runner is not from_flag:
-        agent_error(f"--runner {runner} contradicts --{from_flag}: name one place for the run to execute", error_type="ArgumentError")
+        agent_argument_error(
+            f"--runner {runner} contradicts --{from_flag}: name one place for the run to execute",
+            argument="--runner",
+            reason=f"contradicts --{from_flag}",
+        )
     try:
         execution = resolve_run_execution(requested=requested)
-    except PipelexConfigError as exc:
-        # The same configuration a local boot reads, so the same next step a failed boot gives.
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc, hint=AGENT_INIT_FAILURE_HINT)
     except PipelexError as exc:
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+        # A configuration error is the same one a local boot reads, so its problem gives the same next step.
+        agent_error(exc.message, cause=exc)
     if base_url is not None and not execution.is_hosted:
-        agent_error(
+        agent_argument_error(
             "--base-url names the hosted API a hosted run calls, and this run executes locally. Add --runner hosted, or drop --base-url.",
-            error_type="ArgumentError",
+            argument="--base-url",
+            reason="only applies to a hosted run",
         )
     return execution
 
@@ -75,15 +83,16 @@ def refuse_local_only_flags(*, dry_run: bool, mock_inputs: bool) -> None:
     """Refuse the flags that steer this machine's runtime, which a hosted run never boots."""
     named = [flag for flag, given in (("--dry-run", dry_run), ("--mock-inputs", mock_inputs)) if given]
     if named:
-        agent_error(
+        agent_argument_error(
             f"{' and '.join(named)} only apply to a run on this machine, and this run executes on the hosted API. "
             "Pass --runner local to run it here.",
-            error_type="ArgumentError",
+            argument=" and ".join(named),
+            reason="only applies to a run on this machine",
         )
 
 
 def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, exit_code: int = 1) -> NoReturn:
-    """Report a hosted run's failure in the agent error envelope, and exit with `exit_code`.
+    """Report a hosted run's failure in the envelope a hosted run had before the problem, and exit with `exit_code`.
 
     A refusal the hosted API answered carries its problem document and goes through `agent_error_api_response`, whose
     envelope matches a local failure's. Every other failure is reported as `pipelex.hosted.error_rendering` reads it,
@@ -111,7 +120,7 @@ def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, exit_cod
         if report is not None:
             reported = {"error_category": report.error_category, "model": report.model, "provider": report.provider}
             extra.update({field_name: value for field_name, value in reported.items() if value})
-    agent_error(view.message, error_type=view.error_type, cause=error, exit_code=exit_code, **extra)
+    agent_error_hosted_envelope(view.message, error_type=view.error_type, cause=error, exit_code=exit_code, **extra)
 
 
 def build_hosted_run_output(*, outcome: HostedRunOutcome, with_memory: bool) -> dict[str, Any]:
@@ -151,7 +160,7 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
     try:
         client = make_hosted_client(base_url=base_url)
     except PipelexError as exc:
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+        agent_error(exc.message, cause=exc)
     started_run_ids: list[str] = []
 
     def _record_start(*, pipeline_run_id: str) -> None:
@@ -166,7 +175,8 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
     except (PipelineRequestError, HostedRunError) as exc:
         agent_error_hosted(error=exc)
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: a failure no arm above names, such as a results body that drifted, is still the
+        # hosted run's, so it leaves in the hosted run's envelope too.
+        agent_error_hosted_envelope(str(exc), error_type=type(exc).__name__, cause=exc)
     result = build_hosted_run_output(outcome=outcome, with_memory=with_memory)
     agent_success_formatted(result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format)

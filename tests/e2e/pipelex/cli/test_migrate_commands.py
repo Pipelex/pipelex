@@ -522,7 +522,9 @@ class TestTheAgentMigrateLoop:
         )
 
         assert refused.returncode == 2
-        assert json.loads(refused.stderr)["error_type"] == "ArgumentError"
+        problem: dict[str, Any] = json.loads(refused.stderr)
+        assert problem["code"] == "client.argument_invalid"
+        assert problem["params"] == {"argument": "--yes", "reason": "contradicts --dry-run"}
 
 
 class TestAPreReshapeMachine:
@@ -727,12 +729,13 @@ class TestAPreReshapeMachine:
         boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
 
         assert boot.returncode != 0, "a file the ledger cannot fully explain still fails the boot"
-        assert boot.stderr.count('"error": true') == 1, boot.stderr
-        envelope: dict[str, Any] = json.loads(boot.stderr)
-        assert envelope["error_type"] == "PipelexConfigError"
-        assert envelope["error_domain"] == "config"
+        # One problem: a second JSON document on the stream would make json.loads refuse it ("Extra data").
+        problem: dict[str, Any] = json.loads(boot.stderr)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["domain"] == "operator"
+        assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
 
-        block: dict[str, Any] = envelope["migration"]
+        block: dict[str, Any] = problem["diagnostics"]["migration"]
         assert block["remedy"] == "pipelex migrate"
         assert block["needs_attention"] is True
         first_step_title = next(step["title"] for plan in block["plans"] for step in plan["steps"])
@@ -1007,7 +1010,7 @@ class TestABootFailureCarriesThePendingMigration:
         config_file.write_text(planted + config_file.read_text(encoding="utf-8"), encoding="utf-8")
         return config_file
 
-    def test_the_agent_boot_error_carries_the_config_domain_and_the_block(
+    def test_the_agent_boot_error_carries_the_operator_domain_and_the_block(
         self,
         hermetic_home: Path,
         offline_subprocess_env: dict[str, str],
@@ -1017,16 +1020,19 @@ class TestABootFailureCarriesThePendingMigration:
         boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
 
         assert boot.returncode != 0, "the scenario is worthless if this machine boots"
-        # One envelope, and it has to be said out loud: `agent_error` leaves through `typer.Exit`,
+        # One problem, and it has to be said out loud: `agent_error` leaves through `typer.Exit`,
         # which is a `RuntimeError` rather than a `SystemExit`, so a command boundary re-raising
         # only `SystemExit` caught it again and printed a second document after the first. Two
-        # JSON documents on one stream is not JSON, and the block below would be unreadable.
-        assert boot.stderr.count('"error": true') == 1, boot.stderr
-        envelope: dict[str, Any] = json.loads(boot.stderr)
-        assert envelope["error_type"] == "PipelexConfigError"
-        assert envelope["error_domain"] == "config", "a new domain would route the agent hooks to BLOCK"
+        # JSON documents on one stream is not JSON: json.loads refuses them ("Extra data").
+        problem: dict[str, Any] = json.loads(boot.stderr)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["domain"] == "operator", "the operator's configuration, which only the operator can fix"
+        assert problem["next_step"]["kind"] == "fix_configuration"
+        assert problem["next_step"]["detail"] == (
+            "Correct the setting 'posthog_project_key' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime."
+        )
 
-        block: dict[str, Any] = envelope["migration"]
+        block: dict[str, Any] = problem["diagnostics"]["migration"]
         assert block["remedy"] == "pipelex migrate"
         assert block["needs_attention"] is True, "a key no entry explains is a person's to resolve"
         unexplained = [found for plan in block["plans"] for found in plan["unexplained"]]
@@ -1103,7 +1109,7 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         assert any("pipelex migrate" in action for action in actions)
         assert not any("init telemetry" in action for action in actions), "this file is old, not broken"
 
-    def test_a_telemetry_boot_failure_carries_the_block_in_one_envelope(
+    def test_a_telemetry_boot_failure_carries_the_block_in_one_problem(
         self,
         hermetic_home: Path,
         offline_subprocess_env: dict[str, str],
@@ -1121,12 +1127,12 @@ class TestAStaleTelemetryFileIsMigratedNotReset:
         boot = _boot(env=offline_subprocess_env, cwd=hermetic_home)
 
         assert boot.returncode != 0, "a file the ledger cannot fully explain still fails the boot"
-        assert boot.stderr.count('"error": true') == 1, boot.stderr
-        envelope: dict[str, Any] = json.loads(boot.stderr)
-        assert envelope["error_type"] == "TelemetryConfigValidationError"
-        assert envelope["error_domain"] == "config", "it comes from the class now, not the lookup table"
-        assert envelope["migration"]["remedy"] == "pipelex migrate"
-        assert "init telemetry" not in envelope["hint"]
+        problem: dict[str, Any] = json.loads(boot.stderr)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["domain"] == "operator"
+        assert problem["diagnostics"]["error_class"] == "TelemetryConfigValidationError"
+        assert problem["diagnostics"]["migration"]["remedy"] == "pipelex migrate"
+        assert "init telemetry" not in problem["next_step"]["detail"]
 
     def test_the_human_doctor_says_migrate_and_never_offers_to_start_the_file_over(
         self,

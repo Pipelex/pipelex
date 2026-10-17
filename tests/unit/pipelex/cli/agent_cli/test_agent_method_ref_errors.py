@@ -31,14 +31,14 @@ def _parse_single_json_error(stderr_text: str) -> dict[str, Any]:
 
 
 class TestAgentMethodRefErrors:
-    """A fetch failure surfaces as the structured JSON envelope, never unstructured Typer text."""
+    """A fetch failure surfaces as its problem, never unstructured Typer text."""
 
     def _mock_failing_clone(self, mocker: MockerFixture, tmp_path: Path) -> None:
         mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=VCSFetchError("connection refused"))
         mocker.patch("pipelex.cli.method_resolver.tempfile.mkdtemp", return_value=str(tmp_path / "dest"))
 
-    def test_run_method_fetch_failure_emits_json_envelope(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """`run method <ref>` with a failing fetch exits 1 with a MethodFetchError JSON envelope on stderr."""
+    def test_run_method_fetch_failure_reports_its_problem(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """`run method <ref>` with a failing fetch exits 1 with the fetch failure's problem as JSON on stderr."""
         self._mock_failing_clone(mocker, tmp_path)
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -46,14 +46,14 @@ class TestAgentMethodRefErrors:
 
         assert exc_info.value.exit_code == 1
         error_obj = _parse_single_json_error(capsys.readouterr().err)
-        assert error_obj["error"] is True
-        assert error_obj["error_type"] == "MethodFetchError"
+        assert error_obj["code"] == "method.fetch_failed"
+        assert error_obj["diagnostics"]["error_class"] == "MethodFetchError"
         assert "connection refused" in error_obj["message"]
 
-    def test_validate_method_fetch_failure_emits_json_envelope(
+    def test_validate_method_fetch_failure_reports_its_problem(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """`validate method <ref>` with a failing fetch is a no-verdict condition: exit 2, structured envelope."""
+        """`validate method <ref>` with a failing fetch is a no-verdict condition: exit 2, its problem."""
         self._mock_failing_clone(mocker, tmp_path)
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -61,12 +61,12 @@ class TestAgentMethodRefErrors:
 
         assert exc_info.value.exit_code == 2
         error_obj = _parse_single_json_error(capsys.readouterr().err)
-        assert error_obj["error"] is True
-        assert error_obj["error_type"] == "MethodFetchError"
+        assert error_obj["code"] == "method.fetch_failed"
+        assert error_obj["diagnostics"]["error_class"] == "MethodFetchError"
         assert "connection refused" in error_obj["message"]
 
-    def test_inputs_method_fetch_failure_emits_json_envelope(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """`inputs method <ref>` with a failing fetch exits 1 with the structured envelope (JSON is its error default)."""
+    def test_inputs_method_fetch_failure_reports_its_problem(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """`inputs method <ref>` with a failing fetch exits 1 with its problem (JSON is its error default)."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         self._mock_failing_clone(mocker, tmp_path)
 
@@ -75,6 +75,6 @@ class TestAgentMethodRefErrors:
 
         assert exc_info.value.exit_code == 1
         error_obj = _parse_single_json_error(capsys.readouterr().err)
-        assert error_obj["error"] is True
-        assert error_obj["error_type"] == "MethodFetchError"
+        assert error_obj["code"] == "method.fetch_failed"
+        assert error_obj["diagnostics"]["error_class"] == "MethodFetchError"
         assert "connection refused" in error_obj["message"]

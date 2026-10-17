@@ -200,6 +200,29 @@ class FormerReleaseFinding(BaseModel):
     the profile another boot starts on."""
 
     @property
+    def setting(self) -> str | None:
+        """The key the finding is at in its file, as a dotted path; `None` for a finding that is a whole file."""
+        match self.kind:
+            case FormerReleaseFindingKind.RETIRED_BACKEND_TABLE:
+                return self.subject
+            case FormerReleaseFindingKind.MODEL_SPECS_SECTION_KEY:
+                return f"{self.subject}.{MODEL_SPECS_SECTION_KEY}"
+            case (
+                FormerReleaseFindingKind.RETIRED_BACKEND_FILE
+                | FormerReleaseFindingKind.GATEWAY_MODELS_REFERENCE
+                | FormerReleaseFindingKind.SERVICE_FILE
+            ):
+                return None
+            case FormerReleaseFindingKind.RETIRED_ROUTING_PROFILE:
+                return f"{ROUTING_PROFILES_KEY}.{self.subject}"
+            case FormerReleaseFindingKind.RETIRED_PROFILE_DEFAULT:
+                return f"{ROUTING_PROFILES_KEY}.{self.subject}.{_DEFAULT_KEY}"
+            case FormerReleaseFindingKind.ROUTE_TO_RETIRED_BACKEND:
+                return f"{ROUTING_PROFILES_KEY}.{self.subject}.{self.route_table or _ROUTES_KEY}"
+            case FormerReleaseFindingKind.ACTIVE_ROUTING_PROFILE | FormerReleaseFindingKind.PROJECT_ACTIVE_ROUTING_PROFILE:
+                return ACTIVE_KEY
+
+    @property
     def description(self) -> str:
         """The finding as one sentence, for a report a person reads."""
         where = f"'{self.file_path}'"

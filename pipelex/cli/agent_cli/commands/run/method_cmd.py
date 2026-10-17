@@ -12,10 +12,10 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
     agent_success_formatted,
-    run_failure_fields,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
@@ -90,7 +90,7 @@ def run_method_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
     runner: Annotated[
         RunExecution | None,
@@ -121,11 +121,11 @@ def run_method_cmd(
         pipelex-agent run method my-method --dry-run --mock-inputs
         pipelex-agent run method github.com/Pipelex/methods/text_stats@v0.1.7 --runner hosted --inputs '{"text": "Hello"}'
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
-        agent_error("--mock-inputs requires --dry-run", error_type="ArgumentError")
+        agent_argument_error("--mock-inputs requires --dry-run", argument="--mock-inputs", reason="requires --dry-run")
 
     execution = resolve_agent_run_execution(runner=runner, hosted=hosted, base_url=base_url)
     if execution.is_hosted:
@@ -135,7 +135,7 @@ def run_method_cmd(
         try:
             target = resolve_hosted_method_target(name=name, pipe_override=pipe, library_dirs=library_dir)
         except (HostedRunSourceError, MethodRefError) as exc:
-            agent_error(exc.message, error_type=type(exc).__name__, cause=exc)
+            agent_error(exc.message, cause=exc)
         hosted_inputs = parse_cli_inputs(
             inputs_arg=resolve_inputs_arg_against_dir(inputs, base_dir=target.inputs_anchor_dir),
             stdin_fallback=True,
@@ -161,7 +161,7 @@ def run_method_cmd(
     except MethodRefError as exc:
         # Method-reference failure (parse, fetch, location, bounds, refusal): report it through
         # the structured error envelope instead of the human CLI's plain red text.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        agent_error(str(exc), cause=exc)
 
     # A fetched method's package directory is an ephemeral clone deleted at process exit —
     # anchor run output folders (output JSON, graph files) in a durable location instead.
@@ -218,7 +218,7 @@ def run_method_cmd(
         )
 
     except PipelineExecutionError as exc:
-        agent_error(exc.message, error_type="PipelineExecutionError", cause=exc, **run_failure_fields(error=exc))
+        agent_error(exc.message, cause=exc)
 
     except PipeOperatorModelAvailabilityError as exc:
         availability_extra: dict[str, Any] = {
@@ -229,11 +229,11 @@ def run_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, cause=exc, **availability_extra)
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()
