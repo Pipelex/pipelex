@@ -298,6 +298,8 @@ class TestSecurityEventRoutes:
         [
             pytest.param("/v1/start", {"callback_urls": [""]}, "InvalidCallbackUrls", id="empty_callback_url"),
             pytest.param("/v1/start", {"callback_urls": ["https://hooks.example.com/" + "a" * 5000]}, "InvalidCallbackUrls", id="long_callback_url"),
+            pytest.param("/v1/start", {"callback_urls": ["hooks.example.com/done"]}, "InvalidCallbackUrls", id="callback_url_without_scheme"),
+            pytest.param("/v1/start", {"callback_urls": ["http:///done"]}, "InvalidCallbackUrls", id="callback_url_without_host"),
             pytest.param(
                 "/v1/execute",
                 {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes//a.txt": "x"}},

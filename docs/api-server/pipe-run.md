@@ -179,7 +179,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 }
 ```
 
-A callback URL is refused before anything runs with a **422** `InvalidCallbackUrls` when its scheme is not `http` or `https`, or when its host is one the runtime's SSRF rule refuses: `localhost`, a cloud metadata name such as `metadata.google.internal` in any case and with or without a trailing dot, or a literal address that is not publicly routable, a loopback, private, link-local, carrier-grade NAT or cloud metadata address among them. It is the rule the delivery applies again when the webhook fires, resolving the name, and such a refusal also writes a [security event](logging.md#security-events).
+A callback URL is refused before anything runs with a **422** `InvalidCallbackUrls` when its scheme is not `http` or `https`, or when its host is one the runtime's SSRF rule refuses: `localhost`, a cloud metadata name such as `metadata.google.internal` in any case and with or without a trailing dot, or a literal address that is not publicly routable, a loopback, private, link-local, carrier-grade NAT or cloud metadata address among them. It is the rule the delivery applies again when the webhook fires, resolving the name, and such a refusal also writes a [security event](logging.md#security-events). A callback URL that is not a URL at all, empty, longer than the limit, with no scheme or naming no host, is refused with the same 422 and writes none.
 
 When the pipeline completes, each URL in the list receives a POST carrying:
 

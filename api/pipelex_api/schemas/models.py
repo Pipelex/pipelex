@@ -488,11 +488,19 @@ class PipelineApiExtras(BaseModel):
                 msg = f"callback URL exceeds {MAX_CALLBACK_URL_LEN} chars"
                 raise ValueError(msg)
             parsed = urlparse(url)
-            # Both refusals are a security rule's, so each states the class of destination its security event names.
+            # A URL with no scheme or no host is malformed, the shape of the field, which a plain `ValueError` refuses
+            # with no security event. A scheme other than http or https, and a host the SSRF rule refuses, are a security
+            # rule's refusals, so each states the class of destination its security event names.
+            if not parsed.scheme:
+                msg = "callback URL must be an absolute http or https URL, starting with its scheme"
+                raise ValueError(msg)
             if parsed.scheme not in _ALLOWED_CALLBACK_SCHEMES:
                 msg = f"callback URL scheme must be http or https (got {parsed.scheme!r})"
                 raise CallbackUrlRefusedError(msg).with_security_target_class(SecurityTargetClass.SCHEME)
-            host = parsed.hostname or ""
+            host = parsed.hostname
+            if not host:
+                msg = "callback URL must name a host"
+                raise ValueError(msg)
             if _is_disallowed_host(host):
                 msg = f"callback URL host {parsed.hostname!r} is not allowed (private/loopback/metadata addresses are blocked)"
                 raise CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
