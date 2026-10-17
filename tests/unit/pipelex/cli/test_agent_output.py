@@ -314,6 +314,32 @@ class TestAgentOutput:
             f"#### The run's errors\n\n- `method.concept_unresolved`: {item.detail} (pipe 'summarize')"
         ) in rendered
 
+    @pytest.mark.parametrize(
+        ("safety", "label"),
+        [("safe", "safe"), ("unsafe", "unsafe, confirm before applying"), ("reviewed", "unsafe, confirm before applying")],
+        ids=["safe", "unsafe", "unknown"],
+    )
+    def test_render_problem_markdown_labels_a_fix_by_its_safety(self, safety: str, label: str) -> None:
+        """A safety this reader does not know reads as unsafe (`SuggestedFix.effective_safety`), so it says it needs confirming."""
+        problem = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.CALLER).with_members(
+            errors=[
+                {
+                    "code": "model.unknown",
+                    "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+                    "suggested_fix": {
+                        "fix_code": "rename-model",
+                        "description": "Replace model 'gpt-5.1' with 'gpt-5.5'",
+                        "safety": safety,
+                        "ops": [{"kind": "set_key", "table_path": ["pipe", "draft"], "key": "model", "value": "gpt-5.5"}],
+                    },
+                }
+            ]
+        )
+
+        rendered = render_problem_markdown(problem=problem)
+
+        assert f"  - Suggested fix (`rename-model`, {label}): Replace model 'gpt-5.1' with 'gpt-5.5'" in rendered
+
     def test_render_problem_markdown_names_the_model_and_the_provider(self) -> None:
         cause = InferenceBackendCredentialsError(
             credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,

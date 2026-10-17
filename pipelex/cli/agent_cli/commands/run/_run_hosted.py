@@ -6,20 +6,24 @@ its result is reported in, and the problem its failure is reported as. Nothing h
 
 A refusal decided here, before anything is sent, is a problem like any local failure, in the operator's view. A failure
 of the run itself is the problem the runner answered or the client decided, in the caller's view, since the runner is
-someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, and pipelex's own `HostedRunError`s give
-theirs. Only a failure no arm names, which is this process's own, is `runtime.unexpected` in the operator's view.
+someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, by its declared members alone, a refusal
+the hosted plane answered in its own shape reads as the core code its status names, and pipelex's own `HostedRunError`s
+give theirs. A failure no arm names is this process's own and is reported as a local one is, in the operator's view: a
+Pipelex error under its own code, any other exception as `runtime.unexpected`.
 """
 
 from __future__ import annotations
 
 import asyncio
 import functools
+from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, SuggestedFix
 from mthds.protocol.problem.registry import CoreCode
-from pipelex_sdk.errors import ApiResponseError, RunFailedError
-from pydantic import ValidationError
+from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, PipelexRequestError, RunFailedError
+from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import (
@@ -30,8 +34,9 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_success_formatted,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import make_hosted_client
+from pipelex.hosted.error_rendering import hosted_refusal_problem
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
@@ -40,7 +45,6 @@ from pipelex.pipeline.validation_errors import problem_item_of, validation_item_
 from pipelex.system.usage_stats.usage_stats_runs import sent_usage_stats_error, usage_stats_error
 
 if TYPE_CHECKING:
-    from mthds.protocol.problem.models import Problem, ProblemItem
     from pipelex_sdk.client import PipelexAPIClient
     from pipelex_sdk.error_models import RunErrorReport
     from pipelex_sdk.validation_models import ValidationErrorItem as SentValidationErrorItem
@@ -98,53 +102,120 @@ def refuse_local_only_flags(*, dry_run: bool, mock_inputs: bool) -> None:
         )
 
 
-#: The members Pipelex declares beside the standard's, which a problem a runner sent may carry in a shape this version
-#: does not read; such a member is left out rather than losing the problem around it.
+#: The parts of a problem, each read against the model that declares its members, so that a member neither the standard
+#: nor Pipelex declares is left out at every level. A problem's `params` and a fix's `ops` are the code's and the
+#: operation's own and are kept whole; the nested `run_error` and Pipelex's other members are read apart.
+_PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
+    PipelexProblem: {"next_step": NextStep, "location": ProblemLocation, "errors": ProblemItem},
+    ProblemItem: {"location": ProblemLocation, "suggested_fix": SuggestedFix},
+}
+#: Pipelex's members beside the standard's, each of which a problem a runner sent may carry in a shape this version does
+#: not read: it is read apart and left out alone when it does not read, never losing the problem around it.
 _PIPELEX_PROBLEM_MEMBERS: tuple[str, ...] = ("request_id", "run_error", "diagnostics")
 
 
-def _holds_diagnostics(*, problem: PipelexProblem) -> bool:
-    """Whether a problem, or the run's problem it nests, carries the diagnostics only an operator reads."""
-    if problem.diagnostics is not None:
+def _declared_members(*, members: Mapping[str, Any], shape: type[BaseModel]) -> dict[str, Any]:
+    """The members of ``members`` that ``shape`` declares, each part it nests read the same way (:data:`_PROBLEM_PARTS`)."""
+    declared: dict[str, Any] = {}
+    parts = _PROBLEM_PARTS.get(shape, {})
+    for name in shape.model_fields:
+        if name not in members:
+            continue
+        value = members[name]
+        part_shape = parts.get(name)
+        if part_shape is not None and isinstance(value, Mapping):
+            declared[name] = _declared_members(members=cast("Mapping[str, Any]", value), shape=part_shape)
+        elif part_shape is not None and isinstance(value, list):
+            declared[name] = [
+                _declared_members(members=cast("Mapping[str, Any]", item), shape=part_shape) if isinstance(item, Mapping) else item
+                for item in cast("list[Any]", value)
+            ]
+        else:
+            declared[name] = value
+    return declared
+
+
+def _holds_diagnostics(*, members: Mapping[str, Any]) -> bool:
+    """Whether a document, or the run's problem it nests, carries diagnostics, whatever their shape: only an operator reads them."""
+    if "diagnostics" in members:
         return True
-    return problem.run_error is not None and _holds_diagnostics(problem=problem.run_error)
+    run_error = members.get("run_error")
+    return isinstance(run_error, Mapping) and _holds_diagnostics(members=cast("Mapping[str, Any]", run_error))
 
 
-def received_problem(*, problem: Problem, request_id: str | None = None) -> PipelexProblem:
+def _readable_problem(*, members: Mapping[str, Any]) -> PipelexProblem | None:
+    """The problem a document's declared members make, each of Pipelex's members kept only when it reads.
+
+    The standard's members are read first, by their declared members alone; then ``request_id`` is added when it is a
+    text, and ``run_error`` when it reads the same way, so a nested problem whose own members do not all read is kept
+    without them. ``diagnostics`` is never kept: the problem is reported to a caller, who reads none.
+
+    Returns:
+        The problem, or ``None`` when the standard's members do not make one.
+    """
+    declared = _declared_members(members=members, shape=PipelexProblem)
+    extensions = {name: declared.pop(name) for name in _PIPELEX_PROBLEM_MEMBERS if name in declared}
+    try:
+        readable = PipelexProblem.model_validate(declared)
+    except ValidationError:
+        return None
+    run_error = extensions.get("run_error")
+    if isinstance(run_error, Mapping):
+        nested = _readable_problem(members=cast("Mapping[str, Any]", run_error))
+        if nested is not None:
+            readable = readable.model_copy(update={"run_error": nested})
+    request_id = extensions.get("request_id")
+    if isinstance(request_id, str) and request_id:
+        readable = readable.model_copy(update={"request_id": request_id})
+    return readable
+
+
+def received_problem(*, problem: Problem, request_id: str | None = None, stored: bool = False) -> PipelexProblem:
     """A problem a runner answered or a client decided, as this CLI reports it: as it came, in the caller's view.
 
-    A runner answers its caller in the caller's view already, so the problem is kept member for member, the runner's own
-    next step included. One that carries diagnostics, which a runner answers only to its operator, is projected onto the
-    caller's view (:func:`caller_view_of`), since this machine is not the runner's operator.
+    A runner answers its caller in the caller's view already, so the problem is kept as it came, the runner's own next
+    step included, by the members the standard and Pipelex declare alone (:func:`_readable_problem`): a member no reader
+    declares, such as the `error_type`, `error_domain` and `retryable` a runner may still write, is left out at every
+    level, and one of Pipelex's members that does not read is left out alone. An answer that carries diagnostics, which
+    a runner answers only to its operator, is projected onto the caller's view (:func:`caller_view_of`), decided from
+    the document as it came, before any member is left out, since this machine is not the runner's operator; so is a
+    stored record of a run, which is the operator's.
+
+    The reading never fails: a problem the standard's client validated always makes one, and the last resort for one
+    that would not is `runtime.unexpected`, so the command always prints a problem.
 
     Args:
         problem: The problem as the standard's client reads it.
         request_id: The request the answer belongs to, when the client read it off the answer and the problem names none.
+        stored: The problem is a stored record of a run, in its operator's view.
 
     Returns:
         The problem, in the caller's view.
     """
     members = problem.as_wire()
-    try:
-        received = PipelexProblem.model_validate(members)
-    except ValidationError:
-        for member in _PIPELEX_PROBLEM_MEMBERS:
-            members.pop(member, None)
-        received = PipelexProblem.model_validate(members)
+    received = _readable_problem(members=members)
+    if received is None:
+        return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, request_id=request_id)
     if request_id and received.request_id is None:
-        received = received.with_members(request_id=request_id)
-    return caller_view_of(problem=received) if _holds_diagnostics(problem=received) else received
+        received = received.model_copy(update={"request_id": request_id})
+    return caller_view_of(problem=received) if stored or _holds_diagnostics(members=members) else received
 
 
 def _stored_run_problem(*, report: RunErrorReport | None) -> PipelexProblem | None:
-    """The failed run's own problem, when the report the hosted API stored for it is a problem document; ``None`` otherwise."""
+    """The failed run's own problem, when the report the hosted API stored for it is a problem document; ``None`` otherwise.
+
+    The report is read as a runner's answer is (:func:`received_problem`), in the caller's view, so a member it holds
+    beside the problem, such as its `message` or its `error_type`, is left out, and so is one of Pipelex's members that
+    does not read, never the whole problem.
+    """
     if report is None:
         return None
     try:
-        stored = PipelexProblem.model_validate(report.model_dump(mode="json", exclude_none=True))
+        stored = Problem.model_validate(report.model_dump(mode="json", exclude_none=True))
     except ValidationError:
+        # A report in the shape the hosted plane wrote before it stored problem documents.
         return None
-    return caller_view_of(problem=stored)
+    return received_problem(problem=stored, stored=True)
 
 
 def _typed_sent_item(*, sent: SentValidationErrorItem) -> ValidationErrorItem:
@@ -182,7 +253,7 @@ def hosted_method_problem_items(*, validation_errors: list[SentValidationErrorIt
     return items
 
 
-def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError) -> PipelexProblem:
+def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, credential_sent: bool) -> PipelexProblem:
     """The problem of a run on a runner that failed, in the caller's view: the runner's, the client's, or pipelex's own.
 
     - A refusal the runner answered, a runner that cannot be reached and every other failure the client meets carries
@@ -190,6 +261,9 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError) -> P
       runner's own problem document when the answer is one, and otherwise the code the client reads, such as
       `client.unreachable` naming the base URL, or `client.outcome_unknown` for an answer that leaves a run possibly
       started, a server fault on the run request included.
+    - A refusal the hosted plane answered in its own shape, which predates the standard's, reads as the core code its
+      status names, with the next step the human CLI gives (`pipelex.hosted.error_rendering.hosted_refusal_problem`):
+      a refused or missing credential, a route or method this origin does not serve, a rate limit with its delay.
     - A run that started and failed is `run.failed`, naming the run and its status, and nests the run's own problem as
       `run_error` when the report the hosted API stored for it is one.
     - A failure pipelex detects itself is its `HostedRunError`'s problem, naming the run the hosted API acknowledged
@@ -197,6 +271,7 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError) -> P
 
     Args:
         error: The failure.
+        credential_sent: Whether the run's requests carried a key, which tells a refused key from a missing one.
 
     Returns:
         The problem, in the caller's view.
@@ -209,7 +284,12 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError) -> P
         return error.to_problem(view=ProblemView.CALLER, pipeline_run_id=error.pipeline_run_id)
     if isinstance(error, HostedRunError):
         return error.to_problem(view=ProblemView.CALLER)
-    request_id = error.request_id if isinstance(error, ApiResponseError) else None
+    request_id: str | None = None
+    if isinstance(error, ApiResponseError):
+        refusal = hosted_refusal_problem(error=error, credential_sent=credential_sent)
+        if refusal is not None:
+            return refusal
+        request_id = error.request_id
     problem = received_problem(problem=error.problem, request_id=request_id)
     if isinstance(error, RunFailedError):
         run_error = _stored_run_problem(report=error.error)
@@ -218,20 +298,22 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError) -> P
     return problem
 
 
-def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, exit_code: int = 1) -> NoReturn:
+def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, credential_sent: bool, exit_code: int = 1) -> NoReturn:
     """Report a run on a runner that failed as its problem (:func:`hosted_failure_problem`), and exit with `exit_code`.
 
     The problem is printed as it came, in the active error format, with no member of the envelope this CLI wrote before
-    it reported problems. pipelex's own errors add their sentence as `message`, and a run that failed adds the client's,
-    which quotes the run's stored reason; a request error of the client adds none, its problem saying it all. The usage
-    statistics record what the problem says, except for a refusal a server answered, which they record by the code and
-    domain its body sent alone, and not at all when it sent none, never by the client's reading of its status.
+    it reported problems. pipelex's own errors add their sentence as `message`, and so does every error of pipelex-sdk's
+    own, which says what its code's parameters cannot: the stored reason of a run that failed, how long the client waited
+    for one that did not finish, that a completed run delivered no main output. An answer's refusal and a runner that
+    cannot be reached add none, their problem saying it all, where their sentence would quote a raw body or a transport's
+    class. The usage statistics record what the problem says, except for a refusal a server answered, which they record
+    by the code and domain its body sent alone, and not at all when it sent none, never by the client's reading of its status.
     """
-    problem = hosted_failure_problem(error=error)
+    problem = hosted_failure_problem(error=error, credential_sent=credential_sent)
     message: str | None
     if isinstance(error, PipelexError):
         message = error.message
-    elif isinstance(error, RunFailedError):
+    elif isinstance(error, PipelexRequestError) and not isinstance(error, ApiResponseError | ApiUnreachableError):
         message = str(error)
     else:
         message = None
@@ -277,6 +359,8 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
         client = make_hosted_client(base_url=base_url)
     except PipelexError as exc:
         agent_error(exc.message, cause=exc)
+    # Whether the run's requests carry a key, which tells a refused key from a missing one; never the key itself.
+    credential_sent = bool(client.api_key)
     started_run_ids: list[str] = []
 
     def _record_start(*, pipeline_run_id: str) -> None:
@@ -287,12 +371,13 @@ def run_hosted_for_agent(*, request: HostedRunRequest, base_url: str | None, wit
     except (KeyboardInterrupt, asyncio.CancelledError):
         # Ctrl-C stops the wait, not the run: the problem names the run that keeps going.
         interrupted = HostedRunInterruptedError(pipeline_run_id=started_run_ids[-1] if started_run_ids else None)
-        agent_error_hosted(error=interrupted, exit_code=_INTERRUPTED_EXIT_CODE)
+        agent_error_hosted(error=interrupted, credential_sent=credential_sent, exit_code=_INTERRUPTED_EXIT_CODE)
     except (PipelineRequestError, HostedRunError) as exc:
-        agent_error_hosted(error=exc)
+        agent_error_hosted(error=exc, credential_sent=credential_sent)
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: a failure no arm above names, such as a results body that drifted, is this
-        # process's own, so it is reported as a local run's is, `runtime.unexpected` in the operator's view.
+        # Agent CLI command boundary: a failure no arm above names is this process's own, so it is reported as a local
+        # run's is, in the operator's view: a Pipelex error under its own code, any other exception, such as a results
+        # body that drifted, as `runtime.unexpected`.
         agent_error(str(exc), cause=exc)
     result = build_hosted_run_output(outcome=outcome, with_memory=with_memory)
     agent_success_formatted(result, markdown_renderer=functools.partial(format_run_markdown, with_memory=with_memory), output_format=output_format)

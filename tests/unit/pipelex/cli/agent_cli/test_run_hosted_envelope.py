@@ -141,9 +141,18 @@ class TestRunHostedEnvelope:
                 assert "- Run: `run_9`" in printed
                 assert "LLMCompletionError" not in printed
 
-    def test_a_failed_run_nests_the_run_s_own_problem_in_the_caller_s_view(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """A stored report that is a problem document rides as `run_error`, without the diagnostics only its operator reads."""
-        report = RunErrorReport.model_validate(StoredRunReports.PROBLEM)
+    @pytest.mark.parametrize(
+        "stored_report",
+        [StoredRunReports.PROBLEM, StoredRunReports.PROBLEM_WITH_REPORT_MEMBERS],
+        ids=["problem", "problem_with_report_members"],
+    )
+    def test_a_failed_run_nests_the_run_s_own_problem_in_the_caller_s_view(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], stored_report: dict[str, Any]
+    ) -> None:
+        """A stored report that is a problem document rides as `run_error` by its declared members alone, without the
+        diagnostics only its operator reads, and a member it holds in a shape this version does not read drops only itself.
+        """
+        report = RunErrorReport.model_validate(stored_report)
         failed = RunFailedError("Run finished with status FAILED", run_id="run_9", status=RunStatus.FAILED, error=report)
         mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=failed))
 
@@ -171,6 +180,20 @@ class TestRunHostedEnvelope:
         ) in markdown
         assert "- Code: `pipe.output_multiplicity` (domain method, retry no)" in markdown
         assert "PipeOutputMultiplicityError" not in markdown
+
+    def test_a_pipelex_error_no_hosted_arm_names_reports_its_own_code(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """A Pipelex error of this process's that is no hosted run's leaves as a local failure does, under its own code in the operator's view."""
+        config_error = PipelexConfigError("pipelex.toml is invalid")
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=config_error))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 1
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["next_step"] == config_error.to_problem(view=ProblemView.OPERATOR).next_step.as_wire()
+        assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
 
     def test_an_unexpected_failure_is_this_process_s_own_problem(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """A failure no hosted arm names, such as a results body that drifted, is `runtime.unexpected`, as a local run reports it."""
@@ -227,29 +250,48 @@ class TestRunHostedEnvelope:
         assert "pipeline_run_id" not in problem
 
     @pytest.mark.parametrize(
-        ("error", "code"),
+        ("error", "code", "message"),
         [
-            (RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0), "run.not_finished"),
-            (MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"), "client.response_unreadable"),
+            (
+                RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0),
+                "run.not_finished",
+                "Run 'run_7' did not finish within 1200s",
+            ),
+            (
+                MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"),
+                "client.response_unreadable",
+                "Completed run 'run_7' returned no main stuff",
+            ),
             (
                 HostedRunPollingError("The run run_7 started on the hosted API, but following it failed", pipeline_run_id="run_7"),
                 "client.follow_failed",
+                "The run run_7 started on the hosted API, but following it failed",
             ),
         ],
+        ids=["timed_out", "no_main_output", "follow_failed"],
     )
-    def test_an_error_after_the_start_carries_the_run_id(
-        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error: Exception, code: str
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_an_error_after_the_start_carries_the_run_id_and_what_the_client_said(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error: Exception, code: str, message: str, error_format: CliOutputFormat
     ) -> None:
+        """The client's sentence says what the code cannot (how long it waited, that a completed run delivered nothing): it is the `message`."""
         mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=error))
 
         with pytest.raises(typer.Exit):
-            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=error_format)
 
-        problem = json.loads(capsys.readouterr().err)
-        assert problem["code"] == code
-        assert problem["pipeline_run_id"] == "run_7"
-        for retired in RetiredEnvelope.MEMBERS:
-            assert retired not in problem
+        printed = capsys.readouterr().err
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem["code"] == code
+                assert problem["pipeline_run_id"] == "run_7"
+                assert problem["message"] == message
+                for retired in RetiredEnvelope.MEMBERS:
+                    assert retired not in problem
+            case CliOutputFormat.MARKDOWN:
+                assert message in printed
+                assert f"- Code: `{code}`" in printed
 
     def test_a_method_that_does_not_load_lists_the_hosted_api_s_items(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Each item of pipe-io's verdict is a problem item coded as a local verdict codes it, located in the file it was sent as."""

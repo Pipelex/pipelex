@@ -1,5 +1,6 @@
 """Answers a runner gives a refused run, for the agent CLI's tests of a run on a runner."""
 
+import json
 from typing import Any, ClassVar
 
 
@@ -49,6 +50,191 @@ class RunnerProblems:
     )
 
 
+#: A run stopped by an operator, as a runner answers it to its operator: the operator's next step, which reads the run's
+#: record, and the diagnostics only an operator reads. The caller of such a runner reports it instead.
+_OPERATOR_VIEW_OF_A_STOPPED_RUN: dict[str, Any] = {
+    "type": "https://mthds.ai/errors/run.terminated",
+    "title": "The run was stopped by an operator or an erasure",
+    "status": 409,
+    "detail": "The run was stopped before it ended (ended by: operator).",
+    "code": "run.terminated",
+    "domain": "operator",
+    "retry": "no",
+    "next_step": {"kind": "read_run", "detail": "Read the run's record to see when and why it was stopped."},
+    "params": {"ended_by": "operator"},
+}
+_OPERATOR_DIAGNOSTICS: dict[str, Any] = {"error_class": "RunTerminatedError", "message": "terminated from the console"}
+
+
+class OperatorViewAnswers:
+    """A runner's answers in its operator's view, each with one of Pipelex's members in a shape this version does not read."""
+
+    # The diagnostics read, the request id does not.
+    UNREADABLE_REQUEST_ID: ClassVar[str] = json.dumps({**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "request_id": 12345, "diagnostics": _OPERATOR_DIAGNOSTICS})
+    # The request id reads, the diagnostics do not.
+    UNREADABLE_DIAGNOSTICS: ClassVar[str] = json.dumps(
+        {**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "request_id": "01M55PREQUEST0000000000000", "diagnostics": 7}
+    )
+    # The problem the caller reads for either: the caller's next step, and no diagnostics.
+    CALLER_VIEW: ClassVar[dict[str, Any]] = {
+        **_OPERATOR_VIEW_OF_A_STOPPED_RUN,
+        "next_step": {"kind": "report", "detail": "Report this to whoever runs the runtime if the run was still wanted."},
+    }
+    # Pipelex's members in shapes no version reads, the nested run's problem included: none of them may stop the report.
+    HOSTILE: ClassVar[tuple[str, ...]] = (
+        json.dumps({**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "run_error": "not a problem"}),
+        json.dumps({**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "run_error": {"code": 5, "diagnostics": []}}),
+        json.dumps({**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "request_id": ["x"], "diagnostics": "x", "run_error": []}),
+        json.dumps(
+            {
+                **_OPERATOR_VIEW_OF_A_STOPPED_RUN,
+                "request_id": {"id": 1},
+                "run_error": {**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "request_id": 9, "diagnostics": "x", "run_error": {"title": 3}},
+            }
+        ),
+    )
+
+
+#: A refused run whose problem carries, at every level, members neither the standard nor Pipelex declares: those the
+#: runner's API-authored errors write (`error_type`, `error_domain`, `retryable`), RFC 9457's `instance`, and others.
+_PROBLEM_WITH_UNDECLARED_MEMBERS: dict[str, Any] = {
+    "type": "https://mthds.ai/errors/method.invalid",
+    "title": "The method does not validate",
+    "status": 422,
+    "detail": "The method does not validate.",
+    "code": "method.invalid",
+    "domain": "method",
+    "retry": "no",
+    "next_step": {"kind": "change_method", "detail": "Fix each fault the problem's errors list, then validate the method again.", "hint": "x"},
+    "errors": [
+        {
+            "code": "model.unknown",
+            "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+            "params": {"model": "gpt-5.1", "model_type": "llm"},
+            "location": {"pipe": "draft_pitch", "field": "model", "source": "main.mthds"},
+            "suggestions": ["gpt-5.5"],
+            "suggested_fix": {
+                "fix_code": "rename-model",
+                "description": "Replace model 'gpt-5.1' of pipe 'draft_pitch' with 'gpt-5.5'",
+                "safety": "unsafe",
+                "ops": [{"kind": "set_key", "table_path": ["pipe", "draft_pitch"], "key": "model", "value": "gpt-5.5"}],
+                "error_code": "unknown_model",
+            },
+            "error_type": "unknown_model",
+            "error_category": "pipe_validation",
+        }
+    ],
+    "location": {"pipe": "draft_pitch", "pipe_stack": ["draft_pitch"]},
+    "request_id": "01M55PUNDECLARED0000000000",
+    "instance": "urn:pipelex:request:01M55PUNDECLARED0000000000",
+    "error_type": "PipeValidationError",
+    "error_domain": "input",
+    "retryable": False,
+    "hint": "Fix the method",
+    "http_status": 422,
+    "validation_errors": [{"category": "pipe_validation", "message": "unknown model"}],
+}
+
+
+class UndeclaredMembers:
+    """A runner's problem carrying members no reader declares, and what the agent CLI reports of it: its declared members alone."""
+
+    SENT: ClassVar[str] = json.dumps(_PROBLEM_WITH_UNDECLARED_MEMBERS)
+    REPORTED: ClassVar[dict[str, Any]] = {
+        "type": "https://mthds.ai/errors/method.invalid",
+        "title": "The method does not validate",
+        "status": 422,
+        "detail": "The method does not validate.",
+        "code": "method.invalid",
+        "domain": "method",
+        "retry": "no",
+        "next_step": {"kind": "change_method", "detail": "Fix each fault the problem's errors list, then validate the method again."},
+        "location": {"pipe": "draft_pitch"},
+        "errors": [
+            {
+                "code": "model.unknown",
+                "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+                "params": {"model": "gpt-5.1", "model_type": "llm"},
+                "location": {"pipe": "draft_pitch", "field": "model"},
+                "suggestions": ["gpt-5.5"],
+                "suggested_fix": {
+                    "fix_code": "rename-model",
+                    "description": "Replace model 'gpt-5.1' of pipe 'draft_pitch' with 'gpt-5.5'",
+                    "safety": "unsafe",
+                    "ops": [{"kind": "set_key", "table_path": ["pipe", "draft_pitch"], "key": "model", "value": "gpt-5.5"}],
+                },
+            }
+        ],
+        "request_id": "01M55PUNDECLARED0000000000",
+    }
+
+
+class HostedPlaneRefusals:
+    """Refusals the hosted plane answers in its own shape, which predates the standard's problem document."""
+
+    UNAUTHORIZED: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/unauthorized",
+            "title": "Unauthorized",
+            "status": 401,
+            "code": "unauthorized",
+            "detail": "The API key is not valid.",
+            "instance": "urn:pipelex:request:01M55PLEGACY401000000000000",
+            "request_id": "01M55PLEGACY401000000000000",
+            "error_domain": "config",
+            "retryable": False,
+        }
+    )
+    FORBIDDEN: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/role_not_permitted",
+            "title": "Forbidden",
+            "status": 403,
+            "code": "role_not_permitted",
+            "detail": "Your role in this organization does not allow running methods.",
+            "request_id": "01M55PLEGACY403000000000000",
+            "error_domain": "input",
+            "retryable": False,
+        }
+    )
+    NOT_FOUND: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/not_found",
+            "title": "Not found",
+            "status": 404,
+            "code": "not_found",
+            "detail": "No route serves POST /v1/execute.",
+            "error_domain": "config",
+            "retryable": False,
+        }
+    )
+    RATE_LIMITED: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/rate_limited",
+            "title": "Too many requests",
+            "status": 429,
+            "code": "rate_limited",
+            "detail": "Too many runs started in the last minute.",
+            "request_id": "01M55PLEGACY429000000000000",
+            "error_domain": "runtime",
+            "retryable": True,
+        }
+    )
+    # A rate limit whose delay rides the body alone, with no `Retry-After` header.
+    RATE_LIMITED_BODY_DELAY: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/rate_limited",
+            "title": "Too many requests",
+            "status": 429,
+            "code": "rate_limited",
+            "detail": "Too many runs started in the last minute.",
+            "retry_after_seconds": 12,
+            "error_domain": "runtime",
+            "retryable": True,
+        }
+    )
+
+
 class GatewayAnswers:
     """Answers that are no problem document, which a gateway or a hosted plane in front of the runner may give."""
 
@@ -56,6 +242,8 @@ class GatewayAnswers:
     HTML_PAGE: ClassVar[str] = "<html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>"
     # A server that does not serve the route at all, as a framework answers it.
     NOT_FOUND: ClassVar[str] = '{"detail":"Not Found"}'
+    # A gateway's refusal of a request its authorizer did not let through.
+    FORBIDDEN: ClassVar[str] = '{"message":"Forbidden"}'
 
 
 class RetiredEnvelope:
@@ -104,6 +292,20 @@ class StoredRunReports:
         "params": {"output": "ideas", "declared": "single", "produced": "list", "pipe": "review_topic"},
         "location": {"pipe": "review_topic", "path": ["review_topic"]},
         "diagnostics": {"error_class": "PipeOutputMultiplicityError", "message": "the branches do not combine"},
+    }
+    # The same problem with the members the hosted plane's stored report carries beside it, which no reader of the
+    # problem declares, its own diagnostics in a shape this version does not read.
+    PROBLEM_WITH_REPORT_MEMBERS: ClassVar[dict[str, Any]] = {
+        **PROBLEM,
+        "diagnostics": "unreadable",
+        "message": "the branches do not combine",
+        "error_type": "PipeOutputMultiplicityError",
+        "error_domain": "input",
+        "error_category": "validation",
+        "retryable": False,
+        "caller_facing_message": "The pipe's output has another multiplicity",
+        "provider_metadata": {"region": "eu"},
+        "validation_errors": [{"category": "pipe_validation", "message": "multiplicity"}],
     }
 
 

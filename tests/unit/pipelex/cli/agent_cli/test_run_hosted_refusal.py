@@ -21,9 +21,17 @@ from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.hosted.error_rendering import HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
-from tests.unit.pipelex.cli.agent_cli.test_data import GatewayAnswers, RetiredEnvelope, RunnerProblems
+from tests.unit.pipelex.cli.agent_cli.test_data import (
+    GatewayAnswers,
+    HostedPlaneRefusals,
+    OperatorViewAnswers,
+    RetiredEnvelope,
+    RunnerProblems,
+    UndeclaredMembers,
+)
 from tests.unit.pipelex.hosted.test_data import HostedVersions
 
 if TYPE_CHECKING:
@@ -34,6 +42,8 @@ if TYPE_CHECKING:
 HOSTED_URL = "https://hosted.test"
 RUN_PIPE_MODULE = "pipelex.cli.agent_cli.commands.run.pipe_cmd"
 START_ROUTE = ("POST", "/v1/start")
+#: The request id a hosted API names in its `X-Request-ID` header.
+HEADER_REQUEST_ID = "01M55PHEADER000000000000000"
 #: The problem pipelex-sdk decides for a runner that cannot be reached at `HOSTED_URL`, the base client's own.
 UNREACHABLE_PROBLEM: dict[str, Any] = {
     "type": "https://mthds.ai/errors/client.unreachable",
@@ -60,14 +70,15 @@ RUNNER_FAULT: str = json.dumps(
 )
 
 
-def _answering(*, status: int, body: str, seen: list[httpx.Request]) -> httpx.MockTransport:
-    """A hosted API that answers its version, then refuses every other request with ``status`` and ``body``."""
+def _answering(*, status: int, body: str, seen: list[httpx.Request], headers: dict[str, str] | None = None) -> httpx.MockTransport:
+    """A hosted API that answers its version, then refuses every other request with ``status``, ``body`` and ``headers``."""
 
     def _handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         if request.method == "GET" and request.url.path == "/v1/version":
             return httpx.Response(200, content=HostedVersions.HOSTED.encode("utf-8"), headers={"content-type": "application/json"})
-        return httpx.Response(status, content=body.encode("utf-8"), headers={"content-type": "application/problem+json"})
+        answer_headers = {"content-type": "application/problem+json", **(headers or {})}
+        return httpx.Response(status, content=body.encode("utf-8"), headers=answer_headers)
 
     return httpx.MockTransport(_handler)
 
@@ -90,10 +101,12 @@ def _install_transport(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *
     mocker.patch.object(PipelexAPIClient, "start_client", _start_client)
 
 
-def _install_hosted_api(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *, status: int, body: str) -> list[httpx.Request]:
+def _install_hosted_api(
+    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *, status: int, body: str, headers: dict[str, str] | None = None
+) -> list[httpx.Request]:
     """Point every `PipelexAPIClient` at a mocked hosted API refusing with ``status`` / ``body``; return the requests it receives."""
     seen: list[httpx.Request] = []
-    _install_transport(mocker, monkeypatch, transport=_answering(status=status, body=body, seen=seen))
+    _install_transport(mocker, monkeypatch, transport=_answering(status=status, body=body, seen=seen, headers=headers))
     return seen
 
 
@@ -358,10 +371,10 @@ class TestRunHostedRefusal:
         assert {(request.url.host, request.url.port) for request in seen} == {("self-hosted.test", 8081)}
 
     @pytest.mark.usefixtures("tty_stdin")
-    def test_a_server_without_the_run_routes_is_the_client_s_reading_of_its_answer(
+    def test_a_server_without_the_run_routes_serves_no_such_route(
         self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
     ) -> None:
-        """A server with neither `/v1/start` nor `/v1/execute` answers no problem document, so its 404 is read from the status."""
+        """A server with neither `/v1/start` nor `/v1/execute` answers a bare 404: `request.not_found`, telling to check the origin."""
         seen = _install_hosted_api(mocker, monkeypatch, status=404, body=GatewayAnswers.NOT_FOUND)
 
         with pytest.raises(typer.Exit):
@@ -370,9 +383,220 @@ class TestRunHostedRefusal:
         # The SDK falls back to a blocking execute when the run routes are absent, as a bare runner serves.
         assert _routes(seen=seen) == [START_ROUTE, ("POST", "/v1/execute")]
         problem = json.loads(capsys.readouterr().err)
-        assert problem["code"] == "client.response_unreadable"
-        assert problem["params"] == {"status": 404}
+        assert problem["code"] == "request.not_found"
+        assert problem["detail"] == "Not Found"
+        assert problem["next_step"] == {"kind": "upgrade", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]}
         _assert_no_retired_member(problem=problem)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize(
+        ("status", "body", "headers", "expected"),
+        [
+            (
+                401,
+                HostedPlaneRefusals.UNAUTHORIZED,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/auth.invalid_credential",
+                    "title": "The credential was refused",
+                    "status": 401,
+                    "detail": "The API key is not valid.",
+                    "code": "auth.invalid_credential",
+                    "domain": "account",
+                    "retry": "no",
+                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[401]},
+                    "request_id": "01M55PLEGACY401000000000000",
+                },
+            ),
+            (
+                403,
+                HostedPlaneRefusals.FORBIDDEN,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/auth.invalid_credential",
+                    "title": "The credential was refused",
+                    "status": 403,
+                    "detail": "Your role in this organization does not allow running methods.",
+                    "code": "auth.invalid_credential",
+                    "domain": "account",
+                    "retry": "no",
+                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
+                    "request_id": "01M55PLEGACY403000000000000",
+                },
+            ),
+            (
+                403,
+                GatewayAnswers.FORBIDDEN,
+                {"x-request-id": HEADER_REQUEST_ID},
+                {
+                    "type": "https://mthds.ai/errors/auth.invalid_credential",
+                    "title": "The credential was refused",
+                    "status": 403,
+                    "detail": "Forbidden",
+                    "code": "auth.invalid_credential",
+                    "domain": "account",
+                    "retry": "no",
+                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
+                    "request_id": HEADER_REQUEST_ID,
+                },
+            ),
+            (
+                429,
+                HostedPlaneRefusals.RATE_LIMITED,
+                {"retry-after": "30"},
+                {
+                    "type": "https://mthds.ai/errors/account.rate_limited",
+                    "title": "The account is over its request rate",
+                    "status": 429,
+                    "detail": "Too many runs started in the last minute.",
+                    "code": "account.rate_limited",
+                    "domain": "account",
+                    "retry": "yes",
+                    "retry_after": 30,
+                    "next_step": {"kind": "wait", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[429]},
+                    "request_id": "01M55PLEGACY429000000000000",
+                },
+            ),
+            (
+                429,
+                HostedPlaneRefusals.RATE_LIMITED_BODY_DELAY,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/account.rate_limited",
+                    "title": "The account is over its request rate",
+                    "status": 429,
+                    "detail": "Too many runs started in the last minute.",
+                    "code": "account.rate_limited",
+                    "domain": "account",
+                    "retry": "yes",
+                    "retry_after": 12,
+                    "next_step": {"kind": "wait", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[429]},
+                },
+            ),
+        ],
+        ids=["unauthorized", "forbidden", "gateway_forbidden", "rate_limited", "rate_limited_body_delay"],
+    )
+    def test_a_refusal_of_the_hosted_plane_reads_as_its_core_code_with_the_hosted_guidance(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        status: int,
+        body: str,
+        headers: dict[str, str],
+        expected: dict[str, Any],
+    ) -> None:
+        """The hosted plane answers in its pre-standard shape: its refusal reads as the core code its status names, the
+        plane's own detail kept, the next step the human CLI gives, and a rate limit's delay from its header or its body.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers=headers)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        assert exc_info.value.exit_code == 1
+        problem = json.loads(capsys.readouterr().err)
+        assert problem == expected
+        _assert_no_retired_member(problem=problem)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    def test_a_refused_request_that_carried_no_key_is_a_missing_credential(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
+    ) -> None:
+        _install_hosted_api(mocker, monkeypatch, status=401, body=HostedPlaneRefusals.UNAUTHORIZED)
+        monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "")
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.MARKDOWN, runner=RunExecution.HOSTED)
+
+        markdown = capsys.readouterr().err
+        assert markdown.startswith("## No credential was sent\n\nThe API key is not valid.\n")
+        assert f"**Next step** (`check_credentials`): {HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[401]}" in markdown
+        assert "- Code: `auth.missing_credential` (domain account, retry no)" in markdown
+        _assert_no_retired_markdown(markdown=markdown)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    def test_a_runner_s_problem_is_reported_by_its_declared_members_alone(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
+    ) -> None:
+        """Members neither the standard nor Pipelex declares, at any level, are left out: the retired envelope does not come back."""
+        _install_hosted_api(mocker, monkeypatch, status=422, body=UndeclaredMembers.SENT)
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem == UndeclaredMembers.REPORTED
+        _assert_no_retired_member(problem=problem)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize(
+        ("body", "request_id"),
+        [
+            (OperatorViewAnswers.UNREADABLE_REQUEST_ID, HEADER_REQUEST_ID),
+            (OperatorViewAnswers.UNREADABLE_DIAGNOSTICS, "01M55PREQUEST0000000000000"),
+        ],
+        ids=["unreadable_request_id", "unreadable_diagnostics"],
+    )
+    def test_an_answer_in_the_operator_s_view_reads_in_the_caller_s_whatever_member_does_not_read(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        body: str,
+        request_id: str,
+    ) -> None:
+        """An answer holding diagnostics is projected onto the caller's view, its next step re-aimed, even when one of
+        Pipelex's members does not read; only that member is left out, and the request id survives.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=409, body=body, headers={"x-request-id": HEADER_REQUEST_ID})
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        assert json.loads(capsys.readouterr().err) == {**OperatorViewAnswers.CALLER_VIEW, "request_id": request_id}
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    @pytest.mark.parametrize(
+        ("body", "keeps_run_error"),
+        list(zip(OperatorViewAnswers.HOSTILE, (False, False, False, True), strict=True)),
+        ids=["run_error_text", "run_error_unreadable", "every_member_unreadable", "nested_members_unreadable"],
+    )
+    def test_no_member_a_runner_answers_stops_the_report(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        body: str,
+        keeps_run_error: bool,
+        error_format: CliOutputFormat,
+    ) -> None:
+        """Pipelex's members in any shape, the nested run's problem included, leave the command reporting the runner's problem:
+        each member that does not read is left out alone, so a nested problem whose own members do not read is kept without them.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=409, body=body)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
+
+        assert exc_info.value.exit_code == 1
+        printed = capsys.readouterr().err
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem["code"] == "run.terminated"
+                assert "diagnostics" not in problem
+                assert "request_id" not in problem
+                if keeps_run_error:
+                    assert problem["run_error"] == OperatorViewAnswers.CALLER_VIEW
+                else:
+                    assert "run_error" not in problem
+            case CliOutputFormat.MARKDOWN:
+                assert printed.startswith("## The run was stopped by an operator or an erasure\n")
 
     @pytest.mark.parametrize(
         ("flags", "named"),
