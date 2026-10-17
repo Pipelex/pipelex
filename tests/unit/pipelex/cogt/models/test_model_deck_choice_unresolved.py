@@ -10,6 +10,7 @@ and names the deck's setting to its operator alone.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -164,6 +165,21 @@ class TestModelDeckChoiceUnresolved:
         operator = unresolved.to_problem(view=ProblemView.OPERATOR)
         assert operator.diagnostics is not None
         assert expected_deck_setting in operator.diagnostics.message
+
+    def test_a_stale_handle_s_sentence_renders_with_its_reason(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """`model.unavailable` declares why the model is not served, and a stale handle of the deck is served by no backend."""
+        _use_deck(mocker, model_deck=_make_deck())
+
+        with pytest.raises(ModelDeckChoiceUnresolvedError) as exc_info:
+            resolve_llm_setting_for_text()
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.MODEL_UNAVAILABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": "stale-text-model", "model_type": "llm", "reason": "not_served"}
+        assert caller.detail == "The llm model 'stale-text-model' exists, but this deployment does not serve it (reason: not_served)."
+        assert not any(record.getMessage() == "A problem's sentence could not be rendered from its template" for record in caplog.records)
 
     @pytest.mark.parametrize(
         ("_topic", "resolve", "expected_choice"),

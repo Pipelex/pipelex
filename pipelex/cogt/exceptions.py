@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ModelUnavailableReason
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, ProblemFacts, iter_cause_chain
@@ -340,8 +340,8 @@ class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
     reference reaches the deck's lookup as a method's own does: a step that names no model runs on the deck's default
     or override, and a miss there is raised by the same lookup, as a ``ModelChoiceNotFoundError``, which this wraps.
     A bare handle is ``model.unavailable``, a model this deployment serves no backend for as the type the step needs,
-    whose other step lets the caller name a model the step can use; a preset, an alias or a waterfall the deck does
-    not define is ``pipelex.config.invalid``. Its message names the deck's setting and the reference, for the
+    with the reason ``not_served``, whose other step lets the caller name a model the step can use; a preset, an alias
+    or a waterfall the deck does not define is ``pipelex.config.invalid``. Its message names the deck's setting and the reference, for the
     operator, so it is not caller-facing.
 
     It is still a model choice the deck does not resolve, so a handler that skips an unresolvable choice, such as the
@@ -374,6 +374,11 @@ class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
                 self.with_error_code(CoreCode.MODEL_UNAVAILABLE)
             case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
                 pass
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The reason `model.unavailable` declares: no backend of this deployment serves the handle the deck names.
+        return {**super().problem_params(), "reason": ModelUnavailableReason.NOT_SERVED}
 
 
 class ModelDeckValidationError(CogtError):
