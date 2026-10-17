@@ -40,3 +40,11 @@ class ProblemViewsTestData:
         "retry": "no",
         "next_step": {"kind": "change_method", "detail": "Correct the rule the host's '/srv/pipelex/private/settings.toml' enforces."},
     }
+    # An item built by hand, not by `make_problem_item`, whose parameter and sentence name a part of the host that only an
+    # operator may read: `component` is operator-only for `runtime.misconfigured`.
+    HAND_BUILT_OPERATOR_ITEM: ClassVar[dict[str, Any]] = {
+        "code": "runtime.misconfigured",
+        "detail": "The component '/srv/pipelex/private/settings.toml' is misconfigured.",
+        "params": {"component": "/srv/pipelex/private/settings.toml"},
+        "location": {"pipe": "summarize"},
+    }

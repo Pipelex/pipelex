@@ -1,7 +1,10 @@
+import json
 import logging
 from typing import Any, ClassVar, Self, cast
 
 import pytest
+from mthds.protocol.problem.answers import MAX_BODY_NESTING, decode_json, nests_deeper_than
+from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode, StepKind
 from pydantic import BaseModel, model_validator
 from pytest_mock import MockerFixture
@@ -338,3 +341,56 @@ class TestProblemViews:
         assert "summarize" not in str(metadata)
         assert problem.detail not in str(metadata)
         assert problem.next_step.detail not in str(metadata)
+
+    def test_a_problem_nested_to_the_readers_limit_is_written_back(self) -> None:
+        """A problem a reader accepts, an extension member nested to the body's limit included, is written by every write path."""
+        nested: Any = "leaf"
+        for _ in range(MAX_BODY_NESTING - 2):
+            nested = {"inner": nested}
+        operator_wire = make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR).to_wire()
+        body = json.dumps({**operator_wire, "run_error": {**operator_wire, "extension": nested}})
+        assert not nests_deeper_than(body, limit=MAX_BODY_NESTING)
+        assert nests_deeper_than(body, limit=MAX_BODY_NESTING - 1)
+
+        problem = PipelexProblem.model_validate(decode_json(body).value)
+
+        assert json.loads(json.dumps(problem.to_wire())) == json.loads(body)
+        assert problem.as_wire() == problem.to_wire()
+        caller = caller_view_of(problem=problem)
+        assert caller.run_error is not None
+        assert caller.run_error.to_wire()["extension"] == nested
+        assert "diagnostics" not in caller.to_wire()
+
+    @pytest.mark.parametrize("view", list(ProblemView))
+    def test_an_item_never_carries_an_operator_only_parameter(self, view: ProblemView) -> None:
+        """An item built by hand is the same in every view: its operator-only parameter and the sentence quoting it are gone."""
+        hand_built = ProblemItem.model_validate(ProblemViewsTestData.HAND_BUILT_OPERATOR_ITEM)
+        expected_detail = error_code_spec(CoreCode.RUNTIME_MISCONFIGURED).detail
+
+        built = make_problem(code=CoreCode.METHOD_INVALID, view=view, errors=[hand_built])
+        # A stored record whose items no `make_problem` built, which its reader projects to the caller's view.
+        stored = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR).model_copy(update={"errors": [hand_built]})
+
+        for problem in (built, caller_view_of(problem=stored)):
+            assert problem.errors is not None
+            assert problem.errors[0].as_wire() == {"code": "runtime.misconfigured", "detail": expected_detail, "location": {"pipe": "summarize"}}
+            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
+
+    @pytest.mark.parametrize(
+        ("code", "params"),
+        [
+            (PipelexErrorCode.DOCGEN_PRINT_TIMEOUT, {"limit": float("inf")}),
+            (PipelexErrorCode.DOCGEN_PRINT_TIMEOUT, {"limit": float("nan")}),
+            (CoreCode.RUN_TIMED_OUT, {"timeout": float("inf")}),
+        ],
+    )
+    def test_a_number_json_cannot_write_is_dropped(self, code: ErrorCode, params: dict[str, Any], caplog: pytest.LogCaptureFixture) -> None:
+        """An infinity or NaN never renders into a sentence it would then vanish from: it is a parameter of the wrong type."""
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = make_problem(code=code, view=ProblemView.CALLER, params=params)
+
+        assert problem.params is None
+        assert problem.detail == error_code_spec(code).title
+        assert "inf" not in problem.detail
+        json.dumps(problem.to_wire(), allow_nan=False)
+        assert any(record.getMessage() == "An error gives a parameter of the wrong type for its code" for record in caplog.records)

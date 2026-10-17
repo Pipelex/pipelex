@@ -49,6 +49,7 @@ from mthds.protocol.problem.client_problems import render_template
 from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, ProblemParams
 from mthds.protocol.problem.registry import ProblemDomain, StepKind
 from pydantic import BaseModel, ConfigDict, SerializerFunctionWrapHandler, ValidationError, model_serializer
+from pydantic_core import to_jsonable_python
 from typing_extensions import override
 
 from pipelex.errors.error_codes import ErrorCode, ErrorCodeSpec, error_code_spec, parse_error_code
@@ -206,16 +207,23 @@ class PipelexProblem(Problem):
     def _drop_null_members(self, handler: SerializerFunctionWrapHandler):
         # Unannotated on purpose: a return annotation would replace the model's published serialization schema.
         # Whoever dumps a problem, alone or nested in a model that holds one (a graph node, a trace event, a webhook's
-        # payload), gets it with no member written as `null`, which a strict reader refuses.
+        # payload), gets it with no member written as `null`, which a strict reader refuses. This path is pydantic's,
+        # which refuses a value nested past its own depth limit; every write of a problem by itself goes through
+        # `to_wire`, which has none.
         return _without_null_members(value=handler(self))
 
     def to_wire(self) -> dict[str, Any]:
         """The problem in JSON types, with no member written as ``null``.
 
+        The members are written by walking the model by hand, as the standard's ``Problem.as_wire`` does, rather than
+        through pydantic's serializer, which refuses a value nested past its own depth limit of a few hundred levels as
+        a circular reference: a reader accepts a body nested up to ``mthds.protocol.problem.answers.MAX_BODY_NESTING``,
+        so every problem a reader accepts, a recovered one with a deep extension member included, can be written back.
+
         Returns:
             The members of the problem that hold a value, nested ones included.
         """
-        return self.model_dump(mode="json")
+        return _model_wire(model=self)
 
     @override
     def as_wire(self) -> dict[str, Any]:
@@ -229,6 +237,57 @@ def _without_null_members(*, value: Any) -> Any:
     if isinstance(value, list):
         return [_without_null_members(value=item) for item in cast("list[Any]", value)]
     return value
+
+
+def _model_wire(*, model: BaseModel) -> dict[str, Any]:
+    """A model's members that hold a value, in JSON types, each declared one in the order the model declares it, then each undeclared one.
+
+    A model open to undeclared members, which any problem model is, is walked by hand, one level per call, so that no
+    depth limit but the interpreter's applies; a closed one, such as a migration block, holds only the members it
+    types and is dumped by pydantic.
+    """
+    if model.model_config.get("extra") != "allow":
+        return cast("dict[str, Any]", _without_null_members(value=model.model_dump(mode="json")))
+    wire: dict[str, Any] = {}
+    for name in type(model).model_fields:
+        member = _wire_member(value=getattr(model, name))
+        if member is not None:
+            wire[name] = member
+    for name, value in (model.model_extra or {}).items():
+        member = _wire_member(value=value)
+        if member is not None:
+            wire[name] = member
+    return wire
+
+
+def _wire_member(*, value: Any) -> Any:
+    """A member's value in JSON types, with no member written as ``null``; a container is walked one level per call.
+
+    The loops are written out rather than as comprehensions, which cost a frame of their own per level on Python 3.11.
+    A number JSON cannot hold, an infinity or ``NaN``, reads as ``null``, as pydantic's JSON serialization writes it.
+    """
+    if isinstance(value, BaseModel):
+        return _model_wire(model=value)
+    if isinstance(value, dict):
+        wire_object: dict[str, Any] = {}
+        for key, item in cast("dict[str, Any]", value).items():
+            member = _wire_member(value=item)
+            if member is not None:
+                wire_object[key] = member
+        return wire_object
+    if isinstance(value, list | tuple):
+        wire_array: list[Any] = []
+        for item in cast("list[Any] | tuple[Any, ...]", value):
+            wire_array.append(_wire_member(value=item))
+        return wire_array
+    if isinstance(value, Enum):
+        return _wire_member(value=value.value)
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    # A string, an integer, a boolean or null is already a JSON value.
+    if value is None or isinstance(value, str | int):
+        return value
+    return to_jsonable_python(value)
 
 
 # The sentence of a step whose template could not be rendered: one per kind, naming no parameter.
@@ -304,14 +363,25 @@ def _param_value(*, value: Any) -> Any:
     return value
 
 
+def _holds_only_finite_numbers(*, value: Any) -> bool:
+    """Whether every number ``value`` holds, itself or as an item, is one JSON can write: never an infinity or ``NaN``."""
+    if isinstance(value, float):
+        return math.isfinite(value)
+    if isinstance(value, list):
+        return all(_holds_only_finite_numbers(value=item) for item in cast("list[Any]", value))
+    return True
+
+
 def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, Any]:
     """The parameters of ``params`` the code declares, each of the type its model requires.
 
     A parameter the code does not declare, or one of the wrong type, is dropped and logged: it is a fault of the
-    raise site, which must never turn the error it reports into another. A parameter given as ``None`` is left out.
-    The result validates against the code's model and against the problem's own ``params`` model, whatever the raise
-    site gave: a refusal that names no parameter, such as a model-level one, drops every parameter rather than let one
-    the models refuse reach the problem, where it would fail the problem's construction.
+    raise site, which must never turn the error it reports into another. A parameter given as ``None`` is left out,
+    and a number JSON cannot write, an infinity or ``NaN``, is of the wrong type whatever the code's model says, since
+    it would render into a sentence and then vanish from the wire. The result validates against the code's model and
+    against the problem's own ``params`` model, whatever the raise site gave: a refusal that names no parameter, such
+    as a model-level one, drops every parameter rather than let one the models refuse reach the problem, where it would
+    fail the problem's construction.
 
     Args:
         code: The code the parameters are given for.
@@ -328,7 +398,14 @@ def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, 
         if name not in spec.param_names:
             _warn(message="An error gives a parameter its code does not declare", fields={"error.code": code, "param": name})
             continue
-        accepted[name] = _param_value(value=value)
+        param_value = _param_value(value=value)
+        if not _holds_only_finite_numbers(value=param_value):
+            _warn(
+                message="An error gives a parameter of the wrong type for its code",
+                fields={"error.code": code, "param": name, "reason": "non_finite_number"},
+            )
+            continue
+        accepted[name] = param_value
     # The code's own model, then the wire's, which types a parameter every reader reads the same way.
     for params_model in (spec.params_model, ProblemParams):
         _drop_refused_params(accepted=accepted, params_model=params_model, code=code)
@@ -419,7 +496,8 @@ def make_problem(
         params: The parameters the raise site gave, operator-only ones included; they are validated by
             :func:`accepted_params`.
         location: Where the error happened.
-        errors: One item per fault, for a refusal with several.
+        errors: One item per fault, for a refusal with several; an item is the same in every view, so a parameter its
+            code declares operator-only is taken out of it (:func:`item_for_every_view`).
         retry_after: The delay before a retry, kept only when the code's verdict is ``yes`` and the delay is a finite,
             non-negative number of seconds: a provider can send any value, ``inf`` included, and the wire takes none of those.
         pipeline_run_id: The run the error belongs to.
@@ -451,7 +529,7 @@ def make_problem(
             next_step=_next_step(spec=spec, view=view, params=step_params),
             params=ProblemParams.model_validate(caller_params) if caller_params else None,
             location=location,
-            errors=errors or None,
+            errors=[item_for_every_view(item=item) for item in errors] if errors else None,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
             diagnostics=view_diagnostics,
@@ -496,6 +574,37 @@ def make_problem_item(
             suggested_fix=dict(suggested_fix) if suggested_fix is not None else None,
         )
     )
+
+
+def item_for_every_view(*, item: ProblemItem) -> ProblemItem:
+    """An item as every view reads it: without a parameter its code declares operator-only.
+
+    :func:`make_problem_item` builds every item so, but an item may come from elsewhere: a raise site that built it by
+    hand, a plugin, or a stored record read back. When a parameter is taken out, the item's sentence, which may quote
+    it, is rendered again from the parameters left, falling back on the code's title. An item whose code neither
+    registry of this process holds is kept as it is: its parameters cannot be told apart, and the process that built
+    it, which knew its code, built it with :func:`make_problem_item`.
+
+    Args:
+        item: An item of a problem.
+
+    Returns:
+        The item, or a copy of it without the operator-only parameters.
+    """
+    code = parse_error_code(item.code)
+    if code is None or item.params is None:
+        return item
+    spec = error_code_spec(code)
+    params = item.params.as_wire()
+    if not any(name in spec.operator_only_params for name in params):
+        return item
+    caller_params = {name: value for name, value in params.items() if name not in spec.operator_only_params}
+    members = item.as_wire()
+    members["detail"] = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
+    members.pop("params")
+    if caller_params:
+        members["params"] = caller_params
+    return ProblemItem.model_validate(members)
 
 
 def make_location(
@@ -566,7 +675,9 @@ def caller_view_of(*, problem: PipelexProblem) -> PipelexProblem:
     The projection fails closed for a code neither registry of this process holds, such as one a newer worker or a
     stored record carries: its step cannot be rendered again, and the operator's may quote an operator-only parameter,
     so the caller reads the generic sentence of the step's kind, and ``report`` for a code of the ``operator`` domain,
-    whose actor's step is not the caller's. A nested ``run_error`` is projected the same way.
+    whose actor's step is not the caller's. A nested ``run_error`` is projected the same way, and each item loses a
+    parameter its code declares operator-only (:func:`item_for_every_view`), since a stored record's items may not have
+    been built by :func:`make_problem`.
 
     Args:
         problem: A problem in any view.
@@ -578,6 +689,8 @@ def caller_view_of(*, problem: PipelexProblem) -> PipelexProblem:
     members.pop("diagnostics", None)
     if problem.run_error is not None:
         members["run_error"] = caller_view_of(problem=problem.run_error).to_wire()
+    if problem.errors:
+        members["errors"] = [item_for_every_view(item=item).as_wire() for item in problem.errors]
     code = parse_error_code(problem.code)
     if code is None:
         members["next_step"] = _unknown_code_caller_step(problem=problem).as_wire()
