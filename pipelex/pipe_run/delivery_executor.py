@@ -22,7 +22,7 @@ from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
-from pipelex.errors.problem import PipelexProblem, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
@@ -46,6 +46,27 @@ class ResultFile(NamedTuple):
 
     data: bytes
     content_type: str
+
+
+def _problem_wires_by_view(*, problem: PipelexProblem | None, webhooks: list[WebhookTarget]) -> dict[ProblemView, dict[str, Any]]:
+    """A failed run's problem in the wire form of each view the webhooks read it in, each view built once.
+
+    ``problem`` is in the operator's view, which an operator's webhook receives as it is, and a caller's webhook
+    receives its caller view, projected once for every caller webhook rather than once per webhook.
+    """
+    wires: dict[ProblemView, dict[str, Any]] = {}
+    if problem is None:
+        return wires
+    for webhook in webhooks:
+        view = webhook.problem_view
+        if view in wires:
+            continue
+        match view:
+            case ProblemView.OPERATOR:
+                wires[view] = problem.to_wire()
+            case ProblemView.CALLER:
+                wires[view] = caller_view_of(problem=problem).to_wire()
+    return wires
 
 
 class DeliveryExecutor:
@@ -84,13 +105,14 @@ class DeliveryExecutor:
                 )
 
             # Step 2: Notify webhooks with status + result_url (always, even on failure)
+            problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
             for webhook in delivery_assignment.webhooks:
                 await self._notify_webhook(
                     pipeline_run_id=pipeline_run_id,
                     status=status,
                     result_url=result_url,
                     webhook=webhook,
-                    problem=problem,
+                    problem_wire=problem_wires.get(webhook.problem_view),
                 )
 
     # ---- Result file generation ----
@@ -460,13 +482,13 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,
-        problem: PipelexProblem | None = None,
+        problem_wire: dict[str, Any] | None = None,
     ) -> None:
         """POST status, optional result_url, and a failed run's problem to a webhook URL.
 
-        The problem rides in the webhook's own view (``WebhookTarget.problem_view``): an
-        operator's webhook, such as a hosted plane's completion callback, receives the
-        diagnostics, and a caller's receives the problem without them.
+        ``problem_wire`` is the problem in the webhook's own view (``WebhookTarget.problem_view``),
+        already in its wire form: an operator's webhook, such as a hosted plane's completion
+        callback, receives the diagnostics, and a caller's receives the problem without them.
 
         The HTTP client uses :class:`SsrfGuardedTransport`, which re-resolves the
         callback host at connect time and refuses private/loopback/metadata
@@ -488,8 +510,8 @@ class DeliveryExecutor:
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
-            if problem is not None:
-                payload["error"] = (problem if webhook.problem_view.shows_diagnostics else caller_view_of(problem=problem)).to_wire()
+            if problem_wire is not None:
+                payload["error"] = problem_wire
 
             async with httpx.AsyncClient(transport=SsrfGuardedTransport()) as client:
                 response = await client.post(

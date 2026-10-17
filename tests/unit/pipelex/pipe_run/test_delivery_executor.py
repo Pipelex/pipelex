@@ -45,6 +45,7 @@ from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, Webh
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from tests.helpers.pipe_io_artifacts import make_pipe_io_artifacts
+from tests.unit.pipelex.errors.test_data import ProblemViewsTestData
 
 
 def _records_with_message(*, caplog: pytest.LogCaptureFixture, message: str) -> list[logging.LogRecord]:
@@ -933,6 +934,44 @@ class TestDeliveryExecutor:
                 assert rehydrated.diagnostics is None
                 assert "provider returned 429" not in json.dumps(payload["error"])
                 assert "429 Too Many Requests" not in json.dumps(payload["error"])
+
+    async def test_caller_webhooks_share_one_projection_that_fails_closed_on_an_unknown_code(self, mocker: MockerFixture) -> None:
+        """Every caller webhook reads one caller view, built once, and a code this process does not know keeps no operator step."""
+        mock_client = mocker.AsyncMock()
+        mock_response = mocker.MagicMock()
+        mock_response.raise_for_status = mocker.Mock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(return_value=mock_response)
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+        projection_spy = mocker.spy(delivery_executor_module, "caller_view_of")
+
+        problem = PipelexProblem.model_validate(ProblemViewsTestData.UNKNOWN_OPERATOR_PROBLEM)
+        assignment = DeliveryAssignment(
+            webhooks=[
+                WebhookTarget(url="https://example.com/first", problem_view=ProblemView.CALLER),
+                WebhookTarget(url="https://example.com/second", problem_view=ProblemView.CALLER),
+                WebhookTarget(url="https://example.com/operator", problem_view=ProblemView.OPERATOR),
+            ]
+        )
+
+        await DeliveryExecutor().execute(
+            pipe_output=None,
+            storage_scope="test-user",
+            pipeline_run_id="plr-failed",
+            delivery_assignment=assignment,
+            status=DeliveryStatus.FAILED,
+            problem=problem,
+        )
+
+        assert projection_spy.call_count == 1
+        errors_by_url = {call.args[0] if call.args else call.kwargs["url"]: call.kwargs["json"]["error"] for call in mock_client.post.call_args_list}
+        for caller_url in ("https://example.com/first", "https://example.com/second"):
+            caller_error = errors_by_url[caller_url]
+            assert caller_error["next_step"] == {"kind": "report", "detail": "Report this problem with its request id."}
+            assert "diagnostics" not in caller_error
+            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in json.dumps(caller_error)
+        assert errors_by_url["https://example.com/operator"] == problem.to_wire()
 
     async def test_webhook_omits_error_when_problem_is_none(self, mocker: MockerFixture) -> None:
         """A completed delivery (no problem) must not introduce an ``error`` field in the payload."""

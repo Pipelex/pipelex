@@ -309,6 +309,9 @@ def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, 
 
     A parameter the code does not declare, or one of the wrong type, is dropped and logged: it is a fault of the
     raise site, which must never turn the error it reports into another. A parameter given as ``None`` is left out.
+    The result validates against the code's model and against the problem's own ``params`` model, whatever the raise
+    site gave: a refusal that names no parameter, such as a model-level one, drops every parameter rather than let one
+    the models refuse reach the problem, where it would fail the problem's construction.
 
     Args:
         code: The code the parameters are given for.
@@ -326,11 +329,26 @@ def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, 
             _warn(message="An error gives a parameter its code does not declare", fields={"error.code": code, "param": name})
             continue
         accepted[name] = _param_value(value=value)
+    # The code's own model, then the wire's, which types a parameter every reader reads the same way.
+    for params_model in (spec.params_model, ProblemParams):
+        _drop_refused_params(accepted=accepted, params_model=params_model, code=code)
+    return accepted
+
+
+def _drop_refused_params(*, accepted: dict[str, Any], params_model: type[BaseModel], code: ErrorCode) -> None:
+    """Drop from ``accepted`` every parameter ``params_model`` refuses, and all of them when a refusal names none.
+
+    A missing parameter is no refusal: the code's sentences that name it fall back when they are rendered.
+    """
     try:
-        spec.params_model.model_validate(accepted)
+        params_model.model_validate(accepted)
     except ValidationError as validation_error:
+        unattributed_reasons: list[str] = []
         for error in validation_error.errors(include_url=False, include_input=False):
-            if error["type"] == "missing" or not error["loc"]:
+            if error["type"] == "missing":
+                continue
+            if not error["loc"]:
+                unattributed_reasons.append(error["type"])
                 continue
             refused_name = str(error["loc"][0])
             if accepted.pop(refused_name, None) is not None:
@@ -338,7 +356,12 @@ def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, 
                     message="An error gives a parameter of the wrong type for its code",
                     fields={"error.code": code, "param": refused_name, "reason": error["type"]},
                 )
-    return accepted
+        if unattributed_reasons and accepted:
+            _warn(
+                message="An error gives parameters its code refuses as a whole",
+                fields={"error.code": code, "params": sorted(accepted), "reason": ", ".join(unattributed_reasons)},
+            )
+            accepted.clear()
 
 
 def _caller_step_is_actor_step(*, domain: ProblemDomain) -> bool:
@@ -537,9 +560,13 @@ def caller_view_of(*, problem: PipelexProblem) -> PipelexProblem:
     """The caller's view of a problem built in the operator's: ``diagnostics`` dropped, the step re-aimed at the caller.
 
     The operator view holds everything the caller view does, so a reader holding the operator's record, such as the
-    hosted plane's stored run report, serves its caller from it. For a code of the ``operator`` domain the step is
-    rendered again from the problem's ``params``, which never hold an operator-only parameter; any other code's step is
-    the caller's already. A code neither registry holds keeps its step. A nested ``run_error`` is projected the same way.
+    hosted plane's stored run report, serves its caller from it. The step is rendered again from the problem's
+    ``params``, which never hold an operator-only parameter, since the operator's step may have been rendered with one.
+
+    The projection fails closed for a code neither registry of this process holds, such as one a newer worker or a
+    stored record carries: its step cannot be rendered again, and the operator's may quote an operator-only parameter,
+    so the caller reads the generic sentence of the step's kind, and ``report`` for a code of the ``operator`` domain,
+    whose actor's step is not the caller's. A nested ``run_error`` is projected the same way.
 
     Args:
         problem: A problem in any view.
@@ -552,10 +579,26 @@ def caller_view_of(*, problem: PipelexProblem) -> PipelexProblem:
     if problem.run_error is not None:
         members["run_error"] = caller_view_of(problem=problem.run_error).to_wire()
     code = parse_error_code(problem.code)
-    if code is not None:
+    if code is None:
+        members["next_step"] = _unknown_code_caller_step(problem=problem).as_wire()
+    else:
         params = problem.params.as_wire() if problem.params is not None else {}
         members["next_step"] = _next_step(spec=error_code_spec(code), view=ProblemView.CALLER, params=params).as_wire()
     return PipelexProblem.model_validate(members)
+
+
+def _unknown_code_caller_step(*, problem: PipelexProblem) -> NextStep:
+    """The caller's step of a problem whose code this process's registries do not hold, naming no parameter.
+
+    The kind is the problem's own, read the way a reader reads a kind it does not know, except for a code of the
+    ``operator`` domain, whose step is the actor's in the operator's record, and whose caller reports the problem.
+    """
+    kind: StepKind
+    if _caller_step_is_actor_step(domain=problem.effective_domain):
+        kind = problem.effective_step_kind
+    else:
+        kind = StepKind.REPORT
+    return NextStep(kind=kind, detail=_GENERIC_STEP_SENTENCES[kind])
 
 
 class LocationShape(BaseModel):

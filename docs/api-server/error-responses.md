@@ -85,7 +85,7 @@ A failure the runtime raised is one problem seen through a view, and the identit
 | `AUTH_MODE=jwt`: a caller's token | The caller view |
 | `AUTH_MODE=none` without the trusted proxy, or a request refused before any authentication ran | The caller view |
 
-**The caller view** carries the code's sentences, rendered from the parameters a caller may read, and the step for the caller: for a code of the `operator` domain, whose actor is whoever runs this server, that is what the caller can do meanwhile, such as choosing another model. It never carries the error's own message, its class, a path on the host, a provider's answer or a foreign exception's text, whatever the failure.
+**The caller view** carries the code's sentences, rendered from the parameters a caller may read, and the step for the caller: for a code of the `operator` domain, whose actor is whoever runs this server, that is what the caller can do meanwhile, such as choosing another model. It never carries the error's own message, its class, a path on the host, a provider's answer or a foreign exception's text, whatever the failure. A problem this server relays with a code its own registries do not hold, such as one a newer worker built, reaches the caller with the generic step of its kind, and `report` for a code of the `operator` domain, since its recorded step was written for the operator.
 
 **The operator view** adds the operator's step and `diagnostics`:
 

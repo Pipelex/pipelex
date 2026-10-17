@@ -1,9 +1,10 @@
 import logging
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, Self, cast
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, StepKind
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
@@ -34,6 +35,25 @@ class _TemplateRefusalError(PipelexError):
 
 class _NodeHolder(BaseModel):
     error: PipelexProblem | None = None
+
+
+class _RefusedAsAWholeParams(BaseModel):
+    """A parameters model whose refusal names no parameter, as a model-level validator's does."""
+
+    pipe: str | None = None
+    template: str | None = None
+    finding: str | None = None
+
+    @model_validator(mode="after")
+    def _refuse_the_set(self) -> Self:
+        msg = "the parameters are refused together"
+        raise ValueError(msg)
+
+
+class _LaxBlobsParams(BaseModel):
+    """A parameters model laxer than the problem's own, which types each missing blob as a SHA-256."""
+
+    missing_blobs: list[str] | None = None
 
 
 def _all_codes() -> list[ErrorCode]:
@@ -254,6 +274,57 @@ class TestProblemViews:
         assert make_problem(code=CoreCode.PROVIDER_RATE_LIMITED, view=ProblemView.CALLER, retry_after=3.5).retry_after == 3.5
         # A code whose verdict is not `yes` never carries a delay.
         assert make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, retry_after=3.5).retry_after is None
+
+    def test_a_parameter_set_refused_as_a_whole_is_dropped(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A refusal naming no parameter, a model-level one, drops them all: the error is reported, never replaced."""
+        spec = error_code_spec(CoreCode.METHOD_TEMPLATE_INVALID).model_copy(
+            update={"params_model": _RefusedAsAWholeParams, "param_names": frozenset({"pipe", "template", "finding"})}
+        )
+        mocker.patch("pipelex.errors.problem.error_code_spec", return_value=spec)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = make_problem(code=CoreCode.METHOD_TEMPLATE_INVALID, view=ProblemView.CALLER, params={"pipe": "summarize", "template": "x"})
+
+        assert problem.code == CoreCode.METHOD_TEMPLATE_INVALID
+        assert problem.params is None
+        assert problem.detail == spec.title
+        assert any(record.getMessage() == "An error gives parameters its code refuses as a whole" for record in caplog.records)
+
+    def test_a_parameter_the_wire_refuses_is_dropped(self, mocker: MockerFixture) -> None:
+        """A value the code's model takes but the problem's own `params` model refuses never fails the problem."""
+        spec = error_code_spec(CoreCode.REQUEST_BLOBS_MISSING).model_copy(update={"params_model": _LaxBlobsParams})
+        mocker.patch("pipelex.errors.problem.error_code_spec", return_value=spec)
+
+        problem = make_problem(code=CoreCode.REQUEST_BLOBS_MISSING, view=ProblemView.CALLER, params={"missing_blobs": ["not-a-sha256"]})
+
+        assert problem.code == CoreCode.REQUEST_BLOBS_MISSING
+        assert problem.params is None
+
+    @pytest.mark.parametrize(
+        ("wire", "expected_kind", "expected_detail"),
+        [
+            (ProblemViewsTestData.UNKNOWN_OPERATOR_PROBLEM, StepKind.REPORT, "Report this problem with its request id."),
+            (
+                ProblemViewsTestData.UNKNOWN_METHOD_PROBLEM,
+                StepKind.CHANGE_METHOD,
+                "Correct the method as the problem describes, then validate it again.",
+            ),
+        ],
+    )
+    def test_the_caller_view_of_an_unknown_code_fails_closed(self, wire: dict[str, Any], expected_kind: StepKind, expected_detail: str) -> None:
+        """A code this process does not know keeps no operator sentence: its caller reads a generic step, nested ones included."""
+        operator = PipelexProblem.model_validate(wire)
+        outer = make_problem(
+            code=CoreCode.RUN_FAILED, view=ProblemView.OPERATOR, params={"pipeline_run_id": "run-1", "run_status": "failed"}
+        ).model_copy(update={"run_error": operator})
+
+        for caller in (caller_view_of(problem=operator), caller_view_of(problem=outer).run_error):
+            assert caller is not None
+            assert caller.code == wire["code"]
+            assert caller.next_step.kind == expected_kind
+            assert caller.next_step.detail == expected_detail
+            assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(caller.to_wire())
+            assert caller.diagnostics is None
 
     def test_the_metadata_view_holds_no_sentence(self) -> None:
         error = _TemplateRefusalError("refused").with_params(pipe="summarize", template="prompt", finding="unexpected '}'")

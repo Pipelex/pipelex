@@ -1,6 +1,6 @@
 """Test data for the server's problem documents: the failures they are built from and the identities that pick their view."""
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
@@ -27,6 +27,20 @@ class ProblemTestData:
     FORWARDED_USER_ID = "22222222-2222-4222-2222-222222222222"
     JWT_USER_ID = "33333333-3333-4333-3333-333333333333"
     CALLBACK_URL = "https://example.com/done"
+
+    # A problem whose code no registry of this server holds, as a newer worker or a stored record carries it, built in
+    # the operator's view: its step and its diagnostics name a file of the host that a caller must never read.
+    PRIVATE_HOST_FILE = "/srv/pipelex/private/settings.toml"
+    UNKNOWN_OPERATOR_PROBLEM: ClassVar[dict[str, Any]] = {
+        "type": "https://docs.pipelex.com/errors/pipelex.config.future_setting_missing",
+        "title": "A setting the runtime needs is missing",
+        "detail": "A setting the runtime needs is missing.",
+        "code": "pipelex.config.future_setting_missing",
+        "domain": "operator",
+        "retry": "no",
+        "next_step": {"kind": "fix_configuration", "detail": "Set the setting in '/srv/pipelex/private/settings.toml', then restart the runtime."},
+        "diagnostics": {"error_class": "FutureSettingError", "message": "no setting in /srv/pipelex/private/settings.toml"},
+    }
 
     # Each code with the status its registry entry declares, which the response must carry.
     CODE_STATUSES: ClassVar[list[tuple[ErrorCode, int]]] = [

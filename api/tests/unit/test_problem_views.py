@@ -20,12 +20,14 @@ import jwt
 import pytest
 from fastapi import APIRouter, Depends, FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
-from pipelex.errors.problem import ProblemView
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.mthds_parsing.parser import MthdsParser
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import RequestIdMiddleware
@@ -62,6 +64,29 @@ class _MisconfiguredComponentError(PipelexError):
     error_code = CoreCode.RUNTIME_MISCONFIGURED
 
 
+class _RecoveredProblemError(PipelexError):
+    """Carries a problem recovered across a transport boundary in the operator's view, and reports it as it is."""
+
+    def __init__(self, message: str, *, problem: PipelexProblem):
+        super().__init__(message)
+        self.recovered_problem = problem
+
+    @override
+    def to_problem(
+        self,
+        *,
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        match view:
+            case ProblemView.OPERATOR:
+                return self.recovered_problem
+            case ProblemView.CALLER:
+                return caller_view_of(problem=self.recovered_problem)
+
+
 # Route handlers are deliberately not underscore-prefixed: a private,
 # decorator-only function reads as unused to the type checker.
 _router = APIRouter()
@@ -92,6 +117,12 @@ async def invalid_method_route() -> None:
 async def unexpected_error_route() -> None:
     msg = "something nobody anticipated"
     raise RuntimeError(msg)
+
+
+@_router.get("/unknown-code")
+async def unknown_code_route() -> None:
+    msg = "a worker reported a code this server does not know"
+    raise _RecoveredProblemError(msg, problem=PipelexProblem.model_validate(ProblemTestData.UNKNOWN_OPERATOR_PROBLEM))
 
 
 async def refuse_before_authentication() -> None:
@@ -216,6 +247,26 @@ class TestProblemViews:
         assert body["error_type"] == "InvalidToken"
         assert "diagnostics" not in body
         assert "code" not in body
+
+    @pytest.mark.parametrize("identity", list(_IDENTITIES))
+    def test_an_unknown_code_reaches_a_caller_without_the_operator_step(self, mocker: MockerFixture, identity: _Identity) -> None:
+        """A recorded problem whose code this server does not know: its caller reads a generic step, never the operator's."""
+        _, _, expected_view = _IDENTITIES[identity]
+        client, headers = _authenticated_client(mocker, identity=identity)
+
+        response = client.get("/unknown-code", headers=headers)
+
+        assert response.status_code == 500
+        body = response.json()
+        assert body["code"] == ProblemTestData.UNKNOWN_OPERATOR_PROBLEM["code"]
+        match expected_view:
+            case ProblemView.OPERATOR:
+                assert body["next_step"] == ProblemTestData.UNKNOWN_OPERATOR_PROBLEM["next_step"]
+                assert body["diagnostics"]["error_class"] == "FutureSettingError"
+            case ProblemView.CALLER:
+                assert body["next_step"] == {"kind": "report", "detail": "Report this problem with its request id."}
+                assert "diagnostics" not in body
+                assert ProblemTestData.PRIVATE_HOST_FILE not in response.text
 
     @pytest.mark.parametrize("view", [ProblemView.OPERATOR, ProblemView.CALLER])
     @pytest.mark.parametrize("path", ["/config-error", "/misconfigured", "/llm-error", "/invalid-method", "/unexpected-error"])
