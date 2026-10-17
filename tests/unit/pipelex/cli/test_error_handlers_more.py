@@ -152,19 +152,35 @@ class TestErrorHandlersExtended:
         assert "anthropic, openai" in output
         assert "Possible solutions:" in output
         assert "Configure model 'gpt-5' in one of your enabled backends" in output
+        # The tip's markup is the handler's own and is rendered, never printed as text.
+        assert "[bold]" not in output
+        assert "[yellow]" not in output
 
     def test_handle_model_deck_preset_error_uses_user_action_detail(self, console: Console) -> None:
-        """When the error carries user-action advice, it becomes the tip verbatim."""
+        """When the error carries user-action advice, it becomes the tip verbatim, brackets included and escaped once."""
         exc = self._make_deck_preset_error(enabled_backends=None)
-        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="switch to gpt-4o in the preset")
+        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="switch to 'gpt-4o → SDK[openai]' in the preset")
 
         with pytest.raises(typer.Exit):
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
         output = console.export_text()
-        assert "switch to gpt-4o in the preset" in output
+        assert "💡 Tip: switch to 'gpt-4o → SDK[openai]' in the preset" in output
+        assert "\\[" not in output
         assert "Possible solutions:" not in output
         assert "Enabled Backends:" not in output
+
+    def test_handle_validate_bundle_error_prints_a_bracketed_tip_as_written(self, console: Console) -> None:
+        """The verdict's advice is plain text: `SDK[openai]` prints as written, neither swallowed as a style tag nor escaped twice."""
+        exc = ValidateBundleError(message="validation failed")
+        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="use 'gpt-4o → SDK[openai]' in the pipe")
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc)
+
+        output = console.export_text()
+        assert "💡 Tip: use 'gpt-4o → SDK[openai]' in the pipe" in output
+        assert "\\[" not in output
 
     def test_handle_validate_bundle_error_renders_all_sections(self, console: Console) -> None:
         """Blueprint, pipe, and dry-run sections all render with their details."""

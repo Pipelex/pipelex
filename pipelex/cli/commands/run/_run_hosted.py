@@ -30,7 +30,7 @@ from pipelex.hosted.run_config import RunExecution
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
-from pipelex.runtime_hub import get_console
+from pipelex.runtime_hub import get_console, get_error_console
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
 
@@ -64,7 +64,7 @@ def resolve_cli_run_execution(*, hosted: bool | None, base_url: str | None) -> R
     try:
         execution = resolve_run_execution(requested=RunExecution.from_hosted_flag(hosted=hosted))
     except PipelexError as exc:
-        print_traceback_if_requested(console=get_console())
+        print_traceback_if_requested(console=get_error_console())
         raise _fail(message=exc.message) from exc
     if base_url is not None and not execution.is_hosted:
         msg = "--base-url names the hosted API a hosted run calls, and this run executes locally. Add --hosted, or drop --base-url."
@@ -115,7 +115,8 @@ def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError, headi
     running by an interruption can be looked up.
     """
     view = describe_hosted_error(error=error)
-    console = get_console()
+    # On stderr, as every failure's report: stdout is the run's output.
+    console = get_error_console()
     console.print(f"\n[bold red]{escape(heading)}[/bold red]\n")
     console.print(f"  {escape(view.message)}\n")
     if view.validation_errors:

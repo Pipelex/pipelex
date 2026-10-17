@@ -70,9 +70,13 @@ class TestExecuteRunWrapper:
             "teardown": mocker.patch("pipelex.cli.commands.run._run_core.Pipelex.teardown_if_needed"),
             "core": mocker.patch("pipelex.cli.commands.run._run_core._execute_run", new=mocker.AsyncMock(return_value=None)),
         }
+        # A failure's report goes to the error console, stderr; the output console, stdout, is the run's output.
         recorded_console = Console(width=200, record=True, color_system=None)
-        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_error_console", return_value=recorded_console)
         mocks["console"] = recorded_console
+        output_console = Console(width=200, record=True, color_system=None)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=output_console)
+        mocks["output_console"] = output_console
         return mocks
 
     def test_happy_path_setup_and_teardown(self, wrapper_mocks: dict[str, Any]) -> None:
@@ -167,6 +171,7 @@ class TestExecuteRunWrapper:
         output = wrapper_mocks["console"].export_text()
         assert "Failed to execute pipeline" in output
         assert message in output
+        assert wrapper_mocks["output_console"].export_text() == ""
 
     def test_a_missing_credential_message_prints_the_backend_table_as_written(self, wrapper_mocks: dict[str, Any]) -> None:
         r"""The message names the table as `[openai]`; it used to carry a Rich escape, which the escape here printed as `\[openai]`."""

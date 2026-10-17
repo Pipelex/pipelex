@@ -305,7 +305,7 @@ A run loads its bundle before any pipe runs, and refuses an invalid one there, b
 
 ## A Failed Run
 
-A run that fails prints its problem: the failure's message, then the problem's title, its next step, its code with its domain and retry verdict, and its location, the pipe that failed and its path from the entry pipe, followed by the error's advice as a tip when it gives one, and exits with code `1`. A failure with a panel of its own, a model that is not available or a model choice that cannot be read, prints that panel, which carries the same rows. An unexpected failure is printed the same way, its message capped, and logged by its code and the classes along its cause chain; pass `--traceback` for its stack trace.
+A run that fails prints its problem: the failure's message, then the problem's title, its next step, its code with its domain and retry verdict, and its location, the pipe that failed and its path from the entry pipe, followed by the error's advice as a tip when it gives one, and exits with code `1`. A failure with a panel of its own, a model that is not available or a model choice that cannot be read, prints that panel, which carries the same rows. An unexpected failure is printed the same way, its message capped, and logged by its code and the classes along its cause chain; pass `--traceback` for its stack trace. The report and the stack trace go to stderr whatever `console_print_target` says, so stdout keeps only what the run produced.
 
 ## Related Documentation
 

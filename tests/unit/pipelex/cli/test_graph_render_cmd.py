@@ -44,7 +44,7 @@ class TestGraphRenderFailure:
         telemetry_manager = mocker.patch(f"{GRAPH_CMD}.get_telemetry_manager").return_value
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
         printed = io.StringIO()
-        mocker.patch(f"{GRAPH_CMD}.get_console", return_value=Console(file=printed, width=1000))
+        mocker.patch(f"{GRAPH_CMD}.get_error_console", return_value=Console(file=printed, width=1000))
         log_spy = mocker.patch(f"{GRAPH_CMD}.log")
 
         spec_dir = tmp_path / bracketed_dir
@@ -80,7 +80,7 @@ class TestGraphRenderFailure:
         telemetry_manager = mocker.patch(f"{GRAPH_CMD}.get_telemetry_manager").return_value
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
         printed = io.StringIO()
-        mocker.patch(f"{GRAPH_CMD}.get_console", return_value=Console(file=printed, width=1000))
+        mocker.patch(f"{GRAPH_CMD}.get_error_console", return_value=Console(file=printed, width=1000))
         mocker.patch(f"{GRAPH_CMD}._do_graph_render", side_effect=RuntimeError("the renderer broke"))
         log_spy = mocker.patch(f"{GRAPH_CMD}.log")
 
@@ -115,7 +115,7 @@ class TestGraphRenderFailure:
         telemetry_manager = mocker.patch(f"{GRAPH_CMD}.get_telemetry_manager").return_value
         telemetry_manager.telemetry_context.return_value = contextlib.nullcontext()
         printed = io.StringIO()
-        mocker.patch(f"{GRAPH_CMD}.get_console", return_value=Console(file=printed, width=1000))
+        mocker.patch(f"{GRAPH_CMD}.get_error_console", return_value=Console(file=printed, width=1000))
         mocker.patch(f"{GRAPH_CMD}._do_graph_render", side_effect=RuntimeError("the renderer broke"))
         sink_buffer = io.StringIO()
         sink: LogSink = console_sink_on_buffer(buffer=sink_buffer) if sink_kind == "console" else JsonLogSink(stream=sink_buffer)

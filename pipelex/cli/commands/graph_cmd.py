@@ -27,7 +27,7 @@ from pipelex.graph.exceptions import GraphSpecValidationError
 from pipelex.graph.graph_rendering import render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipelex import Pipelex
-from pipelex.runtime_hub import get_console, get_telemetry_manager
+from pipelex.runtime_hub import get_error_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
@@ -204,8 +204,7 @@ def graph_render_cmd(
         log.error(
             "The graph spec was refused and no graph was rendered", fields={OTelLogAttr.FILE_PATH: str(input_file), **error_fields(exc=spec_error)}
         )
-        console = get_console()
-        console.print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
+        get_error_console().print(f"\n[bold red]Failed to render graph[/bold red]\n\n{escape(str(spec_error))}\n")
         raise typer.Exit(1) from spec_error
 
     except Exception as exc:
@@ -217,7 +216,7 @@ def graph_render_cmd(
         # under `--traceback`: the `console` sink renders it under the line, and the `json` and `otlp` sinks write it
         # to the log store. The console renders no locals unless the configuration asks it to, since they would print
         # the loaded graph.
-        problem = print_failure_problem(console=get_console(), title="Failed to render graph", error=exc)
+        problem = print_failure_problem(console=get_error_console(), title="Failed to render graph", error=exc)
         log.error(
             "The graph could not be rendered",
             fields={OTelLogAttr.FILE_PATH: str(input_file), **failure_log_fields(error=exc, problem=problem)},

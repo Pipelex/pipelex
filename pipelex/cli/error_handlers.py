@@ -211,7 +211,8 @@ def display_error_panel(
         fields: ``(label, value)`` pairs; values must already be escaped.
         error_message: The error message body (already markup-safe), or None to omit it.
         problem: The problem the panel reports, in the operator's view, or None to print no problem rows.
-        tip: The 💡 tip text (may span multiple lines / carry markup).
+        tip: The 💡 tip text, printed as given: already markup-safe, its plain text escaped by the caller (it may
+            span several lines and carry markup the caller meant).
         links: ``(label, url)`` pairs printed dimmed at the bottom.
     """
     console.print(f"\n[bold red]❌ {title}[/bold red]\n")
@@ -222,7 +223,8 @@ def display_error_panel(
         console.print()
     if problem is not None:
         print_problem_rows(console=console, problem=problem, error_message=error_message, tip=tip)
-    console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
+    # The tip is printed as given: its caller escaped the plain text in it and kept the markup it meant.
+    console.print(f"[bold green]💡 Tip:[/bold green] {tip}")
     for link_label, link_url in links:
         console.print(f"[dim]{link_label}: {link_url}[/dim]")
     console.print()
@@ -509,8 +511,10 @@ def handle_validate_bundle_error(
             "Review the error messages above and check your pipeline configuration. "
             "Make sure all required fields are present and correctly formatted."
         )
-        print_problem_rows(console=console, problem=problem, error_message=None, tip=escape(tip))
-        console.print(f"[bold green]💡 Tip:[/bold green] {escape(tip)}")
+        # The advice is plain text, a model's description such as `SDK[openai]` included, escaped once for Rich.
+        printed_tip = escape(tip)
+        print_problem_rows(console=console, problem=problem, error_message=None, tip=printed_tip)
+        console.print(f"[bold green]💡 Tip:[/bold green] {printed_tip}")
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc

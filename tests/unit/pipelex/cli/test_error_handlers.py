@@ -46,7 +46,7 @@ class TestErrorHandlers:
             handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN)
 
         assert exc_info.value.exit_code == 1
-        assert spy.called
+        spy.assert_called_once()
 
     def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_availability_error should read the advice for its tip and exit with code 1."""
@@ -66,7 +66,7 @@ class TestErrorHandlers:
             handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
 
         assert exc_info.value.exit_code == 1
-        assert spy.called
+        spy.assert_called_once()
 
     def test_handle_model_deck_preset_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error should read the advice for its tip and exit with code 1."""
@@ -84,16 +84,23 @@ class TestErrorHandlers:
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
         assert exc_info.value.exit_code == 1
-        assert spy.called
+        spy.assert_called_once()
 
     def test_handle_validate_bundle_error_exits_and_reads_its_items(self, mocker: MockerFixture) -> None:
-        """handle_validate_bundle_error should read the verdict's items and exit with code 1."""
+        """handle_validate_bundle_error should read the verdict's items and exit with code 1.
+
+        The items are read exactly twice: once for the panel's own sections, and once by the problem the panel prints
+        rows from, since ``to_problem`` builds its ``errors`` through ``problem_items``. Both reads are the same builder
+        over the same error data, so the sections and the problem cannot disagree.
+        """
         mocker.patch("pipelex.cli.error_handlers.get_console")
         exc = ValidateBundleError(message="validation failed")
         spy = mocker.spy(exc, "validation_error_items")
+        problem_items_spy = mocker.spy(exc, "problem_items")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_validate_bundle_error(exc)
 
         assert exc_info.value.exit_code == 1
-        assert spy.called
+        assert spy.call_count == 2
+        problem_items_spy.assert_called_once()
