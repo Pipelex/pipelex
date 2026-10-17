@@ -10,6 +10,7 @@ The API-authored refusals (``pipelex_api.errors.ApiError``, built from ``pipelex
 separate family with no ``ErrorReport`` behind them.
 """
 
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
@@ -30,3 +31,14 @@ class InvalidErrorDisclosureError(PipelexError):
     """Raised at startup when `ERROR_DISCLOSURE` holds an unrecognized value."""
 
     error_code = PipelexErrorCode.CONFIG_INVALID
+
+
+class CallbackUrlRefusedError(PipelexError, ValueError):
+    """A completion callback URL the SSRF rules refuse: a scheme other than http or https, or a disallowed host.
+
+    Also a ``ValueError``, since the check runs inside the request model's validator, which turns only a ``ValueError``
+    into a validation error. The route answering the validation error reads it from there to log its security event,
+    with the class of destination it states and never the URL.
+    """
+
+    error_code = CoreCode.SECURITY_INPUT_URL_REFUSED

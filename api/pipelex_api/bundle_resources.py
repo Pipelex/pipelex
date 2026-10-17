@@ -28,7 +28,7 @@ from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.tools.log.error_fields import error_fields
 
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_payload_too_large, raise_validation_error
+from pipelex_api.errors import raise_bad_request, raise_payload_too_large, raise_validation_error, security_refusal_of
 from pipelex_api.limits import MAX_RESOURCE_FILE_BYTES, MAX_RESOURCES_PER_REQUEST, MAX_RESOURCES_TOTAL_BYTES
 
 # Base64 inflates by 4/3, so a file within the ceiling encodes to at most this many characters (+4 covers padding).
@@ -57,7 +57,9 @@ def decode_bundle_resources(*, resources: dict[str, str] | None) -> dict[str, by
         try:
             canonical_path = canonical_resource_path(path=path)
         except BundleResourcePathError as exc:
-            raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_RESOURCE_PATH)
+            # The path rule is a security rule's (`security.input_path_refused`): the response keeps its error type, and
+            # its handler logs the refusal's security event.
+            raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_RESOURCE_PATH, security_refusal=security_refusal_of(error=exc))
         if canonical_path in sent_by_path:
             msg = f"Two files submitted with the bundle name the same file '{canonical_path}'."
             raise_validation_error(message=msg, error_type=ErrorType.INVALID_RESOURCE_PATH)

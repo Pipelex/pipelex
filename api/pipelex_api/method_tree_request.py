@@ -63,7 +63,7 @@ from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_forbidden, raise_validation_error, raise_validation_problem
+from pipelex_api.errors import ApiSecurityRefusal, raise_forbidden, raise_validation_error, raise_validation_problem
 from pipelex_api.limits import (
     MAX_METHOD_DEPENDENCIES,
     MAX_METHOD_REQUEST_TOTAL_BYTES,
@@ -360,7 +360,52 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoRetur
                 message=f"{label} is not a method tree. {refusal_error.message}",
                 error_type=ErrorType.INVALID_METHOD_FILES,
                 members={"tree_refusal": {"code": refusal.code, "names": [wire_name(name) for name in refusal.names]}},
+                security_refusal=_tree_path_security_refusal(refusal_error=refusal_error),
             )
+
+
+def _tree_path_security_refusal(*, refusal_error: MethodTreeRefusedError) -> ApiSecurityRefusal | None:
+    """The security refusal a tree refusal is, when a path it names tries to leave the tree, else `None`.
+
+    A path that is absolute or climbs with a `..` segment is a traversal, `security.input_path_refused`, whether the
+    caller sent it as a key of `files` or as a member of `bundle_b64`, which the same reader judges. Every other path
+    the reader refuses (an empty segment, a backslash, a colon, a path not in NFC) is the shape of how the caller packed
+    the method, a refusal of the request and no security event.
+    """
+    refusal = refusal_error.refusal
+    match refusal.code:
+        case TreeRefusalCode.INVALID_TREE_PATH:
+            if any(_leaves_the_tree(name) for name in refusal.names):
+                return ApiSecurityRefusal(code=CoreCode.SECURITY_INPUT_PATH_REFUSED, error_type=type(refusal_error).__name__)
+            return None
+        case (
+            TreeRefusalCode.MISSING_BLOB
+            | TreeRefusalCode.SYMBOLIC_LINK
+            | TreeRefusalCode.SPECIAL_FILE
+            | TreeRefusalCode.NORMALIZATION_COLLISION
+            | TreeRefusalCode.PATH_COLLISION
+            | TreeRefusalCode.EMPTY_TREE
+            | TreeRefusalCode.LONE_FILE_EXCLUDED
+            | TreeRefusalCode.GITIGNORE_NOT_UTF8
+            | TreeRefusalCode.DUPLICATE_KEY
+            | TreeRefusalCode.EXCLUDED_NAME
+            | TreeRefusalCode.MALFORMED_ENTRY
+            | TreeRefusalCode.REFERENCE_INVALID
+            | TreeRefusalCode.REFERENCE_LEAVES_TREE
+            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
+            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
+            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
+            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
+            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
+            | TreeRefusalCode.MODULE_NOT_IN_TREE
+            | TreeRefusalCode.MODULE_AMBIGUOUS
+        ):
+            return None
+
+
+def _leaves_the_tree(name: str) -> bool:
+    """Whether a refused path is absolute or climbs out of the tree with a `..` segment."""
+    return name.startswith("/") or ".." in name.split("/")
 
 
 async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str) -> BlobStore:

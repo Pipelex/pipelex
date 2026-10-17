@@ -179,6 +179,8 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 }
 ```
 
+A callback URL is refused before anything runs with a **422** `InvalidCallbackUrls` when its scheme is not `http` or `https`, or when its host is one the runtime's SSRF rule refuses: `localhost`, a cloud metadata name such as `metadata.google.internal` in any case and with or without a trailing dot, or a literal address that is not publicly routable, a loopback, private, link-local, carrier-grade NAT or cloud metadata address among them. It is the rule the delivery applies again when the webhook fires, resolving the name, and such a refusal also writes a [security event](logging.md#security-events).
+
 When the pipeline completes, each URL in the list receives a POST carrying:
 
 - A completion notice in the body, not the run's output: `pipeline_run_id`, the delivery `state` (`"COMPLETED"` or `"FAILED"`, also sent under the legacy `status` key), `result_url` (when results were stored: the storage key prefix under which the result files sit, not a fetchable URL) and `error` (the raw `ErrorReport` dict on failure). The receiver reads the results from storage under that prefix.

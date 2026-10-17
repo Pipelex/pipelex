@@ -35,7 +35,7 @@ from pipelex_api.api_config import ApiConfig, get_api_config, is_callers_overrid
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_validation_error
+from pipelex_api.errors import ApiSecurityRefusal, raise_bad_request, raise_validation_error, security_refusal_of
 from pipelex_api.json_body import decode_json_body
 from pipelex_api.method_source import fetched_method
 from pipelex_api.method_tree_request import (
@@ -644,7 +644,7 @@ def _find_reserved_object_key(payload: object) -> str | None:
 
 
 def _decode_body(body: bytes) -> dict[str, Any]:
-    """Parse the run body as plain JSON and confirm it is an object free of class markers. Raises 422 if not.
+    """Parse the run body as plain JSON and confirm it is an object. Raises 422 if not.
 
     The body is parsed as plain JSON by `decode_json_body`, never with kajson. kajson reads a
     `{"__class__": ..., "__module__": ...}` object as an order to import that module and
@@ -653,8 +653,10 @@ def _decode_body(body: bytes) -> dict[str, Any]:
     wire is plain JSON, and no client sends class markers.
 
     Parsing as plain data is not enough on its own: a marker accepted as an ordinary dict comes
-    back to life the moment the runtime round-trips the inputs through kajson. So a key a kajson
-    decoder treats as a marker is refused at any depth with a 422 `ReservedObjectKey`.
+    back to life the moment the runtime round-trips the inputs through kajson. So the caller,
+    `_parse_request`, refuses a key a kajson decoder treats as a marker at any depth with a 422
+    `ReservedObjectKey` (`_refuse_reserved_object_keys`), once the run's extras are bound for the
+    security event that refusal logs.
 
     The parse is `decode_json_body`'s, so its failures are caller mistakes answered with a 422
     `InvalidJSON` rather than a sanitized 500: a body nested deeper than `MAX_JSON_NESTING_DEPTH`,
@@ -667,7 +669,15 @@ def _decode_body(body: bytes) -> dict[str, Any]:
             message="Request body must be a JSON object",
             error_type=ErrorType.INVALID_JSON,
         )
-    request_data = cast("dict[str, Any]", decoded)
+    return cast("dict[str, Any]", decoded)
+
+
+def _refuse_reserved_object_keys(request_data: dict[str, Any]) -> None:
+    """Refuse a body holding an object key a kajson decoder reads as a class marker, at any depth, with a 422.
+
+    The refusal is a security rule's, `pipelex.security.reserved_key`, so it logs a security event, which names the
+    kind of thing refused and never the key.
+    """
     reserved_key = _find_reserved_object_key(request_data)
     if reserved_key is not None:
         # The key is the caller's, as long as the body allows (any `__kajson…` key matches), and the
@@ -679,8 +689,8 @@ def _decode_body(body: bytes) -> dict[str, Any]:
                 f"no object in it may carry a '__class__' or '__module__' key, or a key starting with '{_RESERVED_OBJECT_KEY_PREFIX}'."
             ),
             error_type=ErrorType.RESERVED_OBJECT_KEY,
+            security_refusal=ApiSecurityRefusal(code=PipelexErrorCode.SECURITY_RESERVED_KEY, error_type=ErrorType.RESERVED_OBJECT_KEY),
         )
-    return request_data
 
 
 # The `error_type` a 422 on one extras field carries. A field absent from this map
@@ -722,7 +732,34 @@ def _validate_extras(request_data: dict[str, Any]) -> PipelineApiExtras:
         raise_validation_error(
             message=str(exc),
             error_type=_extras_error_type(exc),
+            security_refusal=_security_refusal_in(exc),
         )
+
+
+def _security_refusal_in(exc: ValidationError) -> ApiSecurityRefusal | None:
+    """The refusal of a security rule an extras validator raised, such as a callback URL aimed at a private address.
+
+    A validator's error rides its entry's context, where pydantic keeps the exception it raised. A body that also fails
+    on another field is still the security rule's refusal, so the first one found is reported whatever else failed.
+    """
+    for error in exc.errors():
+        refusal = security_refusal_of(error=error.get("ctx", {}).get("error"))
+        if refusal is not None:
+            return refusal
+    return None
+
+
+def _validated_run_extras_or_none(request_data: dict[str, Any]) -> dict[str, str] | None:
+    """The body's `analytics_groups` when they pass the runtime's rules on their own, else `None`.
+
+    Read before anything else is refused, so that the security event of a refusal before the extras are validated,
+    such as a reserved object key or a callback URL, still names whose request it was, with values the runtime's
+    own rules accepted.
+    """
+    try:
+        return PipelineApiExtras.model_validate({"analytics_groups": request_data.get("analytics_groups")}).analytics_groups
+    except ValidationError:
+        return None
 
 
 # Per-field bound applied at the request.state binding site so an oversized
@@ -764,7 +801,7 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
 
     Splits the body into:
       1. The upstream `RunRequest` (pipe_code, mthds_contents, inputs, …),
-         parsed as plain JSON by `_decode_body`, which refuses class markers.
+         parsed as plain JSON by `_decode_body`, then refused by `_refuse_reserved_object_keys` if it carries a class marker.
       2. `PipelineApiExtras` (pipeline_run_id, callback_urls, orchestration_mode,
          storage_scope, analytics_groups) validated by Pydantic — callback_urls
          are checked for scheme + private/loopback hosts to harden against SSRF.
@@ -773,6 +810,9 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     """
     body = await request.body()
     request_data = _decode_body(body)
+    # The run's opaque extras, for the security event a refusal of this request logs before any run carries them.
+    request.state.run_extras = _validated_run_extras_or_none(request_data)
+    _refuse_reserved_object_keys(request_data)
     # Bind body-derived correlation identifiers onto `request.state` as soon as
     # the raw dict is in hand — before `_validate_extras` or `from_body`, so a
     # later validation failure (a rejected callback URL, a Pydantic coercion
@@ -783,8 +823,6 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     request.state.pipe_code = _coerce_correlation_field(request_data.get("pipe_code"))
     request.state.pipeline_run_id = _coerce_correlation_field(request_data.get("pipeline_run_id"))
     extras = _validate_extras(request_data)
-    # The run's opaque extras, for the security event a refusal of this request logs before any run carries them.
-    request.state.run_extras = extras.analytics_groups
     try:
         run_request = RunRequest.from_body(request_data)
     except ValidationError as exc:
