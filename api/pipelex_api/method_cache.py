@@ -76,10 +76,10 @@ def _run_ls_remote(*, clone_url: str, ref_patterns: list[str], ref_str: str) -> 
         # One exit status covers a repository that does not exist and a host that does not answer, so the code is the
         # transient one until the fetch tells them apart (L-261015-09d338).
         msg = f"Failed to fetch method '{ref_str}': could not reach the repository ({exc.stderr.strip()})"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=ref_str) from exc
     except subprocess.TimeoutExpired as exc:
         msg = f"Timed out resolving method '{ref_str}' against the remote repository"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=ref_str) from exc
 
     pairs: list[tuple[str, str]] = []
     for line in result.stdout.strip().splitlines():
@@ -125,12 +125,12 @@ def resolve_remote_commit_sha(*, ref: MethodRef, clone_url: str | None = None) -
             f"'{ref.tag}' in method reference '{ref.ref_str}' does not name a git tag on the repository — "
             f"`@<tag>` pins a git tag (recommended form vX.Y.Z); branch names are not accepted."
         )
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND)
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND).for_method_ref(method_ref=ref.ref_str)
     pairs = _run_ls_remote(clone_url=effective_clone_url, ref_patterns=["HEAD"], ref_str=ref.ref_str)
     head = [sha for sha, name in pairs if name == "HEAD"]
     if not head:
         msg = f"The repository behind method reference '{ref.ref_str}' has no HEAD (empty repository?)"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND)
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND).for_method_ref(method_ref=ref.ref_str)
     return head[0]
 
 
