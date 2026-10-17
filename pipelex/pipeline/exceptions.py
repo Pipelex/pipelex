@@ -475,18 +475,22 @@ class PipelineInputUrlMissingError(PipelineInputContentError):
 
 
 class MethodEntryError(PipelexError):
-    """Raised when a method run with no pipe named has no single pipe to start at.
+    """Raised when a method has no single pipe to start at, or no single bundle defining the pipe named.
 
-    The rule is the MTHDS protocol's for a run that names no `pipe_code`: the manifest's `main_pipe` when the method's
-    tree holds a `METHODS.toml` at its root, else the one `main_pipe` its bundles declare. A manifest declaring none or
-    a pipe no bundle defines, and a method with no manifest whose bundles declare none or several, are refused, with
-    the bundles named by their tree paths. The method is the caller's own, so the message is theirs to read.
+    The rule is the MTHDS protocol's for a run that names no `pipe_code`, and every command acting on one pipe of a
+    method's folder applies it to settle that pipe, `run`, `inputs` and `build` among them: the manifest's `main_pipe`
+    when the method's tree holds a `METHODS.toml` at its root, else the one `main_pipe` its bundles declare. A manifest
+    declaring none or a pipe no bundle defines, and a method with no manifest whose bundles declare none or several, are
+    refused, with the bundles named by their tree paths. So is a pipe named for a command that acts on the bundle
+    defining it, when no single bundle of the method defines that pipe. A command judging the whole method, such as
+    `validate`, needs no pipe to start at and is not refused. The method is the caller's own, so the message is theirs
+    to read.
     """
 
     error_domain = ErrorDomain.INPUT
     retryable = False
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail="Name the pipe to run, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",
+        detail="Name the pipe, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",
     )
     _authors_caller_facing_message = True

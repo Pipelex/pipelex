@@ -33,15 +33,17 @@ pipelex build inputs pipe <PIPE_CODE> [OPTIONS]
 pipelex build inputs bundle <PATH> [OPTIONS]
 ```
 
+A folder is read as its [method tree](../../../building-methods/method-trees.md), as [`pipelex run bundle`](../run.md#run-bundle) reads it. With no `--pipe`, the template is for the pipe a run of the folder starts at: the manifest's `main_pipe`, or, with no manifest, the one `main_pipe` its bundles declare. A folder whose bundles declare none, or several, is refused with the message `run bundle` gives, naming each bundle by its path in the tree. The bundle defining that pipe loads with the rest of the method's folder and the `-L` directories, as a run loads it, so a concept or a pipe it takes from a sibling bundle resolves. With `--pipe`, the folder loads as the method's library and the pipe named is looked up there, as a run naming its pipe does. A refusal names the command, as in `Failed to build inputs: ...`. Either way the file is written in the folder unless `--output` says otherwise, so `pipelex run bundle` on the same folder finds it.
+
 **Arguments:**
 
-- `PATH` - Path to a `.mthds` bundle file or a pipeline directory
+- `PATH` - Path to a `.mthds` bundle file or a method's folder
 
 **Options:**
 
-- `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
+- `--pipe` - Pipe code to use (can be omitted if the bundle, or the method's folder, declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated inputs file (defaults to the bundle's directory, filename `inputs.json` or `inputs.toml` depending on `--format`)
+- `--output`, `-o` - Path to save the generated inputs file (defaults to the method's folder, or to the bundle file's directory, filename `inputs.json` or `inputs.toml` depending on `--format`)
 - `--format` - Template format: `json` (default) or `toml`
 - `--explicit` - Emit the ceremonial `{concept, content}` envelope form instead of the light values
 
@@ -77,7 +79,7 @@ pipelex build inputs pipe my_domain.my_pipe
 pipelex build inputs bundle my_bundle.mthds
 ```
 
-**Generate inputs from a pipeline directory:**
+**Generate inputs for the main pipe of a method's folder:**
 
 ```bash
 pipelex build inputs bundle pipeline_01/

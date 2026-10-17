@@ -1,21 +1,33 @@
 """Shared crate-resolution plumbing for the `/resolve`, `/codegen` and `/pipe-io` routes.
 
-They all select a closure the same way (inline `files[]` XOR `method_ref`), resolve it through the
-same engine core (`pipelex.pipeline.resolve_bundle.resolve_crate_from_contents`), and speak the same
-verdict vocabulary as `POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with
-the invalid arm carrying the structured `validation_errors[]` built by pipelex's one shared builder.
-This module holds the pieces they share so the envelopes cannot drift.
+They all take a method the same way `/validate` and the run routes do — a tree sent in `files`, with its
+`dependencies` and `resources`, XOR an address-form `method_ref` — read it with the same machinery
+(`pipelex_api.routes.pipelex.method_selection`), write it out as a run writes it
+(`pipelex_api.method_tree_request.written_method`), and resolve it through the same engine core
+(`pipelex.pipeline.resolve_bundle.resolve_crate_from_method_dir`). The resolution is static: a package the method
+calls by its address loads only when the request shipped it, in `dependencies` or under a fetched package's
+`.mthds/methods/`, and one nothing shipped is the invalid verdict, never a lookup among the methods installed on this
+server or a fetch. They speak the same verdict vocabulary as
+`POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with the invalid arm carrying the
+structured `validation_errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
+the envelopes cannot drift.
 
 The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s runnability facts
 (`pending_signatures`, `is_runnable`) — resolution is static (no dry-run sweep, matching
 `pipelex resolve`), so runnability is not part of its vocabulary. The per-pipe route (`/pipe-io`)
 rides that same static core: it reads the selected pipe's *declared* IO with no dry-run sweep.
+
+Writing the tree, loading it, projecting the crate and tearing the library down are blocking work, so they run in one
+worker thread (`project_resolved_method`), never on the event loop: a slow resolution never stalls the server's other
+requests, and the current library, a context variable, is bound, read and cleared in that one thread's context.
 """
 
 import asyncio
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Literal, NamedTuple, NoReturn
+from typing import Literal, NamedTuple, NoReturn, TypeVar
 
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -24,15 +36,19 @@ from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeNotFoundError
 from pipelex.methods.method_ref import looks_like_method_ref
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
-from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_not_implemented
-from pipelex_api.method_source import fetch_method_mthds_files
-from pipelex_api.schemas.models import MthdsFileItem, MthdsFilesRequest
+from pipelex_api.method_tree_request import RequestMethod, WrittenMethod, manifest_of, written_method
+from pipelex_api.routes.pipelex.method_selection import select_request_method
+from pipelex_api.schemas.models import MethodTreeRequest
+
+#: What a route makes of a resolved method, in the worker thread that holds it loaded.
+ProjectionT = TypeVar("ProjectionT")
 
 
 class GeneratedArtifact(BaseModel):
@@ -74,90 +90,96 @@ def invalid_crate_report_response(error_report: ErrorReport) -> JSONResponse:
     return JSONResponse(content=invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True))
 
 
-class SelectedFiles(NamedTuple):
-    """What the closure selector resolved to: the files, plus the fetched manifest's entry pipe when there is one."""
+class ResolvedMethod(NamedTuple):
+    """A method resolved to its crate: the normalized crate, and the method's trees as the request named them."""
 
-    files: list[MthdsFileItem]
-    """The `.mthds` files forming the closure — inline `files[]` verbatim, or the fetched package's."""
+    crate: LibraryCrate
+    """The normalized library crate the method's tree resolved to."""
 
-    manifest_main_pipe: str | None
-    """The fetched package manifest's `main_pipe` (a bare pipe code). Always None for inline `files[]`, which carry no manifest."""
+    request_method: RequestMethod
+    """The method's tree and its dependency trees, read in full, so a route echoes its bundles without reading it again."""
+
+    method_label: str
+    """How the entry rule's messages name the method: as sent in the request, or by the fetched package's address."""
+
+    @property
+    def manifest_main_pipe(self) -> str | None:
+        """The `main_pipe` the `METHODS.toml` at the method tree's root declares, or None without one.
+
+        A fetched package's manifest and a manifest sent in `files` alike, since both sit at the root of the tree.
+
+        Raises:
+            MethodEntryError: The manifest is not UTF-8 text, or not a valid manifest (a 422 in the input domain).
+        """
+        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}")
+        return manifest.main_pipe if manifest is not None else None
 
 
-async def selected_files(request_data: MthdsFilesRequest) -> SelectedFiles:
-    """The files the closure selector names: inline `files[]`, or an address `method_ref`'s package.
+def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ErrorReport:
+    """The crate of a method written out, or the invalid verdict when it does not resolve."""
+    try:
+        return resolve_crate_from_method_dir(method_dir=written.method_dir, methods_dirs=written.methods_dirs)
+    except ValidateBundleError as validate_error:
+        # The produced negative verdict: the core already tore its library down.
+        return validate_error.to_error_report()
 
-    Every route on the `files[]` envelope reaches it through `resolve_requested_crate`, so they all
-    give the same answer on every selector.
 
-    An **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) resolves
-    through the same fetch path the run routes use: the package's `.mthds` files come back as
-    `files[]` items with their real relative paths as per-file sources, and the manifest's
-    `main_pipe` rides beside them so the per-pipe route can default its selector the way a run
-    by address does. Only `.mthds` data travels — the package's Python (if any) never loads
-    on these routes. The **registry form** (any non-address reference) stays reserved and keeps
-    its 501 until the packaging program's registry phase.
+def _project_written_method(
+    *,
+    request_method: RequestMethod,
+    method_label: str,
+    project: Callable[[ResolvedMethod], ProjectionT],
+) -> ProjectionT | ErrorReport:
+    """Write the method out, resolve it, hand it to `project` while it is loaded, and release everything: blocking work.
 
-    Raises:
-        ApiError: 501 for a registry-form `method_ref`; 422 for a fetched package this server
-            cannot accept.
-        MethodRefError subclasses: parse, fetch, location, and bounds failures on the address
-            form, rendered as `problem+json` by the global handler.
+    Runs whole in one worker thread, so the library the core binds as current in this thread's context is the one
+    `project` reads and the one torn down here, however `project` exits.
     """
-    if request_data.method_ref is not None:
-        if looks_like_method_ref(request_data.method_ref):
-            # The fetch runs git and reads the package from disk, so it runs off the event loop, as a run's does.
-            fetched = await asyncio.to_thread(fetch_method_mthds_files, request_data.method_ref)
-            return SelectedFiles(files=fetched.files, manifest_main_pipe=fetched.main_pipe)
+    with written_method(request_method=request_method) as written:
+        resolution = _resolve_written_method(written=written)
+        if isinstance(resolution, ErrorReport):
+            return resolution
+        try:
+            return project(ResolvedMethod(crate=resolution, request_method=request_method, method_label=method_label))
+        finally:
+            teardown_current_library()
+
+
+async def project_resolved_method(
+    *,
+    request: Request,
+    request_data: MethodTreeRequest,
+    project: Callable[[ResolvedMethod], ProjectionT],
+) -> ProjectionT | ErrorReport:
+    """Resolve the method the request names into its normalized crate, and return what `project` makes of it.
+
+    The method is read as `/validate` reads it (`select_request_method`), then written out as a run writes it and loaded
+    alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread.
+    `project` runs in that thread with the freshly opened library loaded and current, so it can read live pipes, and the
+    written tree held; both are released when it returns or raises. A method that does not resolve returns its invalid
+    verdict instead, an `ErrorReport` carrying the structured `validation_errors`, with `project` never called and
+    nothing left loaded.
+
+    Raises (as problem documents): 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`;
+    the address-form fetch and location failures (`MethodRefError` subclasses); and whatever `project` raises, such as
+    a selection refusal.
+    """
+    if request_data.method_ref is not None and not looks_like_method_ref(request_data.method_ref):
         raise_not_implemented(
             "Registry-form method_ref resolution is not available on this server: no method registry is wired. "
             "Use an address-form reference (a `github.com/...` address, e.g. `github.com/Pipelex/methods/documents@v0.1.0`) "
-            "or submit inline `files[]`.",
+            "or send the method's tree in `files`.",
             error_type=ErrorType.METHOD_REF_NOT_SUPPORTED,
         )
-    return SelectedFiles(files=request_data.files or [], manifest_main_pipe=None)
-
-
-class ResolvedClosure(NamedTuple):
-    """A resolved closure: its normalized crate, the files it was resolved from, and the fetched manifest's entry pipe."""
-
-    crate: LibraryCrate
-    """The normalized library crate the closure resolved to."""
-
-    files: list[MthdsFileItem]
-    """The `.mthds` files the crate was resolved from, carried through from `selected_files` so no route fetches twice."""
-
-    manifest_main_pipe: str | None
-    """The fetched package manifest's `main_pipe`, carried through from `selected_files` (None for inline `files[]`)."""
-
-
-async def resolve_requested_crate(request_data: MthdsFilesRequest) -> ResolvedClosure:
-    """Resolve the request's closure selector into a normalized library crate.
-
-    Inherits the engine core's **loaded-on-success contract**: on success the freshly opened
-    library is loaded and current (so a route can read live pipes from it) and the route owns its
-    teardown — call `teardown_current_library()` in a `finally`. On failure the core has already
-    torn down and restored.
-
-    The fetched manifest's `main_pipe` (when the selector was a `method_ref`) rides beside the
-    crate so a per-pipe route can hand it to `resolve_requested_pipe` — the crate itself only
-    knows the domains' own `main_pipe` declarations. The selected files ride beside it too, so a
-    route that echoes the closure (`/pipe-io` with `include_files`) reads them here rather than
-    calling `selected_files` again, which would fetch a `method_ref` a second time.
-
-    Raises:
-        ValidateBundleError: the produced negative verdict (route maps it to the 200 invalid arm).
-        ApiError: 501 for a registry-form `method_ref` (see `selected_files`).
-        MethodRefError subclasses: address-form fetch/location failures (see `selected_files`).
-    """
-    selection = await selected_files(request_data)
-    crate = resolve_crate_from_contents(
-        mthds_contents=[item.content for item in selection.files],
-        mthds_sources=[item.source for item in selection.files],
-        # The files the closure's steps read, such as a PipeDocGen template file, which the load reads.
-        submitted_files=decode_bundle_resources(resources=request_data.resources),
+    selected = await select_request_method(
+        request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
     )
-    return ResolvedClosure(crate=crate, files=selection.files, manifest_main_pipe=selection.manifest_main_pipe)
+    return await asyncio.to_thread(
+        _project_written_method,
+        request_method=selected.request_method,
+        method_label=selected.method_label,
+        project=project,
+    )
 
 
 class RequestedPipe(NamedTuple):
@@ -167,7 +189,7 @@ class RequestedPipe(NamedTuple):
     """The qualified `domain.pipe_code` actually selected — always qualified, whatever the request spelled."""
 
     pipe: PipeAbstract
-    """The live pipe, read from the library `resolve_requested_crate` left loaded + current."""
+    """The live pipe, read from the library `project_resolved_method` holds loaded + current."""
 
 
 class PipeSelectionMissKind(StrEnum):
@@ -209,7 +231,7 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     answer for the same `pipe_code`. A chain finding no entry pipe or several has no run-route twin to
     match: this route refuses both the way the pipe-selector design classifies them.
 
-    Must be called while the library `resolve_requested_crate` opened is still loaded + current.
+    Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if pipe_ref is not None:
         selected = _select_entry_pipe(pipe_ref, origin=_SelectorOrigin.REQUEST)
@@ -246,15 +268,15 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
 def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) -> RequestedPipe | PipeSelectionMiss:
     """The selection chain without the request's `pipe_ref`: the method's own entry pipe, or why there is none.
 
-    The precedence is the run routes' (`pipeline.py`: `pipe_code or fetched.main_pipe`): a fetched
-    package's manifest `main_pipe` is the package author's declared entry pipe and is taken first;
-    only without one does the closure's own declaration decide. That last step mirrors `pipelex
-    codegen inputs` (`inputs_cmd.py::_default_main_pipe_ref`): the single declared `main_pipe`, with
-    **both** un-defaultable arms missed — a closure declaring none, and one declaring several across
-    domains. The chain stops at the first link present, so a manifest `main_pipe` the closure does
-    not declare, or declares in several domains, is a miss rather than a fall-through to the
-    closure's declarations. Inline `files[]` carry no manifest, so for them the chain is exactly the
-    closure-declared default.
+    The precedence is the run routes' (the protocol's entry rule, `select_tree_entry`): the `main_pipe`
+    of the `METHODS.toml` at the method tree's root, a fetched package's or one sent in `files`, is the
+    method author's declared entry pipe and is taken first; only without one does the closure's own
+    declaration decide. That last step mirrors `pipelex codegen inputs`
+    (`inputs_cmd.py::_default_main_pipe_ref`): the single declared `main_pipe`, with **both**
+    un-defaultable arms missed — a closure declaring none, and one declaring several across domains.
+    The chain stops at the first link present, so a manifest `main_pipe` the closure does not
+    declare, or declares in several domains, is a miss rather than a fall-through to the closure's
+    declarations. A tree with no manifest at its root gets exactly the closure-declared default.
 
     It returns the miss instead of raising, so the one chain serves both `resolve_requested_pipe`
     (which refuses with the miss's message) and `/pipe-io`'s `default_pipe_ref` (which states `null`),
@@ -262,7 +284,7 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
     `/validate`'s `default_pipe_ref`, which is the run default and names the first of several
     declaring domains where this chain refuses to choose.
 
-    Must be called while the library `resolve_requested_crate` opened is still loaded + current.
+    Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if manifest_main_pipe:
         return _select_entry_pipe(manifest_main_pipe, origin=_SelectorOrigin.MANIFEST)
@@ -308,8 +330,8 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
             scope = "the submitted closure"
         case _SelectorOrigin.MANIFEST:
             # The caller never spelled this selector — say where it came from, or the 422 names a pipe out of nowhere.
-            described = f"Pipe '{selector}' (the fetched package manifest's `main_pipe`)"
-            scope = "the package's closure"
+            described = f"Pipe '{selector}' (the `main_pipe` of the method's manifest)"
+            scope = "the method's closure"
         case _SelectorOrigin.CLOSURE:
             described = f"Pipe '{selector}' (the closure's declared `main_pipe`)"
             scope = "the submitted closure"
@@ -326,7 +348,7 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
 
 
 def teardown_current_library() -> None:
-    """Tear down the library `resolve_requested_crate` left loaded + current (success-path cleanup)."""
+    """Tear down the library the resolution left loaded + current, once its projection is done."""
     library_id = get_current_library_id_or_none()
     clear_current_library()
     if library_id is not None:

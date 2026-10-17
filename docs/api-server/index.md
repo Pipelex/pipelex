@@ -164,7 +164,7 @@ Validate MTHDS content to ensure pipelines are correctly defined before executio
 ### Pipe I/O
 Read a method's I/O artifacts without a validation. A Pipelex API extension carrying the standard's artifacts.
 
-- `POST /v1/pipe-io` — The pipe I/O contracts, input form and output form of one pipe, or of every pipe with `all_pipes`, beside the method's entry pipe and its pending signatures; no dry run. Takes the same closure selector as `/v1/resolve`, and `include_files` echoes the closure's `.mthds` files
+- `POST /v1/pipe-io` — The pipe I/O contracts, input form and output form of one pipe, or of every pipe with `all_pipes`, beside the method's entry pipe and its pending signatures; no dry run. Takes the method as a tree in `files` or by `method_ref`, as `/v1/resolve` and `/v1/validate` do, and `include_files` echoes the method's `.mthds` bundles by tree path
 
 [Learn more →](pipe-io.md)
 

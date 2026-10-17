@@ -38,6 +38,7 @@ from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORe
 from pipelex_sdk.upload import UploadRecord
 
 from pipelex.hosted.exceptions import HostedLocalFileUploadUnavailableError, HostedMethodInvalidError
+from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -49,10 +50,9 @@ _HTTP_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
 _NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://", "data:")
 #: A `file://` URI, which a local run reads as the local path it names.
 _FILE_URI_PREFIX = "file://"
-#: What the crate core behind `POST /v1/pipe-io` says when it refuses a method calling another one by its address
-#: (`pipelex/pipeline/resolve_bundle.py`). The run route fetches such a dependency; pipe-io cannot load it.
-ADDRESS_DEPENDENCY_REFUSAL_MARKER = "address-based dependency"
-#: The dependency's address, as that refusal quotes it.
+#: The dependency's address, as the refusal of `POST /v1/pipe-io` quotes it when the method calls a package by its
+#: address that the request did not ship (`ADDRESS_DEPENDENCY_REFUSAL_MARKER`). The run route fetches such a dependency;
+#: pipe-io never fetches.
 _REFUSED_DEPENDENCY_PATTERN = re.compile(re.escape(ADDRESS_DEPENDENCY_REFUSAL_MARKER) + r" '([^']+)'")
 
 

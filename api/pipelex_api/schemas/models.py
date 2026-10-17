@@ -587,84 +587,80 @@ class PipelexApiStartResponse(PipelexRunResultStart):
     method_provenance: MethodProvenance | None = Field(default=None, description=_METHOD_PROVENANCE_DESCRIPTION)
 
 
-class MthdsFileItem(BaseModel):
-    """One inline MTHDS bundle: its content plus an optional logical source for diagnostics.
+_TREE_READ_SCOPE_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the request reads the method under, as a run's "
+    "`read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry of `files` resolves in "
+    "that scope's blob store, and the tree the request read is recorded there, so a later request can send it by hash. "
+    "Omit it and a hash entry resolves in the caller's own id's store, and nothing is recorded."
+)
 
-    The `files[]` envelope pairs each content with its source in one entry (the shape the codegen
-    spec pins for the resolve/codegen routes), unlike the legacy parallel
-    `mthds_contents[]`/`mthds_sources[]` lists on `/validate`.
+
+class MethodTreeRequest(BaseModel):
+    """The method selector of the crate routes (`/resolve`, `/codegen`, `/pipe-io`): a tree sent in `files` XOR a `method_ref`.
+
+    Exactly one of the two must be provided — both or neither is a request-shape 422. The tree is the MTHDS standard's
+    map of file entries, read from the request's raw JSON text exactly as `/validate` and the run routes read it
+    (`pipelex_api.method_tree_request`), with the `dependencies` it carries and the `resources` that join it. An
+    **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is resolved by this server through
+    the run routes' fetch path: the package's tree is read from its commit's git objects, with the packages it ships
+    under `.mthds/methods/`. The **registry form** (any non-address reference) stays reserved and answers 501 until
+    server-side method-registry resolution exists. Either way the method is held to the run routes' Python policy:
+    custom `.py` only on a sandbox-hosted deployment, and no Python structure class at all.
     """
 
-    content: str = Field(..., description="MTHDS bundle content.")
-    source: str | None = Field(
+    # Documents the wire only: the route reads the map from the request's raw JSON text, never from this field.
+    files: Annotated[dict[str, FileEntry] | None, SkipValidation] = Field(
         default=None,
-        max_length=1024,
-        description=(
-            "Optional logical source for this bundle (e.g. its path relative to the submitted directory). "
-            "Threaded onto the blueprint so server-side diagnostics carry a `source` pointing at the owning file."
-        ),
+        description=f"{FILES_FIELD_DESCRIPTION} Exactly one of `files` / `method_ref`.",
     )
-
-    @field_validator("content")
-    @classmethod
-    def _bound_content(cls, value: str) -> str:
-        _ensure_mthds_file_within_bytes_limit(value)
-        return value
-
-
-class MthdsFilesRequest(BaseModel):
-    """Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
-
-    Exactly one of the two must be provided (spec'd envelope) — both or neither is a request-shape
-    422. An **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is
-    resolved by this server: the repository is fetched at the tag, the package is located by
-    manifest identity, and its `.mthds` files feed the closure with their real relative paths as
-    per-file sources. The **registry form** (any non-address reference) stays reserved and answers
-    501 until server-side method-registry resolution exists.
-    """
-
-    files: list[MthdsFileItem] | None = Field(
-        default=None,
-        min_length=1,
-        max_length=MAX_MTHDS_FILES_PER_REQUEST,
-        description="Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).",
-    )
+    dependencies: Annotated[dict[str, dict[str, FileEntry]] | None, SkipValidation] = Field(default=None, description=DEPENDENCIES_FIELD_DESCRIPTION)
     method_ref: str | None = Field(
         default=None,
         min_length=1,
         max_length=MAX_METHOD_REF_LEN,
         description=(
-            "Reference to a published method, resolving to its package's `.mthds` files. Address form "
-            "(`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is fetched and resolved server-side; the registry "
-            "form stays reserved (501 until a method registry exists)."
+            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — a published method by reference, instead of its tree. "
+            "Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is fetched and read as a `files` tree is, "
+            "through the same path as a `method_ref` run; the registry form stays reserved (501 until a method registry "
+            "exists). Exactly one of `files` / `method_ref`."
         ),
     )
-
     resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
+    read_scope: str | None = Field(default=None, description=_TREE_READ_SCOPE_DESCRIPTION)
+
+    @field_validator("read_scope")
+    @classmethod
+    def _validate_read_scope(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return validate_read_scope(value=value)
 
     @model_validator(mode="after")
     def _exactly_one_selector(self) -> Self:
         if (self.files is None) == (self.method_ref is None):
             msg = "provide exactly one of `files` or `method_ref`"
             raise ValueError(msg)
+        if self.dependencies is not None and self.files is None:
+            msg = "`dependencies` accompany the method's own `files`"
+            raise ValueError(msg)
         if self.resources and self.method_ref is not None:
-            msg = "resources accompany inline `files`; a method_ref's files are the package's own"
+            msg = "resources accompany a method sent in `files`; a method_ref's files are the package's own"
             raise ValueError(msg)
         return self
 
 
-class MthdsPipeRequest(MthdsFilesRequest):
-    """The base of a per-pipe route's request (`/pipe-io`): the closure selector plus a pipe selector.
+class MethodTreePipeRequest(MethodTreeRequest):
+    """The base of a per-pipe route's request (`/pipe-io`): the method selector plus a pipe selector.
 
     The pipe selector is the **qualified** ref `domain.pipe_code`, mirroring `pipelex codegen inputs
-    --pipe`. It is optional, and an omitted selector defaults with the run routes' precedence: on a
-    `method_ref` request, to the fetched package manifest's `main_pipe` (the package author's declared
-    entry pipe); otherwise to the closure's declared `main_pipe`, which is what a single-bundle caller
-    almost always wants. A closure that declares no `main_pipe` — or several, across domains — cannot
-    be defaulted from its own declarations, so when no manifest `main_pipe` settles it a route that
-    needs one pipe refuses the omitted selector with an input 422, `EntryPipeNotFoundError` or
-    `EntryPipeAmbiguousError` (`crate_ops.resolve_requested_pipe`), never the request-shape
-    `ValidationError` of a malformed body.
+    --pipe`. It is optional, and an omitted selector defaults with the run routes' precedence: to the
+    `main_pipe` of the `METHODS.toml` at the method tree's root (a fetched package's manifest, or one
+    sent in `files`), the method author's declared entry pipe; otherwise to the closure's declared
+    `main_pipe`, which is what a single-bundle caller almost always wants. A closure that declares no
+    `main_pipe` — or several, across domains — cannot be defaulted from its own declarations, so when
+    no manifest `main_pipe` settles it a route that needs one pipe refuses the omitted selector with an
+    input 422, `EntryPipeNotFoundError` or `EntryPipeAmbiguousError`
+    (`crate_ops.resolve_requested_pipe`), never the request-shape `ValidationError` of a malformed body.
     """
 
     pipe_ref: str | None = Field(
@@ -672,9 +668,9 @@ class MthdsPipeRequest(MthdsFilesRequest):
         min_length=1,
         max_length=MAX_PIPE_CODE_LEN,
         description=(
-            "Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the fetched package manifest's "
-            "`main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, "
-            "or several, with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set."
+            "Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the `main_pipe` of the `METHODS.toml` "
+            "at the method tree's root, else to the closure's declared `main_pipe`; a closure declaring none, or several, "
+            "with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set."
         ),
     )
 
@@ -690,16 +686,13 @@ so the static crate routes do not accept it."""
 class MthdsContentsRequest(BaseModel):
     """The `POST /validate` request envelope: one of `mthds_contents`, `files` and `method_ref`, plus the sweep's `allow_signatures`.
 
-    This is the flat-list envelope. `/validate` uses it through this class (its `ValidateRequest`
-    subclass adds a parallel `mthds_sources` for per-file source labels), and the run routes
-    `/execute` and `/start` carry the same `mthds_contents` field independently on `RunRequest`.
-    The newer Pipelex-API extension routes (`/resolve`, `/codegen`, `/pipe-io`) use
-    `MthdsFilesRequest` instead (`files[]` pairing each content with its `source`, XOR a
-    `method_ref`), which folds the source label into each entry. `/validate` keeps the flat-list
-    shape deliberately: it is an MTHDS Protocol route, so changing its inline envelope is a
-    protocol-level decision owned by the `mthds/` spec, not this server's to take. `method_ref` is
-    this server's layer-2 extension beside that inline shape — an address is resolved by the
-    runner, so validate-by-address belongs here (the hosted-only `method_id` does not).
+    `/validate` uses it through this class (its `ValidateRequest` subclass adds a parallel
+    `mthds_sources` for per-file source labels), and the run routes `/execute` and `/start` carry the
+    same `mthds_contents` and `files` fields independently on `RunRequest`. The Pipelex-API extension
+    routes (`/resolve`, `/codegen`, `/pipe-io`) take the same `files` tree through
+    `MethodTreeRequest`, XOR a `method_ref`, with no inline `mthds_contents`. `method_ref` is this
+    server's layer-2 extension — an address is resolved by the runner, so validate-by-address
+    belongs here (the hosted-only `method_id` does not).
     """
 
     mthds_contents: list[str] | None = Field(
