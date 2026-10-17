@@ -21,6 +21,8 @@ class TestHostRules:
             ("0.0.0.0", True),  # ruff: ignore[hardcoded-bind-all-interfaces] # unspecified address — asserting it is disallowed
             ("::1", True),  # IPv6 loopback
             ("fe80::1", True),  # IPv6 link-local
+            ("::ffff:127.0.0.1", True),  # IPv4-mapped loopback
+            ("::ffff:169.254.169.254", True),  # IPv4-mapped metadata endpoint
             ("8.8.8.8", False),  # public
             ("1.1.1.1", False),  # public
             ("93.184.216.34", False),  # public (example.com)
@@ -63,6 +65,16 @@ class TestHostRules:
         [
             ("169.254.169.254", SecurityTargetClass.METADATA),  # the cloud metadata endpoint, link-local but named apart
             ("fd00:ec2::254", SecurityTargetClass.METADATA),  # AWS's IPv6 metadata endpoint
+            ("169.254.170.2", SecurityTargetClass.METADATA),  # AWS ECS task metadata and container credentials
+            ("169.254.170.23", SecurityTargetClass.METADATA),  # AWS EKS Pod Identity credentials
+            ("fd00:ec2::23", SecurityTargetClass.METADATA),  # AWS EKS Pod Identity credentials, IPv6
+            ("100.100.100.200", SecurityTargetClass.METADATA),  # Alibaba Cloud metadata
+            ("192.0.0.192", SecurityTargetClass.METADATA),  # Oracle Cloud metadata
+            ("::ffff:169.254.169.254", SecurityTargetClass.METADATA),  # IPv4-mapped: classified as the IPv4 address it carries
+            ("::ffff:169.254.170.2", SecurityTargetClass.METADATA),
+            ("::ffff:127.0.0.1", SecurityTargetClass.LOOPBACK),
+            ("::ffff:169.254.1.1", SecurityTargetClass.LINK_LOCAL),
+            ("::ffff:10.0.0.5", SecurityTargetClass.PRIVATE),
             ("metadata", SecurityTargetClass.METADATA),
             ("METADATA.google.internal.", SecurityTargetClass.METADATA),  # normalized like is_disallowed_host
             ("localhost", SecurityTargetClass.LOOPBACK),
