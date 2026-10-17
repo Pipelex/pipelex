@@ -11,8 +11,9 @@ the tree's rule judges them as it judges the tree's own files.
 Refusals, in the order they are checked:
 
 - more `resources` than `MAX_RESOURCES_PER_REQUEST` → 413 `PayloadTooLarge`;
-- a path that cannot name a file inside the bundle (absolute, a `..` segment, a backslash, a colon, empty, or a
-  second spelling of a path already submitted) → 422 `InvalidResourcePath`, before any value is decoded;
+- a path that cannot name a file inside the bundle (absolute, a drive, a `..` segment, a backslash, a colon, empty, or
+  a second spelling of a path already submitted) → 422 `InvalidResourcePath`, before any value is decoded, which also
+  logs a security event when the path leaves the bundle, as a key of a method tree does;
 - a file whose encoded length already exceeds the per-file ceiling → 413 `PayloadTooLarge`, before decoding;
 - a value that is not valid base64 → 400 `InvalidBase64`, as `bundle_b64` is;
 - a decoded file over `MAX_RESOURCE_FILE_BYTES`, or a running total over `MAX_RESOURCES_TOTAL_BYTES` → 413.
@@ -57,8 +58,9 @@ def decode_bundle_resources(*, resources: dict[str, str] | None) -> dict[str, by
         try:
             canonical_path = canonical_resource_path(path=path)
         except BundleResourcePathError as exc:
-            # The path rule is a security rule's (`security.input_path_refused`): the response keeps its error type, and
-            # its handler logs the refusal's security event.
+            # A path that leaves the bundle is a security rule's refusal (`security.input_path_refused`), whose security event
+            # the response's handler logs; one of the wrong shape is the request's (`request.invalid`), and logs none. The
+            # response keeps its error type either way.
             raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_RESOURCE_PATH, security_refusal=security_refusal_of(error=exc))
         if canonical_path in sent_by_path:
             msg = f"Two files submitted with the bundle name the same file '{canonical_path}'."

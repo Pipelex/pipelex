@@ -11,6 +11,7 @@ import base64
 import io
 import json
 import logging
+import zipfile
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, NamedTuple
@@ -39,6 +40,13 @@ _MODE = "temporal"
 _SECURITY_EVENT_LOGGER = "pipelex.errors.security_event"
 _LOCAL_PATH = "/etc/passwd"
 _REQUEST_ID = "req-security-event-1"
+# Paths that leave the tree in a spelling other than a leading slash or a `..` between slashes, each with what of it the
+# event must never carry: a backslash traversal, a drive and a network share.
+_ESCAPING_PATHS: list[tuple[str, str, str]] = [
+    ("..\\secrets\\key.pem", "key.pem", "backslash_dot_dot"),
+    ("C:/Windows/win.ini", "win.ini", "drive"),
+    ("\\\\server\\share\\key.pem", "key.pem", "network_share"),
+]
 _DESCRIBE_IMAGE_MTHDS = """\
 domain = "security_event"
 main_pipe = "describe_image"
@@ -50,6 +58,19 @@ inputs = { photo = "Image" }
 output = "Text"
 prompt = "Describe this image. $photo"
 """
+
+
+def _bundle_b64(entries: dict[str, str]) -> str:
+    """A `bundle_b64` archive holding each entry under its name as written, a backslash included."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        for name, text in entries.items():
+            archive.writestr(name, text)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _b64(text: str) -> str:
+    return base64.b64encode(text.encode("utf-8")).decode("ascii")
 
 
 class _ServerRefusal(NamedTuple):
@@ -267,6 +288,54 @@ class TestSecurityEventRoutes:
                 ),
                 id="absolute_file_path",
             ),
+            *[
+                pytest.param(
+                    _ServerRefusal(
+                        route="/v1/execute",
+                        body={"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, path: "x"}},
+                        error_type="InvalidMethodFiles",
+                        code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
+                        event_error_type="MethodTreeRefusedError",
+                        target="path",
+                        target_class=None,
+                        refused_content=refused_content,
+                    ),
+                    id=f"file_{case_id}",
+                )
+                for path, refused_content, case_id in _ESCAPING_PATHS
+            ],
+            *[
+                pytest.param(
+                    _ServerRefusal(
+                        route="/v1/execute",
+                        body={"mthds_contents": None, "bundle_b64": _bundle_b64({"main.mthds": _DESCRIBE_IMAGE_MTHDS, path: "x"})},
+                        error_type="InvalidMethodFiles",
+                        code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
+                        event_error_type="MethodTreeRefusedError",
+                        target="path",
+                        target_class=None,
+                        refused_content=refused_content,
+                    ),
+                    id=f"archive_member_{case_id}",
+                )
+                for path, refused_content, case_id in _ESCAPING_PATHS
+            ],
+            *[
+                pytest.param(
+                    _ServerRefusal(
+                        route="/v1/execute",
+                        body={"resources": {path: _b64("x")}},
+                        error_type="InvalidResourcePath",
+                        code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
+                        event_error_type="BundleResourcePathError",
+                        target="path",
+                        target_class=None,
+                        refused_content=refused_content,
+                    ),
+                    id=f"resource_{case_id}",
+                )
+                for path, refused_content, case_id in _ESCAPING_PATHS
+            ],
         ],
     )
     def test_a_refusal_the_server_authors_logs_one_event_without_its_content(self, mocker: MockerFixture, case: _ServerRefusal) -> None:
@@ -312,6 +381,15 @@ class TestSecurityEventRoutes:
                 "InvalidMethodFiles",
                 id="backslash_in_a_file_path",
             ),
+            pytest.param(
+                "/v1/execute",
+                {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes:v2.txt": "x"}},
+                "InvalidMethodFiles",
+                id="colon_in_a_file_path",
+            ),
+            pytest.param("/v1/execute", {"resources": {"notes\\a.txt": _b64("x")}}, "InvalidResourcePath", id="backslash_in_a_resource_path"),
+            pytest.param("/v1/execute", {"resources": {"notes:v2.txt": _b64("x")}}, "InvalidResourcePath", id="colon_in_a_resource_path"),
+            pytest.param("/v1/execute", {"resources": {"": _b64("x")}}, "InvalidResourcePath", id="empty_resource_path"),
         ],
     )
     def test_a_refusal_of_the_request_shape_logs_no_event(self, mocker: MockerFixture, route: str, body: dict[str, Any], error_type: str) -> None:

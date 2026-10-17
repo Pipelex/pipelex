@@ -52,6 +52,7 @@ from mthds.package.manifest.schema import MethodsManifest
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
+from pipelex.core.bundle_resources.bundle_resource import root_escape_refusal
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -367,15 +368,18 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoRetur
 def _tree_path_security_refusal(*, refusal_error: MethodTreeRefusedError) -> ApiSecurityRefusal | None:
     """The security refusal a tree refusal is, when a path it names tries to leave the tree, else `None`.
 
-    A path that is absolute or climbs with a `..` segment is a traversal, `security.input_path_refused`, whether the
-    caller sent it as a key of `files` or as a member of `bundle_b64`, which the same reader judges. Every other path
-    the reader refuses (an empty segment, a backslash, a colon, a path not in NFC) is the shape of how the caller packed
-    the method, a refusal of the request and no security event.
+    The standard's reader refuses a key that is not a tree path without saying why, so the runtime's one rule for a
+    caller's path that leaves its root decides (`root_escape_refusal`): a path that is absolute, names a drive or a
+    network share, or climbs with a `..` segment, read with either separator, is a traversal,
+    `security.input_path_refused`, whether the caller sent it as a key of `files` or as a member of `bundle_b64`, which
+    the same reader judges, and as it is under `resources`. Every other path the reader refuses (an empty segment, a
+    backslash, a colon, a path not in NFC) is the shape of how the caller packed the method, a refusal of the request
+    and no security event.
     """
     refusal = refusal_error.refusal
     match refusal.code:
         case TreeRefusalCode.INVALID_TREE_PATH:
-            if any(_leaves_the_tree(name) for name in refusal.names):
+            if any(root_escape_refusal(path=name) is not None for name in refusal.names):
                 return ApiSecurityRefusal(code=CoreCode.SECURITY_INPUT_PATH_REFUSED, error_type=type(refusal_error).__name__)
             return None
         case (
@@ -401,11 +405,6 @@ def _tree_path_security_refusal(*, refusal_error: MethodTreeRefusedError) -> Api
             | TreeRefusalCode.MODULE_AMBIGUOUS
         ):
             return None
-
-
-def _leaves_the_tree(name: str) -> bool:
-    """Whether a refused path is absolute or climbs out of the tree with a `..` segment."""
-    return name.startswith("/") or ".." in name.split("/")
 
 
 async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str) -> BlobStore:

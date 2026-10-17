@@ -21,7 +21,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files
+from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files, path_refusal_code
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -633,7 +633,7 @@ class LibraryManager(LibraryManagerAbstract):
             violation = tree_path_violation(path)
             if violation is not None:
                 msg = f"The file '{path}' submitted beside the method cannot be a file of its tree: {violation}."
-                raise BundleResourcePathError(msg)
+                raise BundleResourcePathError(msg).with_error_code(path_refusal_code(path=path))
             already_held = joined.get(path)
             if already_held is not None and already_held.sha256 != held_file.sha256:
                 msg = (
