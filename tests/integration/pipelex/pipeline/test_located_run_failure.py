@@ -160,6 +160,27 @@ class TestLocatedRunFailure:
         assert caller.next_step.kind == StepKind.CHANGE_METHOD
         assert "Branch 'gen_ideas'" not in str(caller.to_wire())
 
+    async def test_every_branch_whose_multiplicity_differs_is_an_item(self) -> None:
+        """Two branches give a list to a single field: the problem names the first, and one item names each."""
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=_dry_mock_config())
+        with pytest.raises(PipelineExecutionError) as exc_info:
+            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureTestData.PARALLEL_TWO_MULTIPLICITIES_MTHDS])
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_OUTPUT_MULTIPLICITY
+        assert caller.detail == "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'."
+        assert caller.errors is not None
+        assert [(item.code, item.detail) for item in caller.errors] == [
+            (
+                CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.",
+            ),
+            (
+                CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'summary' is declared 'single'.",
+            ),
+        ]
+
     async def test_a_method_fault_at_the_root_reads_its_code_s_sentence_located(self) -> None:
         """A root fault of the caller's own method reads its code's sentence, located at the failing pipe."""
         runner = PipelexMTHDSProtocol()

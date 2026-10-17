@@ -24,6 +24,7 @@ from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.errors.problem import make_problem_item
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
@@ -590,15 +591,26 @@ class PipeParallel(PipeController):
             # A StuffFactoryError raised from the combine's own: a run failure is reported as its root fault, and
             # of two faults of the same class on the chain the outer one, which restates the inner with a remedy,
             # is that root (see `pipe_run.located_failure.find_root_fault`), so every surface reports this one.
-            # It is the method's fault like the refusal it restates, and its sentence names the first branch to change.
+            # It is the method's fault like the refusal it restates: its sentence names the first branch to change, and
+            # when several branches differ from their fields, its items name each one, so no branch to change is hidden.
+            multiplicity_params = {result_name: self._multiplicity_params(result_stuff=output_stuffs[result_name]) for result_name in next_steps}
             first_result_name = next(iter(next_steps))
-            produced_multiplicity = "list" if output_stuffs[first_result_name].is_list else "single"
-            declared_multiplicity = "single" if output_stuffs[first_result_name].is_list else "list"
-            raise (
+            multiplicity_refusal = (
                 StuffFactoryError(" ".join(message_parts))
                 .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
-                .with_params(output=first_result_name, declared=declared_multiplicity, produced=produced_multiplicity)
-            ) from exc
+                .with_params(output=first_result_name, **multiplicity_params[first_result_name])
+            )
+            if len(next_steps) > 1:
+                multiplicity_refusal.with_items(
+                    items=[
+                        make_problem_item(
+                            code=CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                            params={"pipe": self.code, "output": result_name, **branch_params},
+                        )
+                        for result_name, branch_params in multiplicity_params.items()
+                    ]
+                )
+            raise multiplicity_refusal from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
@@ -667,6 +679,13 @@ class PipeParallel(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
+
+    @staticmethod
+    def _multiplicity_params(*, result_stuff: "Stuff") -> dict[str, str]:
+        """The multiplicity a branch result produced, and the one its field declares, which differs from it."""
+        if result_stuff.is_list:
+            return {"declared": "single", "produced": "list"}
+        return {"declared": "list", "produced": "single"}
 
     def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> dict[str, str]:
         """Say, for each branch whose result and field differ only in multiplicity, which one to change.

@@ -97,6 +97,9 @@ output = "Summary"
 prompt = "Summarize $topic"
 """
 
+    # Both branches of the parallel give a list to a single field: two multiplicity faults in one combine.
+    PARALLEL_TWO_MULTIPLICITIES_MTHDS: ClassVar[str] = PARALLEL_MTHDS.replace('output = "Summary"', 'output = "Summary[]"')
+
     # A step force-unwraps ('!') an optional input the caller left out: a caller-facing failure.
     FORCE_MTHDS: ClassVar[str] = """
 domain = "located_failure_force"

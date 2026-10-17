@@ -280,6 +280,8 @@ class PipelexError(Exception):
     _chosen_error_code: ErrorCode | None = None
     # The parameters the raise site gave with :meth:`with_params`.
     _given_params: dict[str, Any] | None = None
+    # The items the raise site gave with :meth:`with_items`, one per fault of a refusal of several.
+    _given_items: list[ProblemItem] | None = None
 
     def __init_subclass__(cls, **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
@@ -336,6 +338,22 @@ class PipelexError(Exception):
             This error, so that the raise site reads ``raise SomeError(msg).with_params(name=value)``.
         """
         self._given_params = {**(self._given_params or {}), **params}
+        return self
+
+    def with_items(self, *, items: list[ProblemItem]) -> Self:
+        """Give, where this error is raised, one item per fault when it refuses several at once.
+
+        A raise site that finds several faults of one kind reports them all, each item rendered from its own
+        parameters with :func:`pipelex.errors.problem.make_problem_item`, while the error's own code and parameters
+        describe the first. A subclass that derives its items overrides :meth:`problem_items` instead.
+
+        Args:
+            items: The items, one per fault.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_items(items=items)``.
+        """
+        self._given_items = list(items)
         return self
 
     def advised_action(self) -> UserAction | None:
@@ -455,8 +473,11 @@ class PipelexError(Exception):
         return None
 
     def problem_items(self) -> list[ProblemItem] | None:
-        """One item per fault, for an error that refuses several at once; a subclass that holds several overrides it."""
-        return None
+        """One item per fault, for an error that refuses several at once: those its raise site gave with :meth:`with_items`.
+
+        A subclass that holds several faults of its own overrides it.
+        """
+        return list(self._given_items) if self._given_items else None
 
     def problem_facts(self) -> ProblemFacts:
         """The facts this error itself holds for its problem's diagnostics; a subclass that holds some overrides it."""
