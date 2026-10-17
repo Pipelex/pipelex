@@ -174,7 +174,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @classmethod
     def _thinking_off_config(cls, *, inference_model: InferenceModelSpec) -> genai_types.ThinkingConfig:
@@ -184,7 +184,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 f"Model '{inference_model.desc}' cannot turn thinking off, so it cannot take reasoning_effort 'none': "
                 f"set another reasoning effort, or remove the reasoning setting"
             )
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="turning its reasoning off")
         return genai_types.ThinkingConfig(thinking_budget=0)
 
     @classmethod
@@ -215,7 +215,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     #########################################################
 

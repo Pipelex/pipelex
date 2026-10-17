@@ -85,4 +85,4 @@ def make_hosted_client(*, base_url: str | None = None, api_key: str | None = Non
             "Give scheme://host[:port], with http or https and no path, query or credentials, such as https://api.pipelex.com."
         )
         # Not chained: the SDK's message quotes the rejected value whole, credentials included, and a traceback prints it.
-        raise HostedBaseUrlError(msg) from None
+        raise HostedBaseUrlError(msg).with_params(setting=source) from None

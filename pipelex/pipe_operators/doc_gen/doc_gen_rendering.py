@@ -6,6 +6,7 @@ print stage renders an HTML template file, which it reads through the method fil
 Both raise the same errors, worded the same way.
 """
 
+import re
 from typing import Any
 
 from jinja2.exceptions import UndefinedError
@@ -16,6 +17,16 @@ from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDo
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError, Jinja2TemplateRenderError
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
+
+# The name a strict undefined's message says is missing: Jinja2 words it "'name' is undefined", "... has no attribute
+# 'name'" or "... has no element 'name'", where what comes before the name can quote an object's class, never a caller's.
+_UNDEFINED_NAME_PATTERN = re.compile(r"(?:has no (?:attribute|element) |^)'([^']+)'(?: is undefined)?$")
+
+
+def undefined_name(*, undefined_error: UndefinedError) -> str | None:
+    """The name a strict undefined's error says is missing, or ``None`` when its message is not one Jinja2 words."""
+    match = _UNDEFINED_NAME_PATTERN.search(undefined_error.message or "")
+    return match.group(1) if match else None
 
 
 async def render_doc_gen_template(
@@ -60,6 +71,8 @@ async def render_doc_gen_template(
                 "Every value a document's template reads must exist: check the name against the input's concept, "
                 "or test an optional value first with {% if ... %}."
             )
-            raise PipeDocGenUndefinedValueError(msg) from undefined_error
+            raise PipeDocGenUndefinedValueError(msg).with_params(
+                pipe=pipe_code, variable=undefined_name(undefined_error=undefined_error)
+            ) from undefined_error
         msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc}"
         raise PipeDocGenRunError(msg) from exc

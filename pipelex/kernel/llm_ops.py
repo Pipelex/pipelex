@@ -149,7 +149,9 @@ def check_llm_setting_with_served_model(*, llm_setting: LLMSetting, is_structure
         # A built-in worker names the model by its description, which carries the SDK, the backend and the
         # provider's model id: the caller who wrote the setting knows the model by its deck handle alone.
         msg = str(refusal).replace(inference_model.desc, inference_model.name)
-        raise LLMSettingRefusedError(msg) from refusal
+        # The model by its handle, and the capability the worker's refusal named, which a caller reads alike.
+        capability = refusal.given_params.get("capability")
+        raise LLMSettingRefusedError(msg).with_params(model=inference_model.name, capability=capability) from refusal
 
 
 # A resolution chain is at most a handful of hops (preset -> alias -> handle); this only

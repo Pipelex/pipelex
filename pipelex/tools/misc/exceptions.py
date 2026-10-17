@@ -1,7 +1,8 @@
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 import tomli
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -62,6 +63,11 @@ class TomlError(ToolError):
         self.pos = pos
         self.lineno = lineno
         self.colno = colno
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The parser's own words, which name a position in the document and never its text.
+        return {"reason": self.message, "finding": self.message, "line": self.lineno, "column": self.colno}
 
     @classmethod
     def from_tomli_error(cls, exc: tomli.TOMLDecodeError) -> Self:

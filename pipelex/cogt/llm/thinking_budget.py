@@ -44,7 +44,7 @@ def fit_thinking_budget(*, budget: int, max_tokens: int | None, min_budget: int 
                 f"{ceiling} remain for thinking, below the smallest thinking budget of {smallest_budget}. "
                 f"Raise max_tokens or remove the reasoning setting."
             )
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="reasoning within the step's max_tokens")
         fitted_budget = min(fitted_budget, ceiling)
     if min_budget is not None:
         fitted_budget = max(fitted_budget, min_budget)

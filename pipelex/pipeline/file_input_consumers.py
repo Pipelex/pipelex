@@ -222,6 +222,8 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
         return
     consumers_by_slot = collect_file_input_consumers(entry_pipe)
     violations: list[str] = []
+    # The code's parameters name one violation, the first, which the message lists among the others.
+    first_violation_params: dict[str, str | None] | None = None
     for file_input in known_file_inputs:
         format_key = file_input.format_key
         if format_key is None:
@@ -239,9 +241,11 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
                 f"pipe '{consumer.pipe_code}' {consumer.verb_phrase} model '{consumer.model}', "
                 f"which reads {describe_format_keys(format_keys=consumer.listed_formats)}."
             )
+            if first_violation_params is None:
+                first_violation_params = {"input": file_input.display_path, "format": format_key, "model": consumer.model}
     if violations:
         msg = " ".join([*violations, "Give a file in a format its model reads, or use a model that reads this format."])
-        raise PipelineInputFormatUnsupportedError(msg)
+        raise PipelineInputFormatUnsupportedError(msg).with_params(**(first_violation_params or {}))
 
 
 def _is_http_url(*, uri_kind: UriKind) -> bool:

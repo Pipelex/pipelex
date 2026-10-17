@@ -1,6 +1,9 @@
 """Errors raised while loading pipeline-inputs files for the run CLI surfaces."""
 
+from typing import Any
+
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -18,3 +21,7 @@ class AmbiguousInputsFilesError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass --inputs explicitly to choose which inputs file to use",
     )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"field": "inputs"}

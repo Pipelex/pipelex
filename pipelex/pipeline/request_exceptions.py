@@ -49,4 +49,4 @@ class PipelexRequestError(PipelineRequestError, PipelexError):
         # is the refusal alone, since the report states its next step on its own.
         self.message = message
         self.field = field
-        self.with_error_code(code)
+        self.with_error_code(code).with_params(**params)

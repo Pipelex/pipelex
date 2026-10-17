@@ -162,8 +162,10 @@ def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_ad
         mthds_content = mthds_path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         msg = f"Bundle '{bundle_source}' of method package '{package_address}' is not valid UTF-8."
-        raise MthdsParserError(msg, validation_errors=[PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]).with_error_code(
-            CoreCode.METHOD_DEPENDENCY_INVALID
+        raise (
+            MthdsParserError(msg, validation_errors=[PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)])
+            .with_error_code(CoreCode.METHOD_DEPENDENCY_INVALID)
+            .with_params(package=package_address, finding=f"its bundle '{bundle_source}' is not UTF-8 text")
         ) from exc
     try:
         return MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_source)
@@ -173,9 +175,11 @@ def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_ad
         context = f"Bundle '{bundle_source}' of method package '{package_address}' does not parse"
         items = [item.model_copy(update={"source": bundle_source, "message": f"{context}: {item.message}"}) for item in exc.validation_errors]
         msg = f"{context}: {exc.message}"
-        raise MthdsParserError(
-            msg, validation_errors=items or [PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]
-        ).with_error_code(CoreCode.METHOD_DEPENDENCY_INVALID) from exc
+        raise (
+            MthdsParserError(msg, validation_errors=items or [PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)])
+            .with_error_code(CoreCode.METHOD_DEPENDENCY_INVALID)
+            .with_params(package=package_address, finding=f"its bundle '{bundle_source}' does not parse")
+        ) from exc
 
 
 def _public_dependency_pipe_refs(*, resolved_dep: ResolvedDependency, blueprints: list[PipelexBundleBlueprint]) -> set[str] | None:
@@ -641,13 +645,13 @@ class LibraryManager(LibraryManagerAbstract):
                     "beside a method's content strings, from its library directories and with its request, make one tree, "
                     "so each path names one file: give them distinct paths."
                 )
-                raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID)
+                raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
             joined[path] = held_file
         collisions = path_collisions(joined)
         if collisions:
             listed = ", ".join(f"'{collision}'" for collision in collisions)
             msg = f"The files submitted beside the method cannot make one tree: their paths collide at {listed}."
-            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID)
+            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
         return joined
 
     def _submitted_tree(self, *, library_id: str) -> MethodTree | None:

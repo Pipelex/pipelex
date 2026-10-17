@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from pipelex.errors.error_codes import ErrorCode
@@ -168,7 +170,8 @@ class DryRunFailureErrorData(BaseModel):
     where it happened. ``code`` is the failure's own code, which decides whether the failure is the
     method's (an invalid verdict) or a fault no verdict may carry. ``message`` names the pipe and gives
     the sentence the code renders for a caller, never the failure's own message, because the verdict
-    that carries it is read by the caller.
+    that carries it is read by the caller, and ``params`` holds the parameters that sentence was rendered
+    from, so that the verdict's item renders it again whole.
     """
 
     code: ErrorCode = Field(description="The code of the pipe's failure")
@@ -176,3 +179,4 @@ class DryRunFailureErrorData(BaseModel):
     domain_code: str | None = Field(default=None, description="Domain of the pipe whose dry run failed")
     source: str | None = Field(default=None, description="Source file of the pipe, when the library knows it")
     message: str = Field(description="The pipe's failure, in the sentence its code renders for a caller")
+    params: dict[str, Any] | None = Field(default=None, description="The parameters the code's sentences are rendered from, those a caller may read")

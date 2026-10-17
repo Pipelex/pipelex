@@ -1,6 +1,8 @@
 from enum import StrEnum
+from typing import Any
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
@@ -19,6 +21,15 @@ class UriReadRefusalReason(StrEnum):
                 return "it names a stored file this run may not read"
             case UriReadRefusalReason.LOCAL_PATH:
                 return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
+
+    @property
+    def target_class(self) -> str:
+        """The kind of target the refused URL points at, as the refusal's sentence names it."""
+        match self:
+            case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
+                return "foreign storage"
+            case UriReadRefusalReason.LOCAL_PATH:
+                return "local"
 
 
 class UriReadRefusedError(SecurityError):
@@ -44,3 +55,7 @@ class UriReadRefusedError(SecurityError):
     def __init__(self, message: str, *, reason: UriReadRefusalReason):
         super().__init__(message)
         self.reason = reason
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": self.reason.desc, "target_class": self.reason.target_class}

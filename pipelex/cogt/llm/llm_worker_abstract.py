@@ -4,7 +4,7 @@ import sys
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from typing_extensions import override
@@ -91,7 +91,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             return
         if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
             msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @classmethod
     def constrained_job_params(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> LLMJobParams | None:
@@ -520,13 +520,17 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if llm_job.llm_prompt.user_images:
             if not self.inference_model.is_vision_supported:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not support vision."
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="images")
 
             nb_images = len(llm_job.llm_prompt.user_images)
             max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
-                raise LLMCapabilityError(msg).with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
+                raise (
+                    LLMCapabilityError(msg)
+                    .with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
+                    .with_params(limit=ModelContextExceededLimit.PROMPT_IMAGES, count=nb_images, max=max_prompt_images)
+                )
 
             check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=llm_job.llm_prompt.user_images)
 
@@ -536,7 +540,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         if not self.inference_model.is_document_supported:
             msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="documents")
 
         check_prompt_documents_are_read(
             model_name=self.inference_model.name,

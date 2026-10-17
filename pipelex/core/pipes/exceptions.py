@@ -9,7 +9,7 @@ from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import ErrorCode
-from pipelex.errors.problem import ProblemView, make_location
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -216,6 +216,11 @@ class PipeLoadRefusalError(PipelexError):
         super().__init__(message)
 
     @override
+    def problem_params(self) -> dict[str, Any]:
+        # Its own code is its fallback, taken only when the refusal it wraps carries none: the pipe's whole declaration.
+        return {"pipe": self.pipe_code, "field_path": f"pipe.{self.pipe_code}", "finding": "the pipe could not be built from its declaration"}
+
+    @override
     def problem_location(self) -> ProblemLocation | None:
         return make_location(pipe=self.pipe_code, file=self.source)
 
@@ -226,14 +231,27 @@ class PipeLoadRefusalError(PipelexError):
         return cls(message, pipe_code=pipe_code, domain_code=domain_code, source=source)
 
 
-def refusal_detail(*, refusal: PipelexError) -> str:
+def caller_refusal(*, refusal: PipelexError, pipe_code: str | None = None) -> PipelexProblem:
+    """The problem a refusal makes for a caller, located at the pipe that met it when the refusal does not name it.
+
+    Args:
+        refusal: The refusal.
+        pipe_code: The pipe that met the refusal, which names the pipe parameter of a code that declares one.
+
+    Returns:
+        The refusal's problem in the caller's view.
+    """
+    return refusal.to_problem(view=ProblemView.CALLER, failure_location=make_location(pipe=pipe_code))
+
+
+def refusal_detail(*, refusal: PipelexError, pipe_code: str | None = None) -> str:
     """The sentence a refusal's code renders for a caller, the text an item of a verdict built from a raised refusal carries.
 
     A verdict is read by the caller, so an item taken from a refusal never carries the refusal's own message,
     which is the operator's diagnostics: it carries the code's ``detail``, rendered from the parameters a caller
-    may read.
+    may read, the pipe that met the refusal included when it is given.
     """
-    return refusal.to_problem(view=ProblemView.CALLER).detail
+    return caller_refusal(refusal=refusal, pipe_code=pipe_code).detail
 
 
 def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) -> ErrorCode:

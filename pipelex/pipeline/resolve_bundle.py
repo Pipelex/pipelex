@@ -21,6 +21,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.crate_normalization import normalize_crate
@@ -125,4 +126,8 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
                     f"In-memory resolve cannot load address-based dependency '{alias}' from the host filesystem; "
                     "provide the dependency contents in the request or use directory-based resolution."
                 )
-                raise PipeLibraryError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+                raise (
+                    PipeLibraryError(msg)
+                    .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+                    .with_params(field="files", reason=ADDRESS_DEPENDENCY_UNSUPPORTED_REASON)
+                )

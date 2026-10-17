@@ -27,6 +27,7 @@ from pipelex.core.pipes.exceptions import (
     PipeOperatorModelChoiceError,
     PipeRunError,
     PipeValidationError,
+    caller_refusal,
     refusal_detail,
 )
 from pipelex.core.validation import report_validation_error
@@ -177,14 +178,16 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         failure_code = pipe_run_error.resolve_error_code()
         if not code_is_method_domain(code=failure_code):
             raise
-        failure_text = refusal_detail(refusal=pipe_run_error)
+        failure_problem = caller_refusal(refusal=pipe_run_error, pipe_code=pipe_run_error.pipe_code)
+        failure_params = failure_problem.params.as_wire() if failure_problem.params is not None else None
         raise ValidateBundleError(
             message=pipe_run_error.message,
             dry_run_failures=[
                 DryRunFailureErrorData(
                     code=failure_code,
                     pipe_code=pipe_run_error.pipe_code,
-                    message=f"Pipe '{pipe_run_error.pipe_code}' failed its dry run: {failure_text}",
+                    message=f"Pipe '{pipe_run_error.pipe_code}' failed its dry run: {failure_problem.detail}",
+                    params=failure_params or None,
                 )
             ],
         ) from pipe_run_error

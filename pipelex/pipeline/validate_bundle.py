@@ -121,7 +121,7 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
         missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
         msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
         # The bundle-scoped wording stays the raise site's own, more precise here than the class's library-lookup message.
-        raise EntryPipeNotFoundError(msg)
+        raise EntryPipeNotFoundError(msg).with_params(pipe=", ".join(sorted(missing)))
     return selected
 
 

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, ProblemFacts, iter_cause_chain
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction, UserActionKind
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReferenceKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause, declared_error_codes
 from pipelex.errors.problem import ProviderDiagnostics, cap_problem_text
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_type import ModelType
     from pipelex.errors.error_codes import ErrorCode
 
 
@@ -200,6 +200,11 @@ class CogtError(PipelexError):
             self.backend_name = backend_name
 
     @override
+    def problem_params(self) -> dict[str, Any]:
+        # The backend the failure was met on is the component an operator configures (`runtime.misconfigured`, operator-only).
+        return {"component": self.backend_name} if self.backend_name is not None else {}
+
+    @override
     def problem_facts(self) -> ProblemFacts:
         """The model and the provider this failure names, what the provider answered, and how long it asked to wait.
 
@@ -212,7 +217,7 @@ class CogtError(PipelexError):
         metadata = self.provider_metadata
         if metadata is not None:
             provider = ProviderDiagnostics(
-                name=self.backend_name or metadata.provider,
+                name=self.backend_name,
                 status=metadata.status_code,
                 code=metadata.provider_error_code,
                 request_id=metadata.request_id,
@@ -320,6 +325,11 @@ class ModelChoiceNotFoundError(CogtError):
             full_message += f"\n\nAvailable {reference_kind or 'options'}: {options_str}"
 
         super().__init__(message=full_message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        suggestions = self.suggestions + self.cross_collection_suggestions
+        return {**super().problem_params(), "model": self.model_choice, "model_type": self.model_type, "suggestions": suggestions or None}
 
 
 class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
@@ -621,6 +631,16 @@ class LLMCompletionTruncatedError(LLMCompletionError):
         self.max_tokens = max_tokens
         self.output_tokens = output_tokens
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {
+            **super().problem_params(),
+            "pipe": self.pipe_code,
+            "model": self.model_handle,
+            "max_tokens": self.max_tokens,
+            "output_tokens": self.output_tokens,
+        }
+
 
 class LLMCompletionRefusedError(LLMCompletionError):
     """A text completion the model declined to write, or that a provider's safety filter stopped.
@@ -882,6 +902,10 @@ class JudgmentModelMissingError(PipelexError):
         )
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipe": self.pipe_code, "model_type": ModelType.JUDGMENT}
+
 
 class RoutingProfileLibraryNotFoundError(CogtError):
     error_code = PipelexErrorCode.CONFIG_INVALID
@@ -967,6 +991,11 @@ class InferenceBackendCredentialsError(CogtError):
                 self.with_error_code(PipelexErrorCode.CONFIG_INVALID)
             case InferenceBackendCredentialsErrorType.NOT_RESOLVED_ON_KEYLESS_BOOT:
                 self.with_error_code(CoreCode.RUNTIME_MISCONFIGURED)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # Operator-only parameters of its codes: they reach the operator's step and diagnostics alone.
+        return {"variable": self.key_name, "backend": self.backend_name, "component": self.backend_name}
 
 
 class InferenceBackendLibraryError(CogtError):

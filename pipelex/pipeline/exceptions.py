@@ -1,6 +1,6 @@
 import re
 from collections.abc import Collection
-from typing import Any, ClassVar, NamedTuple, Self, TypeVar
+from typing import Any, ClassVar, NamedTuple, Self, TypeVar, cast
 
 from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
@@ -207,21 +207,33 @@ class _FileWithholding(NamedTuple):
         return self.pattern.sub(lambda _match: self.placeholder, text)
 
     def withheld_errors(self, *, errors: list[_SourcedErrorData]) -> list[_SourcedErrorData]:
-        """The error data without a withheld name as its ``source``, its ``field_path`` or in its ``message``.
+        """The error data without a withheld name as its ``source``, its ``field_path``, in its ``message`` or its ``params``.
 
         A pipe-validation error located from the pipe-source map carries its file as its ``field_path`` too
-        (``categorize_pipe_validation_with_libraries_error``), so a withheld file leaves that field empty.
+        (``categorize_pipe_validation_with_libraries_error``), so a withheld file leaves that field empty. A dry-run
+        failure's parameters render its item's sentence, so a text among them, such as the template file a host's step
+        names, reads the placeholder too.
         """
         withheld: list[_SourcedErrorData] = []
         for error in errors:
-            update: dict[str, str | None] = {
+            update: dict[str, Any] = {
                 "source": None if error.source in self.names else error.source,
                 "message": self.withheld_text(text=error.message),
             }
             if isinstance(error, PipesAndConceptValidationErrorData) and error.field_path in self.names:
                 update["field_path"] = ""
+            if isinstance(error, DryRunFailureErrorData) and error.params:
+                update["params"] = {name: self._withheld_value(value=value) for name, value in error.params.items()}
             withheld.append(error.model_copy(update=update))
         return withheld
+
+    def _withheld_value(self, *, value: Any) -> Any:
+        """A parameter's value reading the placeholder where a text of it named a withheld file."""
+        if isinstance(value, str):
+            return self.withheld_text(text=value)
+        if isinstance(value, list):
+            return [self._withheld_value(value=item) for item in cast("list[Any]", value)]
+        return value
 
 
 def withhold_names_in_text(*, text: str, names: Collection[str], placeholder: str) -> str:
@@ -231,6 +243,10 @@ def withhold_names_in_text(*, text: str, names: Collection[str], placeholder: st
     is not a verdict's error data, such as an advisory warning.
     """
     return _FileWithholding.make_from_names(names=names, placeholder=placeholder).withheld_text(text=text)
+
+
+# The code of a verdict itself, which no item of it takes: its sentence says nothing of any one fault.
+_VERDICT_UMBRELLA_CODES: frozenset[ErrorCode] = frozenset({CoreCode.METHOD_INVALID})
 
 
 class ValidateBundleError(PipelexError):
@@ -375,21 +391,34 @@ class ValidateBundleError(PipelexError):
         """One problem item per validation item, each with its own code: a dry run's the failure's, any other its type's.
 
         An item no stage classified takes the code of the refusal this verdict was built from when that refusal is
-        the method's, and ``method.schema_violation`` otherwise.
+        the method's, and ``method.schema_violation`` otherwise, or when that code is ``method.invalid``: the verdict's
+        own umbrella, whose sentence says nothing of the item.
         """
         residual_code: ErrorCode = CoreCode.METHOD_SCHEMA_VIOLATION
+        # The parameters the refusal's code renders from, as a caller reads them, which an item taking its code keeps.
+        residual_params: dict[str, Any] | None = None
         cause = self.__cause__
-        if isinstance(cause, PipelexError) and code_is_method_domain(code=cause.resolve_error_code()):
-            residual_code = cause.resolve_error_code()
-        dry_run_codes = iter([failure.code for failure in self.dry_run_failures])
+        if isinstance(cause, PipelexError):
+            cause_code = cause.resolve_error_code()
+            if code_is_method_domain(code=cause_code) and cause_code not in _VERDICT_UMBRELLA_CODES:
+                residual_code = cause_code
+                cause_params = cause.to_problem(view=ProblemView.CALLER).params
+                residual_params = cause_params.as_wire() if cause_params is not None else None
+        dry_run_failures = iter(self.dry_run_failures)
         items: list[ProblemItem] = []
         for item in self.validation_error_items():
             item_code: ErrorCode
+            item_params: dict[str, Any] | None = None
             if item.category.is_dry_run:
-                item_code = next(dry_run_codes, CoreCode.RUNTIME_UNEXPECTED)
+                dry_run_failure = next(dry_run_failures, None)
+                item_code = dry_run_failure.code if dry_run_failure is not None else CoreCode.RUNTIME_UNEXPECTED
+                item_params = dry_run_failure.params if dry_run_failure is not None else None
+            elif item.error_type is None:
+                item_code = residual_code
+                item_params = residual_params
             else:
                 item_code = validation_item_code(item=item, residual_code=residual_code)
-            items.append(problem_item_of(item=item, code=item_code))
+            items.append(problem_item_of(item=item, code=item_code, params=item_params))
         return items or None
 
 

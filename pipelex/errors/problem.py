@@ -426,7 +426,7 @@ def make_problem(
             retry=spec.retry,
             retry_after=retry_after if invites_retry and _is_usable_delay(seconds=retry_after) else None,
             next_step=_next_step(spec=spec, view=view, params=step_params),
-            params=ProblemParams.model_validate(caller_params) if spec.param_names - spec.operator_only_params else None,
+            params=ProblemParams.model_validate(caller_params) if caller_params else None,
             location=location,
             errors=errors or None,
             pipeline_run_id=pipeline_run_id,
@@ -467,7 +467,7 @@ def make_problem_item(
         _members(
             code=spec.code,
             detail=detail,
-            params=ProblemParams.model_validate(caller_params) if spec.param_names - spec.operator_only_params else None,
+            params=ProblemParams.model_validate(caller_params) if caller_params else None,
             location=location,
             suggestions=suggestions or None,
             suggested_fix=dict(suggested_fix) if suggested_fix is not None else None,

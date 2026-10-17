@@ -1,4 +1,4 @@
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
@@ -48,6 +48,10 @@ class AsyncExecutionNotEnabledError(PipelexError):
         that needs async execution when no such backend is enabled.
         """
         return cls(cls.DEFAULT_MESSAGE)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"capability": "asynchronous execution"}
 
 
 class PipeRunParamsError(PipelexError):
@@ -112,9 +116,11 @@ class DryRunError(PipelexError):
         items: list[ProblemItem] = []
         for failure in self.failures:
             spec = error_code_spec(failure.code)
-            params = {"pipe": failure.pipe_code} if failure.pipe_code is not None and "pipe" in spec.param_names else None
+            params = dict(failure.params or {})
+            if failure.pipe_code is not None and "pipe" in spec.param_names:
+                params.setdefault("pipe", failure.pipe_code)
             location = make_location(pipe=failure.pipe_code, file=failure.source)
-            items.append(make_problem_item(code=failure.code, params=params, location=location))
+            items.append(make_problem_item(code=failure.code, params=params or None, location=location))
         return items or None
 
 

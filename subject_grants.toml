@@ -4,29 +4,13 @@ version = 1
 param = "problem_domain"
 rationale = "Converts its one operand, a registry domain: ErrorDomain.from_problem_domain(spec.domain) reads as a conversion."
 
-["pipelex/base_exceptions.py::ErrorReport.from_dict"]
-param = "data"
-rationale = "Factory from source: builds the report from the dict; single operand."
-
-["pipelex/base_exceptions.py::PipelexError._enrich_error_report_from_cause"]
-param = "report"
-rationale = "Verb-object: enriches the report; single operand."
-
 ["pipelex/base_exceptions.py::PipelexError.with_error_code"]
 param = "error_code"
 rationale = "Chained at every raise site on its one operand, the chosen code: raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING)."
 
-["pipelex/base_exceptions.py::_redact_provider_metadata_for_strict"]
-param = "metadata_payload"
-rationale = "Transforms the metadata payload; single operand."
-
 ["pipelex/base_exceptions.py::error_domain_is_input"]
 param = "error_domain"
 rationale = "Predicate on the error domain; single operand."
-
-["pipelex/base_exceptions.py::error_domain_to_http_status"]
-param = "error_domain"
-rationale = "Conversion: maps the error domain to a status; single operand."
 
 ["pipelex/base_exceptions.py::iter_cause_chain"]
 param = "exc"

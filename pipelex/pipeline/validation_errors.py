@@ -19,7 +19,12 @@ is no import cycle.
 from typing import Any
 
 from mthds.protocol.problem.models import ProblemItem
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import (
+    CoreCode,
+    MethodDependencyMissingKind,
+    MethodDependencyMissingReason,
+    MethodIdentifierInvalidIdentifierKind,
+)
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.exceptions import (
@@ -29,6 +34,7 @@ from pipelex.core.exceptions import (
     PipesAndConceptValidationErrorData,
 )
 from pipelex.core.pipes.exceptions import pipe_validation_error_code
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import make_location, make_problem_item
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
@@ -193,41 +199,109 @@ def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode)
     return residual_code
 
 
+# The identifier an item of these types is about, and where the item holds it: an input name among its variable names, a pipe
+# code as its pipe. A main_pipe the item does not name, or a pipe code only its message quotes, gives no identifier facts.
+_IDENTIFIER_KINDS: dict[PipeValidationErrorType, MethodIdentifierInvalidIdentifierKind] = {
+    PipeValidationErrorType.INVALID_INPUT_NAME: MethodIdentifierInvalidIdentifierKind.INPUT_NAME,
+    PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX: MethodIdentifierInvalidIdentifierKind.PIPE_CODE,
+}
+
+
+def _identifier_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
+    """The name an identifier item is about and what the name is, when the item holds the name."""
+    if not isinstance(item.error_type, PipeValidationErrorType):
+        return {}
+    identifier_kind = _IDENTIFIER_KINDS.get(item.error_type)
+    if identifier_kind is None:
+        return {}
+    match identifier_kind:
+        case MethodIdentifierInvalidIdentifierKind.INPUT_NAME:
+            name = item.variable_names[0] if item.variable_names else None
+        case MethodIdentifierInvalidIdentifierKind.PIPE_CODE | MethodIdentifierInvalidIdentifierKind.MAIN_PIPE:
+            name = item.pipe_code
+    if name is None:
+        return {}
+    return {"identifier_kind": identifier_kind, "name": name}
+
+
+def _dependency_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
+    """The package an unresolved package reference names, the prefix of its ``->`` reference, as a missing dependency."""
+    if item.error_type not in _PACKAGE_DEPENDENCY_TYPES or not item.missing_pipe_code:
+        return {}
+    reference = item.missing_pipe_code
+    package = QualifiedRef.split_cross_package_ref(reference).alias if QualifiedRef.has_cross_package_prefix(reference) else reference
+    return {
+        "kind": MethodDependencyMissingKind.PACKAGE,
+        "name": package,
+        "reason": MethodDependencyMissingReason.NOT_FOUND,
+        "package": package,
+    }
+
+
+# The item types about a package the method depends on that could not be resolved.
+_PACKAGE_DEPENDENCY_TYPES: frozenset[PipeValidationErrorType] = frozenset({PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY})
+
+
 def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     """The facts a validation item holds, by the names the registry gives the parameters that carry them."""
     facts: dict[str, Any] = {
+        **_identifier_facts(item=item),
+        **_dependency_facts(item=item),
         "pipe": item.pipe_code,
         "concept": item.missing_concept_code or item.concept_code,
         "variables": item.variable_names,
         "model": item.model_reference,
         "model_type": item.model_type,
         "suggestions": item.suggestions,
-        "field_path": item.field_path,
+        "field_path": item.field_path or _declaration_path(item=item),
         "missing": item.missing_pipe_code,
         "finding": item.message,
     }
     return {name: value for name, value in facts.items() if value is not None}
 
 
-def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode) -> ProblemItem:
+def _declaration_path(*, item: ValidationErrorItem) -> str | None:
+    """The bundle-root dot path of the declaration an item is about when it names no field path: its pipe's, or its concept's."""
+    if item.pipe_code is not None:
+        return f"pipe.{item.pipe_code}.{item.field_name}" if item.field_name else f"pipe.{item.pipe_code}"
+    if item.concept_code is not None:
+        return f"concept.{item.concept_code}"
+    return None
+
+
+def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[str, Any] | None = None) -> ProblemItem:
     """The problem item of a validation item: its code, the parameters its locators give that code, and its location.
 
     Args:
         item: The validation item.
         code: Its code: :func:`validation_item_code`'s, or the dry-run failure's own.
+        params: Parameters known beside the item, such as those a dry-run failure was rendered from, which take
+            precedence over the item's own.
 
     Returns:
         The problem item, its sentence rendered from the code's template.
     """
     spec = error_code_spec(code)
-    params = {name: value for name, value in _item_facts(item=item).items() if name in spec.param_names}
+    facts = {**_item_facts(item=item), **(params or {})}
+    item_params = {name: value for name, value in facts.items() if name in spec.param_names}
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
     location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
     return make_problem_item(
         code=code,
-        params=params,
+        params=item_params,
         location=location,
         suggestions=item.suggestions,
-        suggested_fix=item.suggested_fix.model_dump(mode="json", exclude_none=True) if item.suggested_fix is not None else None,
+        suggested_fix=_problem_fix(item=item),
     )
+
+
+def _problem_fix(*, item: ValidationErrorItem) -> dict[str, Any] | None:
+    """An item's suggested fix in the standard's wire form, where the file it edits is ``file``, not ``source``."""
+    if item.suggested_fix is None:
+        return None
+    fix = item.suggested_fix.model_dump(mode="json", exclude_none=True)
+    source = fix.pop("source", None)
+    if source is not None:
+        fix["file"] = source
+    return fix

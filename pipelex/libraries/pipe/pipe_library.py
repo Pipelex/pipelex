@@ -158,7 +158,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             # asserting the opposite — and handed a `user_action` naming candidates that never existed.
             raise
         except PipeLibraryError as exc:
-            raise EntryPipeAmbiguousError(str(exc)) from exc
+            raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code) from exc
         if pipe is not None:
             return pipe
 
@@ -173,7 +173,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if len(matches) > 1:
             candidates = sorted(match.pipe_ref for match in matches)
             msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly, as 'domain.pipe_code'."
-            raise EntryPipeAmbiguousError(msg)
+            raise EntryPipeAmbiguousError(msg).with_params(pipe=pipe_code, candidates=candidates)
         return None
 
     @override
@@ -184,7 +184,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            raise EntryPipeNotFoundError(msg)
+            raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code)
         return the_pipe
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:

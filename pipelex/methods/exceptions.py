@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -21,6 +22,11 @@ class MethodRefParseError(MethodRefError):
 
     error_code = ErrorCodeSet(default=CoreCode.REQUEST_INVALID, others=(CoreCode.REQUEST_UNSUPPORTED,))
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The reference is the request's `method_ref`; an address it does not fetch is one off GitHub.
+        return {"field": "method_ref", "reason": "address_not_on_github"}
+
 
 class MethodFetchError(MethodRefError):
     """Fetching the repository behind a method reference failed (clone, tag verification, or commit resolution).
@@ -35,6 +41,17 @@ class MethodFetchError(MethodRefError):
         default=CoreCode.METHOD_FETCH_FAILED,
         others=(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, CoreCode.METHOD_NOT_FOUND, CoreCode.METHOD_PACKAGE_INVALID),
     )
+
+    method_ref: str | None = None
+
+    def for_method_ref(self, *, method_ref: str) -> Self:
+        """Name the method reference whose fetch failed, which the codes' sentences name; returns this error."""
+        self.method_ref = method_ref
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"method_ref": self.method_ref}
 
 
 class MethodPackageNotFoundError(MethodRefError):

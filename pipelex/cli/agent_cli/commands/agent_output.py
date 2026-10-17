@@ -226,6 +226,7 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
 
     # Extract structured data from a PipelexError cause when available: its code decides the domain and the verdict
     report_hint: str | None = None
+    report_next_step: str | None = None
     report_retryable: bool | None = None
     report_category: str | None = None
     report_domain: str | None = None
@@ -237,6 +238,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
         code_spec = error_code_spec(cause.resolve_error_code())
         advised_action = cause.advised_action()
         report_hint = advised_action.detail if advised_action is not None and advised_action.detail else None
+        # The code's next step, as the operator reads it, which whoever runs this CLI is: the hint when nothing advises.
+        report_next_step = problem.next_step.detail
         report_retryable = code_spec.invites_retry
         report_category = find_inference_error_category_in_chain(cause)
         report_domain = ErrorDomain.from_problem_domain(code_spec.domain)
@@ -252,8 +255,8 @@ def _assemble_error_payload(message: str, *, error_type: str, cause: BaseExcepti
         if chain_validation_errors:
             report_extras["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in chain_validation_errors]
 
-    # hint: report-first, fallback to lookup dict
-    hint = report_hint or AGENT_ERROR_HINTS.get(error_type)
+    # hint: the chain's advice, else the lookup dict, else the code's next step
+    hint = report_hint or AGENT_ERROR_HINTS.get(error_type) or report_next_step
     if hint:
         error_json["hint"] = hint
 

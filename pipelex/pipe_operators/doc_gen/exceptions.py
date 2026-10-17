@@ -1,4 +1,7 @@
+from typing import Any
+
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ErrorCodeSet, InheritsCause
@@ -25,6 +28,19 @@ class PipeDocGenFactoryError(PipelexError):
             CoreCode.METHOD_FIELD_PATH_UNRESOLVED,
         ),
     )
+
+    def __init__(self, message: str, *, facts: dict[str, Any] | None = None):
+        """The refusal, and the facts its raise site knows, by the parameter names its codes give them.
+
+        Each raise site chooses one of several codes declaring different parameters, so it gives every fact it holds,
+        and the problem keeps the ones its code declares, where :meth:`with_params` would log the others.
+        """
+        super().__init__(message)
+        self.facts = facts or {}
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return dict(self.facts)
 
 
 class PipeDocGenRunError(PipelexError):

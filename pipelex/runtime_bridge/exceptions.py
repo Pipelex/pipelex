@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
@@ -39,6 +40,10 @@ class MissingOrchestratorError(PipelexRuntimeBridgeError):
         super().__init__(_build_missing_message(noun="orchestrator", mode=mode))
         _code_a_missing_direct_mode(error=self, mode=mode)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return _missing_mode_params(mode=self.mode)
+
 
 class MissingBundleValidatorError(PipelexRuntimeBridgeError):
     """Raised when no bundle validator is registered for a requested orchestration mode.
@@ -59,6 +64,15 @@ class MissingBundleValidatorError(PipelexRuntimeBridgeError):
         self.mode = mode
         super().__init__(_build_missing_message(noun="bundle validator", mode=mode))
         _code_a_missing_direct_mode(error=self, mode=mode)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return _missing_mode_params(mode=self.mode)
+
+
+def _missing_mode_params(*, mode: OrchestrationMode) -> dict[str, Any]:
+    """The facts both Missing* errors give their codes: the setting and the mode, as the deployment's or the caller's choice."""
+    return {"setting": "orchestration_mode", "value": mode, "capability": f"the orchestration mode '{mode}'"}
 
 
 def _build_missing_message(*, noun: str, mode: OrchestrationMode) -> str:

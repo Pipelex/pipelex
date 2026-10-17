@@ -41,8 +41,10 @@ def resolve_method_folder_run(*, directory: Path, pipe_override: str | None) -> 
     """List a method folder's tree and settle the pipe its run starts at.
 
     Raises:
-        ValidateBundleError: The tree is refused or past this machine's limits, a bundle does not parse, or the method
-            has no single pipe to start at, each as the invalid verdict `validate` gives.
+        ValidateBundleError: The tree is refused or past this machine's limits, or a bundle does not parse, each as the
+            invalid verdict `validate` gives.
+        MethodEntryError: The method has no single pipe to start at and `pipe_override` names none, which is no verdict
+            on the method, coded as the refusal of a run that selects no pipe.
     """
     with translate_to_validate_bundle_error():
         tree = list_local_method_tree(handed_over=directory)

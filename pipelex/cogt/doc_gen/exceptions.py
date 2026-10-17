@@ -1,7 +1,9 @@
 from enum import StrEnum
+from typing import Any
 
 from mthds.method_tree.vocabulary import TreeRefusalCode
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
@@ -35,6 +37,17 @@ class DocGenEngineGap(StrEnum):
 
     NOT_REGISTERED = "not_registered"
     """The engine's model is declared, and no installed plugin registers a worker for its sdk."""
+
+    @property
+    def desc(self) -> str:
+        """What is missing, as the operator's step names it after the engine."""
+        match self:
+            case DocGenEngineGap.NO_DEFAULT:
+                return "the model deck names no default engine for the format"
+            case DocGenEngineGap.NOT_DECLARED:
+                return "its model is not declared in this installation"
+            case DocGenEngineGap.NOT_REGISTERED:
+                return "no installed plugin registers a worker for it"
 
 
 def _step_label(*, pipe_code: str | None) -> str:
@@ -101,6 +114,12 @@ class DocGenEngineMissingError(PipelexError):
                     message = f"{asks}, on the engine '{model}', which is not installed in this runtime. {comes_with_the_plugin}"
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The engine and the gap are the operator's own facts, operator-only parameters of the code.
+        engine = self.model or f"default engine for {self.doc_gen_format.with_article} {self.source.desc}"
+        return {"format": self.doc_gen_format, "engine": engine, "gap": self.gap.desc}
+
 
 class DocGenModelCapabilityError(PipelexError):
     """The document engine a `PipeDocGen` step names does not print the step's format from its source.
@@ -121,6 +140,10 @@ class DocGenModelCapabilityError(PipelexError):
             "Name an engine that does in the step's 'model', or leave 'model' out for the model deck's default."
         )
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"model": self.model, "capability": f"printing {self.doc_gen_format.with_article} {self.source.desc}"}
 
 
 class DocGenRenderError(PipelexError):

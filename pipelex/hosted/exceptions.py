@@ -1,7 +1,8 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.validation_models import ValidationErrorItem
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -82,6 +83,10 @@ class HostedRunPollingError(HostedRunError):
             ),
         )
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipeline_run_id": self.pipeline_run_id}
+
 
 class HostedRunOutcomeUnknownError(HostedRunError):
     """The request that runs the method was sent, and the connection failed before its answer came back.
@@ -133,6 +138,10 @@ class HostedRunInterruptedError(HostedRunError):
         self.user_action = UserAction(kind=UserActionKind.UNKNOWN, detail=detail)
         if pipeline_run_id is not None:
             self.with_error_code(CoreCode.CLIENT_FOLLOW_FAILED)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipeline_run_id": self.pipeline_run_id}
 
 
 class HostedLocalFileUploadUnavailableError(HostedRunError):
