@@ -227,7 +227,9 @@ class TestFixFormat:
         assert captured.out == ""
         assert captured.err.startswith("## The method does not validate")
         assert "Fix loop stopped after 1 iteration(s)" in captured.err
-        assert "## Pipe validation errors" in captured.err
+        assert "### Errors\n\n- `" in captured.err
+        assert f"file '{bundle_path}')" in captured.err
+        assert "## Pipe validation errors" not in captured.err
         assert "### Applied Fixes" in captured.err
         assert "**Stopped:** no safe fixes remain" in captured.err
         assert f"- **bundle_path:** {bundle_path.resolve()}" in captured.err

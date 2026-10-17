@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 import pytest
 import typer
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
@@ -16,7 +17,10 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.errors.problem import make_problem_item
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_render import format_validation_error_items_markdown
+from pipelex.validation_error_types import PipeValidationErrorType
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestAgentErrorFormat:
@@ -89,14 +93,49 @@ class TestAgentErrorFormat:
                 assert f"- `method.pipe_unresolved`: {missing_pipe}" in printed
                 assert "- `method.schema_violation`: " in printed
 
-    def test_markdown_renders_a_verdict_s_own_errors_as_validate_s_prose(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """When the problem's errors are exactly the verdict's, the Markdown renders them as the prose `validate` prints."""
-        set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
-        verdict = ValidateBundleError(message="the verdict's own fault")
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_an_invalid_verdict_lists_its_problem_items_in_both_formats(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error_format: CliOutputFormat
+    ) -> None:
+        """An invalid bundle's Markdown lists the problem's items, code, detail, location and suggestions, as its JSON does."""
+        set_agent_cli_error_format(error_format)
+        item = ValidationErrorItem(
+            category=ValidationErrorCategory.PIPE_VALIDATION,
+            error_type=PipeValidationErrorType.UNKNOWN_MODEL,
+            message="Pipe 'draft_pitch' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck",
+            pipe_code="draft_pitch",
+            domain_code="sales_copy",
+            field_name="model",
+            model_reference="gpt-5.1",
+            model_type="llm",
+            suggestions=["gpt-5.5", "gpt-5.4"],
+            source="pitch.mthds",
+        )
+        verdict = ValidateBundleError(message="the bundle does not validate")
+        mocker.patch.object(verdict, "validation_error_items", return_value=[item])
 
         with pytest.raises(typer.Exit):
             agent_error("the bundle does not validate", cause=verdict)
 
         printed = capsys.readouterr().err
-        assert "### Errors" not in printed
-        assert format_validation_error_items_markdown(verdict.validation_error_items()) in printed
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem["errors"] == [
+                    {
+                        "code": "model.unknown",
+                        "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+                        "params": {"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5.5", "gpt-5.4"]},
+                        "location": {"pipe": "draft_pitch", "field": "model", "file": "pitch.mthds"},
+                        "suggestions": ["gpt-5.5", "gpt-5.4"],
+                    }
+                ]
+            case CliOutputFormat.MARKDOWN:
+                assert (
+                    "### Errors\n\n"
+                    "- `model.unknown`: The method names the llm model 'gpt-5.1', which no catalog knows. "
+                    "(pipe 'draft_pitch', field 'model', file 'pitch.mthds')\n"
+                    "  - Suggestions: `gpt-5.5`, `gpt-5.4`"
+                ) in printed
+                for retired_prose in ("## Pipe validation errors", "Domain:", "Declared concepts", "Source:"):
+                    assert retired_prose not in printed

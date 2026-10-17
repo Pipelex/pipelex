@@ -4,9 +4,9 @@ Every error of a hosted run that is not pipelex's own arrives as one of the SDK'
 the protocol's `PipelineRequestError`; pipelex's own derive from `HostedRunError`. An `ApiResponseError` carries the
 hosted API's problem document: its reason (the problem's `detail`) and, when the server advised one, its next step
 (`user_action.detail`). Answers the hosted plane authors in front of the runner (a refused key, an unknown route, a
-rate limit, an unavailable runner) advise none, so their next step follows their status here. Both CLIs read the
-same view of an error, its run id and its validation items included, so a person and an agent are told the same
-thing.
+rate limit, an unavailable runner) advise none, so their next step follows their status here. The human CLI prints
+this view of an error, its run id and its validation items included; the agent CLI reports the problem the error
+carries instead (`pipelex/cli/agent_cli/commands/run/_run_hosted.py`).
 """
 
 from typing import NamedTuple

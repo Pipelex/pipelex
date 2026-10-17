@@ -16,10 +16,10 @@ and the API-runner cannot drift in format/structure.
 ``format_validation_error_items_markdown`` is the markdown sibling of the human
 ``display_validation_error_items`` (``cli/error_handlers.py``): it renders typed
 :class:`ValidationErrorItem`s as category-grouped prose with per-item ``💡
-Suggested fix`` lines. It backs the agent ``validate`` failure surface and the
-agent ``fix`` still-invalid surface (and, in a later phase, the API
-``rendered_markdown``) so the prose an agent reads mirrors the human panel and
-cannot drift. ``build_fix_command`` is the shared builder for the copy-pasteable
+Suggested fix`` lines. It backs the API runner's ``rendered_markdown`` of an
+invalid verdict, so that prose mirrors the human panel and cannot drift; the agent
+CLI's failure surfaces list the problem's items instead, as their JSON does.
+``build_fix_command`` is the shared builder for the copy-pasteable
 ``<executable> fix bundle <path>`` footer, used by both the human and agent
 ``validate`` surfaces so the ``-L`` / ``--allow-signatures`` echo cannot drift.
 """
@@ -124,10 +124,9 @@ def render_invalid_validation_markdown(report: dict[str, Any]) -> str:
 
     Reconstructs the typed :class:`ValidationErrorItem`s from the report's serialized
     ``validation_errors`` and delegates to the shared
-    :func:`format_validation_error_items_markdown` — the *same* prose renderer that backs the
-    agent ``validate`` failure surface and the human panel. So the markdown an agent reads
-    through the hosted ``/validate`` (the opt-in ``rendered_markdown``) is byte-identical in
-    structure to the local CLI prose: category-grouped items with humanized titles, identity
+    :func:`format_validation_error_items_markdown` — the *same* prose renderer that mirrors the
+    human panel. So the markdown an agent reads through the hosted ``/validate`` (the opt-in
+    ``rendered_markdown``) is the human CLI's prose in structure: category-grouped items with humanized titles, identity
     fields, the message, and per-item ``💡 Suggested fix`` lines (which the old dict-based
     renderer dropped). A ``# Validation failed`` heading frames it.
 
