@@ -698,3 +698,73 @@ inputs      = { note = "Text" }
 output      = "ParcelLabel"
 prompt      = "Read the label from $note"
 """
+
+
+class RunContentMarkerTestData:
+    """Steps that each fail on the run's own data, which carries a marker no log line and no view may hold."""
+
+    # A value no secret pattern matches, so no redaction hides it: only the raise sites' own rule can keep it out.
+    MARKER: ClassVar[str] = "zebra-quartz-ledger-5521"
+
+    # One step per family of raise site: the input shaper, the content factory, a method's function, the composer and a
+    # structure refusing the model's answer, the stand-in model answering the marker for every field.
+    MTHDS: ClassVar[str] = """
+domain = "run_content_marker"
+description = "Steps that each fail on the run's own data"
+
+[concept.Tally]
+description = "A count"
+
+[concept.Tally.structure]
+count = { type = "integer", description = "How many there are", required = true }
+
+[concept.Ticket]
+description = "A ticket and its priority"
+
+[concept.Ticket.structure]
+priority = { choices = ["low", "high"], description = "How urgent it is", required = true }
+
+[pipe.echo_amount]
+type = "PipeCompose"
+description = "Read a number input"
+inputs = { amount = "Number" }
+output = "Text"
+template = "{{ amount }}"
+
+[pipe.echo_tally]
+type = "PipeCompose"
+description = "Read a structured input"
+inputs = { tally = "Tally" }
+output = "Text"
+template = "{{ tally.count }}"
+
+[pipe.echo_date]
+type = "PipeCompose"
+description = "Read a date input"
+inputs = { when = "Date" }
+output = "Text"
+template = "{{ when }}"
+
+[pipe.file_note]
+type = "PipeFunc"
+description = "A function whose own refusal quotes its input"
+inputs = { note = "Text" }
+output = "Text"
+function_name = "tests.integration.pipelex.pipeline.test_run_content_stays_out_of_sinks.run_content_quote_the_note"
+
+[pipe.make_ticket]
+type = "PipeCompose"
+description = "Copy a text into a field holding one of its choices"
+inputs = { level = "Text" }
+output = "Ticket"
+
+[pipe.make_ticket.construct]
+priority = { from = "level" }
+
+[pipe.count_notes]
+type = "PipeLLM"
+description = "Ask a model for a count"
+inputs = { note = "Text" }
+output = "Tally"
+prompt = "Count the items in $note"
+"""
