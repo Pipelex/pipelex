@@ -100,7 +100,12 @@ class TestGraphRenderFailure:
         assert log_kwargs["include_exception"] is False
         fields = dict(log_kwargs["fields"])
         frames = fields.pop("error.frames")
-        assert fields == {"file.path": str(spec_file), "error.code": "runtime.unexpected", "error.type": "RuntimeError", "error.chain": ["RuntimeError"]}
+        assert fields == {
+            "file.path": str(spec_file),
+            "error.code": "runtime.unexpected",
+            "error.type": "RuntimeError",
+            "error.chain": ["RuntimeError"],
+        }
         # The failing frame is named, by module, line and function, so the log says where the failure happened.
         assert any(frame.startswith(f"{GRAPH_CMD}:") for frame in frames)
 

@@ -3,10 +3,10 @@
 from typing import Any
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_progress_markdown
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.helpers.fix_results import fix_result
 
 
 class TestFixRender:
@@ -99,7 +99,7 @@ class TestFixRender:
 
         The remaining errors are the problem's own, rendered with it, so this part does not repeat them.
         """
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=2,
             fixes_applied=[
@@ -143,7 +143,7 @@ class TestFixRender:
 
     def test_still_invalid_tip_says_manual_when_no_remaining_fix(self) -> None:
         """When no remaining error carries a suggested fix, the tip points at a manual edit."""
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=1,
             fixes_applied=[],

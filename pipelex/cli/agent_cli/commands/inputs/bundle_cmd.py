@@ -15,6 +15,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_argument_error,
     agent_error,
     agent_file_error,
+    agent_unreadable_file_error,
     use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
@@ -115,6 +116,10 @@ def inputs_bundle_cmd(
 
     except FileNotFoundError as exc:
         agent_file_error(f"Bundle file not found: {bundle_path}", path=str(bundle_path), reason="not found", cause=exc)
+
+    except OSError as exc:
+        # A method file this machine would not let the command read: the file, never a fault of the method.
+        agent_unreadable_file_error(error=exc, path=str(bundle_path))
 
     except ValidateBundleError as exc:
         # A failing dry run is the problem's errors, one located item per failing pipe.

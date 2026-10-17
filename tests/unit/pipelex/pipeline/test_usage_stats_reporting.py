@@ -2,8 +2,8 @@ from typing import Any, cast
 
 import pytest
 from mthds.protocol.exceptions import PipelineRequestError
-from mthds.protocol.problem.client_problems import make_client_problem
 from mthds.protocol.problem.answers import read_answer
+from mthds.protocol.problem.client_problems import make_client_problem
 from mthds.protocol.problem.registry import CoreCode
 from mthds.runners.api.exceptions import ApiResponseError
 from pytest_mock import MockerFixture
@@ -110,10 +110,15 @@ def _generate_raising(*, error: BaseException) -> None:
 
 
 def _answered_refusal(*, status: int, body: str) -> ApiResponseError:
-    """A refusal a server answered with `body`, carrying the problem the MTHDS client reads from it, inferred from the status when the body names none."""
+    """A refusal a server answered with `body`, with the problem the MTHDS client reads from it, inferred from the status if the body names none."""
     reading = read_answer(status=status, body=body, headers={}, creates_run=False)
     return ApiResponseError(
-        f"API POST /v1/start failed ({status})", problem=reading.problem, api_url="https://runner.test", status=status, status_text="", response_body=body
+        f"API POST /v1/start failed ({status})",
+        problem=reading.problem,
+        api_url="https://runner.test",
+        status=status,
+        status_text="",
+        response_body=body,
     )
 
 

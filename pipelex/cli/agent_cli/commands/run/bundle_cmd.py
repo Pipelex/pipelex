@@ -17,7 +17,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error,
     agent_file_error,
     agent_success_formatted,
-    file_read_failure_reason,
+    agent_unreadable_file_error,
     use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.run._output_helpers import format_run_markdown
@@ -38,7 +38,7 @@ from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
 from pipelex.mthds_parsing.helpers import is_pipelex_file
-from pipelex.mthds_parsing.parser import MthdsParser
+from pipelex.mthds_parsing.parser import MthdsParser, decode_mthds_text
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import MethodEntryError, PipelineExecutionError, ValidateBundleError
@@ -169,10 +169,6 @@ def run_bundle_cmd(
 
     elif is_pipelex_file(target_path):
         bundle_path = path
-        try:
-            method_tree = list_bundle_file_tree(bundle_file=target_path)
-        except ValidateBundleError as exc:
-            agent_error(exc.message, cause=exc)
     else:
         agent_argument_error(
             f"'{path}' is not a .mthds file or directory. Use 'run pipe <code>' for pipe codes, or 'run bundle <path>' for .mthds files/directories.",
@@ -183,8 +179,24 @@ def run_bundle_cmd(
     # Load MTHDS content from bundle
     mthds_content: str | None = None
     if bundle_path:
+        # The file is read before its tree is listed: one this machine would not let the command read is the file it
+        # was handed (`client.file_unreadable`), never a fault of the method.
         try:
-            mthds_content = Path(bundle_path).read_text(encoding="utf-8")
+            mthds_bytes = Path(bundle_path).read_bytes()
+        except FileNotFoundError as exc:
+            agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc)
+        except OSError as exc:
+            agent_unreadable_file_error(error=exc, path=bundle_path)
+        if method_tree is None:
+            # The bundle file named alone: its own tree, which a folder run has already listed.
+            try:
+                method_tree = list_bundle_file_tree(bundle_file=target_path)
+            except ValidateBundleError as exc:
+                agent_error(exc.message, cause=exc)
+        try:
+            # A file that is not UTF-8 text does not parse: the invalid verdict `validate` gives it, `method.syntax`.
+            with translate_to_validate_bundle_error():
+                mthds_content = decode_mthds_text(content=mthds_bytes, source=bundle_path)
             if not pipe_code:
                 # A bundle file named alone starts at its own main_pipe.
                 # A bundle that does not parse is the invalid verdict, with the items `validate` gives,
@@ -200,11 +212,6 @@ def run_bundle_cmd(
                     )
                 pipe_code = main_pipe_code
                 hosted_pipe_code = main_pipe_code
-        except FileNotFoundError as exc:
-            agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc)
-        except (OSError, UnicodeDecodeError) as exc:
-            reason = file_read_failure_reason(error=exc)
-            agent_file_error(f"Failed to read bundle file '{bundle_path}': {reason}", path=bundle_path, reason=reason, cause=exc)
         except ValidateBundleError as exc:
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc.message}", cause=exc)
 

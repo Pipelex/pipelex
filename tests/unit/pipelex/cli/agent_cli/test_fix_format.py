@@ -7,13 +7,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
+from pipelex.pipeline.validation_errors import ValidationItemCode
 from pipelex.suggested_fix import FixSafety, SetKeyOp, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.helpers.fix_results import fix_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -152,7 +155,7 @@ class TestFixFormat:
     def test_still_invalid_emits_json_error(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=1,
             fixes_applied=[_applied_fix(str(bundle_path))],
@@ -177,11 +180,36 @@ class TestFixFormat:
         assert [item["location"]["file"] for item in parsed["errors"]] == [str(bundle_path)]
         assert "error_type" not in parsed
 
+    def test_still_invalid_items_keep_the_codes_the_verdict_gave_them(
+        self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A remaining error no stage classified takes the code the loop's last verdict gave it, as `validate` reports it."""
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
+        unparsed = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="Expected a value", source=str(bundle_path))
+        result = fix_result(
+            is_valid=False,
+            iterations=0,
+            fixes_applied=[],
+            remaining_errors=[unparsed],
+            remaining_error_codes=[ValidationItemCode(code=CoreCode.METHOD_SYNTAX, params={"finding": "Expected a value"})],
+        )
+        _patch_command(mocker, result=result)
+
+        with pytest.raises(typer.Exit):
+            fix_bundle_cmd(path=str(bundle_path), output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().err)
+        (item,) = parsed["errors"]
+        assert item["code"] == "method.syntax"
+        assert item["params"] == {"finding": "Expected a value"}
+        assert "remaining_error_codes" not in parsed
+
     def test_still_invalid_markdown_renders_prose(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Default (markdown) still-invalid renders the remaining errors as prose on stderr, not a JSON dump."""
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=1,
             fixes_applied=[_applied_fix(str(bundle_path))],

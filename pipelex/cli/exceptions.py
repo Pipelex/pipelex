@@ -65,4 +65,3 @@ class BundleClosureEmptyError(PipelexError):
     """Raised when the bundle closure a command assembled holds no .mthds bundle, so there is no method to read."""
 
     error_code = CoreCode.METHOD_NOT_FOUND
-

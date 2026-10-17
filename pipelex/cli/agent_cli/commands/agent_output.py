@@ -23,6 +23,7 @@ A hosted run's failure keeps the envelope it had before the problem, built from 
 (:func:`agent_error_hosted_envelope`, :func:`agent_error_api_response`), until the hosted plane answers problems.
 """
 
+import os
 import sys
 import traceback
 from collections.abc import Callable, Mapping
@@ -51,7 +52,7 @@ from pipelex.hosted.error_rendering import hosted_refusal_message, hosted_refusa
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from pipelex.pipeline.fixes.fix_render import format_fix_progress_markdown
-from pipelex.pipeline.validation_errors import problem_item_of, validation_item_code
+from pipelex.pipeline.validation_errors import problem_item_of
 from pipelex.pipeline.validation_render import build_fix_command, count_applicable_fixes, format_validation_error_items_markdown
 from pipelex.system.usage_stats.usage_stats_client import note_command_error
 from pipelex.system.usage_stats.usage_stats_runs import sent_usage_stats_error, usage_stats_error, usage_stats_error_of_problem
@@ -422,6 +423,22 @@ def agent_file_error(
     )
 
 
+def agent_unreadable_file_error(*, error: OSError, path: str | Path, exit_code: int = 1) -> NoReturn:
+    """Refuse a local file the operating system would not let the command read: ``client.file_unreadable``.
+
+    The file named is the one the error names, else ``path``, the file the command was handed; the reason is the
+    system's own (:func:`file_read_failure_reason`).
+
+    Args:
+        error: The error reading the file raised.
+        path: The file the command was handed.
+        exit_code: Process exit code.
+    """
+    unreadable = os.fsdecode(error.filename) if isinstance(error.filename, (str, bytes)) else str(path)
+    reason = file_read_failure_reason(error=error)
+    agent_file_error(f"Cannot read '{unreadable}': {reason}", path=unreadable, reason=reason, cause=error, exit_code=exit_code)
+
+
 def file_read_failure_reason(*, error: OSError | UnicodeDecodeError) -> str:
     """Why a local file could not be read, in the few words ``client.file_unreadable`` names: the system's own reason."""
     if isinstance(error, UnicodeDecodeError):
@@ -533,12 +550,16 @@ def agent_error_fix_bundle(*, result: FixBundleResult, bundle_path: str, message
         bundle_path: The bundle file the fix started from, resolved.
         message: The command's own sentence.
     """
+    # Each remaining error keeps the code `validate` gives it, which the verdict the loop last read decided.
     items = [
-        problem_item_of(item=item, code=validation_item_code(item=item, residual_code=CoreCode.METHOD_SCHEMA_VIOLATION))
-        for item in result.remaining_errors
+        problem_item_of(item=item, code=item_code.code, params=item_code.params)
+        for item, item_code in zip(result.remaining_errors, result.remaining_error_codes, strict=True)
     ]
     problem = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR, errors=items or None)
-    extras: dict[str, Any] = {"bundle_path": bundle_path, **result.model_dump(mode="json", exclude_none=True, exclude={"remaining_errors"})}
+    extras: dict[str, Any] = {
+        "bundle_path": bundle_path,
+        **result.model_dump(mode="json", exclude_none=True, exclude={"remaining_errors", "remaining_error_codes"}),
+    }
     _emit_problem(
         problem=problem,
         message=message,

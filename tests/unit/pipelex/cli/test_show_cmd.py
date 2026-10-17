@@ -121,7 +121,9 @@ class TestShowCmd:
             ("home", "~/.pipelex/pipelex.toml"),
         ],
     )
-    def test_do_show_config_names_the_layer_that_does_not_parse(self, mocker: MockerFixture, tmp_path: Path, broken_layer: str, expected_file: str) -> None:
+    def test_do_show_config_names_the_layer_that_does_not_parse(
+        self, mocker: MockerFixture, tmp_path: Path, broken_layer: str, expected_file: str
+    ) -> None:
         """A syntax error names the layer at fault, where its line and column are, without the home directory."""
         home_dir = tmp_path / "home"
         project_dir = home_dir / "project"

@@ -21,13 +21,13 @@ import pytest
 
 from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.errors.problem import ProblemView
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import kit_default_routing_profile_name
 from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.core.validation import MIGRATE_COMMAND
 from pipelex.system.configuration.config_loader import (
     BACKENDS_FILE_NAME,
     INFERENCE_DIR_NAME,

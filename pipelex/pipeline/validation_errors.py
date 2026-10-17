@@ -25,6 +25,7 @@ from mthds.protocol.problem.registry import (
     MethodDependencyMissingReason,
     MethodIdentifierInvalidIdentifierKind,
 )
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.exceptions import (
@@ -172,6 +173,19 @@ def build_validation_error_items(
         )
 
     return items
+
+
+class ValidationItemCode(BaseModel):
+    """The code a validation item takes in its verdict's problem, with the parameters known beside the item that it renders from.
+
+    A verdict decides it (``ValidateBundleError.item_codes``) from more than the item holds, the refusal it was built from and
+    its dry-run failures, so a surface that reports the items after the verdict is gone, ``fix bundle``'s, keeps it beside them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    code: ErrorCode
+    params: dict[str, Any] | None = None
 
 
 def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode) -> ErrorCode:

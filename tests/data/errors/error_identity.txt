@@ -111,6 +111,7 @@ FatalError | abstract
 FileTypeError | one of input.file_type_unsupported, provider.response_invalid
 FixTransactionError | runtime.unexpected
 FixWriteConflictError | method.changed_concurrently
+FixWriteFailedError | client.write_failed
 FormerReleaseConfigError | pipelex.config.invalid
 FuncOutputTypeError | pipe.output_invalid
 FunctionNamesMigrationError | inherits cause, else runtime.unexpected; or chosen: request.invalid

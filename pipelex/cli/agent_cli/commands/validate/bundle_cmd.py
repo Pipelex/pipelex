@@ -13,6 +13,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     agent_error_validate_bundle,
     agent_file_error,
     agent_success_formatted,
+    agent_unreadable_file_error,
     use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
@@ -186,6 +187,10 @@ def validate_bundle_cmd(
 
     except FileNotFoundError as exc:
         agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc, exit_code=2)
+
+    except OSError as exc:
+        # A method file this machine would not let the command read: the file, never a fault of the method.
+        agent_unreadable_file_error(error=exc, path=bundle_path, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict: the problem of the method that does not validate, format-aware. Its errors are

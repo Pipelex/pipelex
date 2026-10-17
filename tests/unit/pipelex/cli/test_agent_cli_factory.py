@@ -227,4 +227,3 @@ class TestMakePipelexForAgentCli:
         markdown = capsys.readouterr().err
         assert expected_tip in markdown
         assert markdown.count("💡") == 1
-

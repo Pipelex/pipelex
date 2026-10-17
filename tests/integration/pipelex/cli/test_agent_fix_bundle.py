@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 from typing import TYPE_CHECKING, cast
 
 import pytest
 import tomlkit
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 
 if TYPE_CHECKING:
@@ -147,6 +149,7 @@ class TestAgentFixBundle:
         assert payload["pending_signatures"] == ["agent_fix_signature.summarize_doc"]
         assert payload["fixes_applied"] == []
         assert payload["remaining_errors"] == []
+        assert "remaining_error_codes" not in payload
 
     def test_select_filter_is_honored_end_to_end(
         self,
@@ -172,3 +175,32 @@ class TestAgentFixBundle:
         assert payload["is_valid"] is False
         assert payload["fixes_applied"] == []
         assert _pipes(bundle_path)["list_ideas"]["output"] == "Idea"
+
+    @pytest.mark.skipif(sys.platform == "win32" or os.geteuid() == 0, reason="needs a directory permissions can keep this user from writing in")
+    def test_a_fix_it_cannot_write_is_a_write_failure_never_an_unreadable_file(
+        self,
+        tmp_path: Path,
+        mocker: MockerFixture,
+        capsys: pytest.CaptureFixture[str],
+        load_empty_library: Callable[[], str],
+    ) -> None:
+        """A fix whose directory refuses its write is `client.write_failed` naming the directory, and the bundle is left as it was."""
+        load_empty_library()
+        _patch_setup(mocker)
+        bundle_dir = tmp_path / "read_only"
+        bundle_dir.mkdir()
+        bundle_path = bundle_dir / "bundle.mthds"
+        bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")
+        bundle_dir.chmod(0o500)
+        try:
+            with pytest.raises(typer.Exit) as exc_info:
+                fix_bundle_cmd(path=str(bundle_path), output_format=CliOutputFormat.JSON, error_format=CliOutputFormat.JSON)
+        finally:
+            bundle_dir.chmod(0o700)
+            set_agent_cli_error_format(CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 2
+        payload = json.loads(capsys.readouterr().err)
+        assert payload["code"] == "client.write_failed"
+        assert payload["params"] == {"path": str(bundle_dir.resolve()), "reason": "permission denied"}
+        assert bundle_path.read_text(encoding="utf-8") == _FIXABLE_SEQUENCE_MTHDS

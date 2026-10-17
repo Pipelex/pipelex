@@ -51,9 +51,9 @@ from tomlkit.exceptions import TOMLKitError
 from tomlkit.items import Comment, Item, Null, Table, Whitespace
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.errors.problem import MigrationErrorBlock
 from pipelex.cogt.model_routing.routing_profile_factory import RoutingProfileLibraryBlueprint
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import MigrationErrorBlock
 from pipelex.fix_ops.applier import apply_fix_ops, delete_literally
 from pipelex.fix_ops.file_transaction import FileSnapshot, read_file_snapshot
 from pipelex.migration.engine import apply_ops_over_text
