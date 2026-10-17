@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
+from pipelex.errors.security_event import emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
@@ -100,6 +101,8 @@ class PipeRun(PipeRunProtocol):
                 "The execution of a pipe failed",
                 fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
             )
+            # A security refusal also logs its security event, once, naming the run and never what it refused.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
