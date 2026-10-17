@@ -102,8 +102,14 @@ class RequestTree(NamedTuple):
 
     @property
     def bundle_texts(self) -> dict[str, str]:
-        """The text of each `.mthds` bundle of the tree by its tree path, in tree path order, as a verdict echoes them."""
-        return {tree_path: self.contents[tree_path].decode("utf-8", errors="replace") for tree_path in self.bundle_paths}
+        """The text of each `.mthds` bundle of the tree by its tree path, in tree path order, as a valid verdict echoes them.
+
+        Decoded strictly, so it is read only once the bundles loaded: a bundle that is not UTF-8 never loads.
+
+        Raises:
+            UnicodeDecodeError: A bundle is not UTF-8 text, which a tree that loaded never holds.
+        """
+        return {tree_path: self.contents[tree_path].decode("utf-8") for tree_path in self.bundle_paths}
 
     @classmethod
     def make_from_contents(cls, *, contents: dict[str, bytes]) -> "RequestTree":

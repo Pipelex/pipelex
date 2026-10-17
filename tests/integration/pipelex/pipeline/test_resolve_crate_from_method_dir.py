@@ -1,8 +1,9 @@
 """Integration: ``resolve_crate_from_method_dir``, the host-facing resolve core over a method's written tree.
 
 Pins the contract the HTTP crate routes build on: a tree a host wrote out and holds resolves to the normalized crate
-with each bundle named by its tree path, an invalid tree or one holding no bundle raises the one shared
-``ValidateBundleError``, and the library lifecycle honors the loaded-on-success / torn-down-on-failure contract.
+with each bundle named by its tree path, an invalid tree, one holding no bundle or one calling a package nothing shipped
+raises the one shared ``ValidateBundleError``, and the library lifecycle honors the loaded-on-success /
+torn-down-on-failure contract.
 """
 
 from collections.abc import Callable, Generator
@@ -16,8 +17,10 @@ from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
+from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
+from pipelex.validation_error_types import PipeValidationErrorType
 from tests.integration.pipelex.pipeline.test_data import ResolveBundleTestData
 
 
@@ -85,8 +88,51 @@ class TestResolveCrateFromMethodDir:
             validation_errors = exc_info.value.to_error_report().validation_errors or []
             assert validation_errors, "the shared builder must produce structured validation-error items"
             assert validation_errors[0].source == "broken.mthds"
+            # Nothing of the verdict names the directory the host wrote the tree to, the report's own message included.
+            report_text = exc_info.value.to_error_report().model_dump_json()
+            assert str(tmp_path) not in report_text
+            assert str(tmp_path.resolve()) not in report_text
         else:
             assert "holds no .mthds bundle" in exc_info.value.message
         opened_library_id, _ = open_library_spy.spy_return
         assert teardown_spy.call_args_list[-1].kwargs["library_id"] == opened_library_id
         assert get_current_library_id_or_none() == current_before
+
+    def test_a_merge_error_names_the_bundles_by_their_tree_paths(self, load_empty_library: Callable[[], str], tmp_path: Path):
+        """An error raised once the bundles parsed, such as one concept declared twice, names no directory of the host."""
+        load_empty_library()
+        files = {"first.mthds": ResolveBundleTestData.MAIN_MTHDS, "second.mthds": ResolveBundleTestData.MAIN_MTHDS}
+        with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
+            resolve_crate_from_method_dir(method_dir=method_dir)
+
+        report = exc_info.value.to_error_report()
+        assert "['first.mthds', 'second.mthds']" in report.message
+        report_text = report.model_dump_json()
+        assert str(tmp_path) not in report_text
+        assert str(tmp_path.resolve()) not in report_text
+
+    def test_an_address_dependency_nothing_shipped_is_refused_without_a_lookup_or_a_fetch(
+        self,
+        load_empty_library: Callable[[], str],
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ):
+        """A static resolution reads no method installed on the host and fetches nothing: it refuses the call."""
+        load_empty_library()
+        discovery = mocker.patch(
+            "pipelex.libraries.library_manager.resolve_address_based_method",
+            side_effect=AssertionError("a static resolution must not look up installed methods or fetch by address"),
+        )
+        files = {"host.mthds": ResolveBundleTestData.ADDRESS_DEPENDENCY_MTHDS}
+        with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
+            resolve_crate_from_method_dir(method_dir=method_dir)
+
+        discovery.assert_not_called()
+        # The unresolved dependency `/v1/validate` reports, located on the pipe calling it, in the words of the contents
+        # core's refusal, whose marker a hosted run tells it apart by.
+        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        assert len(validation_errors) == 1, validation_errors
+        item = validation_errors[0]
+        assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
+        assert item.source == "host.mthds"
+        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message

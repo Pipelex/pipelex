@@ -303,6 +303,20 @@ class TestPipeIoRoute:
         assert body["pipe_ref"] == "nomain.echo"
         assert body["default_pipe_ref"] == "nomain.echo"
 
+    @pytest.mark.parametrize("all_pipes", [False, True])
+    def test_a_manifest_that_does_not_parse_refuses_only_a_request_naming_no_pipe(self, all_pipes: bool):
+        """A request naming its pipe never reads the manifest to select it, so a broken one only leaves the default unstated."""
+        client = _build_client()
+        files = {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}
+
+        named = _valid_arm(client, {"files": files, "pipe_ref": "smoke.echo", "all_pipes": all_pipes})
+        assert named["pipe_ref"] == "smoke.echo"
+        assert "default_pipe_ref" in named
+        assert named["default_pipe_ref"] is None
+
+        unnamed = client.post(PIPE_IO_PATH, json={"files": files, "all_pipes": all_pipes})
+        _assert_input_422(unnamed, error_type="MethodEntryError")
+
     @pytest.mark.parametrize(
         "request_fields",
         [
@@ -492,6 +506,9 @@ class TestPipeIoRoute:
             pytest.param({"files": {"main.mthds": NO_MAIN_PIPE_MTHDS}}, 422, id="no-entry-pipe-422"),
             # A manifest that does not parse is the method entry rule's refusal, as on a run naming no pipe.
             pytest.param({"files": {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}}, 422, id="invalid-manifest-422"),
+            pytest.param(
+                {"files": {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}, "pipe_ref": "smoke.echo"}, 200, id="invalid-manifest-named-pipe"
+            ),
         ],
     )
     def test_every_exit_tears_its_library_down(self, mocker: MockerFixture, payload: dict[str, Any], expected_status: int):

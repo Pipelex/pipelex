@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
-from pipelex_api.routes.pipelex.crate_ops import CrateInvalidReport, invalid_crate_report_response, resolved_crate
+from pipelex_api.routes.pipelex.crate_ops import CrateInvalidReport, ResolvedMethod, invalid_crate_report_response, project_resolved_method
 from pipelex_api.schemas.models import MethodTreeRequest
 
 router = APIRouter(tags=["resolve"], route_class=JsonBodyRoute)
@@ -67,8 +67,13 @@ async def resolve_mthds(request: Request, request_data: MethodTreeRequest) -> JS
       is a 501 until server-side method registry resolution exists; auth is 401/403; server fault is
       5xx. All RFC 7807 `application/problem+json` via the global handlers.
     """
-    async with resolved_crate(request=request, request_data=request_data) as resolution:
-        if isinstance(resolution, ErrorReport):
-            return invalid_crate_report_response(resolution)
-        report = ResolveValidReport(crate=json.loads(encode_crate_json(resolution.crate)))
-        return JSONResponse(content=report.model_dump(mode="json", by_alias=True))
+    outcome = await project_resolved_method(request=request, request_data=request_data, project=_crate_response)
+    if isinstance(outcome, ErrorReport):
+        return invalid_crate_report_response(outcome)
+    return outcome
+
+
+def _crate_response(resolution: ResolvedMethod) -> JSONResponse:
+    """The valid arm carrying the resolved method's crate, encoded in the worker thread that resolved it."""
+    report = ResolveValidReport(crate=json.loads(encode_crate_json(resolution.crate)))
+    return JSONResponse(content=report.model_dump(mode="json", by_alias=True))

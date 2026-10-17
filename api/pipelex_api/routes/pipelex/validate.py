@@ -20,7 +20,7 @@ from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
 from pipelex_api.routes.pipelex.method_selection import select_request_method
-from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id
+from pipelex_api.routes.pipelex.pipeline import ApiRunner, bound_read_scope, get_request_user_id
 from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
@@ -363,14 +363,15 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     user_id = get_request_user_id(request)
     # The scope the host named, which the validator reads the method under: a dispatched validator hands the method's
     # trees to its worker through that scope's blob store. Never the caller's id a run falls back to, a prefix no host
-    # lists or erases, where a validation must leave nothing stored.
-    read_scope = request_data.read_scope
+    # lists or erases, where a validation must leave nothing stored. Bound to the caller on every arm, the contents arm
+    # included, which reads no blob store of its own (`bound_read_scope`).
+    read_scope = bound_read_scope(request, requested=request_data.read_scope)
     # Verdict-as-value: the runner resolves the orchestration mode and dispatches through the bundle
     # validator registry, returning either a validation verdict or a classified fault report.
     # Only `ErrorReport`s with validation diagnostics are invalid-bundle verdicts (→ 200
     # InvalidReport); backend/config/runtime reports keep the global problem+json mapping.
+    validated_method: RequestMethod | None = None
     if request_data.mthds_contents is not None:
-        validated_contents = request_data.mthds_contents
         verdict = await ApiRunner(
             user_id=user_id,
             extras=request_data.analytics_groups,
@@ -395,7 +396,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         request_method, method_label = await select_request_method(
             request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=read_scope
         )
-        validated_contents = list(request_method.tree.bundle_texts.values())
+        validated_method = request_method
         # The entry pipe of the tree, the one a selector-less run executes, is the graph's pipe and the default the
         # verdict reports; a tree with none still validates.
         entry = _optional_tree_entry(request_method=request_method, method_label=method_label)
@@ -422,6 +423,8 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             return _invalid_report_response(verdict, requested_formats=requested_formats)
         return problem_response_from_error_report(verdict, request=request)
     report = verdict
+    # The echo of a tree is its bundles' text, decoded strictly now that the valid verdict says they loaded.
+    validated_contents = request_data.mthds_contents if validated_method is None else list(validated_method.tree.bundle_texts.values())
 
     # Splat the report's own field/value pairs so a future canonical field rides the wire
     # automatically — the wrapper never enumerates (and silently drops) report fields. `is_valid`

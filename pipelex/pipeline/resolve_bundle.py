@@ -9,6 +9,10 @@ Two entry points, the host-facing siblings of the CLI's directory-based crate lo
   the tree in ``WRITTEN_METHOD_TREES``, its bundles are named by their tree paths.
 - ``resolve_crate_from_contents`` resolves bundle contents held as strings, without touching the filesystem.
 
+Both resolve statically from what the caller sent: a package the method calls by its address is loaded only from the
+packages shipped with it, and one nothing shipped is refused with ``unshipped_address_dependency_message``, never looked
+up among the methods installed on the host or fetched.
+
 Same engine, same verdict vocabulary: an invalid library raises the one shared
 ``ValidateBundleError`` (carrying the structured ``validation_errors`` items every surface
 renders), so a resolve verdict cannot drift from a validate verdict.
@@ -33,6 +37,7 @@ from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -112,7 +117,8 @@ def resolve_crate_from_method_dir(*, method_dir: Path, methods_dirs: Sequence[Pa
     The directory is loaded alone, as the caller's own library directory, exactly as ``validate_bundle`` loads a
     ``method_dir``: every bundle of the tree is loaded as a member of it, every other file is one a step may read, such
     as a ``PipeDocGen`` template, and ``methods_dirs``, laid out like ``.mthds/methods/``, hold the packages the caller
-    ships with the method, searched first for an address-based reference. A tree the host holds in
+    ships with the method, the only place an address-based reference is looked up: one they do not answer is refused,
+    since a static resolution reads no method installed on the host and fetches nothing. A tree the host holds in
     ``WRITTEN_METHOD_TREES`` (``pipelex.libraries.written_trees``) has its bundles named by their tree paths, so the
     diagnostics and the crate's ``source_map`` never name a path on the host. Resolution is static, as for contents: no
     dry run.
@@ -129,8 +135,9 @@ def resolve_crate_from_method_dir(*, method_dir: Path, methods_dirs: Sequence[Pa
         The normalized library crate (fully qualified, natives materialized, fingerprint set).
 
     Raises:
-        ValidateBundleError: the produced negative verdict — the method holds no bundle, or its library could not be
-            parsed, loaded, or validated; carries the structured validation-error items.
+        ValidateBundleError: the produced negative verdict — the method holds no bundle, calls a package by its address
+            that nothing shipped, or its library could not be parsed, loaded, or validated; carries the structured
+            validation-error items.
         CrateNormalizationError: internal invariant violation in the normalization pass — deliberately not translated.
     """
     library_manager = get_library_manager()
@@ -140,6 +147,7 @@ def resolve_crate_from_method_dir(*, method_dir: Path, methods_dirs: Sequence[Pa
                 library_id=library_id,
                 library_dirs=[method_dir],
                 methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
+                address_dependency_sources=AddressDependencySources.SHIPPED,
             )
         crate = library_manager.get_crate(library_id)
         if crate is None:
@@ -182,8 +190,5 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
                 continue
             alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref)
             if QualifiedRef.is_address_based_alias(alias):
-                msg = (
-                    f"In-memory resolve cannot load address-based dependency '{alias}' from the host filesystem; "
-                    "provide the dependency contents in the request or use directory-based resolution."
-                )
+                msg = unshipped_address_dependency_message(alias=alias)
                 raise PipeLibraryError(msg)

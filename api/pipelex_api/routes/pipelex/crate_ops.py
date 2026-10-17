@@ -4,7 +4,10 @@ They all take a method the same way `/validate` and the run routes do — a tree
 `dependencies` and `resources`, XOR an address-form `method_ref` — read it with the same machinery
 (`pipelex_api.routes.pipelex.method_selection`), write it out as a run writes it
 (`pipelex_api.method_tree_request.written_method`), and resolve it through the same engine core
-(`pipelex.pipeline.resolve_bundle.resolve_crate_from_method_dir`). They speak the same verdict vocabulary as
+(`pipelex.pipeline.resolve_bundle.resolve_crate_from_method_dir`). The resolution is static: a package the method
+calls by its address loads only when the request shipped it, in `dependencies` or under a fetched package's
+`.mthds/methods/`, and one nothing shipped is the invalid verdict, never a lookup among the methods installed on this
+server or a fetch. They speak the same verdict vocabulary as
 `POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with the invalid arm carrying the
 structured `validation_errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
 the envelopes cannot drift.
@@ -13,12 +16,16 @@ The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s
 (`pending_signatures`, `is_runnable`) — resolution is static (no dry-run sweep, matching
 `pipelex resolve`), so runnability is not part of its vocabulary. The per-pipe route (`/pipe-io`)
 rides that same static core: it reads the selected pipe's *declared* IO with no dry-run sweep.
+
+Writing the tree, loading it, projecting the crate and tearing the library down are blocking work, so they run in one
+worker thread (`project_resolved_method`), never on the event loop: a slow resolution never stalls the server's other
+requests, and the current library, a context variable, is bound, read and cleared in that one thread's context.
 """
 
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+import asyncio
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Literal, NamedTuple, NoReturn
+from typing import Literal, NamedTuple, NoReturn, TypeVar
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -39,6 +46,9 @@ from pipelex_api.errors import raise_not_implemented
 from pipelex_api.method_tree_request import RequestMethod, WrittenMethod, manifest_of, written_method
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.schemas.models import MethodTreeRequest
+
+#: What a route makes of a resolved method, in the worker thread that holds it loaded.
+ProjectionT = TypeVar("ProjectionT")
 
 
 class GeneratedArtifact(BaseModel):
@@ -114,20 +124,45 @@ def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ErrorRe
         return validate_error.to_error_report()
 
 
-@asynccontextmanager
-async def resolved_crate(*, request: Request, request_data: MethodTreeRequest) -> AsyncGenerator[ResolvedMethod | ErrorReport, None]:
-    """Resolve the method the request names into its normalized crate, holding it loaded for the block.
+def _project_written_method(
+    *,
+    request_method: RequestMethod,
+    method_label: str,
+    project: Callable[[ResolvedMethod], ProjectionT],
+) -> ProjectionT | ErrorReport:
+    """Write the method out, resolve it, hand it to `project` while it is loaded, and release everything: blocking work.
 
-    The method is read as `/validate` reads it (`select_request_method`), written out as a run writes it, and loaded
-    alone as the caller's own library directory, its dependency trees as the packages it ships. The block receives
-    the `ResolvedMethod`, with the freshly opened library loaded and current so it can read live pipes, and the
-    written tree held; both are released when the block exits, however it exits. A method that does not resolve
-    gives the block its invalid verdict instead, an `ErrorReport` carrying the structured `validation_errors`, with
+    Runs whole in one worker thread, so the library the core binds as current in this thread's context is the one
+    `project` reads and the one torn down here, however `project` exits.
+    """
+    with written_method(request_method=request_method) as written:
+        resolution = _resolve_written_method(written=written)
+        if isinstance(resolution, ErrorReport):
+            return resolution
+        try:
+            return project(ResolvedMethod(crate=resolution, request_method=request_method, method_label=method_label))
+        finally:
+            teardown_current_library()
+
+
+async def project_resolved_method(
+    *,
+    request: Request,
+    request_data: MethodTreeRequest,
+    project: Callable[[ResolvedMethod], ProjectionT],
+) -> ProjectionT | ErrorReport:
+    """Resolve the method the request names into its normalized crate, and return what `project` makes of it.
+
+    The method is read as `/validate` reads it (`select_request_method`), then written out as a run writes it and loaded
+    alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread.
+    `project` runs in that thread with the freshly opened library loaded and current, so it can read live pipes, and the
+    written tree held; both are released when it returns or raises. A method that does not resolve returns its invalid
+    verdict instead, an `ErrorReport` carrying the structured `validation_errors`, with `project` never called and
     nothing left loaded.
 
-    Raises (as problem documents, before the block runs):
-        ApiError: 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`.
-        MethodRefError subclasses: address-form fetch and location failures.
+    Raises (as problem documents): 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`;
+    the address-form fetch and location failures (`MethodRefError` subclasses); and whatever `project` raises, such as
+    a selection refusal.
     """
     if request_data.method_ref is not None and not looks_like_method_ref(request_data.method_ref):
         raise_not_implemented(
@@ -139,15 +174,12 @@ async def resolved_crate(*, request: Request, request_data: MethodTreeRequest) -
     selected = await select_request_method(
         request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
     )
-    with written_method(request_method=selected.request_method) as written:
-        resolution = _resolve_written_method(written=written)
-        if isinstance(resolution, ErrorReport):
-            yield resolution
-            return
-        try:
-            yield ResolvedMethod(crate=resolution, request_method=selected.request_method, method_label=selected.method_label)
-        finally:
-            teardown_current_library()
+    return await asyncio.to_thread(
+        _project_written_method,
+        request_method=selected.request_method,
+        method_label=selected.method_label,
+        project=project,
+    )
 
 
 class RequestedPipe(NamedTuple):
@@ -157,7 +189,7 @@ class RequestedPipe(NamedTuple):
     """The qualified `domain.pipe_code` actually selected — always qualified, whatever the request spelled."""
 
     pipe: PipeAbstract
-    """The live pipe, read from the library `resolved_crate` holds loaded + current."""
+    """The live pipe, read from the library `project_resolved_method` holds loaded + current."""
 
 
 class PipeSelectionMissKind(StrEnum):
@@ -199,7 +231,7 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     answer for the same `pipe_code`. A chain finding no entry pipe or several has no run-route twin to
     match: this route refuses both the way the pipe-selector design classifies them.
 
-    Must be called inside `resolved_crate`'s block, while its library is loaded + current.
+    Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if pipe_ref is not None:
         selected = _select_entry_pipe(pipe_ref, origin=_SelectorOrigin.REQUEST)
@@ -252,7 +284,7 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
     `/validate`'s `default_pipe_ref`, which is the run default and names the first of several
     declaring domains where this chain refuses to choose.
 
-    Must be called inside `resolved_crate`'s block, while its library is loaded + current.
+    Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if manifest_main_pipe:
         return _select_entry_pipe(manifest_main_pipe, origin=_SelectorOrigin.MANIFEST)
@@ -316,7 +348,7 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
 
 
 def teardown_current_library() -> None:
-    """Tear down the library `resolved_crate` left loaded + current (its block's cleanup)."""
+    """Tear down the library the resolution left loaded + current, once its projection is done."""
     library_id = get_current_library_id_or_none()
     clear_current_library()
     if library_id is not None:

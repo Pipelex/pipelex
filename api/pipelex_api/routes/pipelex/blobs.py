@@ -4,7 +4,8 @@ A sender about to send a method by hash first asks which of its files' bytes thi
 missing ones to the targets the answer names (`pipelex_api.routes.blob_upload`), then sends the request with hash
 entries. The blobs live in the runner's blob store (`pipelex_api.blob_store`), under the caller's scope: the request's
 `read_scope` query parameter when a multi-tenant host sends one for the organization it serves, else the caller's own
-id, the scope a run's hash entries are resolved in.
+id, the scope a run's hash entries are resolved in. A caller holding its own token (`AUTH_MODE=jwt`) may name only a
+scope under its own id (`bound_read_scope`).
 """
 
 from typing import Annotated
@@ -19,6 +20,7 @@ from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_tree_request import ensure_within_tree_limits
+from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE
 from pipelex_api.routes.pipelex.pipeline import resolve_blob_scope
 
 router = APIRouter(tags=["blobs"], route_class=JsonBodyRoute)
@@ -89,6 +91,7 @@ def _unique_blobs(*, blobs: list[BlobRef]) -> dict[str, int]:
     "/blobs/missing",
     summary="Which of these blobs the runner lacks, and where to upload each.",
     openapi_extra={"x-mthds-protocol": True},
+    responses={403: PROBLEM_403_READ_SCOPE},
 )
 async def find_missing_blobs(
     request: Request,

@@ -470,7 +470,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -829,7 +830,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -955,7 +957,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -1045,7 +1048,9 @@ paths:
           description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
             (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).'
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -1145,7 +1150,9 @@ paths:
           description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
             (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).'
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -1240,7 +1247,9 @@ paths:
           description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
             (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
-            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).'
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -1619,6 +1628,13 @@ paths:
         '500':
           description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
             override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '403':
+          description: '`ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under
+            the caller''s own `user_id`, the only scope its token may read.'
           content:
             application/problem+json:
               schema:

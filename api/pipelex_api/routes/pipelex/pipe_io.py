@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from pipelex.base_exceptions import ErrorReport
 from pipelex.interpreter_hub import get_own_pipes, get_pipe_library
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.input_form import InputForm, OutputForm
 from pipelex.pipeline.pipe_io_contracts import PipeIOContracts
 from pipelex.pipeline.validate_bundle import build_pending_signatures
@@ -15,9 +16,10 @@ from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROB
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
     RequestedPipe,
+    ResolvedMethod,
     invalid_crate_report_response,
+    project_resolved_method,
     resolve_requested_pipe,
-    resolved_crate,
     select_default_pipe,
 )
 from pipelex_api.schemas.models import MethodTreePipeRequest
@@ -145,43 +147,72 @@ async def pipe_io(request: Request, request_data: PipeIORequest) -> JSONResponse
       an artifact that cannot be derived (`PipeIOContractError`) is a 500. All RFC 7807
       `application/problem+json` via the global handlers.
     """
-    async with resolved_crate(request=request, request_data=request_data) as resolution:
-        if isinstance(resolution, ErrorReport):
-            return invalid_crate_report_response(resolution)
+    outcome = await project_resolved_method(
+        request=request,
+        request_data=request_data,
+        project=lambda resolution: _pipe_io_response(resolution=resolution, request_data=request_data),
+    )
+    if isinstance(outcome, ErrorReport):
+        return invalid_crate_report_response(outcome)
+    return outcome
+
+
+def _manifest_main_pipe_if_readable(*, resolution: ResolvedMethod) -> tuple[str | None, bool]:
+    """The manifest's `main_pipe`, and whether the manifest could be read, for a request that named its pipe.
+
+    Such a request selects its pipe without the manifest, so a `METHODS.toml` that cannot be read refuses nothing: it
+    only leaves the method's own default unstated.
+    """
+    try:
+        return resolution.manifest_main_pipe, True
+    except MethodEntryError:
+        return None, False
+
+
+def _pipe_io_response(*, resolution: ResolvedMethod, request_data: PipeIORequest) -> JSONResponse:
+    """The valid arm for a resolved method, built in the worker thread that holds its library loaded and current."""
+    # The manifest is read strictly only when the selection depends on it, which is when the request names no pipe.
+    manifest_readable = True
+    if request_data.pipe_ref is None:
         manifest_main_pipe = resolution.manifest_main_pipe
+    else:
+        manifest_main_pipe, manifest_readable = _manifest_main_pipe_if_readable(resolution=resolution)
+    default_pipe_ref: str | None = None
+    if manifest_readable:
         default_pipe = select_default_pipe(resolution.crate, manifest_main_pipe=manifest_main_pipe)
         default_pipe_ref = default_pipe.ref if isinstance(default_pipe, RequestedPipe) else None
-        pipe_ref: str | None
-        described_pipes: list[PipeAbstract]
-        if request_data.all_pipes:
-            # A whole-method answer needs no selection: a requested ref is still resolved (and refused
-            # when it names nothing), but a method with no single entry pipe is described all the same.
-            if request_data.pipe_ref is not None:
-                pipe_ref = resolve_requested_pipe(resolution.crate, pipe_ref=request_data.pipe_ref, manifest_main_pipe=manifest_main_pipe).ref
-            else:
-                pipe_ref = default_pipe_ref
-            # The closure's own pipes in load order, the order `/validate`'s report walks.
-            described_pipes = get_own_pipes()
+    pipe_ref: str | None
+    described_pipes: list[PipeAbstract]
+    if request_data.all_pipes:
+        # A whole-method answer needs no selection: a requested ref is still resolved (and refused
+        # when it names nothing), but a method with no single entry pipe is described all the same.
+        if request_data.pipe_ref is not None:
+            pipe_ref = resolve_requested_pipe(resolution.crate, pipe_ref=request_data.pipe_ref, manifest_main_pipe=None).ref
         else:
-            requested = resolve_requested_pipe(resolution.crate, pipe_ref=request_data.pipe_ref, manifest_main_pipe=manifest_main_pipe)
-            pipe_ref = requested.ref
-            described_pipes = [requested.pipe]
-        # Raises `PipeIOContractError` when a pipe's input or output JSON Schema cannot be rendered;
-        # it reaches the global handler as a no-verdict 500, exactly as on `/validate`.
-        artifacts = build_pipe_io_artifacts(described_pipes)
-        pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
-        report = PipeIOValidReport(
-            pipe_ref=pipe_ref,
-            pipe_io_contracts=artifacts.pipe_io_contracts,
-            input_form=artifacts.input_form,
-            output_form=artifacts.output_form,
-            default_pipe_ref=default_pipe_ref,
-            pending_signatures=pending_signatures,
-            is_runnable=not pending_signatures,
-        )
-        # Dumped as `/validate` dumps its valid arm, never with `exclude_none`: that would strip the
-        # contracts' `item_count: null` and break the byte equality with `/validate`'s maps.
-        content: dict[str, Any] = report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude={"files"})
-        if request_data.include_files:
-            content["files"] = resolution.request_method.tree.bundle_texts
-        return JSONResponse(content=content)
+            pipe_ref = default_pipe_ref
+        # The closure's own pipes in load order, the order `/validate`'s report walks.
+        described_pipes = get_own_pipes()
+    else:
+        requested = resolve_requested_pipe(resolution.crate, pipe_ref=request_data.pipe_ref, manifest_main_pipe=manifest_main_pipe)
+        pipe_ref = requested.ref
+        described_pipes = [requested.pipe]
+    # Raises `PipeIOContractError` when a pipe's input or output JSON Schema cannot be rendered;
+    # it reaches the global handler as a no-verdict 500, exactly as on `/validate`.
+    artifacts = build_pipe_io_artifacts(described_pipes)
+    pending_signatures = build_pending_signatures(get_pipe_library().get_pipes_dict())
+    report = PipeIOValidReport(
+        pipe_ref=pipe_ref,
+        pipe_io_contracts=artifacts.pipe_io_contracts,
+        input_form=artifacts.input_form,
+        output_form=artifacts.output_form,
+        default_pipe_ref=default_pipe_ref,
+        pending_signatures=pending_signatures,
+        is_runnable=not pending_signatures,
+    )
+    # Dumped as `/validate` dumps its valid arm, never with `exclude_none`: that would strip the
+    # contracts' `item_count: null` and break the byte equality with `/validate`'s maps.
+    content: dict[str, Any] = report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude={"files"})
+    if request_data.include_files:
+        # Decoded strictly: every bundle loaded, so every bundle is UTF-8 text.
+        content["files"] = resolution.request_method.tree.bundle_texts
+    return JSONResponse(content=content)

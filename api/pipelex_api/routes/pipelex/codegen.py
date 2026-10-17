@@ -16,7 +16,13 @@ from pydantic import BaseModel, Field, model_validator
 
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
-from pipelex_api.routes.pipelex.crate_ops import CrateInvalidReport, GeneratedArtifact, invalid_crate_report_response, resolved_crate
+from pipelex_api.routes.pipelex.crate_ops import (
+    CrateInvalidReport,
+    GeneratedArtifact,
+    ResolvedMethod,
+    invalid_crate_report_response,
+    project_resolved_method,
+)
 from pipelex_api.schemas.models import MethodTreeRequest
 
 router = APIRouter(tags=["codegen"], route_class=JsonBodyRoute)
@@ -141,10 +147,8 @@ async def codegen_mthds(request: Request, request_data: CodegenRequest) -> JSONR
 
 async def _generate_codegen_response(*, request: Request, request_data: CodegenRequest, generation_report: CodeGenerationReport) -> JSONResponse:
     """The body of `codegen_mthds`, timed by `generation_report`, which an invalid verdict declares failed."""
-    async with resolved_crate(request=request, request_data=request_data) as resolution:
-        if isinstance(resolution, ErrorReport):
-            generation_report.declare_failed()
-            return invalid_crate_report_response(resolution)
+
+    def _projection_response(resolution: ResolvedMethod) -> JSONResponse:
         # `types` is concept-set-wide: no pipe is selected, so the method's manifest `main_pipe` is unused. A future
         # per-pipe kind reads it off the resolution and hands it to `resolve_requested_pipe`.
         crate = resolution.crate
@@ -166,3 +170,9 @@ async def _generate_codegen_response(*, request: Request, request_data: CodegenR
             lock=projection.lock_content,
         )
         return JSONResponse(content=report.model_dump(mode="json", by_alias=True))
+
+    outcome = await project_resolved_method(request=request, request_data=request_data, project=_projection_response)
+    if isinstance(outcome, ErrorReport):
+        generation_report.declare_failed()
+        return invalid_crate_report_response(outcome)
+    return outcome

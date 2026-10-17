@@ -117,6 +117,7 @@ own page. Classes are grouped by subsystem.
 ## Methods
 
 - [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch
+- [`MethodDependencyNotShippedError`](method-dependency-not-shipped-error.md) — Method dependency not shipped
 - [`MethodFetchDisabledError`](method-fetch-disabled-error.md) — Method fetch disabled
 - [`MethodFetchError`](method-fetch-error.md) — Method fetch
 - [`MethodInstallError`](method-install-error.md) — Method install

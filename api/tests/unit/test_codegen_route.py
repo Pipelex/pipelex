@@ -151,8 +151,8 @@ class TestCodegenRoute:
         assert open_spy.call_count == teardown_spy.call_count
 
     def test_codegen_tears_down_library_when_emission_raises(self, mocker: MockerFixture):
-        # Leak canary: a failure in the success window — after resolve_requested_crate left its
-        # library loaded + current, before the finally — must NOT leak that library. The synthetic
+        # Leak canary: a failure in the success window — after project_resolved_method's worker left
+        # the library loaded + current, before its teardown in the finally — must NOT leak that library. The synthetic
         # RuntimeError propagates to the global Exception handler (500), and the conservation
         # property still holds: opens == teardowns.
         library_manager = get_library_manager()

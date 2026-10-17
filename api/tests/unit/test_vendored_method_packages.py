@@ -21,6 +21,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import DisclosureMode
 from pipelex.config import get_config
+from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -347,6 +348,32 @@ class TestVendoredMethodPackages:
             assert [(item["error_type"], item["missing_pipe_code"]) for item in verdict["validation_errors"]] == [
                 ("unresolved_package_dependency", UNRESOLVED_PACKAGE_REFERENCE)
             ]
+
+    @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    def test_a_crate_route_never_looks_up_or_fetches_a_dependency_nothing_shipped(self, mocker: MockerFixture, tmp_path: Path, route: str):
+        """Even with fetch-on-miss on, a crate route resolves statically, refusing the call in the words a hosted run matches."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
+        lookup = mocker.patch(
+            "pipelex.libraries.library_manager.resolve_address_based_method",
+            side_effect=AssertionError("a crate route must not look up installed methods or fetch by address"),
+        )
+        body = _tree_body(VENDORED_PROBE_FILES)
+        body.pop("dependencies")
+        if route == "/v1/codegen":
+            body |= {"kind": "types", "target": "ts-zod"}
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is False, response.text
+        lookup.assert_not_called()
+        [item] = verdict["validation_errors"]
+        assert item["error_type"] == "unresolved_package_dependency"
+        assert item["source"] == "bundle.mthds"
+        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} '{VENDORED_PROBE_ADDRESS}'" in item["message"]
+        assert ADDRESS_DEPENDENCY_REFUSAL_MARKER in verdict["message"]
 
     def test_validate_by_method_ref_resolves_the_dependency_it_ships(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]

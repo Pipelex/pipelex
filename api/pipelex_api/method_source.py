@@ -212,7 +212,15 @@ def _read_listed_tree(*, root: Path, package_address: str, label: str) -> Reques
 
 
 def _read_package_method(*, package: FetchedMethodPackage) -> RequestMethod:
-    """The package's tree and the dependency trees it ships, read from the commit's git objects."""
+    """The package's tree and the dependency trees it ships, read from the commit's git objects.
+
+    The staging directory is read into memory and removed here, and a route loading the method writes the tree out a
+    second time (`written_method`), rather than loading the staged directory in place. The staged copy is the commit
+    as git holds it: files the membership rule leaves out of the tree, symlinks, and entries under `.mthds/methods/`
+    that are no package all stay in it, so loading it would load more than the tree. The tree is needed in memory
+    anyway, for the Python policy, the limits, the `include_files` echo and the blob store, and every method a route
+    loads, sent or fetched, is then written by the one `written_method`, which owns its teardown.
+    """
     staging_dir = Path(tempfile.mkdtemp(prefix="pipelex-package-"))
     try:
         package_root = staging_dir / "package"

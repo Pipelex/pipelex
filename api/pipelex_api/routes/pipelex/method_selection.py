@@ -60,6 +60,11 @@ async def select_request_method(
     Raises (as problem documents): the refusals of `read_request_method` and `with_resources` (422s), the
     `method_ref` fetch outcomes (`fetched_method`), a 422 `InvalidBundle` for a method whose own tree holds no `.mthds`
     file, and the Python policy's 403s (`ensure_python_allowed`).
+
+    The Python policy holds for the crate routes too, although they run nothing: on a deployment that is not
+    sandbox-hosted, loading the library imports every `.py` of the tree declaring a `StructuredContent` subclass
+    (`LibraryManager.load_libraries`), which runs that file's module-level code in this process. Which files those are
+    is a static scan's call, so the policy refuses every `.py` there, exactly as a run and `/v1/validate` do.
     """
     if method_ref is not None:
         fetched = await asyncio.to_thread(fetched_method, method_ref)
