@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast, get_args
 
 from pydantic import BaseModel, ValidationError
+from pydantic_core import PydanticKnownError
+from pydantic_core.core_schema import ErrorType
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from pydantic_core import ErrorDetails
     from rich.repr import Result as RichReprResult
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
@@ -163,6 +167,11 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
 def format_pydantic_validation_error(exc: ValidationError) -> str:
     """Format a Pydantic ValidationError into a readable string with detailed error information.
 
+    The text quotes the values pydantic refused, an invalid enum value or a literal it did not expect, so it is for a
+    document whose author reads it: the caller's own method or the operator's configuration. A run's data, its inputs,
+    a model's answer or a value a pipe built, is never refused through it: `format_validation_error_without_input`
+    renders that refusal without the data.
+
     Args:
         exc: The Pydantic ValidationError exception
 
@@ -171,6 +180,132 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
     """
     return analyze_pydantic_validation_error(exc).error_msg
+
+
+#: The keys of a pydantic error's context whose values come from the schema, never from the input: the bounds a field
+#: declares, the values, tags, schemes or version it expects, a discriminator's name, a pattern, and the class or the kind
+#: of collection it validates into. A context holding any other key, the input's own tag, its length, or a parser's or
+#: a validator's ``error`` text, which can quote the input, keeps its message out of the rendering.
+SCHEMA_CONTEXT_KEYS = frozenset(
+    {
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "multiple_of",
+        "min_length",
+        "max_length",
+        "max_digits",
+        "decimal_places",
+        "whole_digits",
+        "expected",
+        "expected_tags",
+        "expected_schemes",
+        "expected_version",
+        "discriminator",
+        "pattern",
+        "class_name",
+        "class",
+        "field_type",
+        "method_name",
+        "tz_expected",
+        "encoding",
+    }
+)
+
+#: The error type of a key the model forbids, whose last location component is that key, as the caller sent it.
+EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
+
+#: The error type pydantic gives a validator's ``ValueError``, whose message is the validator's own text.
+VALUE_ERROR_TYPE = "value_error"
+
+#: Every error type pydantic itself knows how to word.
+_PYDANTIC_ERROR_TYPES: frozenset[str] = frozenset(get_args(ErrorType))
+
+
+def _pydantic_own_reason(*, error: ErrorDetails) -> str | None:
+    """The error's message when nothing in it came from the input, or ``None`` when any of it may have.
+
+    A validator's ``InputFreeValueError`` keeps its message, which declares it holds nothing of the value. Any other
+    type pydantic does not know is a ``PydanticCustomError``'s, whose message the validator wrote. A known type is
+    kept only when every key of its context is in ``SCHEMA_CONTEXT_KEYS``, so that its template is filled from the
+    schema alone, and when its message is exactly the one pydantic renders for it, which a ``PydanticCustomError``
+    reusing a built-in type's name with a message of its own is not.
+    """
+    error_type = error["type"]
+    context = error.get("ctx")
+    if error_type == VALUE_ERROR_TYPE and context is not None and isinstance(context.get("error"), InputFreeValueError):
+        # A validator's refusal that declares its message holds nothing of the value: pydantic's "Value error, " prefix
+        # and the validator's own sentence.
+        return error["msg"]
+    if error_type not in _PYDANTIC_ERROR_TYPES:
+        # A type pydantic does not know, and so a `PydanticCustomError`'s, worded by the validator.
+        return None
+    if context is not None and not SCHEMA_CONTEXT_KEYS.issuperset(context):
+        # A value of the context may come from the input, or be a validator's or a parser's own text.
+        return None
+    try:
+        own_message = PydanticKnownError(cast("ErrorType", error_type), context).message()
+    except (KeyError, TypeError, ValueError):
+        # Not with the context its template needs: the message is not pydantic's.
+        return None
+    if own_message != error["msg"]:
+        return None
+    return own_message
+
+
+def refusal_reason_without_input(*, error: ErrorDetails) -> str:
+    """One error's reason, never anything of the input it refused: pydantic's own message, or else the error's type."""
+    return _pydantic_own_reason(error=error) or error["type"]
+
+
+def _error_location(*, error: ErrorDetails) -> str:
+    """An error's dotted location, a forbidden key's stopping at its parent, since the key is the input's own text."""
+    location_parts = error["loc"][:-1] if error["type"] == EXTRA_FORBIDDEN_ERROR_TYPE else error["loc"]
+    return ".".join(str(part) for part in location_parts)
+
+
+def validation_error_locations(*, validation_error: ValidationError) -> list[str]:
+    """The dotted location of each error of a ``ValidationError``, once each and in order, without what it refused.
+
+    A forbidden key's location stops at its parent, the key being the input's own text, and an error at the root has no
+    location, so it adds none.
+    """
+    locations: list[str] = []
+    for error in validation_error.errors(include_url=False, include_input=False):
+        location = _error_location(error=error)
+        if location and location not in locations:
+            locations.append(location)
+    return locations
+
+
+def format_validation_error_without_input(*, validation_error: ValidationError) -> str:
+    """Each error of a ``ValidationError`` as its location and its reason, never the input it refused.
+
+    A ``ValidationError``'s own text, and the analysis `format_pydantic_validation_error` gives, quote the values pydantic
+    refused, which on a run's data are its inputs, a model's answer or a value a pipe built, and no message, log line or
+    view carries those. The reason is pydantic's own message, or the error's type where the message may hold something
+    of the input, since a validator's text, or one of pydantic's templates, can quote the very value it rejected; a
+    validator that raises ``InputFreeValueError`` declares its text holds none of it, and keeps it. A forbidden key's
+    location stops at its parent, the key being the caller's own text.
+    """
+    located_reasons: list[str] = []
+    for error in validation_error.errors(include_url=False, include_input=False):
+        location = _error_location(error=error)
+        reason = refusal_reason_without_input(error=error)
+        located_reasons.append(f"{location}: {reason}" if location else reason)
+    return "; ".join(located_reasons) or validation_error.title
+
+
+def describe_exception_without_input(*, exc: BaseException) -> str:
+    """The text of an exception, a ``ValidationError``'s written without the input it refused.
+
+    Every other exception's text is kept as it is: a raise site of Pipelex writes no run's data into its message, and a
+    foreign exception's own text is the operator's diagnosis.
+    """
+    if isinstance(exc, ValidationError):
+        return format_validation_error_without_input(validation_error=exc)
+    return str(exc)
 
 
 def convert_strenum_to_str(

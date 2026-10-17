@@ -1,6 +1,8 @@
 import datetime
 import re
 
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
+
 # The temporal natives accept EXTENDED ISO 8601 only. `date.fromisoformat` / `time.fromisoformat`
 # (3.11+) additionally accept the basic forms ("20260707", "154000") and the week / ordinal calendars
 # ("2026-W27-2", "2026-189"): all of those restate the value in a calendar the source did not use, and
@@ -12,6 +14,7 @@ import re
 # The offset's minutes are range-checked here because nothing downstream does it: they are summed into
 # a timedelta, so `+02:60` would arrive as a silent `+03:00` (an out-of-range offset HOUR does raise,
 # and the time's own minute/second components are range-checked by `fromisoformat`).
+# A refusal names the form it expected and never the value it refused, which is a run's input or a model's answer.
 _EXTENDED_DATE_PATTERN = re.compile(r"\d{4}-\d{2}-\d{2}")
 _EXTENDED_TIME_PATTERN = re.compile(r"(?P<hour>\d{2}):\d{2}(:\d{2}([.,]\d+)?)?([Zz]|[+-]\d{2}(:[0-5]\d)?)?")
 
@@ -26,18 +29,19 @@ def parse_iso_date(text: str) -> datetime.date:
         datetime.date: The parsed calendar date.
 
     Raises:
-        ValueError: When the string is not an extended ISO 8601 calendar date. Callers in a pydantic
-            validator rely on this staying a ValueError, which pydantic wraps into a ValidationError.
+        InputFreeValueError: When the string is not an extended ISO 8601 calendar date. Callers in a pydantic
+            validator rely on this staying a ValueError, which pydantic wraps into a ValidationError, and its message
+            names the form expected, never the value.
 
     """
     if not _EXTENDED_DATE_PATTERN.fullmatch(text):
-        msg = f"'{text}' is not an extended ISO 8601 calendar date (e.g. '2026-07-07')."
-        raise ValueError(msg)
+        msg = "The value is not an extended ISO 8601 calendar date (e.g. '2026-07-07')."
+        raise InputFreeValueError(msg)
     try:
         return datetime.date.fromisoformat(text)
     except ValueError as exc:
-        msg = f"'{text}' is not a valid ISO 8601 calendar date (e.g. '2026-07-07')."
-        raise ValueError(msg) from exc
+        msg = "The value is not a valid ISO 8601 calendar date (e.g. '2026-07-07')."
+        raise InputFreeValueError(msg) from exc
 
 
 def parse_iso_time(text: str) -> datetime.time:
@@ -50,22 +54,22 @@ def parse_iso_time(text: str) -> datetime.time:
         datetime.time: The parsed time of day, carrying the UTC offset when the string states one.
 
     Raises:
-        ValueError: When the string is not an extended ISO 8601 time of day, or uses the end-of-day
+        InputFreeValueError: When the string is not an extended ISO 8601 time of day, or uses the end-of-day
             ``24:00`` form. Callers in a pydantic validator rely on this staying a ValueError, which
-            pydantic wraps into a ValidationError.
+            pydantic wraps into a ValidationError, and its message names the form expected, never the value.
 
     """
     match = _EXTENDED_TIME_PATTERN.fullmatch(text)
     if not match:
-        msg = f"'{text}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
-        raise ValueError(msg)
+        msg = "The value is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
+        raise InputFreeValueError(msg)
     # ISO 8601's end-of-day 24:00 names the NEXT day's midnight, which a time of day alone cannot
     # carry. It must be rejected explicitly rather than left to the parser: Python 3.14 silently
     # returns 00:00 for it (3.11-3.13 raise), so accepting it would move the value back a full day —
     # and only on some of the interpreters we support.
     if match.group("hour") == "24":
-        msg = f"'{text}' uses the ISO 8601 end-of-day form 24:00, which names the next day's midnight; state that day with '00:00:00' instead."
-        raise ValueError(msg)
+        msg = "The value uses the ISO 8601 end-of-day form 24:00, which names the next day's midnight; state that day with '00:00:00' instead."
+        raise InputFreeValueError(msg)
     # `fromisoformat` takes only the upper-case UTC designator, while RFC 3339 states the two spellings
     # are equivalent and pydantic accepted both before this parser existed. Case-folding the designator
     # is not normalization of the value — it names the same offset — so admit it rather than refuse a
@@ -74,5 +78,5 @@ def parse_iso_time(text: str) -> datetime.time:
     try:
         return datetime.time.fromisoformat(parsable)
     except ValueError as exc:
-        msg = f"'{text}' is not a valid ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
-        raise ValueError(msg) from exc
+        msg = "The value is not a valid ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00')."
+        raise InputFreeValueError(msg) from exc

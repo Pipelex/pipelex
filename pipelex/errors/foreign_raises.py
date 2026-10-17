@@ -45,8 +45,9 @@ VALIDATOR_DECORATOR_NAMES: frozenset[str] = frozenset(
 )
 """Pydantic's decorators, inside which a builtin raise is wrapped by pydantic into its own error."""
 
-VALIDATOR_EXCEPTION_NAMES: frozenset[str] = frozenset({"ValueError", "TypeError", "AssertionError", "PydanticCustomError"})
-"""The exceptions pydantic turns into a validation error when a validator raises them."""
+VALIDATOR_EXCEPTION_NAMES: frozenset[str] = frozenset({"ValueError", "TypeError", "AssertionError", "PydanticCustomError", "InputFreeValueError"})
+"""The exceptions pydantic turns into a validation error when a validator raises them, ``InputFreeValueError`` being the
+``ValueError`` whose message holds nothing of the value refused."""
 
 DATA_MODEL_DUNDER_NAMES: frozenset[str] = frozenset(
     {

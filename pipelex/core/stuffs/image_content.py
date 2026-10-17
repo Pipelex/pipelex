@@ -10,6 +10,7 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.templating.text_format import TextFormat
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
 
 if TYPE_CHECKING:
@@ -35,7 +36,7 @@ class ImageContent(StuffContent):
         """Pixel dimensions come from measuring the image, which yields both — a lone one is a bug."""
         if (self.width is None) != (self.height is None):
             msg = "An Image carries both width and height, or neither — a lone pixel dimension is not a valid state."
-            raise ValueError(msg)
+            raise InputFreeValueError(msg)
         return self
 
     @model_validator(mode="after")

@@ -17,6 +17,7 @@ from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_K
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,6 +47,7 @@ class _Diagnosis(BaseModel):
     severity: int = 0
     code: str = "none"
     reviewed: bool = False
+    ward: str = "A1"
 
     @field_validator("diagnosis")
     @classmethod
@@ -62,6 +64,15 @@ class _Diagnosis(BaseModel):
             error_type = "unknown_code"
             message_template = "The code {code} is not known"
             raise PydanticCustomError(error_type, message_template, {"code": value})
+        return value
+
+    @field_validator("ward")
+    @classmethod
+    def _ward_is_a_letter_and_a_floor(cls, value: str) -> str:
+        if len(value) != 2:
+            # A refusal that names the form it expected and never the value.
+            msg = "A ward is named by its letter and its floor"
+            raise InputFreeValueError(msg)
         return value
 
     @field_validator("severity", mode="before")
@@ -183,13 +194,25 @@ class TestLogErrorFields:
 
         assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "assertion_error"
 
-    def test_a_date_content_rejection_is_written_without_the_value_it_quotes(self) -> None:
-        """`DateContent`'s validator names the string it could not read as a date, which can be a run's input."""
+    def test_a_date_content_rejection_keeps_its_sentence_which_names_no_value(self) -> None:
+        """`DateContent`'s validator raises an `InputFreeValueError`, whose sentence names the form it expected alone."""
         with pytest.raises(ValidationError) as caught:
             DateContent.model_validate({"date": _PAYLOAD})
-        assert _PAYLOAD in caught.value.errors()[0]["msg"]
+        assert _PAYLOAD not in caught.value.errors()[0]["msg"]
 
-        assert error_fields(exc=caught.value) == {ERROR_TYPE_FIELD: "ValidationError", ERROR_MESSAGE_FIELD: "date: value_error"}
+        assert error_fields(exc=caught.value) == {
+            ERROR_TYPE_FIELD: "ValidationError",
+            ERROR_MESSAGE_FIELD: "date: Value error, The value is not an extended ISO 8601 calendar date (e.g. '2026-07-07').",
+        }
+
+    def test_an_input_free_value_error_keeps_its_sentence_beside_a_custom_one(self) -> None:
+        """A validator raising `InputFreeValueError` declares its sentence holds nothing of the value, so it is kept."""
+        with pytest.raises(ValidationError) as caught:
+            _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "ward": _PAYLOAD})
+
+        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == (
+            "diagnosis: value_error; ward: Value error, A ward is named by its letter and its floor"
+        )
 
     def test_pydantic_own_reasons_are_kept_beside_a_custom_one(self) -> None:
         """Only the validator's message goes: the reasons pydantic wrote itself, which quote no input, stay readable."""
