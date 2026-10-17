@@ -293,16 +293,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
-            msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {type(instructor_exc).__name__}"
-            raise LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
-                ),
-            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from instructor_exc
+            raise self._make_structured_generation_failure(api_name="Mistral", schema=schema, instructor_exc=instructor_exc) from instructor_exc
         except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)

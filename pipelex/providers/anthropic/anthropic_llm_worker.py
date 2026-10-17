@@ -526,19 +526,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     model_handle=self.inference_model.name,
                 )
                 raise self._with_note(error=rendered_error, note=lowered_max_tokens_note, failure=underlying_exc) from instructor_exc
-            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
-            msg = (
-                f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {type(instructor_exc).__name__}"
-            )
-            fallback_error = LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
-                ),
-            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+            fallback_error = self._make_structured_generation_failure(api_name="Anthropic", schema=schema, instructor_exc=instructor_exc)
             raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)

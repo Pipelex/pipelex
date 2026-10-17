@@ -5,14 +5,11 @@ import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
-from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
+from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.inference.error_classification import (
-    UserAction,
-    UserActionKind,
     extract_google_metadata,
     extract_underlying_sdk_exception,
 )
@@ -354,16 +351,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
-            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {type(instructor_exc).__name__}"
-            raise LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
-                ),
-            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from instructor_exc
+            raise self._make_structured_generation_failure(api_name="Google", schema=schema, instructor_exc=instructor_exc) from instructor_exc
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)

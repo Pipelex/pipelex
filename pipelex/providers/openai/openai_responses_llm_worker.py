@@ -268,13 +268,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            # instructor's own text is the last validation error's, which quotes the model's answer: the message names its class.
-            msg = (
-                f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {type(instructor_exc).__name__}"
-            )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
-                CoreCode.RUNTIME_UNEXPECTED
+            raise self._make_structured_generation_failure(
+                api_name="OpenAI Responses", schema=schema, instructor_exc=instructor_exc
             ) from instructor_exc
         except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)

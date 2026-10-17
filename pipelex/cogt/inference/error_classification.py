@@ -383,6 +383,31 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
     return None
 
 
+def describe_instructor_failure(*, instructor_exc: BaseException, validated_type: type[BaseModel] | None = None) -> str:
+    """Why instructor's structured generation failed, as the class and the input-free text of what ended its loop.
+
+    That is the exception :func:`extract_underlying_sdk_exception` recovers, else the wrapper's own cause, such as a
+    retry error whose last attempt holds no exception, written by :func:`describe_exception_without_input`, so a
+    ``ValidationError``, which quotes the model's answer, is written by its locations and reasons. ``instructor``'s
+    own text is never used: it is the last exception's, the model's answer included. With nothing to read, the
+    wrapper is named by its class alone.
+
+    Args:
+        instructor_exc: The ``InstructorRetryException`` instructor raised.
+        validated_type: The class the generation was asked for, whose schema names a refusal's locations.
+
+    Returns:
+        The reason, such as ``ValidationError: count: Input should be a valid integer``.
+    """
+    reason_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc) or instructor_exc.__cause__
+    if reason_exc is None:
+        return type(instructor_exc).__name__
+    reason_text = describe_exception_without_input(exc=reason_exc, validated_type=validated_type)
+    if not reason_text:
+        return type(reason_exc).__name__
+    return f"{type(reason_exc).__name__}: {reason_text}"
+
+
 def parse_retry_after_seconds(value: Any) -> float | None:
     """Parse a ``Retry-After`` header value into a delay in seconds.
 
