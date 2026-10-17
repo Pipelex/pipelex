@@ -151,12 +151,16 @@ class TestPipeFuncFailureCode:
         assert caller.code == CoreCode.PIPE_FUNCTION_RAISED
         assert isinstance(failure.__cause__, PipeFuncRaisedError)
         assert type(failure.__cause__.__cause__).__name__ == raised_type
-        assert f"Error: {raised_type}: " in failure.message
-        # What the function raised can carry whatever the process holds, so its text is the operator's alone.
+        assert f"Error: The function raised {raised_type}" in failure.message
+        # What the function raised can quote the run's inputs or whatever the process holds: its class names it, and its
+        # text reaches no view, the operator's included.
+        function_text = str(failure.__cause__.__cause__)
+        assert function_text not in failure.message
         assert raised_type not in str(caller.to_wire())
         operator = failure.to_problem(view=ProblemView.OPERATOR)
         assert operator.diagnostics is not None
         assert operator.diagnostics.message == failure.message
+        assert function_text not in str(operator.to_wire())
 
     @pytest.mark.parametrize(
         ("executor", "expected_code"),

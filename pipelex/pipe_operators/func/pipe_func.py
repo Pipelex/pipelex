@@ -356,13 +356,13 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             # The message names the step's inputs, never their values: those are this run's content.
             inputs_desc = ", ".join(self.inputs.root) or "none"
             output_desc = self.output.to_bundle_representation()
-            # The function's own exception, which the in-process executor marks as raised by the function.
+            # The function's own exception, which the executor marks as raised by the function and names by its class.
             error_desc = exc.message if isinstance(exc, PipeFuncRaisedError) else f"{type(exc).__name__}: {exc}"
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n  Expected output: {output_desc}\n  Inputs: {inputs_desc}\n\n  Error: {error_desc}"
             )
-            # No parameter carries the function's own exception text, which can carry whatever the
-            # process holds (a path, a setting, a secret): it rides the operator's diagnostics alone.
+            # Neither the message nor a parameter carries the function's own exception text, which can
+            # quote the run's inputs or whatever the process holds (a path, a setting, a secret).
             # The wrapper takes its cause's code. What the function raised reads
             # `pipe.function_raised` only because an executor marked it so: the in-process executor
             # raises it as `PipeFuncRaisedError`, and an out-of-process one must report a coded Pipelex
