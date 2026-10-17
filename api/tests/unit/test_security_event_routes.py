@@ -40,6 +40,35 @@ _MODE = "temporal"
 _SECURITY_EVENT_LOGGER = "pipelex.errors.security_event"
 _LOCAL_PATH = "/etc/passwd"
 _REQUEST_ID = "req-security-event-1"
+_METHODS_TOML = """\
+[package]
+address = "github.com/pipelex-tests/security-event"
+version = "1.0.0"
+description = "Prints a letter from a template file"
+"""
+# A method whose step names, as its template file, a path that climbs out of its tree to a file of the server's disk.
+_TEMPLATE_OUTSIDE_THE_TREE_MTHDS = """\
+domain = "security_event"
+main_pipe = "print_letter"
+
+[concept.Letter]
+description = "A letter to print"
+
+[concept.Letter.structure]
+body = { type = "text", description = "The letter's text", required = true }
+
+[concept.LetterFile]
+description = "The letter as a printable file"
+refines = "Document"
+
+[pipe.print_letter]
+type = "PipeDocGen"
+description = "Print the letter"
+inputs = { letter = "Letter" }
+output = "LetterFile"
+format = "docx"
+template_file = "../../etc/passwd.docx"
+"""
 # Paths that leave the tree in a spelling other than a leading slash or a `..` between slashes, each with what of it the
 # event must never carry: a backslash traversal, a drive and a network share.
 _ESCAPING_PATHS: list[tuple[str, str, str]] = [
@@ -361,6 +390,32 @@ class TestSecurityEventRoutes:
         assert line["request_id"] == _REQUEST_ID
         assert "pipeline_run_id" not in line
         assert case.refused_content not in json.dumps(line)
+
+    def test_a_method_naming_a_file_outside_its_tree_fails_under_its_security_code_and_logs_one_event(self, mocker: MockerFixture) -> None:
+        """A path the method names that climbs out of its tree is the method's security refusal, never a verdict about the method."""
+        client = _build_client(mocker)
+        body = {
+            **_run_body(),
+            "mthds_contents": None,
+            "pipe_code": "print_letter",
+            "inputs": {"letter": {"concept": "security_event.Letter", "content": {"body": "Dear reader"}}},
+            "files": {"METHODS.toml": _METHODS_TOML, "main.mthds": _TEMPLATE_OUTSIDE_THE_TREE_MTHDS},
+        }
+
+        with _security_event_lines() as lines:
+            response = client.post("/v1/execute", json=body, headers={REQUEST_ID_HEADER: _REQUEST_ID})
+
+        assert response.status_code == 422, response.text
+        assert response.json()["code"] == CoreCode.SECURITY_METHOD_PATH_REFUSED, response.text
+        (line,) = lines
+        assert line["event.name"] == SECURITY_EVENT_NAME
+        assert line["error.code"] == CoreCode.SECURITY_METHOD_PATH_REFUSED
+        assert line["error.domain"] == "method"
+        assert line["error.type"] == "PipeDocGenFactoryError"
+        assert line["security.target"] == "path"
+        assert line["run.extras.org_id"] == "org_abc"
+        assert line["request_id"] == _REQUEST_ID
+        assert "passwd" not in json.dumps(line)
 
     @pytest.mark.parametrize(
         ("route", "body", "error_type"),

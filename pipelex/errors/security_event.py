@@ -104,6 +104,22 @@ def security_target_kind(*, code: ErrorCode) -> SecurityTargetKind | None:
     return SECURITY_TARGET_KIND_BY_CODE.get(code)
 
 
+def is_security_refusal(*, error: BaseException) -> bool:
+    """Whether a failure reports a code of the ``security.`` or ``pipelex.security.`` family, wherever it was coded.
+
+    A refusal coded so at its raise site is a security refusal whatever its class, a ``SecurityError`` or not, so a
+    handler that answers the caller's input with a domain answer, a validation verdict included, lets it through as it
+    is rather than replacing its code with its own.
+
+    Args:
+        error: The failure, the outermost error of its chain.
+
+    Returns:
+        Whether its code is a security refusal's.
+    """
+    return isinstance(error, PipelexError) and security_target_kind(code=error.resolve_error_code()) is not None
+
+
 def mark_security_event_emitted(*, error: BaseException) -> None:
     """Record that the security event of ``error``'s failure was logged, so no boundary logs it again in this process.
 
