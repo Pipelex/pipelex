@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`resolve_crate_from_method_dir`**: `pipelex.pipeline.resolve_bundle` resolves a method's tree a host wrote out to a directory into the normalized crate, loading it as the caller's library directory the way `validate_bundle` loads a `method_dir`, with `methods_dirs` holding the packages shipped with it, under the same `ValidateBundleError` verdict and loaded-on-success contract as `resolve_crate_from_contents`.
+
 ### Changed
 
+- **`/v1/resolve`, `/v1/codegen` and `/v1/pipe-io` take the method tree (Breaking)**: the three routes take the method as `/v1/validate` and the run routes do, `files` being the MTHDS protocol's map of file entries with `dependencies`, `resources` and `read_scope` beside it, or a `method_ref` whose package's whole tree is loaded with the packages it ships, so a call into another package by its address now resolves, and a `METHODS.toml` at the root of a sent tree names the default pipe of `/v1/pipe-io`. A `files` list of `{content, source}` items is refused with a `422` `InvalidMethodFiles`, the tree's refusals and the custom-Python `403`s are those of `/v1/validate`, `include_files` echoes the method's `.mthds` bundles as a map from tree path to text, and the request models `MthdsFilesRequest`, `MthdsFileItem` and `MthdsPipeRequest` are removed.
 - **A bundle validator receives the read scope, plugin API version 8 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `read_scope`, the scope the host named for the validation, `None` when it named none, so a validator dispatching the validation to another process hands the method's trees to its worker through that scope's blob store and the worker reads them by digest under it, as a run's worker reads under the run's read scope. The API server's `POST /v1/validate` hands its validator the request's `read_scope` on every arm, never the caller's own id, and `PLUGIN_API_VERSION` moves to 8, so a plugin declaring `targets_api = 7` is refused at discovery with `PluginApiVersionMismatchError`.
 
 ## [v0.88.0] - 2026-10-16

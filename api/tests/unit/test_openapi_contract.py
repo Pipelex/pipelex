@@ -62,9 +62,9 @@ ROUTE_EXTRA_STATUSES = {
     ("/v1/execute", "post"): (403, 429),
     ("/v1/start", "post"): (400, 403, 409, 501),
     ("/v1/validate", "post"): (403,),
-    ("/v1/resolve", "post"): (404, 501),
-    ("/v1/pipe-io", "post"): (404, 501),
-    ("/v1/codegen", "post"): (501,),
+    ("/v1/resolve", "post"): (403, 404, 501),
+    ("/v1/pipe-io", "post"): (403, 404, 501),
+    ("/v1/codegen", "post"): (403, 404, 501),
 }
 
 
@@ -156,13 +156,13 @@ class TestOpenApiErrorContract:
         assert "method_id" not in json.dumps(openapi_schema)
 
     def test_pipe_io_request_declares_no_hosted_selector_and_no_views(self, openapi_schema: dict[str, Any]):
-        """The platform resolves the hosted `method_id` into `files[]` before forwarding, so the runner
+        """The platform resolves the hosted `method_id` into `files` before forwarding, so the runner
         never declares it; and the route always carries all three artifacts, so it takes no `views`.
         """
         schemas = openapi_schema["components"]["schemas"]
         body_ref = openapi_schema["paths"]["/v1/pipe-io"]["post"]["requestBody"]["content"]["application/json"]["schema"]["$ref"]
         properties = set(schemas[body_ref.rsplit("/", 1)[-1]]["properties"])
-        assert properties >= {"files", "method_ref", "pipe_ref", "all_pipes", "include_files"}
+        assert properties >= {"files", "dependencies", "method_ref", "resources", "read_scope", "pipe_ref", "all_pipes", "include_files"}
         assert "method_id" not in properties
         assert "views" not in properties
 

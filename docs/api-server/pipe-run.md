@@ -334,7 +334,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 
 **Environment knobs.** The cache: `MAX_METHOD_CACHE_CLONES` (default 64), `MAX_METHOD_CACHE_TOTAL_KIB` (default 512 MiB), `MAX_METHOD_CACHE_AGE_HOURS` (default 24), `METHOD_CACHE_DIR` (default: a fixed directory under the system temp dir). The fetch itself is bounded by the pipelex runtime's fetched-package ceilings: `PIPELEX_MAX_FETCHED_PACKAGE_FILES` (default 256), `PIPELEX_MAX_FETCHED_PACKAGE_TOTAL_KIB` (default 8 MiB), and the manifest-scan bounds `PIPELEX_MAX_SCANNED_MANIFESTS` (default 100 manifests considered per fetched repository) and `PIPELEX_MAX_MANIFEST_FILE_KIB` (default 256 KiB per `METHODS.toml` read during package location). All are read once at process start.
 
-`method_ref` also selects the method on the tooling routes: natively on [`POST /v1/validate`](pipe-validate.md), and as the closure selector on [`/resolve` and `/codegen`](codegen.md) (address form resolved; the registry form stays a `501`).
+`method_ref` also selects the method on the tooling routes: on [`POST /v1/validate`](pipe-validate.md), [`/resolve` and `/codegen`](codegen.md#selecting-the-method) and [`/pipe-io`](pipe-io.md), which read the fetched package's tree as a run does (address form resolved; on the crate routes the registry form stays a `501`).
 
 ---
 

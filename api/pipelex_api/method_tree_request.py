@@ -100,6 +100,11 @@ class RequestTree(NamedTuple):
     def bundle_paths(self) -> list[str]:
         return [tree_path for tree_path in self.tree.tree_paths if tree_path.endswith(BUNDLE_SUFFIX)]
 
+    @property
+    def bundle_texts(self) -> dict[str, str]:
+        """The text of each `.mthds` bundle of the tree by its tree path, in tree path order, as a verdict echoes them."""
+        return {tree_path: self.contents[tree_path].decode("utf-8", errors="replace") for tree_path in self.bundle_paths}
+
     @classmethod
     def make_from_contents(cls, *, contents: dict[str, bytes]) -> "RequestTree":
         """The tree these files make, each at its tree path, already judged as a tree's files."""

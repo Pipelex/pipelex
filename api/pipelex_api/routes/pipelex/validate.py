@@ -1,4 +1,3 @@
-import asyncio
 from enum import StrEnum
 from typing import Annotated, Literal, Self, Union
 
@@ -15,26 +14,13 @@ from pipelex.system.storage_scope import validate_read_scope
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
-from pipelex_api.errors import raise_validation_error
 from pipelex_api.exception_handlers import problem_response_from_error_report
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.method_source import fetched_method
-from pipelex_api.method_tree_request import (
-    REQUEST_METHOD_LABEL,
-    RequestMethod,
-    ensure_method_holds_a_bundle,
-    ensure_python_allowed,
-    read_request_method,
-    record_request_method,
-    select_tree_entry,
-    tree_documents_of,
-    with_resources,
-    written_method,
-)
+from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
-from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id, resolve_blob_scope
+from pipelex_api.routes.pipelex.method_selection import select_request_method
+from pipelex_api.routes.pipelex.pipeline import ApiRunner, get_request_user_id
 from pipelex_api.schemas.models import RESOURCES_FIELD_DESCRIPTION, CallerAnalyticsGroupsMixin, MthdsContentsRequest
 
 router = APIRouter(tags=["validate"], route_class=JsonBodyRoute)
@@ -187,12 +173,6 @@ def _effective_default_pipe_ref(report: PipelexValidationReport) -> str | None:
     if not blueprint.main_pipe:
         return None
     return PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
-
-
-def _bundle_texts(*, request_method: RequestMethod) -> list[str]:
-    """The texts of a method tree's `.mthds` bundles, in tree path order, as the valid verdict echoes them."""
-    tree = request_method.tree
-    return [tree.contents[tree_path].decode("utf-8", errors="replace") for tree_path in tree.bundle_paths]
 
 
 def _optional_tree_entry(*, request_method: RequestMethod, method_label: str) -> MethodEntry | None:
@@ -407,32 +387,15 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         tree_default_pipe_ref: str | None = None
     else:
         # A method tree: sent as `files`, or fetched by `method_ref` from its commit's git objects through the same path
-        # as a `method_ref` run. Every failure to obtain the tree — a map that is not a tree, missing blobs, a fetch, a
-        # package location, the custom-Python policy — raises OUT of this block as a non-2xx problem+json: no verdict
-        # was produced, so it is never rendered as `is_valid: false` (that verdict is about the method's content).
-        request_method: RequestMethod
-        if request_data.method_ref is not None:
-            fetched = await asyncio.to_thread(fetched_method, request_data.method_ref)
-            request_method = fetched.request_method
-            method_label = fetched.label
-            ensure_method_holds_a_bundle(request_method=request_method, label=f"Method package {fetched.label}")
-            ensure_python_allowed(request_method=request_method, label=f"Method package {fetched.label}")
-        else:
-            blob_store = RunnerBlobStore.make_for_scope(scope=resolve_blob_scope(request, read_scope=read_scope))
-            sent_method = await read_request_method(documents=tree_documents_of(body=await request.body()), blob_store=blob_store)
-            if sent_method is None:
-                # Unreachable: the envelope's selector validator already 422'd a body with no `files`.
-                raise_validation_error(message="provide exactly one of `mthds_contents`, `files` or `method_ref`")
-            request_method = with_resources(request_method=sent_method, resources=decode_bundle_resources(resources=request_data.resources))
-            method_label = REQUEST_METHOD_LABEL
-            ensure_method_holds_a_bundle(request_method=request_method, label="This method")
-            ensure_python_allowed(request_method=request_method, label="This method")
-            # A dry run records the tree only under the scope a host named: without one, the fallback scope is the
-            # caller's own id, a prefix no host lists or erases, and a validation must leave nothing stored there. Under
-            # one, the tree is held there before the validator is called, so a dispatched validator names it by digest.
-            if read_scope is not None:
-                await record_request_method(request_method=request_method, blob_store=blob_store)
-        validated_contents = _bundle_texts(request_method=request_method)
+        # as a `method_ref` run, read the way the crate routes read it (`select_request_method`). Every failure to obtain
+        # the tree — a map that is not a tree, missing blobs, a fetch, a package location, the custom-Python policy —
+        # raises OUT of this block as a non-2xx problem+json: no verdict was produced, so it is never rendered as
+        # `is_valid: false` (that verdict is about the method's content). A sent tree is recorded only under the scope a
+        # host named, before the validator is called, so a dispatched validator names it by digest.
+        request_method, method_label = await select_request_method(
+            request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=read_scope
+        )
+        validated_contents = list(request_method.tree.bundle_texts.values())
         # The entry pipe of the tree, the one a selector-less run executes, is the graph's pipe and the default the
         # verdict reports; a tree with none still validates.
         entry = _optional_tree_entry(request_method=request_method, method_label=method_label)

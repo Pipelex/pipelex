@@ -127,6 +127,13 @@ PROBLEM_403_RUN_POLICY: dict[str, Any] = _problem(
     "loading anything (express the types as MTHDS concepts instead).",
 )
 
+PROBLEM_403_METHOD_PYTHON_POLICY: dict[str, Any] = _problem(
+    "The run routes' Python policy, applied to the method's tree: `CustomCodeRequiresSandbox` — the method (sent in "
+    "`files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted; or "
+    "`MethodStructuresRefusedError` — the method's Python declares structure classes (`StructuredContent` subclasses), "
+    "which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).",
+)
+
 PROBLEM_409_DUPLICATE_RUN: dict[str, Any] = _problem(
     "`PipelineManagerAlreadyExistsError` — the submitted `pipeline_run_id` is still registered for an in-flight run. "
     "Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates.",
@@ -174,9 +181,9 @@ PROBLEM_403_BLOB_UPLOAD: dict[str, Any] = _problem(
 )
 
 PROBLEM_501_METHOD_REF: dict[str, Any] = _problem(
-    "`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not a "
+    "`MethodRefNotSupported` — the request selected its method by a **registry-form** `method_ref` (not a "
     "`github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference "
-    "or submit inline `files[]` instead.",
+    "or send the method's tree in `files` instead.",
 )
 
 

@@ -170,7 +170,7 @@ A method sent in `files`, or fetched by `method_ref`, is validated whole, as it 
 
 ## Sending the files the steps read (`resources`)
 
-A bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, is sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-closure).
+A bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, is sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-method).
 
 ```json
 {
