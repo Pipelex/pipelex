@@ -319,9 +319,13 @@ def count_applicable_fixes(
     bundle_path: Path,
     library_dirs: list[Path] | None,
 ) -> int:
-    """Count safe fixes the displayed command is authorized and able to apply."""
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
-    is_single_file = not effective_dirs
+    """Count safe fixes the displayed command is authorized and able to apply.
+
+    A method's folder always loads as a library directory, so its load is never a single file's, and that is decided
+    without asking the interpreter hub for its default directories: a folder whose tree is refused before the boot is
+    reported, with this count, while no hub exists.
+    """
+    is_single_file = not bundle_path.is_dir() and not resolve_library_dirs(library_dirs)[0]
     entry_path = bundle_path.resolve()
     writable_dirs = [library_dir.resolve() for library_dir in library_dirs] if library_dirs is not None else []
     applicable_count = 0
