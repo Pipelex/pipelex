@@ -10,9 +10,12 @@ it would in a folder, and the run's crate names that tree by its digest like any
 from collections.abc import Mapping
 from pathlib import PurePosixPath, PureWindowsPath
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, SecurityInputPathRefusedRule
 
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
+
+# The field of a run request the files submitted with its bundles ride, which a refusal of one of their paths names.
+SUBMITTED_FILES_FIELD = "resources"
 
 
 def root_escape_refusal(*, path: str) -> str | None:
@@ -34,6 +37,20 @@ def root_escape_refusal(*, path: str) -> str | None:
         return "it is absolute; write it relative to the bundle"
     if ".." in windows_path.parts:
         return "it leaves the bundle through a '..' segment"
+    return None
+
+
+def root_escape_rule(*, path: str) -> SecurityInputPathRefusedRule | None:
+    """The rule of ``security.input_path_refused`` that `path` breaks by leaving its root, or None when it stays below it.
+
+    The same reading as `root_escape_refusal`, as the registry's rule: a path naming a drive or a network share, and a
+    rooted path, are `absolute`, and a path climbing with a `..` segment is `parent_segment`.
+    """
+    windows_path = PureWindowsPath(path)
+    if windows_path.drive or windows_path.root:
+        return SecurityInputPathRefusedRule.ABSOLUTE
+    if ".." in windows_path.parts:
+        return SecurityInputPathRefusedRule.PARENT_SEGMENT
     return None
 
 
@@ -85,15 +102,27 @@ def canonical_resource_path(*, path: str) -> str:
     refusal = resource_path_refusal(path=path)
     if refusal is not None:
         msg = f"The file '{path}' submitted with the bundle cannot be one of its files: {refusal}."
-        raise BundleResourcePathError(msg).with_error_code(path_refusal_code(path=path))
+        raise BundleResourcePathError(msg).with_error_code(path_refusal_code(path=path)).with_params(**path_refusal_params(path=path))
     return PurePosixPath(path).as_posix()
 
 
 def path_refusal_code(*, path: str) -> CoreCode:
     """The code of the refusal of a caller's path: a security refusal when it leaves its root, else a refusal of the request."""
-    if root_escape_refusal(path=path) is not None:
+    if root_escape_rule(path=path) is not None:
         return CoreCode.SECURITY_INPUT_PATH_REFUSED
     return CoreCode.REQUEST_INVALID
+
+
+def path_refusal_params(*, path: str) -> dict[str, str]:
+    """The parameters of the refusal `path_refusal_code` names for a submitted file's path.
+
+    The rule a path leaving its root breaks, for ``security.input_path_refused``, else the request's field the submitted
+    files ride, `resources`, for ``request.invalid``.
+    """
+    rule = root_escape_rule(path=path)
+    if rule is not None:
+        return {"rule": rule}
+    return {"field": SUBMITTED_FILES_FIELD}
 
 
 def canonical_submitted_files(*, files: Mapping[str, bytes]) -> dict[str, bytes]:
@@ -107,6 +136,6 @@ def canonical_submitted_files(*, files: Mapping[str, bytes]) -> dict[str, bytes]
         canonical_path = canonical_resource_path(path=path)
         if canonical_path in canonical_files:
             msg = f"Two files submitted with the bundle name the same file '{canonical_path}'."
-            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
+            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field=SUBMITTED_FILES_FIELD)
         canonical_files[canonical_path] = content
     return canonical_files

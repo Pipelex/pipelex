@@ -222,6 +222,9 @@ class ValidationErrorItem(BaseModel):
     # (a defined name, a Table, a cell, a shape, a tag). Optional and additive, like ``declared_concepts``.
     template_file: str | None = None
     template_location: str | None = None
+    # The hint locator, carried by a hint lint item: the hint key the finding is about, elided as its message quotes it,
+    # which its problem item names as the code's ``hint`` parameter. Optional and additive, like ``declared_concepts``.
+    hint_key: str | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.
