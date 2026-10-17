@@ -16,6 +16,10 @@ rationale = "Verb-object: enriches the report; single operand."
 param = "error_code"
 rationale = "Chained at every raise site on its one operand, the chosen code: raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING)."
 
+["pipelex/base_exceptions.py::PipelexError.with_security_target_class"]
+param = "target_class"
+rationale = "Chained at every raise site on its one operand, the class of destination refused: raise SsrfBlockedError(msg).with_security_target_class(target_class)."
+
 ["pipelex/base_exceptions.py::_redact_provider_metadata_for_strict"]
 param = "metadata_payload"
 rationale = "Transforms the metadata payload; single operand."
@@ -6403,6 +6407,10 @@ rationale = "Parses/reads the path; single operand."
 ["pipelex/tools/misc/toml_utils.py::save_toml_to_path"]
 param = "data"
 rationale = "Transforms the data; single operand."
+
+["pipelex/tools/network/host_rules.py::classify_disallowed_host"]
+param = "host"
+rationale = "Reads as classify(host): its one operand is the host the SSRF guard refused, as is_disallowed_host takes it."
 
 ["pipelex/tools/network/host_rules.py::is_disallowed_host"]
 param = "host"

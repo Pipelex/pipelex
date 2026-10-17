@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex.base_exceptions import DisclosureMode, ErrorDomain
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.uri_read_scope import UriReference, authorize_uri_read, authorize_uri_reads
 
@@ -47,6 +48,8 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="image 1 of the prompt")
         assert exc_info.value.reason == UriReadRefusalReason.FOREIGN_STORAGE_KEY
+        # The security event names the class of what was refused, never the key.
+        assert exc_info.value.security_target_class == SecurityTargetClass.FOREIGN_STORAGE_KEY
 
     @pytest.mark.parametrize(
         "uri",
@@ -66,6 +69,8 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="the input 'photo'")
         assert exc_info.value.reason == UriReadRefusalReason.LOCAL_PATH
+        # A path on the server's disk, or a scheme the run does not read, is a refused scheme to the security event.
+        assert exc_info.value.security_target_class == SecurityTargetClass.SCHEME
 
     def test_a_multi_segment_scope_compares_every_segment(self) -> None:
         authorize_uri_read(uri="pipelex-storage://org_abc/team_1/x.png", read_scope="org_abc/team_1", position="p")

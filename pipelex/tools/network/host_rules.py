@@ -9,11 +9,20 @@ way.
 
 from ipaddress import ip_address
 
+from pipelex.errors.security_target import SecurityTargetClass
+
+# The cloud metadata-server aliases: ``metadata`` / ``metadata.google.internal`` are GCP's.
+_METADATA_HOSTNAMES: frozenset[str] = frozenset({"metadata.google.internal", "metadata"})
+
+# The loopback alias.
+_LOOPBACK_HOSTNAMES: frozenset[str] = frozenset({"localhost"})
+
 # Hostnames that never resolve to a public destination but aren't literal IPs, so
-# the IP-privateness check below can't catch them. ``metadata`` /
-# ``metadata.google.internal`` are the GCP metadata-server aliases; ``localhost``
-# is the loopback alias.
-_DISALLOWED_HOSTNAMES: frozenset[str] = frozenset({"localhost", "metadata.google.internal", "metadata"})
+# the IP-privateness check below can't catch them.
+_DISALLOWED_HOSTNAMES: frozenset[str] = _METADATA_HOSTNAMES | _LOOPBACK_HOSTNAMES
+
+# The cloud metadata endpoints by address: the link-local one AWS, GCP and Azure all serve, and AWS's IPv6 one.
+_METADATA_IPS: frozenset[str] = frozenset({"169.254.169.254", "fd00:ec2::254"})
 
 
 def is_disallowed_ip(host: str) -> bool:
@@ -64,3 +73,35 @@ def is_disallowed_host(host: str) -> bool:
     if normalized_host in _DISALLOWED_HOSTNAMES:
         return True
     return is_disallowed_ip(normalized_host)
+
+
+def classify_disallowed_host(host: str) -> SecurityTargetClass | None:
+    """The class of destination a disallowed host is, for the security event its refusal emits.
+
+    A cloud metadata endpoint, by alias or by address, is ``metadata``; ``localhost`` and a loopback address are
+    ``loopback``; any other link-local address is ``link_local``; and every other address that is not publicly
+    routable (private ranges, carrier-grade NAT, multicast, reserved, the unspecified address) is ``private``.
+    The host is normalized as :func:`is_disallowed_host` normalizes it.
+
+    Args:
+        host: A host :func:`is_disallowed_host` refuses, a literal IP or a hostname.
+
+    Returns:
+        The host's class, or ``None`` for a host that is neither a known internal name nor a literal disallowed
+        IP, an empty one among them, which the refusal names no class for.
+    """
+    normalized_host = host.rstrip(".").lower()
+    if normalized_host in _METADATA_HOSTNAMES:
+        return SecurityTargetClass.METADATA
+    if normalized_host in _LOOPBACK_HOSTNAMES:
+        return SecurityTargetClass.LOOPBACK
+    if not is_disallowed_ip(normalized_host):
+        return None
+    addr = ip_address(normalized_host)
+    if str(addr) in _METADATA_IPS:
+        return SecurityTargetClass.METADATA
+    if addr.is_loopback:
+        return SecurityTargetClass.LOOPBACK
+    if addr.is_link_local:
+        return SecurityTargetClass.LINK_LOCAL
+    return SecurityTargetClass.PRIVATE
