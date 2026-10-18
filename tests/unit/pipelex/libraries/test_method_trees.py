@@ -243,3 +243,38 @@ class TestMethodTrees:
             sources.update(tree_python_sources(tree=library_tree.tree, library_dir=library_tree.library_dir))
 
         assert sources == {"top_funcs.py": "X = 1\n", "checkouts/reports/models/report.py": "X = 2\n"}
+
+    def test_a_directory_named_like_an_inputs_file_is_entered_and_kept(self, tmp_path: Path) -> None:
+        """A directory named like a run's inputs file is an ordinary directory: the scan enters `inputs.json/` and its bundle loads."""
+        _touch(directory=tmp_path, tree_path="top.mthds")
+        _touch(directory=tmp_path, tree_path="vendor/tool/inputs.json/flow.mthds")
+        _touch(directory=tmp_path, tree_path="vendor/tool/inputs.toml/notes.md", content="kept")
+        (tmp_path / "vendor" / "tool" / ".git").mkdir()
+
+        library_trees = list_library_dir_trees(library_dirs=[tmp_path])
+
+        tool_tree = next(
+            library_tree.tree for library_tree in library_trees if library_tree.tree.directory == (tmp_path / "vendor" / "tool").resolve()
+        )
+        assert tool_tree.tree_paths == ["inputs.json/flow.mthds", "inputs.toml/notes.md"]
+        bundle_paths = {bundle_file.path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])}
+        assert bundle_paths == {tmp_path / "top.mthds", tmp_path / "vendor" / "tool" / "inputs.json" / "flow.mthds"}
+
+    @pytest.mark.xfail(
+        raises=MethodTreeLoadError,
+        reason="The run-inputs default is applied by the mthds lister from the mthds release implementing it, not pinned yet",
+    )
+    def test_a_run_s_inputs_file_is_no_member_of_any_tree_at_any_depth(self, tmp_path: Path) -> None:
+        """An inputs.json or inputs.toml, regular file or link never followed, stays out at the root and below; names match byte for byte."""
+        outside = _touch(directory=tmp_path, tree_path="outside/secrets.json", content='{"token": "x"}')
+        method_dir = tmp_path / "method"
+        _touch(directory=method_dir, tree_path="method.mthds")
+        _touch(directory=method_dir, tree_path="inputs.json", content='{"topic": "cats"}')
+        _touch(directory=method_dir, tree_path="steps/inputs.toml", content='topic = "cats"\n')
+        _touch(directory=method_dir, tree_path="cases/Inputs.json", content="{}")
+        (method_dir / "examples").mkdir()
+        (method_dir / "examples" / "inputs.json").symlink_to(outside)
+
+        (library_tree,) = list_library_dir_trees(library_dirs=[method_dir])
+
+        assert library_tree.tree.tree_paths == ["cases/Inputs.json", "method.mthds"]

@@ -10,9 +10,9 @@ from typing import Any, NamedTuple, cast
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_argument_error, agent_error, agent_file_error, file_read_failure_reason
-from pipelex.cli.commands.run._inputs_file_loader import find_default_inputs_file, load_inputs_dict_from_path
+from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_bytes, load_inputs_dict_from_path, read_default_inputs_file
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
-from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
+from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 
 WORKING_MEMORY_KEY = "working_memory"
@@ -180,11 +180,12 @@ def parse_cli_inputs(
 
     if auto_inputs_dir is not None:
         try:
-            auto_inputs_file = find_default_inputs_file(directory=auto_inputs_dir)
-        except AmbiguousInputsFilesError as ambiguity_exc:
-            agent_error(ambiguity_exc.message, cause=ambiguity_exc)
-        if auto_inputs_file is not None:
-            return _parse_inputs_arg(str(auto_inputs_file))
+            detected_inputs = read_default_inputs_file(directory=auto_inputs_dir)
+        except (AmbiguousInputsFilesError, AutoDetectedInputsFileError) as inputs_file_exc:
+            agent_error(inputs_file_exc.message, cause=inputs_file_exc)
+        if detected_inputs is not None:
+            # Parsed from the bytes the probe read without following a link, never by opening the path again.
+            return _parse_inputs_file(inputs_path=detected_inputs.path, label=str(detected_inputs.path), data=detected_inputs.data)
 
     return ParsedCliInputs(pipeline_inputs=None, inputs_base_dir=None)
 
@@ -205,29 +206,41 @@ def _parse_inputs_arg(inputs_arg: str) -> ParsedCliInputs:
         except json.JSONDecodeError as exc:
             agent_argument_error(f"Failed to parse inline JSON inputs: {exc}", argument="--inputs", reason="not valid JSON", cause=exc)
         return ParsedCliInputs(pipeline_inputs=result, inputs_base_dir=None)
+    # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
+    # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
+    return _parse_inputs_file(inputs_path=Path(inputs_arg).expanduser(), label=inputs_arg, data=None)
+
+
+def _parse_inputs_file(*, inputs_path: Path, label: str, data: bytes | None) -> ParsedCliInputs:
+    """Parse an inputs file: from ``data`` when auto-detection read it, else by reading the file, a link followed.
+
+    Args:
+        inputs_path: The inputs file, whose suffix selects the parser and whose directory anchors relative paths.
+        label: How error messages name the file: the ``--inputs`` value as given, or the auto-detected path.
+        data: The bytes auto-detection read from the file, or None to read the file named with ``--inputs``.
+
+    Returns:
+        A :class:`ParsedCliInputs` carrying the file's parent directory, so bare relative file-ish / CSV
+        inputs resolve against it (D3).
+    """
     try:
-        # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
-        # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
-        inputs_path = Path(inputs_arg).expanduser()
-        loaded = load_inputs_dict_from_path(inputs_path)
+        loaded = load_inputs_dict_from_path(inputs_path) if data is None else load_inputs_dict_from_bytes(data=data, path=inputs_path)
         # Resolve relative url paths against the inputs file's parent directory. The same directory
         # rides to the runner as inputs_base_dir so the shaper can resolve bare relative file-ish /
         # CSV strings (whose declared concept the signature-blind CLI cannot see).
         base_dir = inputs_path.parent.resolve()
         return ParsedCliInputs(pipeline_inputs=resolve_inputs_paths(loaded, base_dir=base_dir), inputs_base_dir=base_dir)
     except FileNotFoundError as exc:
-        agent_file_error(f"Input file not found: {inputs_arg}", path=inputs_arg, reason="not found", cause=exc)
+        agent_file_error(f"Input file not found: {label}", path=label, reason="not found", cause=exc)
     except json.JSONDecodeError as exc:
         # A subclass of ValueError, never of the read failures below.
-        agent_argument_error(
-            f"Input file contains invalid JSON: {inputs_arg}: {exc}", argument="--inputs", reason="the file is not valid JSON", cause=exc
-        )
+        agent_argument_error(f"Input file contains invalid JSON: {label}: {exc}", argument="--inputs", reason="the file is not valid JSON", cause=exc)
     except (OSError, UnicodeDecodeError) as exc:
         reason = file_read_failure_reason(error=exc)
-        agent_file_error(f"Input file cannot be read: {inputs_arg}: {reason}", path=inputs_arg, reason=reason, cause=exc)
+        agent_file_error(f"Input file cannot be read: {label}: {reason}", path=label, reason=reason, cause=exc)
     except JsonTypeError as exc:
         agent_argument_error(
-            f"Input file must be a valid JSON dictionary: {inputs_arg}", argument="--inputs", reason="the file does not hold a JSON object", cause=exc
+            f"Input file must be a valid JSON dictionary: {label}", argument="--inputs", reason="the file does not hold a JSON object", cause=exc
         )
     except TomlError as exc:
         # The inputs file is the caller's request, not the runtime's configuration.

@@ -5,7 +5,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, NoReturn
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
@@ -162,6 +162,30 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
+def report_agent_init_failure(*, error: Exception) -> NoReturn:
+    """Report a failure to initialize Pipelex, or to read the configuration it boots from, as its problem.
+
+    The one account of a failed boot, given whether the boot raised it or a step reading this machine's configuration
+    before the boot did, such as listing a method's tree under the configured limits: the same configuration fails the
+    same way wherever it is first read. A configuration that does not load, telemetry and a former release's leftovers
+    included, reports its own code, its next step, its advice and, when the migration history explains it, the pending
+    migration in its diagnostics. A failure whose chain gives no advice is tipped with the boot's recovery path, its
+    problem still its own.
+    """
+    if isinstance(error, ModelDeckPresetValidationError):
+        agent_error(
+            error.message,
+            cause=error,
+            preset_id=error.preset_id,
+            model_type=str(error.model_type),
+            model_handle=error.model_handle,
+            enabled_backends=sorted(error.enabled_backends),
+        )
+    if isinstance(error, PipelexError):
+        agent_error(error.message, cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+    agent_error(f"Pipelex initialization failed: {error}", cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+
+
 def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
     """Initialize Pipelex for agent CLI commands, a failure reported as its problem.
 
@@ -209,23 +233,10 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
             needs_inference=needs_inference,
             config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
         )
-    except ModelDeckPresetValidationError as exc:
-        agent_error(
-            exc.message,
-            cause=exc,
-            preset_id=exc.preset_id,
-            model_type=str(exc.model_type),
-            model_handle=exc.model_handle,
-            enabled_backends=sorted(exc.enabled_backends),
-        )
-    except PipelexError as exc:
-        # A configuration that does not load, telemetry and a former release's leftovers included, reports its own code,
-        # its next step, its advice and, when the migration history explains it, the pending migration in its diagnostics.
-        # A failure whose chain gives no advice is tipped with the boot's recovery path, its problem still its own.
-        agent_error(exc.message, cause=exc, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
-        agent_error(f"Pipelex initialization failed: {exc}", cause=exc, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+        # Agent CLI command boundary: report_agent_init_failure() (NoReturn) converts any boot failure into its problem,
+        # the model deck's preset refusal with its own fields.
+        report_agent_init_failure(error=exc)
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the
     # structured success/error envelope. Defense-in-depth on top of the init-time

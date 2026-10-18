@@ -69,6 +69,20 @@ class HostedVersions:
     BARE_RUNNER: ClassVar[str] = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
 
 
+class HostedPipeIoVerdicts:
+    """`POST /v1/pipe-io` invalid verdicts, as the runner's crate core builds them in the caller's view."""
+
+    # A method calling a package by its address that the request did not ship: pipe-io loads only the packages shipped
+    # with the method, and `/v1/start` fetches the dependency and runs. Built from the item
+    # `resolve_crate_from_method_dir`'s refusal carries on 2026-10-18.
+    UNSHIPPED_ADDRESS_DEPENDENCY: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [{"category": "pipe_validation", "error_type": "unresolved_package_dependency", '
+        '"source": "bundle.mthds", "message": "In-memory resolve cannot load address-based dependency '
+        "'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents in the request or "
+        'use directory-based resolution."}], "message": "The method does not validate."}'
+    )
+
+
 class HostedPipeIoRefusals:
     """`POST /v1/pipe-io` refusals, as the runner answers them in the caller's view."""
 

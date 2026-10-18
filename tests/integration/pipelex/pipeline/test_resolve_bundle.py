@@ -18,66 +18,15 @@ from pipelex.errors.problem import ProblemView
 from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
+from tests.integration.pipelex.pipeline.test_data import ResolveBundleTestData
 
-MAIN_MTHDS = """\
-domain = "pipeline"
-description = "Pipeline domain"
-
-[concept.Report]
-description = "A report"
-structure.score = { description = "the score", type = "concept", concept_ref = "Score" }
-structure.label = { description = "a label", type = "concept", concept_ref = "Text" }
-
-[pipe.run_pipeline]
-type = "PipeSequence"
-description = "Run the pipeline"
-inputs = { doc = "Text" }
-output = "Score"
-steps = [{ pipe = "compute_score", result = "score" }]
-"""
-
-STEPS_MTHDS = """\
-domain = "pipeline"
-
-[concept.Score]
-description = "A score"
-structure = { value = { description = "the value", type = "number" } }
-
-[pipe.compute_score]
-type = "PipeLLM"
-description = "Compute a score"
-inputs = { doc = "Text" }
-output = "Score"
-model = "$quick-reasoning"
-prompt = "Compute a score from $doc"
-"""
-
-# The pipe references a concept that no bundle declares — a load-stage library error, translated
-# by the shared cascade into a ValidateBundleError carrying structured validation errors.
-INVALID_MTHDS = """\
-domain = "broken"
-description = "Broken domain"
-
-[pipe.bad_pipe]
-type = "PipeLLM"
-description = "References an undeclared concept"
-inputs = { doc = "NoSuchConcept" }
-output = "Text"
-prompt = "Do something with $doc"
-"""
-
-ADDRESS_DEPENDENCY_MTHDS = """\
-domain = "host"
-
-[pipe.run_host]
-type = "PipeSequence"
-description = "Run an installed dependency"
-inputs = { doc = "Text" }
-output = "Text"
-steps = [{ pipe = "github.com/org/pkg->remote.process", result = "result" }]
-"""
+MAIN_MTHDS = ResolveBundleTestData.MAIN_MTHDS
+STEPS_MTHDS = ResolveBundleTestData.STEPS_MTHDS
+INVALID_MTHDS = ResolveBundleTestData.INVALID_MTHDS
+ADDRESS_DEPENDENCY_MTHDS = ResolveBundleTestData.ADDRESS_DEPENDENCY_MTHDS
 
 
 class TestResolveCrateFromContents:
@@ -156,3 +105,5 @@ class TestResolveCrateFromContents:
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == CoreCode.REQUEST_UNSUPPORTED
         assert problem.to_wire().get("params") == {"field": "files", "reason": ADDRESS_DEPENDENCY_UNSUPPORTED_REASON}
+        # The operator's message quotes the dependency after the marker the tree resolution's verdict items carry too.
+        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in exc_info.value.message

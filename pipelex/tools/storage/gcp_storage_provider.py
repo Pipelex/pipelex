@@ -280,6 +280,57 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         await asyncio.to_thread(self._store_sync, data, key=key, content_type=content_type)
 
+    def _store_if_absent_sync(self, *, data: bytes, key: str, content_type: str | None) -> bool:
+        """Synchronous implementation of the create-only store for use with to_thread.
+
+        Raises:
+            StorageGcpError: If the GCS operation fails other than on the key already holding an object.
+        """
+        bucket = self._get_bucket()
+
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
+            GoogleAPIError,
+            PreconditionFailed,
+            Unauthorized,
+        )
+
+        try:
+            blob = bucket.blob(key)
+            # Generation 0 matches only an object that does not exist, so GCS creates it or answers 412.
+            blob.upload_from_string(data, content_type=content_type, if_generation_match=0)
+        except PreconditionFailed:  # pyright: ignore[reportUnknownVariableType]
+            return False
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to store object to GCS: '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
+        except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to store object to GCS: '{key}': {exc}"
+            raise StorageGcpError(msg) from exc
+        return True
+
+    @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Create a GCS object unless one exists at the key, with GCS checking the condition.
+
+        The upload is conditional on the object's generation being 0, which only a key holding no object matches, so
+        GCS creates it or refuses with `412`, the key already held. GCS checks no SHA-256: the bytes were checked
+        against it before this call, and the client library checks the upload's own CRC32C or MD5 on the way.
+
+        Args:
+            data: The bytes to store, already checked against their checksum.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the object.
+            checksum_sha256_hex: Checked before this call; GCS takes no SHA-256 checksum.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._store_if_absent_sync, data=data, key=key, content_type=content_type)
+
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for a GCS object.
 

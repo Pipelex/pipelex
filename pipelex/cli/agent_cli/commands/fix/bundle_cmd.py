@@ -2,7 +2,7 @@
 
 import asyncio
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, NoReturn
 
 import typer
 
@@ -18,10 +18,12 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
+from pipelex.cli.judged_target import fix_judged_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.fixes.fix_loop import FixBundleResult, unfixable_method_result
 from pipelex.pipeline.fixes.fix_render import format_fix_markdown
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
@@ -79,10 +81,18 @@ def _failure_message(result: FixBundleResult) -> str:
     return message
 
 
+def _emit_still_invalid(*, result: FixBundleResult, bundle_path: str) -> NoReturn:
+    """Report the still-invalid verdict, format-aware, and exit 1.
+
+    The problem is the method's that does not validate, its faults the remaining errors.
+    """
+    agent_error_fix_bundle(result=result, bundle_path=str(Path(bundle_path).resolve()), message=_failure_message(result))
+
+
 def fix_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, whose every bundle is judged"),
     ],
     library_dir: Annotated[
         list[str] | None,
@@ -116,37 +126,46 @@ def fix_bundle_cmd(
         typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
-    """Fix a bundle file (.mthds) or pipeline directory in place."""
+    """Fix a bundle file (.mthds) or a method's folder in place.
+
+    A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
+    """
     use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     select_codes = _normalize_rule_codes(select_codes_raw)
     ignore_codes = _normalize_rule_codes(ignore_codes_raw)
     _reject_invalid_rule_filters(select_codes=select_codes, ignore_codes=ignore_codes)
 
-    bundle_path, library_dir = resolve_bundle_target(path, library_dir=library_dir)
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+    # A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it. A folder whose tree is
+    # refused is the still-invalid verdict, with nothing to fix, as `validate bundle` gives it the invalid one.
+    try:
+        target = resolve_bundle_target(path, library_dir=library_dir)
+    except ValidateBundleError as exc:
+        _emit_still_invalid(result=unfixable_method_result(error=exc), bundle_path=str(Path(path).expanduser()))
+    bundle_path = str(target.judged_path)
+    library_dirs = target.library_dirs
 
     try:
         make_pipelex_for_agent_cli(library_dirs=library_dirs, needs_inference=False)
         result = asyncio.run(
-            fix_bundle_file(
-                Path(bundle_path),
-                library_dirs=library_dirs,
+            fix_judged_target(
+                target=target,
+                writable_library_dirs=None,
                 allow_signatures=allow_signatures,
                 max_iterations=max_iterations,
                 select_codes=select_codes,
                 ignore_codes=ignore_codes,
             )
         )
-        payload = _result_payload(result, bundle_path=bundle_path)
         if result.is_valid:
+            payload = _result_payload(result, bundle_path=bundle_path)
             agent_success_formatted({"success": True, **payload}, markdown_renderer=format_fix_markdown, output_format=output_format)
             if not allow_signatures and result.is_runnable is False:
                 raise typer.Exit(1)
             return
 
         # Still-invalid verdict: the problem of the method that does not validate, its faults the remaining errors.
-        agent_error_fix_bundle(result=result, bundle_path=str(payload["bundle_path"]), message=_failure_message(result))
+        _emit_still_invalid(result=result, bundle_path=bundle_path)
 
     except FileNotFoundError as exc:
         agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc, exit_code=2)
