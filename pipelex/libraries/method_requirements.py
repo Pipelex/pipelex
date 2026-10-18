@@ -388,12 +388,21 @@ def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environ
     raise MethodRequirementsNotMetError(msg, items=items).with_params(**_unmet_requirement_params(unmet_requirement=unmet[0]))
 
 
-def _refused_by_deployment_error(*, judged: JudgedMethod, refusal: PipeFuncPackageRefusal) -> MethodRequirementsNotMetError:
+def _refused_by_deployment_error(
+    *, judged: JudgedMethod, refusal: PipeFuncPackageRefusal, requirements: Sequence[RequirementLine]
+) -> MethodRequirementsNotMetError:
     """The refusal of a method whose requirements the deployment cannot hold in any environment, carrying its reason.
 
     The deployment's reason is about the requirements together, such as a conflict its resolver found among them, so the
-    one item it rides on names the file and no line.
+    one item it rides on names the file and no line. `method.dependency_missing` names one distribution, as a refusal
+    of several unmet requirements names the first of them: the first requirement the file declares, with the `reason`
+    `no_matching_version`, since no set of versions the deployment can build satisfies the requirements.
     """
+    params = {
+        "kind": MethodDependencyMissingKind.REQUIREMENT,
+        "name": requirements[0].requirement.name,
+        "reason": MethodDependencyMissingReason.NO_MATCHING_VERSION,
+    }
     msg = (
         f"{judged.method_name} needs Python packages that {refusal.environment} cannot offer, "
         f"as its {REQUIREMENTS_FILE_NAME} declares: {refusal.reason}"
@@ -401,8 +410,9 @@ def _refused_by_deployment_error(*, judged: JudgedMethod, refusal: PipeFuncPacka
     item = PipelexBundleBlueprintValidationErrorData(
         source=judged.requirements_source,
         message=f"The requirements are refused by {refusal.environment}: {refusal.reason}",
+        params=params,
     )
-    return MethodRequirementsNotMetError(msg, items=[item])
+    return MethodRequirementsNotMetError(msg, items=[item]).with_params(**params)
 
 
 def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool) -> None:
@@ -434,7 +444,7 @@ def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_
             continue
         environment = resolve_pipe_func_package_environment(requirements=parsed.requirements, names_host_paths=names_host_paths)
         if isinstance(environment, PipeFuncPackageRefusal):
-            raise _refused_by_deployment_error(judged=judged, refusal=environment)
+            raise _refused_by_deployment_error(judged=judged, refusal=environment, requirements=parsed.requirements)
         unmet = unmet_requirements(requirements=parsed.requirements, environment=environment)
         if unmet:
             _raise_unmet(judged=judged, unmet=unmet, environment=environment)

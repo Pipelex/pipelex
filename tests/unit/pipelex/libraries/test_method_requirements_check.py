@@ -283,6 +283,9 @@ class TestMethodRequirementsCheck:
         refusal = refusal_info.value.to_problem(view=ProblemView.CALLER)
         assert refusal.code == CoreCode.METHOD_DEPENDENCY_MISSING
         assert refusal.domain == ProblemDomain.METHOD
+        # The refusal names the first requirement, as one of several unmet requirements names the first.
+        assert refusal.params is not None
+        assert refusal.params.as_wire() == {"kind": "requirement", "name": "pandas", "reason": "no_matching_version"}
         (item,) = verdict_info.value.validation_error_items()
         assert (item.source, item.line) == ("requirements.txt", None)
         assert item.message == f"The requirements are refused by the Daytona sandbox: {reason}"
