@@ -248,16 +248,16 @@ class TestMethodRequirementsCheck:
         with pytest.raises(ValidateBundleError) as verdict_info, translate_to_validate_bundle_error():
             ensure_served_method_requirements_met(library_dirs=[method_dir])
 
-        refusal = refusal_info.value.to_error_report()
-        assert refusal.error_domain == ErrorDomain.INPUT
-        message = refusal.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"]
+        message = refusal_info.value.message
         assert message == f"The method needs Python packages that the Daytona sandbox cannot offer, as its requirements.txt declares: {reason}"
-        verdict = verdict_info.value.to_error_report()
-        assert verdict.validation_errors is not None
-        (item,) = verdict.validation_errors
+        refusal = refusal_info.value.to_problem(view=ProblemView.CALLER)
+        assert refusal.code == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert refusal.domain == ProblemDomain.METHOD
+        (item,) = verdict_info.value.validation_error_items()
         assert (item.source, item.line) == ("requirements.txt", None)
         assert item.message == f"The requirements are refused by the Daytona sandbox: {reason}"
-        assert str(tmp_path) not in str(refusal.to_dict(disclosure_mode=DisclosureMode.STRICT))
+        for disclosed in (message, str(refusal.to_wire()), str(item)):
+            assert str(tmp_path) not in disclosed
 
     def test_a_served_method_checks_the_packages_nested_in_its_directory(self, tmp_path: Path) -> None:
         _write(directory=tmp_path, tree_path="top.mthds", content="domain = 'requirements_top'\n")

@@ -23,7 +23,9 @@ from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
@@ -65,13 +67,11 @@ class _RecordingBundleValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,
-    ) -> ErrorReport:
+    ) -> BundleValidationFailure:
         self.read_scopes.append(read_scope)
         self.held_keys.append(set(self._blob_storage.root))
-        return ErrorReport.make_for_code(
-            code=CoreCode.METHOD_INVALID,
-            error_type="ValidateBundleError",
-            message="bundle is invalid",
+        return BundleValidationFailure(
+            problem=make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR),
             validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
         )
 

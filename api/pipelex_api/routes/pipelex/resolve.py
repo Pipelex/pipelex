@@ -3,8 +3,8 @@ from typing import Annotated, Any, Literal, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.codegen.crate_encoding import encode_crate_json
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
