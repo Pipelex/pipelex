@@ -36,6 +36,13 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 _NAMED_REMOTE_SCHEMES: frozenset[str] = frozenset({"http", "https", "s3", "gs", PIPELEX_STORAGE_SCHEME.removesuffix("://")})
 
 
+def _whole_input_params(*, name: str | None) -> dict[str, str]:
+    """The parameters of `input.invalid` for a table input refused whole: the input, which is also the field at fault."""
+    if name is None:
+        return {}
+    return {"input": name, "field": name}
+
+
 class StuffBlueprint(BaseModel):
     stuff_name: str
     concept_ref: str
@@ -257,7 +264,7 @@ class StuffFactory:
                 f"'{concept.concept_ref}' has a url that could not be parsed. "
                 "Download the file locally and reference it by path."
             )
-            raise CsvError(msg) from exc
+            raise CsvError(msg).with_params(**_whole_input_params(name=name)) from exc
         # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to ``Path`` keeps
         # any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned ``...csv?X-Amz-...``),
         # which would hide the ``.csv`` and let a remote ref slip past the local-only guard below.
@@ -278,7 +285,7 @@ class StuffFactory:
                 f"'{concept.concept_ref}' points at a remote or non-local url{in_scheme}. "
                 "Download the file locally and reference it by path."
             )
-            raise CsvError(msg)
+            raise CsvError(msg).with_params(**_whole_input_params(name=name))
 
         try:
             row_model = concept_provider.get_structure_class(concept=concept)
@@ -286,7 +293,7 @@ class StuffFactory:
             # Keep the codec's typed-error boundary intact: an unregistered structure class is a
             # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
-            raise CsvError(msg) from exc
+            raise CsvError(msg).with_params(**_whole_input_params(name=name)) from exc
         authorize_uri_read(
             uri=url,
             read_scope=read_scope,
@@ -296,9 +303,14 @@ class StuffFactory:
         try:
             return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
         except CsvError as exc:
-            # The codec names the file by the input it was given as, and the code's sentences name it as well.
-            if name is not None and "input" in error_code_spec(exc.resolve_error_code()).param_names:
-                exc.with_params(input=name)
+            # The codec names the file by the input it was given as, and the code's sentences name it as well: the input,
+            # and, for a code naming the field at fault, the input itself, since the codec refuses the whole table.
+            if name is not None:
+                param_names = error_code_spec(exc.resolve_error_code()).param_names
+                if "input" in param_names:
+                    exc.with_params(input=name)
+                if "field" in param_names and "field" not in exc.given_params:
+                    exc.with_params(field=name)
             raise
 
     @classmethod

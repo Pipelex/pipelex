@@ -218,9 +218,6 @@ class TestPipeFuncFailureCode:
 
         assert failure.to_problem(view=ProblemView.CALLER).code == expected_code
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="the coercion of a function's return knows neither the step's output concept nor a field of it"
-    )
     @pytest.mark.parametrize(
         ("failure", "expected_error"),
         [
@@ -250,6 +247,9 @@ class TestPipeFuncFailureCode:
         assert step_failure.message.endswith(expected_error)
         assert _FUNCTION_TEXT not in step_failure.message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the coercion of a function's return knows neither the step's output concept nor a field of it"
+    )
     @pytest.mark.parametrize(
         "function",
         [_returns_a_list_holding_a_dict, _returns_a_list_holding_a_number],

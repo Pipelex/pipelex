@@ -130,6 +130,9 @@ class TestInputShaperCsvBySignature:
         ), topic
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert "confidential" not in json.dumps(operator.to_wire()), topic
+        # The table is refused whole, so the field at fault is the input itself.
+        assert operator.params is not None
+        assert operator.params.as_wire() == {"input": "people", "field": "people"}, topic
 
     def test_a_table_that_does_not_fit_names_the_input_never_the_file(self, tmp_path: Path):
         """The codec knows the file alone: the input it was given as completes the problem's sentence, and the path stays out."""
@@ -143,6 +146,6 @@ class TestInputShaperCsvBySignature:
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.INPUT_INVALID
         assert caller.params is not None
-        assert caller.params.as_wire() == {"input": "people"}
+        assert caller.params.as_wire() == {"input": "people", "field": "people"}
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert "confidential" not in json.dumps(operator.to_wire())
