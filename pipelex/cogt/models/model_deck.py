@@ -1,4 +1,3 @@
-import difflib
 from collections.abc import Callable, Container, Mapping
 from functools import partial
 from typing import NoReturn, Self, TypeVar
@@ -55,6 +54,7 @@ from pipelex.system.runtime import ProblemReaction
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
+from pipelex.tools.misc.string_utils import close_matches
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
@@ -353,7 +353,7 @@ class ModelDeck(ConfigModel):
         candidates = self.inference_models.handles_of_type(model_type=model_type)
         return [
             write_model_handle(name=match)
-            for match in difflib.get_close_matches(name, candidates, n=CLOSE_HANDLE_MAX_MATCHES, cutoff=CLOSE_HANDLE_CUTOFF)
+            for match in close_matches(name=name, candidates=candidates, cutoff=CLOSE_HANDLE_CUTOFF, max_matches=CLOSE_HANDLE_MAX_MATCHES)
         ]
 
     def is_served_only_as_other_types(self, *, name: str, model_type: ModelType) -> bool:

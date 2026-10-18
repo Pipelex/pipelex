@@ -4,7 +4,6 @@ Provides functions to find close matches for model names and detect wrong-sigil 
 Used by the CLI check-model command, the model deck validation layer and the model reference check.
 """
 
-import difflib
 from typing import NamedTuple
 
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -16,6 +15,7 @@ from pipelex.cogt.models.model_reference import (
     ModelReferenceKind,
     write_model_handle,
 )
+from pipelex.tools.misc.string_utils import close_matches
 
 KIND_SIGILS: dict[ModelReferenceKind, str] = {
     ModelReferenceKind.PRESET: SIGIL_PRESET,
@@ -116,7 +116,7 @@ def find_model_alternatives(*, model_deck: ModelDeck, model_type: ModelType, nam
     candidates = get_collection_keys(model_deck, model_type=model_type, kind=kind)
     same_kind = [
         ModelReferenceName(kind=kind, name=match)
-        for match in difflib.get_close_matches(name, candidates, n=_SAME_KIND_MAX_MATCHES, cutoff=_SAME_KIND_CUTOFF)
+        for match in close_matches(name=name, candidates=candidates, cutoff=_SAME_KIND_CUTOFF, max_matches=_SAME_KIND_MAX_MATCHES)
     ]
 
     other_kinds: list[ModelReferenceName] = []
@@ -130,7 +130,7 @@ def find_model_alternatives(*, model_deck: ModelDeck, model_type: ModelType, nam
         else:
             cross_kind.extend(
                 ModelReferenceName(kind=other_kind, name=match)
-                for match in difflib.get_close_matches(name, other_candidates, n=_CROSS_KIND_MAX_MATCHES, cutoff=_CROSS_KIND_CUTOFF)
+                for match in close_matches(name=name, candidates=other_candidates, cutoff=_CROSS_KIND_CUTOFF, max_matches=_CROSS_KIND_MAX_MATCHES)
             )
 
     return ModelAlternatives(same_kind=same_kind, other_kinds=other_kinds, cross_kind=cross_kind)

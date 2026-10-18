@@ -19,7 +19,6 @@ rather than a ``ValidateBundleError`` instance — that keeps the dependency one
 is no import cycle.
 """
 
-import difflib
 from typing import Any
 
 from mthds.protocol.problem.models import ProblemItem
@@ -45,6 +44,7 @@ from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import make_location, make_problem_item
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
+from pipelex.tools.misc.string_utils import close_matches
 from pipelex.validation_error_types import (
     HintLintErrorType,
     PipeFactoryErrorType,
@@ -315,7 +315,9 @@ def _concept_suggestions(*, item: ValidationErrorItem) -> list[str] | None:
     if not is_unresolved_concept or concept is None:
         return None
     local_code = concept.rsplit(".", 1)[-1]
-    return difflib.get_close_matches(local_code, item.declared_concepts or [], n=_CLOSE_CONCEPT_MAX_MATCHES, cutoff=_CLOSE_CONCEPT_CUTOFF)
+    return close_matches(
+        name=local_code, candidates=item.declared_concepts or [], cutoff=_CLOSE_CONCEPT_CUTOFF, max_matches=_CLOSE_CONCEPT_MAX_MATCHES
+    )
 
 
 # What the name of a `method.name_conflict` item collides with, by the type of the item; a name declared twice across a

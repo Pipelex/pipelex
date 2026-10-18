@@ -20,7 +20,7 @@ from mthds.package.manifest.schema import MethodsManifest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexUnexpectedError
-from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION, close_pipe_refs
+from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION, close_pipe_refs, declared_pipe_refs
 from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -49,7 +49,7 @@ def _listed(*, names: list[str]) -> str:
 
 def _declared_pipe_refs(*, candidates: list[EntryCandidate]) -> list[str]:
     """The qualified refs of every pipe the method's bundles declare, sorted: the pipes a run may name to start at."""
-    return sorted({f"{candidate.blueprint.domain}.{pipe_code}" for candidate in candidates for pipe_code in candidate.blueprint.pipe or {}})
+    return declared_pipe_refs(blueprints=[candidate.blueprint for candidate in candidates])
 
 
 def _entry_of(*, candidate: EntryCandidate, pipe_code: str) -> MethodEntry:
