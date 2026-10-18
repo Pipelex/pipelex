@@ -44,6 +44,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     # Template mode fields (used when template is provided)
     template: str | None = None
+    # The key of the pipe's table holding the template's source, which a refusal its render meets is located on:
+    # `template.template` when the template is a table of its own. None in construct mode, whose fields each locate their
+    # own refusals (`construct.<path>`), and on a pipe built without its blueprint, whose template is the plain string.
+    template_field: str | None = None
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
@@ -215,7 +219,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        with locating_template_refusal(template_field="template"):
+        with locating_template_refusal(template_field=self.template_field or "template"):
             compose_result = await run_compose_template(
                 memory=working_memory,
                 template=self.template,

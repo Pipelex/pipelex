@@ -37,6 +37,23 @@ caption = { template = "CAPTION_SLOT" }
 url = { template = "URL_SLOT" }
 """
 
+# A compose whose template is a table of its own, its source written under the table's `template` key.
+_TEMPLATE_TABLE_MTHDS = """
+domain = "template_refusal_table"
+description = "Compose a line about a topic"
+main_pipe = "say"
+
+[pipe.say]
+type = "PipeCompose"
+description = "Say something about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+
+[pipe.say.template]
+template = "Talk about {{ topic['_owner'] }}"
+category = "basic"
+"""
+
 # A condition whose field, written as a template or as an expression, reads a private name its own source spells.
 _CONDITION_MTHDS = """
 domain = "template_refusal_condition"
@@ -133,6 +150,17 @@ class TestTemplateRefusalNames:
         assert caller.location is not None
         assert caller.location.as_wire() == {"pipe": "say", "path": ["say"], "field": "template"}
         assert "# Error: PipelineExecutionError" in markdown
+
+    async def test_a_template_written_as_a_table_is_located_on_the_key_holding_its_source(self) -> None:
+        """A compose template written as a table of its own holds its source under the table's `template` key."""
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol().execute(mthds_contents=[_TEMPLATE_TABLE_MTHDS], inputs={"topic": SecurityRefusalTestData.TOPIC})
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"pipe": "say", "path": ["say"], "field": "template.template"}
 
     @pytest.mark.parametrize(
         ("caption_template", "url_template", "expected_field"),

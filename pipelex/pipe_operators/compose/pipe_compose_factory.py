@@ -92,6 +92,7 @@ class PipeComposeFactory(PipeFactoryProtocol[PipeComposeBlueprint, PipeCompose])
             inputs=inputs,
             output=output,
             template=template_source,
+            template_field=blueprint.template_field,
             templating_style=blueprint.templating_style,
             category=blueprint.template_category,
             extra_context=blueprint.extra_context,
