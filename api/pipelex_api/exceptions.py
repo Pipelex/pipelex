@@ -104,8 +104,9 @@ class RunnerRequestError(PipelexError):
     one, that cannot be parsed, ``request.too_large`` for a request past one of this runner's size limits,
     ``request.unsupported`` for a form this runner does not accept, ``request.blobs_missing`` for files sent by hash
     that this runner does not hold, ``request.not_found`` and ``request.method_not_allowed`` for a request no route
-    serves, and ``account.rate_limited`` for a request a rate limit in front of a route refused, which only the web
-    framework's own refusal answers (``pipelex_api.exception_handlers.handle_http_exception``).
+    serves, and ``runtime.unavailable``, naming the rate limiter as its ``dependency``, for a request a rate limit in
+    front of a route refused, which only the web framework's own refusal answers
+    (``pipelex_api.exception_handlers.framework_refusal``).
     """
 
     error_code = ErrorCodeSet(
@@ -117,7 +118,7 @@ class RunnerRequestError(PipelexError):
             CoreCode.REQUEST_BLOBS_MISSING,
             CoreCode.REQUEST_NOT_FOUND,
             CoreCode.REQUEST_METHOD_NOT_ALLOWED,
-            CoreCode.ACCOUNT_RATE_LIMITED,
+            CoreCode.RUNTIME_UNAVAILABLE,
         ),
     )
 

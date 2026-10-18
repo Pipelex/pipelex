@@ -13,13 +13,14 @@ the operator's, which `test_problem_views.py` drives through the real dependenci
 
 import asyncio
 import json
+import logging
 import re
 from typing import Any, cast
 
 import pytest
 from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.testclient import TestClient
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pipelex.base_exceptions import PipelexConfigError, PipelexError, ProblemFacts
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
@@ -41,7 +42,15 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import Message, Scope
 from typing_extensions import override
 
-from pipelex_api.exception_handlers import ERROR_CHAIN_FIELD, ERROR_FRAMES_FIELD, problem_response, register_exception_handlers
+from pipelex_api.exception_handlers import (
+    ERROR_CHAIN_FIELD,
+    ERROR_FRAMES_FIELD,
+    RecordLevel,
+    framework_refusal,
+    problem_response,
+    record_level_of,
+    register_exception_handlers,
+)
 from pipelex_api.exceptions import RunnerMisconfiguredError, RunnerRequestError
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
@@ -548,7 +557,8 @@ class TestExceptionHandlers:
         body = json.loads(bytes(response.body))
         assert body["status"] == expected_status
         assert body["code"] == code
-        fields = _emitted_fields(log_spy, as_error=expected_status >= 500)
+        # A 501 states what this deployment does not offer, which the caller meets each time it asks: a warning.
+        fields = _emitted_fields(log_spy, as_error=expected_status >= 500 and expected_status != 501)
         assert fields["http.response.status_code"] == expected_status
         assert fields["error.code"] == code
 
@@ -695,14 +705,30 @@ class TestExceptionHandlers:
         body = assert_problem(response, status=404, code="request.not_found")
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
         assert "params" not in body
-        fields = _emitted_fields(log_spy, as_error=False)
+        # Nobody has anything to do about a path nobody serves, which scanners probe by the thousand: its record is a
+        # debug one, never a warning.
+        log_spy.warning.assert_not_called()
+        log_spy.error.assert_not_called()
+        fields = log_spy.debug.call_args.kwargs["fields"]
         assert fields["error.code"] == "request.not_found"
         assert fields["http.response.status_code"] == 404
+        assert ERROR_FRAMES_FIELD not in fields
 
-    def test_a_method_the_route_does_not_accept_is_a_method_not_allowed_problem_keeping_allow(self):
+    def test_a_method_the_route_does_not_accept_is_a_method_not_allowed_problem_keeping_allow(self, mocker: MockerFixture):
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/needs-body")
         assert_problem(response, status=405, code="request.method_not_allowed")
         assert response.headers["Allow"] == "POST"
+        log_spy.warning.assert_not_called()
+        log_spy.error.assert_not_called()
+        assert log_spy.debug.call_args.kwargs["fields"]["error.code"] == "request.method_not_allowed"
+
+    def test_a_routing_refusal_writes_no_warning_record(self, caplog: pytest.LogCaptureFixture):
+        # Through the real log, not a spy: no record at `WARNING` or above reaches a sink for a path nobody serves.
+        with caplog.at_level("DEBUG"):
+            _build_client().get("/wp-admin/setup.php")
+            _build_client().get("/needs-body")
+        assert [record for record in caplog.records if record.levelno >= logging.WARNING] == []
 
     def test_a_framework_4xx_is_the_caller_s_malformed_request_never_a_500(self, mocker: MockerFixture):
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
@@ -724,12 +750,15 @@ class TestExceptionHandlers:
         [
             # A security class's missing credential, keeping the challenge it named.
             (401, 401, "auth.missing_credential", "WWW-Authenticate"),
-            (403, 403, "auth.forbidden", None),
-            (413, 413, "request.too_large", None),
-            # No code declares a 415: the refusal keeps its status, under the code whose meaning matches it.
-            (415, 415, "request.unsupported", None),
-            # A rate limiter's refusal, keeping the delay it asked for.
-            (429, 429, "account.rate_limited", "Retry-After"),
+            # A security class's refusal of a credential: the framework names no requirement for `auth.forbidden`.
+            (403, 403, "auth.invalid_credential", None),
+            # The framework names no limit and no size for `request.too_large`.
+            (413, 413, "request.malformed", None),
+            # No code declares a 415: the refusal keeps its status, a form of request the framework would not read.
+            (415, 415, "request.malformed", None),
+            # A rate limiter's refusal, keeping the delay it asked for: the framework names no limit and no window for
+            # `account.rate_limited`.
+            (429, 429, "runtime.unavailable", "Retry-After"),
         ],
     )
     def test_a_framework_4xx_keeps_its_meaning(self, mocker: MockerFixture, raised_status: int, status: int, code: str, kept_header: str | None):
@@ -752,6 +781,47 @@ class TestExceptionHandlers:
         assert fields["http.response.status_code"] == status
         # The refusal stands in for the framework's exception, which the record's chain still names.
         assert fields[ERROR_CHAIN_FIELD] == [fields["error.type"], "HTTPException"]
+
+    @pytest.mark.parametrize("raised_status", range(400, 500))
+    def test_every_framework_refusal_fills_its_code_s_parameters(self, raised_status: int):
+        """Whatever 4xx the framework raises, the refusal answering it carries every parameter its code requires.
+
+        A code whose required parameter is missing renders its fallback sentence, which tells the caller nothing.
+        """
+        refusal, kept_status = framework_refusal(status=raised_status, challenge=None)
+        problem = refusal.to_problem(view=ProblemView.OPERATOR)
+        # Every framework refusal is answered under one of the standard's own codes.
+        spec = error_code_spec(CoreCode(problem.code))
+        params = problem.params.model_dump(exclude_none=True) if problem.params else {}
+        spec.params_model.model_validate(params)
+        required = {name for name, field in spec.params_model.model_fields.items() if field.is_required()}
+        assert required <= set(params), (problem.code, params)
+        # The caller reads the code's sentence filled from those parameters, never the fallback naming none.
+        assert problem.detail == spec.detail.format(**params)
+        # The status answered is the one the framework raised, whether the code declares it or the refusal keeps it.
+        assert (kept_status or spec.status) == (422 if raised_status == 400 else raised_status)
+
+    @pytest.mark.parametrize(
+        ("status", "domain", "level", "frames"),
+        [
+            (422, ProblemDomain.INPUT, RecordLevel.WARNING, False),
+            (409, ProblemDomain.RUNTIME, RecordLevel.WARNING, False),
+            (429, ProblemDomain.RUNTIME, RecordLevel.WARNING, False),
+            # What this deployment does not offer, which a caller meets each time it asks.
+            (501, ProblemDomain.OPERATOR, RecordLevel.WARNING, False),
+            # A refusal the caller can avoid, such as its own webhook receiver refusing a delivery.
+            (502, ProblemDomain.INPUT, RecordLevel.WARNING, False),
+            (500, ProblemDomain.METHOD, RecordLevel.WARNING, False),
+            (500, ProblemDomain.ACCOUNT, RecordLevel.WARNING, False),
+            (500, ProblemDomain.OPERATOR, RecordLevel.ERROR, True),
+            (500, ProblemDomain.RUNTIME, RecordLevel.ERROR, True),
+            (503, ProblemDomain.RUNTIME, RecordLevel.ERROR, True),
+        ],
+    )
+    def test_only_a_fault_the_server_must_fix_is_recorded_as_an_error(self, status: int, domain: ProblemDomain, level: RecordLevel, frames: bool):
+        record_level = record_level_of(status=status, domain=domain)
+        assert record_level == level
+        assert record_level.writes_frames is frames
 
     def test_a_framework_401_without_a_challenge_names_none(self):
         response = _build_client().get("/framework-refusal/401")
@@ -1129,12 +1199,14 @@ class TestExceptionHandlers:
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
 
     def test_async_execution_not_enabled_logs_its_status(self, mocker: MockerFixture):
-        # The record carries the status the client saw.
+        # The record carries the status the client saw. A 501 states what this deployment does not offer, which any
+        # caller can ask for again and again: a warning without frames, never an error filling the alerts.
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/async-execution-not-enabled")
         assert response.status_code == 501
-        log_spy.error.assert_called_once()
-        fields = _emitted_fields(log_spy, as_error=True)
+        log_spy.error.assert_not_called()
+        fields = _emitted_fields(log_spy, as_error=False)
+        assert ERROR_FRAMES_FIELD not in fields
         assert fields["http.response.status_code"] == 501
         assert fields["error.type"] == "AsyncExecutionNotEnabledError"
         assert fields["error.code"] == CoreCode.RUNTIME_UNSUPPORTED

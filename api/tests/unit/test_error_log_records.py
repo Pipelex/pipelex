@@ -421,9 +421,9 @@ class TestErrorLogRecords:
     )
     def test_a_crafted_path_survives_as_one_value_and_forges_nothing(self, caplog: pytest.LogCaptureFixture, crafted_segment: str, logged_path: str):
         # The path a caller sends is the one value of the record it controls whatever the route, a path no route serves
-        # included. `json.dumps` writes each value inside one string, so a quote or an `=` stays part of it, and the
-        # line stays one object with the value as one field.
-        with caplog.at_level(logging.WARNING):
+        # included, whose record is a debug one. `json.dumps` writes each value inside one string, so a quote or an `=`
+        # stays part of it, and the line stays one object with the value as one field.
+        with caplog.at_level(logging.DEBUG):
             response = _build_client().get(f"/unserved/{crafted_segment}")
         assert response.status_code == 404
         payload = _rendered_json(_api_error_record(caplog))
