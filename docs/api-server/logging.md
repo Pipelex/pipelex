@@ -120,7 +120,7 @@ To change any of this for a deployment, mount a `pipelex_override.toml` into `/r
 
 ## Blob store lines
 
-A file a request names by its hash is read from the runner's blob store and checked against that hash. Bytes that do not hash to it, or are not the size the store holds the blob at, are a damaged object in the deployment's storage, and the request is answered `500` `pipelex.storage.not_found`, whose verdict is not to retry, since a retry reads the same object (see [Error Responses](error-responses.md)). Beside the request's error line, the store writes one line at `ERROR` naming the object, the one place the operator reads which object to remove, after which the blob is uploaded again:
+A file a request names by its hash is read from the runner's blob store and checked against that hash. Bytes that do not hash to it, or are not the size the store holds the blob at, are a damaged object in the deployment's storage, and the request is answered `500` `pipelex.storage.damaged`, whose verdict is not to retry, since a retry reads the same object (see [Error Responses](error-responses.md)). Beside the request's error line, the store writes one line at `ERROR` naming the object, the one place the operator reads which object to remove, after which the blob is uploaded again:
 
 ```json
 {"time": "2026-10-17T10:41:09.204Z", "severity": "ERROR", "logger": "pipelex_api.blob_store", "message": "Stored blob bytes do not match their hash", "request_id": "01M2TCP02W04RZG6DTM8AR508C", "blob_sha256": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08", "blob_size_bytes": 14, "read_size_bytes": 14, "storage_scheme": "s3"}

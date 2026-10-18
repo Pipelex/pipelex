@@ -94,7 +94,7 @@ paths:
 
         uploading bytes the runner already holds answers 204 and changes nothing, and uploading bytes whose hash names an
 
-        object of another size, which only damaged storage could hold, is a 500 `pipelex.storage.not_found` that leaves the
+        object of another size, which only damaged storage could hold, is a 500 `pipelex.storage.damaged` that leaves the
 
         object as it is.'
       operationId: put_blob_v1_blobs__sha256__put
@@ -170,9 +170,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -477,9 +477,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -845,9 +845,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -980,9 +980,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -1088,9 +1088,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -1198,9 +1198,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -1302,9 +1302,9 @@ paths:
         '500':
           description: 'A failure the caller cannot fix: the runner''s own configuration (`runtime.misconfigured`, such as
             a missing env var), a bad TOML override, a backend fault, or an unexpected error answered as `runtime.unexpected`.
-            Report the `request_id`. Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes
-            the blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so
-            its verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
+            Report the `request_id`. Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the
+            blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its
+            verdict is not to retry. The operator removes the object, for the blob to be uploaded again.'
           content:
             application/problem+json:
               schema:
@@ -1648,7 +1648,7 @@ paths:
 
         at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
 
-        change nothing, and bytes of another size mean the object held is damaged, a 500 `pipelex.storage.not_found`, since
+        change nothing, and bytes of another size mean the object held is damaged, a 500 `pipelex.storage.damaged`, since
 
         nothing writes over a blob. When the request names the tree the blobs
 

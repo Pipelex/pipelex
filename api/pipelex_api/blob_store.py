@@ -36,7 +36,7 @@ From this the blob store answers without reading what it does not need:
 - `POST /v1/blobs/missing` lists a hash this runner does not hold at the size the sender states, an object held at
   another size included. The upload then tells the two cases apart, holding the bytes: bytes of the size held are the
   ones held, and nothing is written, while bytes of another size mean the object held is damaged, which only a storage
-  that does not publish writes whole could leave, a 500 `pipelex.storage.not_found`, since nothing writes over a blob
+  that does not publish writes whole could leave, a 500 `pipelex.storage.damaged`, since nothing writes over a blob
   and its operator must remove the object.
 - A run looks up each hash's stored size first. A hash held at another size than an entry states is a 422
   `request.invalid`, never `request.blobs_missing`, since uploading those bytes again would change nothing: the entry
@@ -44,7 +44,7 @@ From this the blob store answers without reading what it does not need:
   Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
   states, which its census already held to the tree's limits, and each is checked against its hash once read. Bytes
   that do not hash to their key mean the object stored under it is damaged, which no caller can repair and no retry
-  cures: a 500 `pipelex.storage.not_found` naming the kind of storage, whose verdict is not to retry, and an error
+  cures: a 500 `pipelex.storage.damaged` naming the kind of storage, whose verdict is not to retry, and an error
   record, "Stored blob bytes do not match their hash", naming the hash for the operator to remove the object, after
   which the blob is uploaded again.
 
@@ -154,7 +154,7 @@ class RunnerBlobStore:
     async def _read_verified(self, *, sha256: str, size: int) -> bytes:
         """The stored bytes of `sha256`, held at `size`, checked against their hash.
 
-        Raises (as a problem document): a 500 `pipelex.storage.not_found` naming the kind of storage, for bytes that
+        Raises (as a problem document): a 500 `pipelex.storage.damaged` naming the kind of storage, for bytes that
         are not `size` bytes hashing to `sha256`, after an error record naming the hash, the one place the operator
         reads which damaged object to remove.
         """
@@ -190,7 +190,7 @@ class RunnerBlobStore:
         free, with its hash as its checksum: a writer that created it meanwhile wrote the same bytes, and the key
         holding an object is the blob held.
 
-        Raises (as a problem document): a 500 `pipelex.storage.not_found` naming the kind of storage when an object of
+        Raises (as a problem document): a 500 `pipelex.storage.damaged` naming the kind of storage when an object of
         another size is held under the hash, which only damaged storage could hold and which this runner never writes
         over, after the error record naming the hash that a read of damaged bytes writes.
         """

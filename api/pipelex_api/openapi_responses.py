@@ -184,7 +184,7 @@ PROBLEM_500: dict[str, Any] = _problem(_PROBLEM_500_DESCRIPTION)
 # The 500 of a route that reads files a request names by hash from the runner's blob store, which can also find one of
 # them damaged. It replaces the composite router's 500 on those routes, so its description names that code too.
 PROBLEM_500_HELD_BLOBS: dict[str, Any] = _problem(
-    f"{_PROBLEM_500_DESCRIPTION} Or `pipelex.storage.not_found`, naming the kind of storage as `params.scheme`: bytes the "
+    f"{_PROBLEM_500_DESCRIPTION} Or `pipelex.storage.damaged`, naming the kind of storage as `params.scheme`: bytes the "
     "blob store holds under a hash the request names do not hash to it, a damaged object a retry reads again, so its "
     "verdict is not to retry. The operator removes the object, for the blob to be uploaded again.",
 )
