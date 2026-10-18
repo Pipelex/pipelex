@@ -77,9 +77,13 @@ def resource_path_refusal(*, path: str) -> str | None:
     A path that leaves the bundle says so first (`root_escape_of`). The reason never repeats the path, which a host
     library's step would otherwise put in front of a caller.
     """
+    return _path_refusal_reason(path=path, escape=root_escape_of(path=path))
+
+
+def _path_refusal_reason(*, path: str, escape: RootEscape | None) -> str | None:
+    """Why `path` cannot name a file inside a bundle, `escape` being how it leaves the bundle (`root_escape_of`)."""
     if not path.strip():
         return "it is empty"
-    escape = root_escape_of(path=path)
     if escape is not None:
         return escape.desc
     if "\\" in path:
@@ -114,30 +118,26 @@ def canonical_resource_path(*, path: str) -> str:
         BundleResourcePathError: the path cannot name a file inside the bundle: ``security.input_path_refused`` for a
             path that leaves it (`root_escape_of`), ``request.invalid`` for a path of the wrong shape.
     """
-    refusal = resource_path_refusal(path=path)
+    # Read once: it decides both the reason the message gives and the refusal's code and parameters.
+    escape = root_escape_of(path=path)
+    refusal = _path_refusal_reason(path=path, escape=escape)
     if refusal is not None:
         msg = f"The file '{path}' submitted with the bundle cannot be one of its files: {refusal}."
-        raise BundleResourcePathError(msg).with_error_code(path_refusal_code(path=path)).with_params(**path_refusal_params(path=path))
+        raise path_refusal_error(message=msg, escape=escape)
     return PurePosixPath(path).as_posix()
 
 
-def path_refusal_code(*, path: str) -> CoreCode:
-    """The code of the refusal of a caller's path: a security refusal when it leaves its root, else a refusal of the request."""
-    if root_escape_of(path=path) is not None:
-        return CoreCode.SECURITY_INPUT_PATH_REFUSED
-    return CoreCode.REQUEST_INVALID
+def path_refusal_error(*, message: str, escape: RootEscape | None) -> BundleResourcePathError:
+    """The refusal of a submitted file's path, `escape` being how the path leaves its root (`root_escape_of`).
 
-
-def path_refusal_params(*, path: str) -> dict[str, str]:
-    """The parameters of the refusal `path_refusal_code` names for a submitted file's path.
-
-    The rule a path leaving its root breaks, for ``security.input_path_refused``, else the request's field the submitted
-    files ride, `resources`, for ``request.invalid``.
+    A path that leaves its root is a security refusal, ``security.input_path_refused``, naming the rule it breaks and
+    never the path; any other is a refusal of the request, ``request.invalid``, naming the field the submitted files
+    ride, `resources`.
     """
-    escape = root_escape_of(path=path)
+    error = BundleResourcePathError(message)
     if escape is not None:
-        return {"rule": escape.rule}
-    return {"field": SUBMITTED_FILES_FIELD}
+        return error.with_error_code(CoreCode.SECURITY_INPUT_PATH_REFUSED).with_params(rule=escape.rule)
+    return error.with_error_code(CoreCode.REQUEST_INVALID).with_params(field=SUBMITTED_FILES_FIELD)
 
 
 def canonical_submitted_files(*, files: Mapping[str, bytes]) -> dict[str, bytes]:

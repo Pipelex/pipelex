@@ -399,18 +399,6 @@ _ORCHESTRATION_MODE_DESCRIPTION = (
 _ALLOWED_CALLBACK_SCHEMES = frozenset({"http", "https"})
 
 
-def _is_disallowed_host(host: str) -> bool:
-    """True if `host` is a destination a completion callback must not reach: the runtime's own SSRF rule.
-
-    Used to harden /start callback_urls against SSRF — a malicious client could otherwise aim webhooks at internal
-    services or cloud metadata endpoints (e.g. 169.254.169.254). The rule is the one the delivery-time guard applies
-    when the webhook fires, `pipelex.tools.network.host_rules`, so a spelling the guard refuses at fire time (an
-    uppercase or trailing-dot alias, a carrier-grade NAT address) is refused here first. Best-effort: hostnames that
-    resolve to private addresses at fire time aren't blocked here, only literal IPs and the known internal names.
-    """
-    return is_disallowed_host(host)
-
-
 class PipelineApiExtras(BaseModel):
     """Validates the API-server-only fields on `/execute` and `/start` requests.
 
@@ -505,7 +493,12 @@ class PipelineApiExtras(BaseModel):
             if not host or not host.rstrip("."):
                 msg = "callback URL must name a host"
                 raise ValueError(msg)
-            if _is_disallowed_host(host):
+            # The runtime's own SSRF rule, the one the delivery-time guard applies when the webhook fires
+            # (`pipelex.tools.network.host_rules`), so a spelling the guard refuses at fire time, an uppercase or
+            # trailing-dot alias or a carrier-grade NAT address, is refused here first, before a malicious client can
+            # aim a webhook at an internal service or a cloud metadata endpoint. Best effort: a hostname resolving to a
+            # private address at fire time is not refused here, only literal IPs and the known internal names.
+            if is_disallowed_host(host):
                 msg = f"callback URL host {parsed.hostname!r} is not allowed (private/loopback/metadata addresses are blocked)"
                 raise CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
         return value

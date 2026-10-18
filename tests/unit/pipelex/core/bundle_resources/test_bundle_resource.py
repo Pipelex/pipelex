@@ -5,7 +5,7 @@ from pipelex.core.bundle_resources.bundle_resource import (
     canonical_resource_path,
     canonical_resource_path_or_none,
     canonical_submitted_files,
-    path_refusal_params,
+    path_refusal_error,
     root_escape_of,
 )
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
@@ -63,8 +63,11 @@ class TestCanonicalResourcePath:
         assert reason in exc_info.value.message
         assert exc_info.value.resolve_error_code() == code
         assert exc_info.value.given_params == params
-        assert path_refusal_params(path=path) == params
         escape = root_escape_of(path=path)
+        # The refusal a caller of the rule builds from the same escape is the one this raised.
+        built = path_refusal_error(message="refused", escape=escape)
+        assert built.resolve_error_code() == code
+        assert built.given_params == params
         assert (escape.rule if escape is not None else None) == params.get("rule")
         if escape is not None:
             # The one classifier gives both the message's reason and the security rule.
