@@ -789,6 +789,10 @@ $photo
     # that is the run's input, which no problem may carry.
     DATA_NAMED_TEMPLATE: ClassVar[str] = "Talk about {{ topic[topic.text] }}"
     DATA_NAMED_TOPIC: ClassVar[str] = "_quokka_marmalade_4471"
+    # The same lookup, in a template whose condition compares the topic to a string literal holding the name the data
+    # chose as a word: a literal no access reads names nothing the template reached for.
+    DATA_NAMED_BESIDE_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {% if topic.text == 'debug _token' %}debug{% endif %}{{ topic[topic.text] }}"
+    DATA_NAMED_BESIDE_LITERAL_TOPIC: ClassVar[str] = "_token"
     TOPIC: ClassVar[str] = "the quarterly payroll"
     COMPOSE_MTHDS_SLOT: ClassVar[str] = "TEMPLATE_SLOT"
     COMPOSE_MTHDS: ClassVar[str] = """

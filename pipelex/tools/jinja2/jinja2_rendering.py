@@ -1,4 +1,5 @@
 import re
+import string
 from collections.abc import Awaitable, Callable, Generator
 from contextlib import contextmanager
 from typing import Any, NamedTuple, Protocol, TypeVar
@@ -159,15 +160,61 @@ class SpelledNames(NamedTuple):
 
     ``references`` are the names it reads, stores or reaches as a variable or an attribute: a variable (``invoice``), an
     attribute (``.total``), a key written as a literal (``['total']``, ``attr('total')``, ``{'total': ...}``), a
-    keyword's name (``namespace(total=...)``), a namespace's attribute it sets and a macro's name. ``filters_and_tests``
-    are the filters and tests it applies. ``literals`` are the string constants its expressions write, such as a format
-    string. A name the template reaches through a value, ``notes[patient_id]``, is none of them: that name is a value of
-    the run's data.
+    keyword's name (``namespace(total=...)``), a namespace's attribute it sets, a macro's name, and a name a replacement
+    field of a format string reads, where the literal is the string a ``.format`` or ``.format_map`` call formats
+    (``'{0.total}'.format(invoice)``), which the sandboxed formatter reads as an attribute or a key. ``filters_and_tests``
+    are the filters and tests it applies. A name the template reaches through a value, ``notes[patient_id]``, is none of
+    them: that name is a value of the run's data. Nor is a word any other string literal holds, ``mode == 'debug'``, which
+    no access reads.
     """
 
     references: frozenset[str]
     filters_and_tests: frozenset[str]
-    literals: frozenset[str]
+
+
+# The methods of a string that format it, reading its replacement fields as attributes and keys of their arguments.
+_FORMAT_METHODS = frozenset({"format", "format_map"})
+
+# A part of a replacement field's name after its first: an attribute (`.total`) or a key (`[total]`), as `str.format` reads it.
+_FORMAT_FIELD_PART_PATTERN = re.compile(r"\.(?P<attribute>[^.\[]*)|\[(?P<key>[^\]]*)\]")
+
+
+def _format_string_names(*, format_string: str) -> set[str]:
+    """The names the replacement fields of a `str.format` string read: argument names, attributes and keys, nested fields included.
+
+    A string that does not parse as a format string reads nothing, since formatting it fails before any field is read.
+    """
+    names: set[str] = set()
+    try:
+        parsed_fields = list(string.Formatter().parse(format_string))
+    except ValueError:
+        return names
+    for _, field_name, format_spec, _ in parsed_fields:
+        if field_name is None:
+            continue
+        argument_name = re.split(r"[.\[]", field_name, maxsplit=1)[0]
+        if argument_name and not argument_name.isdigit():
+            names.add(argument_name)
+        for part in _FORMAT_FIELD_PART_PATTERN.finditer(field_name[len(argument_name) :]):
+            name = part.group("attribute") if part.group("attribute") is not None else part.group("key")
+            if name and not name.isdigit():
+                names.add(name)
+        if format_spec:
+            names |= _format_string_names(format_string=format_spec)
+    return names
+
+
+def _formatted_literal(*, call: nodes.Call) -> str | None:
+    """The string literal a call formats, ``'{0.x}'.format(v)`` or ``'{0.x}' | attr('format')`` called, else ``None``."""
+    match call.node:
+        case nodes.Getattr(node=nodes.Const(value=str() as format_string), attr=str() as method) if method in _FORMAT_METHODS:
+            return format_string
+        case nodes.Filter(name="attr", node=nodes.Const(value=str() as format_string), args=[nodes.Const(value=str() as method)]) if (
+            method in _FORMAT_METHODS
+        ):
+            return format_string
+        case _:
+            return None
 
 
 def template_spelled_names(*, template_source: str) -> SpelledNames:
@@ -180,13 +227,27 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
     try:
         parsed_template = jinja2_env.parse(template_source)
     except TemplateSyntaxError:
-        return SpelledNames(references=frozenset(), filters_and_tests=frozenset(), literals=frozenset())
+        return SpelledNames(references=frozenset(), filters_and_tests=frozenset())
     references: set[str] = set()
     filters_and_tests: set[str] = set()
-    literals = {node.value for node in parsed_template.find_all(nodes.Const) if isinstance(node.value, str)}
-    spelling_nodes = (nodes.Name, nodes.Getattr, nodes.NSRef, nodes.Keyword, nodes.Getitem, nodes.Pair, nodes.Macro, nodes.Filter, nodes.Test)
+    spelling_nodes = (
+        nodes.Name,
+        nodes.Getattr,
+        nodes.NSRef,
+        nodes.Keyword,
+        nodes.Getitem,
+        nodes.Pair,
+        nodes.Macro,
+        nodes.Filter,
+        nodes.Test,
+        nodes.Call,
+    )
     for node in parsed_template.find_all(spelling_nodes):
         match node:
+            case nodes.Call():
+                format_string = _formatted_literal(call=node)
+                if format_string is not None:
+                    references |= _format_string_names(format_string=format_string)
             case nodes.Name(name=str() as name) | nodes.Macro(name=str() as name):
                 references.add(name)
             case nodes.Getattr(attr=str() as attribute) | nodes.NSRef(attr=str() as attribute):
@@ -204,7 +265,7 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
                 filters_and_tests.add(test_name)
             case _:
                 pass
-    return SpelledNames(references=frozenset(references), filters_and_tests=frozenset(filters_and_tests), literals=frozenset(literals))
+    return SpelledNames(references=frozenset(references), filters_and_tests=frozenset(filters_and_tests))
 
 
 def undefined_variable_name(*, undefined_error: UndefinedError, template_source: str) -> str | None:
@@ -236,28 +297,18 @@ def _describe_render_error(*, description: str, render_error: BaseException) -> 
 
 
 def _spells_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
-    """Whether the parsed template spells every name a refusal quotes (see ``template_spelled_names``)."""
+    """Whether the parsed template spells every name a refusal quotes, the sandbox's and the budget's alike.
+
+    A name spelled as a variable, an attribute or a literal key is the template's own (see ``template_spelled_names``), and
+    so is one a replacement field reads in the format string a ``.format`` or ``.format_map`` call formats, such as the
+    ``_x`` of ``{{ '{0._x}'.format(v) }}``: the template's own literal holds it, so naming it leaks nothing of the run's
+    data. No other text of the template counts, a word another string literal holds (``mode == 'debug _x'``) or the plain
+    text outside its expressions, so a key the data chose that the template happens to write elsewhere is still withheld.
+    """
     if not named:
         return True
     spelled_references = template_spelled_names(template_source=template_source).references
     return all(name in spelled_references for name in named)
-
-
-def _template_writes_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
-    """Whether the parsed template writes every name a refusal quotes: it spells it, or a string literal holds it as a word.
-
-    A name spelled as a variable or an attribute is the template's own (see ``template_spelled_names``), and so is one a
-    string literal of its expressions holds as a whole word, such as the ``_x`` of ``{{ '{0._x}'.format(v) }}``, which
-    the sandboxed ``format`` reads: the template's own literal holds it, so naming it leaks nothing of the run's data. The
-    template's plain text outside its expressions counts for nothing, so a key the data chose that the text happens to
-    hold too is still withheld.
-    """
-    spelled_names = template_spelled_names(template_source=template_source)
-    return all(
-        name in spelled_names.references
-        or any(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", literal) is not None for literal in spelled_names.literals)
-        for name in named
-    )
 
 
 def _make_security_refusal(*, security_error: SecurityError, template_source: str) -> Jinja2TemplateSecurityError:
@@ -266,15 +317,14 @@ def _make_security_refusal(*, security_error: SecurityError, template_source: st
     A refusal names what the template reached for, which a template reading ``obj[key]``, ``obj | attr(key)`` or
     storing ``namespace({key: value})`` takes from the run's data: the sandbox words each refusal twice
     (``SandboxRefusalError``), and the wording with the names, and the refused name passed on as the problem's ``name``,
-    are kept only when the template writes every name the refusal quotes (``_template_writes_every_name``): the parsed
-    template spells it, or a string literal of its expressions holds it, such as the ``_x`` of
-    ``{{ '{0._x}'.format(v) }}``, which the sandboxed ``format`` reads. Otherwise the refusal carries neither, so the
-    run's input reaches no message and no problem. A refusal worded by Jinja2 itself, not by the sandbox, is written as a
+    are kept only when the parsed template spells every name the refusal quotes (``_spells_every_name``), a format
+    string it formats included, such as the ``_x`` of ``{{ '{0._x}'.format(v) }}``. Otherwise the refusal carries
+    neither, so the run's input reaches no message and no problem. A refusal worded by Jinja2 itself, not by the sandbox, is written as a
     fixed description and names nothing.
     """
     refused_name: str | None = None
     if isinstance(security_error, SandboxRefusalError):
-        if _template_writes_every_name(named=security_error.named, template_source=template_source):
+        if _spells_every_name(named=security_error.named, template_source=template_source):
             refusal = security_error.message or ""
             refused_name = security_error.refused_name
         else:
@@ -294,8 +344,8 @@ def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError, template_
     """The budget's refusal, which names the operation and its size, never the template source or a value.
 
     A refused call names the callable it called, which a template reading it by ``obj[key]`` or ``obj | attr(key)`` names
-    by a value of the run's data: as for the sandbox's refusals, the wording with the names is kept only when the parsed
-    template spells every one (``RenderBudgetExceededError``).
+    by a value of the run's data: by the sandbox's own rule (``_spells_every_name``), the wording with the names is kept
+    only when the parsed template spells every one (``RenderBudgetExceededError``).
     """
     is_spelled = _spells_every_name(named=budget_error.named, template_source=template_source)
     refusal = (budget_error.message or "") if is_spelled else budget_error.anonymous_message

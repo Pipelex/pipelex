@@ -151,6 +151,24 @@ class TestTemplateRefusalNames:
         assert caller.location.as_wire() == {"pipe": "say", "path": ["say"], "field": "template"}
         assert "# Error: PipelineExecutionError" in markdown
 
+    async def test_a_name_another_string_literal_holds_is_still_the_run_s_data(self) -> None:
+        """A word a string literal holds, outside any format string, is not what the template reached for.
+
+        In `{% if topic.text == 'debug _token' %}…{{ topic[topic.text] }}`, the key `_token` is the run's data, which the
+        refusal withholds even though the template's condition writes the same word.
+        """
+        marker = SecurityRefusalTestData.DATA_NAMED_BESIDE_LITERAL_TOPIC
+        error = await _refused_run(template=SecurityRefusalTestData.DATA_NAMED_BESIDE_LITERAL_TEMPLATE, topic=marker)
+
+        caller = error.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"pipe": "say"}
+        assert caller.detail == "A template of pipe 'say' looked a name up from the run's data, and the template sandbox refused that name."
+        assert marker not in json.dumps(caller.to_wire())
+        assert marker not in error.message
+
     async def test_a_template_written_as_a_table_is_located_on_the_key_holding_its_source(self) -> None:
         """A compose template written as a table of its own holds its source under the table's `template` key."""
         with pytest.raises(PipelexError) as exc_info:

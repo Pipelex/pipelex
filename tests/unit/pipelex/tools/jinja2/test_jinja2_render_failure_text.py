@@ -118,6 +118,20 @@ class TestJinja2RenderFailureText:
                 "Jinja2 render — refused by the template sandbox: A template may not read an unsafe name on a 'object' value.",
             ),
             (
+                "a private name read by a key a string literal of the expressions also holds, which no access reads",
+                f"{{% if lookup == 'debug _{_PAYLOAD_IDENTIFIER}' %}}debug{{% endif %}}{{{{ record[lookup] }}}}",
+                {"record": object(), "lookup": f"_{_PAYLOAD_IDENTIFIER}"},
+                Jinja2TemplateSecurityError,
+                "Jinja2 render — refused by the template sandbox: A template may not read an unsafe name on a 'object' value.",
+            ),
+            (
+                "a private name read by a key of the data inside a format call's argument, which a literal the call does not format writes",
+                f"{{{{ 'x'.format(record[lookup]) }}}}{{{{ '_{_PAYLOAD_IDENTIFIER}' }}}}",
+                {"record": object(), "lookup": f"_{_PAYLOAD_IDENTIFIER}"},
+                Jinja2TemplateSecurityError,
+                "Jinja2 render — refused by the template sandbox: A template may not read an unsafe name on a 'object' value.",
+            ),
+            (
                 "a callable stored in a namespace under a key of the data",
                 "{% set ns = namespace({lookup: record.count}) %}{{ ns }}",
                 {"record": [], "lookup": _PAYLOAD},
@@ -198,6 +212,18 @@ class TestJinja2RenderFailureText:
             (
                 "a private name the template writes as a literal key",
                 "{{ record['_secret'] }}",
+                {"record": object()},
+                "Jinja2 render — refused by the template sandbox: A template may not read '_secret' on a 'object' value.",
+            ),
+            (
+                "a private name a format string reads, the string a format call formats",
+                "{{ '{0._secret}'.format(record) }}",
+                {"record": object()},
+                "Jinja2 render — refused by the template sandbox: A template may not read '_secret' on a 'object' value.",
+            ),
+            (
+                "a private name a format string reads, the string a format_map call formats",
+                "{{ '{r._secret}'.format_map({'r': record}) }}",
                 {"record": object()},
                 "Jinja2 render — refused by the template sandbox: A template may not read '_secret' on a 'object' value.",
             ),
