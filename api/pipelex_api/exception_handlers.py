@@ -273,13 +273,17 @@ def record_level_of(*, status: int, domain: ProblemDomain) -> RecordLevel:
       caller can avoid, such as a webhook receiver of its own that refused a delivery, and at `error` when it is the
       runtime's or the operator's.
     """
-    if status < 500 or status == HTTPStatus.NOT_IMPLEMENTED:
-        return RecordLevel.WARNING
-    match domain:
-        case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+    match status:
+        case HTTPStatus.NOT_IMPLEMENTED:
             return RecordLevel.WARNING
-        case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
-            return RecordLevel.ERROR
+        case server_status if server_status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+            match domain:
+                case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+                    return RecordLevel.WARNING
+                case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
+                    return RecordLevel.ERROR
+        case _:
+            return RecordLevel.WARNING
 
 
 def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel | None) -> None:
