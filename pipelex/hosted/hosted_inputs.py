@@ -34,7 +34,7 @@ from mthds.protocol.input_form import (
     UnknownItem,
 )
 from mthds.protocol.problem.models import ProblemItem
-from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKind
+from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKind, MethodDependencyMissingReason
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest
 from pipelex_sdk.errors import ApiResponseError
@@ -280,8 +280,8 @@ def _unshipped_dependency_refusal(*, report: CrateInvalidReport) -> HostedLocalF
     """The error to raise when pipe-io's invalid verdict refuses the method for calling a package by its address, else `None`.
 
     pipe-io resolves the method's tree with only the packages the request ships, and answers a call into a package
-    nothing shipped with its invalid verdict, whose item is coded `method.dependency_missing` with the `kind` `package`
-    and the package's address as its `name`. The run route fetches such a dependency, so the method is not at fault. The
+    nothing shipped with its invalid verdict, whose item is coded `method.dependency_missing` with the `kind` `package`,
+    the `reason` `not_found` and the package's address as its `name`. The run route fetches such a dependency, so the method is not at fault. The
     error names the dependency from the item's code and parameters, never from its message, and leaves out the
     verdict's advice, to send the dependency's contents, which is meant for the API's callers.
     """
@@ -299,11 +299,13 @@ def _missing_package(*, report: CrateInvalidReport) -> str | None:
     """The address of the first method package pipe-io's invalid verdict names as missing, else `None`.
 
     A runner speaking the standard answers the verdict's items as `errors`, read from the members the SDK's model does
-    not name, and a `method.dependency_missing` item of the `kind` `package` names the package in `params.name`. A runner
+    not name, and a `method.dependency_missing` item of the `kind` `package` and the `reason` `not_found` names the
+    package in `params.name`; a package found in a cycle or in no matching version is the method's own fault. A runner
     answering the shape that predates the standard sends `validation_errors` alone, whose items carry no code: each is
     read by the code the runner gives the same item in its problem's `errors`, its type's (`pipe_validation_error_code`),
     and the package it names, the alias of the reference it could not resolve. An item this client cannot read is
-    skipped, so it never takes the verdict's place.
+    skipped, so it never takes the verdict's place, and when no item of `errors` names a package, `validation_errors`
+    is read too.
     """
     raw_errors = (report.model_extra or {}).get("errors")
     if isinstance(raw_errors, list):
@@ -314,17 +316,20 @@ def _missing_package(*, report: CrateInvalidReport) -> str | None:
                 continue
             if (package := _missing_package_of_problem_item(item=item)) is not None:
                 return package
-        return None
     return next((package for item in report.validation_errors if (package := _missing_package_of_validation_item(item=item)) is not None), None)
 
 
 def _missing_package_of_problem_item(*, item: ProblemItem) -> str | None:
-    """The address of the method package a `method.dependency_missing` problem item names as missing, else `None`."""
+    """The address of the method package a `method.dependency_missing` problem item names as not found, else `None`."""
     if item.code != CoreCode.METHOD_DEPENDENCY_MISSING or item.params is None:
         return None
     params = item.params.as_wire()
     name = params.get("name")
-    if params.get("kind") != MethodDependencyMissingKind.PACKAGE or not isinstance(name, str):
+    if (
+        params.get("kind") != MethodDependencyMissingKind.PACKAGE
+        or params.get("reason") != MethodDependencyMissingReason.NOT_FOUND
+        or not isinstance(name, str)
+    ):
         return None
     return name
 

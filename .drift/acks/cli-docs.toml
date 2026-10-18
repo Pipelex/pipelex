@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:0c289e80154f633564579e684f836b0414574a075662869b73aded083805d71b"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-18T15:54:03Z"
-rationale = "clean-pass: absorbing Agent-renders-problem, which carries dev's v0.89.0 through the Problem branch, keeps this branch's hosted-run problems and takes dev's folder readings (bundle_target_resolution.py, the two readings of a folder); pipelex/cli/agent_cli/CLAUDE.md and docs/tools/cli/agent-cli.md say both."
+digest = "sha256:ac91f5e61faf4724b56784407f69ccb54e233b31566da3ddddabb7cc44dc861f"
+reviewed_by = "Claude Opus 5.5"
+reviewed_at = "2026-10-18T17:24:55Z"
+rationale = "real-catch: the hosted refusal readings changed (a 403 reads auth.forbidden only under the platform's authorization codes, a former-shape step takes the kind its advice names through FORMER_ADVICE_KINDS, now in pipelex/hosted/error_rendering.py, and a sent item keeps every field it can read); docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md say so, the rest of docs/tools/cli/ is unaffected."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -38,7 +38,7 @@ rationale = "clean-pass: absorbing Agent-renders-problem, which carries dev's v0
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
 "pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:d71aee873856cfa72eb0ff18eb82c79e348f124a"
-"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:6c78ff75ec7a76e30acc25b6aad6f3a18029707f"
+"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:cd2b8dda59e076f1023d3b20d7c239b3674c3f2e"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:7546d9b31ea2dc22b1ddae538edfbc8e7f7d08df"
 "pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:f53ae3eb53d23eb91c765d18c7a3688464f6bd0e"
 "pipelex/cli/agent_cli/commands/run/method_cmd.py" = "blob:0df77aa1e35c22ceffdcefd7f4c12f28fda366c7"

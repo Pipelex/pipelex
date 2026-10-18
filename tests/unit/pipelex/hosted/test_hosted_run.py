@@ -272,8 +272,12 @@ class TestHostedRun:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "verdict_json",
-        [HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY, HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS],
-        ids=["validation_errors", "problem_items"],
+        [
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY,
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS,
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_UNREADABLE_PROBLEM_ITEMS,
+        ],
+        ids=["validation_errors", "problem_items", "unreadable_problem_items"],
     )
     async def test_a_local_file_for_a_method_whose_address_dependency_was_not_shipped_is_refused_naming_it(
         self, mocker: MockerFixture, tmp_path: Path, verdict_json: str
@@ -281,8 +285,8 @@ class TestHostedRun:
         """pipe-io loads only the packages shipped with the method, and answers a call into another one with its verdict.
 
         The run route fetches that dependency, so the method is not at fault: the error names the dependency, read from
-        the `method.dependency_missing` item's parameters in either shape of the verdict, and the URL to use, never the
-        verdict's advice to fix the method.
+        the `method.dependency_missing` item's parameters in either shape of the verdict, from `validation_errors` when no
+        item of `errors` reads, and the URL to use, never the verdict's advice to fix the method.
         """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
         client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
@@ -301,12 +305,19 @@ class TestHostedRun:
         client.start.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_a_verdict_quoting_the_dependency_refusal_s_words_without_its_code_is_the_method_s_fault(
-        self, mocker: MockerFixture, tmp_path: Path
+    @pytest.mark.parametrize(
+        "verdict_json",
+        [HostedPipeIoVerdicts.ADDRESS_DEPENDENCY_WORDS_ONLY, HostedPipeIoVerdicts.DEPENDENCY_CYCLE_PROBLEM_ITEMS],
+        ids=["words_only", "dependency_cycle"],
+    )
+    async def test_a_verdict_naming_no_unshipped_dependency_is_the_method_s_fault(
+        self, mocker: MockerFixture, tmp_path: Path, verdict_json: str
     ) -> None:
-        """The refusal is read from an item's code and parameters, never its words: an item only quoting them is the method's."""
+        """The refusal is read from an item's code and parameters, never its words: an item only quoting them is the
+        method's, and so is a `method.dependency_missing` item whose reason is not `not_found`, such as a cycle.
+        """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
-        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.ADDRESS_DEPENDENCY_WORDS_ONLY))
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
         request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedMethodInvalidError):

@@ -214,6 +214,30 @@ class HostedPlaneRefusals:
             "retryable": False,
         }
     )
+    # The platform's generic refusal of an operation to a key it authenticated, which is no matter of role.
+    FORBIDDEN_OPERATION: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/forbidden",
+            "title": "Forbidden",
+            "status": 403,
+            "code": "forbidden",
+            "detail": "This route is served to a web session only.",
+            "error_domain": "config",
+            "retryable": False,
+        }
+    )
+    # A 403 whose code is no refusal of an operation but of the credential, as a key that expired.
+    FORBIDDEN_EXPIRED_KEY: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/api_key_expired",
+            "title": "Forbidden",
+            "status": 403,
+            "code": "api_key_expired",
+            "detail": "The API key has expired.",
+            "error_domain": "config",
+            "retryable": False,
+        }
+    )
     NOT_FOUND: ClassVar[str] = json.dumps(
         {
             "type": "https://pipelex.com/errors/not_found",
@@ -306,6 +330,22 @@ class RunnerOwnRefusals:
             "error_type": "ReservedObjectKey",
             "error_domain": "input",
             "retryable": False,
+        }
+    )
+    # The reason and the advice of a refusal whose advice names a kind of its own.
+    NO_CREDIT_REASON: ClassVar[str] = "The account has no inference credit left."
+    NO_CREDIT_ADVICE: ClassVar[str] = "Add credit to the account on app.pipelex.com, then run again"
+    # A 402 advising the caller to check its billing: a reason and an advice of the kind `check_billing`, but no code,
+    # domain, retry verdict or next step the standard's client reads.
+    NO_CREDIT: ClassVar[str] = json.dumps(
+        {
+            "type": "https://docs.pipelex.com/latest/errors/payment-required/",
+            "title": "Payment required",
+            "status": 402,
+            "detail": NO_CREDIT_REASON,
+            "error_domain": "config",
+            "retryable": False,
+            "user_action": {"kind": "check_billing", "detail": NO_CREDIT_ADVICE},
         }
     )
 
@@ -422,6 +462,30 @@ class HostedMethodItems:
     ]
     # An item of a type this version reads, carrying a field neither this version nor the SDK declares.
     SENT_WITH_AN_UNKNOWN_FIELD: ClassVar[dict[str, Any]] = {**SENT[1], "pipe_type": "PipeLLM"}
+    # A missing dependency of a newer runner, whose fix carries a member the SDK reads and this version does not.
+    SENT_WITH_AN_UNREADABLE_FIX: ClassVar[dict[str, Any]] = {
+        "category": "pipe_validation",
+        "message": "In-memory resolve cannot load address-based dependency 'github.com/mthds/scoring-lib/scoring'.",
+        "error_type": "unresolved_package_dependency",
+        "pipe_code": "score_invoice",
+        "source": "bundle.mthds",
+        "field_path": "pipe.score_invoice.steps[0].pipe",
+        "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score",
+        "suggested_fix": {
+            "fix_code": "ship-dependency",
+            "description": "Ship the dependency with the method",
+            "safety": "unsafe",
+            "ops": [{"kind": "set_key", "table_path": ["pipe", "score_invoice"], "key": "note", "value": "shipped"}],
+            "preview": "A member a newer runner adds to its fixes",
+        },
+    }
+    # Its problem item: the missing dependency its type and its locators give, without the fix this version cannot read.
+    UNREADABLE_FIX_PROBLEM_ITEM: ClassVar[dict[str, Any]] = {
+        "code": "method.dependency_missing",
+        "detail": "The method depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: not_found).",
+        "params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "not_found"},
+        "location": {"pipe": "score_invoice", "field": "pipe.score_invoice.steps[0].pipe", "file": "bundle.mthds"},
+    }
     PROBLEM_ITEMS: ClassVar[list[dict[str, Any]]] = [
         {
             "code": "method.schema_violation",

@@ -448,6 +448,23 @@ class TestRunHostedEnvelope:
 
         assert json.loads(capsys.readouterr().err)["errors"] == [HostedMethodItems.PROBLEM_ITEMS[1]]
 
+    def test_a_sent_item_with_a_member_this_version_does_not_read_keeps_its_code_and_its_facts(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A declared member this version cannot read, such as a newer runner's fix, is left out alone: the item keeps its
+        type, its locators and the dependency they name, never degrading to `method.schema_violation`.
+        """
+        refused = HostedMethodInvalidError(
+            "The hosted API cannot load the method: Bundle does not load",
+            validation_errors=[ValidationErrorItem.model_validate(HostedMethodItems.SENT_WITH_AN_UNREADABLE_FIX)],
+        )
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refused))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        assert json.loads(capsys.readouterr().err)["errors"] == [HostedMethodItems.UNREADABLE_FIX_PROBLEM_ITEM]
+
     def test_a_method_that_does_not_load_lists_the_hosted_api_s_items(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Each item of pipe-io's verdict is a problem item coded as a local verdict codes it, located in the file it was sent as."""
         refused = HostedMethodInvalidError(

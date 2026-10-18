@@ -103,6 +103,21 @@ HOSTED_RUN_REQUEST_NEXT_STEP = "Check the run request: the method, the pipe and 
 #: The member of the hosted plane's own refusal that states, in seconds, how long to wait before asking again; its
 #: `Retry-After` header states it too, and wins.
 _SENT_RETRY_AFTER_MEMBER = "retry_after_seconds"
+#: The codes the platform answers a `403` with when it authenticated the key and refuses the operation: `forbidden`, and
+#: `role_not_permitted` for a role that may not do it. pipelex-sdk names no constant for them. Any other code on a `403`
+#: is no refusal of an operation this client can tell, so it reads as the credential's.
+_PLANE_AUTHORIZATION_CODES: frozenset[str] = frozenset({"forbidden", "role_not_permitted"})
+
+#: The step kind each advice of an answer or a report in the former shape names (its `user_action.kind`), in the
+#: standard's closed list of kinds; an advice of another kind, `unknown` included, takes the kind its reader gives.
+FORMER_ADVICE_KINDS: dict[str, StepKind] = {
+    "wait_and_retry": StepKind.WAIT,
+    "check_billing": StepKind.CHECK_ACCOUNT,
+    "check_credentials": StepKind.CHECK_CREDENTIALS,
+    "change_input": StepKind.CHANGE_INPUT,
+    "change_model": StepKind.CHANGE_MODEL,
+    "contact_support": StepKind.REPORT,
+}
 
 
 class _RefusalReading(NamedTuple):
@@ -120,8 +135,9 @@ def _hosted_refusal_reading(*, status: int, plane_code: str | None, credential_s
 
     A refused credential is the hosted plane's `401` and the bare `403` its edge's authorizer answers, without a reason,
     for an unknown key among others; it is `auth.missing_credential` when the request carried no key. A `403` the
-    platform answers with a code of its own (`forbidden`, `role_not_permitted`) refuses an operation to a key it
-    authenticated. A `404` is the run or the method the platform's code names (`run_not_found`,
+    platform answers with one of its authorization codes (:data:`_PLANE_AUTHORIZATION_CODES`) refuses an operation to a
+    key it authenticated, and a `403` with any other code, such as one for a key that is invalid or expired, refuses the
+    credential. A `404` is the run or the method the platform's code names (`run_not_found`,
     `method_version_not_found`), and otherwise a route or a method this origin does not serve, which the platform's
     `not_found` does not tell apart. A `429` is a rate limit.
 
@@ -134,7 +150,7 @@ def _hosted_refusal_reading(*, status: int, plane_code: str | None, credential_s
             return _RefusalReading(code=CoreCode.AUTH_MISSING_CREDENTIAL, next_step=HOSTED_MISSING_KEY_NEXT_STEP)
         case 401:
             return _RefusalReading(code=CoreCode.AUTH_INVALID_CREDENTIAL, next_step=by_status[401])
-        case 403 if plane_code:
+        case 403 if plane_code in _PLANE_AUTHORIZATION_CODES:
             return _RefusalReading(code=CoreCode.AUTH_FORBIDDEN, next_step=HOSTED_FORBIDDEN_NEXT_STEP)
         case 403:
             return _RefusalReading(code=CoreCode.AUTH_INVALID_CREDENTIAL, next_step=by_status[403])
@@ -202,7 +218,8 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
     - Any other answer that gives its reason keeps the client's reading, its code and its status, by the standard's
       members alone (:func:`_client_reading`), with that reason as its `detail` and the step the human CLI gives it
       (:func:`hosted_refusal_next_step`), so the reader is told what the body said rather than to report a body it
-      never sees.
+      never sees. The step's kind is the one the answer's advice names (:data:`FORMER_ADVICE_KINDS`), else
+      `change_input` for a `4xx`, a refusal of the caller's request, and the client's reading's for any other status.
 
     The agent CLI reads an answer that lists validation items before this one is asked, as a method that does not
     validate (`pipelex.cli.agent_cli.commands.run._run_hosted`), since only it codes the items.
@@ -224,8 +241,11 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
     if error.status in STATUS_READINGS or not error.server_message:
         return None
     reason_kept = _client_reading(error=error)
-    # A refusal of the caller's request asks for a change to it; any other answer is the runtime's to explain.
-    kind = StepKind.CHANGE_INPUT if 400 <= error.status < 500 else reason_kept.next_step.kind
+    # A refusal of the caller's request asks for a change to it; any other answer is the runtime's to explain. Advice
+    # the answer gave is the step's detail, so the step takes the kind that advice names.
+    status_kind = StepKind.CHANGE_INPUT if 400 <= error.status < 500 else reason_kept.next_step.kind
+    advice = error.user_action
+    kind = FORMER_ADVICE_KINDS.get(advice.kind, status_kind) if advice is not None else status_kind
     updates: dict[str, Any] = {
         "status": error.status,
         "detail": error.server_message,
