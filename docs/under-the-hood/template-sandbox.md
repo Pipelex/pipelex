@@ -42,11 +42,11 @@ A method template renders without a template loader, so `{% include %}`, `{% ext
 
 Many refusals are visible in the template itself, and validation reports them before anything runs: a template that reads an undeclared underscore name with a dot fails with the `template_private_name` validation error, which names the pipe and the template (`prompt`, `system_prompt`, `template`, `expression`, or `construct field '<path>'`).
 
-What validation cannot see, because it depends on the values at run time (a method call, a name computed while rendering, or a bracketed key, which is legitimate on a plain dict), is refused where it happens: the render raises [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md), whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
+What validation cannot see, because it depends on the values at run time (a method call, a name computed while rendering, or a bracketed key, which is legitimate on a plain dict), is refused where it happens: the render raises `Jinja2TemplateSecurityError`, whose message names the refused attribute or callable and the type it was reached on. A refusal never renders as an empty string, so a prompt is never sent with a hole in it.
 
-`Jinja2TemplateSecurityError` is a [`SecurityError`](../errors/security-error.md), like `UriReadRefusedError`, `SsrfBlockedError` and `UnsafeSchemaError`, the other policy refusals that are never absorbed into a domain answer. A host that treats that family alike, never retrying any of it, catches that base class, and an `except ToolError` around a render does not catch this refusal. The sandbox's budget refusal is a separate error, `Jinja2TemplateBudgetError`, which is a `ToolError` in the input domain (see below). `Jinja2TemplateSecurityError` stays a type of its own, apart from `Jinja2TemplateRenderError`, which a template that fails for any other reason raises.
+`Jinja2TemplateSecurityError` is a `SecurityError`, like `UriReadRefusedError`, `SsrfBlockedError` and `UnsafeSchemaError`, the other policy refusals that are never absorbed into a domain answer. A host that treats that family alike, never retrying any of it, catches that base class, and an `except ToolError` around a render does not catch this refusal. The sandbox's budget refusal is a separate error, `Jinja2TemplateBudgetError`, which is a `ToolError` in the input domain (see below). `Jinja2TemplateSecurityError` stays a type of its own, apart from `Jinja2TemplateRenderError`, which a template that fails for any other reason raises.
 
-A render that would overdraw its budget raises [`Jinja2TemplateBudgetError`](../errors/jinja2-template-budget-error.md), in the input domain, whose message names the operation that was refused and what it would have spent, never the template or a value: for example, *the operator '\*' needs about 1,000,000,000, and 134,217,062 are left*. A template whose macros or includes nest deeper than Python allows raises the same error.
+A render that would overdraw its budget raises `Jinja2TemplateBudgetError`, in the input domain, whose message names the operation that was refused and what it would have spent, never the template or a value: for example, *the operator '\*' needs about 1,000,000,000, and 134,217,062 are left*. A template whose macros or includes nest deeper than Python allows raises the same error.
 
 ## How it is built
 
@@ -99,5 +99,5 @@ A method also writes dotted paths that are not templates: a PipeCompose construc
 ## Related
 
 - [StuffArtefact & Image Rendering](stuffartefact-and-image-rendering.md): how inputs reach templates, and how images are extracted from them.
-- [`Jinja2TemplateSecurityError`](../errors/jinja2-template-security-error.md): the error a refusal raises at render time.
-- [`Jinja2TemplateBudgetError`](../errors/jinja2-template-budget-error.md): the error a render raises when it would overdraw its budget.
+- `Jinja2TemplateSecurityError`: the error a refusal raises at render time.
+- `Jinja2TemplateBudgetError`: the error a render raises when it would overdraw its budget.

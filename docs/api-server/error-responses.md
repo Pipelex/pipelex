@@ -32,7 +32,7 @@ A failure response looks like this:
 - `error_domain` — one of `input`, `config`, `runtime`. See [Status codes](#status-codes). Absent for domain-less pipelex errors (some pipelex tool errors, e.g. `EnvVarNotFoundError`, do not classify a domain — the HTTP status still defaults to **500**).
 - `retryable` — whether retrying the same request can plausibly succeed. Always emitted for API-authored 4xx/5xx (always `false`). For pipelex-originated errors, present only when the source error populates it — `true` only when the originating error explicitly classifies itself as transient (e.g. inference provider rate limits), `false` when it declares itself a deterministic refusal of what the caller sent (e.g. `BundleResourceNotNamedError`, `BundleResourcePathError`, as for the API-authored `InvalidResourcePath`); absent on pipelex errors that don't set it (e.g. `EnvVarNotFoundError`, `PipelexConfigError`).
 - `request_id` — server-correlated identifier for the request. Echoed from inbound `X-Request-ID` if provided, otherwise generated. Use this when reporting issues.
-- `error_category` — finer classification when the originating error provides one (currently used by inference errors — see [`InferenceErrorCategory`](https://docs.pipelex.com/latest/errors/) upstream).
+- `error_category` — finer classification when the originating error provides one (currently used by inference errors — see `InferenceErrorCategory` in the [Error Model](../under-the-hood/error-model.md#inferenceerrorcategory)).
 - `user_action` — structured suggestion of what the caller should do next, when the error can author one.
 - `model`, `provider`, `provider_metadata` — populated when the failure originated in an upstream inference call. **Stripped under STRICT disclosure** (see [Disclosure modes](#disclosure-modes)).
 - `tree_refusal` — on a **422** `InvalidMethodFiles`, the MTHDS standard's refusal of a method tree the request sent: `{"code": "<refusal code>", "names": [...]}`, the code one of the standard's tree refusal codes, such as `invalid_tree_path`, `duplicate_key`, `excluded_name` or `malformed_entry`, and `names` the keys, paths or addresses it refuses. A name holding a code point UTF-8 cannot encode, such as a lone surrogate a JSON escape can carry, is written with that code point backslash-escaped. See [Pipe Run](pipe-run.md#sending-a-method-as-a-tree).
@@ -205,15 +205,15 @@ An unclassified failure is the one error a caller cannot diagnose from a request
 
 ## The `type` URI
 
-`type` is a stable URI pointing at the per-class documentation page upstream:
+`type` is a stable URI derived from the originating error's class:
 
 ```
 https://docs.pipelex.com/latest/errors/<kebab-class-name>/
 ```
 
-Every `PipelexError` subclass resolves to a live page (the trailing slash is canonical — pipelex emits it to match the MkDocs `use_directory_urls: true` form). The page describes the class, the typical cause, and how to recover.
-
 API-authored errors (`ValidationError`, `BadRequest`, `Unauthenticated`, etc.) follow the same convention with their own slugs.
+
+The per-class pages these URIs named are retired. Errors are moving to the codes of the MTHDS standard and of the Pipelex error registry, whose type URI is the code's page: `https://mthds.ai/errors/<code>` for a core code and `https://docs.pipelex.com/errors/<code>` for a `pipelex.` code, listed on the [Error Codes](../errors/index.md) page. Until a response carries its code, its class-derived `type` names no page of its own: the documentation site sends such a URL to the Error Codes index.
 
 ## Request correlation
 

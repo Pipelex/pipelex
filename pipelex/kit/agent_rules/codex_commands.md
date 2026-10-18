@@ -81,10 +81,16 @@
      .venv/bin/pipelex-dev generate-mthds-schema
      ```
 
-   - **`generate-error-pages`**: Regenerate the per-class error reference pages under `docs/errors/` — one Markdown page per `PipelexError` subclass, which is what each error's `type_uri` dereferences to. Run after adding or renaming an error class. Pages a maintainer claims with a `<!-- pipelex:authored -->` marker are preserved across runs. Also available as `make generate-error-pages` (alias `make gep`).
+   - **`generate-error-registry`**: Write every file derived from the Pipelex error registry, `pipelex/errors/registry/pipelex-error-registry.yaml`: its JSON snapshot, its typed codes in `pipelex/errors/registry/pipelex_codes.py`, and one page per code under `docs/errors/`. Run after adding or changing a code in the registry, and after a version bump, since the snapshot carries the version. A source the format's schema, the typed model or the registry's rules refuse writes nothing. Also available as `make generate-error-registry` (alias `make ger`). See `docs/contribute/error-registry.md`.
 
      ```bash
-     .venv/bin/pipelex-dev generate-error-pages
+     .venv/bin/pipelex-dev generate-error-registry
+     ```
+
+   - **`check-error-registry`**: Check the error registry against the MTHDS standard, and that every file derived from it is what `generate-error-registry` writes, without writing anything. Also available as `make check-error-registry` (alias `make cer`).
+
+     ```bash
+     .venv/bin/pipelex-dev check-error-registry
      ```
 
    - **`generate-error-identity`**: Regenerate the committed `(error_type, title, type_uri)` snapshot of every `PipelexError` subclass at `tests/data/errors/error_identity.txt`. `error_type` is the bare class name and consumers outside this repo branch on it, so a rename is a silent wire break — the snapshot turns it into a reviewable diff, gated by `tests/unit/pipelex/errors/test_error_identity_snapshot.py`. Run after adding, renaming or removing an error class. Also available as `make generate-error-identity` (alias `make gei`).

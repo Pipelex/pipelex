@@ -50,5 +50,5 @@ jobs:
             make docs-deploy-stable
           elif [[ "${{ github.ref }}" == refs/heads/pre-release/* ]]; then
             echo "Deploying pre-release docs..."
-            make docs-deploy-specific-version
+            make docs-deploy-specific-version-pre-release
           fi

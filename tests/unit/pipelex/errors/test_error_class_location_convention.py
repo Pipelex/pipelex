@@ -34,7 +34,7 @@ from pathlib import Path
 
 import pipelex
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.error_pages_generator import (
+from pipelex.errors.error_class_discovery import (
     _FIXTURE_DIR_NAMES,  # pyright: ignore[reportPrivateUsage]
     iter_pipelex_error_subclasses,
 )

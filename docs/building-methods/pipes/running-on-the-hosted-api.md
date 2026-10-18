@@ -104,7 +104,7 @@ except ApiUnreachableError as exc:
 
 `start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs its cause read as above.
 
-`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own [`HostedRunOutcomeUnknownError`](../../errors/hosted-run-outcome-unknown-error.md). `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
+`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own `HostedRunOutcomeUnknownError`. `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
 
 ## Related Documentation
 
