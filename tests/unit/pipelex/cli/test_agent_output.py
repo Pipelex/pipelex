@@ -297,7 +297,9 @@ class TestAgentOutput:
         assert "is_valid" not in rendered
 
     def test_render_problem_markdown_nests_the_run_s_own_problem(self) -> None:
-        """A read of a failed run's results renders the run's own problem under it: its sentence, step, code, location and items."""
+        """A read of a failed run's results renders the run's own problem under it as the problem itself renders, one heading
+        level down: its title, sentence, step, code, location and items.
+        """
         item = make_problem_item(code=CoreCode.METHOD_CONCEPT_UNRESOLVED, params={"concept": "Missing"}, location=make_location(pipe="summarize"))
         run_error = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.CALLER, location=make_location(pipe="summarize"), errors=[item])
         read = make_problem(
@@ -308,10 +310,10 @@ class TestAgentOutput:
 
         assert "- Code: `run.failed` (domain runtime, retry no)" in rendered
         assert (
-            f"### The run's own problem\n\n**{run_error.title}**: {run_error.detail}\n\n"
+            f"### The run's own problem\n\n#### {run_error.title}\n\n{run_error.detail}\n\n"
             f"**Next step** (`{run_error.next_step.kind}`): {run_error.next_step.detail}\n\n"
             "- Code: `method.invalid` (domain method, retry no)\n- Location: pipe 'summarize'\n\n"
-            f"#### The run's errors\n\n- `method.concept_unresolved`: {item.detail} (pipe 'summarize')"
+            f"##### Errors\n\n- `method.concept_unresolved`: {item.detail} (pipe 'summarize')"
         ) in rendered
 
     @pytest.mark.parametrize(

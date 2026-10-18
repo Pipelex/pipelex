@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
-from mthds.protocol.problem.models import NextStep, ProblemItem, ProblemLocation, SuggestedFix
 from pipelex_sdk.error_models import RunErrorReport
 from pipelex_sdk.errors import ApiResponseError, RunFailedError
 from pipelex_sdk.runs import RunStatus
@@ -11,9 +10,16 @@ from pydantic import BaseModel
 
 import pipelex.cli.agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import problem_payload
+from pipelex.cli.agent_cli.commands.run._run_hosted import PROBLEM_PARTS as READ_PROBLEM_PARTS
 from pipelex.cli.agent_cli.commands.run._run_hosted import hosted_failure_problem
 from pipelex.errors.problem import PipelexProblem
-from tests.unit.pipelex.cli.agent_cli.test_data import HostedPlaneRefusals, OperatorViewAnswers, StoredRunReports, UndeclaredMembers
+from tests.unit.pipelex.cli.agent_cli.test_data import (
+    HostedPlaneRefusals,
+    OperatorViewAnswers,
+    RunnerOwnRefusals,
+    StoredRunReports,
+    UndeclaredMembers,
+)
 
 # The functions that report a problem and take the command's own members as keyword arguments.
 _PROBLEM_REPORTERS: frozenset[str] = frozenset({"agent_error", "agent_argument_error", "agent_file_error"})
@@ -51,11 +57,12 @@ def _written_member(*, node: ast.AST) -> str | None:
             return None
 
 
-# The parts of a reported problem, each read against the model that declares its members. A problem's `params` and a
-# fix's `ops` are the code's and the operation's own, so they are not walked.
+# The parts of a reported problem, each read against the model that declares its members: the parts the reader of a
+# runner's answer walks, and the nested run's problem, which it reads as a problem of its own. A problem's `params` and
+# a fix's `ops` are the code's and the operation's own, so they are not walked.
 _PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
-    PipelexProblem: {"next_step": NextStep, "location": ProblemLocation, "errors": ProblemItem, "run_error": PipelexProblem},
-    ProblemItem: {"location": ProblemLocation, "suggested_fix": SuggestedFix},
+    **READ_PROBLEM_PARTS,
+    PipelexProblem: {**READ_PROBLEM_PARTS[PipelexProblem], "run_error": PipelexProblem},
 }
 
 # The command's own sentence, which rides beside the problem's members.
@@ -99,11 +106,18 @@ def _reported_failures() -> list[PipelineRequestError]:
         _refusal(status=401, body=HostedPlaneRefusals.UNAUTHORIZED),
         _refusal(status=429, body=HostedPlaneRefusals.RATE_LIMITED_BODY_DELAY),
         _refusal(status=409, body=OperatorViewAnswers.UNREADABLE_REQUEST_ID),
+        _refusal(status=422, body=RunnerOwnRefusals.RESERVED_OBJECT_KEY),
         RunFailedError(
             "Run finished with status FAILED",
             run_id="run_9",
             status=RunStatus.FAILED,
             error=RunErrorReport.model_validate(StoredRunReports.PROBLEM_WITH_REPORT_MEMBERS),
+        ),
+        RunFailedError(
+            "Run finished with status FAILED",
+            run_id="run_9",
+            status=RunStatus.FAILED,
+            error=RunErrorReport.model_validate(StoredRunReports.FORMER_SHAPE_WITH_ITEMS),
         ),
     ]
 

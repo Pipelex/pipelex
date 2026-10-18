@@ -201,16 +201,31 @@ def _errors_lines(*, problem: PipelexProblem, heading: str) -> list[str]:
     return lines
 
 
+def _problem_head_lines(*, problem: PipelexProblem, depth: int, message: str | None = None, tip: str | None = None) -> list[str]:
+    """A problem under a heading of ``depth``: its title, its detail, the next step, its facts and its faults.
+
+    The command's own sentence and the tip are added when they say more than the detail and the next step. Its faults
+    are listed one heading level down. The reported problem and the run's own problem it nests both render through
+    here, at their own depths.
+    """
+    heading = "#" * depth
+    lines: list[str] = [f"{heading} {problem.title}", "", problem.detail]
+    if message and message != problem.detail:
+        lines += ["", message]
+    lines += ["", f"**Next step** (`{problem.next_step.kind}`): {problem.next_step.detail}"]
+    if tip and tip != problem.next_step.detail:
+        lines += ["", f"💡 {tip}"]
+    lines.append("")
+    lines += _fact_lines(problem=problem)
+    lines += _errors_lines(problem=problem, heading=f"{heading}# Errors")
+    return lines
+
+
 def _run_error_lines(*, run_error: PipelexProblem | None) -> list[str]:
     """The failed run's own problem, nested in the problem of a read of its results: what made the run fail, and where."""
     if run_error is None:
         return []
-    lines = ["", "### The run's own problem", "", f"**{run_error.title}**: {run_error.detail}", ""]
-    lines.append(f"**Next step** (`{run_error.next_step.kind}`): {run_error.next_step.detail}")
-    lines.append("")
-    lines += _fact_lines(problem=run_error)
-    lines += _errors_lines(problem=run_error, heading="#### The run's errors")
-    return lines
+    return ["", "### The run's own problem", "", *_problem_head_lines(problem=run_error, depth=4)]
 
 
 def _fact_lines(*, problem: PipelexProblem) -> list[str]:
@@ -299,15 +314,7 @@ def render_problem_markdown(
     Returns:
         The Markdown, with no trailing newline.
     """
-    lines: list[str] = [f"## {problem.title}", "", problem.detail]
-    if message and message != problem.detail:
-        lines += ["", message]
-    lines += ["", f"**Next step** (`{problem.next_step.kind}`): {problem.next_step.detail}"]
-    if tip and tip != problem.next_step.detail:
-        lines += ["", f"💡 {tip}"]
-    lines.append("")
-    lines += _fact_lines(problem=problem)
-    lines += _errors_lines(problem=problem, heading="### Errors")
+    lines = _problem_head_lines(problem=problem, depth=2, message=message, tip=tip)
     lines += _run_error_lines(run_error=problem.run_error)
     lines += _diagnostics_lines(diagnostics=problem.diagnostics)
     lines += _extras_lines(extras=extras or {})

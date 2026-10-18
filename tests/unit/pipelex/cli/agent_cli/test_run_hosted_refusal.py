@@ -21,7 +21,13 @@ from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.error_rendering import HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS
+from pipelex.hosted.error_rendering import (
+    HOSTED_FORBIDDEN_NEXT_STEP,
+    HOSTED_MISSING_KEY_NEXT_STEP,
+    HOSTED_REFUSAL_CALLER_NEXT_STEP,
+    HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS,
+    HOSTED_UNREACHABLE_NEXT_STEP,
+)
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
 from tests.unit.pipelex.cli.agent_cli.test_data import (
@@ -29,6 +35,7 @@ from tests.unit.pipelex.cli.agent_cli.test_data import (
     HostedPlaneRefusals,
     OperatorViewAnswers,
     RetiredEnvelope,
+    RunnerOwnRefusals,
     RunnerProblems,
     UndeclaredMembers,
 )
@@ -44,7 +51,8 @@ RUN_PIPE_MODULE = "pipelex.cli.agent_cli.commands.run.pipe_cmd"
 START_ROUTE = ("POST", "/v1/start")
 #: The request id a hosted API names in its `X-Request-ID` header.
 HEADER_REQUEST_ID = "01M55PHEADER000000000000000"
-#: The problem pipelex-sdk decides for a runner that cannot be reached at `HOSTED_URL`, the base client's own.
+#: The problem pipelex-sdk decides for a runner that cannot be reached at `HOSTED_URL`, the base client's own, with the
+#: next step the human CLI gives it.
 UNREACHABLE_PROBLEM: dict[str, Any] = {
     "type": "https://mthds.ai/errors/client.unreachable",
     "title": "The runtime could not be reached",
@@ -52,7 +60,7 @@ UNREACHABLE_PROBLEM: dict[str, Any] = {
     "code": "client.unreachable",
     "domain": "runtime",
     "retry": "yes",
-    "next_step": {"kind": "retry", "detail": f"Check that the runtime at {HOSTED_URL} is up and reachable, then try again."},
+    "next_step": {"kind": "retry", "detail": HOSTED_UNREACHABLE_NEXT_STEP},
     "params": {"base_url": HOSTED_URL},
 }
 #: A runner's own problem for a fault it met while running, which an answer on the run request cannot be trusted for.
@@ -286,7 +294,7 @@ class TestRunHostedRefusal:
 
         markdown = capsys.readouterr().err
         assert markdown.startswith(f"## The runtime could not be reached\n\nThe client could not connect to the runtime at {HOSTED_URL}.\n")
-        assert f"**Next step** (`retry`): Check that the runtime at {HOSTED_URL} is up and reachable, then try again." in markdown
+        assert f"**Next step** (`retry`): {HOSTED_UNREACHABLE_NEXT_STEP}" in markdown
         assert "- Code: `client.unreachable` (domain runtime, retry yes)" in markdown
         assert "ConnectError" not in markdown
         _assert_no_retired_markdown(markdown=markdown)
@@ -413,14 +421,14 @@ class TestRunHostedRefusal:
                 HostedPlaneRefusals.FORBIDDEN,
                 {},
                 {
-                    "type": "https://mthds.ai/errors/auth.invalid_credential",
-                    "title": "The credential was refused",
+                    "type": "https://mthds.ai/errors/auth.forbidden",
+                    "title": "The credential does not permit this",
                     "status": 403,
                     "detail": "Your role in this organization does not allow running methods.",
-                    "code": "auth.invalid_credential",
+                    "code": "auth.forbidden",
                     "domain": "account",
                     "retry": "no",
-                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
+                    "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
                     "request_id": "01M55PLEGACY403000000000000",
                 },
             ),
@@ -438,6 +446,36 @@ class TestRunHostedRefusal:
                     "retry": "no",
                     "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
                     "request_id": HEADER_REQUEST_ID,
+                },
+            ),
+            (
+                404,
+                HostedPlaneRefusals.RUN_NOT_FOUND,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/run.not_found",
+                    "title": "No such run",
+                    "status": 404,
+                    "detail": "No run run_9 is visible to this key.",
+                    "code": "run.not_found",
+                    "domain": "input",
+                    "retry": "no",
+                    "next_step": {"kind": "change_input", "detail": "Check the run id, then read the run again."},
+                },
+            ),
+            (
+                404,
+                HostedPlaneRefusals.METHOD_VERSION_NOT_FOUND,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/method.not_found",
+                    "title": "No method at this address",
+                    "status": 404,
+                    "detail": "The method mt_7 has no published version 3.",
+                    "code": "method.not_found",
+                    "domain": "input",
+                    "retry": "no",
+                    "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]},
                 },
             ),
             (
@@ -474,7 +512,15 @@ class TestRunHostedRefusal:
                 },
             ),
         ],
-        ids=["unauthorized", "forbidden", "gateway_forbidden", "rate_limited", "rate_limited_body_delay"],
+        ids=[
+            "unauthorized",
+            "forbidden",
+            "gateway_forbidden",
+            "run_not_found",
+            "method_version_not_found",
+            "rate_limited",
+            "rate_limited_body_delay",
+        ],
     )
     def test_a_refusal_of_the_hosted_plane_reads_as_its_core_code_with_the_hosted_guidance(
         self,
@@ -487,8 +533,9 @@ class TestRunHostedRefusal:
         headers: dict[str, str],
         expected: dict[str, Any],
     ) -> None:
-        """The hosted plane answers in its pre-standard shape: its refusal reads as the core code its status names, the
-        plane's own detail kept, the next step the human CLI gives, and a rate limit's delay from its header or its body.
+        """The hosted plane answers in its pre-standard shape: its refusal reads as the core code its status and its own
+        code name, the plane's own detail kept, the next step the human CLI gives, and a rate limit's delay from its header
+        or its body. A 403 the platform answers refuses a key it authenticated; the edge's bare 403 may refuse an unknown key.
         """
         _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers=headers)
 
@@ -501,20 +548,77 @@ class TestRunHostedRefusal:
         _assert_no_retired_member(problem=problem)
 
     @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize(
+        ("status", "body", "detail"),
+        [(401, HostedPlaneRefusals.UNAUTHORIZED, "The API key is not valid."), (403, GatewayAnswers.FORBIDDEN, "Forbidden")],
+        ids=["unauthorized", "gateway_forbidden"],
+    )
     def test_a_refused_request_that_carried_no_key_is_a_missing_credential(
-        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        status: int,
+        body: str,
+        detail: str,
     ) -> None:
-        _install_hosted_api(mocker, monkeypatch, status=401, body=HostedPlaneRefusals.UNAUTHORIZED)
+        """With no key sent, a refused credential is a missing one, and its next step says how to get a key, never that one was refused."""
+        _install_hosted_api(mocker, monkeypatch, status=status, body=body)
         monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "")
 
         with pytest.raises(typer.Exit):
             run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.MARKDOWN, runner=RunExecution.HOSTED)
 
         markdown = capsys.readouterr().err
-        assert markdown.startswith("## No credential was sent\n\nThe API key is not valid.\n")
-        assert f"**Next step** (`check_credentials`): {HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[401]}" in markdown
+        assert markdown.startswith(f"## No credential was sent\n\n{detail}\n")
+        assert f"**Next step** (`check_credentials`): {HOSTED_MISSING_KEY_NEXT_STEP}" in markdown
+        assert "refused the credentials" not in markdown
         assert "- Code: `auth.missing_credential` (domain account, retry no)" in markdown
         _assert_no_retired_markdown(markdown=markdown)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_a_runner_s_own_refusal_in_the_former_shape_keeps_its_reason(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        error_format: CliOutputFormat,
+    ) -> None:
+        """A runner's own 422, which no standard client reads, keeps the client's `client.response_unreadable` but tells
+        its reason and the step the human CLI gives it, never to report a body this CLI does not print.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=422, body=RunnerOwnRefusals.RESERVED_OBJECT_KEY)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
+
+        assert exc_info.value.exit_code == 1
+        printed = capsys.readouterr().err
+        reason = json.loads(RunnerOwnRefusals.RESERVED_OBJECT_KEY)["detail"]
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem == {
+                    "type": "https://mthds.ai/errors/client.response_unreadable",
+                    "title": "The runtime's answer could not be read",
+                    "status": 422,
+                    "detail": reason,
+                    "code": "client.response_unreadable",
+                    "domain": "runtime",
+                    "retry": "no",
+                    "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_CALLER_NEXT_STEP},
+                    "params": {"status": 422},
+                    "request_id": "01M55PRESERVED00000000000",
+                }
+                _assert_no_retired_member(problem=problem)
+            case CliOutputFormat.MARKDOWN:
+                assert printed.startswith(f"## The runtime's answer could not be read\n\n{reason}\n")
+                assert f"**Next step** (`change_input`): {HOSTED_REFUSAL_CALLER_NEXT_STEP}" in printed
+                assert "with the status and the body" not in printed
+                _assert_no_retired_markdown(markdown=printed)
 
     @pytest.mark.usefixtures("tty_stdin")
     def test_a_runner_s_problem_is_reported_by_its_declared_members_alone(
@@ -557,6 +661,34 @@ class TestRunHostedRefusal:
             run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
 
         assert json.loads(capsys.readouterr().err) == {**OperatorViewAnswers.CALLER_VIEW, "request_id": request_id}
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_a_nested_run_s_record_reads_in_the_caller_s_view_in_an_answer_in_the_caller_s(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        error_format: CliOutputFormat,
+    ) -> None:
+        """A run's stored record nested in an answer is its operator's, so its operator-only next step is re-aimed at the
+        caller even when no diagnostics tell its view; the answer around it keeps the runner's own step.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=409, body=OperatorViewAnswers.NESTING_THE_OPERATOR_S_RECORD)
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
+
+        printed = capsys.readouterr().err
+        sent = json.loads(OperatorViewAnswers.NESTING_THE_OPERATOR_S_RECORD)
+        match error_format:
+            case CliOutputFormat.JSON:
+                assert json.loads(printed) == {**sent, "run_error": OperatorViewAnswers.CALLER_VIEW}
+            case CliOutputFormat.MARKDOWN:
+                assert f"**Next step** (`report`): {OperatorViewAnswers.CALLER_VIEW['next_step']['detail']}" in printed
+                assert sent["run_error"]["next_step"]["detail"] not in printed
+                assert f"**Next step** (`read_run`): {sent['next_step']['detail']}" in printed
 
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])

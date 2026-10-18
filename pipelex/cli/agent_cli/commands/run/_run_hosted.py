@@ -6,10 +6,11 @@ its result is reported in, and the problem its failure is reported as. Nothing h
 
 A refusal decided here, before anything is sent, is a problem like any local failure, in the operator's view. A failure
 of the run itself is the problem the runner answered or the client decided, in the caller's view, since the runner is
-someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, by its declared members alone, a refusal
-the hosted plane answered in its own shape reads as the core code its status names, and pipelex's own `HostedRunError`s
-give theirs. A failure no arm names is this process's own and is reported as a local one is, in the operator's view: a
-Pipelex error under its own code, any other exception as `runtime.unexpected`.
+someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, by its declared members alone, with the
+next step the human CLI tailors for a failure of the client's own; an answer in a shape that predates the standard's
+reads as the core code its status names, or keeps its reason; and pipelex's own `HostedRunError`s give theirs. A
+failure no arm names is this process's own and is reported as a local one is, in the operator's view: a Pipelex error
+under its own code, any other exception as `runtime.unexpected`.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, SuggestedFix
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, RetryVerdict, StepKind
 from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, PipelexRequestError, RunFailedError
 from pydantic import BaseModel, ValidationError
 
@@ -36,7 +37,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import make_hosted_client
-from pipelex.hosted.error_rendering import hosted_refusal_problem
+from pipelex.hosted.error_rendering import hosted_refusal_problem, tailored_next_step
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
@@ -105,7 +106,7 @@ def refuse_local_only_flags(*, dry_run: bool, mock_inputs: bool) -> None:
 #: The parts of a problem, each read against the model that declares its members, so that a member neither the standard
 #: nor Pipelex declares is left out at every level. A problem's `params` and a fix's `ops` are the code's and the
 #: operation's own and are kept whole; the nested `run_error` and Pipelex's other members are read apart.
-_PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
+PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
     PipelexProblem: {"next_step": NextStep, "location": ProblemLocation, "errors": ProblemItem},
     ProblemItem: {"location": ProblemLocation, "suggested_fix": SuggestedFix},
 }
@@ -115,9 +116,9 @@ _PIPELEX_PROBLEM_MEMBERS: tuple[str, ...] = ("request_id", "run_error", "diagnos
 
 
 def _declared_members(*, members: Mapping[str, Any], shape: type[BaseModel]) -> dict[str, Any]:
-    """The members of ``members`` that ``shape`` declares, each part it nests read the same way (:data:`_PROBLEM_PARTS`)."""
+    """The members of ``members`` that ``shape`` declares, each part it nests read the same way (:data:`PROBLEM_PARTS`)."""
     declared: dict[str, Any] = {}
-    parts = _PROBLEM_PARTS.get(shape, {})
+    parts = PROBLEM_PARTS.get(shape, {})
     for name in shape.model_fields:
         if name not in members:
             continue
@@ -179,7 +180,8 @@ def received_problem(*, problem: Problem, request_id: str | None = None, stored:
     level, and one of Pipelex's members that does not read is left out alone. An answer that carries diagnostics, which
     a runner answers only to its operator, is projected onto the caller's view (:func:`caller_view_of`), decided from
     the document as it came, before any member is left out, since this machine is not the runner's operator; so is a
-    stored record of a run, which is the operator's.
+    stored record of a run, which is the operator's, and so is the run's problem an answer nests (`run_error`), which is
+    that record, whatever view the answer around it is in.
 
     The reading never fails: a problem the standard's client validated always makes one, and the last resort for one
     that would not is `runtime.unexpected`, so the command always prints a problem.
@@ -198,34 +200,78 @@ def received_problem(*, problem: Problem, request_id: str | None = None, stored:
         return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, request_id=request_id)
     if request_id and received.request_id is None:
         received = received.model_copy(update={"request_id": request_id})
-    return caller_view_of(problem=received) if stored or _holds_diagnostics(members=members) else received
+    if stored or _holds_diagnostics(members=members):
+        return caller_view_of(problem=received)
+    if received.run_error is not None:
+        # A runner's caller-view answer may still nest the run's record as it was stored, in its operator's view, with an
+        # operator-only next step and nothing that tells its view, so the record is projected whatever the answer's view.
+        return received.model_copy(update={"run_error": caller_view_of(problem=received.run_error)})
+    return received
+
+
+#: The step kind each advice of a report in the former shape names (its `user_action.kind`), in the standard's closed
+#: list of kinds; an advice of another kind, `unknown` included, takes its code's.
+_FORMER_ADVICE_KINDS: dict[str, StepKind] = {
+    "wait_and_retry": StepKind.WAIT,
+    "check_billing": StepKind.CHECK_ACCOUNT,
+    "check_credentials": StepKind.CHECK_CREDENTIALS,
+    "change_input": StepKind.CHANGE_INPUT,
+    "change_model": StepKind.CHANGE_MODEL,
+    "contact_support": StepKind.REPORT,
+}
 
 
 def _stored_run_problem(*, report: RunErrorReport | None) -> PipelexProblem | None:
-    """The failed run's own problem, when the report the hosted API stored for it is a problem document; ``None`` otherwise.
+    """The failed run's own problem, read off the report the hosted API stored for it; ``None`` when it stored none.
 
-    The report is read as a runner's answer is (:func:`received_problem`), in the caller's view, so a member it holds
-    beside the problem, such as its `message` or its `error_type`, is left out, and so is one of Pipelex's members that
-    does not read, never the whole problem.
+    A report that is a problem document is read as a runner's answer is (:func:`received_problem`), in the caller's
+    view, so a member it holds beside the problem, such as its `message` or its `error_type`, is left out, and so is one
+    of Pipelex's members that does not read, never the whole problem. A report in the shape the hosted plane wrote before
+    it stored problem documents is read by :func:`_former_run_problem`.
     """
     if report is None:
         return None
     try:
         stored = Problem.model_validate(report.model_dump(mode="json", exclude_none=True))
     except ValidationError:
-        # A report in the shape the hosted plane wrote before it stored problem documents.
-        return None
+        return _former_run_problem(report=report)
     return received_problem(problem=stored, stored=True)
 
 
-def _typed_sent_item(*, sent: SentValidationErrorItem) -> ValidationErrorItem:
-    """A validation item the hosted API sent, typed as this version reads one.
+def _former_run_problem(*, report: RunErrorReport) -> PipelexProblem:
+    """The failed run's own problem, read off a report in the shape the hosted plane wrote before it stored problem documents.
 
-    An item of a newer runner, of a type or with a member this version does not read, keeps its locators, and its
-    sentence becomes the finding of the item no stage classified.
+    Such a report names no code: one that lists validation items is `method.invalid`, its items coded as a local verdict
+    codes them (:func:`hosted_method_problem_items`), and any other is `runtime.unexpected`. Its `message` is the
+    problem's detail, its advice the next step, of the kind :data:`_FORMER_ADVICE_KINDS` reads, and its `retryable`
+    the retry verdict, so this CLI tells what the human CLI tells of the same run (`describe_hosted_error`). Its
+    `error_category`, `model` and `provider` are not carried: neither code declares a parameter for them, and the hosted
+    read's projection drops the model and the provider.
     """
+    items = hosted_method_problem_items(validation_errors=report.validation_errors or [])
+    problem = make_problem(code=CoreCode.METHOD_INVALID if items else CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, errors=items or None)
+    updates: dict[str, Any] = {}
+    if report.message:
+        updates["detail"] = report.message
+    advice = report.user_action
+    if advice is not None and advice.detail:
+        updates["next_step"] = NextStep(kind=_FORMER_ADVICE_KINDS.get(advice.kind or "", problem.next_step.kind), detail=advice.detail)
+    if isinstance(report.retryable, bool):
+        updates["retry"] = RetryVerdict.YES if report.retryable else RetryVerdict.NO
+    return problem.model_copy(update=updates)
+
+
+def _typed_sent_item(*, sent: SentValidationErrorItem) -> ValidationErrorItem:
+    """A validation item the hosted API sent, typed as this version reads one, by the fields this version declares.
+
+    A field this version does not declare is left out, so an item of a type it reads keeps its type. An item of a
+    newer runner whose declared fields this version does not read, such as a type it does not know, keeps its
+    locators, and its sentence becomes the finding of the item no stage classified.
+    """
+    sent_fields = sent.model_dump(mode="json", exclude_none=True)
+    declared = {name: value for name, value in sent_fields.items() if name in ValidationErrorItem.model_fields}
     try:
-        return ValidationErrorItem.model_validate(sent.model_dump(mode="json", exclude_none=True))
+        return ValidationErrorItem.model_validate(declared)
     except ValidationError:
         return ValidationErrorItem(
             category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
@@ -261,11 +307,15 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
       runner's own problem document when the answer is one, and otherwise the code the client reads, such as
       `client.unreachable` naming the base URL, or `client.outcome_unknown` for an answer that leaves a run possibly
       started, a server fault on the run request included.
-    - A refusal the hosted plane answered in its own shape, which predates the standard's, reads as the core code its
-      status names, with the next step the human CLI gives (`pipelex.hosted.error_rendering.hosted_refusal_problem`):
-      a refused or missing credential, a route or method this origin does not serve, a rate limit with its delay.
+      A failure the client met on its own side takes the step the human CLI tailors for it in place of its code's
+      (`pipelex.hosted.error_rendering.tailored_next_step`).
+    - An answer in a shape that predates the standard's, which the standard's client reads by its status alone, reads
+      as the core code its status and the hosted plane's own code name, with the next step the human CLI gives
+      (`pipelex.hosted.error_rendering.hosted_refusal_problem`): a refused or missing credential, a refused operation, a
+      route, run or method this origin does not serve, a rate limit with its delay; and any other such answer keeps
+      the client's reading with the reason the answer gave.
     - A run that started and failed is `run.failed`, naming the run and its status, and nests the run's own problem as
-      `run_error` when the report the hosted API stored for it is one.
+      `run_error`, read off the report the hosted API stored for it, whatever its shape.
     - A failure pipelex detects itself is its `HostedRunError`'s problem, naming the run the hosted API acknowledged
       when there is one, and a method the hosted API found does not load lists the hosted API's items as `errors`.
 
@@ -292,9 +342,12 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
         request_id = error.request_id
     problem = received_problem(problem=error.problem, request_id=request_id)
     if isinstance(error, RunFailedError):
+        # The run's own step rides in its nested problem.
         run_error = _stored_run_problem(report=error.error)
-        if run_error is not None:
-            problem = problem.with_members(run_error=run_error.to_wire())
+        return problem.with_members(run_error=run_error.to_wire()) if run_error is not None else problem
+    tailored = None if isinstance(error, ApiResponseError) else tailored_next_step(error=error)
+    if tailored is not None:
+        problem = problem.model_copy(update={"next_step": NextStep(kind=problem.next_step.kind, detail=tailored)})
     return problem
 
 

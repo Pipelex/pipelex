@@ -80,6 +80,23 @@ class OperatorViewAnswers:
         **_OPERATOR_VIEW_OF_A_STOPPED_RUN,
         "next_step": {"kind": "report", "detail": "Report this to whoever runs the runtime if the run was still wanted."},
     }
+    # A read of a failed run's results in the caller's view, nesting the run's stored record in its operator's view with
+    # no diagnostics to tell it by: the nested problem is the run's record, so it reads in the caller's view all the same.
+    NESTING_THE_OPERATOR_S_RECORD: ClassVar[str] = json.dumps(
+        {
+            "type": "https://mthds.ai/errors/run.failed",
+            "title": "The run did not succeed",
+            "status": 409,
+            "detail": "The run 'run_9' ended as 'TERMINATED', without success.",
+            "code": "run.failed",
+            "domain": "runtime",
+            "retry": "no",
+            "next_step": {"kind": "read_run", "detail": "Read the run's own problem in run_error to see why it did not succeed."},
+            "params": {"pipeline_run_id": "run_9", "run_status": "TERMINATED"},
+            "pipeline_run_id": "run_9",
+            "run_error": _OPERATOR_VIEW_OF_A_STOPPED_RUN,
+        }
+    )
     # Pipelex's members in shapes no version reads, the nested run's problem included: none of them may stop the report.
     HOSTILE: ClassVar[tuple[str, ...]] = (
         json.dumps({**_OPERATOR_VIEW_OF_A_STOPPED_RUN, "run_error": "not a problem"}),
@@ -220,6 +237,30 @@ class HostedPlaneRefusals:
             "retryable": True,
         }
     )
+    # A run the platform knows no run by, which names the run it means by its own code.
+    RUN_NOT_FOUND: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/run_not_found",
+            "title": "Not found",
+            "status": 404,
+            "code": "run_not_found",
+            "detail": "No run run_9 is visible to this key.",
+            "error_domain": "input",
+            "retryable": False,
+        }
+    )
+    # A method version the method never published, which names the method by its own code.
+    METHOD_VERSION_NOT_FOUND: ClassVar[str] = json.dumps(
+        {
+            "type": "https://pipelex.com/errors/method_version_not_found",
+            "title": "Not found",
+            "status": 404,
+            "code": "method_version_not_found",
+            "detail": "The method mt_7 has no published version 3.",
+            "error_domain": "input",
+            "retryable": False,
+        }
+    )
     # A rate limit whose delay rides the body alone, with no `Retry-After` header.
     RATE_LIMITED_BODY_DELAY: ClassVar[str] = json.dumps(
         {
@@ -244,6 +285,29 @@ class GatewayAnswers:
     NOT_FOUND: ClassVar[str] = '{"detail":"Not Found"}'
     # A gateway's refusal of a request its authorizer did not let through.
     FORBIDDEN: ClassVar[str] = '{"message":"Forbidden"}'
+
+
+class RunnerOwnRefusals:
+    """Refusals a runner authors itself rather than raising a Pipelex error for, in the shape that predates the standard's."""
+
+    # The runner's 422 for a run request carrying a reserved object key, as `raise_validation_error` answers it: a
+    # reason, but no code, domain, retry verdict or next step the standard's client reads.
+    RESERVED_OBJECT_KEY: ClassVar[str] = json.dumps(
+        {
+            "type": "https://docs.pipelex.com/latest/errors/reserved-object-key/",
+            "title": "Reserved object key",
+            "status": 422,
+            "detail": (
+                "Request body contains the reserved object key '__class__'. A run request is plain JSON: no object in it may "
+                "carry a '__class__' or '__module__' key, or a key starting with '__kajson'."
+            ),
+            "instance": "urn:pipelex:request:01M55PRESERVED00000000000",
+            "request_id": "01M55PRESERVED00000000000",
+            "error_type": "ReservedObjectKey",
+            "error_domain": "input",
+            "retryable": False,
+        }
+    )
 
 
 class RetiredEnvelope:
@@ -279,6 +343,32 @@ class StoredRunReports:
         "retryable": True,
         "model": "claude-5.5-sonnet",
         "user_action": {"kind": "wait_and_retry", "detail": "Run it again in a minute"},
+    }
+    # A report in the former shape for a run whose method did not validate, with the items and the advice it gives.
+    FORMER_SHAPE_WITH_ITEMS: ClassVar[dict[str, Any]] = {
+        "error_type": "ValidateBundleError",
+        "message": "The method does not validate: pipe 'draft' names an unknown model",
+        "title": "Validate bundle error",
+        "type_uri": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
+        "error_domain": "input",
+        "error_category": "configuration",
+        "retryable": False,
+        "caller_facing_message": True,
+        "user_action": {"kind": "change_model", "detail": "Name a model the catalog knows, such as gpt-5.5, then run again"},
+        "validation_errors": [
+            {
+                "category": "pipe_validation",
+                "message": "Pipe 'draft' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck",
+                "error_type": "unknown_model",
+                "pipe_code": "draft",
+                "field_name": "model",
+                "model_reference": "gpt-5.1",
+                "model_type": "llm",
+                "suggestions": ["gpt-5.5"],
+                "source": "main.mthds",
+                "pipe_type": "PipeLLM",
+            }
+        ],
     }
     # The run's own problem, as a runner that speaks the problem document stores it, in the operator's view.
     PROBLEM: ClassVar[dict[str, Any]] = {
@@ -330,6 +420,8 @@ class HostedMethodItems:
         # An item of a newer runner, whose type this version does not read.
         {"category": "pipe_validation", "message": "A kind of fault from a newer runner", "error_type": "some_future_fault", "pipe_code": "step3"},
     ]
+    # An item of a type this version reads, carrying a field neither this version nor the SDK declares.
+    SENT_WITH_AN_UNKNOWN_FIELD: ClassVar[dict[str, Any]] = {**SENT[1], "pipe_type": "PipeLLM"}
     PROBLEM_ITEMS: ClassVar[list[dict[str, Any]]] = [
         {
             "code": "method.schema_violation",
