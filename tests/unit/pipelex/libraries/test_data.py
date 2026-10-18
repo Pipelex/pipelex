@@ -119,3 +119,43 @@ class MethodRequirementsTestData:
                 "sys_platform": "linux",
             },
         )
+
+
+class PackageVisibilityTestData:
+    """Bundles of one package whose `legal` domain calls a pipe its `scoring` domain does not export."""
+
+    PACKAGE_ADDRESS = "github.com/harbour-board/legal-tools"
+    UNEXPORTED_PIPE_REF = "scoring.compute_score"
+
+    SCORING_MTHDS = """
+domain = "scoring"
+description = "Scores a clause"
+
+[pipe.compute_score]
+type = "PipeLLM"
+description = "Score a clause"
+inputs = { clause = "Text" }
+output = "Text"
+prompt = "Score $clause"
+"""
+
+    LEGAL_MTHDS = """
+domain = "legal"
+description = "Reviews a contract"
+main_pipe = "review"
+
+[pipe.review]
+type = "PipeSequence"
+description = "Review a contract by scoring its clause"
+inputs = { clause = "Text" }
+output = "Text"
+steps = [{ pipe = "scoring.compute_score", result = "score" }]
+"""
+
+    RESERVED_DOMAIN_MTHDS = """
+domain = "native"
+description = "Declares a domain the standard reserves"
+
+[concept.Thing]
+description = "A thing"
+"""
