@@ -1,3 +1,4 @@
+import json
 from typing import Any
 
 import pytest
@@ -170,6 +171,16 @@ CALLER_VIEW_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, CoreCo
         {"input": "my_input", "field": "amount"},
         "The input 'my_input' does not fit its concept's structure at 'amount'.",
     ),
+    # A key of a dict the value holds is the caller's own text: the field is named as far as the structure names it.
+    (
+        "structure-dict-value",
+        "shaper_test.ShaperLedger",
+        None,
+        {"scores": {"confidential-patient-diagnosis": "high"}},
+        CoreCode.INPUT_INVALID,
+        {"input": "my_input", "field": "scores.<key>"},
+        "The input 'my_input' does not fit its concept's structure at 'scores.<key>'.",
+    ),
     # `input.invalid` names the field at fault, and a value wrong as a whole names the input itself, the root of every field path.
     (
         "wrong-str-for-number",
@@ -254,6 +265,8 @@ class TestInputShaperErrors:
         assert caller.detail == (expected_detail or error_code_spec(expected_code).title)
         assert caller.location is not None
         assert caller.location.as_wire() == {"input": "my_input"}
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert "confidential-patient-diagnosis" not in json.dumps(operator.to_wire())
 
     def test_an_unknown_input_name_is_named_to_the_caller(self) -> None:
         input_specs = build_input_specs([("question", "native.Text", None)])

@@ -14,6 +14,7 @@ from pipelex.cogt.usage.pricing_unit import PricingUnit
 from pipelex.cogt.usage.usage_cost import record_unit_priced_usage
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import UnitJobId
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.filetype_utils import IMAGE_FORMAT_KEY, describe_file_format, describe_format_keys, format_key_from_mime_type
 from pipelex.tools.uri.resolved_uri import ResolvedHttpUrl
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -146,6 +147,12 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
                 result = await self._extract_pages(extract_job=extract_job)
             except CogtError as exc:
                 exc.fill_model_and_provider(model_handle=self.inference_model.name, backend_name=self.inference_model.backend_name)
+                raise
+            except RemoteFileFetchError as exc:
+                # The file to extract could not be fetched. The fetch knows the URL alone; the input it came from is
+                # known here, and its code's sentences name it.
+                if (input_name := extract_job.extract_input.input_name) is not None:
+                    exc.with_input(input_name=input_name)
                 raise
 
             call_summary.count_pages_extracted(count=len(result.pages))

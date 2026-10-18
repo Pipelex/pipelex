@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
@@ -46,12 +46,16 @@ from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
 from pipelex.tools.jinja2.jinja2_unknown_names import find_unknown_filters_and_tests
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.kernel.llm_results import StructuringPath
+
+
+#: A content class, named here because a pipe's `type` field shadows the builtin in its class body.
+StuffContentClass: TypeAlias = type[StuffContent]
 
 
 class PipeLLMOutput(PipeOutput):
@@ -340,15 +344,16 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main], output_class=output_class)
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             except ValidationError as exc:
                 # Not classified as the caller's fault, here or on the object path below, where an
                 # output the model could not fit to the structure surfaces as `LLMCompletionError`:
                 # whether a model's output fits depends on what the model produced this time.
+                # The refused value is the model's answer, the run's data: the message names its fields and reasons alone.
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = format_pydantic_validation_error(exc)
+                error_details = format_validation_error_without_input(validation_error=exc, validated_type=output_class)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
                     CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
@@ -381,7 +386,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object], output_class=output_class)
                 what_failed = "list of objects" if is_multiple_output else "single object"
                 msg = f"Error generating {what_failed} with direct method {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
@@ -442,12 +447,15 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
-        """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
+    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting], output_class: StuffContentClass) -> str:
+        """Format an LLMCompletionError, with any ValidationError in its chain written without the model's answer it refused.
+
+        Its locations name what the output's class names, when it is the class the error came from.
+        """
         error_details = str(exc)
         for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
-                error_details += f"\n{format_pydantic_validation_error(current_exc)}"
+                error_details += f"\n{format_validation_error_without_input(validation_error=current_exc, validated_type=output_class)}"
                 break
         return f"{error_details}\nLLM settings: {settings}"
 

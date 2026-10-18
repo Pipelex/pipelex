@@ -42,9 +42,11 @@ class TestSsrfGuard:
         mocker.patch("socket.getaddrinfo", side_effect=fake)
         with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips("attacker.example", port=80)
-        # The refusal states the class of what the name resolved to, for its security event, and its message never names the address.
+        # The refusal states the class of what the name resolved to, for its security event. The host is part of a URL the
+        # runtime did not choose, a run's input or a caller's callback, so no message names it, nor the address.
         assert exc_info.value.security_target_class == SecurityTargetClass.METADATA
-        assert "169.254.169.254" not in exc_info.value.message
+        assert "attacker.example" not in str(exc_info.value)
+        assert "169.254.169.254" not in str(exc_info.value)
 
     @pytest.mark.parametrize(
         ("host", "target_class"),
@@ -57,10 +59,12 @@ class TestSsrfGuard:
         ],
     )
     async def test_resolve_blocks_literal_private_host(self, host: str, target_class: SecurityTargetClass) -> None:
-        # A literal private IP never needs resolution — blocked by the cheap rule, and classified for the security event.
+        # A literal private IP never needs resolution — blocked by the cheap rule, classified for the security event, and
+        # never named by the refusal's message.
         with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips(host, port=80)
         assert exc_info.value.security_target_class == target_class
+        assert host not in str(exc_info.value)
 
     async def test_resolve_blocks_mixed_public_and_private(self, mocker: MockerFixture) -> None:
         # A host resolving to both a public and a private IP is itself a rebinding
@@ -77,8 +81,9 @@ class TestSsrfGuard:
     async def test_resolution_failure_maps_to_connect_error(self, mocker: MockerFixture) -> None:
         # A genuine DNS failure is not a security event — surface httpx's usual connect error.
         mocker.patch("socket.getaddrinfo", side_effect=socket.gaierror("name or service not known"))
-        with pytest.raises(httpcore.ConnectError):
+        with pytest.raises(httpcore.ConnectError) as exc_info:
             await resolve_to_allowed_ips("nonexistent.invalid", port=80)
+        assert "nonexistent.invalid" not in str(exc_info.value)
 
     async def test_resolution_timeout_maps_to_connect_timeout(self, mocker: MockerFixture) -> None:
         # DNS resolution is bounded by the connect timeout; a slow resolver surfaces as

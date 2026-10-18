@@ -1741,9 +1741,11 @@ class LibraryManager(LibraryManagerAbstract):
                     pipe.validate_once_built()
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
+                    # The pipe's blueprint is the dependency author's own document, no run's data: its refusal is
+                    # located as pydantic gives it.
                     log.warning(
                         "A pipe of a dependency could not be loaded",
-                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc, is_authored_input=True)},
                     )
                     unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
                 except PipeValidationError as exc:

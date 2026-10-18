@@ -29,10 +29,10 @@ class SsrfBlockedError(SecurityError):
     and the caller fixes it by providing a public URL. A raise or catch site that
     knows the method named the URL chooses ``security.method_url_refused``, and one
     that knows a provider's answer named it ``security.provider_url_refused``.
-    The message deliberately names only the requested hostname, never the
-    resolved private IP, so it never reveals an internal address. That a name
-    resolves to a private address at all stays observable, since the refusal is
-    told apart from a host that cannot be reached.
+    The message names neither the requested host, which is part of a URL the
+    caller or the run supplied, nor the resolved private IP, so it never reveals
+    an internal address. That a name resolves to a private address at all stays
+    observable, since the refusal is told apart from a host that cannot be reached.
     """
 
     error_code = ErrorCodeSet(

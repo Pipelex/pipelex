@@ -4,6 +4,7 @@ import logging
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, StepKind
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
@@ -106,6 +107,36 @@ class TestLocatedFailureProblem:
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "PipelexUnexpectedError"
         assert "boom" not in str(located.to_problem(view=ProblemView.CALLER).to_wire())
+
+    @pytest.mark.parametrize(
+        "foreign_fault",
+        [
+            KeyError("jane.doe@acme.example"),
+            ValueError("could not parse 'jane.doe@acme.example'"),
+            RuntimeError("jane.doe@acme.example"),
+        ],
+    )
+    def test_a_foreign_exception_is_named_by_its_class_alone(self, foreign_fault: Exception) -> None:
+        """A foreign exception's text can carry the run's data: the stand-in's message, the operator's diagnostics, is its class."""
+        unexpected_failure = make_unexpected_failure(error=foreign_fault)
+
+        assert unexpected_failure.message == type(foreign_fault).__name__
+        assert unexpected_failure.__cause__ is foreign_fault
+        operator = unexpected_failure.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert "jane.doe@acme.example" not in str(operator.to_wire())
+
+    def test_a_foreign_validation_error_keeps_its_reasons_without_its_input(self) -> None:
+        """A raw pydantic refusal names its reasons, which hold no value, and no location, since its model is not known."""
+
+        class _Contact(BaseModel):
+            emails: dict[str, int]
+
+        with pytest.raises(ValidationError) as exc_info:
+            _Contact.model_validate({"emails": {"jane.doe@acme.example": "secret-value"}})
+        unexpected_failure = make_unexpected_failure(error=exc_info.value)
+
+        assert unexpected_failure.message == "ValidationError: Input should be a valid integer, unable to parse string as an integer"
 
     def test_a_same_class_rethrow_keeps_its_added_context(self) -> None:
         """An error raised from one of its own class restates the fault with context: the outer one is reported."""

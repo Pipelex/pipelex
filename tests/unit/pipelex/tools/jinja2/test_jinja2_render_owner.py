@@ -63,9 +63,9 @@ class TestJinja2RenderOwner:
     @pytest.mark.parametrize(
         ("template_source", "fault"),
         [
-            (_UNKNOWN_FILTER_IN_A_BRANCH, "No filter named 'frob_the_lane' found."),
-            (_UNKNOWN_FILTER_AT_THE_TOP, "No filter named 'frob_the_lane'."),
-            (_UNKNOWN_TEST_IN_A_BRANCH, "No test named 'frobbed' found."),
+            (_UNKNOWN_FILTER_IN_A_BRANCH, "No filter named 'frob_the_lane' at line 1."),
+            (_UNKNOWN_FILTER_AT_THE_TOP, "No filter named 'frob_the_lane' at line 1."),
+            (_UNKNOWN_TEST_IN_A_BRANCH, "No test named 'frobbed' at line 1."),
         ],
         ids=["filter_in_a_branch", "filter_at_compile", "test_in_a_branch"],
     )
@@ -185,7 +185,10 @@ class TestJinja2RenderOwner:
         method_code: ErrorCode,
         pipelex_code: ErrorCode,
     ) -> None:
-        """The same failure is the method's on a method's template and ours, or the data's, on Pipelex's own."""
+        """The same failure is the method's on a method's template and ours, or the data's, on Pipelex's own.
+
+        Its message never quotes the template, which is the caller's own text on a method's template.
+        """
         for template_owner, expected_code in ((TemplateOwner.METHOD, method_code), (TemplateOwner.PIPELEX, pipelex_code)):
             error = await _render_failure(
                 template_source,
@@ -196,6 +199,7 @@ class TestJinja2RenderOwner:
             )
             assert type(error) is error_class, topic
             assert error.to_problem(view=ProblemView.CALLER).code == expected_code, f"{topic} on a {template_owner} template"
+            assert template_source not in error.message, f"{topic} on a {template_owner} template"
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_a_method_variable_named_like_a_reserved_key_is_a_name_conflict_naming_it(self) -> None:

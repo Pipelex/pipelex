@@ -22,10 +22,12 @@ forge content, such as an image pointing at another organisation's storage key.
   formatter, and the methods a type declares in its template surface. Everything else is refused:
   pydantic methods, `Stuff` and content methods, classes, free functions and class methods, every
   method that changes a list, a dict or a set in place, and the few that produce bytes.
-- **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, which the
-  render functions turn into `Jinja2TemplateSecurityError`, a Pipelex `SecurityError` like the runtime's
-  other policy refusals. Jinja's stock sandbox returns an undefined value that prints as nothing, which
-  would send a prompt with a hole in it.
+- **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, as the
+  `SandboxRefusalError` that words it with the names it quotes and without them and carries the bare
+  name it refused, which the render functions turn into `Jinja2TemplateSecurityError`, a Pipelex
+  `SecurityError` like the runtime's other policy refusals, quoting and passing a name on only where
+  the template spells it. Jinja's stock sandbox returns an undefined value that prints as nothing,
+  which would send a prompt with a hole in it.
 - **Spending.** What a template may reach says nothing about what it may spend, so every render also
   spends from one budget (`jinja2_render_budget.py`), charged by the hooks of this class, by wrappers
   around every filter and test, and by a rewrite of the parsed template for what no hook reaches
@@ -54,7 +56,7 @@ import inspect
 import types
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, NoReturn, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, NoReturn, cast
 
 from jinja2.runtime import BlockReference, Context, LoopContext, Macro, Undefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment, safe_range
@@ -62,8 +64,8 @@ from jinja2.utils import Cycler, Joiner, Namespace, generate_lorem_ipsum
 from markupsafe import Markup
 from typing_extensions import override
 
-from pipelex.tools.jinja2.exceptions import TemplateSandboxRefusalError
-from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, active_render_budget, compare_weight
+from pipelex.tools.jinja2.exceptions import SandboxRefusalError
+from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, DescribedOperation, active_render_budget, compare_weight
 from pipelex.tools.jinja2.jinja2_render_charging import (
     INTERNAL_FILTERS,
     BudgetedContext,
@@ -106,8 +108,16 @@ _PLAIN_VALUE_TYPES: tuple[type, ...] = (
 def _refuse_callable_in_namespace(*, name: str, value: object) -> None:
     # An undefined value is callable only so that calling it fails as an undefined value: storing it is harmless.
     if callable(value) and not isinstance(value, Undefined):
-        msg = f"A template may not store {_describe_callable(obj=value)} in a namespace, as '{name}': a namespace holds data only."
-        raise TemplateSandboxRefusalError(msg, refused_name=_callable_name(obj=value))
+        # The name a template stores under can be a value of the run's data (`namespace({key: value})`).
+        callable_description = _describe_callable(obj=value)
+        msg = f"A template may not store {callable_description.text} in a namespace, as '{name}': a namespace holds data only."
+        anonymous_msg = f"A template may not store {callable_description.anonymous_text} in a namespace: a namespace holds data only."
+        raise SandboxRefusalError(
+            msg,
+            named=(name, *callable_description.named),
+            anonymous_message=anonymous_msg,
+            refused_name=_callable_name(obj=value),
+        )
 
 
 class DataNamespace(Namespace):
@@ -207,7 +217,10 @@ def _is_declared_template_method(*, obj: object) -> bool:
 
 
 def _callable_name(*, obj: object) -> str:
-    """The bare name of a refused callable, as a template reaches for it: a method's, a function's, a macro's or a class's name."""
+    """The bare name of a refused callable, as a template reaches for it: a method's, a function's, a macro's or a class's name.
+
+    A callable value of another kind, which has no name of its own, is named by its class, a name of code.
+    """
     if isinstance(obj, (types.BuiltinMethodType, types.MethodType, types.FunctionType, type)):
         return obj.__name__
     if isinstance(obj, Macro):
@@ -215,23 +228,55 @@ def _callable_name(*, obj: object) -> str:
     return type(obj).__name__
 
 
-def _describe_callable(*, obj: object) -> str:
+class _CallableDescription(NamedTuple):
+    """A refused callable described with its name, ``text``, and without it, ``anonymous_text``.
+
+    The name is the one a template reached it by when it read it with a dot, but one read by ``obj[key]`` or
+    ``obj | attr(key)`` is reached by a value of the run's data: ``named`` holds the names ``text`` quotes. The class a
+    value is of is named in both, a name of code.
+    """
+
+    text: str
+    anonymous_text: str
+    named: tuple[str, ...]
+
+
+def _describe_callable(*, obj: object) -> _CallableDescription:
     """Name a refused callable by what it is and what it was reached on, never by its value's repr."""
     if isinstance(obj, (types.BuiltinMethodType, types.MethodType)):
         name = obj.__name__
         bound_to: object = getattr(obj, "__self__", None)
         if isinstance(bound_to, type):
-            return f"the method '{name}' of the class '{bound_to.__name__}'"
+            return _CallableDescription(
+                text=f"the method '{name}' of the class '{bound_to.__name__}'",
+                anonymous_text=f"a method of the class '{bound_to.__name__}'",
+                named=(name,),
+            )
         if bound_to is None or isinstance(bound_to, types.ModuleType):
-            return f"the function '{name}'"
-        return f"the method '{name}' of a '{type(bound_to).__name__}' value"
+            return _CallableDescription(text=f"the function '{name}'", anonymous_text="a function", named=(name,))
+        return _CallableDescription(
+            text=f"the method '{name}' of a '{type(bound_to).__name__}' value",
+            anonymous_text=f"a method of a '{type(bound_to).__name__}' value",
+            named=(name,),
+        )
     if isinstance(obj, Macro):
-        return f"the macro '{obj.name}'"
+        return _CallableDescription(text=f"the macro '{obj.name}'", anonymous_text="a macro", named=(obj.name,))
     if isinstance(obj, type):
-        return f"the class '{obj.__name__}'"
+        return _CallableDescription(text=f"the class '{obj.__name__}'", anonymous_text="a class", named=(obj.__name__,))
     if isinstance(obj, types.FunctionType):
-        return f"the function '{obj.__name__}'"
-    return f"a '{type(obj).__name__}' value"
+        return _CallableDescription(text=f"the function '{obj.__name__}'", anonymous_text="a function", named=(obj.__name__,))
+    value_description = f"a '{type(obj).__name__}' value"
+    return _CallableDescription(text=value_description, anonymous_text=value_description, named=())
+
+
+def _describe_call(*, obj: object) -> DescribedOperation:
+    """A call the render budget refused, described with the callable's name and without it (see `_describe_callable`)."""
+    callable_description = _describe_callable(obj=obj)
+    return DescribedOperation(
+        text=f"calling {callable_description.text}",
+        anonymous_text=f"calling {callable_description.anonymous_text}",
+        named=callable_description.named,
+    )
 
 
 class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
@@ -317,8 +362,12 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
 
     @override
     def unsafe_undefined(self, obj: Any, attribute: str) -> NoReturn:
-        msg = f"A template may not read '{attribute}' on a '{type(obj).__name__}' value."
-        raise TemplateSandboxRefusalError(msg, refused_name=attribute)
+        # The attribute is the template's own name for `.name`, but a value of the run's data for `obj[key]` or
+        # `obj | attr(key)`.
+        type_name = type(obj).__name__
+        msg = f"A template may not read '{attribute}' on a '{type_name}' value."
+        anonymous_msg = f"A template may not read an unsafe name on a '{type_name}' value."
+        raise SandboxRefusalError(msg, named=(attribute,), anonymous_message=anonymous_msg, refused_name=attribute)
 
     @override
     def wrap_str_format(self, value: Any) -> Callable[..., str] | None:
@@ -332,9 +381,16 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     @override
     def call(self, context: Context, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
         if not self.is_safe_callable(obj):
-            msg = f"A template may not call {_describe_callable(obj=obj)}: templates read data and call methods of plain values only."
-            raise TemplateSandboxRefusalError(msg, refused_name=_callable_name(obj=obj))
-        return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: f"calling {_describe_callable(obj=obj)}")
+            callable_description = _describe_callable(obj=obj)
+            msg = f"A template may not call {callable_description.text}: templates read data and call methods of plain values only."
+            anonymous_msg = (
+                f"A template may not call {callable_description.anonymous_text}: templates read data and call methods of plain values only."
+            )
+            raise SandboxRefusalError(msg, named=callable_description.named, anonymous_message=anonymous_msg, refused_name=_callable_name(obj=obj))
+        # A callable the sandbox lets a template call is a method of code, a plain value's or one a type declares, or the
+        # template's own macro, so the budget's message names it, but only where the template spells its name: one read
+        # by `obj[key]` or `obj | attr(key)` is named by a value of the run's data.
+        return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: _describe_call(obj=obj))
 
     @override
     def call_binop(self, context: Context, operator: str, left: Any, right: Any) -> Any:

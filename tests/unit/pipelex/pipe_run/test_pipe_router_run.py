@@ -18,7 +18,7 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -183,17 +183,19 @@ class TestPipeRouterRun:
         unexpected = exc_info.value.__cause__
         assert isinstance(unexpected, PipelexUnexpectedError)
         assert unexpected.__cause__ is foreign_error
-        assert unexpected.message == "ValueError: unexpected value"
-        assert exc_info.value.message == "Pipe 'stub_pipe' failed: ValueError: unexpected value"
+        # Named by its class, never its text, which can carry anything of the run's data.
+        assert unexpected.message == "ValueError"
+        assert exc_info.value.message == "Pipe 'stub_pipe' failed: ValueError"
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert operator.code == CoreCode.RUNTIME_UNEXPECTED
         assert operator.diagnostics is not None
         assert operator.diagnostics.error_class == "PipelexUnexpectedError"
-        assert operator.diagnostics.message == "ValueError: unexpected value"
+        assert operator.diagnostics.message == "ValueError"
+        assert "unexpected value" not in str(operator.to_wire())
         assert "unexpected value" not in str(exc_info.value.to_problem(view=ProblemView.CALLER).to_wire())
 
-    async def test_pydantic_validation_error_keeps_its_readable_rendering(self) -> None:
-        """A pydantic ValidationError is named and rendered the way the runner renders one."""
+    async def test_pydantic_validation_error_is_rendered_without_the_value_it_refused(self) -> None:
+        """A pydantic ValidationError is named and rendered by its locations and reasons, the value being the run's data."""
         with pytest.raises(ValidationError) as validation_info:
             _MiniPayload(count="not-a-number")  # pyright: ignore[reportArgumentType]
         router = _StubPipeRouter(error=validation_info.value)
@@ -203,7 +205,8 @@ class TestPipeRouterRun:
 
         unexpected = exc_info.value.__cause__
         assert isinstance(unexpected, PipelexUnexpectedError)
-        assert unexpected.message == f"ValidationError: {format_pydantic_validation_error(validation_info.value)}"
+        assert unexpected.message == f"ValidationError: {format_validation_error_without_input(validation_error=validation_info.value)}"
+        assert "not-a-number" not in unexpected.message
 
     async def test_already_located_failure_keeps_the_innermost_location(self) -> None:
         """A failure a router below already located passes through untouched: the innermost location wins."""

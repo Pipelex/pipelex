@@ -27,7 +27,7 @@ from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, iter_cause_chain
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 # Joins the pipe codes of a failure's path from the entry pipe down to the pipe that failed.
 PIPE_PATH_SEPARATOR = " → "
@@ -111,12 +111,17 @@ def make_unexpected_failure(*, error: Exception) -> PipelexUnexpectedError:
     """Stand a `PipelexUnexpectedError` in for an exception that is not a `PipelexError`.
 
     Its message names the original class, and it is chained to the original so its traceback
-    survives. Its message only ever reaches an operator, since a foreign exception's text can carry
-    anything, a server path or a secret included. A pydantic `ValidationError` keeps the readable
-    rendering the runner gives one.
+    survives. The message becomes the run's `diagnostics.message`, which an operator's webhook
+    receives, so it never holds the foreign exception's text, which can carry anything: a key of the
+    run's data (`KeyError('jane.doe@acme.com')`), a value a function was handed, a server path or a
+    secret. A pydantic `ValidationError` adds its reasons, which hold none of the values it refused,
+    and no location, since the model it came from is not known here.
     """
-    detail = format_pydantic_validation_error(error) if isinstance(error, ValidationError) else (str(error) or repr(error))
-    unexpected_error = PipelexUnexpectedError(f"{type(error).__name__}: {detail}")
+    if isinstance(error, ValidationError):
+        message = f"{type(error).__name__}: {format_validation_error_without_input(validation_error=error)}"
+    else:
+        message = type(error).__name__
+    unexpected_error = PipelexUnexpectedError(message)
     unexpected_error.__cause__ = error
     unexpected_error.__suppress_context__ = True
     return unexpected_error
