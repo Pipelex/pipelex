@@ -55,7 +55,7 @@ CrateNormalizationError | one of runtime.unexpected, method.cycle
 CredentialsError | abstract
 CsvCoercionError | input.invalid
 CsvColumnError | input.invalid
-CsvError | one of input.invalid, request.invalid, runtime.unexpected
+CsvError | one of input.invalid, request.invalid, runtime.unexpected, input.file_unreadable, request.unsupported, method.concept_invalid
 CsvFlatnessError | input.invalid
 CsvReadError | input.file_unreadable
 DateContentError | pipe.function_raised

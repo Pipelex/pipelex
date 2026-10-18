@@ -166,7 +166,7 @@ The codec defaults to a comma delimiter and UTF-8 encoding. Reads use `utf-8-sig
 
 ## Limitations in v1
 
-- **Local file paths only.** A remote `url` with a tabular suffix — `http(s)://`, `s3://`, `gs://`, a signed URL — is actively rejected with a clear error, never opened. Reading remote tabular files is a deferred follow-up.
+- **Local file paths only.** A remote `url` with a tabular suffix — `http(s)://`, `s3://`, `gs://`, a signed URL — is actively rejected with a clear error, never opened: its problem is `request.unsupported`, naming the input's field as `inputs.<name>` and the reason `remote_table_url`, and never the URL. A `url` that does not parse is `input.file_unreadable`, with the reason `the URL does not parse`. Reading remote tabular files is a deferred follow-up.
 
 - **Not uploaded on a hosted run.** A run on the hosted Pipelex API uploads the local files named at document and image inputs only, so a `.csv` path at a structured-list input reaches the hosted runner as a path on your machine, which it cannot read. Give the rows as a JSON list of objects instead, or run with `--local`. `--save-csv` is refused on a hosted run too (see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api)).
 

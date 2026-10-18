@@ -13,11 +13,21 @@ class CsvError(ToolError):
     that does not match the row concept, a cell that cannot be coerced), so the default is
     ``input.invalid``. Writing a table the CLI's ``--save-csv`` asked for is
     ``request.invalid``, and a delimiter or a row the codec was handed by its own caller is
-    ``runtime.unexpected``.
+    ``runtime.unexpected``. A table input refused before the codec reads it says what happened instead: a URL that
+    does not parse is ``input.file_unreadable``, a URL that is not a local path, which this runtime does not read a
+    table from, ``request.unsupported``, and a concept with no structure class to read rows into
+    ``method.concept_invalid``.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
-        default=CoreCode.INPUT_INVALID, others=(CoreCode.REQUEST_INVALID, CoreCode.RUNTIME_UNEXPECTED)
+        default=CoreCode.INPUT_INVALID,
+        others=(
+            CoreCode.REQUEST_INVALID,
+            CoreCode.RUNTIME_UNEXPECTED,
+            CoreCode.INPUT_FILE_UNREADABLE,
+            CoreCode.REQUEST_UNSUPPORTED,
+            CoreCode.METHOD_CONCEPT_INVALID,
+        ),
     )
 
 

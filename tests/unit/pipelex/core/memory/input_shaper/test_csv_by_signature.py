@@ -11,14 +11,18 @@ from typing import Any, cast
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
+from pytest_mock import MockerFixture
 
+from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError
 from pipelex.core.memory.exceptions import MultiplicityCountMismatchError, StructureValidationError, WrongScalarKindError
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.errors.problem import ProblemView
+from pipelex.errors.unsupported_reasons import REMOTE_TABLE_UNSUPPORTED_REASON
 from pipelex.interpreter_hub import get_concept_library
-from pipelex.tools.tabular.exceptions import CsvError
+from pipelex.tools.tabular.exceptions import CsvCoercionError, CsvError
 from tests.unit.pipelex.core.memory.input_shaper.data import ShaperPerson, build_input_specs
 
 PEOPLE_CSV_CONTENT = "name\nAda Lovelace\nGrace Hopper\n"
@@ -130,9 +134,63 @@ class TestInputShaperCsvBySignature:
         ), topic
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert "confidential" not in json.dumps(operator.to_wire()), topic
-        # The table is refused whole, so the field at fault is the input itself.
+        # Only a local path is read as a table: the form the input uses is one this runtime does not accept.
+        assert operator.code == CoreCode.REQUEST_UNSUPPORTED, topic
         assert operator.params is not None
-        assert operator.params.as_wire() == {"input": "people", "field": "people"}, topic
+        assert operator.params.as_wire() == {"field": "inputs.people", "reason": REMOTE_TABLE_UNSUPPORTED_REASON}, topic
+
+    def test_a_table_url_that_does_not_parse_is_an_unreadable_file(self):
+        """A url that does not parse names no file to read: the input's file is unreadable, and the url stays out."""
+        input_specs = build_input_specs([("people", "shaper_test.ShaperPerson", True)])
+
+        with pytest.raises(CsvError) as exc_info:
+            InputShaper.shape(
+                {"people": {"url": "https://[confidential-patient-diagnosis/people.csv"}},
+                input_specs=input_specs,
+                concept_provider=get_concept_library(),
+                read_scope=None,
+            )
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_FILE_UNREADABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"input": "people", "file_type": "csv", "reason": "the URL does not parse"}
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert "confidential" not in json.dumps(operator.to_wire())
+
+    def test_a_concept_with_no_structure_class_is_the_method_s_concept_failing(self, people_csv: Path, mocker: MockerFixture):
+        """A concept whose rows have no class to be read into is no fault of the caller's table: its concept cannot be built."""
+        concept_library = get_concept_library()
+        concept = concept_library.get_required_concept(concept_ref="shaper_test.ShaperPerson")
+        mocker.patch.object(
+            type(concept_library), "get_structure_class", side_effect=ConceptStructureClassNotFoundError("no class registered for the concept")
+        )
+
+        with pytest.raises(CsvError) as exc_info:
+            StuffFactory.try_make_csv_list_content(
+                concept, concept_provider=concept_library, content={"url": str(people_csv)}, name="people", read_scope=None
+            )
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_CONCEPT_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"concept": "shaper_test.ShaperPerson", "finding": "it has no structure class to read rows into"}
+
+    def test_a_row_the_codec_refuses_without_a_location_names_the_input_as_its_field(self, people_csv: Path, mocker: MockerFixture):
+        """A row refused as a whole, which pydantic locates nowhere, is the input's own fault, as a table refused whole is."""
+        input_specs = build_input_specs([("people", "shaper_test.ShaperPerson", True)])
+        mocker.patch(
+            "pipelex.core.stuffs.stuff_factory.list_content_from_csv",
+            side_effect=CsvCoercionError("Could not coerce row 2 of the CSV file").with_params(field=None),
+        )
+
+        with pytest.raises(CsvError) as exc_info:
+            InputShaper.shape({"people": str(people_csv)}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"input": "people", "field": "people"}
 
     def test_a_table_that_does_not_fit_names_the_input_never_the_file(self, tmp_path: Path):
         """The codec knows the file alone: the input it was given as completes the problem's sentence, and the path stays out."""
