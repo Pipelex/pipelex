@@ -95,9 +95,10 @@ class DryRunError(PipelexError):
     validation reports each as its own ``dry_run`` item, with the error type ``DryRunError``, the pipe's code,
     domain and source, and the sentence the failure's code renders for a caller.
 
-    With failures, its code is the one the answer takes among theirs (``first_fault_code``), and its problem carries
-    one item per failure; a validation answers it as an invalid verdict only when one of them is the method's. Raised
-    elsewhere it may carry no failures, and then it takes the code of its cause, the failure it reports.
+    With failures, its code is the one the answer takes among theirs (``first_fault_code``), its parameters are those of
+    the failure that code is taken from, its pipe included, so that the problem's sentence renders whole, and its problem
+    carries one item per failure; a validation answers it as an invalid verdict only when one of them is the method's.
+    Raised elsewhere it may carry no failures, and then it takes the code of its cause, the failure it reports.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -106,10 +107,29 @@ class DryRunError(PipelexError):
         self.failures = failures or []
         super().__init__(message)
 
+    def _code_failure(self) -> DryRunFailureErrorData | None:
+        """The failure whose code this error carries: the first of those whose code ``first_fault_code`` takes."""
+        code = first_fault_code(codes=[failure.code for failure in self.failures])
+        for failure in self.failures:
+            if failure.code == code:
+                return failure
+        return None
+
     @property
     @override
     def own_error_code(self) -> ErrorCode | None:
-        return first_fault_code(codes=[failure.code for failure in self.failures]) or super().own_error_code
+        code_failure = self._code_failure()
+        return code_failure.code if code_failure is not None else super().own_error_code
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        code_failure = self._code_failure()
+        if code_failure is None:
+            return {}
+        params = dict(code_failure.params or {})
+        if code_failure.pipe_code is not None:
+            params.setdefault("pipe", code_failure.pipe_code)
+        return params
 
     @override
     def problem_items(self) -> list[ProblemItem] | None:

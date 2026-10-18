@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -38,3 +39,17 @@ def reset_agent_cli_error_format() -> Iterator[None]:
     start_agent_cli_error_format()
     yield
     start_agent_cli_error_format()
+
+
+@pytest.fixture(autouse=True)
+def restore_logging_cutoff() -> Iterator[None]:
+    """Keep the agent CLI's process-global ``logging.disable`` cutoff from leaking out of cli/ tests.
+
+    A test that runs ``pipelex-agent`` in-process, through its app callback, ``make_pipelex_for_agent_cli`` or the
+    doctor, arms ``silence_logging_for_agent_cli``, which raises ``logging.root.manager.disable`` to ``sys.maxsize``
+    for the whole process. A real agent CLI process exits right after, but a test session goes on, so without this
+    restore every log-capture test that runs later, in any directory, would see no record at all.
+    """
+    original_disable = logging.root.manager.disable
+    yield
+    logging.disable(original_disable)

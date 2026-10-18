@@ -112,6 +112,16 @@ class TestMakePipelexForAgentCli:
         [
             (RuntimeError("the disk is full"), "runtime.unexpected"),
             (PipelexSetupError("Pipelex is already initialized"), "runtime.misconfigured"),
+            (
+                ModelDeckPresetValidationError(
+                    message="preset validation failed",
+                    preset_id="my_preset",
+                    model_type=ModelType.LLM,
+                    model_handle="claude-3-opus",
+                    enabled_backends={"openai"},
+                ),
+                "pipelex.config.invalid",
+            ),
         ],
     )
     def test_a_boot_failure_with_no_advice_tips_the_recovery_path(

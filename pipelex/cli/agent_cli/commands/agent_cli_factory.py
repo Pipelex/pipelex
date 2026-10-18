@@ -176,6 +176,7 @@ def report_agent_init_failure(*, error: Exception) -> NoReturn:
         agent_error(
             error.message,
             cause=error,
+            fallback_tip=AGENT_BOOT_RECOVERY_TIP,
             preset_id=error.preset_id,
             model_type=str(error.model_type),
             model_handle=error.model_handle,

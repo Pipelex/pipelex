@@ -467,18 +467,21 @@ def agent_file_error(
     )
 
 
-def agent_unreadable_file_error(*, error: OSError, path: str | Path, exit_code: int = 1) -> NoReturn:
+def agent_unreadable_file_error(*, error: OSError, exit_code: int = 1) -> NoReturn:
     """Refuse a local file the operating system would not let the command read: ``client.file_unreadable``.
 
-    The file named is the one the error names, else ``path``, the file the command was handed; the reason is the
-    system's own (:func:`file_read_failure_reason`).
+    The file named is the one the error names, and the reason is the system's own (:func:`file_read_failure_reason`).
+    An error that names no file, such as a refused connection, a timeout or a TLS failure met while the command ran,
+    refuses no file: it is reported as the unexpected failure it is, ``runtime.unexpected``, as the command's boundary
+    reports any other exception that is no Pipelex error.
 
     Args:
-        error: The error reading the file raised.
-        path: The file the command was handed.
+        error: The error the system raised.
         exit_code: Process exit code.
     """
-    unreadable = os.fsdecode(error.filename) if isinstance(error.filename, (str, bytes)) else str(path)
+    if error.filename is None:
+        agent_error(str(error), cause=error, exit_code=exit_code)
+    unreadable = os.fsdecode(error.filename) if isinstance(error.filename, (str, bytes)) else str(error.filename)
     reason = file_read_failure_reason(error=error)
     agent_file_error(f"Cannot read '{unreadable}': {reason}", path=unreadable, reason=reason, cause=error, exit_code=exit_code)
 

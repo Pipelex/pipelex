@@ -137,7 +137,12 @@ class TestPipeLibraryLookup:
         cause = exc_info.value.__cause__
         assert isinstance(cause, PipeLibraryError)
         assert not isinstance(cause, EntryPipeAmbiguousError)
-        assert exc_info.value.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.INPUT
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.domain == ProblemDomain.INPUT
+        # The candidates ride the refusal, for its caller and for a selection that reads them back.
+        expected_candidates = ["lib->analytics.compute_score", "lib->scoring.compute_score"]
+        assert exc_info.value.given_params["candidates"] == expected_candidates
+        assert problem.to_wire()["params"] == {"pipe": "lib->compute_score", "candidates": expected_candidates}
 
     def test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity(self, mocker: MockerFixture):
         """A miss surfacing from `get_optional_pipe` must not be re-raised as an ambiguity.

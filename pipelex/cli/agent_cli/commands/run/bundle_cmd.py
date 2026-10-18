@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import PipelexConfigError
+from pipelex.base_exceptions import PipelexConfigError, iter_cause_chain
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli, report_agent_init_failure
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
@@ -47,6 +48,14 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 
 if TYPE_CHECKING:
     from mthds.method_tree.models import MethodTree
+
+
+def _file_error_in_chain(*, error: ValidateBundleError) -> OSError | None:
+    """The error the system raised about a file while the tree was listed, when that is why it could not be; else None."""
+    for node in iter_cause_chain(error):
+        if isinstance(node, OSError) and node.filename is not None:
+            return node
+    return None
 
 
 def run_bundle_cmd(
@@ -183,23 +192,31 @@ def run_bundle_cmd(
     # Load MTHDS content from bundle
     mthds_content: str | None = None
     if bundle_path:
-        # The file is read before its tree is listed: one this machine would not let the command read is the file it
-        # was handed (`client.file_unreadable`), never a fault of the method.
+        if method_tree is None:
+            # The bundle file named alone: its own tree, which a folder run has already listed. The tree is listed
+            # before the file is read, since the listing refuses a symbolic link, a special file such as a FIFO and a
+            # file past this machine's limits without reading it.
+            try:
+                method_tree = list_bundle_file_tree(bundle_file=target_path)
+            except ValidateBundleError as exc:
+                # A file this machine would not let the listing read is the file the command was handed
+                # (`client.file_unreadable`), never a fault of the method.
+                read_error = _file_error_in_chain(error=exc)
+                if isinstance(read_error, FileNotFoundError):
+                    missing = os.fsdecode(read_error.filename) if isinstance(read_error.filename, (str, bytes)) else str(read_error.filename)
+                    agent_file_error(f"Bundle file not found: {missing}", path=missing, reason="not found", cause=read_error)
+                if read_error is not None:
+                    agent_unreadable_file_error(error=read_error)
+                agent_error(exc.message, cause=exc)
+            except PipelexConfigError as exc:
+                # Listing the tree reads its limits from the configuration, before the boot would.
+                report_agent_init_failure(error=exc)
         try:
             mthds_bytes = Path(bundle_path).read_bytes()
         except FileNotFoundError as exc:
             agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc)
         except OSError as exc:
-            agent_unreadable_file_error(error=exc, path=bundle_path)
-        if method_tree is None:
-            # The bundle file named alone: its own tree, which a folder run has already listed.
-            try:
-                method_tree = list_bundle_file_tree(bundle_file=target_path)
-            except ValidateBundleError as exc:
-                agent_error(exc.message, cause=exc)
-            except PipelexConfigError as exc:
-                # Listing the tree reads its limits from the configuration, before the boot would.
-                report_agent_init_failure(error=exc)
+            agent_unreadable_file_error(error=exc)
         try:
             # A file that is not UTF-8 text does not parse: the invalid verdict `validate` gives it, `method.syntax`.
             with translate_to_validate_bundle_error():
