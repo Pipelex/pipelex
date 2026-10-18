@@ -774,6 +774,8 @@ $photo
 
     # A template reading a private name off a value, which passes the load and which the sandbox refuses at render.
     PRIVATE_READ_TEMPLATE: ClassVar[str] = "Talk about {{ topic['_owner'] }}"
+    # The same name, written by the template inside a string literal that the sandboxed `format` reads it through.
+    FORMAT_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {{ '{0._owner}'.format(topic) }}"
     # A template that fails at render for a reason no security rule has, a method the value lacks.
     MISSING_METHOD_TEMPLATE: ClassVar[str] = "Talk about {{ topic.model_dump_json() }}"
     # A template looking a name up from the run's data, and a topic naming a private attribute: the sandbox refuses a name

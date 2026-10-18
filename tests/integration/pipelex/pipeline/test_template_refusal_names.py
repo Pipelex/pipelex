@@ -59,9 +59,18 @@ def _agent_markdown(*, error: PipelineExecutionError, capsys: pytest.CaptureFixt
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestTemplateRefusalNames:
-    async def test_a_name_the_template_spells_reaches_the_caller_located_on_the_template_field(self) -> None:
-        """The refused name is the template's own, so the problem names it and locates it on the pipe and its template field."""
-        error = await _refused_run(template=SecurityRefusalTestData.PRIVATE_READ_TEMPLATE, topic=SecurityRefusalTestData.TOPIC)
+    @pytest.mark.parametrize(
+        "template",
+        [SecurityRefusalTestData.PRIVATE_READ_TEMPLATE, SecurityRefusalTestData.FORMAT_LITERAL_TEMPLATE],
+        ids=["read_by_key", "read_through_a_format_string_literal"],
+    )
+    async def test_a_name_the_template_spells_reaches_the_caller_located_on_the_template_field(self, template: str) -> None:
+        """The refused name is the template's own, so the problem names it and locates it on the pipe and its template field.
+
+        A name written inside a string literal, which a format string reads, is the template's own text too: naming it
+        leaks nothing of the run's data.
+        """
+        error = await _refused_run(template=template, topic=SecurityRefusalTestData.TOPIC)
 
         caller = error.to_problem(view=ProblemView.CALLER)
 

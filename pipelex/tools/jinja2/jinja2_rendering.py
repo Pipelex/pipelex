@@ -160,12 +160,14 @@ class SpelledNames(NamedTuple):
     ``references`` are the names it reads, stores or reaches as a variable or an attribute: a variable (``invoice``), an
     attribute (``.total``), a key written as a literal (``['total']``, ``attr('total')``, ``{'total': ...}``), a
     keyword's name (``namespace(total=...)``), a namespace's attribute it sets and a macro's name. ``filters_and_tests``
-    are the filters and tests it applies. A name the template reaches through a value, ``notes[patient_id]``, is none of
-    them: that name is a value of the run's data.
+    are the filters and tests it applies. ``literals`` are the string constants its expressions write, such as a format
+    string. A name the template reaches through a value, ``notes[patient_id]``, is none of them: that name is a value of
+    the run's data.
     """
 
     references: frozenset[str]
     filters_and_tests: frozenset[str]
+    literals: frozenset[str]
 
 
 def template_spelled_names(*, template_source: str) -> SpelledNames:
@@ -178,9 +180,10 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
     try:
         parsed_template = jinja2_env.parse(template_source)
     except TemplateSyntaxError:
-        return SpelledNames(references=frozenset(), filters_and_tests=frozenset())
+        return SpelledNames(references=frozenset(), filters_and_tests=frozenset(), literals=frozenset())
     references: set[str] = set()
     filters_and_tests: set[str] = set()
+    literals = {node.value for node in parsed_template.find_all(nodes.Const) if isinstance(node.value, str)}
     spelling_nodes = (nodes.Name, nodes.Getattr, nodes.NSRef, nodes.Keyword, nodes.Getitem, nodes.Pair, nodes.Macro, nodes.Filter, nodes.Test)
     for node in parsed_template.find_all(spelling_nodes):
         match node:
@@ -201,7 +204,7 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
                 filters_and_tests.add(test_name)
             case _:
                 pass
-    return SpelledNames(references=frozenset(references), filters_and_tests=frozenset(filters_and_tests))
+    return SpelledNames(references=frozenset(references), filters_and_tests=frozenset(filters_and_tests), literals=frozenset(literals))
 
 
 def undefined_variable_name(*, undefined_error: UndefinedError, template_source: str) -> str | None:
@@ -240,19 +243,38 @@ def _spells_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
     return all(name in spelled_references for name in named)
 
 
+def _template_writes_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
+    """Whether the parsed template writes every name a refusal quotes: it spells it, or a string literal holds it as a word.
+
+    A name spelled as a variable or an attribute is the template's own (see ``template_spelled_names``), and so is one a
+    string literal of its expressions holds as a whole word, such as the ``_x`` of ``{{ '{0._x}'.format(v) }}``, which
+    the sandboxed ``format`` reads: the template's own literal holds it, so naming it leaks nothing of the run's data. The
+    template's plain text outside its expressions counts for nothing, so a key the data chose that the text happens to
+    hold too is still withheld.
+    """
+    spelled_names = template_spelled_names(template_source=template_source)
+    return all(
+        name in spelled_names.references
+        or any(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", literal) is not None for literal in spelled_names.literals)
+        for name in named
+    )
+
+
 def _make_security_refusal(*, security_error: SecurityError, template_source: str) -> Jinja2TemplateSecurityError:
-    """The sandbox's refusal, worded with the names it quotes and naming what it refused only where the template spells them all.
+    """The sandbox's refusal, worded with the names it quotes and naming what it refused only where the template writes them all.
 
     A refusal names what the template reached for, which a template reading ``obj[key]``, ``obj | attr(key)`` or
     storing ``namespace({key: value})`` takes from the run's data: the sandbox words each refusal twice
     (``SandboxRefusalError``), and the wording with the names, and the refused name passed on as the problem's ``name``,
-    are kept only when the parsed template spells every name the refusal quotes. Otherwise the refusal carries neither,
-    so the run's input reaches no message and no problem. A refusal worded by Jinja2 itself, not by the sandbox, is
-    written as a fixed description and names nothing.
+    are kept only when the template writes every name the refusal quotes (``_template_writes_every_name``): the parsed
+    template spells it, or a string literal of its expressions holds it, such as the ``_x`` of
+    ``{{ '{0._x}'.format(v) }}``, which the sandboxed ``format`` reads. Otherwise the refusal carries neither, so the
+    run's input reaches no message and no problem. A refusal worded by Jinja2 itself, not by the sandbox, is written as a
+    fixed description and names nothing.
     """
     refused_name: str | None = None
     if isinstance(security_error, SandboxRefusalError):
-        if _spells_every_name(named=security_error.named, template_source=template_source):
+        if _template_writes_every_name(named=security_error.named, template_source=template_source):
             refusal = security_error.message or ""
             refused_name = security_error.refused_name
         else:
