@@ -8,7 +8,7 @@ import difflib
 from typing import NamedTuple
 
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.cogt.models.model_deck import CLOSE_HANDLE_CUTOFF, CLOSE_HANDLE_MAX_MATCHES, ModelDeck
 from pipelex.cogt.models.model_reference import (
     SIGIL_ALIAS,
     SIGIL_PRESET,
@@ -90,9 +90,10 @@ class ModelAlternatives(NamedTuple):
 
 # How near a name must be to be offered, as difflib's similarity ratio, and how many are offered: the
 # threshold is stricter for another kind than for the reference's own, since a slip of the name alone is
-# likelier than a slip of both the name and the sigil.
-_SAME_KIND_CUTOFF = 0.5
-_SAME_KIND_MAX_MATCHES = 5
+# likelier than a slip of both the name and the sigil. The reference's own kind follows the deck's rule for
+# its handles (`ModelDeck.close_handles`).
+_SAME_KIND_CUTOFF = CLOSE_HANDLE_CUTOFF
+_SAME_KIND_MAX_MATCHES = CLOSE_HANDLE_MAX_MATCHES
 _CROSS_KIND_CUTOFF = 0.7
 _CROSS_KIND_MAX_MATCHES = 3
 

@@ -73,18 +73,19 @@ def _raise_not_found(*, model_handle: str, model_type: ModelType) -> ModelNotFou
 
 class TestModelDeckUnknownReference:
     @pytest.mark.parametrize(
-        ("_topic", "model_handle", "model_type"),
+        ("_topic", "model_handle", "model_type", "expected_suggestions"),
         [
-            ("handle", "method-only-model", ModelType.LLM),
-            ("alias", "@method-only-alias", ModelType.LLM),
-            ("waterfall", "~method-only-waterfall", ModelType.LLM),
-            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM),
-            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR),
-            ("search_handle", "method-only-search", ModelType.SEARCH),
+            # A handle near one the deck serves as that type is offered it.
+            ("handle", "method-only-model", ModelType.LLM, ["served-model"]),
+            ("alias", "@method-only-alias", ModelType.LLM, []),
+            ("waterfall", "~method-only-waterfall", ModelType.LLM, []),
+            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM, []),
+            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR, []),
+            ("search_handle", "method-only-search", ModelType.SEARCH, []),
             # An LLM preset names it, but no image-generation entry does.
-            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN),
+            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN, []),
             # The deck serves it, but as an LLM, which an image-generation lookup refuses.
-            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN),
+            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN, []),
         ],
     )
     def test_a_reference_only_the_method_names_is_the_callers_fault(
@@ -92,6 +93,7 @@ class TestModelDeckUnknownReference:
         _topic: str,
         model_handle: str,
         model_type: ModelType,
+        expected_suggestions: list[str],
     ) -> None:
         """A reference the deck neither defines nor names came from the method: `model.unknown`, in the method's domain."""
         error = _raise_not_found(model_handle=model_handle, model_type=model_type)
@@ -105,7 +107,7 @@ class TestModelDeckUnknownReference:
         # The caller reads the reference as the method wrote it and the type its lookup asked for, and nothing of the
         # deck: not even the type the deck serves a model of another type as.
         assert caller.params is not None
-        assert caller.params.as_wire() == {"model": model_handle, "model_type": model_type}
+        assert caller.params.as_wire() == {"model": model_handle, "model_type": model_type, "suggestions": expected_suggestions}
         assert caller.detail == f"The method names the {model_type} model '{model_handle}', which no catalog knows."
         assert caller.next_step.kind == StepKind.CHANGE_MODEL
         assert caller.diagnostics is None
