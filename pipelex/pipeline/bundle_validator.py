@@ -206,10 +206,12 @@ def _dry_run_failure_facts(*, error: Exception, pipe_code: str) -> _DryRunFailur
     context, is the root, as a run failure's problem takes it (see ``find_root_fault``). The sentence is the one the
     code renders for a caller, the failing pipe ``pipe_code`` naming its pipe parameter, never the fault's own message,
     because the verdict is read by the caller. A failure with no Pipelex error on its chain is the dry run failing to
-    mock a value: ``method.mock_unsatisfiable``.
+    mock a value: ``method.mock_unsatisfiable``. So is a pydantic ``ValidationError`` or a polyfactory
+    ``FactoryException`` raised inside a routed pipe, which reaches the sweep as the ``PipelexUnexpectedError`` the
+    router stands in for it (``find_foreign_fault``), and which would otherwise read as a fault of ours.
     """
     root_fault = find_root_fault(error=error)
-    if root_fault is None:
+    if root_fault is None or isinstance(find_foreign_fault(error=error), (ValidationError, FactoryException)):
         return _DryRunFailureFacts(code=CoreCode.METHOD_MOCK_UNSATISFIABLE, text=_MOCK_DATA_FAILURE_TEXT, params=None)
     problem = caller_refusal(refusal=root_fault, pipe_code=pipe_code)
     params = problem.params.as_wire() if problem.params is not None else None
