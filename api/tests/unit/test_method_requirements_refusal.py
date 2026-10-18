@@ -191,7 +191,7 @@ class TestMethodRequirementsRefusal:
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_run_whose_requirements_the_deployment_refuses_carries_its_reason_before_dispatch(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
         files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": f"{_UNRESOLVABLE_REQUIREMENT}\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
