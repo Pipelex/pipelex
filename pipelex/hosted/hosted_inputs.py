@@ -33,17 +33,22 @@ from mthds.protocol.input_form import (
     TextItem,
     UnknownItem,
 )
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.models import ProblemItem
+from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKind
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest
 from pipelex_sdk.errors import ApiResponseError
 from pipelex_sdk.upload import UploadRecord
+from pipelex_sdk.validation_models import ValidationErrorItem
+from pydantic import ValidationError
 
+from pipelex.core.pipes.exceptions import pipe_validation_error_code
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.hosted.exceptions import HostedLocalFileUploadUnavailableError, HostedMethodInvalidError
-from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.validation_error_types import PipeValidationErrorType
 
 #: An `http(s)://` URL, which the hosted API fetches itself. Matched as the SDK matches it, whatever the case of the
 #: scheme.
@@ -57,10 +62,6 @@ _FILE_URI_PREFIX = "file://"
 #: the reason `ADDRESS_DEPENDENCY_UNSUPPORTED_REASON` (`resolve_crate_from_contents` in `pipelex/pipeline/resolve_bundle.py`).
 #: The run route fetches such a dependency.
 _ADDRESS_DEPENDENCY_REFUSAL_CODES: frozenset[str] = frozenset({CoreCode.REQUEST_UNSUPPORTED})
-#: The dependency's address, as the refusal of `POST /v1/pipe-io` quotes it when the method calls a package by its
-#: address that the request did not ship (`ADDRESS_DEPENDENCY_REFUSAL_MARKER`). The run route fetches such a dependency;
-#: pipe-io never fetches.
-_REFUSED_DEPENDENCY_PATTERN = re.compile(re.escape(ADDRESS_DEPENDENCY_REFUSAL_MARKER) + r" '([^']+)'")
 
 
 class AnchoredInputs(NamedTuple):
@@ -279,19 +280,66 @@ def _unshipped_dependency_refusal(*, report: CrateInvalidReport) -> HostedLocalF
     """The error to raise when pipe-io's invalid verdict refuses the method for calling a package by its address, else `None`.
 
     pipe-io resolves the method's tree with only the packages the request ships, and answers a call into a package
-    nothing shipped with its invalid verdict, whose item quotes the dependency's address after
-    `ADDRESS_DEPENDENCY_REFUSAL_MARKER`. The run route fetches such a dependency, so the method is not at fault. The
-    refusal's own advice, to send the dependency's contents, is meant for the API's callers, so the error names the
-    dependency and leaves the advice out.
+    nothing shipped with its invalid verdict, whose item is coded `method.dependency_missing` with the `kind` `package`
+    and the package's address as its `name`. The run route fetches such a dependency, so the method is not at fault. The
+    error names the dependency from the item's code and parameters, never from its message, and leaves out the
+    verdict's advice, to send the dependency's contents, which is meant for the API's callers.
     """
-    messages = [report.message, *(item.message for item in report.validation_errors)]
-    refusal = next((message for message in messages if ADDRESS_DEPENDENCY_REFUSAL_MARKER in message), None)
-    if refusal is None:
+    package = _missing_package(report=report)
+    if package is None:
         return None
-    msg = "Local file upload is not available yet for methods with address-based dependencies, and the inputs name a local file"
-    if dependency := _REFUSED_DEPENDENCY_PATTERN.search(refusal):
-        msg += f": this method depends on {dependency.group(1)}"
+    msg = (
+        "Local file upload is not available yet for methods with address-based dependencies, and the inputs name a local file: "
+        f"this method depends on {package}"
+    )
     return HostedLocalFileUploadUnavailableError(msg)
+
+
+def _missing_package(*, report: CrateInvalidReport) -> str | None:
+    """The address of the first method package pipe-io's invalid verdict names as missing, else `None`.
+
+    A runner speaking the standard answers the verdict's items as `errors`, read from the members the SDK's model does
+    not name, and a `method.dependency_missing` item of the `kind` `package` names the package in `params.name`. A runner
+    answering the shape that predates the standard sends `validation_errors` alone, whose items carry no code: each is
+    read by the code the runner gives the same item in its problem's `errors`, its type's (`pipe_validation_error_code`),
+    and the package it names, the alias of the reference it could not resolve. An item this client cannot read is
+    skipped, so it never takes the verdict's place.
+    """
+    raw_errors = (report.model_extra or {}).get("errors")
+    if isinstance(raw_errors, list):
+        for raw_item in cast("list[Any]", raw_errors):
+            try:
+                item = ProblemItem.model_validate(raw_item)
+            except ValidationError:
+                continue
+            if (package := _missing_package_of_problem_item(item=item)) is not None:
+                return package
+        return None
+    return next((package for item in report.validation_errors if (package := _missing_package_of_validation_item(item=item)) is not None), None)
+
+
+def _missing_package_of_problem_item(*, item: ProblemItem) -> str | None:
+    """The address of the method package a `method.dependency_missing` problem item names as missing, else `None`."""
+    if item.code != CoreCode.METHOD_DEPENDENCY_MISSING or item.params is None:
+        return None
+    params = item.params.as_wire()
+    name = params.get("name")
+    if params.get("kind") != MethodDependencyMissingKind.PACKAGE or not isinstance(name, str):
+        return None
+    return name
+
+
+def _missing_package_of_validation_item(*, item: ValidationErrorItem) -> str | None:
+    """The address of the method package a validation item the runner codes `method.dependency_missing` names, else `None`."""
+    if item.error_type is None or not item.missing_pipe_code:
+        return None
+    try:
+        error_type = PipeValidationErrorType(item.error_type)
+    except ValueError:
+        return None
+    if pipe_validation_error_code(error_type=error_type) != CoreCode.METHOD_DEPENDENCY_MISSING:
+        return None
+    return QualifiedRef.package_named_by(raw=item.missing_pipe_code)
 
 
 async def prepare_hosted_inputs(
