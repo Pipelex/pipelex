@@ -118,6 +118,22 @@ class TestPipeJudgeLoadRefusals:
         assert "only the prompt presents files" in report
         assert "'input_stuff_spec_mismatch'" in report
 
+    @pytest.mark.usefixtures("judgment_model_reading_files")
+    async def test_a_question_reading_a_file_field_names_the_input_and_its_concept(self) -> None:
+        """The code's `input` is the step's input, the root of the path the question reads, with the concept it declares."""
+        bundle = PipeJudgeLoadTestData.bundle(
+            inputs='{ message = "Text", claim = "Claim" }',
+            question="Is $claim.photo damaged?",
+            step_fields=_MODEL,
+            concept_tables=PipeJudgeLoadTestData.CLAIM_CONCEPT_TABLES,
+        )
+
+        item = _only_problem_item(await _refusal(bundle))
+
+        assert item.code == CoreCode.METHOD_INPUT_CONCEPT_MISMATCH
+        assert item.params is not None
+        assert item.params.as_wire() == {"pipe": "judge_it", "input": "claim", "declared": "judge_load.Claim"}
+
     @pytest.mark.parametrize(
         ("prompt", "question"),
         [

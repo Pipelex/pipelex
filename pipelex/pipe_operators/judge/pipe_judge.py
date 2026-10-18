@@ -189,13 +189,20 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 f"PipeJudge '{self.code}' reads {quoted_paths} in its {question_label}, which is an image or a document, and only the "
                 "prompt presents files to the judging model: read it in `prompt`, and ask about it in the question."
             )
+            # The code names the step's input, the root of the path the question reads, and the concept it declares.
+            # No `expected` is given: no concept of an input lets a question present a file, which the code cannot yet say.
+            input_name = get_root_from_dotted_path(question_file_paths[0])
+            input_params: dict[str, str] = {"input": input_name}
+            declared_spec = self.inputs.root.get(input_name)
+            if declared_spec is not None:
+                input_params["declared"] = declared_spec.concept.concept_ref
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 variable_names=question_file_paths,
-            ).with_params(input=question_file_paths[0])
+            ).with_params(**input_params)
 
         # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         labelled_templates = [(self.prompt_content.template, "prompt")]
