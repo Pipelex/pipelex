@@ -17,7 +17,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
 from pipelex.cli.commands.bundle_path_resolver import resolve_build_bundle_target, resolve_bundle_target
 from pipelex.cli.judged_target import JudgedBundleTarget
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
 
 if TYPE_CHECKING:
@@ -30,10 +30,19 @@ _METHOD_TREES_MODULE = "pipelex.libraries.method_trees"
 
 
 def _run_refusal(*, directory: Path) -> str:
-    """The message `run bundle` refuses the folder with."""
-    with pytest.raises(ValidateBundleError) as exc_info:
+    """The message of the refusal `run bundle` refuses the folder with.
+
+    No single pipe to start at is the run's own `MethodEntryError`, no verdict on a method that may be valid. A folder
+    holding no bundle is the method's refusal, so the run reports it as the invalid verdict, whose items read the code's
+    sentence and whose cause is that same `MethodEntryError`, the one a `build` command reports as it is.
+    """
+    with pytest.raises((MethodEntryError, ValidateBundleError)) as exc_info:
         resolve_method_folder_run(directory=directory, pipe_override=None)
-    return exc_info.value.message
+    refusal = exc_info.value
+    if isinstance(refusal, ValidateBundleError):
+        assert isinstance(refusal.__cause__, MethodEntryError)
+        return refusal.__cause__.message
+    return refusal.message
 
 
 class TestHumanBundlePathResolver:
