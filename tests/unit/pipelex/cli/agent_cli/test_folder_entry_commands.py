@@ -210,12 +210,16 @@ class TestAgentFolderEntryCommands:
         assert problem["iterations"] == 0
         assert problem["fixes_applied"] == []
         assert problem["files_written"] == []
-        assert [item["code"] for item in problem["errors"]] == ["method.package_invalid"]
+        (item,) = problem["errors"]
+        # The item names the rule the tree breaks and the file at fault, the symbolic link, without quoting the refusal.
+        assert item["code"] == "method.package_invalid"
+        assert item["params"] == {"reason": "symbolic_link", "path": "linked.mthds"}
+        assert item["location"]["file"] == "linked.mthds"
 
-        # The Markdown lists the same remaining errors as the JSON, one per line under their codes.
+        # The Markdown lists the same item, naming the file the tree refused.
         with pytest.raises(typer.Exit):
             fix_bundle_cmd(path=str(tmp_path), error_format=CliOutputFormat.MARKDOWN)
-        assert "- `method.package_invalid`" in capsys.readouterr().err
+        assert "linked.mthds" in capsys.readouterr().err
         mock_fix.assert_not_called()
 
     @pytest.mark.parametrize("command", ["validate", "fix", "inputs", "run"])

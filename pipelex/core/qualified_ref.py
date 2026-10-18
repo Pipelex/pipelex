@@ -215,3 +215,12 @@ class QualifiedRef(BaseModel):
             raise QualifiedRefError(msg)
         parts = raw.split("->", maxsplit=1)
         return CrossPackageRef(alias=parts[0], remainder=parts[1])
+
+    @staticmethod
+    def package_named_by(*, raw: str) -> str:
+        """The package a reference into another package names: the alias of a cross-package reference, else the reference itself.
+
+        A verdict's item for a package dependency nothing resolved names the pipe it called (`alias->domain.pipe_code`)
+        or the package alone, and either way the package is the `name` its `method.dependency_missing` code declares.
+        """
+        return QualifiedRef.split_cross_package_ref(raw).alias if QualifiedRef.has_cross_package_prefix(raw) else raw
