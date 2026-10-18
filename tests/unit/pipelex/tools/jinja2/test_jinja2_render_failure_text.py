@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 from pipelex.base_exceptions import PipelexError
@@ -15,7 +16,7 @@ from pipelex.tools.jinja2.exceptions import (
     Jinja2TemplateSecurityError,
 )
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal, render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.jinja2.template_surface import TemplateSurface
@@ -39,6 +40,11 @@ class _Chart:
 
     def confidential_patient_diagnosis(self) -> range:
         return range(10**12)
+
+
+# A format string nesting replacement fields in their format specs far deeper than any formatter reads, which a template
+# writes in a `.format` call it never reaches.
+_DEEPLY_NESTED_FORMAT_FIELDS = "{0:" * 1100 + "x" + "}" * 1100
 
 
 # How the budget words a refusal, up to the call it refused.
@@ -290,3 +296,54 @@ class TestJinja2RenderFailureText:
 
         assert isinstance(error, Jinja2TemplateBudgetError)
         assert str(error).startswith(f"{_BUDGET_REFUSAL_PREFIX}calling the method '{_PAYLOAD_IDENTIFIER}' of a '_Chart' value needs about ")
+
+    @pytest.mark.parametrize("is_async", [False, True], ids=["sync", "async"])
+    @pytest.mark.parametrize(
+        ("topic", "template_source", "context", "expected_params"),
+        [
+            (
+                "a private name the template writes as a literal key, beside a format string nested too deep to read",
+                f"{{{{ record['_secret'] }}}}{{% if false %}}{{{{ '{_DEEPLY_NESTED_FORMAT_FIELDS}'.format(record) }}}}{{% endif %}}",
+                {"record": object()},
+                {"name": "_secret"},
+            ),
+            (
+                "a private name of the data, which only a format string nested too deep to read writes",
+                f"{{{{ record[lookup] }}}}{{% if false %}}{{{{ '{{0._secret:{_DEEPLY_NESTED_FORMAT_FIELDS}}}'.format(record) }}}}{{% endif %}}",
+                {"record": object(), "lookup": "_secret"},
+                {},
+            ),
+        ],
+    )
+    async def test_a_format_string_nested_too_deep_to_read_leaves_the_refusal_itself(
+        self, topic: str, template_source: str, context: dict[str, Any], expected_params: dict[str, Any], is_async: bool
+    ) -> None:
+        """Building the refusal reads the template's format strings, which a deeply nested one must not turn into another failure.
+
+        The scan stops past the depth any formatter reads and counts nothing from that literal, so a name only it writes
+        is withheld, and the sandbox's refusal comes out as itself, located on its template field.
+        """
+        if is_async:
+            with pytest.raises(Jinja2TemplateSecurityError) as async_exc_info, locating_template_refusal(template_field="template"):
+                await render_jinja2_async(
+                    template_source=template_source,
+                    template_category=TemplateCategory.BASIC,
+                    templating_context=context,
+                    template_owner=TemplateOwner.METHOD,
+                )
+            error = async_exc_info.value
+        else:
+            with pytest.raises(Jinja2TemplateSecurityError) as sync_exc_info, locating_template_refusal(template_field="template"):
+                render_jinja2_sync(
+                    template_source=template_source,
+                    template_category=TemplateCategory.BASIC,
+                    templating_context=context,
+                    template_owner=TemplateOwner.METHOD,
+                )
+            error = sync_exc_info.value
+
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED, topic
+        assert caller.location is not None, topic
+        assert caller.location.as_wire() == {"field": "template"}, topic
+        assert (caller.params.as_wire() if caller.params is not None else {}) == expected_params, topic

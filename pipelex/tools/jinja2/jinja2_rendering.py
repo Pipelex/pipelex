@@ -179,28 +179,41 @@ _FORMAT_METHODS = frozenset({"format", "format_map"})
 _FORMAT_FIELD_PART_PATTERN = re.compile(r"\.(?P<attribute>[^.\[]*)|\[(?P<key>[^\]]*)\]")
 
 
+# How deep the scan follows replacement fields nested in format specs: `string.Formatter`, which the sandbox's formatter
+# extends, reads a field of the string (depth 0), of its spec (1) and of that spec's spec (2), then refuses to go deeper.
+_FORMAT_SPEC_MAX_DEPTH = 2
+
+
 def _format_string_names(*, format_string: str) -> set[str]:
     """The names the replacement fields of a `str.format` string read: argument names, attributes and keys, nested fields included.
 
-    A string that does not parse as a format string reads nothing, since formatting it fails before any field is read.
+    The scan runs while a refusal is being built, outside the render's own error handling, so it walks the nested specs
+    without recursion and never past `_FORMAT_SPEC_MAX_DEPTH`. A string nested deeper, or one that does not parse as a
+    format string, counts nothing at all, so a name only it writes is withheld rather than named: the refusal comes out
+    as itself, whatever the literal holds.
     """
     names: set[str] = set()
-    try:
-        parsed_fields = list(string.Formatter().parse(format_string))
-    except ValueError:
-        return names
-    for _, field_name, format_spec, _ in parsed_fields:
-        if field_name is None:
-            continue
-        argument_name = re.split(r"[.\[]", field_name, maxsplit=1)[0]
-        if argument_name and not argument_name.isdigit():
-            names.add(argument_name)
-        for part in _FORMAT_FIELD_PART_PATTERN.finditer(field_name[len(argument_name) :]):
-            name = part.group("attribute") if part.group("attribute") is not None else part.group("key")
-            if name and not name.isdigit():
-                names.add(name)
-        if format_spec:
-            names |= _format_string_names(format_string=format_spec)
+    pending: list[tuple[str, int]] = [(format_string, 0)]
+    while pending:
+        text, depth = pending.pop()
+        if depth > _FORMAT_SPEC_MAX_DEPTH:
+            return set()
+        try:
+            parsed_fields = list(string.Formatter().parse(text))
+        except ValueError:
+            return set()
+        for _, field_name, format_spec, _ in parsed_fields:
+            if field_name is None:
+                continue
+            argument_name = re.split(r"[.\[]", field_name, maxsplit=1)[0]
+            if argument_name and not argument_name.isdigit():
+                names.add(argument_name)
+            for part in _FORMAT_FIELD_PART_PATTERN.finditer(field_name[len(argument_name) :]):
+                name = part.group("attribute") if part.group("attribute") is not None else part.group("key")
+                if name and not name.isdigit():
+                    names.add(name)
+            if format_spec:
+                pending.append((format_spec, depth + 1))
     return names
 
 
