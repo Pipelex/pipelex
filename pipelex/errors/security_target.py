@@ -40,3 +40,23 @@ class SecurityTargetClass(StrEnum):
     METADATA = "metadata"
     SCHEME = "scheme"
     FOREIGN_STORAGE_KEY = "foreign_storage_key"
+
+    @property
+    def listed_target_class(self) -> "SecurityTargetClass":
+        """The value the error registry lists for a URL refusal's ``target_class`` parameter that this class falls under.
+
+        A caller reads the parameter, and its code's sentence reads it as a word ("points at a private target"), so it
+        is always a value the registry lists. The security event keeps the class itself, which is finer: a storage key
+        outside the run's read scope, which the registry lists no value for, is someone else's private file to the caller.
+        """
+        match self:
+            case (
+                SecurityTargetClass.LOOPBACK
+                | SecurityTargetClass.PRIVATE
+                | SecurityTargetClass.LINK_LOCAL
+                | SecurityTargetClass.METADATA
+                | SecurityTargetClass.SCHEME
+            ):
+                return self
+            case SecurityTargetClass.FOREIGN_STORAGE_KEY:
+                return SecurityTargetClass.PRIVATE

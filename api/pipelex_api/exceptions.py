@@ -88,7 +88,7 @@ class CallbackUrlRefusedError(PipelexError, ValueError):
         # A host the rules could not classify has no class to state: the parameter is left out rather than given as a
         # `None` its code would refuse, and the sentence that names it falls back on the code's generic one.
         if target_class is not None:
-            params["target_class"] = target_class
+            params["target_class"] = target_class.listed_target_class
         return params
 
     @override

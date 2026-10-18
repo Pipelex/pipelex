@@ -61,7 +61,7 @@ class UriReadRefusedError(SecurityError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        # The problem's `target_class` is a machine-readable parameter, the same token the security event carries for the
-        # refusal: `scheme` for a local path, a value the registry lists, and `foreign_storage_key` for another tenant's key.
-        # The sentence reads it as it is ("points at a scheme target"), since the code's template has no parameter for words.
-        return {"reason": self.reason.desc, "target_class": self.reason.target_class}
+        # The problem's `target_class` is a value the registry lists, which the code's sentence reads as a word ("points
+        # at a private target"): `scheme` for a local path, and `private` for another tenant's key, which the registry
+        # lists no value for. The security event names the finer class the refusal states, `foreign_storage_key`.
+        return {"reason": self.reason.desc, "target_class": self.reason.target_class.listed_target_class}
