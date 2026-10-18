@@ -22,6 +22,10 @@ class TestPathLabel:
             (".", "home/.pipelex/pipelex.toml", "~/.pipelex/pipelex.toml"),
             # A relative path is read against the working directory.
             ("home/project", ".pipelex/pipelex.toml", ".pipelex/pipelex.toml"),
+            # A relative path climbing out of the working directory and back into the home directory by its name.
+            ("home/project/sub", "../../../home/.pipelex/pipelex.toml", "~/.pipelex/pipelex.toml"),
+            # An absolute path that climbs out of the working directory.
+            ("home/project", "home/project/../.pipelex/pipelex.toml", "~/.pipelex/pipelex.toml"),
         ],
     )
     def test_a_path_is_named_without_the_home_directory(

@@ -265,7 +265,7 @@ The category and the code are checked against each other. A classification whose
 
 ### ErrorDomain
 
-Defined in `pipelex/base_exceptions.py`. A problem carries its code's own domain, one of the five the MTHDS core declares; `ErrorDomain` is a three-valued reading of it, derived through `ErrorDomain.from_problem_domain()`, which the API's log records still carry as `error_domain`. The CLIs' problems and the usage statistics carry the code's own domain instead, one of the five:
+Defined in `pipelex/base_exceptions.py`. A problem carries its code's own domain, one of those the MTHDS core declares; `ErrorDomain` is a coarser reading of it, derived through `ErrorDomain.from_problem_domain()`, which the API's log records still carry as `error_domain`. The CLIs' problems and the usage statistics carry the code's own domain instead, from the core's full list:
 
 | Code's domain | `error_domain` | Who acts |
 |---------------|----------------|----------|

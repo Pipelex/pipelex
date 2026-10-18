@@ -24,11 +24,13 @@ from pipelex.cli.commands.init.setup_path import describe_project_execution_shad
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
+from pipelex.tools.misc.file_utils import path_label
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -238,7 +240,11 @@ def _configure_backends(
         List of enabled backend keys.
     """
     if not backends_toml_path.exists():
-        agent_error("backends.toml not found after config initialization")
+        agent_error(
+            "backends.toml not found after config initialization",
+            code=PipelexErrorCode.CONFIG_FILE_MISSING,
+            params={"surface": "inference", "file": path_label(path=backends_toml_path)},
+        )
 
     requested_backends: list[str] | None = config.get("backends")
 
@@ -284,7 +290,11 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
     routing_profiles_toml_path = target_dir / "inference" / "routing_profiles.toml"
 
     if not routing_profiles_toml_path.exists():
-        agent_error("routing_profiles.toml not found after config initialization")
+        agent_error(
+            "routing_profiles.toml not found after config initialization",
+            code=PipelexErrorCode.CONFIG_FILE_MISSING,
+            params={"surface": "inference", "file": path_label(path=routing_profiles_toml_path)},
+        )
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
