@@ -2,7 +2,12 @@ import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
-from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite, MethodOutputMultiplicityMismatchExpected
+from mthds.protocol.problem.registry import (
+    CoreCode,
+    MethodNameConflictConflict,
+    MethodOptionalUnhandledSite,
+    MethodOutputMultiplicityMismatchExpected,
+)
 from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
@@ -45,6 +50,7 @@ from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.invocation_path import branch_segment
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -505,16 +511,12 @@ class PipeParallel(PipeController):
         output_stuff_contents: dict[str, StuffContent] = {}
 
         for output_index, pipe_output in enumerate(pipe_outputs):
-            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
-            if not sub_pipe_output_name:
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' output name not specified"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            if sub_pipe_output_name in seen_output_names:
-                # TODO: check that at the blueprint / factory level
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+            sub_pipe_output_name = branch_output_name(
+                pipe_code=self.code,
+                sub_pipe=self.parallel_sub_pipes[output_index],
+                seen_output_names=seen_output_names,
+                run_mode=pipe_run_params.run_mode,
+            )
             seen_output_names.add(sub_pipe_output_name)
             branch_resolved = pipe_output.working_memory.resolve_main_stuff()
             if isinstance(branch_resolved, AbsenceRecord):
@@ -875,6 +877,33 @@ class PipeParallel(PipeController):
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
         pass
+
+
+def branch_output_name(*, pipe_code: str, sub_pipe: SubPipe, seen_output_names: set[str], run_mode: PipeRunMode) -> str:
+    """The name a branch's output is combined under, refused when the branch names none or one an earlier branch took.
+
+    Args:
+        pipe_code: The parallel's code.
+        sub_pipe: The branch.
+        seen_output_names: The names the earlier branches' outputs took.
+        run_mode: The run's mode, which the refusal carries.
+
+    Raises:
+        PipeRunError: The branch names no output, or, under `method.name_conflict`, one an earlier branch took.
+    """
+    output_name = sub_pipe.output_name
+    if not output_name:
+        msg = f"PipeParallel '{pipe_code}': sub-pipe '{sub_pipe.pipe_code}' output name not specified"
+        raise PipeRunError(message=msg, run_mode=run_mode, pipe_code=pipe_code)
+    if output_name in seen_output_names:
+        # TODO: check that at the blueprint / factory level
+        msg = f"PipeParallel '{pipe_code}': sub-pipe '{sub_pipe.pipe_code}' duplicate output name '{output_name}'"
+        raise (
+            PipeRunError(message=msg, run_mode=run_mode, pipe_code=pipe_code)
+            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+            .with_params(name=output_name, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+        )
+    return output_name
 
 
 def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:

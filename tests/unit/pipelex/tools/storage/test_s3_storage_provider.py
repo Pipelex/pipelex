@@ -4,6 +4,7 @@ import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError, NoCredentialsError, ReadTimeoutError
 from pytest_mock import MockerFixture
 
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
 from pipelex.tools.storage.s3_storage_provider import S3StorageProvider
@@ -146,6 +147,10 @@ class TestS3StorageProvider:
             await s3_provider_no_signed_urls.load(uri=nonexistent_uri)
 
         assert "nonexistent/file.bin" in str(exc_info.value)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == PipelexErrorCode.STORAGE_NOT_FOUND
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"scheme": "s3"}
 
     async def test_store_raises_if_key_has_scheme_prefix(
         self,

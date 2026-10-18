@@ -10,6 +10,8 @@ import pytest
 from pytest_mock import MockerFixture
 from typing_extensions import override
 
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageLocalError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
@@ -52,6 +54,20 @@ class TestStorageLoadSize:
         for provider in [InMemoryStorageProvider(), LocalStorageProvider(root_path=tmp_path), _LoadOnlyProvider()]:
             with pytest.raises(StorageFileNotFoundError):
                 await provider.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf")
+
+    async def test_a_missing_object_names_the_kind_of_storage_that_lost_it(self, tmp_path: Path) -> None:
+        """The refusal of a provider Pipelex ships names its kind, the `scheme` of `pipelex.storage.not_found`."""
+        for provider, expected_kind in [(InMemoryStorageProvider(), "memory"), (LocalStorageProvider(root_path=tmp_path), "local")]:
+            for read in (
+                provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf"),
+                provider.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf"),
+            ):
+                with pytest.raises(StorageFileNotFoundError) as raised:
+                    await read
+                problem = raised.value.to_problem(view=ProblemView.CALLER)
+                assert problem.code == PipelexErrorCode.STORAGE_NOT_FOUND
+                assert problem.params is not None
+                assert problem.params.as_wire() == {"scheme": expected_kind}
 
     async def test_the_local_size_is_read_without_opening_the_file(self, tmp_path: Path, mocker: MockerFixture) -> None:
         provider = LocalStorageProvider(root_path=tmp_path)

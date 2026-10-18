@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
@@ -166,6 +167,10 @@ class TestGcpStorageProvider:
             await gcp_provider_no_signed_urls.load(uri=nonexistent_uri)
 
         assert "nonexistent/file.bin" in str(exc_info.value)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == PipelexErrorCode.STORAGE_NOT_FOUND
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"scheme": "gcs"}
 
     @pytest.mark.parametrize(
         ("failure_name", "expected_code"),
