@@ -55,11 +55,14 @@ class UriReadRefusedError(SecurityError):
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_URL_REFUSED, others=(CoreCode.SECURITY_METHOD_URL_REFUSED,))
 
-    def __init__(self, message: str, *, reason: UriReadRefusalReason, input_name: str | None = None):
+    def __init__(self, message: str, *, reason: UriReadRefusalReason, input_name: str | None = None, field: str | None = None):
         super().__init__(message)
         self.reason = reason
-        # The run input whose file the URL is, when the caller gave it: the `input` of `security.input_url_refused`.
+        # The run input whose file the URL is, when the caller gave it: the `input` of `security.input_url_refused`, the
+        # root of the file's path. The path down to the file, the input included, such as `documents[1]`, is the
+        # location's `field`.
         self.input_name = input_name
+        self.field = field
         # The reason is the class of destination refused, so the security event names it without the raise site saying so.
         self.with_security_target_class(reason.target_class)
 
@@ -75,4 +78,4 @@ class UriReadRefusedError(SecurityError):
 
     @override
     def problem_location(self) -> ProblemLocation | None:
-        return make_location(input_name=self.input_name)
+        return make_location(input_name=self.input_name, field=self.field)

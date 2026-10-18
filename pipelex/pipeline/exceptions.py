@@ -16,7 +16,7 @@ from pipelex.core.exceptions import (
 )
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
-from pipelex.errors.problem import PipelexProblem, ProblemView
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
 from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
@@ -547,6 +547,33 @@ class PipelineInputContentError(PipelexError):
             "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
         ),
     )
+
+    def __init__(self, message: str, *, input_name: str | None = None, field: str | None = None):
+        """The refusal of a file input, named by the run input it belongs to and the path down to it.
+
+        Args:
+            message: The operator's diagnostics.
+            input_name: The run input the file belongs to, the root of its path: `documents`. It is the problem's
+                `input` and `location.input`.
+            field: The dotted path from that input down to what is refused, the input included: `documents[1]`, or
+                `documents[1].url` for its url. It is `location.field`, and the `field` of a code that declares one.
+        """
+        super().__init__(message)
+        self.input_name = input_name
+        self.field = field
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if self.input_name is not None:
+            params["input"] = self.input_name
+        if self.field is not None:
+            params["field"] = self.field
+        return params
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=self.field)
 
 
 class PipelineInputUrlInvalidError(PipelineInputContentError):

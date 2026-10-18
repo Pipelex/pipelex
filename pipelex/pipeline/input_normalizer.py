@@ -120,13 +120,17 @@ class _PreparationContext(NamedTuple):
 _URL_FIELD = "url"
 
 
-def _url_refusal_params(*, path: FileInputPath) -> dict[str, str]:
-    """The `input` and `field` of an `input.invalid` refusal of a file input's url, by `InputShapingError`'s convention.
+def _refused_file_input(*, path: FileInputPath, field_suffix: str | None = None) -> dict[str, str]:
+    """How a refusal of a file input names it, by `InputShapingError`'s convention, as the error's keyword arguments.
 
-    `input` is the root input, the first segment of the path, and `field` the dotted path inside it down to the url,
-    the root included: `photo.url` for an image input, `case.attachments[0].url` for a file a structure holds.
+    `input_name` is the root input, the first segment of the path, and `field` the dotted path inside it down to what
+    is refused, the root included: `documents[1]` for a file a list holds, `case.attachments[0]` for one a structure
+    holds, and with `field_suffix` the member at fault, such as `photo.url` for an image input's url.
     """
-    return {"input": str(path[0]), "field": f"{format_file_input_path(path)}.{_URL_FIELD}"}
+    field = format_file_input_path(path)
+    if field_suffix is not None:
+        field = f"{field}.{field_suffix}"
+    return {"input_name": str(path[0]), "field": field}
 
 
 class FileInputUnreadableReason(StrEnum):
@@ -391,15 +395,17 @@ async def _prepare_url_content(
         UriReadRefusedError: If the url is a local path, or a storage reference outside the
             read scope, on a run with a read scope.
     """
-    input_name = format_file_input_path(path)
+    display_path = format_file_input_path(path)
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
-        raise PipelineInputUrlMissingError(msg).with_params(**_url_refusal_params(path=path))
+        raise PipelineInputUrlMissingError(msg, **_refused_file_input(path=path, field_suffix=_URL_FIELD))
 
     # Before anything reads or links the url. A signed link is a read by whoever holds it, so a
     # foreign storage reference is refused here rather than read or signed; a local path is refused
     # rather than read, uploaded, or kept for the prompt preparation to read later.
-    authorize_uri_read(uri=content.url, read_scope=context.read_scope, position=f"the file given for input '{input_name}'", input_name=input_name)
+    authorize_uri_read(
+        uri=content.url, read_scope=context.read_scope, position=f"the file given for input '{display_path}'", **_refused_file_input(path=path)
+    )
 
     resolved_uri = resolve_uri(content.url)
     async with context.semaphore:
@@ -407,11 +413,11 @@ async def _prepare_url_content(
             case ResolvedHttpUrl():
                 return _prepare_http_url(content=content, resolved_uri=resolved_uri, path=path, context=context)
             case ResolvedPipelexStorage():
-                return await _prepare_storage_reference(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
+                return await _prepare_storage_reference(content=content, resolved_uri=resolved_uri, path=path, context=context)
             case ResolvedBase64DataUrl():
-                return await _prepare_data_url(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
+                return await _prepare_data_url(content=content, resolved_uri=resolved_uri, path=path, context=context)
             case ResolvedLocalPath():
-                return await _prepare_local_path(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
+                return await _prepare_local_path(content=content, resolved_uri=resolved_uri, path=path, context=context)
 
 
 def _prepare_http_url(
@@ -427,7 +433,7 @@ def _prepare_http_url(
         validate_http_url_syntax(url=resolved_uri.url)
     except ValueError as exc:
         msg = f"{type(content).__name__} input: {exc}"
-        raise PipelineInputUrlInvalidError(msg).with_params(**_url_refusal_params(path=path)) from exc
+        raise PipelineInputUrlInvalidError(msg, **_refused_file_input(path=path, field_suffix=_URL_FIELD)) from exc
     if content.public_url is not None:
         return content
     return content.model_copy(update={"public_url": content.url})
@@ -437,16 +443,17 @@ async def _prepare_storage_reference(
     *,
     content: NormalizableContent,
     resolved_uri: ResolvedPipelexStorage,
-    input_name: str,
+    path: FileInputPath,
     context: _PreparationContext,
 ) -> NormalizableContent:
+    display_path = format_file_input_path(path)
     try:
         head = await context.storage.load_head(uri=resolved_uri.storage_uri, nb_bytes=FILE_HEAD_NB_BYTES)
     except StorageFileNotFoundError as exc:
-        msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' names no stored file"
-        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND).with_params(input=input_name) from exc
+        msg = f"{type(content).__name__} input '{display_path}': the storage reference '{content.url}' names no stored file"
+        raise PipelineInputContentError(msg, **_refused_file_input(path=path)).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
     except StorageInvalidUriError as exc:
-        msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' cannot be read ({exc})"
+        msg = f"{type(content).__name__} input '{display_path}': the storage reference '{content.url}' cannot be read ({exc})"
         raise PipelineInputContentError(msg) from exc
     updates: dict[str, Any] = {}
     mime_type = _identify_file_input(
@@ -454,7 +461,7 @@ async def _prepare_storage_reference(
         head=head,
         declared_mime_type=content.mime_type,
         file_name=content.filename or PurePosixPath(resolved_uri.storage_uri).name,
-        input_name=input_name,
+        path=path,
     )
     if mime_type != content.mime_type:
         updates["mime_type"] = mime_type
@@ -479,7 +486,7 @@ async def _prepare_data_url(
     *,
     content: NormalizableContent,
     resolved_uri: ResolvedBase64DataUrl,
-    input_name: str,
+    path: FileInputPath,
     context: _PreparationContext,
 ) -> NormalizableContent:
     # Lenient on purpose, as it always was: characters outside the alphabet, such as the line breaks
@@ -487,18 +494,18 @@ async def _prepare_data_url(
     try:
         raw_bytes = base64.b64decode(resolved_uri.base64_data)
     except binascii.Error as exc:
-        msg = f"{type(content).__name__} input '{input_name}': the data URL does not hold valid base64 ({exc})"
+        msg = f"{type(content).__name__} input '{format_file_input_path(path)}': the data URL does not hold valid base64 ({exc})"
         raise (
-            PipelineInputContentError(msg)
+            PipelineInputContentError(msg, **_refused_file_input(path=path))
             .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
-            .with_params(input=input_name, file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.INVALID_BASE64)
+            .with_params(file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.INVALID_BASE64)
         ) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],
         declared_mime_type=resolved_uri.mime_type or content.mime_type,
         file_name=content.filename,
-        input_name=input_name,
+        path=path,
     )
 
     if not context.is_relocation_enabled:
@@ -530,7 +537,7 @@ async def _prepare_local_path(
     *,
     content: NormalizableContent,
     resolved_uri: ResolvedLocalPath,
-    input_name: str,
+    path: FileInputPath,
     context: _PreparationContext,
 ) -> NormalizableContent:
     local_path = Path(resolved_uri.path)
@@ -542,7 +549,7 @@ async def _prepare_local_path(
         except (OSError, ValueError):
             return content
         mime_type = _identify_file_input(
-            content=content, head=head, declared_mime_type=content.mime_type, file_name=content.filename or local_path.name, input_name=input_name
+            content=content, head=head, declared_mime_type=content.mime_type, file_name=content.filename or local_path.name, path=path
         )
         if mime_type == content.mime_type:
             return content
@@ -558,16 +565,16 @@ async def _prepare_local_path(
     except (OSError, ValueError) as exc:
         msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
         raise (
-            PipelineInputContentError(msg)
+            PipelineInputContentError(msg, **_refused_file_input(path=path))
             .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
-            .with_params(input=input_name, file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.PATH_UNREADABLE)
+            .with_params(file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.PATH_UNREADABLE)
         ) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],
         declared_mime_type=content.mime_type,
         file_name=content.filename or local_path.name,
-        input_name=input_name,
+        path=path,
     )
     extension = _storage_key_extension(raw_bytes=raw_bytes, mime_type=mime_type, fallback_suffix=local_path.suffix.removeprefix(".") or None)
     key = f"{context.storage_scope}/assets/{shortuuid.uuid()}.{extension}"
@@ -584,7 +591,7 @@ async def _prepare_local_path(
 
 
 def _identify_file_input(
-    *, content: NormalizableContent, head: bytes | None, declared_mime_type: str | None, file_name: str | None, input_name: str
+    *, content: NormalizableContent, head: bytes | None, declared_mime_type: str | None, file_name: str | None, path: FileInputPath
 ) -> str | None:
     """The MIME type that describes a file input, refusing an Image input whose bytes are not an image.
 
@@ -608,12 +615,10 @@ def _identify_file_input(
     format_key = format_key_from_mime_type(mime_type=mime_type_to_describe)
     if format_key is None or format_key == IMAGE_FORMAT_KEY:
         return mime_type
-    msg = (
-        f"Input '{input_name}' expects an image, but the file is {describe_file_format(format_key=format_key, mime_type=mime_type_to_describe)}. "
-        "Give an image file such as PNG, JPEG or WebP."
-    )
+    file_format = describe_file_format(format_key=format_key, mime_type=mime_type_to_describe)
+    msg = f"Input '{format_file_input_path(path)}' expects an image, but the file is {file_format}. Give an image file such as PNG, JPEG or WebP."
     # No model reads the input yet, so the code's sentence, which names one, falls back to its title.
-    raise PipelineInputNotAnImageError(msg).with_params(input=input_name, format=format_key)
+    raise PipelineInputNotAnImageError(msg, **_refused_file_input(path=path)).with_params(format=format_key)
 
 
 async def _load_local_head(local_path: Path) -> bytes:
