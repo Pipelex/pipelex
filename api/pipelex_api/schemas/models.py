@@ -398,6 +398,28 @@ _ORCHESTRATION_MODE_DESCRIPTION = (
 
 _ALLOWED_CALLBACK_SCHEMES = frozenset({"http", "https"})
 
+# The marker that opens a URL's authority, where it names its host.
+_AUTHORITY_MARKER = "//"
+
+
+def _opens_authority(*, url: str, scheme: str) -> bool:
+    """Whether `url` opens an authority, `//` right after its scheme, or at its start when it names none.
+
+    Read for a URL whose authority `urlparse` found empty, which it reads the same with `//` or without: `file:///x`
+    opens an empty authority behind a scheme the SSRF rule refuses, while `file:/x`, or `example.com:8080/hook`, whose
+    host `urlparse` takes for a scheme, opens none.
+    """
+    remainder = url.strip()
+    if scheme:
+        remainder = remainder[len(scheme) + 1 :]
+    return remainder.startswith(_AUTHORITY_MARKER)
+
+
+def _refused_host_error(*, host: str) -> CallbackUrlRefusedError:
+    """The SSRF rule's refusal of a callback URL naming `host`, stating the class of destination its event names."""
+    msg = f"callback URL host {host!r} is not allowed (private/loopback/metadata addresses are blocked)"
+    return CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
+
 
 class PipelineApiExtras(BaseModel):
     """Validates the API-server-only fields on `/execute` and `/start` requests.
@@ -478,18 +500,27 @@ class PipelineApiExtras(BaseModel):
                 msg = f"callback URL exceeds {MAX_CALLBACK_URL_LEN} chars"
                 raise ValueError(msg)
             parsed = urlparse(url)
-            # A URL with no scheme or no host is malformed, the shape of the field, which a plain `ValueError` refuses
-            # with no security event. A scheme other than http or https, and a host the SSRF rule refuses, are a security
-            # rule's refusals, so each states the class of destination its security event names.
+            # A URL that opens no authority, no scheme or no host is malformed, the shape of the field, which a plain
+            # `ValueError` refuses with no security event: `example.com:8080/hook` or `localhost:3000/cb` opens no
+            # authority, and `urlparse` takes its host for a scheme, which is no scheme the rule refuses. A scheme other
+            # than http or https, and a host the SSRF rule refuses, are a security rule's refusals, so each states the
+            # class of destination its security event names.
+            if not parsed.netloc and not _opens_authority(url=url, scheme=parsed.scheme):
+                msg = "callback URL must be an absolute http or https URL, naming its host after '//'"
+                raise ValueError(msg)
+            host = parsed.hostname
+            # A host of dots alone, such as `.`, is empty once the SSRF rule drops a trailing dot, so it names no host
+            # either, and no class of destination a security event could state.
             if not parsed.scheme:
+                # A scheme-relative URL, `//host/path`, names a host but no scheme: a host the SSRF rule refuses is still
+                # that rule's refusal, classed by the host, and any other leaves the URL malformed.
+                if host and host.rstrip(".") and is_disallowed_host(host):
+                    raise _refused_host_error(host=host)
                 msg = "callback URL must be an absolute http or https URL, starting with its scheme"
                 raise ValueError(msg)
             if parsed.scheme not in _ALLOWED_CALLBACK_SCHEMES:
                 msg = f"callback URL scheme must be http or https (got {parsed.scheme!r})"
                 raise CallbackUrlRefusedError(msg).with_security_target_class(SecurityTargetClass.SCHEME)
-            host = parsed.hostname
-            # A host of dots alone, such as `.`, is empty once the SSRF rule drops a trailing dot, so it names no host
-            # either, and no class of destination a security event could state.
             if not host or not host.rstrip("."):
                 msg = "callback URL must name a host"
                 raise ValueError(msg)
@@ -499,8 +530,7 @@ class PipelineApiExtras(BaseModel):
             # aim a webhook at an internal service or a cloud metadata endpoint. Best effort: a hostname resolving to a
             # private address at fire time is not refused here, only literal IPs and the known internal names.
             if is_disallowed_host(host):
-                msg = f"callback URL host {parsed.hostname!r} is not allowed (private/loopback/metadata addresses are blocked)"
-                raise CallbackUrlRefusedError(msg).with_security_target_class(classify_disallowed_host(host))
+                raise _refused_host_error(host=host)
         return value
 
 

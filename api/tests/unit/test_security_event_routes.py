@@ -275,6 +275,30 @@ class TestSecurityEventRoutes:
             ),
             pytest.param(
                 _ServerRefusal(
+                    route="/v1/start",
+                    body={"callback_urls": ["//169.254.169.254/latest/meta-data"]},
+                    code=CoreCode.SECURITY_INPUT_URL_REFUSED,
+                    event_error_type="CallbackUrlRefusedError",
+                    target="url",
+                    target_class="metadata",
+                    refused_content="169.254.169.254",
+                ),
+                id="callback_scheme_relative_metadata_endpoint",
+            ),
+            pytest.param(
+                _ServerRefusal(
+                    route="/v1/start",
+                    body={"callback_urls": ["//127.0.0.1:8080/cb"]},
+                    code=CoreCode.SECURITY_INPUT_URL_REFUSED,
+                    event_error_type="CallbackUrlRefusedError",
+                    target="url",
+                    target_class="loopback",
+                    refused_content="127.0.0.1",
+                ),
+                id="callback_scheme_relative_loopback",
+            ),
+            pytest.param(
+                _ServerRefusal(
                     route="/v1/execute",
                     body={"resources": {"../secrets/key.pem": base64.b64encode(b"x").decode("ascii")}},
                     code=CoreCode.SECURITY_INPUT_PATH_REFUSED,
@@ -470,6 +494,11 @@ class TestSecurityEventRoutes:
             pytest.param("/v1/start", {"callback_urls": ["https://hooks.example.com/" + "a" * 5000]}, "request.invalid", id="long_callback_url"),
             pytest.param("/v1/start", {"callback_urls": ["hooks.example.com/done"]}, "request.invalid", id="callback_url_without_scheme"),
             pytest.param("/v1/start", {"callback_urls": ["http:///done"]}, "request.invalid", id="callback_url_without_host"),
+            # A host and a port with no scheme open no authority, though `urlparse` takes the host for a scheme.
+            pytest.param("/v1/start", {"callback_urls": ["example.com:8080/hook"]}, "request.invalid", id="callback_host_and_port_without_scheme"),
+            pytest.param("/v1/start", {"callback_urls": ["localhost:3000/cb"]}, "request.invalid", id="callback_localhost_and_port_without_scheme"),
+            # A scheme-relative URL naming a host the SSRF rule allows still names no scheme.
+            pytest.param("/v1/start", {"callback_urls": ["//hooks.example.com/done"]}, "request.invalid", id="callback_scheme_relative_public_host"),
             pytest.param(
                 "/v1/execute",
                 {"mthds_contents": None, "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "notes//a.txt": "x"}},
