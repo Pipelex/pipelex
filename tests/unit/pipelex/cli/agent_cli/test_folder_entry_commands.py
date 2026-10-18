@@ -212,10 +212,10 @@ class TestAgentFolderEntryCommands:
         assert problem["files_written"] == []
         assert [item["code"] for item in problem["errors"]] == ["method.package_invalid"]
 
-        # The Markdown renders the remaining errors as prose, the refusal naming the file the tree refused.
+        # The Markdown lists the same remaining errors as the JSON, one per line under their codes.
         with pytest.raises(typer.Exit):
             fix_bundle_cmd(path=str(tmp_path), error_format=CliOutputFormat.MARKDOWN)
-        assert "linked.mthds" in capsys.readouterr().err
+        assert "- `method.package_invalid`" in capsys.readouterr().err
         mock_fix.assert_not_called()
 
     @pytest.mark.parametrize("command", ["validate", "fix", "inputs", "run"])
