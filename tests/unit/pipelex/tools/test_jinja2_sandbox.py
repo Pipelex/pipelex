@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from pipelex.base_exceptions import SecurityError
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.composite_content import CompositeContent
@@ -19,6 +20,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError, Jinja2TemplateSecurityError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
@@ -255,6 +257,21 @@ class TestTemplateSandbox:
                 template_category=TemplateCategory.BASIC,
                 templating_context=_make_context(),
             )
+
+    def test_refusal_is_a_security_error(self) -> None:
+        """A refusal is a `SecurityError` like the runtime's other policy refusals, and never a render failure."""
+        assert issubclass(Jinja2TemplateSecurityError, SecurityError)
+        assert not issubclass(Jinja2TemplateSecurityError, ToolError)
+        assert not issubclass(Jinja2TemplateSecurityError, Jinja2TemplateRenderError)
+        assert not issubclass(Jinja2TemplateRenderError, SecurityError)
+        with pytest.raises(SecurityError) as exc_info:
+            render_jinja2_sync(
+                template_source="{{ photos[0].model_copy() }}",
+                template_category=TemplateCategory.BASIC,
+                templating_context=_make_context(),
+            )
+        assert type(exc_info.value) is Jinja2TemplateSecurityError
+        assert exc_info.value.to_error_report().error_type == "Jinja2TemplateSecurityError"
 
     def test_sync_render_reads_metadata(self) -> None:
         rendered = render_jinja2_sync(

@@ -23,8 +23,9 @@ forge content, such as an image pointing at another organisation's storage key.
   pydantic methods, `Stuff` and content methods, classes, free functions and class methods, every
   method that changes a list, a dict or a set in place, and the few that produce bytes.
 - **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, which the
-  render functions turn into `Jinja2TemplateSecurityError`. Jinja's stock sandbox returns an undefined
-  value that prints as nothing, which would send a prompt with a hole in it.
+  render functions turn into `Jinja2TemplateSecurityError`, a Pipelex `SecurityError` like the runtime's
+  other policy refusals. Jinja's stock sandbox returns an undefined value that prints as nothing, which
+  would send a prompt with a hole in it.
 - **Spending.** What a template may reach says nothing about what it may spend, so every render also
   spends from one budget (`jinja2_render_budget.py`), charged by the hooks of this class, by wrappers
   around every filter and test, and by a rewrite of the parsed template for what no hook reaches

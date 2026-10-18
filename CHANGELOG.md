@@ -9,6 +9,10 @@
 - **A documentation page per error code**: docs.pipelex.com documents each code of the Pipelex error registry on its own page, under the Error Codes index at `errors/`, and its type URI, `https://docs.pipelex.com/errors/<code>`, leads to that page once a release documenting the code is the latest.
 - **`pipelex-dev generate-error-registry` and `pipelex-dev check-error-registry`** (`make ger`, `make cer`): generate the registry's snapshot, its typed Python and its pages from the source, refusing a source the format's JSON Schema, the typed model or the registry's rules refuse, or check that every derived file is what the generator writes; `pipelex-dev write-error-type-redirects` writes the redirects that make a code's type URI resolve, which every documentation deploy runs.
 
+### Changed
+
+- **`Jinja2TemplateSecurityError` is a `SecurityError` (Breaking)**: the template sandbox's refusal at render time now derives from `SecurityError`, like `UriReadRefusedError`, `SsrfBlockedError` and `UnsafeSchemaError`, instead of `ToolError`, so a host catching `SecurityError` catches it too and an `except ToolError` no longer does; it stays a type of its own, apart from `Jinja2TemplateRenderError`, and its `error_type`, title and classification are unchanged.
+
 ### Fixed
 
 - **Pre-release documentation is published**: a push to a `pre-release/` branch deploys its documentation under the `pre-release` alias of docs.pipelex.com, where the deploy workflow called a make target with no recipe and published nothing.
