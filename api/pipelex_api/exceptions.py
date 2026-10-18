@@ -271,7 +271,7 @@ class MethodPackageReason(StrEnum):
 
     Beside them, a refusal of the standard's tree rule gives the standard's own refusal code (`TreeRefusalCode`) as its
     reason. A limit's refusal also gives its `limit`, and each limit has its own reason, so a caller reads which one the
-    method passed: a tree's, a request's, a `bundle_b64` archive's or a fetched package's `.mthds` file's.
+    method passed: a tree's, a request's or a `bundle_b64` archive's.
     """
 
     # The limits of one method tree.
@@ -284,8 +284,6 @@ class MethodPackageReason(StrEnum):
     # The limits of a `bundle_b64` archive, on its members and on its decompressed size.
     BUNDLE_TOO_MANY_FILES = "bundle_too_many_files"
     BUNDLE_TOO_LARGE = "bundle_too_large"
-    # The limit on one `.mthds` file of a package fetched by `method_ref` for a tooling route.
-    MTHDS_FILE_TOO_LARGE = "mthds_file_too_large"
     # The method's own tree holds no `.mthds` bundle.
     NO_BUNDLE = "no_bundle"
     # The manifest of a shipped package or of a dependency tree.

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from kajson.class_registry import ClassRegistry
 
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.methods.address_dependencies import AddressDependencySources
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
@@ -162,7 +163,12 @@ class LibraryManagerAbstract(ABC):
 
     @abstractmethod
     def load_from_blueprints(
-        self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], methods_dirs: list[Path] | None = None
+        self,
+        *,
+        library_id: str,
+        blueprints: list[PipelexBundleBlueprint],
+        methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> list[PipeAbstract]:
         """Load the blueprints into the library, resolving their address-based dependencies.
 
@@ -171,6 +177,8 @@ class LibraryManagerAbstract(ABC):
             blueprints: The parsed bundles to load
             methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone, searched
                 for an address-based dependency before the installed stores and fetch-on-miss, and never written
+            address_dependency_sources: ``SHIPPED`` searches ``methods_dirs`` alone, reading nothing installed on this host
+                and fetching nothing; ``ANYWHERE`` falls back to the installed stores and fetch-on-miss
         """
 
     @abstractmethod
@@ -189,5 +197,6 @@ class LibraryManagerAbstract(ABC):
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> list[PipeAbstract]:
         pass

@@ -1,12 +1,14 @@
 """Envelope tests for `POST /v1/codegen` — the typed-artifact projection route.
 
 Pins `conformance/specs/pipelex-codegen.md#route-envelopes`, in the `conformance` repo beside the tests
-that verify it: the two explicit projection axes (`kind`, `target`); a produced verdict is a 200
+that verify it: the method's tree as the protocol's `files` map XOR a `method_ref`, read as `/v1/resolve`
+reads it; the two explicit projection axes (`kind`, `target`); a produced verdict is a 200
 discriminated on `is_valid` with the stamped artifacts + lock on the valid arm; an unknown
 `kind`/`target` is a request-shape 422 problem+json; the artifacts a client writes verbatim pass the
 offline `codegen check` byte-for-byte.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -19,7 +21,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
-from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, VALID_MTHDS
+from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, STUB_METHOD_ADDRESS, VALID_MTHDS
 from tests.unit._problems import assert_problem
 
 
@@ -43,7 +45,7 @@ class TestCodegenRoute:
         client = _build_client()
         response = client.post(
             "/v1/codegen",
-            json={"files": [{"content": VALID_MTHDS}], "kind": "types", "target": target},
+            json={"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": target},
         )
         assert response.status_code == 200, response.text
         body = response.json()
@@ -68,7 +70,7 @@ class TestCodegenRoute:
         client = _build_client()
         response = client.post(
             "/v1/codegen",
-            json={"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "python-pydantic"},
+            json={"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": "python-pydantic"},
         )
         assert response.status_code == 200, response.text
         body = response.json()
@@ -83,7 +85,7 @@ class TestCodegenRoute:
         client = _build_client()
         response = client.post(
             "/v1/codegen",
-            json={"files": [{"content": INVALID_MAIN_PIPE_MTHDS}], "kind": "types", "target": "ts-zod"},
+            json={"files": {"broken.mthds": INVALID_MAIN_PIPE_MTHDS}, "kind": "types", "target": "ts-zod"},
         )
         assert response.status_code == 200, response.text
         body = response.json()
@@ -104,16 +106,32 @@ class TestCodegenRoute:
     )
     def test_request_shape_errors_are_422_problem_json(self, payload_patch: dict[str, str]):
         client = _build_client()
-        payload: dict[str, object] = {"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod"}
+        payload: dict[str, object] = {"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": "ts-zod"}
         payload.update(payload_patch)
         response = client.post("/v1/codegen", json=payload)
         assert_problem(response, status=422, code="request.invalid")
 
     def test_a_pipe_ref_on_a_concept_set_wide_kind_names_the_pipe_ref(self):
         client = _build_client()
-        payload = {"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod", "pipe_ref": "smoke.echo"}
+        payload = {"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": "ts-zod", "pipe_ref": "smoke.echo"}
         response = client.post("/v1/codegen", json=payload)
         assert_problem(response, status=422, code="request.invalid", field="pipe_ref")
+
+    def test_an_address_method_ref_projects_the_fetched_package(self, install_method_package: Callable[..., Path]):
+        install_method_package(files={"documents.mthds": VALID_MTHDS})
+        client = _build_client()
+        by_ref = client.post("/v1/codegen", json={"method_ref": f"{STUB_METHOD_ADDRESS}@v0.1.0", "kind": "types", "target": "ts-zod"})
+        by_tree = client.post("/v1/codegen", json={"files": {"documents.mthds": VALID_MTHDS}, "kind": "types", "target": "ts-zod"})
+        assert by_ref.status_code == 200, by_ref.text
+        assert by_ref.json()["is_valid"] is True
+        # The package's bundle and the same bundle sent in `files` resolve to one crate, so to one projection.
+        assert by_ref.json()["crate_fingerprint"] == by_tree.json()["crate_fingerprint"]
+        assert by_ref.json()["artifacts"] == by_tree.json()["artifacts"]
+
+    def test_the_retired_list_shape_is_refused_as_no_method_tree(self):
+        client = _build_client()
+        response = client.post("/v1/codegen", json={"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "ts-zod"})
+        assert_problem(response, status=422, code="request.invalid", field="files")
 
     def test_a_registry_form_method_ref_is_an_unsupported_request_until_registry_exists(self):
         client = _build_client()
@@ -129,15 +147,15 @@ class TestCodegenRoute:
         teardown_spy = mocker.spy(library_manager, "teardown")
 
         client = _build_client()
-        response = client.post("/v1/codegen", json={"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "python-pydantic"})
+        response = client.post("/v1/codegen", json={"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": "python-pydantic"})
 
         assert response.status_code == 200, response.text
         assert open_spy.call_count >= 1
         assert open_spy.call_count == teardown_spy.call_count
 
     def test_codegen_tears_down_library_when_emission_raises(self, mocker: MockerFixture):
-        # Leak canary: a failure in the success window — after resolve_requested_crate left its
-        # library loaded + current, before the finally — must NOT leak that library. The synthetic
+        # Leak canary: a failure in the success window — after project_resolved_method's worker left
+        # the library loaded + current, before its teardown in the finally — must NOT leak that library. The synthetic
         # RuntimeError propagates to the global Exception handler (500), and the conservation
         # property still holds: opens == teardowns.
         library_manager = get_library_manager()
@@ -154,7 +172,7 @@ class TestCodegenRoute:
         app.include_router(api_router, prefix="/v1")
         register_exception_handlers(app)
         client = TestClient(app, raise_server_exceptions=False)
-        response = client.post("/v1/codegen", json={"files": [{"content": VALID_MTHDS}], "kind": "types", "target": "python-pydantic"})
+        response = client.post("/v1/codegen", json={"files": {"main.mthds": VALID_MTHDS}, "kind": "types", "target": "python-pydantic"})
 
         assert response.status_code == 500
         assert open_spy.call_count >= 1

@@ -25,10 +25,14 @@ from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRegistry
+from pipelex.plugins.pipe_func_package_offer_registry import (
+    PipeFuncPackageOffer,
+    PipeFuncPackageOfferRegistry,
+    PipeFuncPackageOfferRequest,
+    PipeFuncPackageRefusal,
+)
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
 from pipelex.system.caller_identity import CallerIdentity
-from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
@@ -40,6 +44,8 @@ from tests.unit._constants import STUB_METHOD_ADDRESS
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _SANDBOX_ENVIRONMENT = "the Daytona sandbox snapshot 'pipelex-base-test'"
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
+_UNRESOLVABLE_REQUIREMENT = "pandas<2"
+_REFUSAL_REASON = "uv explains: Because pandas<2 conflicts with the base snapshot's pandas==2.2.3, the requirements are unsatisfiable."
 
 _PLAIN_MTHDS = """\
 domain = "plain_demo"
@@ -111,27 +117,30 @@ class _UnreachableValidator:
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
+        read_scope: str | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."
         raise AssertionError(msg)
 
 
-@pytest.fixture(name="sandbox_hosted_mode")
-def sandbox_hosted_mode_fixture(mocker: MockerFixture) -> Generator[None, None, None]:
-    """Run PipeFunc steps in the neutral `sandbox` mode, whose plugin states a small package set."""
-    offer = PipeFuncPackageOffer(
+def _stated_offer(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+    """A small package set, whatever the requirements, except for a method asking for `pandas<2`, which no environment holds."""
+    if any(line.text == _UNRESOLVABLE_REQUIREMENT for line in request.requirements):
+        return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=_REFUSAL_REASON)
+    return PipeFuncPackageOffer(
         environment=_SANDBOX_ENVIRONMENT,
         distributions={"pandas": "2.2.3", "openpyxl": "3.1.5"},
         marker_environment={"python_version": "3.12", "sys_platform": "linux"},
     )
 
-    def stated_offer(_config: PipeFuncConfig) -> PipeFuncPackageOffer | None:
-        return offer
 
+@pytest.fixture(name="sandbox_hosted_mode")
+def sandbox_hosted_mode_fixture(mocker: MockerFixture) -> Generator[None, None, None]:
+    """Run PipeFunc steps in the neutral `sandbox` mode, whose plugin states a small package set or refuses `pandas<2`."""
     mocker.patch(
         "pipelex.libraries.package_environments.get_pipe_func_package_offer_registry",
-        return_value=PipeFuncPackageOfferRegistry({"sandbox": stated_offer}),
+        return_value=PipeFuncPackageOfferRegistry({"sandbox": _stated_offer}),
     )
     pipe_func_config = get_config().interpreter.pipe_func
     previous = pipe_func_config.execution_mode
@@ -177,6 +186,25 @@ class TestMethodRequirementsRefusal:
         assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in message
         assert message.startswith(f"The method needs Python packages that {_SANDBOX_ENVIRONMENT} does not have")
         assert "rooted at" not in message
+        assert orchestrator.dispatches == []
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_run_whose_requirements_the_deployment_refuses_carries_its_reason_before_dispatch(self, mocker: MockerFixture) -> None:
+        orchestrator = _RecordingOrchestrator()
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
+
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": f"{_UNRESOLVABLE_REQUIREMENT}\n"}
+        response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
+
+        assert response.status_code == 422, response.text
+        body = response.json()
+        assert body["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert body["diagnostics"]["error_class"] == "MethodRequirementsNotMetError"
+        # The deployment's own reason, and no directory of the runner.
+        assert (
+            body["diagnostics"]["message"]
+            == f"The method needs Python packages that the Daytona sandbox cannot offer, as its requirements.txt declares: {_REFUSAL_REASON}"
+        )
         assert orchestrator.dispatches == []
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

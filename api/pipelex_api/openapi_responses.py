@@ -139,6 +139,11 @@ PROBLEM_401: dict[str, Any] = _problem(
     },
 )
 
+PROBLEM_403_READ_SCOPE: dict[str, Any] = _problem(
+    "`auth.forbidden`, whose `params.requirement` is `read_scope_under_caller` — on a `jwt` deployment, the request sent "
+    "a `read_scope` that does not lie under the caller's own `user_id`, the only scope its token may read.",
+)
+
 PROBLEM_409_DUPLICATE_RUN: dict[str, Any] = _problem(
     "`pipelex.run.already_exists` — the submitted `pipeline_run_id` is still registered for an in-flight run. "
     "Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates.",

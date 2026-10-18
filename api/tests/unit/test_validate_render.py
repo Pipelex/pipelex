@@ -53,6 +53,7 @@ class _InvalidVerdictValidator:
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
+        read_scope: str | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         located_item = make_problem_item(code=CoreCode.METHOD_SCHEMA_VIOLATION)
         # Built by hand, as a stored record read back may be, with a parameter only the operator reads.

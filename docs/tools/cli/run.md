@@ -80,7 +80,7 @@ pipelex run pipe my_pipe -L ./pipelines --hosted --inputs data.json
 pipelex run bundle <PATH> [OPTIONS]
 ```
 
-Runs a method from a bundle file (`.mthds`) or a method's folder, read through its [method tree](../../building-methods/method-trees.md). A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused with `Failed to run:` and a message naming each bundle by its path in the tree, which is no verdict on the method, since only the pipe to start at is missing: pass `--pipe`. An inputs file (`inputs.json` or `inputs.toml`) in the folder is auto-detected when `--inputs` is not passed (see [Input File Formats](#input-file-formats)). A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused: run the folder instead, or add a `METHODS.toml`.
+Runs a method from a bundle file (`.mthds`) or a method's folder, read through its [method tree](../../building-methods/method-trees.md). A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused with `Failed to run:` and a message naming each bundle by its path in the tree, which is no verdict on the method, since only the pipe to start at is missing: pass `--pipe`. An inputs file (`inputs.json` or `inputs.toml`) in the folder is auto-detected when `--inputs` is not passed (see [Auto-detection and ambiguity](#auto-detection-and-ambiguity)). A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused: run the folder instead, or add a `METHODS.toml`.
 
 The run prints the digest of the tree it read with its recap, and records the tree as `method_tree.json` in its output folder (see [The results directory](#the-results-directory)).
 
@@ -278,6 +278,8 @@ country = "France"
 ### Auto-detection and ambiguity
 
 `run bundle <dir>` auto-detects a default inputs file inside the directory when `--inputs` is omitted: it looks for `inputs.json`, then `inputs.toml`. If **both** exist, the run fails with an ambiguity error asking you to pass `--inputs` explicitly — passing `--inputs` always bypasses auto-detection.
+
+The file it finds must be a regular file, and it is read without following a link. A symbolic link of either name, a folder or any other entry fails the run with an `AutoDetectedInputsFileError` naming it, so a method you checked out cannot point its `inputs.json` at data outside its folder, even when its `.gitignore` keeps the link out of its [method tree](../../building-methods/method-trees.md#what-a-tree-holds); a link the tree holds refuses the tree itself, as any symbolic link in a method tree does. Replace the link with the file itself, or name the file with `--inputs`, which reads a link as given.
 
 ## Output Format
 
