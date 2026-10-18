@@ -12,9 +12,11 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.problem.models import Problem
 from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.error_models import RunErrorReport
 from pipelex_sdk.errors import (
+    ApiResponseError,
     InvalidLocalSourceError,
     MissingMainStuffError,
     PipelexRequestError,
@@ -34,7 +36,7 @@ from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.error_rendering import describe_hosted_error
+from pipelex.hosted.error_rendering import HOSTED_REFUSAL_CALLER_NEXT_STEP, describe_hosted_error
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
@@ -51,6 +53,8 @@ AGENT_RUN_HOSTED_MODULE = "pipelex.cli.agent_cli.commands.run._run_hosted"
 EXECUTION_MODULE = "pipelex.hosted.execution"
 METHOD_REF = "github.com/Pipelex/methods/text_stats@v0.1.7"
 STATS: dict[str, Any] = {"words": 4, "sentences": 2}
+#: The reason a runner gave for refusing a run, in a body that predates the standard's problem document.
+CONFLICT_REASON = "The run conflicts with another"
 HOSTED_RESULTS: dict[str, Any] = {
     "pipeline_run_id": "run_7",
     "main_stuff": STATS,
@@ -379,6 +383,55 @@ class TestRunHostedEnvelope:
         problem = json.loads(capsys.readouterr().err)
         assert problem["code"] == error.problem.code
         assert problem["next_step"] == {"kind": error.problem.next_step.kind, "detail": describe_hosted_error(error=error).next_step}
+
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    @pytest.mark.parametrize(
+        "malformed",
+        [{"run_error": "not a problem"}, {"run_error": {"title": 7}}, {"diagnostics": "unreadable"}],
+        ids=["run_error_text", "run_error_unreadable", "diagnostics_unreadable"],
+    )
+    def test_a_former_shape_refusal_whose_client_reading_holds_a_member_that_does_not_read_still_prints(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], malformed: dict[str, Any], error_format: CliOutputFormat
+    ) -> None:
+        """A refusal in the former shape keeps the client's reading with the answer's reason, read by the standard's
+        members alone, so a member of Pipelex's beside them in a shape no reader takes never stops the problem printing.
+        """
+        body = json.dumps({"message": CONFLICT_REASON})
+        message = f"API POST /v1/start failed (409): {CONFLICT_REASON}"
+        plain = ApiResponseError(message, api_url="https://hosted.test", status=409, status_text="Conflict", response_body=body)
+        refusal = ApiResponseError(
+            message,
+            api_url="https://hosted.test",
+            status=409,
+            status_text="Conflict",
+            response_body=body,
+            server_message=CONFLICT_REASON,
+            problem=Problem.model_validate({**plain.problem.as_wire(), **malformed}),
+        )
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refusal))
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=error_format)
+
+        assert exc_info.value.exit_code == 1
+        printed = capsys.readouterr().err
+        match error_format:
+            case CliOutputFormat.JSON:
+                assert json.loads(printed) == {
+                    "type": "https://mthds.ai/errors/client.response_unreadable",
+                    "title": "The runtime's answer could not be read",
+                    "status": 409,
+                    "detail": CONFLICT_REASON,
+                    "code": "client.response_unreadable",
+                    "domain": "runtime",
+                    "retry": "no",
+                    "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_CALLER_NEXT_STEP},
+                    "params": {"status": 409},
+                }
+            case CliOutputFormat.MARKDOWN:
+                assert printed.startswith(f"## The runtime's answer could not be read\n\n{CONFLICT_REASON}\n")
+                assert f"**Next step** (`change_input`): {HOSTED_REFUSAL_CALLER_NEXT_STEP}" in printed
+                assert "### The run's own problem" not in printed
 
     def test_a_sent_item_with_a_field_this_version_does_not_read_keeps_its_code(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]

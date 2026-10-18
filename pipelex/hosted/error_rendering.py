@@ -17,7 +17,7 @@ from typing import Any, NamedTuple
 
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.answers import parse_retry_after, read_problem_document
-from mthds.protocol.problem.models import NextStep
+from mthds.protocol.problem.models import NextStep, Problem
 from mthds.protocol.problem.registry import STATUS_READINGS, CoreCode, StepKind
 from pipelex_sdk.errors import (
     ApiResponseError,
@@ -167,6 +167,16 @@ def _sent_retry_after(*, error: ApiResponseError) -> float | None:
     return None
 
 
+def _client_reading(*, error: ApiResponseError) -> PipelexProblem:
+    """The client's reading of a refusal, by the members the standard declares alone.
+
+    A member beside them, such as a `run_error` or `diagnostics` of Pipelex's in a shape no reader takes, is left out, so
+    the reading never fails: the members of a problem the client validated always make one.
+    """
+    standard = {name: value for name, value in error.problem.as_wire().items() if name in Problem.model_fields}
+    return PipelexProblem.model_validate(standard)
+
+
 def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) -> PipelexProblem | None:
     """An answer in a shape that predates the standard's problem document, as the problem the agent CLI reports for it.
 
@@ -178,9 +188,10 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
     - A refusal whose status and plane code name a core code (:func:`_hosted_refusal_reading`) reads as that code, in
       the caller's view (:func:`make_problem`), the plane's own `detail` kept, its request id, the delay its
       `Retry-After` header or its body states, and the step it advised, else the step the human CLI gives its status.
-    - Any other answer that gives its reason keeps the client's reading, its code and its status, with that reason as
-      its `detail` and the step the human CLI gives it (:func:`hosted_refusal_next_step`), so the reader is told what
-      the body said rather than to report a body it never sees.
+    - Any other answer that gives its reason keeps the client's reading, its code and its status, by the standard's
+      members alone (:func:`_client_reading`), with that reason as its `detail` and the step the human CLI gives it
+      (:func:`hosted_refusal_next_step`), so the reader is told what the body said rather than to report a body it
+      never sees.
 
     Args:
         error: The refusal, as the client raised it.
@@ -198,7 +209,7 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
         return _coded_refusal_problem(error=error, reading=reading)
     if error.status in STATUS_READINGS or not error.server_message:
         return None
-    reason_kept = PipelexProblem.model_validate(error.problem.as_wire())
+    reason_kept = _client_reading(error=error)
     # A refusal of the caller's request asks for a change to it; any other answer is the runtime's to explain.
     kind = StepKind.CHANGE_INPUT if 400 <= error.status < 500 else reason_kept.next_step.kind
     updates: dict[str, Any] = {
