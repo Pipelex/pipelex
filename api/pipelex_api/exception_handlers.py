@@ -132,11 +132,12 @@ def _pipeline_run_id_of(request: Request) -> str | None:
 
 
 def _run_extras_of(request: Request) -> dict[str, str] | None:
-    """Return the run's extras when `_parse_request` bound them on the request.
+    """Return the labels the request's body named, its `analytics_groups`, when they were bound on the request.
 
-    The opaque labels a host attaches to a run, which the hosted plane fills with the organization. They ride
+    The opaque labels a host attaches to a request, which the hosted plane fills with the organization. They ride
     the security event a refusal answered here logs, so a refusal before any run exists still names whose
-    request it was. `None` for a route that parses no run request, or a body whose extras did not validate.
+    request it was. Bound as soon as a JSON body is parsed (`pipelex_api.run_extras_binding`); `None` for a request
+    with no JSON body, or a body naming no labels or labels that did not validate.
     """
     return getattr(request.state, "run_extras", None)
 

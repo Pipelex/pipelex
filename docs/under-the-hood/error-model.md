@@ -456,7 +456,7 @@ Beside the failure, the deployment logs one **security event**, so that whoever 
 | `security.target` | The kind of thing refused, which the code decides: `url`, `path`, `template`, `schema`, `dependency`, `object_key` or `result_location` |
 | `security.target_class` | The class of destination refused, when the raise site knows it: `loopback`, `private`, `link_local`, `metadata` (a cloud metadata endpoint), `scheme` (a scheme the run does not read, a `file://` URL or a path on the server's disk among them) or `foreign_storage_key` (a storage key outside the run's read scope) |
 | `pipeline_run_id`, `request_id` | The run, only when the runtime assigned it one, never a run id a request body names before any run exists, and the request, when there is one |
-| `run.extras.<key>` | Each of the run's opaque extras, one field per key, which the hosted plane fills with the organization |
+| `run.extras.<key>` | Each of the run's opaque extras, one field per key, which the hosted plane fills with the organization. The API server reads them off a request's `analytics_groups` as soon as its JSON body is parsed, whatever the route, so a refusal before any run exists, on a diagnostic route that runs none included, carries them too |
 
 Never the URL, the path, the template, the schema, a prompt or an input value, nor the error's message, which may quote any of them, and never a traceback: the failure itself is reported where it is handled, as any other failure is. The runtime does not know organizations, so the event names one only through the run's extras, which it carries without reading.
 
