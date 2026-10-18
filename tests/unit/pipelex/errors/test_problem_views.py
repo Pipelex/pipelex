@@ -289,7 +289,9 @@ class TestProblemViews:
             problem = make_problem(code=CoreCode.METHOD_TEMPLATE_INVALID, view=ProblemView.CALLER, params={"pipe": "summarize", "template": "x"})
 
         assert problem.code == CoreCode.METHOD_TEMPLATE_INVALID
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
         assert problem.detail == spec.title
         assert any(record.getMessage() == "An error gives parameters its code refuses as a whole" for record in caplog.records)
 
@@ -301,7 +303,9 @@ class TestProblemViews:
         problem = make_problem(code=CoreCode.REQUEST_BLOBS_MISSING, view=ProblemView.CALLER, params={"missing_blobs": ["not-a-sha256"]})
 
         assert problem.code == CoreCode.REQUEST_BLOBS_MISSING
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
 
     @pytest.mark.parametrize(
         ("wire", "expected_kind", "expected_detail"),
@@ -389,7 +393,9 @@ class TestProblemViews:
         with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
             problem = make_problem(code=code, view=ProblemView.CALLER, params=params)
 
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
         assert problem.detail == error_code_spec(code).title
         assert "inf" not in problem.detail
         json.dumps(problem.to_wire(), allow_nan=False)

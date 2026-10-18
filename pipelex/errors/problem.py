@@ -23,9 +23,16 @@ template that cannot be rendered, because a parameter it names was not given, fa
 can be given the parameter.
 
 **The parameters.** A problem's ``params`` hold the parameters the code declares and the raise site gave, validated
-against the code's generated model: an undeclared parameter, or one of the wrong type, is dropped and logged. A
-parameter the registry declares operator-only never rides ``params`` in any view; it renders into the operator's step
-and rides ``diagnostics.params``.
+against the code's generated model: an undeclared parameter, or one of the wrong type, is dropped and logged. The
+member is present whenever the code declares a parameter a caller may read, an empty object on an occurrence that has
+none of them, as the protocol puts it on every problem whose code declares parameters. A parameter a caller may read
+that the registry does not mark optional is present on every occurrence, so a problem or an item built without one is a
+fault of its raise site, logged with the parameters it lacks (:func:`missing_required_params`). A parameter the registry declares
+operator-only never rides ``params`` in any view; it renders into the operator's step and rides ``diagnostics.params``.
+
+**One fault, no list.** ``errors`` lists the faults of a problem with several. A problem built with a single item
+restating its own code has one fault, so the item is folded into it: its parameters and its location fill those the
+problem lacks, and the list is left out (:func:`make_problem`).
 
 **The bound.** Every text a raise site, a provider or a caller wrote is capped at :data:`MAX_PROBLEM_TEXT_LENGTH`
 characters, keeping its head, which names the fault: an exception's message, a provider's message and every text
@@ -441,6 +448,54 @@ def _drop_refused_params(*, accepted: dict[str, Any], params_model: type[BaseMod
             accepted.clear()
 
 
+MISSING_REQUIRED_PARAMS_MESSAGE = "A problem lacks a parameter its code requires"
+"""The message of the warning logged when a problem or an item is built without a parameter its code requires.
+
+It names a fault of the raise site, as the warnings about a parameter dropped or a sentence not rendered do, and the
+test suites fail a test during which it is logged, so that no raise site they reach answers less than its code promises.
+"""
+
+
+def missing_required_params(*, code: ErrorCode, params: Mapping[str, Any]) -> list[str]:
+    """The parameters the code requires on every occurrence that ``params`` does not give, by name.
+
+    A parameter a caller may read that the registry does not mark optional is a fact every caller relies on, and the
+    protocol puts it on every occurrence: a problem or an item that lacks one tells its caller less than its code
+    promises, and its sentences fall back on the code's title and the step's generic sentence. An operator-only
+    parameter is not counted, as no caller's problem carries it.
+
+    Args:
+        code: The code of the problem or the item.
+        params: The parameters it was given, by name.
+
+    Returns:
+        The names of the required parameters ``params`` lacks, sorted; empty when it gives them all.
+    """
+    return sorted(error_code_spec(code).required_params - params.keys())
+
+
+def _report_missing_required_params(*, code: ErrorCode, params: Mapping[str, Any], part: str) -> None:
+    """Log a raise site that built a problem or an item without a parameter its code requires."""
+    missing = missing_required_params(code=code, params=params)
+    if missing:
+        _warn(message=MISSING_REQUIRED_PARAMS_MESSAGE, fields={"error.code": code, "params": missing, "problem_part": part})
+
+
+def _params_member(*, spec: ErrorCodeSpec, caller_params: Mapping[str, Any]) -> ProblemParams | None:
+    """The ``params`` member of a problem or an item: present whenever its code declares a parameter a caller may read."""
+    if not caller_params and not spec.caller_param_names:
+        return None
+    return ProblemParams.model_validate(dict(caller_params))
+
+
+def _lone_item_restating(*, code: ErrorCode, errors: list[ProblemItem] | None) -> ProblemItem | None:
+    """The one item of ``errors`` when it is the only one and restates ``code``: a single fault, which no list carries."""
+    if errors is None or len(errors) != 1:
+        return None
+    lone_item = errors[0]
+    return lone_item if lone_item.code == code else None
+
+
 def _caller_step_is_actor_step(*, domain: ProblemDomain) -> bool:
     """Whether the caller reads the actor's step: for every domain but ``operator``, whose actor is whoever runs the runtime."""
     match domain:
@@ -497,7 +552,9 @@ def make_problem(
             :func:`accepted_params`.
         location: Where the error happened.
         errors: One item per fault, for a refusal with several; an item is the same in every view, so a parameter its
-            code declares operator-only is taken out of it (:func:`item_for_every_view`).
+            code declares operator-only is taken out of it (:func:`item_for_every_view`). A single item restating
+            ``code`` is the problem's one fault, so it is folded into the problem: its parameters and its location fill
+            those the problem lacks, and the problem carries no ``errors``.
         retry_after: The delay before a retry, kept only when the code's verdict is ``yes`` and the delay is a finite,
             non-negative number of seconds: a provider can send any value, ``inf`` included, and the wire takes none of those.
         pipeline_run_id: The run the error belongs to.
@@ -508,7 +565,14 @@ def make_problem(
         The problem, without a ``status``, which the HTTP response that carries it adds.
     """
     spec = error_code_spec(code)
+    lone_fault = _lone_item_restating(code=code, errors=errors)
+    if lone_fault is not None:
+        params = {**(lone_fault.params.as_wire() if lone_fault.params is not None else {}), **(params or {})}
+        if lone_fault.location is not None:
+            location = lone_fault.location if location is None else merge_locations(base=lone_fault.location, override=location)
+        errors = None
     given = accepted_params(code=code, params=params or {})
+    _report_missing_required_params(code=code, params=given, part="problem")
     caller_params = {name: value for name, value in given.items() if name not in spec.operator_only_params}
     operator_params = {name: value for name, value in given.items() if name in spec.operator_only_params}
     detail = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
@@ -527,7 +591,7 @@ def make_problem(
             retry=spec.retry,
             retry_after=retry_after if invites_retry and _is_usable_delay(seconds=retry_after) else None,
             next_step=_next_step(spec=spec, view=view, params=step_params),
-            params=ProblemParams.model_validate(caller_params) if caller_params else None,
+            params=_params_member(spec=spec, caller_params=caller_params),
             location=location,
             errors=[item_for_every_view(item=item) for item in errors] if errors else None,
             pipeline_run_id=pipeline_run_id,
@@ -562,13 +626,14 @@ def make_problem_item(
     """
     spec = error_code_spec(code)
     given = accepted_params(code=code, params=params or {})
+    _report_missing_required_params(code=code, params=given, part="item")
     caller_params = {name: value for name, value in given.items() if name not in spec.operator_only_params}
     detail = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
     return ProblemItem.model_validate(
         _members(
             code=spec.code,
             detail=detail,
-            params=ProblemParams.model_validate(caller_params) if caller_params else None,
+            params=_params_member(spec=spec, caller_params=caller_params),
             location=location,
             suggestions=suggestions or None,
             suggested_fix=dict(suggested_fix) if suggested_fix is not None else None,
@@ -602,8 +667,9 @@ def item_for_every_view(*, item: ProblemItem) -> ProblemItem:
     members = item.as_wire()
     members["detail"] = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
     members.pop("params")
-    if caller_params:
-        members["params"] = caller_params
+    params_member = _params_member(spec=spec, caller_params=caller_params)
+    if params_member is not None:
+        members["params"] = params_member
     return ProblemItem.model_validate(members)
 
 
