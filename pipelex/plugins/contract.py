@@ -74,7 +74,19 @@ if TYPE_CHECKING:
 # ``RenderResources.load``, which reads an image, a stylesheet or a font joined under the prefix from the document's
 # method tree; and the error that arm raises for a URL naming no such file (``TemplateUrlRefusedError``), which an engine
 # lets pass as it came. An engine written before them ignores ``base_url`` and keeps refusing a relative URL, as it did.
-PLUGIN_API_VERSION: int = 7
+#
+# v8 changed what a host hands a bundle validator: ``validate_bundles`` takes ``read_scope``, the scope the host named for
+# the validation, ``None`` when it named none, so a validator dispatching the validation to another process hands the
+# method's trees to its worker through that scope's blob store and the worker reads them under it, as a run's worker
+# reads under the run's read scope (``BundleValidatorProtocol``). A validator written against v7 would be called with a
+# keyword it does not accept on its first validation; the bump turns that into a discovery-time mismatch naming the
+# plugin.
+#
+# The PipeFunc package-offer factory changed under v8 too, before any release carried v8: a
+# ``PipeFuncPackageOfferFactoryFn`` receives a ``PipeFuncPackageOfferRequest``, the pipe_func config and the requirements
+# of the one method being judged, where it received the config alone, and may answer a ``PipeFuncPackageRefusal``
+# beside an offer or ``None``. A factory written against v7 would read the request as the config it expected.
+PLUGIN_API_VERSION: int = 8
 
 
 @runtime_checkable

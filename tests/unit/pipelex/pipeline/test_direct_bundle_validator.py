@@ -5,7 +5,8 @@ covered by test_validation_report.py / the integration test_protocol_validate.py
 sweep is returned verbatim as the valid arm; a ``ValidateBundleError`` is converted to its
 structured ``ErrorReport`` (the invalid arm) rather than propagated. Also pins argument
 passthrough, including the ``library_dirs`` host context, the explicit ``graph_pipe_code`` target
-and the ``log_context`` label.
+and the ``log_context`` label, and that the read scope stops here: the in-process arm reads every
+file in its own process, through no blob store, so the sweep is never handed one.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ class TestDirectBundleValidator:
             submitted_files=submitted_files,
             method_dir=None,
             methods_dirs=None,
+            read_scope="org_acme",
         )
 
         assert verdict is report
@@ -79,6 +81,7 @@ class TestDirectBundleValidator:
             submitted_files=None,
             method_dir=None,
             methods_dirs=None,
+            read_scope=None,
         )
 
         assert isinstance(verdict, ErrorReport)
@@ -103,4 +106,5 @@ class TestDirectBundleValidator:
                 submitted_files=None,
                 method_dir=None,
                 methods_dirs=None,
+                read_scope=None,
             )

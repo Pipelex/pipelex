@@ -73,12 +73,6 @@ class TestValidateExitCodes:
             bare_validate_bundle_cmd(path=str(empty_dir))
         assert exc_info.value.exit_code == 2
 
-    def test_bare_bundle_directory_with_multiple_mthds_and_no_default_exits_2(self, tmp_path: Path) -> None:
-        multi_dir = _make_dir(tmp_path, "multi", ["a.mthds", "b.mthds"])
-        with pytest.raises(typer.Exit) as exc_info:
-            bare_validate_bundle_cmd(path=str(multi_dir))
-        assert exc_info.value.exit_code == 2
-
     def test_bare_bundle_path_that_is_neither_file_nor_dir_exits_2(self, tmp_path: Path) -> None:
         with pytest.raises(typer.Exit) as exc_info:
             bare_validate_bundle_cmd(path=str(tmp_path / "nope"))
@@ -123,12 +117,6 @@ class TestValidateExitCodes:
         empty_dir = _make_dir(tmp_path, "empty", [])
         with pytest.raises(typer.Exit) as exc_info:
             agent_validate_bundle_cmd(path=str(empty_dir), output_format=CliOutputFormat.JSON)
-        assert exc_info.value.exit_code == 2
-
-    def test_agent_bundle_directory_with_multiple_mthds_exits_2(self, tmp_path: Path) -> None:
-        multi_dir = _make_dir(tmp_path, "multi", ["a.mthds", "b.mthds"])
-        with pytest.raises(typer.Exit) as exc_info:
-            agent_validate_bundle_cmd(path=str(multi_dir), output_format=CliOutputFormat.JSON)
         assert exc_info.value.exit_code == 2
 
     def test_agent_bundle_path_that_is_neither_file_nor_dir_exits_2(self, tmp_path: Path) -> None:

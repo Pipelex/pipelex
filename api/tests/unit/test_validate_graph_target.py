@@ -56,6 +56,7 @@ class _RecordingBundleValidator:
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
+        read_scope: str | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.graph_pipe_codes.append(graph_pipe_code)
         return ErrorReport.make_for_code(

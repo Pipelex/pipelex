@@ -46,7 +46,12 @@ class _RecordingStub:
         raise NotImplementedError(msg)
 
     async def start(self, *, pipe_job: PipeJob, delivery_assignment: DeliveryAssignment | None) -> PipelexPipeDispatchAck:
-        self.calls.append({"delivery_assignment": delivery_assignment})
+        self.calls.append(
+            {
+                "delivery_assignment": delivery_assignment,
+                "crate_fingerprint": pipe_job.job_metadata.run_metadata.crate_fingerprint,
+            }
+        )
         return PipelexPipeDispatchAck(
             pipeline_run_id=pipe_job.job_metadata.run_metadata.pipeline_run_id,
             workflow_id=self._workflow_id,
@@ -90,6 +95,11 @@ class TestStartCapabilityGate:
         assert body["workflow_id"] == "wf-123"
         # /start drives the fire-and-forget `start` arm exactly once — the caller never chooses delivery.
         assert len(stub.calls) == 1
+        # The ack reports the crate the dispatched job was built from, which a host records on its run.
+        fingerprint = stub.calls[0]["crate_fingerprint"]
+        assert isinstance(fingerprint, str)
+        assert fingerprint
+        assert body["crate_fingerprint"] == fingerprint
 
     def test_start_honestly_400s_when_orchestrator_is_blocking_only(self, mocker: MockerFixture) -> None:
         # The orchestrator-agnostic base (`direct`) is blocking-only: /start refuses honestly with a

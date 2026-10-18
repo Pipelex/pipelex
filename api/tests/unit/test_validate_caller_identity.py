@@ -68,6 +68,7 @@ class _RecordingBundleValidator:
         submitted_files: Mapping[str, bytes] | None,  # noqa: ARG002
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
+        read_scope: str | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.caller_identities.append(caller_identity)
         return ErrorReport.make_for_code(

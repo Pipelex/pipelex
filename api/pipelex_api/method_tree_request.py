@@ -101,6 +101,17 @@ class RequestTree(NamedTuple):
     def bundle_paths(self) -> list[str]:
         return [tree_path for tree_path in self.tree.tree_paths if tree_path.endswith(BUNDLE_SUFFIX)]
 
+    @property
+    def bundle_texts(self) -> dict[str, str]:
+        """The text of each `.mthds` bundle of the tree by its tree path, in tree path order, as a valid verdict echoes them.
+
+        Decoded strictly, so it is read only once the bundles loaded: a bundle that is not UTF-8 never loads.
+
+        Raises:
+            UnicodeDecodeError: A bundle is not UTF-8 text, which a tree that loaded never holds.
+        """
+        return {tree_path: self.contents[tree_path].decode("utf-8") for tree_path in self.bundle_paths}
+
     @classmethod
     def make_from_contents(cls, *, contents: dict[str, bytes]) -> "RequestTree":
         """The tree these files make, each at its tree path, already judged as a tree's files."""
@@ -688,7 +699,7 @@ def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:
             raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_SYNTAX) from exc
         with translate_to_validate_bundle_error():
             blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=tree_path)
-        candidates.append(EntryCandidate(tree_path=tree_path, blueprint=blueprint))
+        candidates.append(EntryCandidate.of_blueprint(tree_path=tree_path, blueprint=blueprint))
     manifest = manifest_of(tree=tree, label=f"the method {method_label}")
     return select_entry(candidates=candidates, manifest=manifest, method_label=method_label)
 
