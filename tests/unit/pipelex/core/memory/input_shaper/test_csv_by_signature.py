@@ -138,6 +138,8 @@ class TestInputShaperCsvBySignature:
         assert operator.code == CoreCode.REQUEST_UNSUPPORTED, topic
         assert operator.params is not None
         assert operator.params.as_wire() == {"field": "inputs.people", "reason": REMOTE_TABLE_UNSUPPORTED_REASON}, topic
+        assert operator.location is not None
+        assert operator.location.as_wire() == {"input": "people"}, topic
 
     def test_a_table_url_that_does_not_parse_is_an_unreadable_file(self):
         """A url that does not parse names no file to read: the input's file is unreadable, and the url stays out."""
@@ -155,6 +157,8 @@ class TestInputShaperCsvBySignature:
         assert caller.code == CoreCode.INPUT_FILE_UNREADABLE
         assert caller.params is not None
         assert caller.params.as_wire() == {"input": "people", "file_type": "csv", "reason": "the URL does not parse"}
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"input": "people"}
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert "confidential" not in json.dumps(operator.to_wire())
 
@@ -175,6 +179,8 @@ class TestInputShaperCsvBySignature:
         assert caller.code == CoreCode.METHOD_CONCEPT_INVALID
         assert caller.params is not None
         assert caller.params.as_wire() == {"concept": "shaper_test.ShaperPerson", "finding": "it has no structure class to read rows into"}
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"input": "people"}
 
     def test_a_row_the_codec_refuses_without_a_location_names_the_input_as_its_field(self, people_csv: Path, mocker: MockerFixture):
         """A row refused as a whole, which pydantic locates nowhere, is the input's own fault, as a table refused whole is."""
@@ -191,6 +197,8 @@ class TestInputShaperCsvBySignature:
         assert caller.code == CoreCode.INPUT_INVALID
         assert caller.params is not None
         assert caller.params.as_wire() == {"input": "people", "field": "people"}
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"input": "people"}
 
     def test_a_table_that_does_not_fit_names_the_input_never_the_file(self, tmp_path: Path):
         """The codec knows the file alone: the input it was given as completes the problem's sentence, and the path stays out."""
@@ -205,5 +213,7 @@ class TestInputShaperCsvBySignature:
         assert caller.code == CoreCode.INPUT_INVALID
         assert caller.params is not None
         assert caller.params.as_wire() == {"input": "people", "field": "people"}
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"input": "people"}
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert "confidential" not in json.dumps(operator.to_wire())

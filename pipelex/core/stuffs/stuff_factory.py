@@ -41,18 +41,6 @@ _NAMED_REMOTE_SCHEMES: frozenset[str] = frozenset({"http", "https", "s3", "gs", 
 _TABLE_FILE_TYPE = "csv"
 
 
-def _input_params(*, name: str | None) -> dict[str, str]:
-    """The `input` parameter naming a table input, when it has a name."""
-    return {"input": name} if name is not None else {}
-
-
-def _whole_input_params(*, name: str | None) -> dict[str, str]:
-    """The parameters of `input.invalid` for a table input refused whole: the input, which is also the field at fault."""
-    if name is None:
-        return {}
-    return {**_input_params(name=name), "field": name}
-
-
 def _input_request_field(*, name: str | None) -> str:
     """The request's field, as a dotted path, that gives a table input: `inputs.<name>`, or `inputs` for an unnamed one."""
     return f"inputs.{name}" if name is not None else "inputs"
@@ -281,8 +269,9 @@ class StuffFactory:
             )
             raise (
                 CsvError(msg)
+                .with_input(input_name=name)
                 .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
-                .with_params(**_input_params(name=name), file_type=_TABLE_FILE_TYPE, reason="the URL does not parse")
+                .with_params(file_type=_TABLE_FILE_TYPE, reason="the URL does not parse")
             ) from exc
         # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to ``Path`` keeps
         # any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned ``...csv?X-Amz-...``),
@@ -306,6 +295,7 @@ class StuffFactory:
             )
             raise (
                 CsvError(msg)
+                .with_input(input_name=name)
                 .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
                 .with_params(field=_input_request_field(name=name), reason=REMOTE_TABLE_UNSUPPORTED_REASON)
             )
@@ -318,6 +308,7 @@ class StuffFactory:
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
             raise (
                 CsvError(msg)
+                .with_input(input_name=name)
                 .with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
                 .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
             ) from exc
@@ -330,14 +321,11 @@ class StuffFactory:
         try:
             return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
         except CsvError as exc:
-            # The codec names the file by the input it was given as, and the code's sentences name it as well: the input,
+            # The codec names the file by the input it was given as, and the problem names and locates it as well: the input,
             # and, for a code naming the field at fault, the input itself when the codec located the fault nowhere inside it.
-            param_names = error_code_spec(exc.resolve_error_code()).param_names
-            whole_input_params = _whole_input_params(name=name)
-            if "input" in param_names and "input" in whole_input_params:
-                exc.with_params(input=whole_input_params["input"])
-            if "field" in param_names and "field" in whole_input_params and exc.given_params.get("field") is None:
-                exc.with_params(field=whole_input_params["field"])
+            exc.with_input(input_name=name)
+            if name is not None and "field" in error_code_spec(exc.resolve_error_code()).param_names and exc.given_params.get("field") is None:
+                exc.with_params(field=name)
             raise
 
     @classmethod
