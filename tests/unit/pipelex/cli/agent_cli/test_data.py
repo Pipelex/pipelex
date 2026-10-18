@@ -516,7 +516,8 @@ class RefusedBundles:
         'output = "Text"\n'
         'template = "Talk about {{ topic[ }}"\n'
     )
-    # A folder's one bundle, which declares no main pipe, so the method has no pipe to start at.
+    # A bundle that declares no main pipe: named alone, or as a folder's one bundle, it has no pipe to start at, and its
+    # one pipe, `say`, is what it could start at.
     NO_MAIN_PIPE: ClassVar[str] = (
         'domain = "probe"\n'
         "\n"

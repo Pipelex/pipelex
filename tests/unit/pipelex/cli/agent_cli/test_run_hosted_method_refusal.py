@@ -157,6 +157,58 @@ class TestRunHostedMethodRefusal:
         assert "message" not in problem
         _assert_nothing_only_an_operator_reads(reported=reported)
 
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_a_bundle_file_with_no_main_pipe_reads_in_the_caller_s_view(
+        self, run_hosted: AsyncMock, capsys: pytest.CaptureFixture[str], tmp_path: Path, error_format: CliOutputFormat
+    ) -> None:
+        """A bundle file named alone with no main pipe is the folder's refusal: its candidates kept, no message, no path."""
+        bundle_path = _write_bundle(directory=tmp_path, source=RefusedBundles.NO_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_path), inputs="{}", runner=RunExecution.HOSTED, error_format=error_format)
+
+        assert exc_info.value.exit_code == 1
+        run_hosted.assert_not_awaited()
+        captured = capsys.readouterr()
+        assert not captured.out
+        reported = captured.err
+        assert str(tmp_path) not in reported
+        assert "does not declare a main_pipe" not in reported
+        _assert_nothing_only_an_operator_reads(reported=reported)
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(reported)
+                assert problem["code"] == "request.pipe_unspecified"
+                assert problem["domain"] == "input"
+                assert problem["next_step"]["kind"] == "change_input"
+                assert problem["params"] == {"candidates": ["say"]}
+                assert "message" not in problem
+            case CliOutputFormat.MARKDOWN:
+                assert reported.startswith(
+                    "## No pipe is selected\n\n"
+                    "The request selects no pipe, and the method gives no main pipe to start from.\n\n"
+                    "**Next step** (`change_input`): "
+                )
+                assert "- Code: `request.pipe_unspecified` (domain input, retry no)" in reported
+                assert "### Diagnostics" not in reported
+
+    def test_a_bundle_file_with_no_main_pipe_run_locally_keeps_its_sentence(
+        self, run_hosted: AsyncMock, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
+        """On this machine's runtime the same refusal keeps its code, its candidates and the command's sentence naming the file."""
+        bundle_path = _write_bundle(directory=tmp_path, source=RefusedBundles.NO_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_path), inputs="{}", runner=RunExecution.LOCAL, error_format=CliOutputFormat.JSON)
+
+        assert exc_info.value.exit_code == 1
+        run_hosted.assert_not_awaited()
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "request.pipe_unspecified"
+        assert problem["params"] == {"candidates": ["say"]}
+        assert problem["message"] == f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe."
+        assert problem["diagnostics"]["error_class"] == "MethodEntryError"
+
     def test_the_statistics_record_the_verdict_s_code(
         self, run_hosted: AsyncMock, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:

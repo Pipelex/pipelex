@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
-from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
@@ -212,11 +211,10 @@ def run_bundle_cmd(
                     bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_path)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
-                    agent_error(
-                        f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
-                        code=CoreCode.REQUEST_PIPE_UNSPECIFIED,
-                        params={"candidates": sorted(bundle_blueprint.pipe or {})},
-                    )
+                    # No pipe to start at, as a folder with no main_pipe has none: the same refusal, `request.pipe_unspecified`.
+                    no_entry_msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe."
+                    no_entry = MethodEntryError(no_entry_msg).with_params(candidates=sorted(bundle_blueprint.pipe or {}))
+                    agent_error_method_refusal(error=no_entry, message=no_entry_msg, execution=execution)
                 pipe_code = main_pipe_code
                 hosted_pipe_code = main_pipe_code
         except ValidateBundleError as exc:

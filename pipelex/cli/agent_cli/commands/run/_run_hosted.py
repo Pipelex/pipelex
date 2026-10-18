@@ -5,8 +5,8 @@ flags, then `[run] execution`), the flags a hosted run refuses, the run itself t
 its result is reported in, and the problem its failure is reported as. Nothing here boots the local runtime.
 
 A refusal decided here, before anything is sent, is a problem like any local failure, in the operator's view, except a
-refusal of the method the run would send, a bundle that does not parse or validate or a method with no pipe to start
-at: that is the refusal the runner would answer for the same method, and it is reported in the caller's view
+refusal of the method the run would send, a bundle that does not parse or validate or a bundle file or folder with no
+pipe to start at: that is the refusal the runner would answer for the same method, and it is reported in the caller's view
 (:func:`agent_error_method_refusal`). A failure
 of the run itself is the problem the runner answered or the client decided, in the caller's view, since the runner is
 someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, by its declared members alone, with the
@@ -111,7 +111,7 @@ def agent_error_method_refusal(*, error: PipelexError, message: str, execution: 
     """Report a refusal of the method a run would start, found on this machine before the run, and exit 1.
 
     A run reads its method before it starts it, wherever it executes: a bundle that does not parse or does not
-    validate, or a method with no single pipe to start at, is refused then. On this machine's runtime that is a local
+    validate, or a bundle file or folder with no pipe to start at, is refused then. On this machine's runtime that is a local
     failure, reported in the operator's view with the command's own sentence (`message`). On a runner, the method is
     refused before it is sent, and the refusal is the one the runner would answer its caller for the same method, so it
     is reported as the runner's answer is, in the caller's view (:meth:`PipelexError.to_problem`): its code, its items
@@ -120,7 +120,7 @@ def agent_error_method_refusal(*, error: PipelexError, message: str, execution: 
     error gives as its tip.
 
     Args:
-        error: The refusal: the invalid verdict, or the method's lack of a pipe to start at.
+        error: The refusal: the invalid verdict, or the lack of a pipe to start at in a bundle file or folder.
         message: The command's own sentence, which a local run reports beside the problem.
         execution: Where the run executes.
     """
