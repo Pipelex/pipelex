@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:002b1dad1a93bb2c802916dad4e7e97e966d024f6876385a51bab80834fe63ca"
+digest = "sha256:86b6bb20d4b2302d9bcae8b7af94798896e399b7eabf709300b4592f41551d99"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-18T02:45:01Z"
-rationale = "real-catch: a run on a runner now lists a former-shape refusal's validation items under method.invalid and reads a former-shape refusal's client reading by the standard's members alone; agent-cli.md and the agent CLI guide say so."
+reviewed_at = "2026-10-18T07:03:41Z"
+rationale = "real-catch: a run on a runner now reports a method run bundle refuses while reading it in the caller's view, through agent_error_method_refusal; agent-cli.md and the agent CLI guide say so."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -38,9 +38,9 @@ rationale = "real-catch: a run on a runner now lists a former-shape refusal's va
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
 "pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:d71aee873856cfa72eb0ff18eb82c79e348f124a"
-"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:6c78ff75ec7a76e30acc25b6aad6f3a18029707f"
+"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:2fb08ed25fedbed027582bd4e5e2696742c1e89a"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:7546d9b31ea2dc22b1ddae538edfbc8e7f7d08df"
-"pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:6a96ce576e0eba7aff48381139fd3e326ed54ad4"
+"pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:9ca310957996a2c6d7bd1583c9a074b193c1fb5a"
 "pipelex/cli/agent_cli/commands/run/method_cmd.py" = "blob:0df77aa1e35c22ceffdcefd7f4c12f28fda366c7"
 "pipelex/cli/agent_cli/commands/run/pipe_cmd.py" = "blob:1a5a2f86ac80fb86cb53376202bad05ffd19e9f6"
 "pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:5a0a4d4a11cbd4b3904bd80575a042edc8db0007"

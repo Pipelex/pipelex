@@ -469,3 +469,86 @@ class RunnerOwnMethodRefusals:
             "validation_errors": HostedMethodItems.SENT[:2],
         }
     )
+
+
+class RefusedBundles:
+    """Bundles `run bundle` refuses while it reads them, before a run on a runner sends them.
+
+    Each case is its bundle, the codes of the verdict's items in order, and where each item places its fault beside
+    the file it names.
+    """
+
+    # A table header TOML cannot parse: the verdict's `method.syntax` item, at its line and column.
+    PARSE_FAILURE: ClassVar[str] = 'domain = "broken_syntax"\nmain_pipe = "say"\n\n[pipe.say\ntype = "PipeCompose"\n'
+    # A native concept redeclared, an input read but not declared, and an input declared but never read.
+    VALIDATION_FAILURE: ClassVar[str] = (
+        'domain = "probe_invalid"\n'
+        'description = "A method with several faults"\n'
+        'main_pipe = "summarize"\n'
+        "\n"
+        "[concept.Rating]\n"
+        'description = "A rating of a summary"\n'
+        "\n"
+        "[pipe.summarize]\n"
+        'type = "PipeLLM"\n'
+        'description = "Summarize the text"\n'
+        'inputs = { text = "Text" }\n'
+        'output = "Text"\n'
+        'prompt = "Summarize $text in the style of $author."\n'
+        "\n"
+        "[pipe.rate]\n"
+        'type = "PipeLLM"\n'
+        'description = "Rate the summary"\n'
+        'inputs = { summary = "Text", audience = "Text" }\n'
+        'output = "Text"\n'
+        'prompt = "Rate this summary from 1 to 10: $summary"\n'
+    )
+    # A template Jinja2 cannot parse, which the bundle's own validation refuses, so no run ever renders it.
+    TEMPLATE_REFUSAL: ClassVar[str] = (
+        'domain = "broken_template"\n'
+        'description = "A template that does not parse"\n'
+        'main_pipe = "say"\n'
+        "\n"
+        "[pipe.say]\n"
+        'type = "PipeCompose"\n'
+        'description = "Say something"\n'
+        'inputs = { topic = "Text" }\n'
+        'output = "Text"\n'
+        'template = "Talk about {{ topic[ }}"\n'
+    )
+    # A folder's one bundle, which declares no main pipe, so the method has no pipe to start at.
+    NO_MAIN_PIPE: ClassVar[str] = (
+        'domain = "probe"\n'
+        "\n"
+        "[pipe.say]\n"
+        'type = "PipeCompose"\n'
+        'description = "Say"\n'
+        'inputs = { topic = "Text" }\n'
+        'output = "Text"\n'
+        'template = "About $topic"\n'
+    )
+    CASES: ClassVar[list[tuple[str, str, list[str], list[dict[str, Any]]]]] = [
+        ("parse_failure", PARSE_FAILURE, ["method.syntax"], [{"line": 4, "column": 10}]),
+        (
+            "validation_failure",
+            VALIDATION_FAILURE,
+            ["method.name_conflict", "method.input_undeclared", "method.input_unused"],
+            [{}, {"pipe": "summarize"}, {"pipe": "rate"}],
+        ),
+        ("template_refusal", TEMPLATE_REFUSAL, ["method.schema_violation"], [{"pipe": "say", "field": "pipe.say"}]),
+    ]
+    # What only the operator's view of these refusals holds, none of which a caller may read: the diagnostics' members,
+    # the classes along the refusal's chain, and the command's sentence quoting the raise site's message.
+    OPERATOR_ONLY: ClassVar[tuple[str, ...]] = (
+        "diagnostics",
+        "error_class",
+        "runtime_version",
+        "ValidateBundleError",
+        "MthdsParserError",
+        "MethodEntryError",
+        "ValidationError",
+        "TomlError",
+        "TOMLDecodeError",
+        "Jinja2TemplateSyntaxError",
+        "Failed to parse bundle",
+    )
