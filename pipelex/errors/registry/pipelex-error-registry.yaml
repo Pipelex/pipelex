@@ -28,6 +28,7 @@ families:
   - {family: pipelex.org, description: "Organizations, their members, their API keys and their promo codes."}
   - {family: pipelex.catalog, description: "Saved methods in an organization's catalog."}
   - {family: pipelex.run, description: "Pipelex's extensions to runs."}
+  - {family: pipelex.request, description: "Refusals of a request's shape that name a fact no core code carries."}
   - {family: pipelex.storage, description: "Pipelex's storage addresses and uploads."}
   - {family: pipelex.security, description: "Pipelex's own refusals made for safety, each recorded as a security event."}
   - {family: pipelex.config, description: "The runtime's own configuration."}
@@ -334,6 +335,24 @@ codes:
     meaning: "The caller chose the run's id, which Pipelex allows as an extension of the protocol, whose run id is always the runner's, and a run already holds that id."
     what_to_do: "Start the run with a new id, or with none so that the runner assigns it. To see the run that holds the id, read it by that id."
 
+  # --- pipelex.request. -------------------------------------------------------------------
+
+  - code: pipelex.request.dependency_key_mismatch
+    title: "A dependency is keyed by another address than its manifest declares"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The dependency keyed '{key}' declares the address '{address}', which must be its key."
+    steps:
+      actor: {kind: change_input, detail: "Key the dependency by '{address}', the address its manifest declares, then send the request again."}
+      other: {kind: change_input, detail: "Pass this to the caller, who must key the dependency '{key}' by '{address}'."}
+    params:
+      key: {type: identifier, description: "The key the request gives the dependency in `dependencies`."}
+      address: {type: identifier, description: "The full address the dependency's manifest declares, its repository address followed by its package name, which its key must be."}
+    meaning: "A request ships each package its method calls by address in `dependencies`, keyed by the package's full address: the address its `METHODS.toml` declares, followed by a slash and the package's name. This dependency is keyed by another address, such as its repository address alone, so the method's calls cannot reach it."
+    what_to_do: "Key the dependency by `params.address`, the full address its manifest declares, as the method's calls name it."
+
   # --- pipelex.storage. -------------------------------------------------------------------
 
   - code: pipelex.storage.uri_invalid
@@ -363,7 +382,7 @@ codes:
       actor: {kind: report, detail: "Report this to whoever runs the runtime."}
       other: {kind: report, detail: "Report this to whoever runs the runtime."}
     params:
-      scheme: {type: enum, values: [local, s3, gcs, memory], description: "The kind of storage that no longer holds the file."}
+      scheme: {type: enum, values: [local, s3, gcs, memory, plugin], description: "The kind of storage that no longer holds the file: one Pipelex ships, or `plugin` for a storage plugin's own."}
     meaning: "A file the run wrote, or that the runtime handed out, is no longer in storage. A caller's own reference to something that does not exist is `input.reference_not_found` instead."
     what_to_do: "Report the problem to whoever runs the runtime, with the run's `pipeline_run_id` when it has one."
 
@@ -378,7 +397,7 @@ codes:
       actor: {kind: retry, detail: "Send the request again after a while."}
       other: {kind: wait, detail: "Wait, then send the request again."}
     params:
-      scheme: {type: enum, values: [local, s3, gcs, memory], description: "The kind of storage that failed."}
+      scheme: {type: enum, values: [local, s3, gcs, memory, plugin], description: "The kind of storage that failed: one Pipelex ships, or `plugin` for a storage plugin's own."}
     meaning: "The storage backend failed a read or a write, which may succeed later."
     what_to_do: "Send the request again after `retry_after` seconds when the problem gives it. If storage keeps failing, report it to whoever runs the runtime."
 

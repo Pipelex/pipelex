@@ -58,6 +58,14 @@ Pipelex's extensions to runs.
 |---|---|---|---|---|
 | [`pipelex.run.already_exists`](pipelex/run/already_exists.md) | A run with this id already exists | `input` | `no` | `409` |
 
+## pipelex.request { #pipelex-request }
+
+Refusals of a request's shape that name a fact no core code carries.
+
+| Code | Title | Domain | Retry | Status |
+|---|---|---|---|---|
+| [`pipelex.request.dependency_key_mismatch`](pipelex/request/dependency_key_mismatch.md) | A dependency is keyed by another address than its manifest declares | `input` | `no` | `422` |
+
 ## pipelex.storage { #pipelex-storage }
 
 Pipelex's storage addresses and uploads.

@@ -20,6 +20,10 @@
       "description": "Pipelex's extensions to runs."
     },
     {
+      "family": "pipelex.request",
+      "description": "Refusals of a request's shape that name a fact no core code carries."
+    },
+    {
       "family": "pipelex.storage",
       "description": "Pipelex's storage addresses and uploads."
     },
@@ -614,6 +618,37 @@
       "what_to_do": "Start the run with a new id, or with none so that the runner assigns it. To see the run that holds the id, read it by that id."
     },
     {
+      "code": "pipelex.request.dependency_key_mismatch",
+      "title": "A dependency is keyed by another address than its manifest declares",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The dependency keyed '{key}' declares the address '{address}', which must be its key.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Key the dependency by '{address}', the address its manifest declares, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must key the dependency '{key}' by '{address}'."
+        }
+      },
+      "params": {
+        "key": {
+          "type": "identifier",
+          "description": "The key the request gives the dependency in `dependencies`."
+        },
+        "address": {
+          "type": "identifier",
+          "description": "The full address the dependency's manifest declares, its repository address followed by its package name, which its key must be."
+        }
+      },
+      "meaning": "A request ships each package its method calls by address in `dependencies`, keyed by the package's full address: the address its `METHODS.toml` declares, followed by a slash and the package's name. This dependency is keyed by another address, such as its repository address alone, so the method's calls cannot reach it.",
+      "what_to_do": "Key the dependency by `params.address`, the full address its manifest declares, as the method's calls name it."
+    },
+    {
       "code": "pipelex.storage.uri_invalid",
       "title": "The storage address is malformed",
       "domain": "input",
@@ -666,9 +701,10 @@
             "local",
             "s3",
             "gcs",
-            "memory"
+            "memory",
+            "plugin"
           ],
-          "description": "The kind of storage that no longer holds the file."
+          "description": "The kind of storage that no longer holds the file: one Pipelex ships, or `plugin` for a storage plugin's own."
         }
       },
       "meaning": "A file the run wrote, or that the runtime handed out, is no longer in storage. A caller's own reference to something that does not exist is `input.reference_not_found` instead.",
@@ -699,9 +735,10 @@
             "local",
             "s3",
             "gcs",
-            "memory"
+            "memory",
+            "plugin"
           ],
-          "description": "The kind of storage that failed."
+          "description": "The kind of storage that failed: one Pipelex ships, or `plugin` for a storage plugin's own."
         }
       },
       "meaning": "The storage backend failed a read or a write, which may succeed later.",
