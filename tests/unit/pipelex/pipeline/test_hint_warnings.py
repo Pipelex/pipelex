@@ -12,6 +12,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipeline.hint_warnings import MAX_AUTHORED_TOKEN_LENGTH, MAX_HINT_FINDINGS_PER_SITE, build_hint_warnings
+from pipelex.pipeline.validation_errors import warning_problem_items
 from pipelex.validation_error_types import HintLintErrorType
 
 
@@ -279,3 +280,42 @@ class TestHintLintOrdering:
         second = [(w.error_type, w.concept_code) for w in _lint(crate)]
         assert first == second
         assert [code for _, code in first] == ["Alpha", "Beta"]
+
+    def test_each_finding_s_problem_item_says_which_declaration_the_hint_is_on(self):
+        """`method.hint_invalid` names the hint and why, never where it is written: its location says which declaration.
+
+        A concept is located at its bundle-root path, a field of its structure at the field's, and a pipe's input at the
+        pipe and the input.
+        """
+        warnings = _lint(
+            _crate(
+                {
+                    "docs.Invoice": ConceptBlueprint(
+                        description="an invoice",
+                        structure={
+                            "total": ConceptStructureBlueprint(
+                                description="the total", type=ConceptStructureBlueprintFieldType.TEXT, hints={"typo": "x"}
+                            )
+                        },
+                        hints={"typo": "x"},
+                    )
+                },
+                {
+                    "docs.summarize": PipeLLMBlueprint(
+                        description="summarize",
+                        inputs={"invoice": InputSlotBlueprint(concept="Invoice", hints={"typo": "x"})},
+                        output="Text",
+                        prompt="Summarize $invoice",
+                    )
+                },
+            )
+        )
+
+        items = warning_problem_items(warnings=warnings)
+
+        dumped = [item.model_dump(mode="json", exclude_none=True) for item in items]
+        assert [(item["code"], item["params"], item.get("location")) for item in dumped] == [
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"field": "concept.Invoice"}),
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"field": "concept.Invoice.structure.total"}),
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"pipe": "summarize", "input": "invoice"}),
+        ]
