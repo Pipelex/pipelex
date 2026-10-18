@@ -304,6 +304,62 @@ class TestErrorLogRecords:
         for record in caplog.records:
             assert _PLANTED_MARKER not in JsonLogFormatter().format(record)
 
+    @pytest.mark.asyncio
+    async def test_the_barrier_records_and_drops_a_failure_to_send_its_own_answer(self, caplog: pytest.LogCaptureFixture):
+        # The barrier answers a failure no handler answered, and the server fails to send that answer, as it does for a
+        # client already gone: the failure is recorded by class and dropped, never raised to the server.
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(_message: Message) -> None:
+            raise ConnectionResetError(_PLANTED_MARKER)
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/gone", "raw_path": b"/gone", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG):
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        payload = _rendered_json(record)
+        assert payload["url.path"] == "/gone"
+        assert payload["http.response.status_code"] == 500
+        assert payload["error.type"] == "ConnectionResetError"
+        for any_record in caplog.records:
+            assert any_record.exc_info is None, any_record
+            assert _PLANTED_MARKER not in JsonLogFormatter().format(any_record)
+
+    @pytest.mark.asyncio
+    async def test_the_barrier_records_and_drops_a_failure_of_the_catch_all_before_any_response(
+        self, caplog: pytest.LogCaptureFixture, mocker: MockerFixture
+    ):
+        # The catch-all fails while the barrier builds its answer, before any status was sent: nothing can be answered,
+        # so the failure is recorded by class, naming no status, and dropped, leaving the server to answer for it.
+        mocker.patch("pipelex_api.exception_handlers.make_unexpected_failure", side_effect=KeyError(_PLANTED_MARKER))
+
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        sent: list[Message] = []
+
+        async def send(message: Message) -> None:
+            sent.append(message)
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/", "raw_path": b"/", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG):
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert sent == []
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        payload = _rendered_json(record)
+        assert "http.response.status_code" not in payload
+        assert payload["error.type"] == "KeyError"
+        assert payload[ERROR_CHAIN_FIELD] == ["KeyError", "LookupError"]
+        for any_record in caplog.records:
+            assert _PLANTED_MARKER not in JsonLogFormatter().format(any_record)
+
     def test_a_failure_the_catch_all_answered_mid_stream_is_recorded_once(self, caplog: pytest.LogCaptureFixture):
         # Starlette runs the catch-all handler even once the response has started, and it writes the failure's record:
         # the barrier then drops the exception Starlette raises again, writing nothing more.

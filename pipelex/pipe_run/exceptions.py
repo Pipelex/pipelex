@@ -98,9 +98,10 @@ class DryRunError(PipelexError):
 
     With failures, its code is the one the answer takes among theirs (``first_fault_code``), a security refusal's
     before any other, so that a refusal a security rule made is answered under its code wherever it sits among the
-    failures, and its problem carries one item per failure; a validation answers it as an invalid verdict only when one
-    of them is the method's and none is a security refusal. Raised elsewhere it may carry no failures, and then it takes
-    the code of its cause, the failure it reports.
+    failures; its parameters are those of the failure that code is taken from, its pipe included, so that the problem's
+    sentence renders whole, and its problem carries one item per failure; a validation answers it as an invalid verdict
+    only when one of them is the method's and none is a security refusal. Raised elsewhere it may carry no failures, and
+    then it takes the code of its cause, the failure it reports.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -108,6 +109,15 @@ class DryRunError(PipelexError):
     def __init__(self, message: str, *, failures: list[DryRunFailureErrorData] | None = None):
         self.failures = failures or []
         super().__init__(message)
+
+    def _code_failure(self) -> DryRunFailureErrorData | None:
+        """The failure whose code this error carries: the first whose code ``first_fault_code`` takes, among its security refusals if any."""
+        codes = self.security_failure_codes or [failure.code for failure in self.failures]
+        code = first_fault_code(codes=codes)
+        for failure in self.failures:
+            if failure.code == code:
+                return failure
+        return None
 
     @property
     def security_failure_codes(self) -> list[ErrorCode]:
@@ -117,8 +127,18 @@ class DryRunError(PipelexError):
     @property
     @override
     def own_error_code(self) -> ErrorCode | None:
-        codes = self.security_failure_codes or [failure.code for failure in self.failures]
-        return first_fault_code(codes=codes) or super().own_error_code
+        code_failure = self._code_failure()
+        return code_failure.code if code_failure is not None else super().own_error_code
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        code_failure = self._code_failure()
+        if code_failure is None:
+            return {}
+        params = dict(code_failure.params or {})
+        if code_failure.pipe_code is not None:
+            params.setdefault("pipe", code_failure.pipe_code)
+        return params
 
     @override
     def problem_items(self) -> list[ProblemItem] | None:

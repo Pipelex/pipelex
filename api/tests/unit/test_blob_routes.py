@@ -292,7 +292,7 @@ class TestBlobRoutes:
         (target,) = _missing(client, _TEMPLATE)
         uploaded = _upload(client, target=target, data=_TEMPLATE)
 
-        assert_problem(uploaded, status=500, code="pipelex.storage.not_found")
+        assert_problem(uploaded, status=500, code="pipelex.storage.damaged")
         assert blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] == _TEMPLATE[:5]
 
     def test_a_held_digest_answers_alone_only_for_blobs_of_its_tree(self) -> None:

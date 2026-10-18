@@ -69,12 +69,20 @@ def _fault_field_path(*, fault: Mapping[str, Any], located_by_request_part: bool
     return refused_field_path(loc=fault.get("loc", ()), located_by_request_part=located_by_request_part)
 
 
-def _summary(*, faults: Sequence[Mapping[str, Any]], located_by_request_part: bool) -> str:
-    """Every fault as `<field>: <message>`, joined: the operator's account of the refusal."""
-    described: list[str] = []
-    for fault in faults:
-        path = _fault_field_path(fault=fault, located_by_request_part=located_by_request_part)
-        described.append(f"{path}: {fault.get('msg') or 'Invalid input'}")
+def _summary(*, faults: Sequence[Mapping[str, Any]], paths: Sequence[str]) -> str:
+    """The operator's account of the refusal: the first `MAX_REFUSED_FIELDS` faults as `<field>: <message>`, joined.
+
+    A list the caller sent can fail item by item, so the account names as many faults as the refusal names fields, and
+    then how many more there were.
+
+    Args:
+        faults: The faults pydantic reported.
+        paths: The path of the field each fault refused, in the same order.
+    """
+    described = [f"{path}: {fault.get('msg') or 'Invalid input'}" for fault, path in zip(faults[:MAX_REFUSED_FIELDS], paths, strict=False)]
+    unnamed_count = len(faults) - len(described)
+    if unnamed_count > 0:
+        described.append(f"and {unnamed_count} more")
     return "; ".join(described) or "Request validation failed"
 
 
@@ -87,14 +95,14 @@ def refused_request_error(*, faults: Sequence[Mapping[str, Any]], located_by_req
 
     Returns:
         `request.malformed` for a body that is not JSON, else `request.invalid` with one item per refused field, the
-        first `MAX_REFUSED_FIELDS` of them.
+        first `MAX_REFUSED_FIELDS` of them. Its message names as many faults, then how many more there were.
     """
-    message = _summary(faults=faults, located_by_request_part=located_by_request_part)
+    fault_paths = [_fault_field_path(fault=fault, located_by_request_part=located_by_request_part) for fault in faults]
+    message = _summary(faults=faults, paths=fault_paths)
     if any(fault.get("type") == _JSON_INVALID_TYPE for fault in faults):
         return RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=RequestMalformedReason.NOT_JSON)
     paths: list[str] = []
-    for fault in faults:
-        path = _fault_field_path(fault=fault, located_by_request_part=located_by_request_part)
+    for path in fault_paths:
         if path not in paths and len(paths) < MAX_REFUSED_FIELDS:
             paths.append(path)
     if not paths:

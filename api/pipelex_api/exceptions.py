@@ -199,13 +199,13 @@ class RunnerMisconfiguredError(PipelexError):
 class BlobStoreDamagedError(PipelexError):
     """Bytes the blob store holds under a hash do not hash to it, or are not the size it holds them at.
 
-    The object stored under the hash is damaged, so the file the runtime stored is no longer in its storage. No caller
+    The object stored under the hash is damaged: storage holds it, but not the bytes the runtime stored. No caller
     can repair that, no upload of theirs changes it, and a retry reads the same damaged object, which stays until the
-    operator removes it: ``pipelex.storage.not_found``, a 500 whose verdict is not to retry and whose step is to report
+    operator removes it: ``pipelex.storage.damaged``, a 500 whose verdict is not to retry and whose step is to report
     it. ``scheme`` is the kind of storage the deployment runs, ``plugin`` for a storage plugin's own.
     """
 
-    error_code = PipelexErrorCode.STORAGE_NOT_FOUND
+    error_code = PipelexErrorCode.STORAGE_DAMAGED
 
     def __init__(self, message: str, *, scheme: str) -> None:
         super().__init__(message)

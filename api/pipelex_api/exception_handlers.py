@@ -273,13 +273,17 @@ def record_level_of(*, status: int, domain: ProblemDomain) -> RecordLevel:
       caller can avoid, such as a webhook receiver of its own that refused a delivery, and at `error` when it is the
       runtime's or the operator's.
     """
-    if status < 500 or status == HTTPStatus.NOT_IMPLEMENTED:
-        return RecordLevel.WARNING
-    match domain:
-        case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+    match status:
+        case HTTPStatus.NOT_IMPLEMENTED:
             return RecordLevel.WARNING
-        case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
-            return RecordLevel.ERROR
+        case server_status if server_status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+            match domain:
+                case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+                    return RecordLevel.WARNING
+                case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
+                    return RecordLevel.ERROR
+        case _:
+            return RecordLevel.WARNING
 
 
 def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel | None) -> None:
@@ -528,7 +532,8 @@ def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexErr
     Each refusal carries a code whose required parameters it can fill: the framework says nothing about a refusal but its
     status and a header, so a code whose parameters it cannot know gives way to one whose parameters it can.
 
-    - a 400, or a 422 raised as an `HTTPException`, is a request the framework could not read, `request.malformed`;
+    - a 400, or a 422 raised as an `HTTPException`, is a request the framework could not read, `request.malformed` with
+      the reason `unreadable`, keeping its status;
     - a 401 is `auth.missing_credential`, with the challenge the raise named;
     - a 403 is `auth.invalid_credential`, keeping its 403: `auth.forbidden` would need the `requirement` the identity
       lacks, which the framework does not say;
@@ -547,6 +552,7 @@ def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexErr
         case 400 | 422:
             message = f"The framework refused to read the request with HTTP {status}"
             refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_UNREADABLE_REASON)
+            kept_status = status
         case 401:
             message = "The framework refused the request for want of a credential"
             refusal = RunnerAuthError(message, challenge=challenge).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
@@ -634,7 +640,9 @@ class AnsweredErrorBarrier:
     the handler answered, which it marks once its record is written, is dropped, and any other, the handler's own
     failure while a response was streaming or sending, is dropped after a record of its own,
     `UNRECORDED_FAILURE_MESSAGE`, which names the request's path, the status already sent and the chain by class, never
-    an exception's text. So no exception, and no text of one, leaves the app, and none leaves it unrecorded.
+    an exception's text. A failure of the barrier's own answer, the catch-all building it or the server sending it, such
+    as to a client already gone, is recorded and dropped the same way. So no exception, and no text of one, leaves the
+    app, and none leaves it unrecorded.
 
     `pipelex_api.main` puts it directly around the FastAPI app, inside `RequestIdMiddleware`, so the request's log
     context is still bound while it answers.
@@ -665,22 +673,30 @@ class AnsweredErrorBarrier:
                 if getattr(request.state, "answered_error", None) is not exc:
                     _log_unrecorded_failure(exc, request=request, sent_status=sent_status)
                 return
-            response = await handle_unexpected_error(request, exc)
-            await response(scope, receive, send)
+            try:
+                response = await handle_unexpected_error(request, exc)
+                await response(scope, receive, tracking_send)
+            except Exception as answer_failure:  # ruff: ignore[BLE001]
+                # The absolute root still: the barrier's own answer failed, the catch-all building it or the server
+                # sending it, such as to a client already gone, and nothing is left to answer it.
+                _log_unrecorded_failure(answer_failure, request=request, sent_status=sent_status)
 
 
-def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_status: int) -> None:
+def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_status: int | None) -> None:
     """Record a failure no handler recorded, which ended a request after its response had started.
 
     The response's status and part of it are already sent, so the failure is answered by no problem: the record names the
     request's path, the status sent, the class that escaped and the classes of its chain, and never an exception's text.
+    `sent_status` is `None` only when the barrier's own answer failed before its status was sent, which leaves the
+    server to answer for it, and the record then names no status.
     """
     fields: dict[str, Any] = {
         "url.path": request.url.path,
-        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: sent_status,
         ERROR_TYPE_FIELD: type(error).__name__,
         **_chain_fields(error, with_frames=False),
     }
+    if sent_status is not None:
+        fields[OTelLogAttr.HTTP_RESPONSE_STATUS_CODE] = sent_status
     log.error(UNRECORDED_FAILURE_MESSAGE, fields=fields)
 
 

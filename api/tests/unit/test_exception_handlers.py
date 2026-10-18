@@ -738,7 +738,8 @@ class TestExceptionHandlers:
     def test_a_framework_4xx_is_the_caller_s_malformed_request_never_a_500(self, mocker: MockerFixture):
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = _build_client().get("/framework-refusal/400")
-        body = assert_problem(response, status=422, code="request.malformed")
+        # It keeps its 400, as every framework 4xx keeps its status.
+        body = assert_problem(response, status=400, code="request.malformed")
         assert body["params"] == {"reason": "unreadable"}
         assert "There was an error parsing the body" not in response.text
         # A caller's mistake: a warning, never the error level of a fault of the server.
@@ -805,7 +806,7 @@ class TestExceptionHandlers:
         # The caller reads the code's sentence filled from those parameters, never the fallback naming none.
         assert problem.detail == spec.detail.format(**params)
         # The status answered is the one the framework raised, whether the code declares it or the refusal keeps it.
-        assert (kept_status or spec.status) == (422 if raised_status == 400 else raised_status)
+        assert (kept_status or spec.status) == raised_status
 
     @pytest.mark.parametrize(
         ("status", "domain", "level", "frames"),

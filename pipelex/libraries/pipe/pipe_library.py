@@ -127,8 +127,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                     return matches[0]
                 if len(matches) > 1:
                     domains = [match.domain_code for match in matches]
-                    msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
+                    # The aliased keys the matches are loaded under, the spellings that name each one unambiguously.
                     candidates = sorted(f"{alias}->{match.pipe_ref}" for match in matches)
+                    msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
                     raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS).with_params(ref=pipe_code, candidates=candidates)
             return None
 
@@ -166,6 +167,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             # asserting the opposite — and handed a `user_action` naming candidates that never existed.
             raise
         except PipeLibraryError as exc:
+            # The candidates the lookup found, which the refusal's code names to the caller and a selection reads back.
             raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code, candidates=exc.given_params.get("candidates", [])) from exc
         if pipe is not None:
             return pipe

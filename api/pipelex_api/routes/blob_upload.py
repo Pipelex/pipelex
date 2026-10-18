@@ -5,7 +5,7 @@ the signed query of its target (`pipelex_api.blob_upload`), which only a caller 
 authentication on `POST /v1/blobs/missing` holds, so a sender uploads with exactly the headers the target names. The
 bytes are written under the scope the signature binds, whole and create-only (`pipelex_api.blob_store`): a blob is never
 changed, so uploading bytes the runner already holds succeeds and changes nothing, and bytes of another size than the
-object held under their hash, which only damaged storage could hold, are a 500 `pipelex.storage.not_found` rather than
+object held under their hash, which only damaged storage could hold, are a 500 `pipelex.storage.damaged` rather than
 written over it. Only `blobs/` is ever written here, never a tree's listing under `trees/`, so an uploaded file that
 happens to read as a listing proves nothing.
 """
@@ -59,7 +59,7 @@ async def put_blob(
     such as an expiry that is not a decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 413 `request.too_large`;
     and a body whose SHA-256 is not the path's a 422 `request.invalid` naming the body. A blob is never changed:
     uploading bytes the runner already holds answers 204 and changes nothing, and uploading bytes whose hash names an
-    object of another size, which only damaged storage could hold, is a 500 `pipelex.storage.not_found` that leaves the
+    object of another size, which only damaged storage could hold, is a 500 `pipelex.storage.damaged` that leaves the
     object as it is.
     """
     if not is_upload_authorized(scope=scope, sha256=sha256, expires=expires, signature=signature) or scope is None:

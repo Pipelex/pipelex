@@ -148,11 +148,11 @@ class TestRunnerBlobStore:
         tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
 
-    async def test_bytes_that_do_not_hash_to_their_key_are_a_stored_file_gone_and_never_retried(self, caplog: pytest.LogCaptureFixture) -> None:
+    async def test_bytes_that_do_not_hash_to_their_key_are_a_damaged_stored_file_never_retried(self, caplog: pytest.LogCaptureFixture) -> None:
         """A damaged object does not heal: a retry reads the same bytes, so the verdict is not to retry.
 
-        No caller's doing, and no upload of theirs would change it: the file the runtime stored is no longer in its storage,
-        `pipelex.storage.not_found`, which the caller reports. Not `pipelex.storage.unavailable`, whose retry verdict would
+        No caller's doing, and no upload of theirs would change it: storage holds the object, but not the bytes the runtime
+        stored, `pipelex.storage.damaged`, which the caller reports. Not `pipelex.storage.unavailable`, whose retry verdict would
         send a client round its retry budget, nor `runtime.misconfigured`, which tells the operator to change a setting
         none of which is wrong; the operator finds which object to remove in a record of its own, naming the hash.
         """
@@ -166,7 +166,7 @@ class TestRunnerBlobStore:
 
         problem = problem_of(exc_info.value)
         assert problem["status"] == 500
-        assert problem["code"] == "pipelex.storage.not_found"
+        assert problem["code"] == "pipelex.storage.damaged"
         assert problem["retry"] == "no"
         assert problem["next_step"]["kind"] == "report"
         assert problem["params"] == {"scheme": "memory"}
@@ -206,7 +206,7 @@ class TestRunnerBlobStore:
 
         problem = problem_of(exc_info.value)
         assert problem["status"] == 500
-        assert problem["code"] == "pipelex.storage.not_found"
+        assert problem["code"] == "pipelex.storage.damaged"
         assert problem["params"] == {"scheme": "memory"}
         assert storage.objects[_blob_key(data)] == data[:10]
         assert storage.created == []

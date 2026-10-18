@@ -37,6 +37,10 @@ def _mentioning_the_host_file(*, label: str) -> str:
     return f"{label} in '{_HOST_FILE}'"
 
 
+class _MethodSyntaxError(PipelexError):
+    error_code = CoreCode.METHOD_SYNTAX
+
+
 class TestValidateBundleErrorWithholding:
     def test_every_channel_of_the_verdict_is_carried(self) -> None:
         constructor_channels = set(inspect.signature(ValidateBundleError.__init__).parameters) - {"self"}
@@ -145,6 +149,25 @@ class TestValidateBundleErrorWithholding:
             {"name": "harbour_board.post_notice", "conflict": "duplicate_declaration"},
             {"name": "harbour_board.pin", "conflict": "duplicate_declaration"},
         ]
+
+    def test_an_item_taking_its_cause_s_parameters_names_no_withheld_file(self, tmp_path: Path) -> None:
+        """An item no stage classified reads its cause's parameters, which the withholding reaches too, its sentence with them."""
+        host_library_file = tmp_path / "harbour_board.mthds"
+        host_library_file.write_text('domain = "harbour_board"\n', encoding="utf-8")
+        cause = _MethodSyntaxError("the host's bundle does not parse").with_params(finding=f"unexpected '=' in '{host_library_file}'")
+
+        with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path]):
+            raise ValidateBundleError(message=f"Could not load '{host_library_file}'") from cause
+
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.errors is not None
+        (item,) = caller.errors
+        assert item.code == CoreCode.METHOD_SYNTAX
+        assert item.params is not None
+        assert item.params.as_wire() == {"finding": f"unexpected '=' in '{HOST_LIBRARY_FILE_PLACEHOLDER}'"}
+        assert item.detail == f"The method does not parse (unexpected '=' in '{HOST_LIBRARY_FILE_PLACEHOLDER}')."
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert str(host_library_file) not in str(raised.value.to_problem(view=view).to_wire())
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:
         # A host library directory listed relatively names its files relatively, so a host file's name can be the

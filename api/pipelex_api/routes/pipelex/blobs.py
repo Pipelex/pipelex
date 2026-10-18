@@ -112,7 +112,7 @@ async def find_missing_blobs(
 
     A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; a hash held
     at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
-    change nothing, and bytes of another size mean the object held is damaged, a 500 `pipelex.storage.not_found`, since
+    change nothing, and bytes of another size mean the object held is damaged, a 500 `pipelex.storage.damaged`, since
     nothing writes over a blob. When the request names the tree the blobs
     make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
     file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.

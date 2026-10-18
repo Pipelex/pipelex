@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from polyfactory.exceptions import FactoryException
+from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
@@ -11,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import (
     BundleValidator,
     DryRunOutput,
@@ -28,6 +30,27 @@ class _MethodFaultError(PipelexError):
 
 class _StorageFaultError(PipelexError):
     error_code = PipelexErrorCode.STORAGE_UNAVAILABLE
+
+
+class _MockedOutput(BaseModel):
+    mock_count: int
+
+
+def _mock_validation_error() -> ValidationError:
+    """The pydantic refusal a mock value meets when it is built into its structure inside a pipe."""
+    try:
+        _MockedOutput.model_validate({"mock_count": "not a number"})
+    except ValidationError as validation_error:
+        return validation_error
+    msg = "the mock value was expected to be refused"
+    raise AssertionError(msg)
+
+
+def _routed_foreign_failure(*, foreign: Exception) -> PipeRouterError:
+    """A foreign exception raised inside a routed pipe, as the router hands it on: located, over the unexpected error standing in for it."""
+    routed = PipeRouterError(message="the step failed", run_mode=PipeRunMode.DRY, pipe_code="analyze_topic", output_name=None, pipe_stack=[])
+    routed.__cause__ = make_unexpected_failure(error=foreign)
+    return routed
 
 
 class TestDryRunFailureLocation:
@@ -120,8 +143,20 @@ class TestDryRunFailureLocation:
                 "The dry run could not generate mock data for this pipe",
                 "polyfactory internals",
             ),
+            (
+                _routed_foreign_failure(foreign=FactoryException("polyfactory internals")),
+                CoreCode.METHOD_MOCK_UNSATISFIABLE,
+                "The dry run could not generate mock data for this pipe",
+                "the step failed",
+            ),
+            (
+                _routed_foreign_failure(foreign=_mock_validation_error()),
+                CoreCode.METHOD_MOCK_UNSATISFIABLE,
+                "The dry run could not generate mock data for this pipe",
+                "the step failed",
+            ),
         ],
-        ids=["method_fault", "config_fault", "uncoded", "foreign"],
+        ids=["method_fault", "config_fault", "uncoded", "foreign", "foreign_factory_in_routed_pipe", "foreign_validation_in_routed_pipe"],
     )
     @pytest.mark.asyncio
     async def test_a_failure_reads_its_code_s_sentence_never_its_own_text(

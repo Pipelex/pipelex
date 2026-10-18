@@ -344,6 +344,10 @@ class ValidateBundleError(PipelexError):
         # One located failure per pipe whose dry run failed (see ``BundleValidator``).
         self.dry_run_failures = dry_run_failures or []
 
+        # The files a withheld verdict must not name (``withholding_files``), withheld again from every problem item it
+        # builds, since an item reads parameters from beyond the verdict's own channels, its cause's among them.
+        self._file_withholding: _FileWithholding | None = None
+
         # Disease C: the top-line ``message`` is often a leaky ``str(pydantic ValidationError)``
         # (``Value errors: '<field>': Value error, …``). Replace it at the source with a clean
         # summary derived from the already-clean per-error item messages, so every surface that
@@ -371,9 +375,11 @@ class ValidateBundleError(PipelexError):
         is the same answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
         it must be added here too, which ``test_validate_bundle_error_withholding`` pins. So is what the raise site chose
         after building it: the code it chose (:meth:`with_error_code`), and the parameters and items it gave
-        (:meth:`with_params`, :meth:`with_items`), withheld as the messages are. A validator of
-        submitted content uses it to keep the files of the host's own library directories, paths on the host,
-        out of a verdict the caller reads.
+        (:meth:`with_params`, :meth:`with_items`), withheld as the messages are. The new verdict keeps the withholding,
+        and every problem item it builds (:meth:`problem_items`) is withheld too, its sentence, every parameter and its
+        locators: an item no stage classified takes the parameters of the refusal the verdict was built from, its
+        cause, which the withholding never rewrote. A validator of submitted content uses it to keep the files of the
+        host's own library directories, paths on the host, out of a verdict the caller reads.
 
         Args:
             withheld_files: Every spelling of every file the verdict must not name.
@@ -399,6 +405,7 @@ class ValidateBundleError(PipelexError):
             withheld.with_params(**withholding.withheld_params(params=self.given_params))
         if self._given_items:
             withheld.with_items(items=[withholding.withheld_item(item=item) for item in self._given_items])
+        withheld._file_withholding = withholding
         return withheld
 
     @property
@@ -439,7 +446,9 @@ class ValidateBundleError(PipelexError):
         An item no stage classified takes the code of the refusal this verdict was built from when that refusal is
         the method's, and ``method.schema_violation`` otherwise. A refusal under ``method.invalid``, the verdict's own
         umbrella, whose sentence says nothing of the item, is read through to the error it was raised from: a library
-        that could not load a bundle forwards the parser's refusal of its syntax that way.
+        that could not load a bundle forwards the parser's refusal of its syntax that way. On a withheld verdict
+        (:meth:`withholding_files`), every item is withheld whole, its sentence, its parameters and its locators,
+        whichever channel each came from.
         """
         residual_code: ErrorCode = CoreCode.METHOD_SCHEMA_VIOLATION
         # The parameters the refusal's code renders from, as a caller reads them, which an item taking its code keeps.
@@ -468,6 +477,9 @@ class ValidateBundleError(PipelexError):
             else:
                 item_code = validation_item_code(item=item, residual_code=residual_code)
             items.append(problem_item_of(item=item, code=item_code, params=item_params))
+        if self._file_withholding is not None:
+            file_withholding = self._file_withholding
+            items = [file_withholding.withheld_item(item=item) for item in items]
         return items or None
 
 
