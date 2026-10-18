@@ -5,9 +5,11 @@ Where a PipeFunc runs decides what its requirements are checked against:
 - In the `direct` execution mode it runs in this interpreter, so the check reads the distributions installed here and
   this interpreter's own marker environment, and can follow a requirement's extras through their metadata.
 - In any other mode it runs in a sandbox this process never sees, such as the Daytona sandbox, whose packages are the
-  whole offer. The plugin providing the mode states them (`pipelex/plugins/pipe_func_package_offer_registry.py`), and
-  the check reads that statement alone: a marker variable it does not state cannot be judged, and an extra's needs,
-  which it does not state, cannot be followed. A mode with no statement fails closed.
+  whole offer. The plugin providing the mode states them for the requirements being judged
+  (`pipelex/plugins/pipe_func_package_offer_registry.py`), a fixed package set or an environment it builds for them,
+  and the check reads that statement alone: a marker variable it does not state cannot be judged, and an extra's needs,
+  which it does not state, cannot be followed. The plugin may instead refuse the requirements with its own reason, when
+  no environment it can build holds them. A mode with no statement fails closed.
 
 How an environment names itself in a refusal depends on who reads it: this interpreter is named by its path on the
 host, and its advice gives the exact install command, only where the refusal may name paths on the host.
@@ -15,7 +17,7 @@ host, and its advice gives the exact install command, only where the refusal may
 
 import shlex
 import sys
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from importlib.metadata import PackageNotFoundError, distribution
 from typing import Protocol
 
@@ -24,9 +26,10 @@ from packaging.utils import canonicalize_name
 from typing_extensions import override
 
 from pipelex.config import get_config, get_pipe_func_execution_mode, is_pipe_func_sandbox_hosted
+from pipelex.core.method_trees.requirements_file import RequirementLine
 from pipelex.interpreter_hub import get_pipe_func_package_offer_registry
 from pipelex.libraries.exceptions import PipeFuncPackageSetUnstatedError
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
 
 
 class PythonPackageEnvironment(Protocol):
@@ -140,10 +143,17 @@ class OfferedPackageEnvironment(PythonPackageEnvironment):
         )
 
 
-def resolve_pipe_func_package_environment(*, names_host_paths: bool) -> PythonPackageEnvironment:
-    """The environment this process's PipeFunc steps run in, as its execution mode decides.
+def resolve_pipe_func_package_environment(
+    *, requirements: Sequence[RequirementLine], names_host_paths: bool
+) -> PythonPackageEnvironment | PipeFuncPackageRefusal:
+    """The environment this process's PipeFunc steps would run a method declaring `requirements` in, as its execution mode decides.
+
+    In the `direct` mode it is this interpreter, whatever the requirements. In any other mode the plugin providing the
+    mode is asked for the offer meeting these requirements, and may refuse them instead, when no environment it can
+    run the method in holds them: its refusal is returned as it came, for the check to refuse the method with its reason.
 
     Args:
+        requirements: Every requirement the method's `requirements.txt` declares, in the file's order.
         names_host_paths: Whether a refusal naming the environment may name paths on this host, such as this
             interpreter's.
 
@@ -157,7 +167,9 @@ def resolve_pipe_func_package_environment(*, names_host_paths: bool) -> PythonPa
     offer_factory = get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
     if offer_factory is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=False)
-    offer = offer_factory(get_config().interpreter.pipe_func)
-    if offer is None:
+    answer = offer_factory(PipeFuncPackageOfferRequest(pipe_func_config=get_config().interpreter.pipe_func, requirements=tuple(requirements)))
+    if answer is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=True)
-    return OfferedPackageEnvironment(offer=offer)
+    if isinstance(answer, PipeFuncPackageRefusal):
+        return answer
+    return OfferedPackageEnvironment(offer=answer)

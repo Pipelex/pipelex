@@ -38,6 +38,8 @@ if TYPE_CHECKING:
     from pipelex_sdk.client import PipelexAPIClient
     from pipelex_sdk.crate_models import MthdsFileItem
 
+    from pipelex.cli.commands.run._inputs_file_loader import DetectedInputsFile
+
 _NATIVE_TEXT_CONCEPT_REF = "native.Text"
 _MAIN_STUFF_NAME = "main_stuff"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
@@ -184,7 +186,7 @@ def execute_hosted_run(
     method_ref: str | None = None,
     method_id: str | None = None,
     pipe_code: str | None,
-    inputs: str | None,
+    inputs: str | DetectedInputsFile | None,
     dynamic_output_concept_ref: str | None,
     base_url: str | None,
     output_label: str,
@@ -198,8 +200,8 @@ def execute_hosted_run(
     """Run on the hosted API, print the main output, and save the outputs as a local run saves them.
 
     The method is named by exactly one of `mthds_files`, `method_ref` and `method_id`. `inputs` is `--inputs` as the
-    command resolved it: inline JSON or a JSON or TOML file, read as a local run reads it, and a local file it names
-    at a document or image input is uploaded first.
+    command resolved it, inline JSON or a JSON or TOML file, or the inputs file auto-detection read from a bundle
+    directory, read as a local run reads it, and a local file it names at a document or image input is uploaded first.
 
     The outputs go to `<output_dir>/<output_label>_output_NN/`: `main_stuff.json` (and `main_stuff.md` for a text
     output), `working_memory.json`, and `graphspec.json` when the hosted API returned the run's graph, which

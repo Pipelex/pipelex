@@ -86,6 +86,22 @@ class TestValidationRender:
         assert "this method is runnable." in markdown
         assert "Pending signatures" not in markdown
 
+    def test_says_plainly_why_a_method_folder_drew_no_graph(self):
+        """A folder judged whole with no single pipe to start at still passes; the markdown says why no graph was drawn."""
+        reason = "No graph was drawn, since a graph is drawn from one pipe: the folder declares several main pipes."
+        result: dict[str, Any] = {
+            "success": True,
+            "bundle_path": "/fake/method",
+            "validated_pipes": [{"pipe_ref": "first.one", "status": "SUCCESS"}, {"pipe_ref": "second.two", "status": "SUCCESS"}],
+            "total_pipes": 2,
+            "graph_unavailable": reason,
+        }
+
+        markdown = format_validate_markdown(result)
+
+        assert markdown.startswith("# Validation passed")
+        assert markdown.endswith(f"## Graph\n\n{reason}")
+
     def test_omits_runnability_verdict_when_key_absent(self):
         """The `validate all` / `validate pipe` shape omits the `pending_signatures` key entirely —
         so no runnability verdict (positive or negative) leaks onto those non-bundle surfaces.

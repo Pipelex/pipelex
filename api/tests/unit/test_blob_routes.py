@@ -185,14 +185,48 @@ class TestBlobRoutes:
         client = _build_client()
         contents = {"main.mthds": VALID_MTHDS.encode("utf-8"), "notes.txt": _NOTES}
         digest = digest_of_contents(contents)
-        assert len(_missing(client, *contents.values(), digest=digest)) == 2
+        assert len(_missing(client, *contents.values(), digest=digest, read_scope="org-a")) == 2
 
-        validated = client.post("/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}})
+        validated = client.post(
+            "/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}, "read_scope": "org-a"}
+        )
 
         assert validated.status_code == 200, validated.text
         assert validated.json()["is_valid"] is True, validated.text
-        assert _missing(client, *contents.values(), digest=digest) == []
-        assert _missing(client, *contents.values()) == []
+        assert _missing(client, *contents.values(), digest=digest, read_scope="org-a") == []
+        assert _missing(client, *contents.values(), read_scope="org-a") == []
+
+    def test_a_validation_records_its_tree_only_under_a_read_scope_it_was_sent(self, blob_storage: InMemoryStorageProvider) -> None:
+        """A dry run without a read scope leaves nothing stored, since its fallback scope, the caller's id, no host erases."""
+        client = _build_client()
+        files = {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}
+        contents = {"main.mthds": VALID_MTHDS.encode("utf-8"), "notes.txt": _NOTES}
+
+        unscoped = client.post("/v1/validate", json={"files": files})
+
+        assert unscoped.status_code == 200, unscoped.text
+        assert unscoped.json()["is_valid"] is True, unscoped.text
+        assert blob_storage.root == {}
+
+        scoped = client.post("/v1/validate", json={"files": files, "read_scope": "org-a"})
+
+        assert scoped.status_code == 200, scoped.text
+        digest_hex = digest_of_contents(contents).removeprefix("sha256:")
+        assert sorted(blob_storage.root) == sorted([f"org-a/blobs/{sha256_hex(data)}" for data in contents.values()] + [f"org-a/trees/{digest_hex}"])
+        assert blob_storage.root[f"org-a/trees/{digest_hex}"] == tree_listing(tree_files_from_contents(contents))
+
+    def test_a_validation_without_a_read_scope_still_reads_the_caller_s_blobs(self, blob_storage: InMemoryStorageProvider) -> None:
+        """Only the recording waits on a read scope: hash entries resolve in the caller's own scope, as before."""
+        client = _build_client()
+        (target,) = _missing(client, _NOTES)
+        assert _upload(client, target=target, data=_NOTES).status_code == 204
+        held_before = dict(blob_storage.root)
+
+        validated = client.post("/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _blob_ref(_NOTES)}})
+
+        assert validated.status_code == 200, validated.text
+        assert validated.json()["is_valid"] is True, validated.text
+        assert blob_storage.root == held_before
 
     def test_an_uploaded_listing_never_records_its_tree(self) -> None:
         """Anyone can upload bytes that happen to form a listing, so an upload never stands for a tree held in full."""
@@ -253,25 +287,26 @@ class TestBlobRoutes:
 
         _assert_problem(response, status=500, error_type="ServerMisconfigured")
 
-    def test_a_blob_held_at_another_size_is_listed_for_its_upload_to_write_over(self, blob_storage: InMemoryStorageProvider) -> None:
-        """Bytes held short, as a storage that does not publish writes whole could leave them, are asked for again and repaired."""
+    def test_a_blob_held_at_another_size_is_listed_and_its_upload_never_writes_over_it(self, blob_storage: InMemoryStorageProvider) -> None:
+        """Bytes held short are damaged storage: they are asked for, and their upload is a 500 that leaves the object as it is."""
         client = _build_client()
         blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] = _TEMPLATE[:5]
 
         (target,) = _missing(client, _TEMPLATE)
         uploaded = _upload(client, target=target, data=_TEMPLATE)
 
-        assert uploaded.status_code == 204, uploaded.text
-        assert blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] == _TEMPLATE
-        assert _missing(client, _TEMPLATE) == []
+        _assert_problem(uploaded, status=500, error_type="BlobStoreCorrupted")
+        assert blob_storage.root[f"single-tenant/blobs/{sha256_hex(_TEMPLATE)}"] == _TEMPLATE[:5]
 
     def test_a_held_digest_answers_alone_only_for_blobs_of_its_tree(self) -> None:
         """A digest the runner holds says nothing of blobs outside its tree, which are looked up one by one."""
         client = _build_client()
         contents = {"main.mthds": VALID_MTHDS.encode("utf-8"), "notes.txt": _NOTES}
-        validated = client.post("/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}})
+        validated = client.post(
+            "/v1/validate", json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _NOTES.decode("utf-8")}, "read_scope": "org-a"}
+        )
         assert validated.status_code == 200, validated.text
 
-        missing = _missing(client, *contents.values(), _TEMPLATE, digest=digest_of_contents(contents))
+        missing = _missing(client, *contents.values(), _TEMPLATE, digest=digest_of_contents(contents), read_scope="org-a")
 
         assert [blob["sha256"] for blob in missing] == [sha256_hex(_TEMPLATE)]

@@ -154,6 +154,61 @@ async def validate_bundle_core(
     }
 
 
+async def validate_method_folder_core(
+    *,
+    method_dir: Path,
+    library_dirs: list[Path] | None,
+    allow_signatures: bool,
+    pipe_code: str | None,
+) -> dict[str, Any]:
+    """Validate a method's folder whole: every bundle of its method tree, as the MTHDS protocol's validation judges a method.
+
+    The folder needs no pipe to start at. Every pipe its bundles define is dry-run, or only ``pipe_code`` when one is
+    named, while the whole tree still loads; the ``library_dirs`` load beside it for its bundles to use and are not
+    judged.
+
+    Args:
+        method_dir: The method's folder.
+        library_dirs: The folder and the ``-L`` directories, the caller's own.
+        allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
+        pipe_code: The one pipe to dry-run, or None for every pipe of the method.
+
+    Returns:
+        Dictionary with validation results suitable for JSON serialization, ``bundle_path`` naming the folder.
+
+    Raises:
+        ValidateBundleError: If validation fails.
+        EntryPipeNotFoundError: If ``pipe_code`` is defined by no bundle of the method.
+    """
+    with MethodValidationReport() as validation_report:
+        result = await validate_bundle(
+            method_dir=method_dir,
+            library_dirs=library_dirs,
+            library_dirs_are_callers=True,
+            allow_signatures=allow_signatures,
+            dry_run_pipe_codes=[pipe_code] if pipe_code else None,
+            collect_dry_run_warnings=True,
+        )
+        warnings = collect_advisory_warnings(
+            pipes=result.pipes,
+            entry_pipe_refs=collect_entry_pipe_refs(result.blueprints),
+            dry_run_result=result.dry_run_result,
+        )
+        validation_report.describe(pipes=result.pipes)
+        validation_report.count_warnings(count=len(warnings))
+
+    return {
+        "success": True,
+        "is_valid": True,
+        "bundle_path": str(method_dir),
+        "validated_pipes": build_validated_pipes(result.dry_run_result),
+        "total_pipes": len(result.dry_run_result),
+        "pending_signatures": result.pending_signatures,
+        "is_runnable": not result.pending_signatures,
+        "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+    }
+
+
 async def validate_pipe_core(
     pipe_code: str,
     *,

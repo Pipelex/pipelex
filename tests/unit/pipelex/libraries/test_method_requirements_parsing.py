@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.libraries.method_requirements import parse_requirements_text
+from pipelex.core.method_trees.requirements_file import parse_requirements_text
 from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
 
 

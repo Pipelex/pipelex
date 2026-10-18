@@ -17,6 +17,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import NamedTuple
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config
 from pipelex.interpreter_hub import resolve_library_dirs
 
@@ -51,18 +52,18 @@ def _excluded_copy_entries(  # kw-only: ignore - shutil.copytree invokes ignore 
 
 
 class PreviewSandbox(NamedTuple):
-    """The mirrored bundle a ``--diff`` preview runs against, plus the copy→original mapping."""
+    """The mirrored bundle or method folder a ``--diff`` preview runs against, plus the copy→original mapping."""
 
-    entry_path: Path
-    """The sandbox path of the entry bundle file (resolved)."""
+    entry_path: Path | None
+    """The sandbox path of the entry bundle file (resolved), or None for a method's folder, which has none."""
     library_dirs: list[Path]
     """The complete effective load scope remapped onto canonical sandbox copies."""
     writable_library_dirs: list[Path]
     """The subset of copied library dirs the real invocation authorized for writes."""
     dir_mappings: list[tuple[Path, Path]]
     """``(copy_root, original_root)`` per explicit ``-L`` dir, both resolved."""
-    entry_mapping: tuple[Path, Path]
-    """``(entry_copy, entry_original)``, both resolved."""
+    entry_mapping: tuple[Path, Path] | None
+    """``(entry_copy, entry_original)``, both resolved, or None for a method's folder."""
 
     def to_original(self, path_str: str) -> str:
         """Map a sandbox file path back to the original it mirrors.
@@ -73,9 +74,10 @@ class PreviewSandbox(NamedTuple):
         dependency's bundle named by its package's address, which resolving would turn into a made-up file.
         """
         resolved = Path(path_str).resolve()
-        entry_copy, entry_original = self.entry_mapping
-        if resolved == entry_copy:
-            return str(entry_original)
+        if self.entry_mapping is not None:
+            entry_copy, entry_original = self.entry_mapping
+            if resolved == entry_copy:
+                return str(entry_original)
         for copy_root, original_root in self.dir_mappings:
             if resolved.is_relative_to(copy_root):
                 return str(original_root / resolved.relative_to(copy_root))
@@ -83,14 +85,26 @@ class PreviewSandbox(NamedTuple):
             return path_str
         return str(resolved)
 
+    def to_copy(self, *, original: Path) -> Path:
+        """The sandbox copy of a file or directory under one of the mirrored directories, such as a method's folder."""
+        resolved = original.resolve()
+        for copy_root, original_root in self.dir_mappings:
+            if resolved.is_relative_to(original_root):
+                return copy_root / resolved.relative_to(original_root)
+        msg = f"'{original}' lies under none of the directories the preview mirrored"
+        raise PipelexUnexpectedError(msg)
+
 
 def mirror_bundle_for_preview(
-    entry_path: Path,
+    entry_path: Path | None,
     *,
     library_dirs: Sequence[Path] | None,
     sandbox_root: Path,
 ) -> PreviewSandbox:
-    """Mirror the entry file and each explicit ``-L`` dir into ``sandbox_root``.
+    """Mirror the entry file, when there is one, and each explicit ``-L`` dir into ``sandbox_root``.
+
+    A method's folder has no entry file: it is one of the ``library_dirs``, and ``PreviewSandbox.to_copy`` finds its
+    copy.
 
     Each effective dir is copied with the loader's configured directory exclusions (the loader
     may read Python files as well as ``.mthds`` files), preserving its internal layout under
@@ -99,7 +113,7 @@ def mirror_bundle_for_preview(
     ``sandbox_root/entry``. Equivalent and overlapping roots collapse to one canonical copy;
     ambient copies are part of load scope but excluded from ``writable_library_dirs``.
     """
-    entry_resolved = entry_path.resolve()
+    entry_resolved = entry_path.resolve() if entry_path is not None else None
     effective_dirs, _ = resolve_library_dirs(library_dirs)
     unique_roots: list[Path] = []
     for library_dir in effective_dirs:
@@ -122,7 +136,7 @@ def mirror_bundle_for_preview(
             copy_root.mkdir(parents=True, exist_ok=True)
         dir_mappings.append((copy_root, original_root))
         remapped_dirs.append(copy_root)
-        if entry_copy is None and entry_resolved.is_relative_to(original_root):
+        if entry_copy is None and entry_resolved is not None and entry_resolved.is_relative_to(original_root):
             entry_copy = copy_root / entry_resolved.relative_to(original_root)
 
     for copy_root, original_root in dir_mappings:
@@ -143,6 +157,14 @@ def mirror_bundle_for_preview(
             copied_link.unlink()
             copied_link.symlink_to(copied_target, target_is_directory=resolved_target.is_dir())
 
+    if entry_resolved is None:
+        return PreviewSandbox(
+            entry_path=None,
+            library_dirs=remapped_dirs,
+            writable_library_dirs=remapped_dirs if library_dirs is not None else [],
+            dir_mappings=dir_mappings,
+            entry_mapping=None,
+        )
     if entry_copy is None:
         entry_dir = sandbox_root / "entry"
         entry_dir.mkdir(parents=True, exist_ok=True)

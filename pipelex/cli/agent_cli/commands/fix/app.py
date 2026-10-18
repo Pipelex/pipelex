@@ -10,5 +10,5 @@ fix_app = typer.Typer(
     no_args_is_help=True,
 )
 
-fix_app.command(name="bundle", help="Fix a bundle file (.mthds) or pipeline directory")(fix_bundle_cmd)
+fix_app.command(name="bundle", help="Fix a bundle file (.mthds) or a method's whole folder")(fix_bundle_cmd)
 fix_app.command(name="function-names", help="Rewrite a method's flat PipeFunc function names as import paths")(fix_function_names_cmd)
