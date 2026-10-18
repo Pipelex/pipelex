@@ -3,10 +3,11 @@
 This router mounts OUTSIDE the authenticated composite `/v1` router, like `/v1/version`: the upload is authorized by
 the signed query of its target (`pipelex_api.blob_upload`), which only a caller who passed the deployment's
 authentication on `POST /v1/blobs/missing` holds, so a sender uploads with exactly the headers the target names. The
-bytes are written under the scope the signature binds, whole: a blob is never changed, so uploading bytes the runner
-already holds at their size succeeds and changes nothing, and only bytes held short, which a storage that does not
-publish writes whole could leave, are written over. Only `blobs/` is ever written here, never a tree's listing under `trees/`,
-so an uploaded file that happens to read as a listing proves nothing.
+bytes are written under the scope the signature binds, whole and create-only (`pipelex_api.blob_store`): a blob is never
+changed, so uploading bytes the runner already holds succeeds and changes nothing, and bytes of another size than the
+object held under their hash, which only damaged storage could hold, are a 500 `BlobStoreCorrupted` rather than written
+over it. Only `blobs/` is ever written here, never a tree's listing under `trees/`, so an uploaded file that happens to
+read as a listing proves nothing.
 """
 
 from typing import Annotated
@@ -55,7 +56,8 @@ async def put_blob(
     403 `BlobUploadNotAuthorized`, as is a query that is not one this runner signs, such as an expiry that is not a
     decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 422 `MethodTreeTooLarge`; and a body whose SHA-256 is not
     the path's a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
-    changes nothing.
+    changes nothing, and uploading bytes whose hash names an object of another size, which only damaged storage could
+    hold, is a 500 `BlobStoreCorrupted` that leaves the object as it is.
     """
     if not is_upload_authorized(scope=scope, sha256=sha256, expires=expires, signature=signature) or scope is None:
         msg = "This upload carries no valid target: ask POST /v1/blobs/missing for one, and upload to the URL it names before it expires."

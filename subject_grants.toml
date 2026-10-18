@@ -48,14 +48,6 @@ rationale = "Emits the formatted success result; single operand."
 param = "error_format"
 rationale = "Setter: installs the agent-CLI error format; single operand."
 
-["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::_handle_resolution_error"]
-param = "error"
-rationale = "Error handler: the resolution error is the single operand handled."
-
-["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::_stringify_library_dirs"]
-param = "library_dirs"
-rationale = "Single-operand conversion of the dirs list."
-
 ["pipelex/cli/agent_cli/commands/bundle_path_resolver.py::resolve_bundle_target"]
 param = "path"
 rationale = "Verb-object: resolves the target path; library_dir stays keyword."
@@ -160,10 +152,6 @@ rationale = "Validates the pipe identified by pipe_code; single operand."
 param = "path"
 rationale = "Verb-object: resolves the target path; library_dir stays keyword."
 
-["pipelex/cli/commands/bundle_path_resolver.py::_handle_resolution_error"]
-param = "error"
-rationale = "Error handler: the resolution error is the single operand handled."
-
 ["pipelex/cli/commands/bundle_path_resolver.py::_stringify_library_dirs"]
 param = "library_dirs"
 rationale = "Single-operand conversion of the dirs list."
@@ -190,7 +178,7 @@ rationale = "Single-operand conversion: maps a sandbox path back to its original
 
 ["pipelex/cli/commands/fix/_diff_sandbox.py::mirror_bundle_for_preview"]
 param = "entry_path"
-rationale = "Verb-object: mirrors the bundle at entry_path; the rest is context."
+rationale = "Verb-object: mirrors the bundle at entry_path, or a method folder with no entry; the rest is context."
 
 ["pipelex/cli/commands/fix/_fix_core.py::_remap_result_to_originals"]
 param = "result"
@@ -199,10 +187,6 @@ rationale = "Verb-object: remaps the result; sandbox is context."
 ["pipelex/cli/commands/fix/_fix_core.py::_remap_validation_error_to_original"]
 param = "item"
 rationale = "Verb-object: remaps the error item; sandbox is context."
-
-["pipelex/cli/commands/fix/_fix_core.py::execute_fix"]
-param = "bundle_path"
-rationale = "Verb-object: fixes the bundle at bundle_path; options stay keyword."
 
 ["pipelex/cli/commands/graph_cmd.py::_do_graph_render"]
 param = "input_file"

@@ -4,7 +4,7 @@ import asyncio
 import difflib
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NoReturn
 
 import typer
 from posthog import tag
@@ -19,10 +19,13 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
     print_traceback_if_requested,
 )
+from pipelex.cli.judged_target import fix_judged_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.libraries.method_trees import method_tree_root
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.fixes.fix_loop import fix_bundle_file
+from pipelex.pipeline.fixes.fix_loop import unfixable_method_result
+from pipelex.pipeline.validate_bundle import dirs_beside_method
 from pipelex.runtime_hub import get_console, get_error_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -34,6 +37,8 @@ if TYPE_CHECKING:
 
     from pipelex.base_exceptions import ValidationErrorItem
     from pipelex.cli.commands.fix._diff_sandbox import PreviewSandbox
+    from pipelex.cli.judged_target import JudgedBundleTarget
+    from pipelex.pipeline.exceptions import ValidateBundleError
     from pipelex.pipeline.fixes.fix_loop import FixBundleResult
     from pipelex.suggested_fix import SuggestedFix
 
@@ -210,11 +215,25 @@ def _print_preview_diffs(*, console: Console, result: FixBundleResult, sandbox: 
         console.print()
 
 
+def _mirrored_dirs(*, target: JudgedBundleTarget) -> list[Path] | None:
+    """The directories the preview mirrors: those the real run loads, a method's folder replaced by its tree's root.
+
+    A folder's tree is rooted at the nearest `METHODS.toml` at or above it, and the real fix may write any bundle of
+    that tree, a sibling of the folder named included: the preview mirrors the root, so its copy holds the manifest and
+    every bundle of the method, and judges the method the real fix judges.
+    """
+    if target.method_dir is None:
+        return target.library_dirs
+    return [
+        method_tree_root(handed_over=target.method_dir),
+        *dirs_beside_method(method_dir=target.method_dir, library_dirs=target.library_dirs),
+    ]
+
+
 def _run_fix_preview(
     *,
     console: Console,
-    bundle_path: Path,
-    library_dirs: list[Path] | None,
+    target: JudgedBundleTarget,
     allow_signatures: bool,
     max_iterations: int | None,
     select_codes: tuple[str, ...] | None,
@@ -222,11 +241,19 @@ def _run_fix_preview(
 ) -> None:
     """Run the real loop against a temp-copy sandbox (D5.6), render diffs, keep the verdict."""
     with tempfile.TemporaryDirectory(prefix="pipelex-fix-preview-") as sandbox_root:
-        sandbox = mirror_bundle_for_preview(bundle_path, library_dirs=library_dirs, sandbox_root=Path(sandbox_root))
+        sandbox = mirror_bundle_for_preview(target.bundle_path, library_dirs=_mirrored_dirs(target=target), sandbox_root=Path(sandbox_root))
+        # The target in the sandbox: a method's folder is found inside its tree root's copy, and the directories it
+        # loads with are the copies of the ones it loads with for real, so the copy is spelled as the original is.
+        sandbox_target = target._replace(
+            bundle_path=sandbox.entry_path,
+            method_dir=sandbox.to_copy(original=target.method_dir) if target.method_dir is not None else None,
+            library_dirs=[sandbox.to_copy(original=library_dir) for library_dir in target.library_dirs]
+            if target.method_dir is not None and target.library_dirs is not None
+            else sandbox.library_dirs,
+        )
         result = asyncio.run(
-            fix_bundle_file(
-                sandbox.entry_path,
-                library_dirs=sandbox.library_dirs,
+            fix_judged_target(
+                target=sandbox_target,
                 writable_library_dirs=sandbox.writable_library_dirs,
                 allow_signatures=allow_signatures,
                 max_iterations=max_iterations,
@@ -237,13 +264,30 @@ def _run_fix_preview(
         if result.files_written:
             _print_preview_diffs(console=console, result=result, sandbox=sandbox)
         display_result = _remap_result_to_originals(result, sandbox=sandbox)
-        _render_fix_result(console=console, result=display_result, bundle_path=bundle_path, allow_signatures=allow_signatures, preview=True)
+        _render_fix_result(console=console, result=display_result, bundle_path=target.judged_path, allow_signatures=allow_signatures, preview=True)
+
+
+def render_refused_method(*, error: ValidateBundleError, method_dir: Path, allow_signatures: bool, preview: bool) -> NoReturn:
+    """Report a method's folder whose tree is refused before anything of it loads, as the fix that fails, exit 1.
+
+    The verdict is the fix loop's still-invalid one, with nothing applied and the refusal as its remaining errors, so
+    the output names the folder and reads as a fix that could not be made, as `validate` names it in its invalid one.
+    """
+    print_traceback_if_requested(console=get_error_console())
+    _render_fix_result(
+        console=get_console(),
+        result=unfixable_method_result(error=error),
+        bundle_path=method_dir,
+        allow_signatures=allow_signatures,
+        preview=preview,
+    )
+    # An invalid verdict always exits 1 in the renderer: this only says so to the type checker.
+    raise typer.Exit(1) from error
 
 
 def execute_fix(
-    bundle_path: Path,
     *,
-    library_dirs: list[Path] | None,
+    target: JudgedBundleTarget,
     allow_signatures: bool = False,
     max_iterations: int | None = None,
     select_codes: tuple[str, ...] | None = None,
@@ -252,14 +296,16 @@ def execute_fix(
 ) -> None:
     """Synchronous entry point wrapping the fix loop with Pipelex setup/teardown.
 
-    Boots with the same profile ``validate`` uses (no inference, real model specs), runs
-    ``fix_bundle_file``, renders the verdict for humans, and tears down in ``finally``.
+    Boots with the same profile ``validate`` uses (no inference, real model specs), runs the fix loop on what
+    ``validate`` judged (``fix_judged_target``: a method's folder, judged whole, else the bundle file), renders the
+    verdict for humans, and tears down in ``finally``.
     Exit codes are presentation: 0 = valid, 1 = negative verdict (still invalid, or valid but
     not runnable without ``--allow-signatures``), 2 = no verdict (bad target, boot failure,
     unexpected exception). ``diff`` previews instead of writing: the same loop runs against a
     temp-copy sandbox and a unified diff is rendered per would-be-written file, with the same
     verdict semantics.
     """
+    judged_path = target.judged_path
     try:
         make_pipelex_for_cli(context=ErrorContext.FIX, needs_inference=False)
         with get_telemetry_manager().telemetry_context():
@@ -270,8 +316,7 @@ def execute_fix(
             if diff:
                 _run_fix_preview(
                     console=get_console(),
-                    bundle_path=bundle_path,
-                    library_dirs=library_dirs,
+                    target=target,
                     allow_signatures=allow_signatures,
                     max_iterations=max_iterations,
                     select_codes=select_codes,
@@ -280,19 +325,19 @@ def execute_fix(
                 return
 
             result = asyncio.run(
-                fix_bundle_file(
-                    bundle_path,
-                    library_dirs=library_dirs,
+                fix_judged_target(
+                    target=target,
+                    writable_library_dirs=None,
                     allow_signatures=allow_signatures,
                     max_iterations=max_iterations,
                     select_codes=select_codes,
                     ignore_codes=ignore_codes,
                 )
             )
-            _render_fix_result(console=get_console(), result=result, bundle_path=bundle_path, allow_signatures=allow_signatures)
+            _render_fix_result(console=get_console(), result=result, bundle_path=judged_path, allow_signatures=allow_signatures)
     except FileNotFoundError as exc:
         print_traceback_if_requested(console=get_error_console())
-        typer.secho(f"Failed to fix: bundle file not found: '{bundle_path}'", fg=typer.colors.RED, err=True)
+        typer.secho(f"Failed to fix: bundle file not found: '{judged_path}'", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.FIX, exit_code=2)
