@@ -100,7 +100,7 @@ class TestProblemRequiredParams:
         assert response.status_code == 200, response.text
         (item,) = _invalid_items(response.json(), code="method.name_conflict")
         assert item["params"] == {"name": "Rating", "conflict": "native_concept"}
-        assert item["location"]["file"] == Data.BUNDLE_PATH
+        assert item["location"] == {"field": "concept.Rating", "file": Data.BUNDLE_PATH}
 
     def test_a_concept_two_bundles_declare_names_both_bundles(self):
         response = _build_client().post("/v1/validate", json={"files": Data.DUPLICATE_BUNDLES})
@@ -109,6 +109,22 @@ class TestProblemRequiredParams:
         assert sorted(item["location"]["file"] for item in items) == sorted(Data.DUPLICATE_BUNDLES), items
         for item in items:
             assert item["params"] == {"name": "dup.Doc", "conflict": "duplicate_declaration"}, item
+            assert item["location"]["field"] == "concept.Doc", item
+
+    def test_a_run_refused_for_a_native_concept_redeclared_locates_the_declaration(self):
+        body = {"files": {Data.BUNDLE_PATH: Data.NATIVE_REDECLARATION_MTHDS}, "inputs": {"text": "x"}}
+        problem = assert_problem(_build_client().post("/v1/execute", json=body), status=422, code="method.invalid")
+        (item,) = [item for item in problem["errors"] if item["code"] == "method.name_conflict"]
+        assert item["params"] == {"name": "Rating", "conflict": "native_concept"}
+        assert item["location"] == {"field": "concept.Rating", "file": Data.BUNDLE_PATH}
+
+    def test_a_run_refused_for_a_concept_two_bundles_declare_locates_both_declarations(self):
+        body = {"files": Data.DUPLICATE_RUNNABLE_BUNDLES, "inputs": {"text": "x"}}
+        problem = assert_problem(_build_client().post("/v1/execute", json=body), status=422, code="method.invalid")
+        items = [item for item in problem["errors"] if item["code"] == "method.name_conflict"]
+        assert sorted((item["location"]["file"], item["location"]["field"]) for item in items) == [
+            (path, "concept.Doc") for path in sorted(Data.DUPLICATE_RUNNABLE_BUNDLES)
+        ], items
 
     def test_a_dependency_keyed_by_its_repository_address_names_the_address_to_key_it_by(self):
         body = {"files": {Data.BUNDLE_PATH: Data.CALLER_MTHDS}, "dependencies": {Data.DEPENDENCY_REPOSITORY_ADDRESS: Data.DEPENDENCY_TREE}}

@@ -53,3 +53,15 @@ class TestDuplicateRefItems:
 
         assert [(item.source, item.message) for item in items] == expected_items
         assert all(item.params == {"name": "scoring.compute_score", "conflict": "duplicate_declaration"} for item in items)
+        # Each item names the table that declares the name, where a caller edits its bundle.
+        assert all(item.field_path == "pipe.compute_score" for item in items)
+
+    def test_a_concept_declared_twice_is_located_on_its_table(self) -> None:
+        items = duplicate_ref_items(
+            ref_kind=DeclarationKind.CONCEPT, ref="scoring.Score", existing_source="first.mthds", incoming_source="second.mthds"
+        )
+
+        assert [(item.source, item.concept_code, item.field_path) for item in items] == [
+            ("second.mthds", "Score", "concept.Score"),
+            ("first.mthds", "Score", "concept.Score"),
+        ]

@@ -397,7 +397,12 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
         item_params.setdefault("suggestions", [])
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
-    location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
+    field = item.field_name or item.field_path or None
+    if field is None and code == CoreCode.METHOD_NAME_CONFLICT:
+        # A name conflict has a place even when its stage gave no field: the declaration that collides, by its
+        # bundle-root path, such as `concept.Rating`, which a caller edits.
+        field = _declaration_path(item=item)
+    location = make_location(pipe=item.pipe_code, field=field, file=item.source, line=line, column=column)
     return make_problem_item(
         code=code,
         params=item_params,

@@ -406,6 +406,8 @@ def categorize_blueprint_validation_error(
             domain_code=domain,
             source=source,
             concept_code=wrapped_native_redeclaration.concept_code,
+            # The table that redeclares it, by its bundle-root path, where a caller edits the bundle.
+            field_path=f"concept.{wrapped_native_redeclaration.concept_code}",
             # The exception's own clean message, not the pydantic ``msg`` (which carries a
             # "Value error, " prefix) — same choice as the wrapped-pipe-error path above.
             message=str(wrapped_native_redeclaration),

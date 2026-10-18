@@ -54,8 +54,9 @@ def duplicate_ref_items(
     """The faults of a declaration made twice, one per bundle that makes it, for a verdict to locate each in its bundle.
 
     Each item names the declaration by its qualified ref and the conflict, the parameters of ``method.name_conflict``,
-    and is located on its bundle and its declaration, so the verdict names both bundles: the one that declared it first
-    and the one whose declaration was refused. A ref declared twice in one bundle is one item; two declarations whose
+    and is located on its bundle and its declaration, the table that declares it by its bundle-root path
+    (``concept.Score``, ``pipe.compute_score``), so the verdict names both bundles: the one that declared it first and
+    the one whose declaration was refused. A ref declared twice in one bundle is one item; two declarations whose
     bundles are unknown are two, since nothing shows them to be one bundle's.
 
     Args:
@@ -85,13 +86,23 @@ def duplicate_ref_items(
             case DeclarationKind.CONCEPT:
                 items.append(
                     PipelexBundleBlueprintValidationErrorData(
-                        source=source, domain_code=domain_code or None, concept_code=code, message=message, params=params
+                        source=source,
+                        domain_code=domain_code or None,
+                        concept_code=code,
+                        field_path=f"{ref_kind}.{code}",
+                        message=message,
+                        params=params,
                     )
                 )
             case DeclarationKind.PIPE:
                 items.append(
                     PipelexBundleBlueprintValidationErrorData(
-                        source=source, domain_code=domain_code or None, pipe_code=code, message=message, params=params
+                        source=source,
+                        domain_code=domain_code or None,
+                        pipe_code=code,
+                        field_path=f"{ref_kind}.{code}",
+                        message=message,
+                        params=params,
                     )
                 )
     return items

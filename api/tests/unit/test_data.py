@@ -179,6 +179,14 @@ prompt = "@text"
         "first/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the first bundle declares it"\n',
         "second/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the second bundle declares it"\n',
     }
+    # The same collision in a method a run can start: the first bundle names its main pipe.
+    DUPLICATE_RUNNABLE_BUNDLES: ClassVar[dict[str, str]] = {
+        "first/declares.mthds": (
+            'domain = "dup"\nmain_pipe = "echo"\n\n[concept]\nDoc = "A document, as the first bundle declares it"\n\n'
+            '[pipe.echo]\ntype = "PipeCompose"\ndescription = "Echo"\ninputs = { text = "Text" }\noutput = "Text"\ntemplate = "{{ text }}"\n'
+        ),
+        "second/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the second bundle declares it"\n',
+    }
 
     DEPENDENCY_REPOSITORY_ADDRESS = "github.com/invented/probe-lib"
     DEPENDENCY_ADDRESS = f"{DEPENDENCY_REPOSITORY_ADDRESS}/probe"
