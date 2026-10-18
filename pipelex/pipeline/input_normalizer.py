@@ -120,6 +120,15 @@ class _PreparationContext(NamedTuple):
 _URL_FIELD = "url"
 
 
+def _url_refusal_params(*, path: FileInputPath) -> dict[str, str]:
+    """The `input` and `field` of an `input.invalid` refusal of a file input's url, by `InputShapingError`'s convention.
+
+    `input` is the root input, the first segment of the path, and `field` the dotted path inside it down to the url,
+    the root included: `photo.url` for an image input, `case.attachments[0].url` for a file a structure holds.
+    """
+    return {"input": str(path[0]), "field": f"{format_file_input_path(path)}.{_URL_FIELD}"}
+
+
 class FileInputUnreadableReason(StrEnum):
     """Why a file input could not be read, the `reason` of `input.file_unreadable`."""
 
@@ -385,7 +394,7 @@ async def _prepare_url_content(
     input_name = format_file_input_path(path)
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
-        raise PipelineInputUrlMissingError(msg).with_params(input=input_name, field=_URL_FIELD)
+        raise PipelineInputUrlMissingError(msg).with_params(**_url_refusal_params(path=path))
 
     # Before anything reads or links the url. A signed link is a read by whoever holds it, so a
     # foreign storage reference is refused here rather than read or signed; a local path is refused
@@ -396,7 +405,7 @@ async def _prepare_url_content(
     async with context.semaphore:
         match resolved_uri:
             case ResolvedHttpUrl():
-                return _prepare_http_url(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
+                return _prepare_http_url(content=content, resolved_uri=resolved_uri, path=path, context=context)
             case ResolvedPipelexStorage():
                 return await _prepare_storage_reference(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
             case ResolvedBase64DataUrl():
@@ -406,7 +415,7 @@ async def _prepare_url_content(
 
 
 def _prepare_http_url(
-    *, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, input_name: str, context: _PreparationContext
+    *, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, path: FileInputPath, context: _PreparationContext
 ) -> NormalizableContent:
     # Never fetched: setup makes no outbound request to a host the caller chose. The operator that
     # consumes the input fetches it and reports a real failure. Its format is only what the caller
@@ -418,7 +427,7 @@ def _prepare_http_url(
         validate_http_url_syntax(url=resolved_uri.url)
     except ValueError as exc:
         msg = f"{type(content).__name__} input: {exc}"
-        raise PipelineInputUrlInvalidError(msg).with_params(input=input_name, field=_URL_FIELD) from exc
+        raise PipelineInputUrlInvalidError(msg).with_params(**_url_refusal_params(path=path)) from exc
     if content.public_url is not None:
         return content
     return content.model_copy(update={"public_url": content.url})

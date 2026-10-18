@@ -23,6 +23,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineInputContentError, PipelineInputUrlInvalidError, PipelineInputUrlMissingError
@@ -35,6 +36,15 @@ def _memory_with_document(url: str) -> WorkingMemory:
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
         content=DocumentContent(url=url),
         name="document",
+    )
+    return WorkingMemoryFactory.make_from_single_stuff(stuff)
+
+
+def _memory_with_documents(urls: list[str]) -> WorkingMemory:
+    stuff = StuffFactory.make_stuff(
+        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+        content=ListContent[DocumentContent](items=[DocumentContent(url=url) for url in urls]),
+        name="documents",
     )
     return WorkingMemoryFactory.make_from_single_stuff(stuff)
 
@@ -71,6 +81,37 @@ class TestInputNormalizerUrlGuards:
         assert caller.code == CoreCode.INPUT_INVALID
         assert caller.next_step.kind == StepKind.CHANGE_INPUT
         assert "not a valid http(s) URL" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        ("memory", "expected_params"),
+        [
+            pytest.param(_memory_with_document(""), {"input": "document", "field": "document.url"}, id="blank_url_of_an_input"),
+            pytest.param(_memory_with_document("https://"), {"input": "document", "field": "document.url"}, id="malformed_url_of_an_input"),
+            pytest.param(
+                _memory_with_documents(["https://example.com/a.pdf", " "]),
+                {"input": "documents", "field": "documents[1].url"},
+                id="blank_url_of_a_list_item",
+            ),
+            pytest.param(
+                _memory_with_documents(["https://example.com/a.pdf", "https://"]),
+                {"input": "documents", "field": "documents[1].url"},
+                id="malformed_url_of_a_list_item",
+            ),
+        ],
+    )
+    async def test_a_url_refusal_names_the_root_input_and_the_full_path_to_its_url(
+        self, mocker: MockerFixture, memory: WorkingMemory, expected_params: dict[str, str]
+    ) -> None:
+        """`input` is the root input's name and `field` the full path ending in `.url`, as every `input.invalid` refusal names them."""
+        _patch_storage_and_config(mocker)
+
+        with pytest.raises(PipelineInputContentError) as exc_info:
+            await prepare_file_inputs(memory, storage_scope="test/scope", read_scope=None, is_relocation_enabled=True)
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == expected_params
 
     async def test_well_formed_http_url_passes_through_unchanged(self, mocker: MockerFixture) -> None:
         """A well-formed http(s) url is not fetched or probed at shaping time, and it becomes its own public_url."""
