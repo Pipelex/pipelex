@@ -71,4 +71,4 @@ def refuse_llm_setting_its_model_refuses(
             pipe_code=pipe_code,
             field_name=field_name,
             model_reference=model_reference,
-        ).with_params(model=model_reference or llm_setting.model, capability=refusal.given_params.get("capability")) from refusal
+        ).with_params(model=model_reference or llm_setting.model, capability=refusal.caller_params().get("capability")) from refusal
