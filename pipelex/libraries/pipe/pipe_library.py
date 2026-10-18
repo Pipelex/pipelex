@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from itertools import groupby
 from typing import Self
 
@@ -27,6 +28,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     # The aliased keys of dependency pipes the package meant to load but that failed to build, with the reason, so a
     # reference to one is refused naming that failure rather than as a pipe the package does not have.
     _unbuilt_dependency_reasons: dict[str, str] = PrivateAttr(default_factory=dict)
+    # The refs of the pipes a caller's own bundles declare, when they are loaded beside a host's library directories:
+    # a refusal the caller reads offers only these among the library's own pipes, since the host's are its own to name.
+    # None when every own pipe is the caller's.
+    _caller_pipe_refs: frozenset[str] | None = PrivateAttr(default=None)
     # Replaced on every change to what the library holds, so a value derived from the pipes it resolves knows it is stale.
     _state_token: int = PrivateAttr(default_factory=next_library_state_token)
 
@@ -48,6 +53,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self._private_dependency_keys = set()
         self._withheld_dependency_keys = set()
         self._unbuilt_dependency_reasons = {}
+        self._caller_pipe_refs = None
         self._mark_changed()
 
     @override
@@ -202,7 +208,22 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if QualifiedRef.has_cross_package_prefix(pipe_code):
             alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
             return self.dependency_pipe_keys(alias=alias, with_private=False)
-        return [pipe.pipe_ref for pipe in self.get_own_pipes()]
+        return self.selectable_own_pipe_refs()
+
+    def set_caller_pipe_refs(self, *, pipe_refs: Iterable[str]) -> None:
+        """Record the pipes the caller's own bundles declare, loaded beside a host's library directories.
+
+        From then on a refusal the caller reads offers only these among the library's own pipes, as a verdict names
+        none of the host's files: the host's pipes are its own, and their refs are not the caller's to read.
+        """
+        self._caller_pipe_refs = frozenset(pipe_refs)
+
+    @override
+    def selectable_own_pipe_refs(self) -> list[str]:
+        own_pipe_refs = [pipe.pipe_ref for pipe in self.get_own_pipes()]
+        if self._caller_pipe_refs is None:
+            return own_pipe_refs
+        return [pipe_ref for pipe_ref in own_pipe_refs if pipe_ref in self._caller_pipe_refs]
 
     def dependency_pipe_keys(self, *, alias: str, with_private: bool) -> list[str]:
         """The aliased keys, `alias->domain.code`, of the pipes the package loaded as `alias` holds in this library.
@@ -282,15 +303,16 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         return sorted(key for key in keys if key.startswith(f"{alias}->") and key.endswith(f".{remainder}"))
 
     @override
-    def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
+    def get_required_pipe(self, pipe_code: str, *, referring_pipe_code: str | None = None) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
             msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in MTHDS file in an imported package."
-            # The library knows the ref that names nothing but not the pipe whose body wrote it; the caller that does
-            # gives `pipe`. The candidates are the refs of the scope the ref is read in: the package it names, or this
-            # library's own pipes.
+            # The candidates are the refs of the scope the ref is read in: the package it names, or this library's own pipes.
             candidates = close_pipe_refs(name=pipe_code, pipe_refs=self._scope_pipe_refs(pipe_code=pipe_code))
-            raise PipeNotFoundError(msg).with_params(missing=pipe_code, candidates=candidates)
+            refusal = PipeNotFoundError(msg).with_params(missing=pipe_code, candidates=candidates)
+            if referring_pipe_code is not None:
+                refusal = refusal.with_params(pipe=referring_pipe_code)
+            raise refusal
         return the_pipe
 
     @override

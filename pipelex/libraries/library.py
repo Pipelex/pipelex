@@ -364,9 +364,8 @@ class Library(BaseModel):
         unrelated package happens to be installed is worse than suggesting nothing.
         """
         by_code: dict[str, list[str]] = defaultdict(list)
-        for pipe_ref in self.pipe_library.root:
-            if QualifiedRef.has_cross_package_prefix(pipe_ref):
-                continue
+        # The own pipes a caller may be offered: beside a host's library directories, the caller's alone.
+        for pipe_ref in self.pipe_library.selectable_own_pipe_refs():
             by_code[QualifiedRef.parse(pipe_ref).local_code].append(pipe_ref)
         return by_code
 

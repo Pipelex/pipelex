@@ -246,7 +246,7 @@ class PipeSequence(PipeController):
                 if sub_pipe is None:
                     continue
             else:
-                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code, referring_pipe_code=self.code)
             # Use the centralized recursion detection
             sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
@@ -731,7 +731,7 @@ class PipeSequence(PipeController):
             # Skip output validation if the last step is an unresolved cross-package ref
             if QualifiedRef.has_cross_package_prefix(last_step_pipe_code) and get_optional_pipe(pipe_code=last_step_pipe_code) is None:
                 return
-            last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
+            last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code, referring_pipe_code=self.code)
             last_step_concept = last_step_pipe.output.concept
             last_step_label = f" '{last_step_pipe.code}'"
             # What the step stores under its result, resolved exactly the way the run path and the typed flow resolve it

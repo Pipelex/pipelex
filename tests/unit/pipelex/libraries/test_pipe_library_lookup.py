@@ -173,23 +173,20 @@ class TestPipeLibraryLookup:
         assert problem.domain == ProblemDomain.METHOD
         assert exc_info.value.message not in str(problem.to_wire())
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="the library knows the ref that names nothing, not the pipe whose body wrote it: the located failure of a run gives `pipe`"
-    )
     def test_in_body_required_miss_carries_the_method_code(self, mocker: MockerFixture):
         """`get_required_pipe` is the in-body door and keeps raising the plain error, with the method's code."""
         library = PipeLibrary.make_empty()
         library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         with pytest.raises(PipeNotFoundError) as exc_info:
-            library.get_required_pipe("scoring.compute_scor")
+            library.get_required_pipe("scoring.compute_scor", referring_pipe_code="review")
         assert not isinstance(exc_info.value, EntryPipeNotFoundError)
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == CoreCode.METHOD_PIPE_UNRESOLVED
         assert problem.domain == ProblemDomain.METHOD
         assert exc_info.value.message not in str(problem.to_wire())
-        # What the library knows: the ref that names nothing, and the pipes nearest it.
+        # The pipe whose body writes the ref, the ref that names nothing, and the pipes nearest it.
         assert problem.params is not None
-        assert problem.params.as_wire() == {"missing": "scoring.compute_scor", "candidates": ["scoring.compute_score"]}
+        assert problem.params.as_wire() == {"pipe": "review", "missing": "scoring.compute_scor", "candidates": ["scoring.compute_score"]}
 
     @pytest.mark.parametrize(
         ("selection", "expected_suggestions"),

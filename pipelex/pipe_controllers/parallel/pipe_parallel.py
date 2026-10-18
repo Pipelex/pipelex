@@ -126,7 +126,7 @@ class PipeParallel(PipeController):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
-            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
             if sub_pipe.batch_params:
@@ -403,7 +403,7 @@ class PipeParallel(PipeController):
             field_annotation = structure_class.model_fields[sub_pipe.output_name].annotation
             if not isinstance(field_annotation, type) or not issubclass(field_annotation, StuffContent):
                 continue
-            branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             if output_multiplicity_to_apply(
                 base_multiplicity=branch_pipe.output.multiplicity,
                 override_multiplicity=sub_pipe.output_multiplicity,
@@ -674,7 +674,7 @@ class PipeParallel(PipeController):
         # Validate that all sub-pipes exist before dispatching the dry branches
         for sub_pipe in self.parallel_sub_pipes:
             try:
-                get_required_pipe(pipe_code=sub_pipe.pipe_code)
+                get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             except PipeNotFoundError as exc:
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc

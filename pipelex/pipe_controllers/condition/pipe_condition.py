@@ -100,7 +100,7 @@ class PipeCondition(PipeController):
 
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
-            required_variables.update(get_required_pipe(pipe_code=pipe_code).required_variables())
+            required_variables.update(get_required_pipe(pipe_code=pipe_code, referring_pipe_code=self.code).required_variables())
 
         # Exclude internal variables starting with `_`
         return {var for var in required_variables if not var.startswith("_")}
@@ -242,7 +242,7 @@ class PipeCondition(PipeController):
 
         # Add the inputs needed by all possible target pipes
         for pipe_code in self.pipe_dependencies():
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_pipe(pipe_code=pipe_code, referring_pipe_code=self.code)
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
 
@@ -315,7 +315,7 @@ class PipeCondition(PipeController):
         # silently escape through the condition boundary.
         if not self.output.presence.is_optional:
             for pipe_code in sorted(mapped_pipe_codes):
-                mapped_pipe = get_required_pipe(pipe_code=pipe_code)
+                mapped_pipe = get_required_pipe(pipe_code=pipe_code, referring_pipe_code=self.code)
                 if mapped_pipe.output.presence.is_optional:
                     msg = (
                         f"PipeCondition '{self.code}' maps outcome pipe '{pipe_code}' whose output "
@@ -361,7 +361,7 @@ class PipeCondition(PipeController):
         # Collect all unique output concept refs from mapped pipes
         mapped_output_refs: set[str] = set()
         for pipe_code in mapped_pipe_codes:
-            pipe = get_required_pipe(pipe_code=pipe_code)
+            pipe = get_required_pipe(pipe_code=pipe_code, referring_pipe_code=self.code)
             mapped_output_refs.add(pipe.output.concept.concept_ref)
 
         all_outputs_same = len(mapped_output_refs) == 1
@@ -523,7 +523,7 @@ class PipeCondition(PipeController):
                 .with_params(outcome=outcome)
             )
 
-        chosen_pipe = get_required_pipe(pipe_code=outcome)
+        chosen_pipe = get_required_pipe(pipe_code=outcome, referring_pipe_code=self.code)
 
         # Get required variables and validate they exist in working memory
         # Extract root names from full paths for looking up stuffs in working memory
@@ -598,12 +598,12 @@ class PipeCondition(PipeController):
         """
         pipes_by_visit_key: dict[str, PipeAbstract] = {}
         for pipe_code in sorted(self.pipe_dependencies()):
-            outcome_pipe = get_required_pipe(pipe_code=pipe_code)
+            outcome_pipe = get_required_pipe(pipe_code=pipe_code, referring_pipe_code=self.code)
             pipes_by_visit_key.setdefault(outcome_pipe.visit_key, outcome_pipe)
         group_pipes = list(pipes_by_visit_key.values())
         if not self.default_outcome or self.default_outcome in SpecialOutcome.value_list():
             return group_pipes
-        default_pipe = get_required_pipe(pipe_code=self.default_outcome)
+        default_pipe = get_required_pipe(pipe_code=self.default_outcome, referring_pipe_code=self.code)
         return [outcome_pipe for outcome_pipe in group_pipes if outcome_pipe is not default_pipe] + [default_pipe]
 
     def _record_resolution(self, *, job_metadata: JobMetadata, evaluated_expression: str, outcome: str) -> None:

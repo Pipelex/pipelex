@@ -29,7 +29,7 @@ from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
-from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs
+from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs, declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -280,6 +280,9 @@ async def validate_bundle(
                 if submitted_files:
                     check_submitted_files(blueprints=loaded_blueprints, submitted_files=submitted_files)
                     library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
+                if not library_dirs_are_callers:
+                    # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
+                    library.pipe_library.set_caller_pipe_refs(pipe_refs=declared_pipe_refs(blueprints=loaded_blueprints))
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),

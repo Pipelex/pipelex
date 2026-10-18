@@ -84,7 +84,7 @@ class SubPipe(BaseModel):
         if self.output_multiplicity is not None:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
 
-        sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
+        sub_pipe = get_required_pipe(pipe_code=self.pipe_code, referring_pipe_code=calling_pipe_code)
 
         # Case 1: Batch processing
         if batch_params := self.batch_params:

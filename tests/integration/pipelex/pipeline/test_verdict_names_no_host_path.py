@@ -151,6 +151,28 @@ prompt      = "Write a short notice for the harbour board from these tide times:
 """
 
 
+# The caller's bundle whose sequence calls a pipe by a code that is a slip from the host's `pin_board_notice`.
+_MISTYPED_STEP_CALLER_BUNDLE = """
+domain      = "harbour_notices"
+description = "Post notices on the harbour board"
+main_pipe   = "post_board_notice"
+
+[pipe.post_board_notice]
+type        = "PipeSequence"
+description = "Write the notice, then post it"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+steps       = [{ pipe = "pin_board_notic", result = "notice" }]
+
+[pipe.write_board_notice]
+type        = "PipeLLM"
+description = "Write the notice for the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
+"""
+
+
 # A host library bundle whose PipeFunc's tree holds a module named like a standard-library module: the
 # refusal names the module, the tree file and the bundle, never the tree's directory on the host.
 _HOST_PIPE_FUNC_BUNDLE = """
@@ -407,6 +429,23 @@ class TestVerdictNamesNoHostPath:
         assert "harbour_board.pin_board_notice" in item.message
         assert HOST_LIBRARY_FILE_PLACEHOLDER in item.message
         _assert_names_no_host_path(payload=_caller_payload(raised.value), tmp_path=tmp_path)
+
+    async def test_a_mistyped_selection_is_offered_no_pipe_of_the_host_s_library(self, tmp_path: Path) -> None:
+        with pytest.raises(PipelexError) as raised:
+            await _run_setup(
+                mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[str(_valid_host_library(tmp_path=tmp_path))], pipe_code="pin_board_notic"
+            )
+
+        assert raised.value.caller_params() == {"pipe": "pin_board_notic", "suggestions": ["harbour_notices.write_board_notice"]}
+
+    async def test_a_mistyped_reference_is_offered_no_pipe_of_the_host_s_library(self, tmp_path: Path) -> None:
+        with pytest.raises(ValidateBundleError) as raised:
+            await validate_bundle(mthds_contents=[_MISTYPED_STEP_CALLER_BUNDLE], library_dirs=[_valid_host_library(tmp_path=tmp_path)])
+
+        (item,) = raised.value.validation_error_items() or []
+        assert item.params is not None
+        assert item.params["candidates"] == ["harbour_notices.post_board_notice", "harbour_notices.write_board_notice"]
+        assert "pin_board_notice" not in item.message
 
     async def test_a_run_answers_a_host_library_refusal_without_a_host_path(self, tmp_path: Path) -> None:
         host_library_dir = tmp_path / "host" / "library"
