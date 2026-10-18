@@ -13,6 +13,6 @@ def is_safe_fix_for_load_scope(fix: SuggestedFix, *, is_single_file: bool) -> bo
     return fix.source is not None or is_single_file
 
 
-def is_target_in_write_scope(target_path: Path, *, entry_path: Path, writable_dirs: Sequence[Path]) -> bool:
-    """Whether a target is the entry file or lies under an explicitly writable directory."""
+def is_target_in_write_scope(target_path: Path, *, entry_path: Path | None, writable_dirs: Sequence[Path]) -> bool:
+    """Whether a target is the entry file, when there is one, or lies under an explicitly writable directory."""
     return target_path == entry_path or any(target_path.is_relative_to(writable_dir) for writable_dir in writable_dirs)

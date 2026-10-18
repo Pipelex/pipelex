@@ -156,18 +156,38 @@ def do_validate_all_libraries_and_dry_run(*, library_dirs: list[Path] | None = N
 
 
 async def _validate_pipe_or_bundle(
-    *, pipe_code: str | None = None, bundle_path: Path | None = None, library_dirs: list[Path] | None = None, allow_signatures: bool = False
+    *,
+    pipe_code: str | None = None,
+    bundle_path: Path | None = None,
+    method_dir: Path | None = None,
+    library_dirs: list[Path] | None = None,
+    allow_signatures: bool = False,
 ) -> None:
-    """Core async validation logic shared between method and pipe subcommands."""
+    """Core async validation logic shared between the bundle, method and pipe subcommands.
+
+    A method's folder is judged whole, every bundle of its method tree, with ``library_dirs`` loaded beside it.
+    """
     with MethodValidationReport() as validation_report:
-        if bundle_path:
+        judged_path = method_dir or bundle_path
+        if judged_path:
+            judged_label = f"the method at '{method_dir}'" if method_dir else f"bundle '{bundle_path}'"
+            judged_subject = f"The method at '{method_dir}'" if method_dir else f"Bundle '{bundle_path}'"
             try:
-                bundle_result = await validate_bundle(
-                    mthds_file_path=bundle_path,
-                    library_dirs=library_dirs,
-                    allow_signatures=allow_signatures,
-                    collect_dry_run_warnings=True,
-                )
+                if method_dir:
+                    bundle_result = await validate_bundle(
+                        method_dir=method_dir,
+                        library_dirs=library_dirs,
+                        library_dirs_are_callers=True,
+                        allow_signatures=allow_signatures,
+                        collect_dry_run_warnings=True,
+                    )
+                else:
+                    bundle_result = await validate_bundle(
+                        mthds_file_path=bundle_path,
+                        library_dirs=library_dirs,
+                        allow_signatures=allow_signatures,
+                        collect_dry_run_warnings=True,
+                    )
                 # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
                 # as `validate --all`. A method with an unimplemented placeholder is the state an author
                 # is most often in while building, and it is exactly then that the advisories help.
@@ -190,7 +210,7 @@ async def _validate_pipe_or_bundle(
                 if bundle_result.pending_signatures and not allow_signatures:
                     pending = ", ".join(bundle_result.pending_signatures)
                     typer.secho(
-                        f"Bundle '{bundle_path}' is valid but NOT yet runnable — unimplemented PipeSignature placeholder(s): {pending}\n"
+                        f"{judged_subject} is valid but NOT yet runnable — unimplemented PipeSignature placeholder(s): {pending}\n"
                         "Implement them, or re-run with --allow-signatures to accept placeholders.",
                         fg=typer.colors.RED,
                         err=True,
@@ -198,19 +218,19 @@ async def _validate_pipe_or_bundle(
                     raise typer.Exit(1)
                 signature_count = sum(1 for pipe in bundle_result.pipes if pipe.is_signature)
                 typer.secho(
-                    f"Successfully validated bundle '{bundle_path}'{_format_signatures_summary_suffix(signature_count=signature_count)}",
+                    f"Successfully validated {judged_label}{_format_signatures_summary_suffix(signature_count=signature_count)}",
                     fg=typer.colors.GREEN,
                 )
             except FileNotFoundError as exc:
                 get_console().print(Traceback())
                 typer.secho(
-                    f"Failed to load bundle '{bundle_path}':",
+                    f"Failed to load {judged_label}:",
                     fg=typer.colors.RED,
                     err=True,
                 )
                 raise typer.Exit(2) from exc
             except ValidateBundleError as bundle_error:
-                handle_validate_bundle_error(bundle_error, bundle_path=bundle_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+                handle_validate_bundle_error(bundle_error, bundle_path=judged_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
         elif pipe_code:
             library_manager = get_library_manager()
             library_id, _ = library_manager.open_library()
@@ -263,6 +283,7 @@ def execute_validate(
     pipe_code: str | None,
     bundle_path: Path | None,
     library_dirs: list[Path] | None,
+    method_dir: Path | None = None,
     telemetry_command_label: str = COMMAND,
     allow_signatures: bool = False,
     orchestrator: str | None = None,
@@ -289,6 +310,7 @@ def execute_validate(
                 _validate_pipe_or_bundle(
                     pipe_code=pipe_code,
                     bundle_path=bundle_path,
+                    method_dir=method_dir,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
                 )

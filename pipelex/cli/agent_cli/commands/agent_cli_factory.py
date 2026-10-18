@@ -5,7 +5,7 @@ import sys
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, NoReturn
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
@@ -163,6 +163,37 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
+def report_agent_init_failure(*, error: Exception) -> NoReturn:
+    """Report a failure to initialize Pipelex, or to read the configuration it boots from, as the agent error envelope.
+
+    The one account of a failed boot, given whether the boot raised it or a step reading this machine's configuration
+    before the boot did, such as listing a method's tree under the configured limits: the same configuration fails the
+    same way wherever it is first read.
+    """
+    if isinstance(error, TelemetryConfigValidationError):
+        agent_error(error.message, error_type="TelemetryConfigValidationError", cause=error)
+    if isinstance(error, FormerReleaseConfigError):
+        # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
+        # everything but what a former release left, and an agent can run it.
+        agent_error(error.message, error_type="FormerReleaseConfigError", cause=error)
+    if isinstance(error, ModelDeckPresetValidationError):
+        agent_error(
+            error.message,
+            error_type="ModelDeckPresetValidationError",
+            cause=error,
+            preset_id=error.preset_id,
+            model_type=str(error.model_type),
+            model_handle=error.model_handle,
+            enabled_backends=sorted(error.enabled_backends),
+        )
+    agent_error(
+        f"Pipelex initialization failed: {error}",
+        error_type=type(error).__name__,
+        cause=error,
+        hint=AGENT_INIT_FAILURE_HINT,
+    )
+
+
 def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
     """Initialize Pipelex for agent CLI commands with JSON error output.
 
@@ -210,30 +241,10 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
             needs_inference=needs_inference,
             config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
         )
-    except TelemetryConfigValidationError as exc:
-        agent_error(exc.message, error_type="TelemetryConfigValidationError", cause=exc)
-    except FormerReleaseConfigError as exc:
-        # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
-        # everything but what a former release left, and an agent can run it.
-        agent_error(exc.message, error_type="FormerReleaseConfigError", cause=exc)
-    except ModelDeckPresetValidationError as exc:
-        agent_error(
-            exc.message,
-            error_type="ModelDeckPresetValidationError",
-            cause=exc,
-            preset_id=exc.preset_id,
-            model_type=str(exc.model_type),
-            model_handle=exc.model_handle,
-            enabled_backends=sorted(exc.enabled_backends),
-        )
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(
-            f"Pipelex initialization failed: {exc}",
-            error_type=type(exc).__name__,
-            cause=exc,
-            hint=AGENT_INIT_FAILURE_HINT,
-        )
+        # Agent CLI command boundary: report_agent_init_failure() (NoReturn) converts any boot failure into the structured
+        # error payload, the known configuration failures with their own fields and hints.
+        report_agent_init_failure(error=exc)
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the
     # structured success/error envelope. Defense-in-depth on top of the init-time

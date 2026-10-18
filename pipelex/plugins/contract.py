@@ -74,13 +74,25 @@ if TYPE_CHECKING:
 # method tree; and the error that arm raises for a URL naming no such file (``TemplateUrlRefusedError``), which an engine
 # lets pass as it came. An engine written before them ignores ``base_url`` and keeps refusing a relative URL, as it did.
 #
-# v8 changed what crosses the plugin contract for a failure, now that every failure is a problem document seen through
+# v8 changed what a host hands a bundle validator: ``validate_bundles`` takes ``read_scope``, the scope the host named for
+# the validation, ``None`` when it named none, so a validator dispatching the validation to another process hands the
+# method's trees to its worker through that scope's blob store and the worker reads them under it, as a run's worker
+# reads under the run's read scope (``BundleValidatorProtocol``). A validator written against v7 would be called with a
+# keyword it does not accept on its first validation; the bump turns that into a discovery-time mismatch naming the
+# plugin.
+#
+# The PipeFunc package-offer factory changed under v8 too, before any release carried v8: a
+# ``PipeFuncPackageOfferFactoryFn`` receives a ``PipeFuncPackageOfferRequest``, the pipe_func config and the requirements
+# of the one method being judged, where it received the config alone, and may answer a ``PipeFuncPackageRefusal``
+# beside an offer or ``None``. A factory written against v7 would read the request as the config it expected.
+#
+# v9 changed what crosses the plugin contract for a failure, now that every failure is a problem document seen through
 # the view of its reader. An HTTP-error mapper (``add_http_error_mapper``) returns the ``PipelexError`` a transport
 # exception stands for, whose problem the host builds in the view of whoever asked, where it returned a report; and a
 # bundle validator's ``validate_bundles`` returns a ``BundleValidationFailure`` as its invalid arm, the refusal's
-# problem in the operator's view with its validation items, where it returned a report. A plugin written against v7
+# problem in the operator's view with its validation items, where it returned a report. A plugin written against v8
 # would hand back a type that is gone; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 8
+PLUGIN_API_VERSION: int = 9
 
 
 @runtime_checkable

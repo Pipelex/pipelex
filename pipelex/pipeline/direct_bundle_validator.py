@@ -48,6 +48,9 @@ class DirectBundleValidator:
         submitted_files: Mapping[str, bytes] | None,
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
+        # The in-process arm reads every file of the method in this process, from the trees its libraries hold, and
+        # reads no blob store, so the scope a dispatched arm hands its worker the trees through has no use here.
+        read_scope: str | None,  # ruff: ignore[unused-method-argument]
     ) -> PipelexValidationReport | BundleValidationFailure:
         try:
             return await validate_bundles_in_process(

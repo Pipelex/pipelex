@@ -178,8 +178,8 @@ def load_json_from_path(path: Path) -> JsonContent:
 def load_json_dict_from_path(path: Path) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
-    This function reads a JSON file and verifies that its content is a dictionary.
-    It uses load_json_from_path internally and adds type checking.
+    This function reads a JSON file and verifies that its content is a dictionary,
+    through load_json_dict_from_bytes.
 
     Args:
         path (Path): The file path to the JSON file to be loaded.
@@ -193,9 +193,27 @@ def load_json_dict_from_path(path: Path) -> dict[str, Any]:
         json.JSONDecodeError: If the file contains invalid JSON.
 
     """
-    json_content: JsonContent = load_json_from_path(path)
+    return load_json_dict_from_bytes(data=path.read_bytes(), source=path)
+
+
+def load_json_dict_from_bytes(*, data: bytes, source: str | Path) -> dict[str, Any]:
+    """Parses a JSON file's bytes, decoded as UTF-8, and ensures they hold a dictionary.
+
+    Args:
+        data: The bytes read from the file.
+        source: The file the bytes were read from, named in the error when they hold no dictionary.
+
+    Returns:
+        Dict[str, Any]: The parsed JSON content as a Python dictionary.
+
+    Raises:
+        JsonTypeError: If the JSON content is not a dictionary.
+        json.JSONDecodeError: If the bytes hold invalid JSON.
+
+    """
+    json_content: JsonContent = json.loads(data.decode("utf-8"))
     if not isinstance(json_content, dict):
-        msg = f"{path} is not a dict"
+        msg = f"{source} is not a dict"
         raise JsonTypeError(msg)
     return json_content
 
