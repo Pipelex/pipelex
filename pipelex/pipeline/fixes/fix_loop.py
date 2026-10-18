@@ -138,6 +138,7 @@ def unfixable_method_result(*, error: ValidateBundleError) -> FixBundleResult:
         fixes_applied=[],
         files_written=[],
         remaining_errors=_validation_error_items(error),
+        remaining_error_codes=error.item_codes(),
     )
 
 

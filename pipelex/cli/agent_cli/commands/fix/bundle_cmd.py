@@ -82,8 +82,10 @@ def _failure_message(result: FixBundleResult) -> str:
 
 
 def _emit_still_invalid(*, result: FixBundleResult, bundle_path: str) -> NoReturn:
-    """Report the still-invalid verdict as the problem of the method that does not validate, its faults the remaining
-    errors, format-aware, and exit 1."""
+    """Report the still-invalid verdict, format-aware, and exit 1.
+
+    The problem is the method's that does not validate, its faults the remaining errors.
+    """
     agent_error_fix_bundle(result=result, bundle_path=str(Path(bundle_path).resolve()), message=_failure_message(result))
 
 

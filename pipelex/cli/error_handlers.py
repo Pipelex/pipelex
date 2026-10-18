@@ -533,7 +533,7 @@ def handle_pre_boot_config_error(*, exc: PipelexConfigError, command: str, exit_
         command: The human command name, as the command's other failures name it (e.g. ``"validate"``).
         exit_code: The exit code the command gives a failed boot.
     """
-    print_traceback_if_requested(console=get_console())
+    print_traceback_if_requested(console=get_error_console())
     typer.secho(f"Failed to {command}: {exc.message}", fg=typer.colors.RED, err=True)
     raise typer.Exit(exit_code) from exc
 
