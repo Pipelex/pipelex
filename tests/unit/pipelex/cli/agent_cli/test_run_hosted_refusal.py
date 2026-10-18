@@ -32,9 +32,11 @@ from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
 from tests.unit.pipelex.cli.agent_cli.test_data import (
     GatewayAnswers,
+    HostedMethodItems,
     HostedPlaneRefusals,
     OperatorViewAnswers,
     RetiredEnvelope,
+    RunnerOwnMethodRefusals,
     RunnerOwnRefusals,
     RunnerProblems,
     UndeclaredMembers,
@@ -78,13 +80,15 @@ RUNNER_FAULT: str = json.dumps(
 )
 
 
-def _answering(*, status: int, body: str, seen: list[httpx.Request], headers: dict[str, str] | None = None) -> httpx.MockTransport:
-    """A hosted API that answers its version, then refuses every other request with ``status``, ``body`` and ``headers``."""
+def _answering(
+    *, status: int, body: str, seen: list[httpx.Request], headers: dict[str, str] | None = None, version: str = HostedVersions.HOSTED
+) -> httpx.MockTransport:
+    """A runner that answers its ``version``, then refuses every other request with ``status``, ``body`` and ``headers``."""
 
     def _handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
         if request.method == "GET" and request.url.path == "/v1/version":
-            return httpx.Response(200, content=HostedVersions.HOSTED.encode("utf-8"), headers={"content-type": "application/json"})
+            return httpx.Response(200, content=version.encode("utf-8"), headers={"content-type": "application/json"})
         answer_headers = {"content-type": "application/problem+json", **(headers or {})}
         return httpx.Response(status, content=body.encode("utf-8"), headers=answer_headers)
 
@@ -110,11 +114,20 @@ def _install_transport(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *
 
 
 def _install_hosted_api(
-    mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, *, status: int, body: str, headers: dict[str, str] | None = None
+    mocker: MockerFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    status: int,
+    body: str,
+    headers: dict[str, str] | None = None,
+    version: str = HostedVersions.HOSTED,
 ) -> list[httpx.Request]:
-    """Point every `PipelexAPIClient` at a mocked hosted API refusing with ``status`` / ``body``; return the requests it receives."""
+    """Point every `PipelexAPIClient` at a mocked runner refusing with ``status`` / ``body``; return the requests it receives.
+
+    The runner answers its version as the hosted API does unless ``version`` says otherwise.
+    """
     seen: list[httpx.Request] = []
-    _install_transport(mocker, monkeypatch, transport=_answering(status=status, body=body, seen=seen, headers=headers))
+    _install_transport(mocker, monkeypatch, transport=_answering(status=status, body=body, seen=seen, headers=headers, version=version))
     return seen
 
 
@@ -618,6 +631,61 @@ class TestRunHostedRefusal:
                 assert printed.startswith(f"## The runtime's answer could not be read\n\n{reason}\n")
                 assert f"**Next step** (`change_input`): {HOSTED_REFUSAL_CALLER_NEXT_STEP}" in printed
                 assert "with the status and the body" not in printed
+                _assert_no_retired_markdown(markdown=printed)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    @pytest.mark.parametrize(
+        ("version", "route"),
+        [(HostedVersions.HOSTED, START_ROUTE), (HostedVersions.BARE_RUNNER, ("POST", "/v1/execute"))],
+        ids=["start", "execute"],
+    )
+    def test_a_runner_s_own_refusal_of_a_method_in_the_former_shape_lists_its_items(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        version: str,
+        route: tuple[str, str],
+        error_format: CliOutputFormat,
+    ) -> None:
+        """A runner's own 422 in the former shape that lists validation items is `method.invalid`, its items coded as a
+        local verdict codes them, with its reason as the detail and its advice as the next step, as a stored report in the
+        same shape reads, so the agent CLI lists what the human CLI lists.
+        """
+        seen = _install_hosted_api(mocker, monkeypatch, status=422, body=RunnerOwnMethodRefusals.INVALID_METHOD, version=version)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
+
+        assert exc_info.value.exit_code == 1
+        assert _routes(seen=seen) == [route]
+        printed = capsys.readouterr().err
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem == {
+                    "type": "https://mthds.ai/errors/method.invalid",
+                    "title": "The method does not validate",
+                    "status": 422,
+                    "detail": RunnerOwnMethodRefusals.REASON,
+                    "code": "method.invalid",
+                    "domain": "method",
+                    "retry": "no",
+                    "next_step": {"kind": "change_model", "detail": RunnerOwnMethodRefusals.ADVICE},
+                    "errors": HostedMethodItems.PROBLEM_ITEMS[:2],
+                    "request_id": "01M55PINVALIDMETHOD000000",
+                }
+                _assert_no_retired_member(problem=problem)
+            case CliOutputFormat.MARKDOWN:
+                assert printed.startswith(f"## The method does not validate\n\n{RunnerOwnMethodRefusals.REASON}\n")
+                assert f"**Next step** (`change_model`): {RunnerOwnMethodRefusals.ADVICE}" in printed
+                assert "### Errors" in printed
+                assert (
+                    f"- `model.unknown`: {HostedMethodItems.PROBLEM_ITEMS[1]['detail']} (pipe 'draft', field 'model', file 'main.mthds')" in printed
+                )
+                assert "client.response_unreadable" not in printed
                 _assert_no_retired_markdown(markdown=printed)
 
     @pytest.mark.usefixtures("tty_stdin")

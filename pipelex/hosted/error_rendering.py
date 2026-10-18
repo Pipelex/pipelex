@@ -167,6 +167,17 @@ def _sent_retry_after(*, error: ApiResponseError) -> float | None:
     return None
 
 
+def answered_in_former_shape(*, error: ApiResponseError) -> bool:
+    """Whether a refusal is an answer in a shape that predates the standard's problem document, read by its status alone.
+
+    An answer that is a problem document of the standard speaks for itself, and one that may have started a run keeps the
+    client's reading as `client.outcome_unknown`, so neither is.
+    """
+    if error.run_may_have_started:
+        return False
+    return read_problem_document(error.response_body, status=error.status, headers=error.headers or {}) is None
+
+
 def _client_reading(*, error: ApiResponseError) -> PipelexProblem:
     """The client's reading of a refusal, by the members the standard declares alone.
 
@@ -193,6 +204,9 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
       (:func:`hosted_refusal_next_step`), so the reader is told what the body said rather than to report a body it
       never sees.
 
+    The agent CLI reads an answer that lists validation items before this one is asked, as a method that does not
+    validate (`pipelex.cli.agent_cli.commands.run._run_hosted`), since only it codes the items.
+
     Args:
         error: The refusal, as the client raised it.
         credential_sent: Whether the request carried a key, which tells a refused key from a missing one.
@@ -202,7 +216,7 @@ def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) ->
         may have started a run, whose reading as `client.outcome_unknown` stands, when its status is one the standard
         reads as a code, or when it names no core code here and gives no reason.
     """
-    if read_problem_document(error.response_body, status=error.status, headers=error.headers or {}) is not None or error.run_may_have_started:
+    if not answered_in_former_shape(error=error):
         return None
     reading = _hosted_refusal_reading(status=error.status, plane_code=error.code, credential_sent=credential_sent)
     if reading is not None:

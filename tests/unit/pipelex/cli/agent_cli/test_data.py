@@ -443,3 +443,29 @@ class HostedMethodItems:
             "location": {"pipe": "step3"},
         },
     ]
+
+
+class RunnerOwnMethodRefusals:
+    """A runner's refusal of a run request whose method does not validate, in the shape that predates the standard's."""
+
+    # The reason and the advice the refusal gives.
+    REASON: ClassVar[str] = "The method does not validate: pipe 'draft' names an unknown model"
+    ADVICE: ClassVar[str] = "Name a model the catalog knows, such as gpt-5.5, then run again"
+    # The 422 a runner answers `POST /v1/start` and `POST /v1/execute` with for a method that does not load, as
+    # `ValidateBundleError` answers it in the former shape: its reason, its advice and the validation items locating the
+    # faults, but no code, domain, retry verdict or next step the standard's client reads.
+    INVALID_METHOD: ClassVar[str] = json.dumps(
+        {
+            "type": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
+            "title": "Validate bundle error",
+            "status": 422,
+            "detail": REASON,
+            "instance": "urn:pipelex:request:01M55PINVALIDMETHOD000000",
+            "request_id": "01M55PINVALIDMETHOD000000",
+            "error_type": "ValidateBundleError",
+            "error_domain": "input",
+            "retryable": False,
+            "user_action": {"kind": "change_model", "detail": ADVICE},
+            "validation_errors": HostedMethodItems.SENT[:2],
+        }
+    )

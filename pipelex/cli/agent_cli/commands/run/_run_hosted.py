@@ -8,7 +8,8 @@ A refusal decided here, before anything is sent, is a problem like any local fai
 of the run itself is the problem the runner answered or the client decided, in the caller's view, since the runner is
 someone else's runtime: pipelex-sdk's errors and the MTHDS client's carry it, by its declared members alone, with the
 next step the human CLI tailors for a failure of the client's own; an answer in a shape that predates the standard's
-reads as the core code its status names, or keeps its reason; and pipelex's own `HostedRunError`s give theirs. A
+reads as the core code its status names, lists its validation items under `method.invalid`, or keeps its reason; and
+pipelex's own `HostedRunError`s give theirs. A
 failure no arm names is this process's own and is reported as a local one is, in the operator's view: a Pipelex error
 under its own code, any other exception as `runtime.unexpected`.
 """
@@ -37,7 +38,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import make_hosted_client
-from pipelex.hosted.error_rendering import hosted_refusal_problem, tailored_next_step
+from pipelex.hosted.error_rendering import answered_in_former_shape, hosted_refusal_problem, sent_verdict, tailored_next_step
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
@@ -242,22 +243,72 @@ def _former_run_problem(*, report: RunErrorReport) -> PipelexProblem:
     """The failed run's own problem, read off a report in the shape the hosted plane wrote before it stored problem documents.
 
     Such a report names no code: one that lists validation items is `method.invalid`, its items coded as a local verdict
-    codes them (:func:`hosted_method_problem_items`), and any other is `runtime.unexpected`. Its `message` is the
-    problem's detail, its advice the next step, of the kind :data:`_FORMER_ADVICE_KINDS` reads, and its `retryable`
-    the retry verdict, so this CLI tells what the human CLI tells of the same run (`describe_hosted_error`). Its
-    `error_category`, `model` and `provider` are not carried: neither code declares a parameter for them, and the hosted
-    read's projection drops the model and the provider.
+    codes them (:func:`hosted_method_problem_items`), and any other is `runtime.unexpected` (:func:`_former_problem`).
+    Its `error_category`, `model` and `provider` are not carried: neither code declares a parameter for them, and the
+    hosted read's projection drops the model and the provider.
     """
-    items = hosted_method_problem_items(validation_errors=report.validation_errors or [])
+    advice = report.user_action
+    return _former_problem(
+        validation_errors=report.validation_errors or [],
+        message=report.message,
+        advice_kind=advice.kind if advice is not None else None,
+        advice_detail=advice.detail if advice is not None else None,
+        retryable=report.retryable,
+    )
+
+
+def _former_refusal_problem(*, error: ApiResponseError) -> PipelexProblem | None:
+    """A refusal in the shape that predates the standard's that lists validation items: the method sent does not validate.
+
+    A runner answered `/v1/start` and `/v1/execute` so before it answered problem documents, and the standard's client
+    reads such an answer by its status alone. It is `method.invalid`, read as a stored report in the same shape is
+    (:func:`_former_problem`), with the answer's reason, advice and retry verdict, its status and its request id, so
+    this CLI lists what the human CLI lists (`describe_hosted_error`).
+
+    Returns:
+        The problem, or ``None`` when the answer lists no item or is not in that shape
+        (`pipelex.hosted.error_rendering.answered_in_former_shape`).
+    """
+    if not error.validation_errors or not answered_in_former_shape(error=error):
+        return None
+    advice = error.user_action
+    problem = _former_problem(
+        validation_errors=error.validation_errors,
+        message=error.server_message,
+        advice_kind=advice.kind if advice is not None else None,
+        advice_detail=advice.detail if advice is not None else None,
+        retryable=sent_verdict(error=error).retryable,
+    )
+    updates: dict[str, Any] = {"status": error.status}
+    if error.request_id:
+        updates["request_id"] = error.request_id
+    return problem.model_copy(update=updates)
+
+
+def _former_problem(
+    *,
+    validation_errors: list[SentValidationErrorItem],
+    message: str | None,
+    advice_kind: str | None,
+    advice_detail: str | None,
+    retryable: bool | None,
+) -> PipelexProblem:
+    """The problem a report or an answer in the shape that predates the standard's makes, in the caller's view.
+
+    It names no code: one that lists validation items is `method.invalid`, its items coded as a local verdict codes them
+    (:func:`hosted_method_problem_items`), and any other is `runtime.unexpected`. Its message is the problem's detail,
+    its advice the next step, of the kind :data:`_FORMER_ADVICE_KINDS` reads, and its `retryable` the retry verdict, so
+    this CLI tells what the human CLI tells of the same failure (`describe_hosted_error`).
+    """
+    items = hosted_method_problem_items(validation_errors=validation_errors)
     problem = make_problem(code=CoreCode.METHOD_INVALID if items else CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, errors=items or None)
     updates: dict[str, Any] = {}
-    if report.message:
-        updates["detail"] = report.message
-    advice = report.user_action
-    if advice is not None and advice.detail:
-        updates["next_step"] = NextStep(kind=_FORMER_ADVICE_KINDS.get(advice.kind or "", problem.next_step.kind), detail=advice.detail)
-    if isinstance(report.retryable, bool):
-        updates["retry"] = RetryVerdict.YES if report.retryable else RetryVerdict.NO
+    if message:
+        updates["detail"] = message
+    if advice_detail:
+        updates["next_step"] = NextStep(kind=_FORMER_ADVICE_KINDS.get(advice_kind or "", problem.next_step.kind), detail=advice_detail)
+    if isinstance(retryable, bool):
+        updates["retry"] = RetryVerdict.YES if retryable else RetryVerdict.NO
     return problem.model_copy(update=updates)
 
 
@@ -312,8 +363,9 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
     - An answer in a shape that predates the standard's, which the standard's client reads by its status alone, reads
       as the core code its status and the hosted plane's own code name, with the next step the human CLI gives
       (`pipelex.hosted.error_rendering.hosted_refusal_problem`): a refused or missing credential, a refused operation, a
-      route, run or method this origin does not serve, a rate limit with its delay; and any other such answer keeps
-      the client's reading with the reason the answer gave.
+      route, run or method this origin does not serve, a rate limit with its delay; one listing validation items is
+      `method.invalid` with those items, as a stored report in the same shape is (:func:`_former_refusal_problem`);
+      and any other such answer keeps the client's reading with the reason the answer gave.
     - A run that started and failed is `run.failed`, naming the run and its status, and nests the run's own problem as
       `run_error`, read off the report the hosted API stored for it, whatever its shape.
     - A failure pipelex detects itself is its `HostedRunError`'s problem, naming the run the hosted API acknowledged
@@ -336,7 +388,7 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
         return error.to_problem(view=ProblemView.CALLER)
     request_id: str | None = None
     if isinstance(error, ApiResponseError):
-        refusal = hosted_refusal_problem(error=error, credential_sent=credential_sent)
+        refusal = _former_refusal_problem(error=error) or hosted_refusal_problem(error=error, credential_sent=credential_sent)
         if refusal is not None:
             return refusal
         request_id = error.request_id
