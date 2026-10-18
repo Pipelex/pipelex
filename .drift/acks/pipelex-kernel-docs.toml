@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:10616bfa857ab1c7f2dd94a75de1fc574f2d4d50745ce4aec423a3eac934a635"
+digest = "sha256:a52db63964b074d919322e0d8d3490a2ad96776d82dfbedb5b2798be1f1279ae"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-18T07:47:24Z"
-rationale = "real-catch: the kernel's prompt assembly now locates a template the sandbox refuses on the field it is written in; pipelex-kernel.md now says which field each assembly names."
+reviewed_at = "2026-10-18T08:55:09Z"
+rationale = "real-catch: the kernel's judgment now locates a refused question on the field it is written in; pipelex-kernel.md now names question and questions.<name>.question beside the prompt fields."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -16,7 +16,7 @@ rationale = "real-catch: the kernel's prompt assembly now locates a template the
 "pipelex/kernel/img_gen_ops.py" = "blob:42858061ef4a9a162bb79281a5a44799268613d4"
 "pipelex/kernel/img_gen_prompt.py" = "blob:d26439e199c1b8197cd3c4e9819d4b6ba5e5c456"
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
-"pipelex/kernel/judgment_ops.py" = "blob:b36e2b6b5d8c9c414d2b6960c31b5f716216abfb"
+"pipelex/kernel/judgment_ops.py" = "blob:4bc8e3a4adad2c299da1aa1cdb46a7eab3906a04"
 "pipelex/kernel/judgment_results.py" = "blob:4dbbcb204309265999de59a179f4420a0f83be93"
 "pipelex/kernel/llm_ops.py" = "blob:730c080684a1f3c1bb90d599105b1789eb6ee10a"
 "pipelex/kernel/llm_prompt_content.py" = "blob:bca49e1446b37a9748e4259f19a235770f24f054"
