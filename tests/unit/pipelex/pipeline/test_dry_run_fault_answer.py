@@ -92,6 +92,7 @@ class TestDryRunFaultAnswer:
         assert item.location is not None
         assert item.location.pipe == "route"
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_a_dry_run_error_renders_its_sentence_from_the_failure_whose_code_it_carries(self, caplog: pytest.LogCaptureFixture) -> None:
         """Its code's sentence is rendered whole, from that failure's parameters and pipe, never falling back on the title."""
         failures = [
