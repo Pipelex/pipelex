@@ -527,7 +527,8 @@ def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexErr
     Each refusal carries a code whose required parameters it can fill: the framework says nothing about a refusal but its
     status and a header, so a code whose parameters it cannot know gives way to one whose parameters it can.
 
-    - a 400, or a 422 raised as an `HTTPException`, is a request the framework could not read, `request.malformed`;
+    - a 400, or a 422 raised as an `HTTPException`, is a request the framework could not read, `request.malformed` with
+      the reason `unreadable`, keeping its status;
     - a 401 is `auth.missing_credential`, with the challenge the raise named;
     - a 403 is `auth.invalid_credential`, keeping its 403: `auth.forbidden` would need the `requirement` the identity
       lacks, which the framework does not say;
@@ -546,6 +547,7 @@ def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexErr
         case 400 | 422:
             message = f"The framework refused to read the request with HTTP {status}"
             refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_UNREADABLE_REASON)
+            kept_status = status
         case 401:
             message = "The framework refused the request for want of a credential"
             refusal = RunnerAuthError(message, challenge=challenge).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
