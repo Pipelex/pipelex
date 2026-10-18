@@ -563,9 +563,7 @@ def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexErr
             kept_status = status
         case 429:
             message = "A rate limit refused the request"
-            refusal = (
-                RunnerRequestError(message).with_error_code(CoreCode.RUNTIME_UNAVAILABLE).with_params(dependency=_RATE_LIMITER_DEPENDENCY)
-            )
+            refusal = RunnerRequestError(message).with_error_code(CoreCode.RUNTIME_UNAVAILABLE).with_params(dependency=_RATE_LIMITER_DEPENDENCY)
             kept_status = status
         case _:
             message = f"The framework refused the request with HTTP {status}, a status no registry code declares"

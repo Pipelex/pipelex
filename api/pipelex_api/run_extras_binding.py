@@ -12,7 +12,7 @@ so the event never carries a value the runtime would refuse, and a body whose la
 refusal is the request's own `request.invalid`, answered when its model is validated.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import Request
 from pydantic import ValidationError
@@ -33,8 +33,10 @@ def validated_run_extras_or_none(*, body: Any) -> dict[str, str] | None:
     """
     if not isinstance(body, dict):
         return None
+    # A JSON object's keys are strings: what each value is, the labels' rules decide.
+    labels = cast("dict[str, Any]", body).get(ANALYTICS_GROUPS_FIELD)
     try:
-        return CallerAnalyticsGroupsMixin.model_validate({ANALYTICS_GROUPS_FIELD: body.get(ANALYTICS_GROUPS_FIELD)}).analytics_groups
+        return CallerAnalyticsGroupsMixin.model_validate({ANALYTICS_GROUPS_FIELD: labels}).analytics_groups
     except ValidationError:
         return None
 

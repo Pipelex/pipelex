@@ -35,6 +35,7 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.limits import MAX_RESOURCE_FILE_BYTES, MAX_RESOURCES_PER_REQUEST, MAX_RESOURCES_TOTAL_BYTES, base64_decoded_size
 
+
 def refuse_two_files_under_one_path(*, path: str, where: str) -> NoReturn:
     """Refuse two different files sent under one path, naming the path, with a 422 `request.invalid` on `resources`."""
     msg = (

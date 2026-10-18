@@ -26,6 +26,7 @@ from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES, base64_
 # The request field the archive rides, which the refusals of its encoding name.
 _BUNDLE_FIELD = "bundle_b64"
 
+
 def _guard_count(count: int) -> None:
     if count == 0:
         msg = "Bundle is empty (no files)"

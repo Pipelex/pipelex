@@ -346,7 +346,7 @@ class TestBundleValidator:
             prepare_mock.side_effect = refusal
         else:
             # The pipe run logs the refusal it meets before raising it, as `PipeRun.run` does.
-            async def _refusing_run(_pipe_job: Any) -> None:
+            def _refusing_run(_pipe_job: Any) -> None:
                 emit_security_event(error=refusal)
                 raise refusal
 

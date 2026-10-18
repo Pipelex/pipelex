@@ -420,14 +420,18 @@ class TestSecurityEventRoutes:
                 "RequestMethodError",
                 id="validate_tree",
             ),
-            pytest.param("/v1/resolve", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="resolve"),
+            pytest.param(
+                "/v1/resolve", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="resolve"
+            ),
             pytest.param(
                 "/v1/codegen",
                 {"kind": "types", "target": "ts-zod", "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}},
                 "RequestMethodError",
                 id="codegen",
             ),
-            pytest.param("/v1/pipe-io", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="pipe_io"),
+            pytest.param(
+                "/v1/pipe-io", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="pipe_io"
+            ),
         ],
     )
     def test_a_diagnostic_route_s_refusal_names_whose_request_it_was(
