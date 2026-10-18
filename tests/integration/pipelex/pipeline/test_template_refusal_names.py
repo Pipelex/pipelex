@@ -105,9 +105,6 @@ class TestTemplateRefusalNames:
         assert caller.location is not None
         assert caller.location.as_wire() == {"pipe": "say", "path": ["say"], "field": "template"}
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="security.template_refused requires the refused name, which a name the run's data gave withholds until the standard words it"
-    )
     async def test_a_name_the_run_s_data_gave_reaches_no_reader(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A template looking the refused name up from the run's data: the input value reaches no view, no message and no Markdown.
 

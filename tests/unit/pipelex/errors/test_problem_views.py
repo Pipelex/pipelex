@@ -17,6 +17,7 @@ from pipelex.errors.error_code_declaration import ErrorCodeDeclaration
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import (
     MAX_PROBLEM_TEXT_LENGTH,
+    MISSING_REQUIRED_PARAMS_MESSAGE,
     TRUNCATION_MARKER,
     PipelexProblem,
     ProblemView,
@@ -157,13 +158,11 @@ class TestProblemViews:
         assert caller.next_step.detail
         assert any(record.getMessage() == "A problem's sentence could not be rendered from its template" for record in caplog.records)
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="security.template_refused requires the refused name, which a name the run's data gave withholds until the standard words it"
-    )
     def test_a_withheld_name_reads_its_own_sentences_in_every_view(self, caplog: pytest.LogCaptureFixture) -> None:
         """A template refusal without its `name` says what happened without it, in each view and in the caller view of the operator's.
 
-        The problem still logs the parameter it lacks, and no sentence falls back on the title or the generic step.
+        The name is withheld by rule, which no raise site is at fault for, so nothing is logged about the parameter it
+        lacks, and no sentence falls back on the title or the generic step.
         """
         with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
             operator = make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.OPERATOR, params={"pipe": "say"})
@@ -175,8 +174,17 @@ class TestProblemViews:
         assert operator.detail == caller.detail == item.detail == detail
         assert operator.next_step.detail == caller.next_step.detail == caller_view_of(problem=operator).next_step.detail == step
         messages = [record.getMessage() for record in caplog.records]
-        assert "A problem lacks a parameter its code requires" in messages
+        assert "A problem lacks a parameter its code requires" not in messages
         assert "A problem's sentence could not be rendered from its template" not in messages
+
+    @pytest.mark.builds_problems_without_required_params(reason="builds a template refusal lacking its pipe, to check that it is still logged")
+    def test_a_withheld_code_still_logs_another_parameter_it_lacks(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Only the parameter withheld by rule goes unreported: a refusal lacking its `pipe` is still a raise site to fix."""
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.CALLER, params={})
+
+        lacking = [getattr(record, "params", None) for record in caplog.records if record.getMessage() == MISSING_REQUIRED_PARAMS_MESSAGE]
+        assert lacking == [["pipe"]]
 
     def test_an_undeclared_or_mistyped_parameter_is_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
         error = _TemplateRefusalError("refused").with_params(pipe="summarize", template="prompt", finding="bad", undeclared="secret value")

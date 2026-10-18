@@ -216,9 +216,6 @@ class TestTemplateSandbox:
         assert caller.params is not None
         assert caller.params.as_wire() == {"name": refused_name}
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="renders outside any pipe, and withholds the refused name the run's data gave, which the standard still requires"
-    )
     @pytest.mark.parametrize(
         ("_topic", "template_source", "data_value"),
         [

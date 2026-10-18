@@ -72,9 +72,7 @@ async def _render_failure(*, template_source: str, context: dict[str, Any], is_a
     return sync_exc_info.value
 
 
-@pytest.mark.builds_problems_without_required_params(
-    reason="renders outside any pipe, whose failure location names the pipe, and withholds a refused name the run's data gave"
-)
+@pytest.mark.builds_problems_without_required_params(reason="renders outside any pipe, whose failure location names the pipe")
 @pytest.mark.asyncio(loop_scope="class")
 class TestJinja2RenderFailureText:
     @pytest.mark.parametrize("is_async", [False, True], ids=["sync", "async"])

@@ -27,7 +27,8 @@ against the code's generated model: an undeclared parameter, or one of the wrong
 member is present whenever the code declares a parameter a caller may read, an empty object on an occurrence that has
 none of them, as the protocol puts it on every problem whose code declares parameters. A parameter a caller may read
 that the registry does not mark optional is present on every occurrence, so a problem or an item built without one is a
-fault of its raise site, logged with the parameters it lacks (:func:`missing_required_params`). A parameter the registry declares
+fault of its raise site, logged with the parameters it lacks (:func:`missing_required_params`), unless the runner
+withholds it by rule, as a template refusal withholds a name the run's data chose. A parameter the registry declares
 operator-only never rides ``params`` in any view; it renders into the operator's step and rides ``diagnostics.params``.
 
 **One fault, no list.** ``errors`` lists the faults of a problem with several. A problem built with a single item
@@ -329,7 +330,8 @@ class _CodeSentences(NamedTuple):
 # withholds, until the standard words that occurrence itself. `security.template_refused` requires `name`, but a name the
 # template looked up from the run's data is the run's input, which no problem carries (`pipelex.tools.jinja2`), so its
 # refusal carries no `name`: its sentences then say what happened without the name, rather than the code's title and the
-# generic step, and the problem still logs the parameter it lacks.
+# generic step. No raise site is at fault for a parameter withheld by rule, so its absence is not logged
+# (`missing_required_params`); any other parameter the code requires still is.
 _WITHHELD_PARAM_SENTENCES: dict[tuple[str, frozenset[str]], _CodeSentences] = {
     ("security.template_refused", frozenset({"name"})): _CodeSentences(
         detail="A template of pipe '{pipe}' looked a name up from the run's data, and the template sandbox refused that name.",
@@ -504,7 +506,9 @@ def missing_required_params(*, code: ErrorCode, params: Mapping[str, Any]) -> li
     A parameter a caller may read that the registry does not mark optional is a fact every caller relies on, and the
     protocol puts it on every occurrence: a problem or an item that lacks one tells its caller less than its code
     promises, and its sentences fall back on the code's title and the step's generic sentence. An operator-only
-    parameter is not counted, as no caller's problem carries it.
+    parameter is not counted, as no caller's problem carries it, and neither is a parameter withheld by rule, such as
+    the `name` of a template refusal whose name the run's data chose: :data:`_WITHHELD_PARAM_SENTENCES` words that
+    occurrence without it, and no raise site is at fault for its absence.
 
     Args:
         code: The code of the problem or the item.
@@ -513,7 +517,11 @@ def missing_required_params(*, code: ErrorCode, params: Mapping[str, Any]) -> li
     Returns:
         The names of the required parameters ``params`` lacks, sorted; empty when it gives them all.
     """
-    return sorted(error_code_spec(code).required_params - params.keys())
+    missing = error_code_spec(code).required_params - params.keys()
+    for withheld_code, withheld in _WITHHELD_PARAM_SENTENCES:
+        if withheld_code == code and withheld <= missing:
+            missing -= withheld
+    return sorted(missing)
 
 
 def _report_missing_required_params(*, code: ErrorCode, params: Mapping[str, Any], part: str) -> None:
