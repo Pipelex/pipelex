@@ -2183,27 +2183,26 @@ def _building_bundle_of(
 def _unexported_pipe_refusal(
     *, export_errors: list[VisibilityError], blueprints: list[PipelexBundleBlueprint], package_address: str
 ) -> LibraryLoadingError:
-    """The refusal of pipe references a domain of the package does not export, one item per reference, located on its bundle.
+    """The refusal of pipe references a domain of the package does not export, one item per reference.
 
-    Each item names the pipe and the package declaring it, the parameters of ``method.pipe_not_exported``. The checker
-    names a reference by its domain and its text alone, so each is located on the first bundle of that domain whose
-    pipes write it.
+    Each item names the pipe and the package declaring it, the parameters of ``method.pipe_not_exported``, and is
+    located on the bundle, the pipe and the field that write the reference: the checker names a reference by its
+    domain and by its field path, its ``context``, which the bundles' references are indexed by.
     """
+    # Where each reference is written, by the domain of its bundle and its field path; a field path holds one reference.
+    referring_sites: dict[tuple[str, str], tuple[str | None, str]] = {}
+    for blueprint in blueprints:
+        for reference in blueprint.collect_located_pipe_references():
+            referring_sites.setdefault((blueprint.domain, reference.field_path), (blueprint.source, reference.referring_pipe_code))
     items: list[PipelexBundleBlueprintValidationErrorData] = []
     for export_error in export_errors:
-        source = next(
-            (
-                blueprint.source
-                for blueprint in blueprints
-                if blueprint.domain == export_error.source_domain
-                and any(pipe_ref == export_error.pipe_ref for pipe_ref, _ in blueprint.collect_pipe_references())
-            ),
-            None,
-        )
+        source, referring_pipe_code = referring_sites.get((export_error.source_domain, export_error.context), (None, None))
         items.append(
             PipelexBundleBlueprintValidationErrorData(
                 source=source,
                 domain_code=export_error.source_domain,
+                pipe_code=referring_pipe_code,
+                field_path=export_error.context,
                 message=export_error.message,
                 params={"pipe": export_error.pipe_ref, "package": package_address},
             )

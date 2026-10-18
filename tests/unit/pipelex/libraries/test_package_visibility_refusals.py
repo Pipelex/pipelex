@@ -13,8 +13,10 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 from tests.unit.pipelex.libraries.test_data import PackageVisibilityTestData
 
 
-def _refused_items(*, mocker: MockerFixture, tmp_path: Path, bundles: dict[str, str]) -> list[tuple[str, str | None, dict[str, object] | None]]:
-    """The code, file and parameters of each item refusing the bundles of a package whose METHODS.toml exports nothing."""
+def _refused_items(
+    *, mocker: MockerFixture, tmp_path: Path, bundles: dict[str, str]
+) -> list[tuple[str, dict[str, object] | None, dict[str, object] | None]]:
+    """The code, location and parameters of each item refusing the bundles of a package whose METHODS.toml exports nothing."""
     manifest = MethodsManifest(address=PackageVisibilityTestData.PACKAGE_ADDRESS, version="1.0.0", description="A package exporting nothing")
     mocker.patch("pipelex.libraries.library_manager.find_package_manifest", return_value=manifest)
     blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=source) for source, content in bundles.items()]
@@ -28,7 +30,7 @@ def _refused_items(*, mocker: MockerFixture, tmp_path: Path, bundles: dict[str, 
         )
 
     items = exc_info.value.to_problem(view=ProblemView.CALLER).errors or []
-    return [(item.code, item.location.file if item.location else None, item.params.as_wire() if item.params else None) for item in items]
+    return [(item.code, item.location.as_wire() if item.location else None, item.params.as_wire() if item.params else None) for item in items]
 
 
 class TestPackageVisibilityRefusals:
@@ -42,7 +44,7 @@ class TestPackageVisibilityRefusals:
         assert items == [
             (
                 CoreCode.METHOD_PIPE_NOT_EXPORTED,
-                "legal.mthds",
+                {"pipe": "review", "field": "pipe.review.steps[0].pipe", "file": "legal.mthds"},
                 {"pipe": PackageVisibilityTestData.UNEXPORTED_PIPE_REF, "package": PackageVisibilityTestData.PACKAGE_ADDRESS},
             )
         ]
@@ -58,4 +60,4 @@ class TestPackageVisibilityRefusals:
             },
         )
 
-        assert items == [(CoreCode.METHOD_NAME_CONFLICT, "native.mthds", {"name": "native", "conflict": "reserved_domain"})]
+        assert items == [(CoreCode.METHOD_NAME_CONFLICT, {"file": "native.mthds"}, {"name": "native", "conflict": "reserved_domain"})]
