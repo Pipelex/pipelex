@@ -245,8 +245,9 @@ def validate_bundle_cmd(
         agent_file_error(f"Bundle file not found: {judged_path}", path=str(judged_path), reason="not found", cause=exc, exit_code=2)
 
     except OSError as exc:
-        # A method file this machine would not let the command read: the file, never a fault of the method.
-        agent_unreadable_file_error(error=exc, path=judged_path, exit_code=2)
+        # A method file this machine would not let the command read: the file, never a fault of the method. An error
+        # naming no file, a connection or a timeout, is the unexpected failure the boundary reports.
+        agent_unreadable_file_error(error=exc, exit_code=2)
 
     except ValidateBundleError as exc:
         # Invalid verdict: the problem of the method that does not validate, format-aware. Its errors are

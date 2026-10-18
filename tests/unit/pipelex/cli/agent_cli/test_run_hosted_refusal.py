@@ -447,6 +447,36 @@ class TestRunHostedRefusal:
             ),
             (
                 403,
+                HostedPlaneRefusals.FORBIDDEN_OPERATION,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/auth.forbidden",
+                    "title": "The credential does not permit this",
+                    "status": 403,
+                    "detail": "This route is served to a web session only.",
+                    "code": "auth.forbidden",
+                    "domain": "account",
+                    "retry": "no",
+                    "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
+                },
+            ),
+            (
+                403,
+                HostedPlaneRefusals.FORBIDDEN_EXPIRED_KEY,
+                {},
+                {
+                    "type": "https://mthds.ai/errors/auth.invalid_credential",
+                    "title": "The credential was refused",
+                    "status": 403,
+                    "detail": "The API key has expired.",
+                    "code": "auth.invalid_credential",
+                    "domain": "account",
+                    "retry": "no",
+                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
+                },
+            ),
+            (
+                403,
                 GatewayAnswers.FORBIDDEN,
                 {"x-request-id": HEADER_REQUEST_ID},
                 {
@@ -528,6 +558,8 @@ class TestRunHostedRefusal:
         ids=[
             "unauthorized",
             "forbidden",
+            "forbidden_operation",
+            "forbidden_expired_key",
             "gateway_forbidden",
             "run_not_found",
             "method_version_not_found",
@@ -548,7 +580,8 @@ class TestRunHostedRefusal:
     ) -> None:
         """The hosted plane answers in its pre-standard shape: its refusal reads as the core code its status and its own
         code name, the plane's own detail kept, the next step the human CLI gives, and a rate limit's delay from its header
-        or its body. A 403 the platform answers refuses a key it authenticated; the edge's bare 403 may refuse an unknown key.
+        or its body. A 403 the platform answers with an authorization code refuses a key it authenticated; one with any
+        other code, and the edge's bare 403, may refuse the key itself.
         """
         _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers=headers)
 
@@ -632,6 +665,30 @@ class TestRunHostedRefusal:
                 assert f"**Next step** (`change_input`): {HOSTED_REFUSAL_CALLER_NEXT_STEP}" in printed
                 assert "with the status and the body" not in printed
                 _assert_no_retired_markdown(markdown=printed)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    def test_a_refusal_in_the_former_shape_takes_the_step_kind_its_advice_names(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+    ) -> None:
+        """A 4xx in the former shape that advises a step of its own kind, here checking the billing, reports that kind
+        beside the advice it gave, never `change_input`, so the step's kind and its detail agree.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=402, body=RunnerOwnRefusals.NO_CREDIT)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        assert exc_info.value.exit_code == 1
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.response_unreadable"
+        assert problem["status"] == 402
+        assert problem["detail"] == RunnerOwnRefusals.NO_CREDIT_REASON
+        assert problem["next_step"] == {"kind": "check_account", "detail": RunnerOwnRefusals.NO_CREDIT_ADVICE}
+        _assert_no_retired_member(problem=problem)
 
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])

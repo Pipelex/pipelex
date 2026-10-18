@@ -500,7 +500,10 @@ def path_label(*, path: Path) -> str:
         home_dir: Path | None = Path.home()
     except RuntimeError:
         home_dir = None
-    absolute = path if path.is_absolute() or working_dir is None else working_dir / path
+    joined = path if path.is_absolute() or working_dir is None else working_dir / path
+    # Collapsed lexically before it is compared, so a `..` cannot climb out of the working directory or the home
+    # directory while still reading as under it, nor walk back into the home directory past its name.
+    absolute = Path(os.path.normpath(joined))
     if working_dir is not None and absolute.is_relative_to(working_dir):
         if home_dir is None or not home_dir.is_relative_to(working_dir):
             return absolute.relative_to(working_dir).as_posix()

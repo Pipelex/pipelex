@@ -3,11 +3,12 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.problem import PipelexProblem, ProblemView
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
@@ -28,6 +29,32 @@ if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+
+
+WEBHOOK_PROBLEM_FAULT_MESSAGE = "The problem of a failed run could not be built for its webhooks"
+"""The error logged when a failed run's problem raises while it is built for the run's webhooks."""
+
+
+def _webhook_problem(*, error: Exception, pipeline_run_id: str, request_id: str | None) -> PipelexProblem:
+    """The problem of a failed run that its webhooks receive, in the operator's view, which each webhook projects to its own.
+
+    A Pipelex error carries its own code, and a bare exception stands as a fault of ours, so a webhook still receives
+    an ``error`` object. Delivery never changes how a run fails: this runs while the run's own error is on its way to
+    the caller, so building the problem must not raise in its place. A problem that cannot be built is logged as an
+    error, and the webhooks receive ``runtime.unexpected``, as a traced node does (``make_node_problem``).
+    """
+    failure = error if isinstance(error, PipelexError) else make_unexpected_failure(error=error)
+    try:
+        return failure.to_problem(view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+    except Exception as problem_fault:  # ruff: ignore[blind-except]
+        # Unbounded code: `to_problem` reads hooks overridden across the whole error hierarchy, the errors plugins
+        # define included, and walks the error's cause chain, so what it raises cannot be enumerated. The run's own
+        # error is the one it fails with, so the fault is logged and the webhooks receive a fault of ours.
+        log.error(
+            WEBHOOK_PROBLEM_FAULT_MESSAGE,
+            fields={"failed_error_type": type(error).__name__, **error_fields(exc=problem_fault)},
+        )
+    return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
 
 
 class PipeRun(PipeRunProtocol):
@@ -87,15 +114,13 @@ class PipeRun(PipeRunProtocol):
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
-            # Always build a problem for the FAILED webhook, in the operator's view, which each webhook projects to its
-            # own: a Pipelex error carries its own code, and a bare exception stands as a fault of ours, so the webhook
-            # still receives an `error` object.
-            failure = exc if isinstance(exc, PipelexError) else make_unexpected_failure(error=exc)
-            problem = failure.to_problem(
-                view=ProblemView.OPERATOR,
-                pipeline_run_id=pipeline_run_id,
-                request_id=pipe_job.job_metadata.run_metadata.request_id,
-            )
+            # The problem a FAILED webhook receives, built only when a webhook is there to receive it.
+            if delivery_assignment is not None and delivery_assignment.webhooks:
+                problem = _webhook_problem(
+                    error=exc,
+                    pipeline_run_id=pipeline_run_id,
+                    request_id=pipe_job.job_metadata.run_metadata.request_id,
+                )
             # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
             # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.

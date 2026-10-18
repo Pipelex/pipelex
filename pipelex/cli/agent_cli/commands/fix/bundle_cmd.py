@@ -172,7 +172,8 @@ def fix_bundle_cmd(
 
     except OSError as exc:
         # A method file the loop could not read; a write it could not make is a `FixWriteFailedError`, never an OSError.
-        agent_unreadable_file_error(error=exc, path=bundle_path, exit_code=2)
+        # An error naming no file, a connection or a timeout, is the unexpected failure the boundary reports.
+        agent_unreadable_file_error(error=exc, exit_code=2)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(

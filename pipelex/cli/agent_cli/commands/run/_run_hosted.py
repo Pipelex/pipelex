@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, SuggestedFix
-from mthds.protocol.problem.registry import CoreCode, RetryVerdict, StepKind
+from mthds.protocol.problem.registry import CoreCode, RetryVerdict
 from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, PipelexRequestError, RunFailedError
 from pydantic import BaseModel, ValidationError
 
@@ -41,7 +41,13 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output, format_run_markdown
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import make_hosted_client
-from pipelex.hosted.error_rendering import answered_in_former_shape, hosted_refusal_problem, sent_verdict, tailored_next_step
+from pipelex.hosted.error_rendering import (
+    FORMER_ADVICE_KINDS,
+    answered_in_former_shape,
+    hosted_refusal_problem,
+    sent_verdict,
+    tailored_next_step,
+)
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 from pipelex.hosted.execution import resolve_run_execution
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest, RunStartedCallback, run_hosted
@@ -236,18 +242,6 @@ def received_problem(*, problem: Problem, request_id: str | None = None, stored:
     return received
 
 
-#: The step kind each advice of a report in the former shape names (its `user_action.kind`), in the standard's closed
-#: list of kinds; an advice of another kind, `unknown` included, takes its code's.
-_FORMER_ADVICE_KINDS: dict[str, StepKind] = {
-    "wait_and_retry": StepKind.WAIT,
-    "check_billing": StepKind.CHECK_ACCOUNT,
-    "check_credentials": StepKind.CHECK_CREDENTIALS,
-    "change_input": StepKind.CHANGE_INPUT,
-    "change_model": StepKind.CHANGE_MODEL,
-    "contact_support": StepKind.REPORT,
-}
-
-
 def _stored_run_problem(*, report: RunErrorReport | None) -> PipelexProblem | None:
     """The failed run's own problem, read off the report the hosted API stored for it; ``None`` when it stored none.
 
@@ -323,7 +317,7 @@ def _former_problem(
 
     It names no code: one that lists validation items is `method.invalid`, its items coded as a local verdict codes them
     (:func:`hosted_method_problem_items`), and any other is `runtime.unexpected`. Its message is the problem's detail,
-    its advice the next step, of the kind :data:`_FORMER_ADVICE_KINDS` reads, and its `retryable` the retry verdict, so
+    its advice the next step, of the kind `FORMER_ADVICE_KINDS` reads, else its code's, and its `retryable` the retry verdict, so
     this CLI tells what the human CLI tells of the same failure (`describe_hosted_error`).
     """
     items = hosted_method_problem_items(validation_errors=validation_errors)
@@ -332,7 +326,7 @@ def _former_problem(
     if message:
         updates["detail"] = message
     if advice_detail:
-        updates["next_step"] = NextStep(kind=_FORMER_ADVICE_KINDS.get(advice_kind or "", problem.next_step.kind), detail=advice_detail)
+        updates["next_step"] = NextStep(kind=FORMER_ADVICE_KINDS.get(advice_kind or "", problem.next_step.kind), detail=advice_detail)
     if isinstance(retryable, bool):
         updates["retry"] = RetryVerdict.YES if retryable else RetryVerdict.NO
     return problem.model_copy(update=updates)
@@ -341,25 +335,23 @@ def _former_problem(
 def _typed_sent_item(*, sent: SentValidationErrorItem) -> ValidationErrorItem:
     """A validation item the hosted API sent, typed as this version reads one, by the fields this version declares.
 
-    A field this version does not declare is left out, so an item of a type it reads keeps its type. An item of a
-    newer runner whose declared fields this version does not read, such as a type it does not know, keeps its
-    locators, and its sentence becomes the finding of the item no stage classified.
+    A field this version does not declare is left out, so an item of a type it reads keeps its type. A declared field
+    whose value this version does not read, as a newer runner may send one, is left out alone, so the item keeps every
+    other field, its type, its locators and its dependency facts included: an item whose type this version does not
+    know becomes the item no stage classified, its sentence the finding, one whose fix it does not read loses only its
+    fix, and one whose category it does not know is read as a blueprint's, the one field an item cannot go without.
     """
     sent_fields = sent.model_dump(mode="json", exclude_none=True)
     declared = {name: value for name, value in sent_fields.items() if name in ValidationErrorItem.model_fields}
     try:
         return ValidationErrorItem.model_validate(declared)
-    except ValidationError:
-        return ValidationErrorItem(
-            category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
-            message=sent.message,
-            pipe_code=sent.pipe_code,
-            concept_code=sent.concept_code,
-            domain_code=sent.domain_code,
-            source=sent.source,
-            field_path=sent.field_path,
-            field_name=sent.field_name,
-        )
+    except ValidationError as exc:
+        # Every field that did not read is named by an error, so the fields left all read.
+        unread = {error["loc"][0] for error in exc.errors() if error["loc"]}
+        readable = {name: value for name, value in declared.items() if name not in unread}
+        if "category" in unread:
+            readable["category"] = ValidationErrorCategory.BLUEPRINT_VALIDATION
+        return ValidationErrorItem.model_validate(readable)
 
 
 def hosted_method_problem_items(*, validation_errors: list[SentValidationErrorItem]) -> list[ProblemItem]:

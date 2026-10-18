@@ -98,8 +98,9 @@ def inputs_bundle_cmd(
         agent_file_error(f"Bundle file not found: {bundle_path}", path=str(bundle_path), reason="not found", cause=exc)
 
     except OSError as exc:
-        # A method file this machine would not let the command read: the file, never a fault of the method.
-        agent_unreadable_file_error(error=exc, path=str(bundle_path))
+        # A method file this machine would not let the command read: the file, never a fault of the method. An error
+        # naming no file, a connection or a timeout, is the unexpected failure the boundary reports.
+        agent_unreadable_file_error(error=exc)
 
     except ValidateBundleError as exc:
         # A failing dry run is the problem's errors, one located item per failing pipe.
