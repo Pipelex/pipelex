@@ -53,6 +53,17 @@ domain = "name_conflict_dup"
 [concept]
 Doc = "A document, as the second bundle declares it"
 """
+    # A second bundle declaring the first one's pipe again.
+    SECOND_PIPE: ClassVar[str] = """
+domain = "name_conflict_dup"
+
+[pipe.echo]
+type = "PipeCompose"
+description = "Echo, as the second bundle declares it"
+inputs = { text = "Text" }
+output = "Text"
+template = "{{ text }}"
+"""
 
 
 def _name_conflict_locations(error: PipelexError) -> list[dict[str, Any]]:
@@ -94,6 +105,18 @@ class TestNameConflictLocation:
         assert sorted(_name_conflict_locations(exc_info.value), key=itemgetter("file")) == [
             {"field": "concept.Doc", "file": "first.mthds"},
             {"field": "concept.Doc", "file": "second.mthds"},
+        ]
+
+    async def test_a_pipe_declared_twice_is_located_by_its_path_from_the_bundle_root_alone(self) -> None:
+        """A pipe's declaration is located by its bundle-root path, with no `pipe` beside it that a reader would join to it."""
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(
+                mthds_contents=[_NameConflictData.FIRST, _NameConflictData.SECOND_PIPE], mthds_sources=["first.mthds", "second.mthds"]
+            )
+
+        assert sorted(_name_conflict_locations(exc_info.value), key=itemgetter("file")) == [
+            {"field": "pipe.echo", "file": "first.mthds"},
+            {"field": "pipe.echo", "file": "second.mthds"},
         ]
 
     @pytest.mark.parametrize(

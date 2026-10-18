@@ -397,12 +397,13 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
         item_params.setdefault("suggestions", [])
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
-    field = item.field_name or item.field_path or None
-    if field is None and code == CoreCode.METHOD_NAME_CONFLICT:
-        # A name conflict has a place even when its stage gave no field: the declaration that collides, by its
-        # bundle-root path, such as `concept.Rating`, which a caller edits.
-        field = _declaration_path(item=item)
-    location = make_location(pipe=item.pipe_code, field=field, file=item.source, line=line, column=column)
+    if code == CoreCode.METHOD_NAME_CONFLICT:
+        # A name conflict is located on the declaration that collides, by its path from the bundle's root, such as
+        # `concept.Rating` or `pipe.compute_score`, which a caller edits. A `field` beside no `pipe` reads from the bundle's
+        # root, so the location names no `pipe` a reader would join that path to.
+        location = make_location(field=item.field_path or _declaration_path(item=item), file=item.source, line=line, column=column)
+    else:
+        location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
     return make_problem_item(
         code=code,
         params=item_params,
