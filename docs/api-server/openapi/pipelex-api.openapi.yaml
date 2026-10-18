@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.87.0
+  version: 0.89.0
 paths:
   /health:
     get:
@@ -91,7 +91,9 @@ paths:
 
         the path''s a 422 `BlobMismatch`. A blob is never changed: uploading bytes the runner already holds answers 204 and
 
-        changes nothing.'
+        changes nothing, and uploading bytes whose hash names an object of another size, which only damaged storage could
+
+        hold, is a 500 `BlobStoreCorrupted` that leaves the object as it is.'
       operationId: put_blob_v1_blobs__sha256__put
       parameters:
       - name: sha256
@@ -468,7 +470,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -827,7 +830,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -953,7 +957,8 @@ paths:
             or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
             whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: a sandbox-hosted
             deployment imports no caller Python into its own process, so it refuses them before loading anything (express
-            the types as MTHDS concepts instead).'
+            the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope`
+            that does not lie under the caller''s own `user_id`.'
           content:
             application/problem+json:
               schema:
@@ -971,22 +976,25 @@ paths:
       tags:
       - resolve
       summary: Resolve Mthds
-      description: "Resolve a library closure into its normalized crate (Pipelex API extension).\n\nResolution is a first-class\
-        \ language operation alongside validation: assemble the closure from\nthe inline `files[]`, load + statically validate\
-        \ the library, and emit the **normalized\nlibrary crate** (fully qualified refs, refinement flattened, natives materialized,\
-        \ fingerprint\nset) — the artifact shape the MTHDS standard specifies as the Library Crate Format. It runs no\ndry-run\
-        \ sweep — runnability is `/validate`'s vocabulary.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid\
-        \ verdict (200, `is_valid: true`):** the crate on the valid arm.\n- **Invalid verdict (200, `is_valid: false`):**\
-        \ the library could not be parsed, loaded, or\n  validated — `validation_errors[]` from pipelex's one shared builder.\n\
-        - **No verdict (non-2xx):** a malformed request body (neither/both closure selectors, an\n  over-limit file) is a\
-        \ request-shape 422; `method_ref` is a 501 until server-side method\n  registry resolution exists; auth is 401/403;\
-        \ server fault is 5xx. All RFC 7807\n  `application/problem+json` via the global handlers."
+      description: "Resolve a method into its normalized crate (Pipelex API extension).\n\nResolution is a first-class language\
+        \ operation alongside validation: read the method's tree\n(`files`, or the package a `method_ref` fetches) exactly\
+        \ as `/validate` reads it, load + statically\nvalidate it as the caller's own library, and emit the **normalized library\
+        \ crate** (fully\nqualified refs, refinement flattened, natives materialized, fingerprint set) — the artifact\nshape\
+        \ the MTHDS standard specifies as the Library Crate Format. It runs no dry-run sweep —\nrunnability is `/validate`'s\
+        \ vocabulary.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):** the\
+        \ crate on the valid arm.\n- **Invalid verdict (200, `is_valid: false`):** the library could not be parsed, loaded,\
+        \ or\n  validated — `validation_errors[]` from pipelex's one shared builder.\n- **No verdict (non-2xx):** a malformed\
+        \ request body (neither or both method selectors) is a\n  request-shape 422; a `files` map that is not a method tree\
+        \ is a 422 `InvalidMethodFiles`, and\n  hash entries this runner does not hold one 422 `MissingBlobs`; custom Python\
+        \ on a deployment\n  that is not sandbox-hosted, or a Python structure class, is a 403; a registry-form `method_ref`\n\
+        \  is a 501 until server-side method registry resolution exists; auth is 401/403; server fault is\n  5xx. All RFC\
+        \ 7807 `application/problem+json` via the global handlers."
       operationId: resolve_mthds_v1_resolve_post
       requestBody:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/MthdsFilesRequest'
+              $ref: '#/components/schemas/MethodTreeRequest'
         required: true
       responses:
         '200':
@@ -1036,6 +1044,17 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+        '403':
+          description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
+            (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
+            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
         '404':
           description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
             the requested address by manifest identity. The message lists the packages the repository does contain.'
@@ -1044,9 +1063,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
+          description: '`MethodRefNotSupported` — the request selected its method by a **registry-form** `method_ref` (not
             a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
+            or send the method''s tree in `files` instead.'
           content:
             application/problem+json:
               schema:
@@ -1057,18 +1076,21 @@ paths:
       - pipe-io
       summary: Pipe Io
       description: "Return a method's pipe I/O contracts, input form and output form, with no dry run (Pipelex API extension).\n\
-        \nThe closure resolves through the static core `/resolve` rides, a pipe is selected the way the\nper-pipe routes select\
-        \ one, and the three artifacts are derived with `build_pipe_io_artifacts`,\nthe builder `/validate` and every run\
-        \ call — so a call costs one load and one derivation where\n`/validate` dry-runs every pipe.\n\nResponse contract\
-        \ (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):** the three artifact maps keyed by qualified\
-        \ `pipe_ref`,\n  beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`, `is_runnable`, and `files` when\n  `include_files`\
-        \ is true.\n- **Invalid verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or\n  statically\
-        \ validated — the crate verdict, carrying no artifact, no selection and no files.\n- **No verdict (non-2xx):** a malformed\
-        \ body and neither or both closure selectors are\n  request-shape 422s (`ValidationError`); a selection refusal is\
-        \ an input 422 named for its failure,\n  `EntryPipeNotFoundError` for an unknown `pipe_ref` or a single-pipe request\
-        \ whose chain finds no\n  entry pipe, `EntryPipeAmbiguousError` for an ambiguous one or a chain that finds several;\
-        \ the\n  `method_ref` fetch outcomes are those of `/resolve` (404, 422, 501);\n  an artifact that cannot be derived\
-        \ (`PipeIOContractError`) is a 500. All RFC 7807\n  `application/problem+json` via the global handlers."
+        \nThe method is read as `/validate` reads a method tree and resolves through the static core\n`/resolve` rides, a\
+        \ pipe is selected the way the per-pipe routes select one, and the three\nartifacts are derived with `build_pipe_io_artifacts`,\
+        \ the builder `/validate` and every run call —\nso a call costs one load and one derivation where `/validate` dry-runs\
+        \ every pipe.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):** the\
+        \ three artifact maps keyed by qualified `pipe_ref`,\n  beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`,\
+        \ `is_runnable`, and `files` when\n  `include_files` is true.\n- **Invalid verdict (200, `is_valid: false`):** the\
+        \ closure could not be parsed, loaded, or\n  statically validated — the crate verdict, carrying no artifact, no selection\
+        \ and no files.\n- **No verdict (non-2xx):** a malformed body and neither or both method selectors are\n  request-shape\
+        \ 422s (`ValidationError`); a `files` map that is not a method tree is a 422\n  `InvalidMethodFiles`, and hash entries\
+        \ this runner does not hold one 422 `MissingBlobs`, as on\n  `/validate`; custom Python on a deployment that is not\
+        \ sandbox-hosted, or a Python structure\n  class, is a 403; a selection refusal is an input 422 named for its failure,\n\
+        \  `EntryPipeNotFoundError` for an unknown `pipe_ref` or a single-pipe request whose chain finds no\n  entry pipe,\
+        \ `EntryPipeAmbiguousError` for an ambiguous one or a chain that finds several; the\n  `method_ref` fetch outcomes\
+        \ are those of `/resolve` (404, 422, 501);\n  an artifact that cannot be derived (`PipeIOContractError`) is a 500.\
+        \ All RFC 7807\n  `application/problem+json` via the global handlers."
       operationId: pipe_io_v1_pipe_io_post
       requestBody:
         content:
@@ -1124,6 +1146,17 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+        '403':
+          description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
+            (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
+            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
         '404':
           description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
             the requested address by manifest identity. The message lists the packages the repository does contain.'
@@ -1132,9 +1165,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
+          description: '`MethodRefNotSupported` — the request selected its method by a **registry-form** `method_ref` (not
             a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
+            or send the method''s tree in `files` instead.'
           content:
             application/problem+json:
               schema:
@@ -1144,16 +1177,17 @@ paths:
       tags:
       - codegen
       summary: Codegen Mthds
-      description: "Generate typed artifacts from a library closure (Pipelex API extension).\n\nResolves the closure to its\
-        \ normalized crate (exactly like `POST /resolve`), then projects it\nthrough the requested `kind`/`target` axes and\
-        \ returns the **stamped** artifact set plus its\n`codegen.lock` — everything a client needs to materialize a byte-identical\
-        \ local projection\nand run the offline drift check. There is deliberately **no** server-side check route: the\ncheck\
-        \ is offline by design.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):**\
+      description: "Generate typed artifacts from a method (Pipelex API extension).\n\nResolves the method to its normalized\
+        \ crate (exactly like `POST /resolve`), then projects it\nthrough the requested `kind`/`target` axes and returns the\
+        \ **stamped** artifact set plus its\n`codegen.lock` — everything a client needs to materialize a byte-identical local\
+        \ projection\nand run the offline drift check. There is deliberately **no** server-side check route: the\ncheck is\
+        \ offline by design.\n\nResponse contract (the `/validate` discipline):\n\n- **Valid verdict (200, `is_valid: true`):**\
         \ the artifacts + lock on the valid arm.\n- **Invalid verdict (200, `is_valid: false`):** the library could not be\
         \ parsed, loaded, or\n  validated — `validation_errors[]` from pipelex's one shared builder; no artifacts exist.\n\
         - **No verdict (non-2xx):** an unknown projection `kind`/`target`, a `pipe_ref` on a\n  concept-set-wide kind, or\
-        \ a malformed closure selector is a request-shape 422 problem+json;\n  `method_ref` is a 501 until server-side method\
-        \ registry resolution exists; auth is 401/403;\n  server fault is 5xx."
+        \ a malformed method selector is a request-shape 422 problem+json; the\n  method's tree is refused as `/resolve` refuses\
+        \ it (422 `InvalidMethodFiles` or `MissingBlobs`,\n  the Python policy's 403s, the `method_ref` fetch outcomes, 501\
+        \ for a registry-form\n  `method_ref`); auth is 401/403; server fault is 5xx."
       operationId: codegen_mthds_v1_codegen_post
       requestBody:
         content:
@@ -1209,6 +1243,17 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+        '403':
+          description: 'The run routes'' Python policy, applied to the method''s tree: `CustomCodeRequiresSandbox` — the method
+            (sent in `files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted;
+            or `MethodStructuresRefusedError` — the method''s Python declares structure classes (`StructuredContent` subclasses),
+            which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead).
+            Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the
+            caller''s own `user_id`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
         '404':
           description: '`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches
             the requested address by manifest identity. The message lists the packages the repository does contain.'
@@ -1217,9 +1262,9 @@ paths:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
         '501':
-          description: '`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not
+          description: '`MethodRefNotSupported` — the request selected its method by a **registry-form** `method_ref` (not
             a `github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference
-            or submit inline `files[]` instead.'
+            or send the method''s tree in `files` instead.'
           content:
             application/problem+json:
               schema:
@@ -1507,9 +1552,13 @@ paths:
       description: 'List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
 
-        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
+        A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; a hash held
 
-        under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+        at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
+
+        change nothing, and bytes of another size mean the object held is damaged, a 500 `BlobStoreCorrupted`, since nothing
+
+        writes over a blob. When the request names the tree the blobs
 
         make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
 
@@ -1579,6 +1628,13 @@ paths:
         '500':
           description: A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML
             override, a backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
+        '403':
+          description: '`ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under
+            the caller''s own `user_id`, the only scope its token may read.'
           content:
             application/problem+json:
               schema:
@@ -1892,14 +1948,41 @@ components:
       properties:
         files:
           anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/Base64FileEntry'
+              - $ref: '#/components/schemas/HashFileEntry'
+            type: object
           - type: 'null'
           title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
+          description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels: each
+            key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment starting with
+            a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size":
+            ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`).
+            The map is read from the request''s JSON text: a key given twice, a key the membership rule keeps out of every
+            tree (`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal`
+            names the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs`
+            lists every such hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read,
+            such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+            of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is
+            only honored on a sandbox-hosted deployment. Exactly one of `files` / `method_ref`.'
+        dependencies:
+          anyOf:
+          - additionalProperties:
+              additionalProperties:
+                anyOf:
+                - type: string
+                - $ref: '#/components/schemas/Base64FileEntry'
+                - $ref: '#/components/schemas/HashFileEntry'
+              type: object
+            type: object
+          - type: 'null'
+          title: Dependencies
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls by address
+            that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map of file entries>}`:
+            each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its root declaring the address it
+            is keyed by. They are searched before the runner''s installed copies, for this request alone. Accompanies `files`.'
         method_ref:
           anyOf:
           - type: string
@@ -1907,8 +1990,10 @@ components:
             minLength: 1
           - type: 'null'
           title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
+          description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — a published method by reference, instead of
+            its tree. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is fetched and read as a `files` tree
+            is, through the same path as a `method_ref` run; the registry form stays reserved (501 until a method registry
+            exists). Exactly one of `files` / `method_ref`.
         resources:
           anyOf:
           - additionalProperties:
@@ -1926,6 +2011,15 @@ components:
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
             the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+        read_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Read Scope
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the request reads the method under,
+            as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry of `files`
+            resolves in that scope''s blob store, and the tree the request read is recorded there, so a later request can
+            send it by hash. Omit it and a hash entry resolves in the caller''s own id''s store, and nothing is recorded.'
         kind:
           $ref: '#/components/schemas/CodegenRouteKind'
           description: What to project. `types` projects the crate's concept set into typed models.
@@ -1945,7 +2039,7 @@ components:
       - kind
       - target
       title: CodegenRequest
-      description: 'The codegen request: the shared closure selector plus the two explicit projection axes.'
+      description: 'The codegen request: the crate routes'' method selector plus the two explicit projection axes.'
     CodegenRouteKind:
       type: string
       enum:
@@ -4015,6 +4109,103 @@ components:
       - commit_sha
       title: MethodProvenance
       description: 'What a fetched-method run must record: address, tag, and the resolved commit SHA.'
+    MethodTreeRequest:
+      properties:
+        files:
+          anyOf:
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/Base64FileEntry'
+              - $ref: '#/components/schemas/HashFileEntry'
+            type: object
+          - type: 'null'
+          title: Files
+          description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels: each
+            key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment starting with
+            a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size":
+            ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`).
+            The map is read from the request''s JSON text: a key given twice, a key the membership rule keeps out of every
+            tree (`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal`
+            names the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs`
+            lists every such hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read,
+            such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+            of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is
+            only honored on a sandbox-hosted deployment. Exactly one of `files` / `method_ref`.'
+        dependencies:
+          anyOf:
+          - additionalProperties:
+              additionalProperties:
+                anyOf:
+                - type: string
+                - $ref: '#/components/schemas/Base64FileEntry'
+                - $ref: '#/components/schemas/HashFileEntry'
+              type: object
+            type: object
+          - type: 'null'
+          title: Dependencies
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls by address
+            that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map of file entries>}`:
+            each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its root declaring the address it
+            is keyed by. They are searched before the runner''s installed copies, for this request alone. Accompanies `files`.'
+        method_ref:
+          anyOf:
+          - type: string
+            maxLength: 512
+            minLength: 1
+          - type: 'null'
+          title: Method Ref
+          description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — a published method by reference, instead of
+            its tree. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is fetched and read as a `files` tree
+            is, through the same path as a `method_ref` run; the registry form stays reserved (501 until a method registry
+            exists). Exactly one of `files` / `method_ref`.
+        resources:
+          anyOf:
+          - additionalProperties:
+              type: string
+            type: object
+          - type: 'null'
+          title: Resources
+          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
+            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
+            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
+            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
+            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
+            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
+            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
+            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
+            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+        read_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Read Scope
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the request reads the method under,
+            as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry of `files`
+            resolves in that scope''s blob store, and the tree the request read is recorded there, so a later request can
+            send it by hash. Omit it and a hash entry resolves in the caller''s own id''s store, and nothing is recorded.'
+      type: object
+      title: MethodTreeRequest
+      description: 'The method selector of the crate routes (`/resolve`, `/codegen`, `/pipe-io`): a tree sent in `files` XOR
+        a `method_ref`.
+
+
+        Exactly one of the two must be provided — both or neither is a request-shape 422. The tree is the MTHDS standard''s
+
+        map of file entries, read from the request''s raw JSON text exactly as `/validate` and the run routes read it
+
+        (`pipelex_api.method_tree_request`), with the `dependencies` it carries and the `resources` that join it. An
+
+        **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is resolved by this server through
+
+        the run routes'' fetch path: the package''s tree is read from its commit''s git objects, with the packages it ships
+
+        under `.mthds/methods/`. The **registry form** (any non-address reference) stays reserved and answers 501 until
+
+        server-side method-registry resolution exists. Either way the method is held to the run routes'' Python policy:
+
+        custom `.py` only on a sandbox-hosted deployment, and no Python structure class at all.'
     MissingBlob:
       properties:
         sha256:
@@ -4331,86 +4522,6 @@ components:
         is preserved within a parent and never across parents — see ``docs/migration-ledger.md``
 
         for the placement rule and for what happens to a moved table''s introducing comment.'
-    MthdsFileItem:
-      properties:
-        content:
-          type: string
-          title: Content
-          description: MTHDS bundle content.
-        source:
-          anyOf:
-          - type: string
-            maxLength: 1024
-          - type: 'null'
-          title: Source
-          description: Optional logical source for this bundle (e.g. its path relative to the submitted directory). Threaded
-            onto the blueprint so server-side diagnostics carry a `source` pointing at the owning file.
-      type: object
-      required:
-      - content
-      title: MthdsFileItem
-      description: 'One inline MTHDS bundle: its content plus an optional logical source for diagnostics.
-
-
-        The `files[]` envelope pairs each content with its source in one entry (the shape the codegen
-
-        spec pins for the resolve/codegen routes), unlike the legacy parallel
-
-        `mthds_contents[]`/`mthds_sources[]` lists on `/validate`.'
-    MthdsFilesRequest:
-      properties:
-        files:
-          anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
-          - type: 'null'
-          title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
-        method_ref:
-          anyOf:
-          - type: string
-            maxLength: 512
-            minLength: 1
-          - type: 'null'
-          title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
-        resources:
-          anyOf:
-          - additionalProperties:
-              type: string
-            type: object
-          - type: 'null'
-          title: Resources
-          description: 'The files submitted with the bundle that its steps read, such as a PipeDocGen step''s `template_file`
-            (an `.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file''s bundle-relative path, exactly
-            as the step names it, to the file''s bytes in standard base64. A path must be relative and written with forward
-            slashes, with no `..` segment, backslash or colon. Beside inline `mthds_contents`, every bundle of the request
-            is read as sitting in one directory, and every file must be named by a step, or the request is refused with a
-            422 `BundleResourceNotNamedError`. Beside a method tree, `files` or `bundle_b64`, each file joins the tree at
-            its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
-            32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
-            `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
-      type: object
-      title: MthdsFilesRequest
-      description: 'Shared closure selector for the resolve/codegen routes: inline `files[]` XOR a `method_ref`.
-
-
-        Exactly one of the two must be provided (spec''d envelope) — both or neither is a request-shape
-
-        422. An **address-form** `method_ref` (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is
-
-        resolved by this server: the repository is fetched at the tag, the package is located by
-
-        manifest identity, and its `.mthds` files feed the closure with their real relative paths as
-
-        per-file sources. The **registry form** (any non-address reference) stays reserved and answers
-
-        501 until server-side method-registry resolution exists.'
     NodeIOSpec:
       properties:
         inputs:
@@ -5440,14 +5551,41 @@ components:
       properties:
         files:
           anyOf:
-          - items:
-              $ref: '#/components/schemas/MthdsFileItem'
-            type: array
-            maxItems: 16
-            minItems: 1
+          - additionalProperties:
+              anyOf:
+              - type: string
+              - $ref: '#/components/schemas/Base64FileEntry'
+              - $ref: '#/components/schemas/HashFileEntry'
+            type: object
           - type: 'null'
           title: Files
-          description: Inline MTHDS bundles forming the closure to resolve (content-passing — no server-side path reads).
+          description: 'The method as a map of file entries, the MTHDS standard''s form of a method tree that travels: each
+            key is a tree path (relative, forward slashes, in Unicode NFC, no `.` or `..` segment, no segment starting with
+            a dot), and each value is the file''s UTF-8 text, `{"base64": ...}` holding its bytes, or `{"sha256": ..., "size":
+            ...}` naming bytes this runner already holds (uploaded with `POST /v1/blobs/missing` then `PUT /v1/blobs/{sha256}`).
+            The map is read from the request''s JSON text: a key given twice, a key the membership rule keeps out of every
+            tree (`.mthds/` included), colliding keys and a malformed entry are a 422 `InvalidMethodFiles` whose `tree_refusal`
+            names the code and the paths, and hash entries the runner does not hold are one 422 `MissingBlobs` whose `missing_blobs`
+            lists every such hash. Its `.mthds` files are the method''s bundles and every other file is one a step may read,
+            such as a `PipeDocGen` template or a `PipeFunc` module. With no `pipe_code`, the run starts at the `main_pipe`
+            of the `METHODS.toml` at the tree''s root, or else at the one `main_pipe` its bundles declare. Custom `.py` is
+            only honored on a sandbox-hosted deployment. Exactly one of `files` / `method_ref`.'
+        dependencies:
+          anyOf:
+          - additionalProperties:
+              additionalProperties:
+                anyOf:
+                - type: string
+                - $ref: '#/components/schemas/Base64FileEntry'
+                - $ref: '#/components/schemas/HashFileEntry'
+              type: object
+            type: object
+          - type: 'null'
+          title: Dependencies
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the method packages the method calls by address
+            that this runner cannot fetch, such as one an author has not published, as `{"<address>": <map of file entries>}`:
+            each value is a tree of its own, read as `files` is, with a `METHODS.toml` at its root declaring the address it
+            is keyed by. They are searched before the runner''s installed copies, for this request alone. Accompanies `files`.'
         method_ref:
           anyOf:
           - type: string
@@ -5455,8 +5593,10 @@ components:
             minLength: 1
           - type: 'null'
           title: Method Ref
-          description: Reference to a published method, resolving to its package's `.mthds` files. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`)
-            is fetched and resolved server-side; the registry form stays reserved (501 until a method registry exists).
+          description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — a published method by reference, instead of
+            its tree. Address form (`github.com/<owner>/<repo>[/<selector>][@<tag>]`) is fetched and read as a `files` tree
+            is, through the same path as a `method_ref` run; the registry form stays reserved (501 until a method registry
+            exists). Exactly one of `files` / `method_ref`.
         resources:
           anyOf:
           - additionalProperties:
@@ -5474,6 +5614,15 @@ components:
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
             the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+        read_scope:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Read Scope
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the request reads the method under,
+            as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry of `files`
+            resolves in that scope''s blob store, and the tree the request read is recorded there, so a later request can
+            send it by hash. Omit it and a hash entry resolves in the caller''s own id''s store, and nothing is recorded.'
         pipe_ref:
           anyOf:
           - type: string
@@ -5481,9 +5630,9 @@ components:
             minLength: 1
           - type: 'null'
           title: Pipe Ref
-          description: Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the fetched package manifest's
-            `main_pipe` on a `method_ref` request, else to the closure's declared `main_pipe`; a closure declaring none, or
-            several, with no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set.
+          description: Qualified pipe ref (`domain.pipe_code`) to select. Optional — defaults to the `main_pipe` of the `METHODS.toml`
+            at the method tree's root, else to the closure's declared `main_pipe`; a closure declaring none, or several, with
+            no manifest `main_pipe` to settle it, requires it unless `all_pipes` is set.
         all_pipes:
           type: boolean
           title: All Pipes
@@ -5494,13 +5643,14 @@ components:
         include_files:
           type: boolean
           title: Include Files
-          description: 'Echo the resolved closure''s `.mthds` files on the valid arm, in the request''s own `files[]` shape:
-            the request''s files for inline `files[]`, the fetched package''s `.mthds` files under their package-relative
-            paths for a `method_ref`. Absent from the response unless true.'
+          description: 'Echo the method''s `.mthds` bundles on the valid arm, as a map of file entries in the request''s own
+            `files` shape, each bundle''s tree path to its text: the bundles of the tree sent in `files`, whatever entry carried
+            them, or those of the fetched package''s tree for a `method_ref`. Its other files and its dependencies are not
+            echoed. Absent from the response unless true.'
           default: false
       type: object
       title: PipeIORequest
-      description: 'The pipe I/O request: the crate routes'' closure selector and pipe selector, plus the whole-method and
+      description: 'The pipe I/O request: the crate routes'' method selector and pipe selector, plus the whole-method and
         echo opt-ins.
 
 
@@ -5561,12 +5711,12 @@ components:
           title: Is Runnable
           description: '`not pending_signatures`, exactly as on `/validate`. No dry run backs it.'
         files:
-          items:
-            $ref: '#/components/schemas/MthdsFileItem'
-          type: array
+          additionalProperties:
+            type: string
+          type: object
           title: Files
-          description: 'The resolved closure''s `.mthds` files, in the request''s `files[]` shape. Present only with `include_files:
-            true`.'
+          description: 'The method''s `.mthds` bundles, each tree path to its text, a map of file entries as the request''s
+            `files` is. Present only with `include_files: true`.'
       type: object
       required:
       - pipe_ref
@@ -6424,6 +6574,14 @@ components:
         main_stuff_name:
           type: string
           title: Main Stuff Name
+        crate_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Crate Fingerprint
+          description: PIPELEX EXTENSION (not part of the MTHDS Protocol) — the fingerprint of the library crate the run's
+            method was loaded into, the identity of its concepts and pipes, which changes with their meaning and not with
+            their formatting or comments. Null when the run was built from no crate.
         method_provenance:
           anyOf:
           - $ref: '#/components/schemas/MethodProvenance'
@@ -6473,6 +6631,14 @@ components:
           - type: string
           - type: 'null'
           title: Workflow Id
+        crate_fingerprint:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Crate Fingerprint
+          description: PIPELEX EXTENSION (not part of the MTHDS Protocol) — the fingerprint of the library crate the run's
+            method was loaded into, the identity of its concepts and pipes, which changes with their meaning and not with
+            their formatting or comments. Null when the run was built from no crate.
         method_provenance:
           anyOf:
           - $ref: '#/components/schemas/MethodProvenance'
@@ -8258,9 +8424,12 @@ components:
           - type: string
           - type: 'null'
           title: Read Scope
-          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope of the blob store a hash entry
-            of `files` resolves in, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves.
-            Omit it and the caller''s own id is the scope.'
+          description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the scope the validation reads the method
+            under, as a run''s `read_scope`: a multi-tenant host sends the one of the organization it serves. A hash entry
+            of `files` resolves in that scope''s blob store, the tree the validation read is recorded there, and the runner
+            hands the scope to its validator, so a validation dispatched to a worker hands it the method through that store.
+            Omit it and a hash entry resolves in the caller''s own id''s store, but nothing is recorded and the validator
+            is handed no scope, so a dry run without one leaves nothing stored.'
       type: object
       title: ValidateRequest
       description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.

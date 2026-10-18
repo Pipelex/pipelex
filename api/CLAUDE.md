@@ -32,10 +32,11 @@ pipelex_api/
       pipeline.py      # POST /v1/execute, /v1/start (MTHDS Protocol run routes)
       blobs.py         # POST /v1/blobs/missing (MTHDS Protocol blob route; the signed upload targets)
       validate.py      # POST /v1/validate
-      resolve.py       # POST /v1/resolve (closure → normalized crate)
-      pipe_io.py       # POST /v1/pipe-io (closure → one pipe's, or every pipe's, I/O artifacts; no dry run)
+      method_selection.py # The method tree a diagnostic request names (`files` or `method_ref`), read as the run routes read it
+      resolve.py       # POST /v1/resolve (method tree → normalized crate)
+      pipe_io.py       # POST /v1/pipe-io (method tree → one pipe's, or every pipe's, I/O artifacts; no dry run)
       codegen.py       # POST /v1/codegen (crate → typed artifacts)
-      crate_ops.py     # Closure resolution, the pipe selection chain, and the invalid-arm envelope the crate routes share
+      crate_ops.py     # Writing and resolving the method's tree, the pipe selection chain, and the invalid-arm envelope the crate routes share
       tools.py         # POST /v1/lint, /v1/format (editor tooling)
       agent/           # GET /v1/models, GET /v1/models/check (the model reference check)
 tests/
