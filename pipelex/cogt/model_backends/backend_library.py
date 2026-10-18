@@ -790,12 +790,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         """Note the models a disabled backend's file declares, which this deployment knows of but does not serve.
 
         Only their names and types are read, nothing validated or substituted: a disabled backend's file is never
-        loaded, so a file that is missing or does not parse declares nothing here, as it refuses nothing at boot.
+        loaded, so a file that is missing, is not UTF-8 text or does not parse declares nothing here, as it refuses
+        nothing at boot. A backend's file has no override files, enabled or not (`_load_local_model_specs`), so the
+        one file is all it declares.
         """
         path = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
         try:
             document = load_toml_from_path(path=path)
-        except (OSError, TomlError):
+        except (OSError, UnicodeDecodeError, TomlError):
             return
         self._disabled_backend_declarations[backend_name] = list_declared_model_specs(document=document)
 
