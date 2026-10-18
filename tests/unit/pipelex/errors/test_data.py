@@ -40,6 +40,21 @@ class ProblemViewsTestData:
         "retry": "no",
         "next_step": {"kind": "change_method", "detail": "Correct the rule the host's '/srv/pipelex/private/settings.toml' enforces."},
     }
+    # An item whose code no registry of this process holds, as a newer worker sends it: its parameter and its sentence name
+    # a file of the host, and nothing tells this process whether its code declares that parameter operator-only.
+    UNKNOWN_CODE_ITEM: ClassVar[dict[str, Any]] = {
+        "code": "method.future_fault",
+        "detail": "The rule in '/srv/pipelex/private/settings.toml' is broken.",
+        "params": {"settings_file": "/srv/pipelex/private/settings.toml"},
+        "location": {"pipe": "summarize"},
+    }
+    # Extension members a problem may carry, whose values hold null: the protocol refuses null on a member a model
+    # declares, and nowhere else, so each is written back as it was read.
+    NULL_HOLDING_EXTENSIONS: ClassVar[dict[str, Any]] = {
+        "extension": {"clear": None, "keep": 1, "nested": [None, {"inner": None}]},
+        "cleared": None,
+    }
+    NULL_HOLDING_ITEM_EXTENSIONS: ClassVar[dict[str, Any]] = {"vendor": {"hint": None}}
     # An item built by hand, not by `make_problem_item`, whose parameter and sentence name a part of the host that only an
     # operator may read: `component` is operator-only for `runtime.misconfigured`.
     HAND_BUILT_OPERATOR_ITEM: ClassVar[dict[str, Any]] = {

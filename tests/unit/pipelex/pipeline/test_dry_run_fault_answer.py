@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 
@@ -86,6 +88,34 @@ class TestDryRunFaultAnswer:
         assert item.code == CoreCode.METHOD_WIRING_INVALID
         assert item.location is not None
         assert item.location.pipe == "route"
+
+    def test_a_dry_run_error_renders_its_sentence_from_the_failure_whose_code_it_carries(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Its code's sentence is rendered whole, from that failure's parameters and pipe, never falling back on the title."""
+        failures = [
+            _failure(code=PipelexErrorCode.STORAGE_UNAVAILABLE, pipe_code="draw"),
+            DryRunFailureErrorData(
+                code=CoreCode.METHOD_WIRING_INVALID,
+                pipe_code="analyze",
+                domain_code="board",
+                message="Pipe 'analyze' failed its dry run",
+                params={"variable_path": "ideas", "finding": "a list fed to a single field"},
+            ),
+        ]
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = DryRunError("two pipes failed their dry run", failures=failures).to_problem(view=ProblemView.CALLER)
+
+        assert problem.code == CoreCode.METHOD_WIRING_INVALID
+        assert problem.detail == "Pipe 'analyze' reads 'ideas' in a shape its wiring does not give it (a list fed to a single field)."
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"pipe": "analyze", "variable_path": "ideas", "finding": "a list fed to a single field"}
+        unrendered = [
+            record
+            for record in caplog.records
+            if record.getMessage() == "A problem's sentence could not be rendered from its template"
+            and getattr(record, "error.code", None) == CoreCode.METHOD_WIRING_INVALID
+        ]
+        assert unrendered == []
 
     @pytest.mark.parametrize(
         ("codes", "expected"),
