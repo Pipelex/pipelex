@@ -317,9 +317,13 @@ class TestVerdictNamesNoHostPath:
         verdict = await _verdict_on(surface=surface, caller_bundle=_CALLER_BUNDLE, tmp_path=tmp_path)
 
         items: list[ValidationErrorItem] = verdict.validation_error_items() or []
-        (item,) = items
-        assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds'" in item.message, surface.description
-        assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds'" in item.message, surface.description
+        # One item per bundle declaring it, each located on its bundle and naming the other by the dependency's address.
+        first_file = f"{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds"
+        copy_file = f"{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds"
+        assert sorted((item.source, item.message) for item in items) == [
+            (first_file, f"Pipe 'tides.write_tide_notice' is declared here and in '{copy_file}'."),
+            (copy_file, f"Pipe 'tides.write_tide_notice' is declared here and in '{first_file}'."),
+        ], surface.description
         _assert_names_no_host_path(payload=_caller_payload(verdict), tmp_path=tmp_path)
 
     @pytest.mark.parametrize("surface", _SURFACES, ids=[surface.surface_id for surface in _SURFACES])
@@ -398,6 +402,7 @@ class TestVerdictNamesNoHostPath:
         with pytest.raises(ValidateBundleError) as raised:
             await validate_bundle(mthds_contents=[_BOARD_NOTICE_PIPE_BUNDLE], library_dirs=[host_library_dir])
 
+        # The host's own declaration is no item of the caller's: the caller's declaration is, naming the host's file by a placeholder.
         (item,) = raised.value.validation_error_items() or []
         assert "harbour_board.pin_board_notice" in item.message
         assert HOST_LIBRARY_FILE_PLACEHOLDER in item.message

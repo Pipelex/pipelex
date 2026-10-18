@@ -170,7 +170,7 @@ def tree_bundle_of_lone_file(*, bundle_file: Path, limits: TreeLimits | None = N
     tree = list_local_method_tree(handed_over=bundle_file, limits=limits)
     if tree.entry is None:
         msg = f"Listing the method tree of the bundle file '{bundle_file}' named no entry for it."
-        raise MethodTreeLoadError(msg)
+        raise MethodTreeLoadError(msg).with_params(reason=TreeRefusalCode.LONE_FILE_EXCLUDED)
     return TreeBundle(tree=tree, tree_path=tree.entry)
 
 

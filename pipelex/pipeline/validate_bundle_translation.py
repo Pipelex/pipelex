@@ -34,7 +34,7 @@ from pipelex.core.validation import report_validation_error
 from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
 from pipelex.errors.security_event import security_target_kind
 from pipelex.interpreter_hub import get_library_manager
-from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
+from pipelex.libraries.exceptions import LibraryError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.libraries.method_trees import bundle_files_under, reporting_host_library_tree_faults
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
@@ -155,23 +155,17 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         # mismatches and duplicate concept/pipe refs (ConceptLibraryError / PipeLibraryError), and
         # the structured LibraryLoadingError aggregate (concept cycles, reserved-domain
         # violations, factory failures). Surface them as a clean ValidateBundleError instead of a
-        # raw traceback. LibraryLoadingError carries blueprint- and pipe/concept-validation errors;
+        # raw traceback. A LibraryError carries the blueprint- and pipe/concept-validation errors it was raised with;
         # forward them so the CLI renders the same structured detail it does for the other arms.
         # A library error that is not the method's, such as an invariant of the library manager
         # (`runtime.unexpected`) or library directories configured wrongly (`pipelex.config.invalid`), is no
         # verdict about the bundle, and propagates as it is, as does a security refusal.
         if not _code_makes_a_verdict(code=library_error.resolve_error_code()):
             raise
-        if isinstance(library_error, LibraryLoadingError):
-            blueprint_validation_errors = library_error.blueprint_validation_errors
-            pipe_concept_validation_errors = library_error.pipe_concept_validation_errors
-        else:
-            blueprint_validation_errors = None
-            pipe_concept_validation_errors = None
         raise ValidateBundleError(
             message=library_error.message,
-            pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
-            pipe_validation_errors=pipe_concept_validation_errors,
+            pipelex_bundle_blueprint_validation_errors=library_error.blueprint_validation_errors or None,
+            pipe_validation_errors=library_error.pipe_concept_validation_errors or None,
         ) from library_error
     except PipeRunError as pipe_run_error:
         # A pipe run failing outside the sweep's per-pipe classification: one dry-run item on its pipe when
@@ -216,7 +210,11 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
     except PipeOperatorModelChoiceError as model_choice_error:
         # A pipe names a model its deck does not define: the operator located it on the pipe and the
         # field, and the library load added the file, so it becomes one `unknown_model` item carrying
-        # the reference as written, the model type and the deck's suggestions.
+        # the reference as written, the model type and the deck's suggestions. A model a catalog of this
+        # deployment knows, which no enabled backend serves (`model.unavailable`), is no fault of the
+        # method: it leaves as it is, located on the pipe and the field, whose fix is the deployment's.
+        if not _code_makes_a_verdict(code=model_choice_error.resolve_error_code()):
+            raise
         raise ValidateBundleError(
             message=model_choice_error.message,
             pipe_validation_errors=[categorize_pipe_operator_model_choice_error(model_choice_error=model_choice_error)],
@@ -329,7 +327,8 @@ def withholding_host_library_files(
     declaration, a load that failed, or two ``@pipe_func`` functions of the same name, which the registry names by
     a module name spelled from the file's absolute path. Around such a load, a ``ValidateBundleError`` leaves this
     block with every one of those names taken out: the item carries no ``source``, still located by its pipe and
-    domain, and a message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one. The names are the ones the
+    domain, and a message reads ``HOST_LIBRARY_FILE_PLACEHOLDER`` where it named one, while the item of a host file that
+    restates a name conflict an item of the caller's own file reports is left out. The names are the ones the
     load gives: each bundle file in the spelling it gives a bundle's ``source`` and resolved, and each Python file's
     module name. A name the caller submitted as a content's source (``caller_sources``) is the caller's own and is
     never withheld, even where a host file is spelled the same. The template files the host's ``PipeDocGen`` steps

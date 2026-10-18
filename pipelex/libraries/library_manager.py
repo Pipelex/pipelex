@@ -13,7 +13,8 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.package.visibility import VisibilityError
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
@@ -39,7 +40,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_current_library, get_current_library_id_or_none, scoped_current_library
-from pipelex.libraries.collision_messages import duplicate_ref_msg
+from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items, duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.libraries.crate_qualification import qualify_crate
@@ -1140,14 +1141,26 @@ class LibraryManager(LibraryManagerAbstract):
                     # Detect duplicate concept declarations across different bundles in the same library
                     if concept_ref in concept_source_in_this_load:
                         existing_source = concept_source_in_this_load[concept_ref]
-                        raise ConceptLibraryError(
-                            duplicate_ref_msg(
-                                ref_kind="concept",
-                                ref=concept_ref,
-                                existing_source=str(existing_source) if existing_source else None,
-                                incoming_source=str(new_source) if new_source else None,
+                        existing_source_str = str(existing_source) if existing_source else None
+                        incoming_source_str = str(new_source) if new_source else None
+                        raise (
+                            ConceptLibraryError(
+                                duplicate_ref_msg(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=existing_source_str,
+                                    incoming_source=incoming_source_str,
+                                ),
+                                blueprint_validation_errors=duplicate_ref_items(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=existing_source_str,
+                                    incoming_source=incoming_source_str,
+                                ),
                             )
-                        ).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                            .with_params(name=concept_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+                        )
                     concept_source_in_this_load[concept_ref] = new_source
                     ref_to_entry[concept_ref] = (
                         blueprint.domain,
@@ -1449,10 +1462,7 @@ class LibraryManager(LibraryManagerAbstract):
             checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
-                error_messages = [err.message for err in reserved_errors]
-                joined_errors = "\n  - ".join(error_messages)
-                msg = f"Reserved domain violations found:\n  - {joined_errors}"
-                raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_NAME_CONFLICT) from exc
+                raise _reserved_domain_refusal(reserved_errors=reserved_errors, blueprints=blueprints) from exc
             return None
 
         if manifest is None:
@@ -1460,10 +1470,7 @@ class LibraryManager(LibraryManagerAbstract):
             checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
-                error_messages = [err.message for err in reserved_errors]
-                joined_errors = "\n  - ".join(error_messages)
-                msg = f"Reserved domain violations found:\n  - {joined_errors}"
-                raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                raise _reserved_domain_refusal(reserved_errors=reserved_errors, blueprints=blueprints)
             return None
 
         visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
@@ -2168,3 +2175,24 @@ def _building_bundle_of(
     if live_tree is None:
         return tree_bundle_ref
     return TreeBundle(tree=live_tree, tree_path=tree_bundle_ref.tree_path)
+
+
+def _reserved_domain_refusal(*, reserved_errors: list[VisibilityError], blueprints: list[PipelexBundleBlueprint]) -> LibraryLoadingError:
+    """The refusal of bundles declaring a reserved domain, one item per bundle, each naming the domain and located on its bundle."""
+    sources_by_domain = {blueprint.domain: blueprint.source for blueprint in blueprints}
+    items = [
+        PipelexBundleBlueprintValidationErrorData(
+            source=sources_by_domain.get(reserved_error.source_domain),
+            domain_code=reserved_error.source_domain,
+            message=reserved_error.message,
+            params={"name": reserved_error.source_domain, "conflict": MethodNameConflictConflict.RESERVED_DOMAIN},
+        )
+        for reserved_error in reserved_errors
+    ]
+    joined_errors = "\n  - ".join(reserved_error.message for reserved_error in reserved_errors)
+    msg = f"Reserved domain violations found:\n  - {joined_errors}"
+    return (
+        LibraryLoadingError(msg, blueprint_validation_errors=items)
+        .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+        .with_params(name=reserved_errors[0].source_domain, conflict=MethodNameConflictConflict.RESERVED_DOMAIN)
+    )

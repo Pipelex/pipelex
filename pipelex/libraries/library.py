@@ -1,6 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from kajson.class_registry import ClassRegistry
 from mthds.protocol.problem.registry import CoreCode
@@ -17,6 +17,7 @@ from pipelex.libraries.domain.domain_library import DomainLibrary
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
+from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -90,13 +91,23 @@ def _describe_unexported_pipe_dependency(*, referring_pipe_key: str, private_ref
     )
 
 
-def _pipe_dependency_refusal(*, pipe: PipeController, missing_ref: str, error_type: PipeValidationErrorType, message: str) -> LibraryLoadingError:
+def _pipe_dependency_refusal(
+    *, pipe: PipeController, missing_ref: str, error_type: PipeValidationErrorType, message: str, params: dict[str, Any]
+) -> LibraryLoadingError:
     """The refusal of a controller's sub-pipe reference, carrying a structured item.
 
     The item makes the refusal a categorized `pipe_validation` item: `pipe_code` is the referring controller and
     `missing_pipe_code` the reference that does not resolve, or is not visible, so a machine consumer reads both
     without parsing the message. LibraryLoadingError rides the existing `except LibraryError` forwarding in
     translate_to_validate_bundle_error.
+
+    Args:
+        pipe: The referring controller.
+        missing_ref: The reference that does not resolve, or is not visible.
+        error_type: The item's type.
+        message: The refusal's message.
+        params: The parameters of the item's code the locators do not give: the pipes a reference that resolves to
+            nothing may have meant, or the package withholding a pipe and that pipe.
     """
     dependency_error_data = PipesAndConceptValidationErrorData(
         error_type=error_type,
@@ -105,6 +116,7 @@ def _pipe_dependency_refusal(*, pipe: PipeController, missing_ref: str, error_ty
         missing_pipe_code=missing_ref,
         message=message,
         field_path=f"pipe.{pipe.code}",
+        params=params,
     )
     return LibraryLoadingError(message=message, pipe_concept_validation_errors=[dependency_error_data])
 
@@ -243,8 +255,13 @@ class Library(BaseModel):
                             candidates=bare_code_candidates,
                             cause=pipe_error,
                         )
+                        candidate_refs = [pipe_ref for pipe_refs in bare_code_candidates.values() for pipe_ref in pipe_refs]
                         raise _pipe_dependency_refusal(
-                            pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+                            pipe=pipe,
+                            missing_ref=sub_pipe_code,
+                            error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+                            message=msg,
+                            params={"candidates": close_pipe_refs(name=sub_pipe_code, pipe_refs=candidate_refs)},
                         ) from pipe_error
 
         for pipe in self.pipe_library.root.values():
@@ -278,15 +295,24 @@ class Library(BaseModel):
                 f"Pipe '{pipe_key}' references '{sub_pipe_code}', which the package loaded as '{ref_alias}' declares "
                 f"but could not build: {unbuilt_reason}"
             )
+            # The package declares the pipe: no other pipe is the one it meant.
             raise _pipe_dependency_refusal(
-                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+                pipe=pipe,
+                missing_ref=sub_pipe_code,
+                error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+                message=msg,
+                params={"candidates": []},
             )
         try:
             sub_pipe = self.pipe_library.get_optional_pipe(pipe_code=sub_pipe_code)
         except PipeLibraryError as pipe_error:
             msg = _describe_unresolved_pipe_dependency(referring_pipe_ref=pipe.pipe_ref, missing_ref=sub_pipe_code, candidates={}, cause=pipe_error)
             raise _pipe_dependency_refusal(
-                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+                pipe=pipe,
+                missing_ref=sub_pipe_code,
+                error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+                message=msg,
+                params={"candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code)},
             ) from pipe_error
         if sub_pipe is None:
             if self.pipe_library.is_withheld_dependency_pipe(pipe_code=sub_pipe_code):
@@ -295,13 +321,18 @@ class Library(BaseModel):
                     missing_ref=sub_pipe_code,
                     error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
                     message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
+                    params={"pipe": sub_pipe_code, "package": ref_alias},
                 )
             msg = (
                 f"Pipe '{pipe_key}' references '{sub_pipe_code}', which does not exist. "
                 f"The package loaded as '{ref_alias}' has no pipe '{remainder}'."
             )
             raise _pipe_dependency_refusal(
-                pipe=pipe, missing_ref=sub_pipe_code, error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, message=msg
+                pipe=pipe,
+                missing_ref=sub_pipe_code,
+                error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
+                message=msg,
+                params={"candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code)},
             )
         # A package's private pipe is visible to that package's own pipes, and to nothing else.
         if ref_alias != dep_alias and self.pipe_library.is_private_dependency_pipe(pipe_key=f"{ref_alias}->{sub_pipe.pipe_ref}"):
@@ -310,7 +341,13 @@ class Library(BaseModel):
                 missing_ref=sub_pipe_code,
                 error_type=PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY,
                 message=_describe_unexported_pipe_dependency(referring_pipe_key=pipe_key, private_ref=sub_pipe_code, package_alias=ref_alias),
+                params={"pipe": sub_pipe_code, "package": ref_alias},
             )
+
+    def _dependency_pipe_candidates(self, *, alias: str, missing_ref: str) -> list[str]:
+        """The pipes of the package loaded as ``alias`` nearest the reference that names none of them, each as a reference into it."""
+        dependency_refs = [f"{alias}->{pipe_ref}" for pipe_ref in self.dependency_libraries[alias].pipe_library.root]
+        return close_pipe_refs(name=missing_ref, pipe_refs=dependency_refs)
 
     def _index_pipe_refs_by_bare_code(self) -> dict[str, list[str]]:
         """Group every pipe ref in this library by its bare code, for failure-path diagnostics only.

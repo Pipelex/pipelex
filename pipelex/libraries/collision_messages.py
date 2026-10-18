@@ -1,6 +1,20 @@
+from enum import StrEnum
+
+from mthds.protocol.problem.registry import MethodNameConflictConflict
+
+from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
+
+
+class DeclarationKind(StrEnum):
+    """The kind of declaration a merged library found declared twice."""
+
+    CONCEPT = "concept"
+    PIPE = "pipe"
+
+
 def duplicate_ref_msg(
     *,
-    ref_kind: str,
+    ref_kind: DeclarationKind,
     ref: str,
     existing_source: str | None,
     incoming_source: str | None,
@@ -12,7 +26,7 @@ def duplicate_ref_msg(
     the two sources, so callers do not pass a separate flag.
 
     Args:
-        ref_kind: Singular noun for the kind of reference ("concept" or "pipe").
+        ref_kind: The kind of the declaration, whose value is its singular noun.
         ref: The fully qualified ref that is declared twice (e.g. "scoring.compute_score").
         existing_source: Source file of the already-seen declaration, or None if unknown.
         incoming_source: Source file of the colliding declaration, or None if unknown.
@@ -28,3 +42,52 @@ def duplicate_ref_msg(
         f"'{existing_source or 'unknown'}' and '{incoming_source or 'unknown'}'. "
         f"Please remove one of the declarations or rename one of the {ref_kind}s."
     )
+
+
+def duplicate_ref_items(
+    *,
+    ref_kind: DeclarationKind,
+    ref: str,
+    existing_source: str | None,
+    incoming_source: str | None,
+) -> list[PipelexBundleBlueprintValidationErrorData]:
+    """The faults of a declaration made twice, one per bundle that makes it, for a verdict to locate each in its bundle.
+
+    Each item names the declaration by its qualified ref and the conflict, the parameters of ``method.name_conflict``,
+    and is located on its bundle and its declaration, so the verdict names both bundles: the one that declared it first
+    and the one whose declaration was refused. A ref declared twice in one bundle is one item.
+
+    Args:
+        ref_kind: The kind of the declaration.
+        ref: The qualified ref declared twice, such as ``scoring.Score``.
+        existing_source: The bundle of the declaration met first, when known.
+        incoming_source: The bundle of the declaration refused, when known.
+
+    Returns:
+        The items, the refused declaration's first.
+    """
+    noun = ref_kind.capitalize()
+    domain_code, _, code = ref.rpartition(".")
+    params = {"name": ref, "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}
+    sources = [incoming_source] if existing_source == incoming_source else [incoming_source, existing_source]
+    items: list[PipelexBundleBlueprintValidationErrorData] = []
+    for source in sources:
+        other_sources = [other for other in (existing_source, incoming_source) if other != source]
+        if other_sources:
+            message = f"{noun} '{ref}' is declared here and in '{other_sources[0] or 'unknown'}'."
+        else:
+            message = f"{noun} '{ref}' is declared twice in this bundle."
+        match ref_kind:
+            case DeclarationKind.CONCEPT:
+                items.append(
+                    PipelexBundleBlueprintValidationErrorData(
+                        source=source, domain_code=domain_code or None, concept_code=code, message=message, params=params
+                    )
+                )
+            case DeclarationKind.PIPE:
+                items.append(
+                    PipelexBundleBlueprintValidationErrorData(
+                        source=source, domain_code=domain_code or None, pipe_code=code, message=message, params=params
+                    )
+                )
+    return items

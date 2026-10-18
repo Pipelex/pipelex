@@ -74,7 +74,9 @@ async def dry_run_pipeline(
 
     if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+        # With no entry pipe to start from, the request may select any pipe the bundles declare.
+        candidates = sorted({f"{blueprint.domain}.{code}" for blueprint in blueprints for code in blueprint.pipe or {}})
+        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
 
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,

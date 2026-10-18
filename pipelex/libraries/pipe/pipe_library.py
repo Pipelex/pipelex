@@ -10,6 +10,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.library_state import next_library_state_token
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
+from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
@@ -121,7 +122,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 if len(matches) > 1:
                     domains = [match.domain_code for match in matches]
                     msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
-                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
+                    candidates = sorted(f"{alias}->{match.pipe_ref}" for match in matches)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS).with_params(ref=pipe_code, candidates=candidates)
             return None
 
         return None
@@ -158,7 +160,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             # asserting the opposite — and handed a `user_action` naming candidates that never existed.
             raise
         except PipeLibraryError as exc:
-            raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code) from exc
+            raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code, candidates=exc.given_params.get("candidates", [])) from exc
         if pipe is not None:
             return pipe
 
@@ -184,7 +186,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code)
+            # The library's own pipes nearest the code, which a caller supplied, so the refusal offers what it most likely meant.
+            suggestions = close_pipe_refs(name=pipe_code, pipe_refs=[pipe.pipe_ref for pipe in self.get_own_pipes()])
+            raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code, suggestions=suggestions)
         return the_pipe
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:

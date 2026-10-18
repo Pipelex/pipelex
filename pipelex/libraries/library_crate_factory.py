@@ -1,10 +1,10 @@
 from typing import TYPE_CHECKING, NamedTuple
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
-from pipelex.libraries.collision_messages import duplicate_ref_msg
+from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items, duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.contract_match import contracts_match
 from pipelex.libraries.domain.domain_metadata_merge import merge_domain_metadata_field
@@ -114,14 +114,24 @@ class LibraryCrateFactory:
                 for concept_code, value in blueprint.concept.items():
                     concept_ref = ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_code)
                     if concept_ref in concepts:
-                        raise ConceptLibraryError(
-                            duplicate_ref_msg(
-                                ref_kind="concept",
-                                ref=concept_ref,
-                                existing_source=source_map.get(concept_ref),
-                                incoming_source=source,
+                        raise (
+                            ConceptLibraryError(
+                                duplicate_ref_msg(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=source_map.get(concept_ref),
+                                    incoming_source=source,
+                                ),
+                                blueprint_validation_errors=duplicate_ref_items(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=source_map.get(concept_ref),
+                                    incoming_source=source,
+                                ),
                             )
-                        ).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                            .with_params(name=concept_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+                        )
                     concepts[concept_ref] = value
                     if source:
                         source_map[concept_ref] = source
@@ -214,12 +224,18 @@ class LibraryCrateFactory:
         if not existing_is_signature and not incoming_is_signature:
             raise PipeLibraryError(
                 duplicate_ref_msg(
-                    ref_kind="pipe",
+                    ref_kind=DeclarationKind.PIPE,
                     ref=pipe_ref,
                     existing_source=existing.source,
                     incoming_source=incoming.source,
-                )
-            )
+                ),
+                blueprint_validation_errors=duplicate_ref_items(
+                    ref_kind=DeclarationKind.PIPE,
+                    ref=pipe_ref,
+                    existing_source=existing.source,
+                    incoming_source=incoming.source,
+                ),
+            ).with_params(name=pipe_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
 
         # At least one is a signature: the declarations' contracts must match (normalized identity).
         if not contracts_match(existing=existing.blueprint, incoming=incoming.blueprint, domain_code=domain_code):

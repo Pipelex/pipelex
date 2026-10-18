@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.protocol.problem.registry import MethodDependencyMissingKind, MethodDependencyMissingReason
 from packaging.markers import Marker, UndefinedComparison, UndefinedEnvironmentName
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
@@ -40,8 +41,13 @@ from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
 from pipelex.libraries.method_trees import list_library_dir_trees, listing_identity, reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
+from pipelex.methods.package_reason import MethodPackageReason
 
 REQUIREMENTS_FILE_NAME = "requirements.txt"
+
+# The parameters of `method.package_invalid` for a `requirements.txt` the standard refuses or that cannot be read.
+_REQUIREMENTS_INVALID_PARAMS: dict[str, str] = {"reason": MethodPackageReason.REQUIREMENTS_INVALID, "path": REQUIREMENTS_FILE_NAME}
+
 PYTHON_SUFFIX = ".py"
 
 _UTF8_BOM = "\ufeff"
@@ -292,10 +298,25 @@ def _read_requirements_text(*, judged: JudgedMethod) -> str:
         return location.read_bytes().decode("utf-8")
     except UnicodeDecodeError as exc:
         msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that is not UTF-8 text, so they cannot be read."
-        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
+        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
+            **_REQUIREMENTS_INVALID_PARAMS
+        ) from exc
     except OSError as exc:
         msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that cannot be read: {exc.strerror or type(exc).__name__}."
-        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
+        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
+            **_REQUIREMENTS_INVALID_PARAMS
+        ) from exc
+
+
+def _unmet_requirement_params(*, requirement: Requirement, environment: PythonPackageEnvironment) -> dict[str, str]:
+    """The parameters of `method.dependency_missing` for a requirement the environment does not meet.
+
+    The requirement's package is missing (`not_found`), or the environment holds a version of it, or of what one of its
+    extras needs, that the requirement does not accept (`no_matching_version`).
+    """
+    is_installed = environment.version_of(distribution_name=requirement.name) is not None
+    reason = MethodDependencyMissingReason.NO_MATCHING_VERSION if is_installed else MethodDependencyMissingReason.NOT_FOUND
+    return {"kind": MethodDependencyMissingKind.REQUIREMENT, "name": requirement.name, "reason": reason}
 
 
 def _raise_refused_lines(*, judged: JudgedMethod, refused_lines: list[RefusedRequirementsLine]) -> None:
@@ -320,7 +341,7 @@ def _raise_refused_lines(*, judged: JudgedMethod, refused_lines: list[RefusedReq
         f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} holding lines the MTHDS standard "
         f"refuses, where each line is blank, a comment, or exactly one PEP 508 requirement: {'; '.join(line_texts)}."
     )
-    raise MethodRequirementsFileError(msg, items=items)
+    raise MethodRequirementsFileError(msg, items=items).with_params(**_REQUIREMENTS_INVALID_PARAMS)
 
 
 def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environment: PythonPackageEnvironment) -> None:
@@ -340,6 +361,7 @@ def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environ
                 source=judged.requirements_source,
                 line=requirement_line.line_number,
                 message=f"The requirement '{requirement_line.text}' is not met by {environment.description}: {unmet_requirement.reason}.",
+                params=_unmet_requirement_params(requirement=requirement_line.requirement, environment=environment),
             )
         )
     advice = environment.advice(requirement_texts=[unmet_requirement.requirement_line.text for unmet_requirement in unmet])
@@ -347,7 +369,10 @@ def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environ
         f"{judged.method_name} needs Python packages that {environment.description} "
         f"does not have, as its {REQUIREMENTS_FILE_NAME} declares: {'; '.join(line_texts)}. {advice}"
     )
-    raise MethodRequirementsNotMetError(msg, items=items)
+    first_requirement = unmet[0].requirement_line.requirement
+    raise MethodRequirementsNotMetError(msg, items=items).with_params(
+        **_unmet_requirement_params(requirement=first_requirement, environment=environment)
+    )
 
 
 def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool) -> None:

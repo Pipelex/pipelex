@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:fa426c90f93765853603351c3b6d823a7bc6de171c381ca2f3961dbe7597eb50"
+digest = "sha256:6d8cb6f8bdb7b88b2ed40602ac56d596236f502e6d691b59f8ce37d7adeec027"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T03:01:43Z"
-rationale = "real-catch: the agent CLI guide said the envelope copies the validation_errors of any cause that carries them; it now names the walk over the cause's chain of Pipelex errors, which stops at a foreign exception, as agent-cli.md already says."
+reviewed_at = "2026-10-17T23:44:05Z"
+rationale = "clean-pass: an install refusal now gives the reason method.package_invalid requires (package_name_invalid, manifest_missing); the CLI docs name neither the code nor its parameters, so nothing is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -133,7 +133,7 @@ rationale = "real-catch: the agent CLI guide said the envelope copies the valida
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
 "pipelex/cli/error_handlers.py" = "blob:d14075dad49baad6df36b2d9b6d3c0baa841cb33"
 "pipelex/cli/exceptions.py" = "blob:5c66f20b0a06c8ae8c20b94f92e2c30b78f5b6c5"
-"pipelex/cli/installed_methods.py" = "blob:1de9b36e7717786fe0454af69011e05ef50610ba"
+"pipelex/cli/installed_methods.py" = "blob:7e7f289d50ca6bc446b6891cbc846dc4a8cee6e2"
 "pipelex/cli/method_resolver.py" = "blob:54fe2e6036b637c2e298f18bbfd10cfc616ef4a8"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"
 "pipelex/cli/usage_stats_cli.py" = "blob:d04e2191e6f6a18027558a3e063f945be7b77679"

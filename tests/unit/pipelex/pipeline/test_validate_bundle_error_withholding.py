@@ -13,6 +13,7 @@ from pipelex.core.exceptions import (
     PipesAndConceptValidationErrorData,
 )
 from pipelex.errors.problem import ProblemView, make_location, make_problem_item
+from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items
 from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER, withholding_host_library_files
@@ -113,6 +114,31 @@ class TestValidateBundleErrorWithholding:
         caller = withheld.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.REQUEST_INVALID
         assert caller.detail == f"The request's field 'field in '{HOST_LIBRARY_FILE_PLACEHOLDER}'' does not match the route's schema."
+
+    def test_a_host_file_s_side_of_a_name_declared_twice_is_left_to_the_caller_s_side(self) -> None:
+        """A name the caller's content and a host file both declare is one item, the caller's, naming the host file by its placeholder."""
+        caller_side, host_side = duplicate_ref_items(
+            ref_kind=DeclarationKind.PIPE, ref="harbour_board.post_notice", existing_source=_HOST_FILE, incoming_source="api://bundle-0.mthds"
+        )
+        # A conflict declared in two host files keeps both items: no item of the caller's restates it.
+        host_pair = duplicate_ref_items(
+            ref_kind=DeclarationKind.PIPE, ref="harbour_board.pin", existing_source=_HOST_FILE, incoming_source=_HOST_FILE
+        )
+        verdict = ValidateBundleError(
+            message="Duplicate declarations", pipelex_bundle_blueprint_validation_errors=[caller_side, host_side, *host_pair]
+        )
+
+        withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+
+        items = withheld.validation_error_items() or []
+        assert [(item.source, item.message) for item in items] == [
+            ("api://bundle-0.mthds", f"Pipe 'harbour_board.post_notice' is declared here and in '{HOST_LIBRARY_FILE_PLACEHOLDER}'."),
+            (None, "Pipe 'harbour_board.pin' is declared twice in this bundle."),
+        ]
+        assert [item.params for item in items] == [
+            {"name": "harbour_board.post_notice", "conflict": "duplicate_declaration"},
+            {"name": "harbour_board.pin", "conflict": "duplicate_declaration"},
+        ]
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:
         # A host library directory listed relatively names its files relatively, so a host file's name can be the
