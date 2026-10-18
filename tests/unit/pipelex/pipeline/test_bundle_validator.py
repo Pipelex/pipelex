@@ -7,15 +7,19 @@ single collect-all aggregate (no per-pipe early abort), and the per-sweep teleme
 is exercised by the integration suite.
 """
 
+import logging
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from polyfactory.exceptions import FactoryException
 from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
 from pipelex.pipe_run.located_failure import make_unexpected_failure
@@ -24,6 +28,7 @@ from pipelex.system.caller_identity import CallerIdentity, get_current_caller_id
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.storage_scope import DRY_RUN_STORAGE_SCOPE, DRY_RUN_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.network.exceptions import SsrfBlockedError
 
 _CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
@@ -324,3 +329,37 @@ class TestBundleValidator:
         prepare_kwargs = prepare_mock.call_args.kwargs
         assert prepare_kwargs["user_id"] == DRY_RUN_USER_ID
         assert prepare_kwargs["extras"] is None
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("is_met_before_the_run", [True, False], ids=["mock_input_build", "pipe_run"])
+    async def test_a_refusal_the_sweep_meets_is_logged_once(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, is_met_before_the_run: bool
+    ) -> None:
+        """Every security refusal the sweep meets logs one event, whether a pipe run met it or the job's preparation did.
+
+        The sweep's error is marked as logged, so the boundary it reaches logs nothing more, which is only right when
+        each refusal it reports was logged where it was met: one met while the mock inputs are built reaches no pipe run.
+        """
+        validator, _telemetry, prepare_mock, pipe_run = self._patch_env(mocker)
+        refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        if is_met_before_the_run:
+            prepare_mock.side_effect = refusal
+        else:
+            # The pipe run logs the refusal it meets before raising it, as `PipeRun.run` does.
+            async def _refusing_run(_pipe_job: Any) -> None:
+                emit_security_event(error=refusal)
+                raise refusal
+
+            pipe_run.run = mocker.AsyncMock(side_effect=_refusing_run)
+        pipe = self._make_pipe(mocker, code="reader", pipe_ref="dom.reader")
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.security_event"), pytest.raises(DryRunError) as exc_info:
+            await validator.validate_pipes([pipe], library_id="lib-1", caller_identity=_CALLER)
+
+        events = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
+        assert len(events) == 1
+        assert events[0]["error.type"] == "SsrfBlockedError"
+        assert events[0]["security.target_class"] == SecurityTargetClass.PRIVATE
+        assert exc_info.value.security_failure_codes == [CoreCode.SECURITY_INPUT_URL_REFUSED]
+        # The boundary the sweep's error reaches logs no second event.
+        assert not emit_security_event(error=exc_info.value)
