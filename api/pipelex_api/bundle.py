@@ -21,17 +21,10 @@ from pipelex import log
 from pipelex.tools.log.error_fields import error_fields
 
 from pipelex_api.exceptions import MethodPackageReason, RequestMethodError, RunnerRequestError
-from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES
+from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES, base64_decoded_size
 
 # The request field the archive rides, which the refusals of its encoding name.
 _BUNDLE_FIELD = "bundle_b64"
-
-# Base64 inflates by 4/3; a zip is compressed, so a bundle whose DECOMPRESSED content is within
-# the ceiling encodes to well under this. Bounding the base64 string BEFORE decoding stops a
-# ~100 MiB request-body (the only other bound) from being expanded into ~75 MiB of heap just to
-# be rejected later by the decompressed-size guard. Slack (+4) covers padding.
-_MAX_BUNDLE_B64_CHARS = MAX_BUNDLE_TOTAL_BYTES * 4 // 3 + 4
-
 
 def _guard_count(count: int) -> None:
     if count == 0:
@@ -56,16 +49,21 @@ def decode_bundle_archive(*, bundle_b64: str) -> list[tuple[str, bytes]]:
     cheap length check on the still-encoded string runs FIRST, so an oversized payload is refused before it is buffered
     into memory as decoded bytes. A name the archive gives twice is returned twice, for the tree's reader to refuse.
 
-    Raises (as problem documents): an encoded archive past the size limit (413 `request.too_large`), a value that is
+    Raises (as problem documents): an archive past the size limit (413 `request.too_large`, its limit and its size in
+    bytes, the size read off the encoded length), a value that is
     not base64 or not a zip archive (422 `request.malformed`), an archive holding no file (422 `request.invalid`), and
     one past the limit on its files or on its decompressed size (422 `method.package_invalid`).
     """
-    if len(bundle_b64) > _MAX_BUNDLE_B64_CHARS:
+    # A zip is compressed, so a bundle whose decompressed content is within the ceiling is an archive well under it. Its
+    # size is read off the encoded length, so a ~100 MiB request body, the only other bound, is refused before it is
+    # expanded into ~75 MiB of heap just to be refused later by the decompressed-size guard.
+    archive_bytes = base64_decoded_size(encoded=bundle_b64)
+    if archive_bytes > MAX_BUNDLE_TOTAL_BYTES:
         msg = f"bundle_b64 exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB compressed-size limit"
         raise (
             RunnerRequestError(msg, field=_BUNDLE_FIELD)
             .with_error_code(CoreCode.REQUEST_TOO_LARGE)
-            .with_params(limit=_MAX_BUNDLE_B64_CHARS, size=len(bundle_b64))
+            .with_params(limit=MAX_BUNDLE_TOTAL_BYTES, size=archive_bytes)
         )
     try:
         raw = base64.b64decode(bundle_b64, validate=True)

@@ -71,3 +71,19 @@ BLOB_UPLOAD_URL_TTL_SECONDS = get_positive_int_env(env_var="BLOB_UPLOAD_URL_TTL_
 MAX_METHOD_CACHE_CLONES = get_positive_int_env(env_var="MAX_METHOD_CACHE_CLONES", default=DEFAULT_MAX_METHOD_CACHE_CLONES)
 MAX_METHOD_CACHE_TOTAL_BYTES = get_positive_int_env(env_var="MAX_METHOD_CACHE_TOTAL_KIB", default=DEFAULT_MAX_METHOD_CACHE_TOTAL_KIB) * 1024
 MAX_METHOD_CACHE_AGE_SECONDS = get_positive_int_env(env_var="MAX_METHOD_CACHE_AGE_HOURS", default=DEFAULT_MAX_METHOD_CACHE_AGE_HOURS) * 3600
+
+# Standard base64 writes three bytes as four characters, padding the last group with `=`.
+_BASE64_GROUP_CHARS = 4
+_BASE64_GROUP_BYTES = 3
+
+
+def base64_decoded_size(*, encoded: str) -> int:
+    """The number of bytes a standard base64 value decodes to, read off its length without decoding it.
+
+    The byte limits are checked against it before a value is decoded, so an oversized value is refused before it is
+    expanded into memory, and the refusal states the limit and the size in bytes, as `request.too_large` does: every
+    four characters carry three bytes, less one per `=` of padding. The size is exact for a value that is valid base64;
+    any other value is refused as malformed once it is decoded.
+    """
+    padding = 2 if encoded.endswith("==") else 1 if encoded.endswith("=") else 0
+    return max(0, len(encoded) * _BASE64_GROUP_BYTES // _BASE64_GROUP_CHARS - padding)
