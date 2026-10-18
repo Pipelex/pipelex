@@ -34,6 +34,7 @@ class TestGenerateInputsCore:
         mocker.patch(f"{MODULE}.resolve_library_dirs", return_value=([], "defaults"))
         validate_result = SimpleNamespace(blueprints=[SimpleNamespace(main_pipe="bundle_main")])
         return {
+            "library_manager": library_manager,
             "validate_bundle": mocker.patch(f"{MODULE}.validate_bundle", new=mocker.AsyncMock(return_value=validate_result)),
             "get_required_entry_pipe": mocker.patch(f"{MODULE}.get_required_entry_pipe", return_value=SimpleNamespace(code="bundle_main")),
             "render_inputs": mocker.patch(f"{MODULE}.render_inputs", return_value='{\n  "topic": "your topic"\n}'),
@@ -56,6 +57,15 @@ class TestGenerateInputsCore:
         asyncio.run(_generate_inputs_core(pipe_code="my_pipe", bundle_path=bundle_path))
 
         core_mocks["get_required_entry_pipe"].assert_called_once_with(pipe_code="my_pipe")
+
+    def test_a_bundle_loads_with_its_whole_method_folder(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
+        """The entry bundle of a folder loads with the folder, as `run bundle` loads it, so a sibling's concept resolves."""
+        bundle_path = tmp_path / "entry.mthds"
+
+        asyncio.run(_generate_inputs_core(pipe_code="demo.bundle_main", bundle_path=bundle_path, library_dir=[str(tmp_path)]))
+
+        core_mocks["validate_bundle"].assert_awaited_once_with(mthds_file_path=bundle_path, library_dirs=[tmp_path])
+        core_mocks["library_manager"].load_libraries.assert_not_called()
 
     def test_bundle_without_main_pipe_exits(self, core_mocks: dict[str, Any], tmp_path: Path) -> None:
         """A bundle without main_pipe and no --pipe is an error."""

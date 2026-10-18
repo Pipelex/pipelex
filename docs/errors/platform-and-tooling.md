@@ -45,6 +45,7 @@ own page. Classes are grouped by subsystem.
 - [`RemoteFileFetchError`](remote-file-fetch-error.md) — Remote file could not be fetched
 - [`SecretNotFoundError`](secret-not-found-error.md) — Secret not found
 - [`SsrfBlockedError`](ssrf-blocked-error.md) — Outbound request blocked (SSRF guard)
+- [`StorageChecksumMismatchError`](storage-checksum-mismatch-error.md) — Storage checksum mismatch
 - [`StorageConfigError`](storage-config-error.md) — Storage config
 - [`StorageError`](storage-error.md) — Storage error
 - [`StorageFileNotFoundError`](storage-file-not-found-error.md) — Storage file not found
@@ -84,6 +85,7 @@ own page. Classes are grouped by subsystem.
 ## CLI
 
 - [`AmbiguousInputsFilesError`](ambiguous-inputs-files-error.md) — Ambiguous inputs files
+- [`AutoDetectedInputsFileError`](auto-detected-inputs-file-error.md) — Auto-detected inputs file is not a regular file
 - [`DriftAckError`](drift-ack-error.md) — Drift ack
 - [`DriftError`](drift-error.md) — Drift
 - [`DriftGitError`](drift-git-error.md) — Drift git
@@ -116,6 +118,7 @@ own page. Classes are grouped by subsystem.
 ## Methods
 
 - [`MethodDependencyFetchError`](method-dependency-fetch-error.md) — Method dependency fetch
+- [`MethodDependencyNotShippedError`](method-dependency-not-shipped-error.md) — Method dependency not shipped
 - [`MethodFetchDisabledError`](method-fetch-disabled-error.md) — Method fetch disabled
 - [`MethodFetchError`](method-fetch-error.md) — Method fetch
 - [`MethodInstallError`](method-install-error.md) — Method install

@@ -24,6 +24,12 @@ class StorageInvalidKeyError(StorageError):
     """Raised when a storage key is invalid (e.g., contains scheme prefix)."""
 
 
+class StorageChecksumMismatchError(StorageError):
+    """Raised when the bytes a create-only write was handed do not hash to the checksum it was handed with them."""
+
+    _declared_title = "Storage checksum mismatch"
+
+
 class StorageLocalError(StorageError):
     """Raised when a local filesystem storage operation fails."""
 

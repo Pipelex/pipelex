@@ -73,16 +73,20 @@ class BundleValidatorProtocol(Protocol):
     async def validate_bundles(
         self,
         *,
-        mthds_contents: list[str],
+        mthds_contents: list[str] | None,
         mthds_sources: list[str] | None,
         allow_signatures: bool,
         library_dirs: "Sequence[Path] | None",
         caller_identity: CallerIdentity | None,
         graph_pipe_code: str | None,
+        submitted_files: "Mapping[str, bytes] | None",
+        method_dir: "Path | None",
+        methods_dirs: "Sequence[Path] | None",
+        read_scope: str | None,
     ) -> BundleValidationVerdict: ...
 ```
 
-The `library_dirs` annotation is a quoted forward reference because `Sequence` and `Path` are imported under `TYPE_CHECKING` in `bundle_validator_registry.py`; a plugin that imports them at module scope can use the unquoted form.
+The quoted annotations are forward references because `Mapping`, `Sequence` and `Path` are imported under `TYPE_CHECKING` in `bundle_validator_registry.py`; a plugin that imports them at module scope can use the unquoted form.
 
 Two contract points distinguish it from `OrchestratorProtocol.execute`:
 
@@ -94,6 +98,10 @@ The seam is deliberately typed at the MTHDS-protocol level (`ValidationReport` f
 `caller_identity` is who asked for the validation: the `user_id` and `extras` the host would state on a run, as a `CallerIdentity` (`pipelex/system/caller_identity.py`). It is required, with `None` meaning "nobody", so a host cannot leave it out by accident: a validation is not a run and has no `RunMetadata` to carry its caller, and without this argument its telemetry — the sweep's `pipe_dry_run` event and its dry runs — reported under the deployment's configured id. The in-process arm hands it to `validate_bundles_in_process`, which makes it the ambient caller for the whole pass; a worker-dispatched arm must carry it to the worker and do the same there. A `PipelexMTHDSProtocol` exposes the caller it was built for as `caller_identity`, so a host runner passes `caller_identity=self.caller_identity`.
 
 `graph_pipe_code` names the pipe the verdict's best-effort `graph_spec` is drawn from. It is resolved the way a run resolves its entry pipe, so a bare pipe code or a qualified `domain.pipe_code` both work, and `None` keeps the default target: the `main_pipe` of the primary blueprint, the first one declaring one. A host passes a target when it knows the pipe a selector-less run of the same request would execute and the bundles do not say so themselves — a method package fetched by address, whose manifest's `main_pipe` outranks the bundles' own declaration and may be the only entry pipe there is. It is required for the same reason as `caller_identity`: a validator that dropped it would silently graph another pipe. A target that does not resolve degrades the graph to `None` like any other graph-arm failure and never changes the verdict. The in-process arm hands it to `validate_bundles_in_process`; a worker-dispatched arm must carry it to the worker's graph arm.
+
+`submitted_files`, `method_dir` and `methods_dirs` say what the method is made of besides its contents. `submitted_files` are the files submitted with `mthds_contents` that their steps read, such as a `PipeDocGen` step's template file, keyed by the path the step names. `method_dir` names a method sent as a tree, or fetched by address, in place of `mthds_contents`, which is then `None`: the directory the host wrote the tree into and holds as written, with the dependency trees it ships in `methods_dirs`. Each is required, `None` meaning there is none, so a validator cannot drop the files a valid method needs and refuse it for a missing file.
+
+`read_scope` is the scope the host named for the validation: on a multi-tenant host, the organization it serves, the same trusted prefix a run of the request reads under. A worker-dispatched arm hands the method's trees to its worker through that scope's blob store, as an orchestrator copies a job's trees into the store its workers read before it dispatches ([the method file store slot](#the-method-file-store-slot)): it holds every tree it validates there, names each by its digest, and the worker reads them through its method file store under the scope, building every key from it and never from what the request names. `None` means the host named no scope, as a single-tenant deployment does, or a multi-tenant host serving a caller who belongs to no organization, and then no blob store is scoped to the caller: a worker-dispatched arm has none to hand the method through and must not make one up, such as one under the caller's id, where nothing lists or erases what a validation would leave. The in-process arm reads every file in its own process and ignores it. It is required for the same reason as `caller_identity`; a host runner passes the read scope it was built with, which `pipelex-api` builds from the request's own `read_scope` and never from the caller's id.
 
 A plugin contributes one per token, right next to its orchestrator:
 

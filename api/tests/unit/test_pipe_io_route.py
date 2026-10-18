@@ -1,14 +1,16 @@
 """Tests for `POST /v1/pipe-io` — a method's three I/O artifacts off the resolved crate, with no dry run.
 
 Pins `conformance/specs/pipelex-codegen.md#the-pipe-io-route`, in the `conformance` repo beside the
-tests that verify it: the route resolves the closure through the crate routes' static core, selects a
-pipe with the per-pipe routes' chain, and returns `pipe_io_contracts`, `input_form` and `output_form`
-keyed by qualified `pipe_ref`, beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`,
-`is_runnable` and, on request, the closure's files. The pinning cases hold each artifact equal to
-`/v1/validate`'s same-named view for the same closure and pipe; the teardown cases hold the
-loaded-on-success contract on every exit.
+tests that verify it: the route takes the method's tree as the protocol's `files` map XOR a
+`method_ref`, resolves it through the crate routes' static core, selects a pipe with the per-pipe
+routes' chain, and returns `pipe_io_contracts`, `input_form` and `output_form` keyed by qualified
+`pipe_ref`, beside `pipe_ref`, `default_pipe_ref`, `pending_signatures`, `is_runnable` and, on
+request, the method's bundles. The pinning cases hold each artifact equal to `/v1/validate`'s
+same-named view for the same tree and pipe; the teardown cases hold the loaded-on-success contract on
+every exit.
 """
 
+import base64
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -53,6 +55,8 @@ ARTIFACT_FIELDS = ("pipe_io_contracts", "input_form", "output_form")
 REQUEST_SHAPE_ERROR = "ValidationError"
 PIPE_NOT_FOUND_ERROR = "EntryPipeNotFoundError"
 PIPE_AMBIGUOUS_ERROR = "EntryPipeAmbiguousError"
+# A `files` member that is no method tree, refused by the standard's reader as on `/v1/validate`.
+INVALID_METHOD_FILES_ERROR = "InvalidMethodFiles"
 
 # Every field only the valid arm carries: the invalid arm is the crate verdict alone.
 VALID_ARM_ONLY_FIELDS = ("pipe_ref", "default_pipe_ref", *ARTIFACT_FIELDS, "pending_signatures", "is_runnable", "files")
@@ -65,9 +69,9 @@ def _build_client() -> TestClient:
     return TestClient(app)
 
 
-def _files(*contents: str) -> list[dict[str, str]]:
-    """Inline `files[]` items, each with a distinct `source` so `/v1/validate` can be sent the same labels."""
-    return [{"content": content, "source": f"bundle_{index}.mthds"} for index, content in enumerate(contents)]
+def _files(*contents: str) -> dict[str, str]:
+    """A method tree holding each bundle at its own tree path, as text entries of a `files` map."""
+    return {f"bundle_{index}.mthds": content for index, content in enumerate(contents)}
 
 
 def _valid_arm(client: TestClient, payload: dict[str, Any]) -> dict[str, Any]:
@@ -272,22 +276,46 @@ class TestPipeIoRoute:
         body = _valid_arm(client, payload)
         assert "files" not in body
 
-    def test_include_files_echoes_the_inline_files_in_the_request_shape(self):
-        # A `source` the request omitted stays omitted: the echo is the request's own shape.
+    def test_include_files_echoes_the_trees_bundles_as_a_map_of_text_entries(self):
+        # The echo is the request's own shape, a map of file entries: each bundle as text under its tree path, whatever
+        # entry carried it, and none of the tree's other files.
         client = _build_client()
-        files = [{"content": VALID_MTHDS, "source": "main.mthds"}, {"content": SIBLING_MTHDS}]
+        files: dict[str, Any] = {
+            "main.mthds": VALID_MTHDS,
+            "steps/wrap.mthds": {"base64": base64.b64encode(SIBLING_MTHDS.encode("utf-8")).decode("ascii")},
+            "notes.txt": "Not a bundle",
+        }
         body = _valid_arm(client, {"files": files, "include_files": True})
-        assert body["files"] == files
+        assert body["files"] == {"main.mthds": VALID_MTHDS, "steps/wrap.mthds": SIBLING_MTHDS}
 
-    def test_include_files_echoes_a_method_refs_mthds_files_with_relative_paths(self, install_method_package: Callable[..., Path]):
+    def test_include_files_echoes_a_method_refs_bundles_under_their_tree_paths(self, install_method_package: Callable[..., Path]):
         # Only the package's `.mthds` files travel, each under its path relative to the package root.
         install_method_package(files={"documents.mthds": VALID_MTHDS, "steps/wrap.mthds": SIBLING_MTHDS, "README.md": "# Not a bundle\n"})
         client = _build_client()
         body = _valid_arm(client, {"method_ref": STUB_METHOD_REF, "include_files": True})
-        assert sorted(body["files"], key=lambda item: item["source"]) == [
-            {"content": VALID_MTHDS, "source": "documents.mthds"},
-            {"content": SIBLING_MTHDS, "source": "steps/wrap.mthds"},
-        ]
+        assert body["files"] == {"documents.mthds": VALID_MTHDS, "steps/wrap.mthds": SIBLING_MTHDS}
+
+    def test_a_manifest_sent_in_the_tree_names_the_default_pipe(self):
+        # A `METHODS.toml` at the root of a sent tree is the method's manifest, as a fetched package's is.
+        client = _build_client()
+        files = {"METHODS.toml": STUB_METHOD_MANIFEST_NOMAIN_ENTRY, "documents.mthds": NO_MAIN_PIPE_MTHDS}
+        body = _valid_arm(client, {"files": files})
+        assert body["pipe_ref"] == "nomain.echo"
+        assert body["default_pipe_ref"] == "nomain.echo"
+
+    @pytest.mark.parametrize("all_pipes", [False, True])
+    def test_a_manifest_that_does_not_parse_refuses_only_a_request_naming_no_pipe(self, all_pipes: bool):
+        """A request naming its pipe never reads the manifest to select it, so a broken one only leaves the default unstated."""
+        client = _build_client()
+        files = {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}
+
+        named = _valid_arm(client, {"files": files, "pipe_ref": "smoke.echo", "all_pipes": all_pipes})
+        assert named["pipe_ref"] == "smoke.echo"
+        assert "default_pipe_ref" in named
+        assert named["default_pipe_ref"] is None
+
+        unnamed = client.post(PIPE_IO_PATH, json={"files": files, "all_pipes": all_pipes})
+        _assert_input_422(unnamed, error_type="MethodEntryError")
 
     @pytest.mark.parametrize(
         "request_fields",
@@ -301,7 +329,7 @@ class TestPipeIoRoute:
         # The closure is resolved before any pipe is selected, so even a pipe_ref naming nothing
         # answers the invalid verdict rather than a 422.
         client = _build_client()
-        response = client.post(PIPE_IO_PATH, json={"files": [{"content": INVALID_MAIN_PIPE_MTHDS, "source": "broken.mthds"}], **request_fields})
+        response = client.post(PIPE_IO_PATH, json={"files": {"broken.mthds": INVALID_MAIN_PIPE_MTHDS}, **request_fields})
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
@@ -364,23 +392,29 @@ class TestPipeIoRoute:
         [
             pytest.param({}, id="neither"),
             pytest.param({"pipe_ref": "smoke.echo"}, id="neither-with-pipe-ref"),
-            pytest.param({"files": [{"content": VALID_MTHDS}], "method_ref": STUB_METHOD_REF}, id="both"),
+            pytest.param({"files": {"main.mthds": VALID_MTHDS}, "method_ref": STUB_METHOD_REF}, id="both"),
         ],
     )
     def test_closure_selector_xor_is_a_request_shape_422(self, payload: dict[str, Any]):
         client = _build_client()
         _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
 
+    def test_an_out_of_bounds_pipe_ref_is_a_request_shape_422(self):
+        client = _build_client()
+        payload = {"files": {"main.mthds": VALID_MTHDS}, "pipe_ref": "x" * (MAX_PIPE_CODE_LEN + 1)}
+        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+
     @pytest.mark.parametrize(
-        "payload",
+        "files",
         [
-            pytest.param({"files": []}, id="empty-files"),
-            pytest.param({"files": [{"content": VALID_MTHDS}], "pipe_ref": "x" * (MAX_PIPE_CODE_LEN + 1)}, id="oversized-pipe-ref"),
+            pytest.param({}, id="empty-map"),
+            pytest.param([], id="empty-list"),
+            pytest.param([{"content": VALID_MTHDS, "source": "main.mthds"}], id="the-retired-list-shape"),
         ],
     )
-    def test_out_of_bounds_selectors_are_a_request_shape_422(self, payload: dict[str, Any]):
+    def test_a_files_member_that_is_no_method_tree_is_invalid_method_files(self, files: Any):
         client = _build_client()
-        _assert_input_422(client.post(PIPE_IO_PATH, json=payload), error_type=REQUEST_SHAPE_ERROR)
+        _assert_input_422(client.post(PIPE_IO_PATH, json={"files": files}), error_type=INVALID_METHOD_FILES_ERROR)
 
     def test_a_bare_pipe_code_resolves_but_is_answered_qualified(self):
         # The engine's entry lookup still accepts a bare request code, falling back across domains, until
@@ -425,18 +459,13 @@ class TestPipeIoRoute:
     )
     def test_artifacts_equal_validate_views(self, contents: tuple[str, ...], request_fields: dict[str, Any]):
         # The pinning test: each map equals `/v1/validate`'s same-named view restricted to the same
-        # keys. Validate is asked first, so a closure it would refuse fails here rather than passing
-        # vacuously; `allow_signatures` lets it accept the signature closures this route accepts.
+        # keys, for the same tree. Validate is asked first, so a tree it would refuse fails here rather
+        # than passing vacuously; `allow_signatures` lets it accept the signature trees this route accepts.
         files = _files(*contents)
         client = _build_client()
         validate_response = client.post(
             "/v1/validate",
-            json={
-                "mthds_contents": [item["content"] for item in files],
-                "mthds_sources": [item["source"] for item in files],
-                "views": ["input_form", "output_form"],
-                "allow_signatures": True,
-            },
+            json={"files": files, "views": ["input_form", "output_form"], "allow_signatures": True},
         )
         assert validate_response.status_code == 200, validate_response.text
         validate_body = validate_response.json()
@@ -471,10 +500,15 @@ class TestPipeIoRoute:
     @pytest.mark.parametrize(
         ("payload", "expected_status"),
         [
-            pytest.param({"files": [{"content": VALID_MTHDS}]}, 200, id="valid-arm"),
-            pytest.param({"files": [{"content": NO_MAIN_PIPE_MTHDS}], "all_pipes": True, "include_files": True}, 200, id="all-pipes"),
-            pytest.param({"files": [{"content": VALID_MTHDS}], "pipe_ref": "smoke.not_a_pipe"}, 422, id="selection-422"),
-            pytest.param({"files": [{"content": NO_MAIN_PIPE_MTHDS}]}, 422, id="no-entry-pipe-422"),
+            pytest.param({"files": {"main.mthds": VALID_MTHDS}}, 200, id="valid-arm"),
+            pytest.param({"files": {"main.mthds": NO_MAIN_PIPE_MTHDS}, "all_pipes": True, "include_files": True}, 200, id="all-pipes"),
+            pytest.param({"files": {"main.mthds": VALID_MTHDS}, "pipe_ref": "smoke.not_a_pipe"}, 422, id="selection-422"),
+            pytest.param({"files": {"main.mthds": NO_MAIN_PIPE_MTHDS}}, 422, id="no-entry-pipe-422"),
+            # A manifest that does not parse is the method entry rule's refusal, as on a run naming no pipe.
+            pytest.param({"files": {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}}, 422, id="invalid-manifest-422"),
+            pytest.param(
+                {"files": {"METHODS.toml": "not toml [", "main.mthds": VALID_MTHDS}, "pipe_ref": "smoke.echo"}, 200, id="invalid-manifest-named-pipe"
+            ),
         ],
     )
     def test_every_exit_tears_its_library_down(self, mocker: MockerFixture, payload: dict[str, Any], expected_status: int):
@@ -504,7 +538,7 @@ class TestPipeIoRoute:
         teardown_spy = mocker.spy(library_manager, "teardown")
 
         client = _build_client()
-        response = client.post(PIPE_IO_PATH, json={"files": [{"content": VALID_MTHDS}]})
+        response = client.post(PIPE_IO_PATH, json={"files": {"main.mthds": VALID_MTHDS}})
 
         assert response.status_code == 500, response.text
         assert response.headers["content-type"] == "application/problem+json"

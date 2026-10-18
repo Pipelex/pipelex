@@ -15,4 +15,4 @@ validate_app = typer.Typer(
 
 validate_app.command(name="method", help="Validate an installed method")(validate_method_cmd)
 validate_app.command(name="pipe", help="Validate a pipe by code, or all pipes")(validate_pipe_cmd)
-validate_app.command(name="bundle", help="Validate a bundle file (.mthds) or pipeline directory")(validate_bundle_cmd)
+validate_app.command(name="bundle", help="Validate a bundle file (.mthds) or a method's whole folder")(validate_bundle_cmd)

@@ -10,8 +10,13 @@ from pipelex.interpreter_hub import get_library_manager, get_required_pipe, scop
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError, PipeFuncPackageSetUnstatedError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.func.pipe_func import PipeFunc
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferFactoryFn, PipeFuncPackageOfferRegistry
-from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
+from pipelex.plugins.pipe_func_package_offer_registry import (
+    PipeFuncPackageOffer,
+    PipeFuncPackageOfferFactoryFn,
+    PipeFuncPackageOfferRegistry,
+    PipeFuncPackageOfferRequest,
+    PipeFuncPackageRefusal,
+)
 from tests.integration.pipelex.libraries.installed_packages import isolate_installed_methods, vendor_probe
 from tests.integration.pipelex.libraries.test_data import ProbePackageTestData
 
@@ -65,14 +70,15 @@ def _method(*, directory: Path, requirements: str, sentinel: Path) -> Path:
     return directory
 
 
-def _offering(mocker: MockerFixture, *, offer: PipeFuncPackageOffer | None) -> None:
-    """Register what the `sandbox` execution mode's plugin would state, or nothing at all when `offer` is None."""
-
-    def stated_offer(_config: PipeFuncConfig) -> PipeFuncPackageOffer | None:
-        return offer
-
-    offers: dict[str, PipeFuncPackageOfferFactoryFn] = {} if offer is None else {"sandbox": stated_offer}
+def _offering(mocker: MockerFixture, *, factory: PipeFuncPackageOfferFactoryFn | None) -> None:
+    """Register the factory of the `sandbox` execution mode's plugin, or no factory at all when `factory` is None."""
+    offers: dict[str, PipeFuncPackageOfferFactoryFn] = {} if factory is None else {"sandbox": factory}
     mocker.patch("pipelex.libraries.package_environments.get_pipe_func_package_offer_registry", return_value=PipeFuncPackageOfferRegistry(offers))
+
+
+def _stated_offer(_request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+    """A sandbox of one fixed package set, whatever the requirements."""
+    return _OFFER
 
 
 class TestMethodRequirementsLoad:
@@ -161,7 +167,7 @@ class TestMethodRequirementsLoad:
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_on_a_sandbox_hosted_deployment_the_stated_package_set_is_the_whole_offer(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        _offering(mocker, offer=_OFFER)
+        _offering(mocker, factory=_stated_offer)
         sentinel = tmp_path / "funcs-module-ran"
         refused_dir = _method(directory=tmp_path / "refused", requirements="pandas>=2\npandas>=3\n", sentinel=sentinel)
         accepted_dir = _method(directory=tmp_path / "accepted", requirements="pandas>=2\nopenpyxl==3.1.5\n", sentinel=sentinel)
@@ -194,7 +200,7 @@ class TestMethodRequirementsLoad:
     def test_a_sandbox_hosted_deployment_stating_no_package_set_refuses_a_method_with_requirements(
         self, mocker: MockerFixture, tmp_path: Path
     ) -> None:
-        _offering(mocker, offer=None)
+        _offering(mocker, factory=None)
         library_dir = _method(directory=tmp_path / "method", requirements="pandas\n", sentinel=tmp_path / "funcs-module-ran")
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
@@ -203,3 +209,62 @@ class TestMethodRequirementsLoad:
                 library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
         finally:
             library_manager.teardown(library_id=library_id)
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_sandbox_mode_building_an_environment_per_method_states_each_trees_own(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Two methods loaded together each load against the environment stated for their own requirements, neither in the base."""
+        sentinel = tmp_path / "funcs-module-ran"
+        polars_dir = _method(directory=tmp_path / "polars", requirements="polars>=1\n", sentinel=sentinel)
+        excel_dir = _method(directory=tmp_path / "excel", requirements="pandas>=3\nxlsxwriter\n", sentinel=sentinel)
+        (excel_dir / "main.mthds").write_text(_MTHDS.replace('domain = "requirements_load"', 'domain = "requirements_excel"'), encoding="utf-8")
+        asked: list[list[str]] = []
+
+        def environment_for(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            requirement_texts = [line.text for line in request.requirements]
+            asked.append(requirement_texts)
+            added = {"polars": "1.2.0"} if requirement_texts == ["polars>=1"] else {"pandas": "3.0.1", "xlsxwriter": "3.2.0"}
+            return PipeFuncPackageOffer(
+                environment=f"the Daytona sandbox environment for {', '.join(requirement_texts)}",
+                distributions={**_OFFER.distributions, **added},
+                marker_environment=_OFFER.marker_environment,
+            )
+
+        _offering(mocker, factory=environment_for)
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id):
+                pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[polars_dir, excel_dir])
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert sorted(pipe.domain_code for pipe in pipes) == ["requirements_excel", "requirements_load"]
+        # A load judges a tree at each of its checks, so the factory is asked again for the same requirements, which is
+        # why a plugin caches by them; each request carries one tree's requirements, never another's.
+        assert {tuple(requirement_texts) for requirement_texts in asked} == {("pandas>=3", "xlsxwriter"), ("polars>=1",)}
+        assert not sentinel.exists()
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_requirement_no_environment_can_hold_refuses_the_method_with_the_plugins_reason(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        reason = "No solution found when resolving dependencies: pandas<3 conflicts with the base snapshot's pandas==2.2.3."
+
+        def refuse(_request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=reason)
+
+        _offering(mocker, factory=refuse)
+        sentinel = tmp_path / "funcs-module-ran"
+        library_dir = _method(directory=tmp_path / "method", requirements="pandas<2\n", sentinel=sentinel)
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with scoped_current_library(library_id=library_id), pytest.raises(MethodRequirementsNotMetError) as exc_info:
+                library_manager.load_libraries(library_id=library_id, library_dirs=[library_dir])
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        assert exc_info.value.message == (
+            f"The method rooted at '{library_dir.resolve()}' needs Python packages that the Daytona sandbox cannot offer, "
+            f"as its requirements.txt declares: {reason}"
+        )
+        assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", None)]
+        assert not sentinel.exists()
