@@ -312,7 +312,9 @@ class Library(BaseModel):
                 missing_ref=sub_pipe_code,
                 error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
                 message=msg,
-                params={"candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code)},
+                params={
+                    "candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code, is_package_own=dep_alias == ref_alias)
+                },
             ) from pipe_error
         if sub_pipe is None:
             if self.pipe_library.is_withheld_dependency_pipe(pipe_code=sub_pipe_code):
@@ -332,7 +334,9 @@ class Library(BaseModel):
                 missing_ref=sub_pipe_code,
                 error_type=PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY,
                 message=msg,
-                params={"candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code)},
+                params={
+                    "candidates": self._dependency_pipe_candidates(alias=ref_alias, missing_ref=sub_pipe_code, is_package_own=dep_alias == ref_alias)
+                },
             )
         # A package's private pipe is visible to that package's own pipes, and to nothing else.
         if ref_alias != dep_alias and self.pipe_library.is_private_dependency_pipe(pipe_key=f"{ref_alias}->{sub_pipe.pipe_ref}"):
@@ -344,9 +348,13 @@ class Library(BaseModel):
                 params={"pipe": sub_pipe_code, "package": ref_alias},
             )
 
-    def _dependency_pipe_candidates(self, *, alias: str, missing_ref: str) -> list[str]:
-        """The pipes of the package loaded as ``alias`` nearest the reference that names none of them, each as a reference into it."""
-        dependency_refs = [f"{alias}->{pipe_ref}" for pipe_ref in self.dependency_libraries[alias].pipe_library.root]
+    def _dependency_pipe_candidates(self, *, alias: str, missing_ref: str, is_package_own: bool) -> list[str]:
+        """The pipes of the package loaded as ``alias`` nearest the reference that names none of them, each as a reference into it.
+
+        Only the pipes the referring pipe may name are offered: those the package exports, and its private ones too when
+        the reference is written in the package itself, which alone may name them.
+        """
+        dependency_refs = self.pipe_library.dependency_pipe_keys(alias=alias, with_private=is_package_own)
         return close_pipe_refs(name=missing_ref, pipe_refs=dependency_refs)
 
     def _index_pipe_refs_by_bare_code(self) -> dict[str, list[str]]:

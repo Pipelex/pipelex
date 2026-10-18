@@ -1,7 +1,7 @@
 from itertools import groupby
 from typing import Self
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import PrivateAttr, RootModel
 from typing_extensions import override
 
@@ -70,7 +70,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 "Check your library configuration: PIPELEXPATH environment variable, "
                 "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
-            raise PipeLibraryError(msg)
+            raise PipeLibraryError(msg).with_params(name=pipe.pipe_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
         self.root[pipe.pipe_ref] = pipe
         self._mark_changed()
 
@@ -186,10 +186,33 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            # The library's own pipes nearest the code, which a caller supplied, so the refusal offers what it most likely meant.
-            suggestions = close_pipe_refs(name=pipe_code, pipe_refs=[pipe.pipe_ref for pipe in self.get_own_pipes()])
+            # The pipes nearest the code a caller supplied that it may select, so the refusal offers what it most likely meant.
+            suggestions = close_pipe_refs(name=pipe_code, pipe_refs=self._scope_pipe_refs(pipe_code=pipe_code))
             raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code, suggestions=suggestions)
         return the_pipe
+
+    def _scope_pipe_refs(self, *, pipe_code: str) -> list[str]:
+        """The pipes a refusal of a code that names none may offer in its place, each in the form the code names a pipe.
+
+        A code naming a dependency (`alias->…`), whether an entry selection or a reference in a pipe's body, is offered
+        only the pipes that package exports, as `alias->domain.code`: its private pipes are no one else's to name. Any
+        other code is offered the entry package's own pipes, as `domain.code`, which a bare code or a domain-qualified
+        ref names; a dependency's pipe is never offered to it, since a bare code never names one.
+        """
+        if QualifiedRef.has_cross_package_prefix(pipe_code):
+            alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
+            return self.dependency_pipe_keys(alias=alias, with_private=False)
+        return [pipe.pipe_ref for pipe in self.get_own_pipes()]
+
+    def dependency_pipe_keys(self, *, alias: str, with_private: bool) -> list[str]:
+        """The aliased keys, `alias->domain.code`, of the pipes the package loaded as `alias` holds in this library.
+
+        Args:
+            alias: The dependency alias.
+            with_private: Whether the package's private pipes are included, which only the package's own pipes may name.
+        """
+        prefix = f"{alias}->"
+        return [key for key in self.root if key.startswith(prefix) and (with_private or key not in self._private_dependency_keys)]
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:
         """Add a pipe from a dependency package with an aliased key.
@@ -263,7 +286,11 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
             msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in MTHDS file in an imported package."
-            raise PipeNotFoundError(msg)
+            # The library knows the ref that names nothing but not the pipe whose body wrote it; the caller that does
+            # gives `pipe`. The candidates are the refs of the scope the ref is read in: the package it names, or this
+            # library's own pipes.
+            candidates = close_pipe_refs(name=pipe_code, pipe_refs=self._scope_pipe_refs(pipe_code=pipe_code))
+            raise PipeNotFoundError(msg).with_params(missing=pipe_code, candidates=candidates)
         return the_pipe
 
     @override
