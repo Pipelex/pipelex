@@ -7,6 +7,7 @@ from typing_extensions import override
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.system.exceptions import ToolError
 
 
@@ -103,6 +104,10 @@ class SemVerError(ToolError):
     """Raised when a version or a version constraint a method package declares does not parse."""
 
     error_code = CoreCode.METHOD_PACKAGE_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": MethodPackageReason.VERSION_INVALID}
 
 
 class UrlSyntaxError(ToolError, ValueError):

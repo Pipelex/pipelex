@@ -21,6 +21,7 @@ from pipelex.tools.jinja2.exceptions import (
     Jinja2TemplateInvalidError,
     Jinja2TemplateRenderError,
     Jinja2TemplateSecurityError,
+    TemplateSandboxRefusalError,
 )
 from pipelex.tools.jinja2.jinja2_environment import (
     make_jinja2_env_from_registry,
@@ -220,7 +221,8 @@ def _make_render_failure(
     """
     if isinstance(render_error, SecurityError):
         security_msg = _make_security_error_msg(security_error=render_error)
-        return _coded_by_owner(error=Jinja2TemplateSecurityError(security_msg), template_owner=template_owner)
+        refused_name = render_error.refused_name if isinstance(render_error, TemplateSandboxRefusalError) else None
+        return _coded_by_owner(error=Jinja2TemplateSecurityError(security_msg, refused_name=refused_name), template_owner=template_owner)
     if isinstance(render_error, (RenderBudgetExceededError, RecursionError)):
         budget_msg = _make_budget_error_msg(budget_error=render_error) if isinstance(render_error, RenderBudgetExceededError) else _RECURSION_MSG
         match template_owner:

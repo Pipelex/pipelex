@@ -267,6 +267,7 @@ class StuffFactory:
             uri=url,
             read_scope=read_scope,
             position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
+            input_name=name,
         )
         return list_content_from_csv(Path(resolved.path), row_model=row_model)
 

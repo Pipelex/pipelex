@@ -1,4 +1,8 @@
+from typing import Any
+
+from jinja2.exceptions import SecurityError as JinjaSecurityError
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
@@ -51,6 +55,19 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
         self.template_owner = template_owner
 
 
+class TemplateSandboxRefusalError(JinjaSecurityError):
+    """The sandbox's refusal of what a template reached for, raised inside a render (`jinja2_sandbox.py`).
+
+    A Jinja2 `SecurityError`, so the render stops as Jinja2's own refusals stop it, carrying the bare name of the
+    attribute or the callable the template reached for, which the render's `Jinja2TemplateSecurityError` reports as the
+    `name` of `security.template_refused`.
+    """
+
+    def __init__(self, message: str, *, refused_name: str):
+        super().__init__(message)
+        self.refused_name = refused_name
+
+
 class Jinja2TemplateSecurityError(SecurityError):
     """A template reached for something the sandbox policy refuses (`jinja2_sandbox.py`).
 
@@ -66,6 +83,17 @@ class Jinja2TemplateSecurityError(SecurityError):
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_TEMPLATE_REFUSED, others=(CoreCode.RUNTIME_UNEXPECTED,))
+
+    def __init__(self, message: str, *, refused_name: str | None = None):
+        super().__init__(message)
+        # The attribute or the callable the template reached for, by its bare name, when the sandbox named it.
+        self.refused_name = refused_name
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        if self.refused_name is None:
+            return {}
+        return {"name": self.refused_name}
 
 
 class Jinja2TemplateBudgetError(ToolError):

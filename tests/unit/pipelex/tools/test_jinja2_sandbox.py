@@ -9,6 +9,7 @@ from enum import StrEnum
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -27,6 +28,7 @@ from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.template_category import TemplateCategory
+from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
 
@@ -185,6 +187,33 @@ class TestTemplateSandbox:
     async def test_refusal_names_the_callable_and_the_type(self) -> None:
         with pytest.raises(Jinja2TemplateSecurityError, match=r"may not call the method 'model_copy' of a 'ImageContent' value"):
             await _render("{{ photos[0].model_copy() }}")
+
+    @pytest.mark.parametrize(
+        ("_topic", "template_source", "refused_name"),
+        [
+            ("private_attribute", "{{ note._stuff }}", "_stuff"),
+            ("pydantic_method", "{{ photos[0].model_copy() }}", "model_copy"),
+            ("mutating_method", "{{ tags.intersection_update(['a']) }}", "intersection_update"),
+            ("callable_in_a_namespace", "{% set ns = namespace(hook=spy) %}", "spy"),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_refusal_gives_the_refused_name_to_its_problem(self, _topic: str, template_source: str, refused_name: str) -> None:
+        """The caller reads what a method's template reached for as the `name` of `security.template_refused`, never the template."""
+        with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
+            await render_jinja2_async(
+                template_source=template_source,
+                template_category=TemplateCategory.LLM_PROMPT,
+                templating_context=_make_context(),
+                templating_style=_TEMPLATING_STYLE,
+                template_owner=TemplateOwner.METHOD,
+            )
+
+        assert exc_info.value.refused_name == refused_name
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"name": refused_name}
 
     @pytest.mark.asyncio(loop_scope="class")
     async def test_refused_mutation_leaves_the_value_unchanged(self) -> None:

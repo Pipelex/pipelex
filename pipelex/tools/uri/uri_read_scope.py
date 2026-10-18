@@ -38,13 +38,14 @@ class UriReference(NamedTuple):
     position: str
 
 
-def authorize_uri_read(*, uri: str, read_scope: str | None, position: str) -> None:
+def authorize_uri_read(*, uri: str, read_scope: str | None, position: str, input_name: str | None = None) -> None:
     """Refuse the read of `uri` if the run's read scope does not allow it.
 
     Args:
         uri: The URL about to be read.
         read_scope: The run's read scope, ``None`` for an unscoped run, which reads everything.
         position: Where the URL sits, named in the refusal instead of the URL itself.
+        input_name: The run input whose file the URL is, when it is one, which the refusal names as its ``input``.
 
     Raises:
         UriReadRefusedError: the URL is a storage key outside the read scope, or a local path.
@@ -63,7 +64,7 @@ def authorize_uri_read(*, uri: str, read_scope: str | None, position: str) -> No
         case ResolvedLocalPath():
             reason = UriReadRefusalReason.LOCAL_PATH
     msg = f"Refused to read {position}: {reason.desc}. Pass the file as an input of the run, or upload it first."
-    raise UriReadRefusedError(msg, reason=reason)
+    raise UriReadRefusedError(msg, reason=reason, input_name=input_name)
 
 
 def authorize_uri_reads(*, uri_references: list[UriReference], read_scope: str | None) -> None:

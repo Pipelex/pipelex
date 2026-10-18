@@ -116,6 +116,28 @@ class _PreparationContext(NamedTuple):
     semaphore: asyncio.Semaphore
 
 
+# The field of a file input that holds its reference, named by an `input.invalid` refusal of a blank or malformed one.
+_URL_FIELD = "url"
+
+
+class FileInputUnreadableReason(StrEnum):
+    """Why a file input could not be read, the `reason` of `input.file_unreadable`."""
+
+    # A data URL whose payload does not decode as base64.
+    INVALID_BASE64 = "invalid_base64"
+    # A local path the runner cannot open: it does not exist, is a directory, or is not readable.
+    PATH_UNREADABLE = "path_unreadable"
+
+
+def _file_type_of(*, content: NormalizableContent) -> str:
+    """The kind of file an input was read as, the `file_type` of `input.file_unreadable`: an image or a document."""
+    match content:
+        case ImageContent():
+            return "image"
+        case DocumentContent():
+            return "document"
+
+
 def format_file_input_path(path: FileInputPath) -> str:
     """Render a file input's path the way a caller writes it: `transcripts[2]`, `case.attachments[0]`."""
     rendered = ""
@@ -363,18 +385,18 @@ async def _prepare_url_content(
     input_name = format_file_input_path(path)
     if not content.url.strip():
         msg = f"{type(content).__name__} input has a blank url — provide https://, data:, pipelex-storage://, or a local file path."
-        raise PipelineInputUrlMissingError(msg)
+        raise PipelineInputUrlMissingError(msg).with_params(input=input_name, field=_URL_FIELD)
 
     # Before anything reads or links the url. A signed link is a read by whoever holds it, so a
     # foreign storage reference is refused here rather than read or signed; a local path is refused
     # rather than read, uploaded, or kept for the prompt preparation to read later.
-    authorize_uri_read(uri=content.url, read_scope=context.read_scope, position=f"the file given for input '{input_name}'")
+    authorize_uri_read(uri=content.url, read_scope=context.read_scope, position=f"the file given for input '{input_name}'", input_name=input_name)
 
     resolved_uri = resolve_uri(content.url)
     async with context.semaphore:
         match resolved_uri:
             case ResolvedHttpUrl():
-                return _prepare_http_url(content=content, resolved_uri=resolved_uri, context=context)
+                return _prepare_http_url(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
             case ResolvedPipelexStorage():
                 return await _prepare_storage_reference(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
             case ResolvedBase64DataUrl():
@@ -383,7 +405,9 @@ async def _prepare_url_content(
                 return await _prepare_local_path(content=content, resolved_uri=resolved_uri, input_name=input_name, context=context)
 
 
-def _prepare_http_url(*, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, context: _PreparationContext) -> NormalizableContent:
+def _prepare_http_url(
+    *, content: NormalizableContent, resolved_uri: ResolvedHttpUrl, input_name: str, context: _PreparationContext
+) -> NormalizableContent:
     # Never fetched: setup makes no outbound request to a host the caller chose. The operator that
     # consumes the input fetches it and reports a real failure. Its format is only what the caller
     # declared: the checks compare a declared type, and leave a URL that declares none to the provider.
@@ -394,7 +418,7 @@ def _prepare_http_url(*, content: NormalizableContent, resolved_uri: ResolvedHtt
         validate_http_url_syntax(url=resolved_uri.url)
     except ValueError as exc:
         msg = f"{type(content).__name__} input: {exc}"
-        raise PipelineInputUrlInvalidError(msg) from exc
+        raise PipelineInputUrlInvalidError(msg).with_params(input=input_name, field=_URL_FIELD) from exc
     if content.public_url is not None:
         return content
     return content.model_copy(update={"public_url": content.url})
@@ -411,7 +435,7 @@ async def _prepare_storage_reference(
         head = await context.storage.load_head(uri=resolved_uri.storage_uri, nb_bytes=FILE_HEAD_NB_BYTES)
     except StorageFileNotFoundError as exc:
         msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' names no stored file"
-        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
+        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND).with_params(input=input_name) from exc
     except StorageInvalidUriError as exc:
         msg = f"{type(content).__name__} input '{input_name}': the storage reference '{content.url}' cannot be read ({exc})"
         raise PipelineInputContentError(msg) from exc
@@ -455,7 +479,11 @@ async def _prepare_data_url(
         raw_bytes = base64.b64decode(resolved_uri.base64_data)
     except binascii.Error as exc:
         msg = f"{type(content).__name__} input '{input_name}': the data URL does not hold valid base64 ({exc})"
-        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_FILE_UNREADABLE) from exc
+        raise (
+            PipelineInputContentError(msg)
+            .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
+            .with_params(input=input_name, file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.INVALID_BASE64)
+        ) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],
@@ -520,7 +548,11 @@ async def _prepare_local_path(
         raw_bytes = await load_binary_async(local_path)
     except (OSError, ValueError) as exc:
         msg = f"Input file cannot be read: '{resolved_uri.path}' ({type(exc).__name__})"
-        raise PipelineInputContentError(msg).with_error_code(CoreCode.INPUT_FILE_UNREADABLE) from exc
+        raise (
+            PipelineInputContentError(msg)
+            .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
+            .with_params(input=input_name, file_type=_file_type_of(content=content), reason=FileInputUnreadableReason.PATH_UNREADABLE)
+        ) from exc
     mime_type = _identify_file_input(
         content=content,
         head=raw_bytes[:FILE_HEAD_NB_BYTES],

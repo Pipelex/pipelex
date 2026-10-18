@@ -56,13 +56,13 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NoReturn, cast
 
-from jinja2.exceptions import SecurityError as JinjaSecurityError
 from jinja2.runtime import BlockReference, Context, LoopContext, Macro, Undefined
 from jinja2.sandbox import ImmutableSandboxedEnvironment, safe_range
 from jinja2.utils import Cycler, Joiner, Namespace, generate_lorem_ipsum
 from markupsafe import Markup
 from typing_extensions import override
 
+from pipelex.tools.jinja2.exceptions import TemplateSandboxRefusalError
 from pipelex.tools.jinja2.jinja2_render_budget import DEFAULT_RENDER_BUDGET_UNITS, active_render_budget, compare_weight
 from pipelex.tools.jinja2.jinja2_render_charging import (
     INTERNAL_FILTERS,
@@ -107,7 +107,7 @@ def _refuse_callable_in_namespace(*, name: str, value: object) -> None:
     # An undefined value is callable only so that calling it fails as an undefined value: storing it is harmless.
     if callable(value) and not isinstance(value, Undefined):
         msg = f"A template may not store {_describe_callable(obj=value)} in a namespace, as '{name}': a namespace holds data only."
-        raise JinjaSecurityError(msg)
+        raise TemplateSandboxRefusalError(msg, refused_name=_callable_name(obj=value))
 
 
 class DataNamespace(Namespace):
@@ -204,6 +204,15 @@ def _is_declared_template_method(*, obj: object) -> bool:
     if surface is None or obj.__name__ not in surface.callable_names:
         return False
     return inspect.getattr_static(type(bound_to), obj.__name__, _MISSING) is obj.__func__
+
+
+def _callable_name(*, obj: object) -> str:
+    """The bare name of a refused callable, as a template reaches for it: a method's, a function's, a macro's or a class's name."""
+    if isinstance(obj, (types.BuiltinMethodType, types.MethodType, types.FunctionType, type)):
+        return obj.__name__
+    if isinstance(obj, Macro):
+        return obj.name
+    return type(obj).__name__
 
 
 def _describe_callable(*, obj: object) -> str:
@@ -309,7 +318,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     @override
     def unsafe_undefined(self, obj: Any, attribute: str) -> NoReturn:
         msg = f"A template may not read '{attribute}' on a '{type(obj).__name__}' value."
-        raise JinjaSecurityError(msg)
+        raise TemplateSandboxRefusalError(msg, refused_name=attribute)
 
     @override
     def wrap_str_format(self, value: Any) -> Callable[..., str] | None:
@@ -324,7 +333,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
     def call(self, context: Context, obj: Any, /, *args: Any, **kwargs: Any) -> Any:
         if not self.is_safe_callable(obj):
             msg = f"A template may not call {_describe_callable(obj=obj)}: templates read data and call methods of plain values only."
-            raise JinjaSecurityError(msg)
+            raise TemplateSandboxRefusalError(msg, refused_name=_callable_name(obj=obj))
         return charged_call(context=context, obj=obj, args=args, kwargs=kwargs, operation=lambda: f"calling {_describe_callable(obj=obj)}")
 
     @override

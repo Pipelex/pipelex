@@ -170,9 +170,25 @@ CALLER_VIEW_CASES: list[tuple[str, str, VariableMultiplicity | None, Any, CoreCo
         {"input": "my_input", "field": "amount"},
         "The input 'my_input' does not fit its concept's structure at 'amount'.",
     ),
-    # `input.invalid` names the field at fault, and a value wrong as a whole has none: its sentence is the code's title.
-    ("wrong-str-for-number", "shaper_test.Priority", None, "42", CoreCode.INPUT_INVALID, {"input": "my_input"}, None),
-    ("null-top-level", "native.Text", None, None, CoreCode.INPUT_INVALID, {"input": "my_input"}, None),
+    # `input.invalid` names the field at fault, and a value wrong as a whole names the input itself, the root of every field path.
+    (
+        "wrong-str-for-number",
+        "shaper_test.Priority",
+        None,
+        "42",
+        CoreCode.INPUT_INVALID,
+        {"input": "my_input", "field": "my_input"},
+        "The input 'my_input' does not fit its concept's structure at 'my_input'.",
+    ),
+    (
+        "null-top-level",
+        "native.Text",
+        None,
+        None,
+        CoreCode.INPUT_INVALID,
+        {"input": "my_input", "field": "my_input"},
+        "The input 'my_input' does not fit its concept's structure at 'my_input'.",
+    ),
 ]
 
 

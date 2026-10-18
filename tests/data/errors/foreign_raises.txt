@@ -8,7 +8,8 @@
 # - validator: a builtin raised in a helper only pydantic validators call, which pydantic wraps;
 # - private: a private class caught in the module that defines it, which no reader sees;
 # - carrier: a class a library or protocol expects by type (the import system's ImportError, httpx's transport
-#   errors, the standard's method tree refusal its callers translate) that the scan cannot recognise by its name alone;
+#   errors, the standard's method tree refusal its callers translate, the Jinja2 SecurityError the template sandbox
+#   stops a render with) that the scan cannot recognise by its name alone;
 # - tooling: developer or release code outside the exempt directories, which only the development CLI calls;
 # - caught: a builtin raised in a module that must import nothing of Pipelex, which its every caller catches by type.
 #
@@ -177,6 +178,9 @@ pipelex/tools/jinja2/jinja2_render_charging.py | charged_test | TypeError | inva
 pipelex/tools/jinja2/jinja2_render_charging.py | render_budget_of | TypeError | invariant
 pipelex/tools/jinja2/jinja2_render_rewrite.py | rewrite_for_render_budget | TypeError | invariant
 pipelex/tools/jinja2/jinja2_sandbox.py | PipelexTemplateEnvironment._generate | RuntimeError | invariant
+pipelex/tools/jinja2/jinja2_sandbox.py | PipelexTemplateEnvironment.call | TemplateSandboxRefusalError | carrier
+pipelex/tools/jinja2/jinja2_sandbox.py | PipelexTemplateEnvironment.unsafe_undefined | TemplateSandboxRefusalError | carrier
+pipelex/tools/jinja2/jinja2_sandbox.py | _refuse_callable_in_namespace | TemplateSandboxRefusalError | carrier
 pipelex/tools/jinja2/jinja2_template_loader.py | TemplateLoader.load | ValueError | invariant
 pipelex/tools/jinja2/jinja2_template_registry.py | TemplateRegistry.get | KeyError | invariant
 pipelex/tools/jinja2/template_surface.py | TemplateSurface.__post_init__ | ValueError | invariant

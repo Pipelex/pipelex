@@ -14,6 +14,7 @@ from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library_id_or_none,
     get_library_manager,
+    get_own_pipes,
     get_pipeline_manager,
     get_required_entry_pipe,
     get_required_pipe,
@@ -224,7 +225,8 @@ async def pipeline_run_setup(
     # production. The constant survives for telemetry only.
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
-        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+        # The request carries no method, so it has no pipe to select.
+        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=[])
 
     # Validate the extras HERE, before this function causes anything observable.
     #
@@ -355,7 +357,9 @@ async def pipeline_run_setup(
                 pipe = get_required_pipe(pipe_code=qualified_main_pipe)
             else:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
-                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+                # With no entry pipe to start from, the request may select any pipe of the method it sent.
+                candidates = sorted(own_pipe.pipe_ref for own_pipe in get_own_pipes())
+                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
         elif pipe_code:
             pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:
