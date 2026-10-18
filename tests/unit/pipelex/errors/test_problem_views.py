@@ -157,6 +157,27 @@ class TestProblemViews:
         assert caller.next_step.detail
         assert any(record.getMessage() == "A problem's sentence could not be rendered from its template" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="security.template_refused requires the refused name, which a name the run's data gave withholds until the standard words it"
+    )
+    def test_a_withheld_name_reads_its_own_sentences_in_every_view(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A template refusal without its `name` says what happened without it, in each view and in the caller view of the operator's.
+
+        The problem still logs the parameter it lacks, and no sentence falls back on the title or the generic step.
+        """
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            operator = make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.OPERATOR, params={"pipe": "say"})
+            caller = make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.CALLER, params={"pipe": "say"})
+            item = make_problem_item(code=CoreCode.SECURITY_TEMPLATE_REFUSED, params={"pipe": "say"})
+
+        detail = "A template of pipe 'say' looked a name up from the run's data, and the template sandbox refused that name."
+        step = "Change the templates of pipe 'say' so that the run's data no longer chooses the names they look up, then run the method again."
+        assert operator.detail == caller.detail == item.detail == detail
+        assert operator.next_step.detail == caller.next_step.detail == caller_view_of(problem=operator).next_step.detail == step
+        messages = [record.getMessage() for record in caplog.records]
+        assert "A problem lacks a parameter its code requires" in messages
+        assert "A problem's sentence could not be rendered from its template" not in messages
+
     def test_an_undeclared_or_mistyped_parameter_is_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
         error = _TemplateRefusalError("refused").with_params(pipe="summarize", template="prompt", finding="bad", undeclared="secret value")
 

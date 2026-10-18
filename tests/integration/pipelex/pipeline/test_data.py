@@ -776,6 +776,10 @@ $photo
     PRIVATE_READ_TEMPLATE: ClassVar[str] = "Talk about {{ topic['_owner'] }}"
     # A template that fails at render for a reason no security rule has, a method the value lacks.
     MISSING_METHOD_TEMPLATE: ClassVar[str] = "Talk about {{ topic.model_dump_json() }}"
+    # A template looking a name up from the run's data, and a topic naming a private attribute: the sandbox refuses a name
+    # that is the run's input, which no problem may carry.
+    DATA_NAMED_TEMPLATE: ClassVar[str] = "Talk about {{ topic[topic.text] }}"
+    DATA_NAMED_TOPIC: ClassVar[str] = "_quokka_marmalade_4471"
     TOPIC: ClassVar[str] = "the quarterly payroll"
     COMPOSE_MTHDS_SLOT: ClassVar[str] = "TEMPLATE_SLOT"
     COMPOSE_MTHDS: ClassVar[str] = """

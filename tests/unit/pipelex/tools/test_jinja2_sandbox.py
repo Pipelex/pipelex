@@ -216,6 +216,69 @@ class TestTemplateSandbox:
         assert caller.params is not None
         assert caller.params.as_wire() == {"name": refused_name}
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, and withholds the refused name the run's data gave, which the standard still requires"
+    )
+    @pytest.mark.parametrize(
+        ("_topic", "template_source", "data_value"),
+        [
+            ("private_attribute_by_key", "{{ note[note.text] }}", "_quokka_marmalade_4471"),
+            ("method_by_attr_filter", "{{ (photos[0] | attr(note.text))() }}", "model_copy"),
+            ("callable_in_a_namespace_by_key", "{% set ns = namespace({note.text: spy}) %}", "quokka_marmalade_4471"),
+        ],
+    )
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_refused_name_the_run_s_data_gave_reaches_no_reader(self, _topic: str, template_source: str, data_value: str) -> None:
+        """A template that looks the refused name up from the run's data gives no `name`, so the run's input reaches no view.
+
+        Its message, its problem in either view and the problem's sentences say what happened without the name: the
+        template looked a name up from the run's data, and the sandbox refused it.
+        """
+        context = _make_context()
+        context["note"] = _make_artefact(content=TextContent(text=data_value), name="note", concept_code=NativeConceptCode.TEXT)
+        with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
+            await render_jinja2_async(
+                template_source=template_source,
+                template_category=TemplateCategory.LLM_PROMPT,
+                templating_context=context,
+                templating_style=_TEMPLATING_STYLE,
+                template_owner=TemplateOwner.METHOD,
+            )
+
+        error = exc_info.value.with_params(pipe="say")
+        assert error.refused_name is None
+        assert data_value not in error.message
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        caller = error.to_problem(view=ProblemView.CALLER)
+        for problem in (operator, caller):
+            assert problem.code == CoreCode.SECURITY_TEMPLATE_REFUSED
+            assert data_value not in str(problem.to_wire())
+            assert problem.params is not None
+            assert problem.params.as_wire() == {"pipe": "say"}
+            assert problem.detail == "A template of pipe 'say' looked a name up from the run's data, and the template sandbox refused that name."
+        assert caller.next_step.detail == (
+            "Change the templates of pipe 'say' so that the run's data no longer chooses the names they look up, then run the method again."
+        )
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_refused_name_the_template_spells_is_named_by_its_sentences(self) -> None:
+        """A name the template's own source writes is passed on as `name`, which the code's own sentences quote."""
+        with pytest.raises(Jinja2TemplateSecurityError) as exc_info:
+            await render_jinja2_async(
+                template_source="{{ note['_stuff'] }}",
+                template_category=TemplateCategory.LLM_PROMPT,
+                templating_context=_make_context(),
+                templating_style=_TEMPLATING_STYLE,
+                template_owner=TemplateOwner.METHOD,
+            )
+
+        caller = exc_info.value.with_params(pipe="say").to_problem(view=ProblemView.CALLER)
+
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"pipe": "say", "name": "_stuff"}
+        assert caller.detail == "A template of pipe 'say' reached for '_stuff', which the template sandbox forbids."
+        assert caller.next_step.detail == "Remove '_stuff' from the templates of pipe 'say', then run the method again."
+
     @pytest.mark.asyncio(loop_scope="class")
     async def test_refused_mutation_leaves_the_value_unchanged(self) -> None:
         context = _make_context()

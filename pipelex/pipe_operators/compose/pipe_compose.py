@@ -27,6 +27,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -214,17 +215,18 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        compose_result = await run_compose_template(
-            memory=working_memory,
-            template=self.template,
-            category=self.category,
-            concept=self.output.concept,
-            output_class=structure_class,
-            templating_style=resolve_templating_style(authored=self.templating_style),
-            runtime_params=pipe_run_params.params,
-            extra_context=self.extra_context,
-            result_name=output_name,
-        )
+        with locating_template_refusal(template_field="template"):
+            compose_result = await run_compose_template(
+                memory=working_memory,
+                template=self.template,
+                category=self.category,
+                concept=self.output.concept,
+                output_class=structure_class,
+                templating_style=resolve_templating_style(authored=self.templating_style),
+                runtime_params=pipe_run_params.params,
+                extra_context=self.extra_context,
+                result_name=output_name,
+            )
         working_memory = compose_result.memory
 
         # Capture execution data for the graph tracer

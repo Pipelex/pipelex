@@ -36,6 +36,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_
 from pipelex.system.invocation_path import DEFAULT_OUTCOME_SEGMENT, outcome_segment
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError, Jinja2TemplateInvalidError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -437,11 +438,12 @@ class PipeCondition(PipeController):
                 expression's text.
         """
         try:
-            return await render_template(
-                template=self.expression,
-                category=TemplateCategory.EXPRESSION,
-                context=working_memory.generate_context(),
-            )
+            with locating_template_refusal(template_field="expression"):
+                return await render_template(
+                    template=self.expression,
+                    category=TemplateCategory.EXPRESSION,
+                    context=working_memory.generate_context(),
+                )
         except Jinja2TemplateInvalidError as exc:
             if not exc.template_owner.is_method:
                 # One of Pipelex's own templates, reached from the expression's render: ours, kept as it is.

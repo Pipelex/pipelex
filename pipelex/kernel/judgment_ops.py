@@ -55,6 +55,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.prompt_assembly import UserPromptContent, assemble_user_prompt
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -325,7 +326,8 @@ async def _ask_judgment(
 ) -> _AskedJudgment:
     """One request to the judging model: the evidence assembled, every question rendered as a `BASIC` template, all sent in one job."""
     with job_metadata.log_context():
-        assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
+        with locating_template_refusal(template_field="prompt"):
+            assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
         judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
         context = memory.generate_context()
         asked_questions: dict[str, JudgmentQuestion] = {}

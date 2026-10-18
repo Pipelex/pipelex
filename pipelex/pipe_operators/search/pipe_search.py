@@ -15,6 +15,7 @@ from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
@@ -99,24 +100,25 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         if self.is_structured_output:
             output_structure_class = get_concept_library().get_structure_class(concept=self.output.concept)
 
-        search_result = await run_search(
-            memory=working_memory,
-            template=self.prompt_blueprint.template,
-            category=self.prompt_blueprint.category,
-            search_setting=search_setting,
-            concept=self.output.concept,
-            job_metadata=job_metadata,
-            cogt_run_params=pipe_run_params.cogt_run_params,
-            # No authored style on this operator: a query template takes the runtime default, the
-            # same one an LLM pipe that declares nothing gets.
-            templating_style=resolve_templating_style(authored=None),
-            output_structure_class=output_structure_class,
-            include_domains=self.include_domains,
-            exclude_domains=self.exclude_domains,
-            from_date=self.from_date,
-            to_date=self.to_date,
-            result_name=output_name,
-        )
+        with locating_template_refusal(template_field="prompt"):
+            search_result = await run_search(
+                memory=working_memory,
+                template=self.prompt_blueprint.template,
+                category=self.prompt_blueprint.category,
+                search_setting=search_setting,
+                concept=self.output.concept,
+                job_metadata=job_metadata,
+                cogt_run_params=pipe_run_params.cogt_run_params,
+                # No authored style on this operator: a query template takes the runtime default, the
+                # same one an LLM pipe that declares nothing gets.
+                templating_style=resolve_templating_style(authored=None),
+                output_structure_class=output_structure_class,
+                include_domains=self.include_domains,
+                exclude_domains=self.exclude_domains,
+                from_date=self.from_date,
+                to_date=self.to_date,
+                result_name=output_name,
+            )
         working_memory = search_result.memory
 
         # Capture execution data for the graph tracer

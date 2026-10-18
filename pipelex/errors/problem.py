@@ -51,7 +51,7 @@ import math
 from collections.abc import Mapping, Sequence
 from enum import Enum, StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, NamedTuple, cast
 
 from mthds.protocol.problem.client_problems import render_template
 from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, ProblemParams
@@ -317,6 +317,44 @@ _GENERIC_STEP_SENTENCES: dict[StepKind, str] = {
 }
 
 
+class _CodeSentences(NamedTuple):
+    """The templates of a code's sentences: its ``detail``, its actor's step and any other reader's step."""
+
+    detail: str
+    actor_step_detail: str
+    other_step_detail: str
+
+
+# The sentences of a code whose required parameter a runner withholds by rule, keyed by the code and the parameters it
+# withholds, until the standard words that occurrence itself. `security.template_refused` requires `name`, but a name the
+# template looked up from the run's data is the run's input, which no problem carries (`pipelex.tools.jinja2`), so its
+# refusal carries no `name`: its sentences then say what happened without the name, rather than the code's title and the
+# generic step, and the problem still logs the parameter it lacks.
+_WITHHELD_PARAM_SENTENCES: dict[tuple[str, frozenset[str]], _CodeSentences] = {
+    ("security.template_refused", frozenset({"name"})): _CodeSentences(
+        detail="A template of pipe '{pipe}' looked a name up from the run's data, and the template sandbox refused that name.",
+        actor_step_detail=(
+            "Change the templates of pipe '{pipe}' so that the run's data no longer chooses the names they look up, then run the method again."
+        ),
+        other_step_detail=(
+            "Ask the method's owner to change the templates of pipe '{pipe}' so that the run's data no longer chooses the names they look up."
+        ),
+    ),
+}
+
+
+def _code_sentences(*, spec: ErrorCodeSpec, params: Mapping[str, Any]) -> _CodeSentences:
+    """The templates of a code's sentences for the parameters given: the code's own, or the wording of a withheld parameter.
+
+    The wording of :data:`_WITHHELD_PARAM_SENTENCES` replaces the code's own only when every parameter it withholds is
+    absent, so every rendering of one problem, in any view and after any projection, picks the same sentences.
+    """
+    for (code, withheld), sentences in _WITHHELD_PARAM_SENTENCES.items():
+        if code == spec.code and not any(name in params for name in withheld):
+            return sentences
+    return _CodeSentences(detail=spec.detail, actor_step_detail=spec.actor_step_detail, other_step_detail=spec.other_step_detail)
+
+
 # The logger of the faults of a raise site this module finds while it builds a problem. This module sits under the
 # import chain of `pipelex.log` itself, whose configuration loads the error classes that build problems, so it cannot
 # import the log, and emits its records on this stdlib logger instead, with the same attached fields, through the
@@ -518,14 +556,15 @@ def _next_step(*, spec: ErrorCodeSpec, view: ProblemView, params: Mapping[str, A
     """The step of a view, rendered with the parameters the view may read, a generic sentence of its kind when it cannot be."""
     kind: StepKind
     template: str
+    sentences = _code_sentences(spec=spec, params=params)
     match view:
         case ProblemView.OPERATOR:
-            kind, template = spec.actor_step, spec.actor_step_detail
+            kind, template = spec.actor_step, sentences.actor_step_detail
         case ProblemView.CALLER:
             if _caller_step_is_actor_step(domain=spec.domain):
-                kind, template = spec.actor_step, spec.actor_step_detail
+                kind, template = spec.actor_step, sentences.actor_step_detail
             else:
-                kind, template = spec.other_step, spec.other_step_detail
+                kind, template = spec.other_step, sentences.other_step_detail
     detail = _render_sentence(template=template, params=params, code=spec.code, part=f"step.{kind}")
     return NextStep(kind=kind, detail=detail or _GENERIC_STEP_SENTENCES[kind])
 
@@ -586,7 +625,8 @@ def make_problem(
     _report_missing_required_params(code=code, params=given, part="problem")
     caller_params = {name: value for name, value in given.items() if name not in spec.operator_only_params}
     operator_params = {name: value for name, value in given.items() if name in spec.operator_only_params}
-    detail = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
+    detail = _render_sentence(template=_code_sentences(spec=spec, params=caller_params).detail, params=caller_params, code=code, part="detail")
+    detail = detail or spec.title
     step_params = given if view.shows_diagnostics else caller_params
     view_diagnostics: ProblemDiagnostics | None = None
     if view.shows_diagnostics and diagnostics is not None:
@@ -639,7 +679,8 @@ def make_problem_item(
     given = accepted_params(code=code, params=params or {})
     _report_missing_required_params(code=code, params=given, part="item")
     caller_params = {name: value for name, value in given.items() if name not in spec.operator_only_params}
-    detail = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
+    detail = _render_sentence(template=_code_sentences(spec=spec, params=caller_params).detail, params=caller_params, code=code, part="detail")
+    detail = detail or spec.title
     return ProblemItem.model_validate(
         _members(
             code=spec.code,
@@ -676,7 +717,8 @@ def item_for_every_view(*, item: ProblemItem) -> ProblemItem:
         return item
     caller_params = {name: value for name, value in params.items() if name not in spec.operator_only_params}
     members = item.as_wire()
-    members["detail"] = _render_sentence(template=spec.detail, params=caller_params, code=code, part="detail") or spec.title
+    detail_template = _code_sentences(spec=spec, params=caller_params).detail
+    members["detail"] = _render_sentence(template=detail_template, params=caller_params, code=code, part="detail") or spec.title
     members.pop("params")
     params_member = _params_member(spec=spec, caller_params=caller_params)
     if params_member is not None:

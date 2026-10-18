@@ -22,6 +22,8 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValidationError,
     StructuredContentComposerValueError,
 )
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSecurityError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import find_private_path_segment
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -174,12 +176,20 @@ class StructuredContentComposer:
                 return self._resolve_from_var(field_blueprint=field_blueprint, field_name=field_name)
 
             case ConstructFieldMethod.TEMPLATE:
-                rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
+                with locating_template_refusal(template_field=f"construct.{field_name}"):
+                    rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
                 self.field_resolutions[field_name]["rendered"] = rendered_text
                 return rendered_text
 
             case ConstructFieldMethod.NESTED:
-                return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
+                try:
+                    return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
+                except Jinja2TemplateSecurityError as exc:
+                    # The nested composer located the refusal on its own field: the path from this construct's root
+                    # runs through this field.
+                    if exc.template_field is not None and exc.template_field.startswith("construct."):
+                        exc.with_template_field(template_field=f"construct.{field_name}.{exc.template_field.removeprefix('construct.')}")
+                    raise
 
     def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> Any:
         """Resolve a FROM_VAR field by getting value from working memory.
