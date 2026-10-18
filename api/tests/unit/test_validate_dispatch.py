@@ -57,6 +57,7 @@ class _StubBundleValidator:
         submitted_files: Mapping[str, bytes] | None,
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
+        read_scope: str | None,
     ) -> BundleValidationFailure:
         self.calls.append(
             {
@@ -69,6 +70,7 @@ class _StubBundleValidator:
                 "submitted_files": submitted_files,
                 "method_dir": method_dir,
                 "methods_dirs": methods_dirs,
+                "read_scope": read_scope,
             }
         )
         if self._error is not None:

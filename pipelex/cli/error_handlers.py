@@ -9,7 +9,7 @@ from rich.console import Console
 from rich.markup import escape
 from rich.traceback import Traceback
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexConfigError, PipelexError, ValidationErrorCategory, ValidationErrorItem, iter_cause_chain
 from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.errors.failure_problem import failure_problem, format_problem_location, format_problem_verdict
@@ -518,6 +518,24 @@ def handle_validate_bundle_error(
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
     raise typer.Exit(1) from exc
+
+
+def handle_pre_boot_config_error(*, exc: PipelexConfigError, command: str, exit_code: int) -> NoReturn:
+    """Report a configuration that cannot be read before the boot, as the command reports a boot that fails on it.
+
+    A command handed a method's folder or bundle file lists its method tree before it boots, under the limits the
+    configuration sets, so a configuration the boot would refuse is refused there first. It is reported as the
+    command's boundary reports the boot's refusal, `Failed to <command>:` and the refusal, which names what to fix and
+    the migration that would, never as a traceback.
+
+    Args:
+        exc: The configuration's refusal.
+        command: The human command name, as the command's other failures name it (e.g. ``"validate"``).
+        exit_code: The exit code the command gives a failed boot.
+    """
+    print_traceback_if_requested(console=get_console())
+    typer.secho(f"Failed to {command}: {exc.message}", fg=typer.colors.RED, err=True)
+    raise typer.Exit(exit_code) from exc
 
 
 def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError) -> NoReturn:

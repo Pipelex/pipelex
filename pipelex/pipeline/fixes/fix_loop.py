@@ -20,10 +20,15 @@ Two scoping rules bound what gets touched:
   file plus ``.mthds`` files under the per-call ``library_dirs``. Fixes sourced at files
   loaded via ambient resolution are excluded; when every fix is out of scope the loop bails
   loudly, naming the files and the ``-L`` remedy.
+
+A method's folder is fixed the same way (``fix_method_folder``): the loop validates the whole
+method tree, as ``validate_bundle(method_dir=...)`` judges it, with no entry file. The tree is
+rooted at the nearest ``METHODS.toml`` at or above the folder, so its root is in the write scope,
+not only the folder named, and so are the ``library_dirs`` passed beside it.
 """
 
 import os
-from collections.abc import Iterable, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Sequence
 from pathlib import Path
 from typing import Any, NamedTuple, Self, cast
 
@@ -43,10 +48,11 @@ from pipelex.fix_ops.file_transaction import (
 )
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
+from pipelex.libraries.method_trees import method_tree_root
 from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_bundle import ValidateBundleResult, dirs_beside_method, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.pipeline.validation_errors import ValidationItemCode
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
@@ -120,6 +126,21 @@ def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorIte
     return exc.validation_error_items()
 
 
+def unfixable_method_result(*, error: ValidateBundleError) -> FixBundleResult:
+    """The fix verdict on a method refused before anything of it loads, such as a folder whose tree is refused.
+
+    Invalid, with nothing applied and nothing to fix: the refusal's items are the remaining errors, as they are when
+    the loop itself cannot list the trees it is about to load.
+    """
+    return FixBundleResult(
+        is_valid=False,
+        iterations=0,
+        fixes_applied=[],
+        files_written=[],
+        remaining_errors=_validation_error_items(error),
+    )
+
+
 def _pending_signatures_from_validation_result(validation_result: Any) -> list[str]:
     """Pending signatures reported by validation, defaulting to none for success-only mocks."""
     pending_signatures = getattr(validation_result, "pending_signatures", None)
@@ -151,14 +172,17 @@ def _absolute_source_path(path: Path) -> Path:
     return Path(os.path.abspath(path))
 
 
-def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequence[Path]) -> dict[Path, FileSnapshot]:
+def _snapshot_loaded_sources(*, entry_source_path: Path | None, effective_dirs: Sequence[Path]) -> dict[Path, FileSnapshot]:
     """Snapshot every source identity validation is about to load.
 
     Keys are lexical absolute source names, while each snapshot is pinned to the destination
     resolved at the same time. The resolved destination is also an alias when unambiguous, which
-    accommodates injected managers that already report canonical source paths.
+    accommodates injected managers that already report canonical source paths. A method's folder
+    has no entry file: its bundles are those of its directory, among ``effective_dirs``.
     """
-    source_paths: set[Path] = {_absolute_source_path(entry_source_path)}
+    source_paths: set[Path] = set()
+    if entry_source_path is not None:
+        source_paths.add(_absolute_source_path(entry_source_path))
     source_paths.update(
         _absolute_source_path(mthds_path)
         for mthds_path in get_pipelex_mthds_files_from_dirs(dirs={_absolute_source_path(directory) for directory in effective_dirs})
@@ -175,13 +199,24 @@ def _snapshot_loaded_sources(*, entry_source_path: Path, effective_dirs: Sequenc
 def _bind_fixes_to_snapshots(
     fixes: list[SuggestedFix],
     *,
-    entry_source_path: Path,
+    entry_source_path: Path | None,
     snapshots_by_source: dict[Path, FileSnapshot],
 ) -> list[_BoundFix]:
-    """Bind each fix once to the pre-validation file identity that supplied its source."""
+    """Bind each fix once to the pre-validation file identity that supplied its source.
+
+    A source-less fix targets the entry file. A method's folder has none, but its load is never single-file, so
+    ``_safe_fixes`` has already dropped every source-less fix.
+    """
     bound_fixes: list[_BoundFix] = []
     for fix in fixes:
-        source_path = entry_source_path if fix.source is None else Path(fix.source)
+        source_path: Path
+        if fix.source is not None:
+            source_path = Path(fix.source)
+        elif entry_source_path is not None:
+            source_path = entry_source_path
+        else:
+            msg = f"refusing to apply fix '{fix.fix_code}': it names no file, and a method's folder has no entry file to apply it to"
+            raise FixWriteConflictError(msg)
         absolute_source = _absolute_source_path(source_path)
         snapshot = snapshots_by_source.get(absolute_source)
         if snapshot is None:
@@ -233,7 +268,7 @@ def _safe_fixes(
 def _partition_by_write_scope(
     fixes: list[_BoundFix],
     *,
-    entry_path: Path,
+    entry_path: Path | None,
     writable_dirs: Sequence[Path],
 ) -> tuple[list[_BoundFix], list[Path]]:
     """Split fixes into (writable, out-of-scope target paths).
@@ -424,14 +459,94 @@ async def fix_bundle_file(
     ``fix_loop_max_attempts`` builder config. ``select_codes`` / ``ignore_codes`` filter which fix
     rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
     """
+    entry_source_path = _absolute_source_path(mthds_file_path)
+    effective_dirs, _ = resolve_library_dirs(library_dirs)
+    write_scope_dirs = library_dirs if writable_library_dirs is None else writable_library_dirs
+
+    async def validate_the_bundle() -> ValidateBundleResult:
+        return await validate_bundle(mthds_file_path=mthds_file_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+
+    return await _fix_to_fixed_point(
+        validate=validate_the_bundle,
+        entry_source_path=entry_source_path,
+        effective_dirs=effective_dirs,
+        writable_dirs=[Path(writable_dir).resolve() for writable_dir in write_scope_dirs] if write_scope_dirs is not None else [],
+        max_iterations=max_iterations,
+        select_codes=select_codes,
+        ignore_codes=ignore_codes,
+    )
+
+
+async def fix_method_folder(
+    *,
+    method_dir: Path,
+    library_dirs: Sequence[Path] | None = None,
+    writable_library_dirs: Sequence[Path] | None = None,
+    allow_signatures: bool = False,
+    max_iterations: int | None = None,
+    select_codes: Sequence[str] | None = None,
+    ignore_codes: Sequence[str] | None = None,
+) -> FixBundleResult:
+    """Fix a method's folder in place, judged whole, until valid, out of fixes, no progress, or max_iterations.
+
+    The loop of ``fix_bundle_file``, validating every bundle of the folder's method tree as ``validate_bundle``
+    judges a method's folder (``method_dir``), with the caller's own ``library_dirs`` loaded beside it. There is no
+    entry file: every fix names the file it targets, a source-less one being dropped, since the load is never a single
+    file.
+
+    The tree is rooted at the nearest ``METHODS.toml`` at or above the folder, so a fix may target any bundle of it,
+    such as a sibling of the folder named: the tree's root and the directories beside it are the write scope, or
+    ``writable_library_dirs`` when given, as the ``--diff`` preview's sandbox gives them, having mirrored that root.
+    The snapshot taken before each validation lists the same directories the validation loads, the folder's listing
+    being its whole tree's, so every file a fix can target was snapshotted under the name the load gives it.
+    """
+    beside_dirs = dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)
+    loaded_dirs = [method_dir, *beside_dirs]
+    write_scope_dirs: Sequence[Path]
+    if writable_library_dirs is None:
+        try:
+            with translate_to_validate_bundle_error():
+                tree_root = method_tree_root(handed_over=method_dir)
+        except ValidateBundleError as exc:
+            return unfixable_method_result(error=exc)
+        write_scope_dirs = [tree_root, *beside_dirs]
+    else:
+        write_scope_dirs = writable_library_dirs
+
+    async def validate_the_method() -> ValidateBundleResult:
+        return await validate_bundle(
+            method_dir=method_dir,
+            library_dirs=library_dirs,
+            library_dirs_are_callers=True,
+            allow_signatures=allow_signatures,
+        )
+
+    return await _fix_to_fixed_point(
+        validate=validate_the_method,
+        entry_source_path=None,
+        effective_dirs=loaded_dirs,
+        writable_dirs=[Path(writable_dir).resolve() for writable_dir in write_scope_dirs],
+        max_iterations=max_iterations,
+        select_codes=select_codes,
+        ignore_codes=ignore_codes,
+    )
+
+
+async def _fix_to_fixed_point(
+    *,
+    validate: Callable[[], Awaitable[ValidateBundleResult]],
+    entry_source_path: Path | None,
+    effective_dirs: Sequence[Path],
+    writable_dirs: list[Path],
+    max_iterations: int | None,
+    select_codes: Sequence[str] | None,
+    ignore_codes: Sequence[str] | None,
+) -> FixBundleResult:
+    """The fix loop over what ``validate`` judges: a bundle file and its entry, or a method's folder with none."""
     if max_iterations is None:
         max_iterations = get_config().interpreter.builder.fix_loop_max_attempts
-    entry_source_path = _absolute_source_path(mthds_file_path)
-    entry_path = entry_source_path.resolve()
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
+    entry_path = entry_source_path.resolve() if entry_source_path is not None else None
     is_single_file = not effective_dirs
-    write_scope_dirs = library_dirs if writable_library_dirs is None else writable_library_dirs
-    writable_dirs: list[Path] = [Path(writable_dir).resolve() for writable_dir in write_scope_dirs] if write_scope_dirs is not None else []
 
     seen_fingerprints: set[str] = set()
     fixes_applied: list[SuggestedFix] = []
@@ -456,11 +571,7 @@ async def fix_bundle_file(
                 remaining_error_codes=exc.item_codes(),
             )
         try:
-            validation_result = await validate_bundle(
-                mthds_file_path=mthds_file_path,
-                library_dirs=library_dirs,
-                allow_signatures=allow_signatures,
-            )
+            validation_result = await validate()
             pending_signatures = _pending_signatures_from_validation_result(validation_result)
             return FixBundleResult(
                 is_valid=True,
@@ -584,11 +695,7 @@ async def fix_bundle_file(
 
     # max_iterations apply rounds done — the final verdict comes from one last validation.
     try:
-        validation_result = await validate_bundle(
-            mthds_file_path=mthds_file_path,
-            library_dirs=library_dirs,
-            allow_signatures=allow_signatures,
-        )
+        validation_result = await validate()
         pending_signatures = _pending_signatures_from_validation_result(validation_result)
         return FixBundleResult(
             is_valid=True,

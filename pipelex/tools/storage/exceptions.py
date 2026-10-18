@@ -62,6 +62,15 @@ class StorageInvalidKeyError(StorageError):
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
+class StorageChecksumMismatchError(StorageError):
+    """Raised when the bytes a create-only write was handed do not hash to the checksum it was handed with them.
+
+    The caller hashes the bytes it hands over, so a mismatch is a bug of the caller, never the storage's fault.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class StorageLocalError(StorageError):
     """Raised when a local filesystem storage operation fails.
 

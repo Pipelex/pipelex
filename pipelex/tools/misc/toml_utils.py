@@ -35,12 +35,30 @@ def load_toml_from_path(path: str | Path) -> dict[str, Any]:
         toml.TomlDecodeError: If TOML parsing fails, with file path included
 
     """
+    with open(path, "rb") as file:
+        data = file.read()
+    return load_toml_from_bytes(data=data, source=path)
+
+
+def load_toml_from_bytes(*, data: bytes, source: str | Path) -> dict[str, Any]:
+    """Load TOML from a file's bytes, decoded as UTF-8 as tomli decodes a file it reads.
+
+    Args:
+        data: The bytes read from the file
+        source: The file the bytes were read from, named in a parsing error
+
+    Returns:
+        Dictionary loaded from TOML
+
+    Raises:
+        TomlError: If TOML parsing fails, with the file path included
+
+    """
     try:
-        with open(path, "rb") as file:
-            return tomli.load(file)
+        return tomli.loads(data.decode())
     except tomli.TOMLDecodeError as exc:
-        msg = f"TOML parsing error in file '{path}': {exc.msg}"
-        raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno, path=Path(path)) from exc
+        msg = f"TOML parsing error in file '{source}': {exc.msg}"
+        raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno, path=Path(source)) from exc
 
 
 def load_toml_from_path_if_exists(path: str | Path) -> dict[str, Any] | None:

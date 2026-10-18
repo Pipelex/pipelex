@@ -172,7 +172,7 @@ def app_callback(
 app.command(name="init", help="Initialize Pipelex configuration (non-interactive)")(agent_init_cmd)
 app.add_typer(run_app, name="run", help="Execute a pipeline and output JSON results")
 app.add_typer(validate_app, name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
-app.add_typer(fix_app, name="fix", help="Fix a bundle file or pipeline directory in place, or migrate a method's function names")
+app.add_typer(fix_app, name="fix", help="Fix a bundle file or a method's folder in place, or migrate a method's function names")
 app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)
 app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
 app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a pipe")

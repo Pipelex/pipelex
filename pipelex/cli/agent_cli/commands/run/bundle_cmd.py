@@ -10,7 +10,8 @@ from typing import TYPE_CHECKING, Annotated, Any
 import typer
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.base_exceptions import PipelexConfigError
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli, report_agent_init_failure
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_argument_error,
@@ -31,8 +32,8 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
     run_hosted_for_agent,
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
+from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
-from pipelex.cli.commands.run._method_folder import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
@@ -51,7 +52,7 @@ if TYPE_CHECKING:
 def run_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, which starts at its entry pipe unless --pipe names one"),
     ],
     pipe: Annotated[
         str | None,
@@ -147,6 +148,9 @@ def run_bundle_cmd(
         except MethodEntryError as exc:
             # No pipe to start at is the run's refusal and no verdict: its problem carries its own code.
             agent_error(exc.message, cause=exc)
+        except PipelexConfigError as exc:
+            # Listing the tree reads its limits from the configuration, before the boot would.
+            report_agent_init_failure(error=exc)
         method_tree = folder_run.tree
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
@@ -193,6 +197,9 @@ def run_bundle_cmd(
                 method_tree = list_bundle_file_tree(bundle_file=target_path)
             except ValidateBundleError as exc:
                 agent_error(exc.message, cause=exc)
+            except PipelexConfigError as exc:
+                # Listing the tree reads its limits from the configuration, before the boot would.
+                report_agent_init_failure(error=exc)
         try:
             # A file that is not UTF-8 text does not parse: the invalid verdict `validate` gives it, `method.syntax`.
             with translate_to_validate_bundle_error():

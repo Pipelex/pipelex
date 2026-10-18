@@ -37,7 +37,7 @@ from pipelex_api.api_config import ApiConfig, get_api_config, is_callers_overrid
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_validation_error
+from pipelex_api.errors import raise_bad_request, raise_forbidden, raise_validation_error
 from pipelex_api.json_body import decode_json_body
 from pipelex_api.method_source import fetched_method
 from pipelex_api.method_tree_request import (
@@ -72,6 +72,7 @@ from pipelex_api.schemas.models import (
     PipelineApiExtras,
     RunRequest,
 )
+from pipelex_api.security import AuthMode, get_auth_mode
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -137,21 +138,43 @@ def _resolve_storage_scope(request: Request, *, requested: str | None) -> str:
     return requested or get_request_user_id(request)
 
 
+def bound_read_scope(request: Request, *, requested: str | None) -> str | None:
+    """The read scope a request sent, once this caller may read under it; every route taking a `read_scope` reads it here.
+
+    Who may name a read scope depends on who the caller is. With `AUTH_MODE=none` the caller is the host itself, a
+    trusted proxy forwarding the user's identity (the hosted plane, which sends the organization it serves) or a
+    single tenant, and with the shared `api_key` it is one tenant: a sent value is taken as it is. With `AUTH_MODE=jwt`
+    the caller reaches this runner directly, its token's `user_id` its only identity, so it reads only under that id: a
+    sent scope must be the id or lie under it, else the request is refused with a 403 `ReadScopeForbidden` before
+    anything is read, so no caller reads another's blobs or runs under another's scope. A run's storage scope must lie
+    under its read scope, so it is bound with it.
+    """
+    if requested is None:
+        return None
+    match get_auth_mode():
+        case AuthMode.NONE | AuthMode.API_KEY:
+            return requested
+        case AuthMode.JWT:
+            caller_id = get_request_user_id(request)
+            if requested.split("/")[0] != caller_id:
+                raise_forbidden(
+                    message=f"The read_scope {requested!r} does not lie under this caller's own id, the only scope its token may read.",
+                    error_type=ErrorType.READ_SCOPE_FORBIDDEN,
+                )
+            return requested
+
+
 def _resolve_read_scope(request: Request, *, requested: str | None) -> str | None:
     """What this run may read — the host's value, the caller's own id, or everything.
 
-    A sent value is the host's and is taken as it is. The fallback mirrors the storage
-    scope's (design DR2 of the read-scope campaign): when the field is omitted, a deployment
-    that identifies its callers scopes the run to the caller's own id, which is also where
-    their writes land by default, and a single-tenant deployment runs unscoped. That default
-    bounds a caller only where the host writes the body: a caller reaching a `jwt`
-    deployment directly can send any read scope, as it can send any storage scope. On a
-    multi-tenant host that forgets the field, the fallback fails closed: the host's own
-    storage scope lies under no caller's id, so the run is refused rather than reading
-    across tenants.
+    A sent value is the host's, taken once this caller may read under it (`bound_read_scope`). The fallback mirrors the
+    storage scope's (design DR2 of the read-scope campaign): when the field is omitted, a deployment that identifies its
+    callers scopes the run to the caller's own id, which is also where their writes land by default, and a
+    single-tenant deployment runs unscoped. On a multi-tenant host that forgets the field, the fallback fails closed:
+    the host's own storage scope lies under no caller's id, so the run is refused rather than reading across tenants.
     """
     if requested is not None:
-        return requested
+        return bound_read_scope(request, requested=requested)
     user: RequestUser | None = getattr(request.state, "user", None)
     return user.user_id if user else None
 
@@ -160,10 +183,11 @@ def resolve_blob_scope(request: Request, *, read_scope: str | None) -> str:
     """The scope of the blob store a request's hash entries resolve in: its read scope, else the caller's own id.
 
     The same scope a run reads under, so a hash entry resolves only in the caller's own blobs, never across tenants:
-    a multi-tenant host sends the organization it serves as the read scope, and a deployment that identifies no caller
-    is one tenant, `single-tenant`.
+    a multi-tenant host sends the organization it serves as the read scope, a caller holding its own token may name
+    only a scope under its id (`bound_read_scope`), and a deployment that identifies no caller is one tenant,
+    `single-tenant`.
     """
-    return read_scope or get_request_user_id(request)
+    return bound_read_scope(request, requested=read_scope) or get_request_user_id(request)
 
 
 class _RunScopes(NamedTuple):
@@ -520,6 +544,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             created_at=created_at,
             state=RunState.STARTED,
             workflow_id=dispatch_ack.workflow_id,
+            # The crate the job was built from, which a host records beside the run's tree digest.
+            crate_fingerprint=pipe_job.job_metadata.run_metadata.crate_fingerprint,
         )
 
     async def _ensure_served_method_requirements_met(self) -> None:
@@ -584,6 +610,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         `method_dir` is the directory a method tree the request carries was written as, by `files` or
         fetched by `method_ref`: the validation loads it whole, with this runner's `methods_dirs`, in
         place of `mthds_contents`, which is then None, and its refusals are the method's verdict.
+
+        This runner's `read_scope` is handed to the validator as the scope of the blob store a dispatched
+        arm hands the method's trees to its worker through. The route builds a validating runner with the
+        `read_scope` its request names, `None` when it names none, and never with the caller's id a run
+        would fall back to: nothing lists or erases what a validation would leave under that prefix.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (403) here, before any validator dispatch / library load. Mirrors start().
@@ -618,6 +649,8 @@ class ApiRunner(PipelexMTHDSProtocol):
             graph_pipe_code=graph_pipe_code,
             # The files submitted with the contents, which the validation's dry run reads, the template check included.
             submitted_files=self.submitted_files,
+            # The scope the host named, under which a dispatched validator's worker reads the method's trees.
+            read_scope=self.read_scope,
         )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical

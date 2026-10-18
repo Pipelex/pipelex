@@ -148,9 +148,23 @@ PROBLEM_403_RUN_POLICY: dict[str, Any] = _problem(
     "A deployment-policy refusal: `OrchestrationModeOverrideForbidden` — the request asked for an "
     "`orchestration_mode` this deployment does not allow overriding per request "
     "(`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox` — the method (a bundle, or a "
-    "fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted. The refusal of a "
-    "method whose Python declares structure classes, `pipelex.deployment.python_structures_refused`, is a 422 instead, "
-    "since the method's author changes it.",
+    "fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted; or "
+    "`ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the caller's "
+    "own `user_id`. The refusal of a method whose Python declares structure classes, "
+    "`pipelex.deployment.python_structures_refused`, is a 422 instead, since the method's author changes it.",
+)
+
+PROBLEM_403_METHOD_PYTHON_POLICY: dict[str, Any] = _problem(
+    "The run routes' Python policy, applied to the method's tree: `CustomCodeRequiresSandbox` — the method (sent in "
+    "`files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted. "
+    "Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the "
+    "caller's own `user_id`. The refusal of a method whose Python declares structure classes, "
+    "`pipelex.deployment.python_structures_refused`, is a 422 instead, since the method's author changes it.",
+)
+
+PROBLEM_403_READ_SCOPE: dict[str, Any] = _problem(
+    "`ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the caller's "
+    "own `user_id`, the only scope its token may read.",
 )
 
 PROBLEM_409_DUPLICATE_RUN: dict[str, Any] = _problem(
@@ -198,9 +212,9 @@ PROBLEM_403_BLOB_UPLOAD: dict[str, Any] = _problem(
 )
 
 PROBLEM_501_METHOD_REF: dict[str, Any] = _problem(
-    "`MethodRefNotSupported` — the request selected its closure by a **registry-form** `method_ref` (not a "
+    "`MethodRefNotSupported` — the request selected its method by a **registry-form** `method_ref` (not a "
     "`github.com/...` address), and no server-side method registry resolves those yet. Use an address-form reference "
-    "or submit inline `files[]` instead.",
+    "or send the method's tree in `files` instead.",
 )
 
 

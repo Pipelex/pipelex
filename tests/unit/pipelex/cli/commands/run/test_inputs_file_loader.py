@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from pipelex.cli.commands.run._inputs_file_loader import (
+    load_inputs_dict_from_bytes,
     load_inputs_dict_from_path,  # pyright: ignore[reportPrivateUsage]
 )
 from pipelex.core.stuffs.date_content import DateContent
@@ -77,6 +78,19 @@ class TestInputsFileLoader:
 
         with pytest.raises(JsonTypeError):
             load_inputs_dict_from_path(inputs_file)
+
+    @pytest.mark.parametrize(
+        ("file_name", "data", "expected"),
+        [
+            ("inputs.toml", b'topic = "cats"\nwhen = 2026-10-17\n', {"topic": "cats", "when": DateContent(date=datetime.date(2026, 10, 17))}),
+            ("inputs.json", b'{"topic": "dogs"}', {"topic": "dogs"}),
+        ],
+    )
+    def test_bytes_load_as_the_file_would_without_opening_the_path(
+        self, tmp_path: Path, file_name: str, data: bytes, expected: dict[str, object]
+    ) -> None:
+        """The path only selects the parser: the bytes are parsed, and the path, which does not exist here, is never opened."""
+        assert load_inputs_dict_from_bytes(data=data, path=tmp_path / "absent" / file_name) == expected
 
     def test_missing_file_raises_file_not_found(self, tmp_path: Path) -> None:
         """A missing file raises FileNotFoundError for both formats."""

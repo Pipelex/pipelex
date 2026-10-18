@@ -191,9 +191,10 @@ class PipelexBundleBlueprint(BaseModel):
 
     @field_validator("main_pipe", mode="before")
     @classmethod
-    def validate_main_pipe_syntax(cls, main_pipe: str | None, info: ValidationInfo) -> str | None:
-        if main_pipe is None:
-            return None
+    def validate_main_pipe_syntax(cls, main_pipe: Any, info: ValidationInfo) -> Any:
+        if not isinstance(main_pipe, str):
+            # None, or a value of another type, which the field's own type refuses as a located error.
+            return main_pipe
         if not is_pipe_code_valid(main_pipe):
             msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
             stripped = _strippable_same_domain_pipe_code(main_pipe, domain=cast("str | None", info.data.get("domain")))

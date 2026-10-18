@@ -1,9 +1,19 @@
-"""Resolve in-memory MTHDS contents into a normalized library crate (presentation-free core).
+"""Resolve a method into a normalized library crate, for a host (presentation-free core).
 
-This is the contents-based sibling of the CLI's directory-based crate loader
-(`pipelex.cli.commands.crate_loading.load_normalized_crate`): a host that already holds the
-bundle contents as strings — an HTTP API, an SDK — resolves them here without touching the
-filesystem. Same engine, same verdict vocabulary: an invalid library raises the one shared
+Two entry points, the host-facing siblings of the CLI's directory-based crate loader
+(`pipelex.cli.commands.crate_loading.load_normalized_crate`):
+
+- ``resolve_crate_from_method_dir`` resolves a method's tree a host received and wrote out, such as the tree the API
+  server's crate routes write from a request's `files` map: the directory is loaded as the caller's own, the way
+  ``validate_bundle`` loads a ``method_dir``, so its other files are the ones its steps read, and, while the host holds
+  the tree in ``WRITTEN_METHOD_TREES``, its bundles are named by their tree paths.
+- ``resolve_crate_from_contents`` resolves bundle contents held as strings, without touching the filesystem.
+
+Both resolve statically from what the caller sent: a package the method calls by its address is loaded only from the
+packages shipped with it, and one nothing shipped is refused with ``unshipped_address_dependency_message``, never looked
+up among the methods installed on the host or fetched.
+
+Same engine, same verdict vocabulary: an invalid library raises the one shared
 ``ValidateBundleError`` (carrying the structured ``validation_errors`` items every surface
 renders), so a resolve verdict cannot drift from a validate verdict.
 
@@ -12,7 +22,9 @@ no dry-run sweep, matching `pipelex resolve` — the crate is emitted from a loa
 validated** library (D6), and runnability is `validate`'s vocabulary, not resolution's.
 """
 
-from collections.abc import Mapping
+from collections.abc import Generator, Mapping
+from contextlib import contextmanager
+from pathlib import Path
 from typing import Sequence
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
@@ -27,8 +39,10 @@ from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
@@ -74,11 +88,7 @@ def resolve_crate_from_contents(
         raise PipelexUnexpectedError(msg)
 
     library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    success = False
-    prev_library_id = get_current_library_id_or_none()
-    try:
-        set_current_library(library_id=library_id)
+    with _resolving_library() as library_id:
         content_sources: list[str | None] = list(mthds_sources) if mthds_sources is not None else [None] * len(mthds_contents)
         with translate_to_validate_bundle_error():
             # Contents belong to no method tree: their steps read only the files submitted with them.
@@ -100,13 +110,73 @@ def resolve_crate_from_contents(
             # None crate is an internal invariant break, not a verdict on the caller's method.
             msg = "library crate unavailable after a successful bundle load"
             raise PipelexUnexpectedError(msg)
-        normalized = normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+        return normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+
+
+def resolve_crate_from_method_dir(*, method_dir: Path, methods_dirs: Sequence[Path] | None = None) -> LibraryCrate:
+    """Load, validate, and normalize the library crate of a method's tree written out to a directory.
+
+    The directory is loaded alone, as the caller's own library directory, exactly as ``validate_bundle`` loads a
+    ``method_dir``: every bundle of the tree is loaded as a member of it, every other file is one a step may read, such
+    as a ``PipeDocGen`` template, and ``methods_dirs``, laid out like ``.mthds/methods/``, hold the packages the caller
+    ships with the method, the only place an address-based reference is looked up: one they do not answer is refused,
+    since a static resolution reads no method installed on the host and fetches nothing. A tree the host holds in
+    ``WRITTEN_METHOD_TREES`` (``pipelex.libraries.written_trees``) has its bundles named by their tree paths, so the
+    diagnostics and the crate's ``source_map`` never name a path on the host. Resolution is static, as for contents: no
+    dry run.
+
+    Same **loaded-on-success contract** as ``resolve_crate_from_contents``: on success the library is left loaded and
+    current, and the host owns its teardown; on failure it is torn down here and the caller's prior current library is
+    restored.
+
+    Args:
+        method_dir: The directory of the method's tree, written as the tree holds it.
+        methods_dirs: Directories laid out like ``.mthds/methods/``, holding the packages the method ships.
+
+    Returns:
+        The normalized library crate (fully qualified, natives materialized, fingerprint set).
+
+    Raises:
+        ValidateBundleError: the produced negative verdict — the method holds no bundle, calls a package by its address
+            that nothing shipped, or its library could not be parsed, loaded, or validated; carries the structured
+            validation-error items.
+        CrateNormalizationError: internal invariant violation in the normalization pass — deliberately not translated.
+    """
+    library_manager = get_library_manager()
+    with _resolving_library() as library_id:
+        with translate_to_validate_bundle_error():
+            library_manager.load_libraries(
+                library_id=library_id,
+                library_dirs=[method_dir],
+                methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
+                address_dependency_sources=AddressDependencySources.SHIPPED,
+            )
+        crate = library_manager.get_crate(library_id)
+        if crate is None:
+            # A tree without a bundle loads nothing: the caller's method, so the caller's verdict, as `validate_bundle`
+            # says of a method directory with no bundle.
+            msg = "The method holds no .mthds bundle, so it has no crate to resolve."
+            raise ValidateBundleError(message=msg)
+        return normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
+
+
+@contextmanager
+def _resolving_library() -> Generator[str, None, None]:
+    """Open a library and make it current for one resolution, which leaves it loaded on success.
+
+    On failure the library is torn down and the caller's prior current library restored, FIRST, so the guarantee holds
+    even when the teardown raises (the same ordering as ``validate_bundle``).
+    """
+    library_manager = get_library_manager()
+    library_id, _ = library_manager.open_library()
+    prev_library_id = get_current_library_id_or_none()
+    success = False
+    try:
+        set_current_library(library_id=library_id)
+        yield library_id
         success = True
-        return normalized
     finally:
         if not success:
-            # Restore the caller's outer current-library FIRST so the safety guarantee holds
-            # even when teardown raises (same ordering rationale as validate_bundle).
             if prev_library_id is not None:
                 set_current_library(library_id=prev_library_id)
             else:
@@ -122,10 +192,7 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
                 continue
             alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref)
             if QualifiedRef.is_address_based_alias(alias):
-                msg = (
-                    f"In-memory resolve cannot load address-based dependency '{alias}' from the host filesystem; "
-                    "provide the dependency contents in the request or use directory-based resolution."
-                )
+                msg = unshipped_address_dependency_message(alias=alias)
                 raise (
                     PipeLibraryError(msg)
                     .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
