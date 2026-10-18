@@ -507,7 +507,9 @@ class TestProblemViews:
                 assert built.errors is not None
                 assert built.errors[0].as_wire() == ProblemViewsTestData.UNKNOWN_CODE_ITEM
 
-    @pytest.mark.builds_problems_without_required_params(reason="gives a required parameter a value the wire refuses, which is dropped, to check that it is")
+    @pytest.mark.builds_problems_without_required_params(
+        reason="gives a required parameter a value the wire refuses, which is dropped, to check that it is"
+    )
     @pytest.mark.parametrize(
         "unreadable",
         [
