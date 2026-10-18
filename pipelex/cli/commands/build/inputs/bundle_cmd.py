@@ -6,15 +6,19 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
-from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
+from pipelex.cli.commands.bundle_path_resolver import resolve_build_bundle_target
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat
-from pipelex.pipeline.default_file_names import DEFAULT_BUNDLE_FILE_NAME
+
+_NOT_A_BUNDLE_HINT = (
+    "  To generate inputs for a pipe by code, use: pipelex build inputs pipe <code>\n"
+    "  To use a bundle, pass a .mthds file or directory: pipelex build inputs bundle <path>"
+)
 
 
 def build_inputs_bundle_cmd(
     path: Annotated[
         str,
-        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+        typer.Argument(help="Path to a .mthds bundle file, or a method's folder, which starts at its entry pipe unless --pipe names one"),
     ],
     pipe: Annotated[
         str | None,
@@ -51,61 +55,18 @@ def build_inputs_bundle_cmd(
         pipelex build inputs bundle pipeline_01/ --format toml
         pipelex build inputs bundle pipeline_01/ --explicit
     """
-    target_path = Path(path)
-    bundle_path: Path
     output_path_path = Path(output_path) if output_path else None
-
-    if target_path.is_dir():
-        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
-        if bundle_file.is_file():
-            bundle_path = bundle_file
-        else:
-            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
-            if len(mthds_files) == 0:
-                typer.secho(
-                    f"Failed to run: no .mthds bundle file found in directory '{path}'",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-            if len(mthds_files) > 1:
-                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
-                typer.secho(
-                    f"Failed to run: multiple .mthds files found in '{path}' ({mthds_names}) "
-                    f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                    f"Pass the .mthds file directly, e.g.: pipelex build inputs bundle {target_path / mthds_files[0].name}",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-            bundle_path = mthds_files[0]
-
-        # Add directory as library dir
-        target_dir_str = str(target_path)
-        if library_dir is None:
-            library_dir = [target_dir_str]
-        elif target_dir_str not in library_dir:
-            library_dir = [target_dir_str, *library_dir]
-
-        typer.echo(f"Auto-detected bundle: {bundle_path}")
-
-    elif is_pipelex_file(target_path):
-        bundle_path = target_path
-    else:
-        typer.secho(
-            f"Failed to run: '{path}' is not a .mthds file or directory.\n"
-            f"  To generate inputs for a pipe by code, use: pipelex build inputs pipe <code>\n"
-            f"  To use a bundle, pass a .mthds file or directory: pipelex build inputs bundle <path>",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
+    # A folder is read as its method tree and acts on the pipe a run of it starts at, as `run bundle` reads it.
+    target = resolve_build_bundle_target(
+        path=path, library_dir=library_dir, pipe_override=pipe, command="build inputs", not_a_bundle_hint=_NOT_A_BUNDLE_HINT
+    )
 
     execute_generate_inputs(
-        pipe_code=pipe,
-        bundle_path=bundle_path,
+        pipe_code=target.pipe_code,
+        bundle_path=target.bundle_path,
         output_path=output_path_path,
-        library_dir=library_dir,
+        default_output_dir=target.default_output_dir,
+        library_dir=target.library_dir,
         template_format=template_format,
         explicit=explicit,
     )

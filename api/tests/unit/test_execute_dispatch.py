@@ -80,6 +80,7 @@ class _StubOrchestrator:
                 "pipe_code": pipe_job.pipe.code,
                 "delivery_assignment": delivery_assignment,
                 "request_id": pipe_job.job_metadata.run_metadata.request_id,
+                "crate_fingerprint": pipe_job.job_metadata.run_metadata.crate_fingerprint,
             }
         )
         # A completed run always delivers a main stuff (pipelex invariant; enforced by
@@ -181,6 +182,22 @@ class TestExecuteDispatch:
         # synchronous, so no delivery target (never the caller's to choose).
         assert len(stub.calls) == 1
         assert stub.calls[0]["delivery_assignment"] is None
+
+    def test_the_result_reports_the_crate_the_job_was_built_from(self, mocker: MockerFixture) -> None:
+        """`crate_fingerprint` is the fingerprint the dispatched job's `RunMetadata` carries, which a host records."""
+        stub = _StubOrchestrator()
+        _register_stub(mocker, mode="direct", stub=stub)
+
+        response = _build_client().post(
+            "/v1/execute",
+            json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "inputs": {"text": "hello"}},
+        )
+
+        assert response.status_code == 200, response.text
+        fingerprint = stub.calls[0]["crate_fingerprint"]
+        assert isinstance(fingerprint, str)
+        assert fingerprint
+        assert response.json()["crate_fingerprint"] == fingerprint
 
     def test_graph_spec_survives_strict_false_rehydration(self, mocker: MockerFixture) -> None:
         """A non-None graph_spec round-trips through the helper's `strict=False` reverse of `model_dump(mode="json")`.

@@ -1,4 +1,6 @@
+import base64
 import importlib.util
+from asyncio import sleep
 from typing import Any
 from urllib.parse import quote
 
@@ -24,6 +26,24 @@ def _code_for_s3_client_error(*, s3_error_code: str) -> ErrorCode:
     if s3_error_code in _S3_CREDENTIAL_REFUSAL_CODES:
         return PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED
     return PipelexErrorCode.STORAGE_UNAVAILABLE
+
+
+# What S3 answers a conditional write whose condition fails: `412` when the key holds an object (`If-None-Match: *`),
+# `409 ConditionalRequestConflict` when another conditional write to the same key is in flight.
+_PRECONDITION_FAILED_CODES = frozenset({"412", "PreconditionFailed"})
+_CONDITIONAL_CONFLICT_CODES = frozenset({"409", "ConditionalRequestConflict"})
+# S3 documents a `409` on a conditional write as retryable: the write is sent again after each of these pauses, and a
+# conflict still answered after the last one is an error.
+CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS: tuple[float, ...] = (0.1, 0.25, 0.5, 1.0, 2.0)
+
+
+def checksum_sha256_header_value(*, sha256_hex: str) -> str:
+    """The `x-amz-checksum-sha256` value of bytes whose SHA-256 is `sha256_hex`: the raw digest in base64.
+
+    Raises:
+        ValueError: `sha256_hex` is not hexadecimal.
+    """
+    return base64.b64encode(bytes.fromhex(sha256_hex)).decode("ascii")
 
 
 class S3StorageProvider(StorageProviderAbstract):
@@ -295,6 +315,79 @@ class S3StorageProvider(StorageProviderAbstract):
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
+
+    @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Create an S3 object unless one exists at the key, with S3 checking the condition and the checksum.
+
+        The PUT carries `If-None-Match: *`, so S3 writes it only when the key holds no object and answers `412`
+        otherwise, which is the key already held. With a checksum, it carries the SHA-256 as `x-amz-checksum-sha256`,
+        and S3 refuses a body whose hash differs, so the object holds exactly the bytes the checksum names.
+
+        A `409 ConditionalRequestConflict` means another operation on the key, a conditional write or a delete, was
+        in flight, and S3's answer to it is to retry: the PUT is sent again after a short pause, a bounded number of
+        times. The PUT is retried rather than the key looked up, because the other operation may leave the key free,
+        when it fails or deletes, and a retried PUT tells every outcome apart: a `412` is the object the other write
+        created, held, and a success is this call's own object.
+
+        Args:
+            data: The bytes to store, already checked against their checksum.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the object.
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, sent for S3 to check, or None.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageS3Error: If the S3 operation fails (any other ClientError, a `409` still answered once the retries
+                ran out, or a BotoCoreError).
+        """
+        from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            BotoCoreError,
+            ClientError,
+        )
+
+        session = self._get_session()
+        client_config = self._get_client_config()
+
+        put_params: dict[str, Any] = {
+            "Bucket": self._bucket_name,
+            "Key": key,
+            "Body": data,
+            "IfNoneMatch": "*",
+        }
+        if content_type:
+            put_params["ContentType"] = content_type
+        if checksum_sha256_hex is not None:
+            put_params["ChecksumSHA256"] = checksum_sha256_header_value(sha256_hex=checksum_sha256_hex)
+
+        retry_delays = CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS
+        conditional_conflict: ClientError | None = None
+        async with session.create_client(**client_config) as client:
+            for index_attempt in range(len(retry_delays) + 1):
+                if index_attempt > 0:
+                    await sleep(retry_delays[index_attempt - 1])
+                try:
+                    await client.put_object(**put_params)
+                except client.exceptions.NoSuchBucket as exc:
+                    msg = f"Bucket not found in S3: '{self._bucket_name}'"
+                    raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
+                except ClientError as exc:
+                    error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
+                    if error_code in _PRECONDITION_FAILED_CODES:
+                        return False
+                    if error_code not in _CONDITIONAL_CONFLICT_CODES:
+                        msg = f"S3 ClientError ({error_code}) for key '{key}'"
+                        raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
+                    conditional_conflict = exc
+                    continue
+                except BotoCoreError as exc:
+                    msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
+                    raise StorageS3Error(msg) from exc
+                return True
+        msg = f"S3 ClientError (ConditionalRequestConflict) for key '{key}' on each of {len(retry_delays) + 1} attempts"
+        raise StorageS3Error(msg) from conditional_conflict
 
     def _make_public_url(self, key: str) -> str:
         """Build an unsigned public URL for an S3 object, on the same host and path a signed one would name.

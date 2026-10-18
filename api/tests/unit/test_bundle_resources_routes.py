@@ -2,7 +2,8 @@
 
 Pins the wire across the routes that load inline contents: the files reach the step that reads them, a file no step
 names is refused as the request's fault, a path that cannot name a file inside the bundle is refused, and the count,
-per-file and total limits are enforced before anything loads. A run handed to an orchestrator other than `direct` names
+per-file and total limits are enforced before anything loads. Beside a method tree, which the crate routes take alone,
+the files join the tree instead. A run handed to an orchestrator other than `direct` names
 the tree of the submitted files by its digest, in its crate and its run metadata, and carries none of their bytes.
 
 The hermetic API environment has no document engine, so the step's engine is stubbed and the dry print's template check
@@ -183,16 +184,16 @@ def _zip_b64(files: Mapping[str, str | bytes]) -> str:
 
 
 def _contents_body(*, route: str, resources: dict[str, str], mthds: str = _INVOICE_MTHDS) -> dict[str, Any]:
-    """The route's body carrying the bundle inline with the given resources: the crate routes take `files[]`."""
+    """The route's body carrying the bundle with the given resources: inline where the route takes contents, else as a tree."""
     match route:
         case "/v1/validate":
             return {"mthds_contents": [mthds], "resources": resources}
         case "/v1/execute":
             return {"mthds_contents": [mthds], "inputs": _INVOICE_INPUTS, "resources": resources}
         case "/v1/codegen":
-            return {"files": [{"content": mthds, "source": "invoicing.mthds"}], "kind": "types", "target": "ts-zod", "resources": resources}
+            return {"files": {"invoicing.mthds": mthds}, "kind": "types", "target": "ts-zod", "resources": resources}
         case _:
-            return {"files": [{"content": mthds, "source": "invoicing.mthds"}], "resources": resources}
+            return {"files": {"invoicing.mthds": mthds}, "resources": resources}
 
 
 def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
@@ -255,7 +256,7 @@ class TestBundleResourcesRoutes:
         assert response.status_code == 200, response.text
         _assert_the_verdict_names_the_missing_file(verdict=response.json(), file=_TEMPLATE_PATH, reason="not_in_tree")
 
-    @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute", "/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute"])
     def test_a_file_no_step_names_is_refused_on_every_route_that_loads_contents(self, mocker: MockerFixture, route: str) -> None:
         _stub_the_document_engine(mocker)
         body = _contents_body(route=route, resources={_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES), "templates/logo.png": _b64(b"png")})
@@ -331,25 +332,37 @@ class TestBundleResourcesRoutes:
         else:
             assert "method_ref" in _assert_problem(response, status=422, error_type="ValidationError")
 
-    @pytest.mark.parametrize("route", ["/v1/validate", "/v1/pipe-io"])
-    def test_a_source_label_naming_a_file_on_the_runner_never_reads_beside_it(self, mocker: MockerFixture, tmp_path: Path, route: str) -> None:
+    def test_a_source_label_naming_a_file_on_the_runner_never_reads_beside_it(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A caller's absolute source naming a real bundle file, with the template file beside it, reaches nothing on the runner's disk."""
         read_templates = _stub_the_document_engine(mocker)
         bundle_path = tmp_path / "invoicing.mthds"
         bundle_path.write_text(_INVOICE_MTHDS, encoding="utf-8")
         (tmp_path / "templates").mkdir()
         (tmp_path / "templates" / "invoice.docx").write_bytes(_TEMPLATE_BYTES)
-        body: dict[str, Any] = (
-            {"mthds_contents": [_INVOICE_MTHDS], "mthds_sources": [str(bundle_path)]}
-            if route == "/v1/validate"
-            else {"files": [{"content": _INVOICE_MTHDS, "source": str(bundle_path)}]}
-        )
+        body: dict[str, Any] = {"mthds_contents": [_INVOICE_MTHDS], "mthds_sources": [str(bundle_path)]}
 
-        response = _build_client().post(route, json=body)
+        response = _build_client().post("/v1/validate", json=body)
 
         assert response.status_code == 200, response.text
         _assert_the_verdict_names_the_missing_file(verdict=response.json(), file=_TEMPLATE_PATH, reason="not_in_tree")
         assert read_templates == []
+
+    @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    @pytest.mark.parametrize("sends_the_template", [True, False])
+    def test_resources_join_the_tree_a_crate_route_reads(self, mocker: MockerFixture, route: str, sends_the_template: bool) -> None:
+        """Beside a tree, `resources` are files of it: the step's template is found there, and a file no step names is kept."""
+        _stub_the_document_engine(mocker)
+        resources = {"notes/readme.txt": _b64(b"kept beside the method")}
+        if sends_the_template:
+            resources[_TEMPLATE_PATH] = _b64(_TEMPLATE_BYTES)
+
+        response = _build_client().post(route, json=_contents_body(route=route, resources=resources))
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is sends_the_template, response.text
+        if not sends_the_template:
+            assert _TEMPLATE_PATH in json.dumps(verdict["validation_errors"])
 
     def test_resources_with_no_bundle_to_read_them_are_refused(self) -> None:
         response = _build_client().post("/v1/execute", json={"pipe_code": "print_invoice", "resources": {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)}})

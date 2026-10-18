@@ -29,7 +29,7 @@ from pipelex.hosted.exceptions import (
     HostedRunPollingError,
 )
 from pipelex.hosted.hosted_run import HostedRunRequest, run_hosted
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedVersions
+from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -57,6 +57,10 @@ def _valid_report(*, pipe_ref: str, descriptor_json: str) -> PipeIOValidReport:
         pending_signatures=[],
         is_runnable=True,
     )
+
+
+def _invalid_report(*, verdict_json: str) -> CrateInvalidReport:
+    return CrateInvalidReport.model_validate_json(verdict_json)
 
 
 def _pipe_io_refusal(*, problem_json: str) -> ApiResponseError:
@@ -259,6 +263,31 @@ class TestHostedRun:
         error = exc_info.value
         assert "address-based dependencies" in error.message
         assert isinstance(error.__cause__, ApiResponseError)
+        assert error.user_action is not None
+        assert "https URL" in error.user_action.detail
+        assert "Fix the method" not in error.user_action.detail
+        client.upload_file.assert_not_awaited()
+        client.start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_local_file_for_a_method_whose_address_dependency_was_not_shipped_is_refused_naming_it(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """pipe-io loads only the packages shipped with the method, and answers a call into another one with its verdict.
+
+        The run route fetches that dependency, so the method is not at fault: the error names the dependency and the URL
+        to use, never the verdict's advice to fix the method.
+        """
+        (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY))
+        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+
+        with pytest.raises(HostedLocalFileUploadUnavailableError) as exc_info:
+            await run_hosted(client=client, request=request)
+
+        error = exc_info.value
+        assert "address-based dependencies" in error.message
+        assert "github.com/mthds/scoring-lib/scoring" in error.message
         assert error.user_action is not None
         assert "https URL" in error.user_action.detail
         assert "Fix the method" not in error.user_action.detail

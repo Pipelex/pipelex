@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 FIX_BUNDLE_MODULE = "pipelex.cli.agent_cli.commands.fix.bundle_cmd"
+JUDGED_TARGET_MODULE = "pipelex.cli.judged_target"
 
 
 def _applied_fix(source: str) -> SuggestedFix:
@@ -49,7 +50,7 @@ def _patch_command(
 ) -> None:
     mocker.patch(f"{FIX_BUNDLE_MODULE}.make_pipelex_for_agent_cli")
     mocker.patch(f"{FIX_BUNDLE_MODULE}.Pipelex.teardown_if_needed")
-    mocker.patch(f"{FIX_BUNDLE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
+    mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
 
 
 class TestFixFormat:
