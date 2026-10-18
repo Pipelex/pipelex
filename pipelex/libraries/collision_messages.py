@@ -55,7 +55,8 @@ def duplicate_ref_items(
 
     Each item names the declaration by its qualified ref and the conflict, the parameters of ``method.name_conflict``,
     and is located on its bundle and its declaration, so the verdict names both bundles: the one that declared it first
-    and the one whose declaration was refused. A ref declared twice in one bundle is one item.
+    and the one whose declaration was refused. A ref declared twice in one bundle is one item; two declarations whose
+    bundles are unknown are two, since nothing shows them to be one bundle's.
 
     Args:
         ref_kind: The kind of the declaration.
@@ -69,14 +70,17 @@ def duplicate_ref_items(
     noun = ref_kind.capitalize()
     domain_code, _, code = ref.rpartition(".")
     params = {"name": ref, "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}
-    sources = [incoming_source] if existing_source == incoming_source else [incoming_source, existing_source]
+    is_one_bundle = existing_source is not None and existing_source == incoming_source
+    # Each declaration with the bundle of the other, the refused declaration's first.
+    located_declarations = [(incoming_source, existing_source), (existing_source, incoming_source)]
+    if is_one_bundle:
+        located_declarations = located_declarations[:1]
     items: list[PipelexBundleBlueprintValidationErrorData] = []
-    for source in sources:
-        other_sources = [other for other in (existing_source, incoming_source) if other != source]
-        if other_sources:
-            message = f"{noun} '{ref}' is declared here and in '{other_sources[0] or 'unknown'}'."
-        else:
+    for source, other_source in located_declarations:
+        if is_one_bundle:
             message = f"{noun} '{ref}' is declared twice in this bundle."
+        else:
+            message = f"{noun} '{ref}' is declared here and in '{other_source or 'unknown'}'."
         match ref_kind:
             case DeclarationKind.CONCEPT:
                 items.append(
