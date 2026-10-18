@@ -7,6 +7,7 @@ the old `{"detail": {...}}` envelope, and never FastAPI's default `{"detail": [.
 The envelope is what is under test, never the route that produced it.
 """
 
+import json
 from collections.abc import Iterator
 from importlib.metadata import PackageNotFoundError
 
@@ -16,6 +17,7 @@ from fastapi.testclient import TestClient
 from pytest_mock import MockerFixture
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from pipelex_api import json_body
 from pipelex_api.exception_handlers import AnsweredErrorBarrier, register_exception_handlers
 from pipelex_api.limits import MAX_REQUEST_BODY_BYTES
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, request_body_size_middleware
@@ -152,6 +154,40 @@ class TestErrorResponses:
         # marker, so the route observes an empty body. Without the fix, the route
         # would see all 4096 bytes.
         assert bytes_seen_by_route == [0]
+
+    def test_a_typed_route_reads_its_body_through_the_size_limit(self, mocker: MockerFixture):
+        # `JsonBodyRoute` reads a typed body itself, before FastAPI: it must read it through the body-size middleware's
+        # counting `receive`, once, so a body streamed past the limit is refused as too large rather than parsed.
+        mocker.patch("pipelex_api.middleware.MAX_REQUEST_BODY_BYTES", 1024)
+        parse_spy = mocker.spy(json_body, "parse_typed_json_body")
+        runner_spy = mocker.patch("pipelex_api.routes.pipelex.validate.ApiRunner")
+        over_limit = json.dumps({"mthds_contents": ["x" * 4096]}).encode("utf-8")
+
+        def streaming_body() -> Iterator[bytes]:
+            yield over_limit
+
+        response = _build_client().post("/v1/validate", content=streaming_body(), headers={"content-type": "application/json"})
+
+        body = assert_problem(response, status=413, code="request.too_large")
+        assert body["params"] == {"limit": 1024, "size": len(over_limit)}
+        # The route read the end of stream the middleware put in place of the over-limit chunk, never the body itself.
+        parse_spy.assert_not_called()
+        runner_spy.assert_not_called()
+
+    def test_a_typed_route_reads_a_body_within_the_limit_once(self, mocker: MockerFixture):
+        # The same route reading the same middleware's `receive` gets the whole body when it is within the limit, and
+        # FastAPI validates the value the route parsed, reading the body no second time.
+        mocker.patch("pipelex_api.middleware.MAX_REQUEST_BODY_BYTES", 1024)
+        parse_spy = mocker.spy(json_body, "parse_typed_json_body")
+
+        def streaming_body() -> Iterator[bytes]:
+            yield b'{"mthds_contents": []}'
+
+        response = _build_client().post("/v1/validate", content=streaming_body(), headers={"content-type": "application/json"})
+
+        # An empty list is refused by the route's model, which proves the model read the parsed body.
+        assert_problem(response, status=422, code="request.invalid")
+        assert parse_spy.call_count == 1
 
     def test_a_misconfigured_runner_is_a_runtime_problem(self, mocker: MockerFixture):
         # Absent package metadata: the installation, not the request, is at fault.
