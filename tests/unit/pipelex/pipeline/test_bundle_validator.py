@@ -332,6 +332,9 @@ class TestBundleValidator:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("is_met_before_the_run", [True, False], ids=["mock_input_build", "pipe_run"])
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises an SSRF refusal built in the test, without the input and the rule its raise sites name"
+    )
     async def test_a_refusal_the_sweep_meets_is_logged_once(
         self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, is_met_before_the_run: bool
     ) -> None:
