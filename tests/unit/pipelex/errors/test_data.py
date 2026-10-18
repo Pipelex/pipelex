@@ -18,6 +18,13 @@ class ProblemViewsTestData:
 
     # A problem whose code no registry of this process holds, as a newer worker or a stored record carries it, built in
     # the operator's view: its step and its diagnostics name a file of the host that a caller must never read.
+    # A suggested fix as an item carries it on the wire.
+    RENAME_MODEL_FIX: ClassVar[dict[str, Any]] = {
+        "fix_code": "rename-model",
+        "description": "Replace model 'gpt-5.1' of pipe 'write' with 'gpt-5', its one close match in the model deck",
+        "safety": "unsafe",
+        "ops": [{"kind": "set_key", "table_path": ["pipe", "write"], "key": "model", "value": "gpt-5"}],
+    }
     PRIVATE_HOST_FILE: ClassVar[str] = "/srv/pipelex/private/settings.toml"
     UNKNOWN_OPERATOR_CODE: ClassVar[str] = "pipelex.config.future_setting_missing"
     UNKNOWN_METHOD_CODE: ClassVar[str] = "method.future_fault"

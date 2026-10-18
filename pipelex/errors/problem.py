@@ -32,7 +32,8 @@ operator-only never rides ``params`` in any view; it renders into the operator's
 
 **One fault, no list.** ``errors`` lists the faults of a problem with several. A problem built with a single item
 restating its own code has one fault, so the item is folded into it: its parameters and its location fill those the
-problem lacks, and the list is left out (:func:`make_problem`).
+problem lacks, and the list is left out (:func:`make_problem`). An item carrying suggestions or a suggested fix fills
+them too but stays the list's one item, since only an item has members for those.
 
 **The bound.** Every text a raise site, a provider or a caller wrote is capped at :data:`MAX_PROBLEM_TEXT_LENGTH`
 characters, keeping its head, which names the fault: an exception's message, a provider's message and every text
@@ -496,6 +497,11 @@ def _lone_item_restating(*, code: ErrorCode, errors: list[ProblemItem] | None) -
     return lone_item if lone_item.code == code else None
 
 
+def _item_carries_remedies(*, item: ProblemItem) -> bool:
+    """Whether an item carries suggestions or a suggested fix, which a problem has no member for: only the item keeps them."""
+    return bool(item.suggestions) or item.suggested_fix is not None
+
+
 def _caller_step_is_actor_step(*, domain: ProblemDomain) -> bool:
     """Whether the caller reads the actor's step: for every domain but ``operator``, whose actor is whoever runs the runtime."""
     match domain:
@@ -554,7 +560,8 @@ def make_problem(
         errors: One item per fault, for a refusal with several; an item is the same in every view, so a parameter its
             code declares operator-only is taken out of it (:func:`item_for_every_view`). A single item restating
             ``code`` is the problem's one fault, so it is folded into the problem: its parameters and its location fill
-            those the problem lacks, and the problem carries no ``errors``.
+            those the problem lacks, and the problem carries no ``errors``, unless the item carries suggestions or a
+            suggested fix, which only an item has members for: it then stays the list's one item.
         retry_after: The delay before a retry, kept only when the code's verdict is ``yes`` and the delay is a finite,
             non-negative number of seconds: a provider can send any value, ``inf`` included, and the wire takes none of those.
         pipeline_run_id: The run the error belongs to.
@@ -570,7 +577,8 @@ def make_problem(
         params = {**(lone_fault.params.as_wire() if lone_fault.params is not None else {}), **(params or {})}
         if lone_fault.location is not None:
             location = lone_fault.location if location is None else merge_locations(base=lone_fault.location, override=location)
-        errors = None
+        if not _item_carries_remedies(item=lone_fault):
+            errors = None
     given = accepted_params(code=code, params=params or {})
     _report_missing_required_params(code=code, params=given, part="problem")
     caller_params = {name: value for name, value in given.items() if name not in spec.operator_only_params}

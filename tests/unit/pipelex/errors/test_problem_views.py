@@ -21,7 +21,9 @@ from pipelex.errors.problem import (
     PipelexProblem,
     ProblemView,
     caller_view_of,
+    make_location,
     make_problem,
+    make_problem_item,
     problem_metadata,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -139,6 +141,9 @@ class TestProblemViews:
         assert caller.params.as_wire() == {"pipe": "summarize", "template": "prompt", "finding": "unexpected '}'"}
         assert "the raise site's own words" not in str(caller.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a problem lacking its parameters, to check that its sentence falls back on the title"
+    )
     def test_a_template_missing_a_parameter_falls_back_on_the_title(self, caplog: pytest.LogCaptureFixture) -> None:
         """Rendering is total: a missing parameter costs the sentence, never the problem, and the raise site is logged."""
         error = _TemplateRefusalError("no parameters given")
@@ -163,6 +168,9 @@ class TestProblemViews:
         assert "secret value" not in str(caller.to_wire())
         assert any(record.getMessage() == "An error gives a parameter its code does not declare" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds every code's problem with no parameter, to check that none holds a null member"
+    )
     @pytest.mark.parametrize("view", list(ProblemView))
     def test_no_problem_holds_a_null_member(self, view: ProblemView) -> None:
         """Every code, in every view, with no parameter given: no member at any depth is written as null."""
@@ -238,6 +246,7 @@ class TestProblemViews:
         assert caller.next_step.detail == "Report this to whoever runs the runtime."
         assert "sk-" not in str(caller.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds every code's problem with no parameter, to check the steps alone")
     def test_no_step_points_at_text_a_caller_cannot_see(self) -> None:
         """Every step of every code stands alone: none sends its reader to an error message the view may not show."""
         for code in _all_codes():
@@ -270,6 +279,7 @@ class TestProblemViews:
         assert operator.diagnostics.provider is not None
         assert operator.diagnostics.provider.message == ProblemViewsTestData.GATEWAY_PROVIDER_TEXT
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds problems with a retry delay alone, to check which delays are kept")
     def test_an_unusable_retry_delay_is_left_out(self) -> None:
         for delay in (float("inf"), float("nan"), -1.0):
             problem = make_problem(code=CoreCode.PROVIDER_RATE_LIMITED, view=ProblemView.CALLER, retry_after=delay)
@@ -278,6 +288,9 @@ class TestProblemViews:
         # A code whose verdict is not `yes` never carries a delay.
         assert make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, retry_after=3.5).retry_after is None
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="gives parameters the code refuses as a whole, which are dropped, to check that they are"
+    )
     def test_a_parameter_set_refused_as_a_whole_is_dropped(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
         """A refusal naming no parameter, a model-level one, drops them all: the error is reported, never replaced."""
         spec = error_code_spec(CoreCode.METHOD_TEMPLATE_INVALID).model_copy(
@@ -295,6 +308,7 @@ class TestProblemViews:
         assert problem.detail == spec.title
         assert any(record.getMessage() == "An error gives parameters its code refuses as a whole" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(reason="gives a parameter the wire refuses, which is dropped, to check that it is")
     def test_a_parameter_the_wire_refuses_is_dropped(self, mocker: MockerFixture) -> None:
         """A value the code's model takes but the problem's own `params` model refuses never fails the problem."""
         spec = error_code_spec(CoreCode.REQUEST_BLOBS_MISSING).model_copy(update={"params_model": _LaxBlobsParams})
@@ -380,6 +394,7 @@ class TestProblemViews:
             assert problem.errors[0].as_wire() == {"code": "runtime.misconfigured", "detail": expected_detail, "location": {"pipe": "summarize"}}
             assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(reason="gives a parameter the wire refuses, which is dropped, to check that it is")
     @pytest.mark.parametrize(
         ("code", "params"),
         [
@@ -400,3 +415,37 @@ class TestProblemViews:
         assert "inf" not in problem.detail
         json.dumps(problem.to_wire(), allow_nan=False)
         assert any(record.getMessage() == "An error gives a parameter of the wrong type for its code" for record in caplog.records)
+
+    def test_a_lone_item_restating_its_problem_is_folded_into_it(self) -> None:
+        """One fault carries no list: the item's parameters and location become the problem's."""
+        item = make_problem_item(
+            code=CoreCode.MODEL_UNKNOWN,
+            params={"model": "gpt-5.1", "model_type": "llm", "suggestions": []},
+            location=make_location(pipe="write", field="model"),
+        )
+
+        problem = make_problem(code=CoreCode.MODEL_UNKNOWN, view=ProblemView.CALLER, errors=[item])
+
+        assert problem.errors is None
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"model": "gpt-5.1", "model_type": "llm", "suggestions": []}
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "write", "field": "model"}
+
+    def test_a_lone_item_carrying_suggestions_or_a_fix_stays_listed(self) -> None:
+        """A problem has no member for an item's suggestions or its fix: the item gives the problem its facts and stays listed."""
+        item = make_problem_item(
+            code=CoreCode.MODEL_UNKNOWN,
+            params={"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5"]},
+            location=make_location(pipe="write", field="model"),
+            suggestions=["gpt-5"],
+            suggested_fix=ProblemViewsTestData.RENAME_MODEL_FIX,
+        )
+
+        wire = make_problem(code=CoreCode.MODEL_UNKNOWN, view=ProblemView.CALLER, errors=[item]).to_wire()
+
+        assert wire["params"] == {"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5"]}
+        assert wire["location"] == {"pipe": "write", "field": "model"}
+        (listed,) = wire["errors"]
+        assert listed["suggestions"] == ["gpt-5"]
+        assert listed["suggested_fix"] == ProblemViewsTestData.RENAME_MODEL_FIX
