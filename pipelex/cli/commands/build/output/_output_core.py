@@ -37,21 +37,23 @@ async def _generate_output_core(
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
+    default_output_dir: Path | None = None,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
     library_dir: list[str] | None = None,
 ) -> None:
-    """Core logic for generating output representation for a pipe."""
-    # Set up library so pipes can be found
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dir)
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+    """Core logic for generating output representation for a pipe.
 
+    The file goes to ``output_path``, else into ``default_output_dir`` (a method's folder), else beside the bundle,
+    else under ``results/``.
+    """
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path)
+            # The bundle loads in one library with the method's whole folder and the -L directories, as `run bundle`
+            # loads it, so a concept or a pipe it takes from a sibling bundle of its method resolves.
+            validate_bundle_result = await validate_bundle(
+                mthds_file_path=bundle_path,
+                library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None,
+            )
             bundle_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
                 main_pipe_code = bundle_blueprint.main_pipe
@@ -72,9 +74,17 @@ async def _generate_output_core(
         except ValidateBundleError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-    elif not pipe_code:
-        typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
-        raise typer.Exit(1)
+    else:
+        # No bundle: the pipe named is found in the library directories, a method's folder among them.
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        effective_dirs, _ = resolve_library_dirs(library_dir)
+        if effective_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        if not pipe_code:
+            typer.secho("Failed to build output: no pipe code specified", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
 
     try:
         the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
@@ -94,17 +104,17 @@ async def _generate_output_core(
         raise typer.Exit(1) from exc
 
     final_output_path: Path
+    output_dir = default_output_dir or (bundle_path.parent if bundle_path else None)
     if output_path:
         final_output_path = output_path
-    elif bundle_path:
-        bundle_dir = Path(bundle_path).parent
+    elif output_dir:
         match output_format:
             case ConceptRepresentationFormat.JSON:
-                final_output_path = bundle_dir / "output.json"
+                final_output_path = output_dir / "output.json"
             case ConceptRepresentationFormat.PYTHON:
-                final_output_path = bundle_dir / "output.py"
+                final_output_path = output_dir / "output.py"
             case ConceptRepresentationFormat.SCHEMA:
-                final_output_path = bundle_dir / "output_schema.json"
+                final_output_path = output_dir / "output_schema.json"
     else:
         match output_format:
             case ConceptRepresentationFormat.JSON:
@@ -130,6 +140,7 @@ def execute_generate_output(
     bundle_path: Path | None,
     output_path: Path | None,
     output_format: ConceptRepresentationFormat,
+    default_output_dir: Path | None = None,
     library_dir: list[str] | None = None,
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_OUTPUT}",
 ) -> None:
@@ -144,7 +155,12 @@ def execute_generate_output(
 
             asyncio.run(
                 _generate_output_core(
-                    pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path, output_format=output_format, library_dir=library_dir
+                    pipe_code=pipe_code,
+                    bundle_path=bundle_path,
+                    output_path=output_path,
+                    default_output_dir=default_output_dir,
+                    output_format=output_format,
+                    library_dir=library_dir,
                 )
             )
 

@@ -4,7 +4,8 @@ A sender about to send a method by hash first asks which of its files' bytes thi
 missing ones to the targets the answer names (`pipelex_api.routes.blob_upload`), then sends the request with hash
 entries. The blobs live in the runner's blob store (`pipelex_api.blob_store`), under the caller's scope: the request's
 `read_scope` query parameter when a multi-tenant host sends one for the organization it serves, else the caller's own
-id, the scope a run's hash entries are resolved in.
+id, the scope a run's hash entries are resolved in. A caller holding its own token (`AUTH_MODE=jwt`) may name only a
+scope under its own id (`bound_read_scope`).
 """
 
 from typing import Annotated
@@ -19,6 +20,7 @@ from pipelex_api.error_types import ErrorType
 from pipelex_api.errors import raise_validation_error
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_tree_request import ensure_within_tree_limits
+from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE
 from pipelex_api.routes.pipelex.pipeline import resolve_blob_scope
 
 router = APIRouter(tags=["blobs"], route_class=JsonBodyRoute)
@@ -89,6 +91,7 @@ def _unique_blobs(*, blobs: list[BlobRef]) -> dict[str, int]:
     "/blobs/missing",
     summary="Which of these blobs the runner lacks, and where to upload each.",
     openapi_extra={"x-mthds-protocol": True},
+    responses={403: PROBLEM_403_READ_SCOPE},
 )
 async def find_missing_blobs(
     request: Request,
@@ -105,8 +108,10 @@ async def find_missing_blobs(
 ) -> MissingBlobsResult:
     """List every blob of the request this runner does not hold, each with a signed upload target (MTHDS Protocol).
 
-    A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; bytes held
-    under a hash at another size are listed, for the upload to write over. When the request names the tree the blobs
+    A blob it holds at the stated size is left out, and an empty list means there is nothing to upload; a hash held
+    at another size than the one stated is listed too, and its upload tells the two cases apart: bytes of the size held
+    change nothing, and bytes of another size mean the object held is damaged, a 500 `BlobStoreCorrupted`, since nothing
+    writes over a blob. When the request names the tree the blobs
     make up by its `digest`, this runner has recorded that tree as held in full, which it does only after reading every
     file of a tree a request sent, and every listed blob is a file of that tree, the answer is an empty list at once.
     A hash given twice with different sizes is a 422 `BlobMismatch`, and a blob or a set of blobs past this runner's

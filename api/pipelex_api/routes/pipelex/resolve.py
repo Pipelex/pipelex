@@ -1,21 +1,16 @@
 import json
 from typing import Annotated, Any, Literal, Union
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
+from pipelex.base_exceptions import ErrorReport
 from pipelex.codegen.crate_encoding import encode_crate_json
-from pipelex.pipeline.exceptions import ValidateBundleError
 from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
-from pipelex_api.routes.pipelex.crate_ops import (
-    CrateInvalidReport,
-    invalid_crate_report_response,
-    resolve_requested_crate,
-    teardown_current_library,
-)
-from pipelex_api.schemas.models import MthdsFilesRequest
+from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
+from pipelex_api.routes.pipelex.crate_ops import CrateInvalidReport, ResolvedMethod, invalid_crate_report_response, project_resolved_method
+from pipelex_api.schemas.models import MethodTreeRequest
 
 router = APIRouter(tags=["resolve"], route_class=JsonBodyRoute)
 
@@ -42,40 +37,43 @@ ResolveResponse = Annotated[Union[ResolveValidReport, CrateInvalidReport], Field
 @router.post(
     "/resolve",
     response_model=ResolveResponse,
-    # On top of the composite router's shared 401/413/422/500: the `method_ref` closure selector
-    # the envelope accepts but no server-side method registry resolves yet.
-    responses={404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_METHOD_REF},
+    # On top of the composite router's shared 401/413/422/500: the Python policy's 403s, the
+    # `method_ref` package-not-found 404, and the registry-form `method_ref` no registry resolves yet.
+    responses={403: PROBLEM_403_METHOD_PYTHON_POLICY, 404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_METHOD_REF},
     # NOT tagged `x-mthds-protocol`: the MTHDS Protocol is the five operations `execute`, `start`,
     # `validate`, `models`, `version`. `/resolve` is a Pipelex API extension. The *artifact* it
     # emits — the normalized library crate — IS standard-owned (the MTHDS Library Crate Format), so
     # its wire fields stay brand-neutral; the route that serves it over HTTP is ours.
 )
-async def resolve_mthds(request_data: MthdsFilesRequest) -> JSONResponse:
-    """Resolve a library closure into its normalized crate (Pipelex API extension).
+async def resolve_mthds(request: Request, request_data: MethodTreeRequest) -> JSONResponse:
+    """Resolve a method into its normalized crate (Pipelex API extension).
 
-    Resolution is a first-class language operation alongside validation: assemble the closure from
-    the inline `files[]`, load + statically validate the library, and emit the **normalized
-    library crate** (fully qualified refs, refinement flattened, natives materialized, fingerprint
-    set) — the artifact shape the MTHDS standard specifies as the Library Crate Format. It runs no
-    dry-run sweep — runnability is `/validate`'s vocabulary.
+    Resolution is a first-class language operation alongside validation: read the method's tree
+    (`files`, or the package a `method_ref` fetches) exactly as `/validate` reads it, load + statically
+    validate it as the caller's own library, and emit the **normalized library crate** (fully
+    qualified refs, refinement flattened, natives materialized, fingerprint set) — the artifact
+    shape the MTHDS standard specifies as the Library Crate Format. It runs no dry-run sweep —
+    runnability is `/validate`'s vocabulary.
 
     Response contract (the `/validate` discipline):
 
     - **Valid verdict (200, `is_valid: true`):** the crate on the valid arm.
     - **Invalid verdict (200, `is_valid: false`):** the library could not be parsed, loaded, or
       validated — `validation_errors[]` from pipelex's one shared builder.
-    - **No verdict (non-2xx):** a malformed request body (neither/both closure selectors, an
-      over-limit file) is a request-shape 422; `method_ref` is a 501 until server-side method
-      registry resolution exists; auth is 401/403; server fault is 5xx. All RFC 7807
-      `application/problem+json` via the global handlers.
+    - **No verdict (non-2xx):** a malformed request body (neither or both method selectors) is a
+      request-shape 422; a `files` map that is not a method tree is a 422 `InvalidMethodFiles`, and
+      hash entries this runner does not hold one 422 `MissingBlobs`; custom Python on a deployment
+      that is not sandbox-hosted, or a Python structure class, is a 403; a registry-form `method_ref`
+      is a 501 until server-side method registry resolution exists; auth is 401/403; server fault is
+      5xx. All RFC 7807 `application/problem+json` via the global handlers.
     """
-    try:
-        # Whole-closure route: no pipe is selected here, so the manifest's `main_pipe` beside the crate is unused.
-        crate = (await resolve_requested_crate(request_data)).crate
-    except ValidateBundleError as validate_error:
-        return invalid_crate_report_response(validate_error.to_error_report())
-    try:
-        report = ResolveValidReport(crate=json.loads(encode_crate_json(crate)))
-        return JSONResponse(content=report.model_dump(mode="json", by_alias=True))
-    finally:
-        teardown_current_library()
+    outcome = await project_resolved_method(request=request, request_data=request_data, project=_crate_response)
+    if isinstance(outcome, ErrorReport):
+        return invalid_crate_report_response(outcome)
+    return outcome
+
+
+def _crate_response(resolution: ResolvedMethod) -> JSONResponse:
+    """The valid arm carrying the resolved method's crate, encoded in the worker thread that resolved it."""
+    report = ResolveValidReport(crate=json.loads(encode_crate_json(resolution.crate)))
+    return JSONResponse(content=report.model_dump(mode="json", by_alias=True))

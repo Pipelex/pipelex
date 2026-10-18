@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 FIX_CORE_MODULE = "pipelex.cli.commands.fix._fix_core"
+JUDGED_TARGET_MODULE = "pipelex.cli.judged_target"
 
 
 def _applied_fix(source: str | None) -> SuggestedFix:
@@ -74,7 +75,7 @@ class TestFixBundleHumanFormat:
         mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{FIX_CORE_MODULE}.tag")
-        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=result))
 
     def _bundle_file(self, tmp_path: Path) -> Path:
         bundle_path = tmp_path / "bundle.mthds"
@@ -269,7 +270,7 @@ class TestFixBundleHumanFormat:
         mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{FIX_CORE_MODULE}.tag")
-        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
 
         with pytest.raises(typer.Exit) as exc_info:
             fix_bundle_cmd(path=str(bundle_path), diff=True)
@@ -325,7 +326,7 @@ class TestFixBundleHumanFormat:
         mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{FIX_CORE_MODULE}.tag")
-        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=FileNotFoundError("missing")))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=FileNotFoundError("missing")))
 
         with pytest.raises(typer.Exit) as exc_info:
             fix_bundle_cmd(path=str(bundle_path))
@@ -340,7 +341,7 @@ class TestFixBundleHumanFormat:
         mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{FIX_CORE_MODULE}.tag")
-        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=RuntimeError("boom")))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=RuntimeError("boom")))
 
         with pytest.raises(typer.Exit) as exc_info:
             fix_bundle_cmd(path=str(bundle_path))
@@ -387,7 +388,7 @@ class TestFixBundleHumanFormat:
         mocker.patch(f"{FIX_CORE_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{FIX_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{FIX_CORE_MODULE}.tag")
-        mocker.patch(f"{FIX_CORE_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_bundle_file", new=mocker.AsyncMock(side_effect=fake_loop))
 
         fix_bundle_cmd(path=str(bundle_path), diff=True)
 
@@ -402,6 +403,38 @@ class TestFixBundleHumanFormat:
         assert "Files that would be written:" in output
         assert f"- {bundle_path.resolve()}" in output
         assert "Files written:" not in output.replace("Files that would be written:", "")
+
+    def test_diff_preview_of_a_subfolder_mirrors_its_tree_root(self, tmp_path: Path, mocker: MockerFixture, console: Console) -> None:
+        """The preview copies the tree from its `METHODS.toml` down, and finds the folder handed over inside that copy."""
+        root_dir = tmp_path / "method"
+        sub_dir = root_dir / "sub"
+        sub_dir.mkdir(parents=True)
+        (root_dir / "METHODS.toml").write_text('[package]\naddress = "github.com/pipelex-tests/preview"\nversion = "1.0.0"\n', encoding="utf-8")
+        sibling_path = root_dir / "ideas.mthds"
+        sibling_path.write_text('domain = "fix_human_format"\n', encoding="utf-8")
+        (sub_dir / "summary.mthds").write_text('domain = "fix_human_format_sub"\n', encoding="utf-8")
+        seen: dict[str, object] = {}
+        seen_library_dirs: list[list[Path]] = []
+
+        def fake_loop(*, method_dir: Path, library_dirs: list[Path], writable_library_dirs: list[Path], **_kwargs: object) -> FixBundleResult:
+            (root_copy,) = writable_library_dirs
+            seen["method_dir_in_root_copy"] = method_dir == root_copy / "sub"
+            seen_library_dirs.append(library_dirs)
+            seen["manifest_copied"] = (root_copy / "METHODS.toml").is_file()
+            seen["sibling_copied"] = (root_copy / "ideas.mthds").is_file()
+            return FixBundleResult(is_valid=True, iterations=0, fixes_applied=[], remaining_errors=[], pending_signatures=[], is_runnable=True)
+
+        self._patch_command(mocker, result=FixBundleResult(is_valid=True, iterations=0, fixes_applied=[], remaining_errors=[], is_runnable=True))
+        mocker.patch(f"{JUDGED_TARGET_MODULE}.fix_method_folder", new=mocker.AsyncMock(side_effect=fake_loop))
+
+        fix_bundle_cmd(path=str(sub_dir), diff=True)
+
+        assert seen["method_dir_in_root_copy"] is True
+        assert seen["manifest_copied"] is True
+        assert seen["sibling_copied"] is True
+        (library_dirs,) = seen_library_dirs
+        assert [library_dir.name for library_dir in library_dirs] == ["sub"]
+        assert "✅ Bundle already valid" in console.export_text()
 
     def test_select_and_ignore_are_mutually_exclusive(self, capsys: pytest.CaptureFixture[str]) -> None:
         with pytest.raises(typer.Exit) as exc_info:

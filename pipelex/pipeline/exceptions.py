@@ -527,15 +527,20 @@ class PipelineInputUrlMissingError(PipelineInputContentError):
 
 
 class MethodEntryError(PipelexError):
-    """Raised when a method run with no pipe named has no single pipe to start at.
+    """Raised when a method has no single pipe to start at, or no single bundle defining the pipe named.
 
-    The rule is the MTHDS protocol's for a run that names no `pipe_code`: the manifest's `main_pipe` when the method's
-    tree holds a `METHODS.toml` at its root, else the one `main_pipe` its bundles declare. A manifest declaring none or
-    a pipe no bundle defines, and a method with no manifest whose bundles declare none or several, are refused, with
-    the bundles named by their tree paths. The method is the caller's own, so the message is theirs to read.
+    The rule is the MTHDS protocol's for a run that names no `pipe_code`, and every command acting on one pipe of a
+    method's folder applies it to settle that pipe, `run`, `inputs` and `build` among them: the manifest's `main_pipe`
+    when the method's tree holds a `METHODS.toml` at its root, else the one `main_pipe` its bundles declare. A manifest
+    declaring none or a pipe no bundle defines, and a method with no manifest whose bundles declare none or several, are
+    refused, with the bundles named by their tree paths. So is a pipe named for a command that acts on the bundle
+    defining it, when no single bundle of the method defines that pipe. A command judging the whole method, such as
+    `validate`, needs no pipe to start at and is not refused. The method is the caller's own, so the message is theirs
+    to read.
 
     Its code defaults to ``request.pipe_unspecified``, a run naming no pipe of a method that declares no
     ``main_pipe``; the raise site chooses ``request.pipe_ambiguous`` when several pipes qualify,
+    ``request.pipe_not_found`` when no bundle of the method defines the pipe the caller named,
     ``method.pipe_unresolved`` when the manifest names a pipe no bundle defines, ``method.package_invalid``
     when the manifest cannot be read, ``method.syntax`` when a bundle is not text, and ``method.invalid`` when
     the method holds no bundle at all.
@@ -545,6 +550,7 @@ class MethodEntryError(PipelexError):
         default=CoreCode.REQUEST_PIPE_UNSPECIFIED,
         others=(
             CoreCode.REQUEST_PIPE_AMBIGUOUS,
+            CoreCode.REQUEST_PIPE_NOT_FOUND,
             CoreCode.METHOD_PIPE_UNRESOLVED,
             CoreCode.METHOD_PACKAGE_INVALID,
             CoreCode.METHOD_SYNTAX,
@@ -553,6 +559,6 @@ class MethodEntryError(PipelexError):
     )
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
-        detail="Name the pipe to run, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",
+        detail="Name the pipe, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",
     )
     _authors_caller_facing_message = True

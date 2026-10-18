@@ -487,9 +487,12 @@ class PluginRegistrar:
         A method's ``requirements.txt`` is checked when it loads against the packages its PipeFunc steps will run
         with. In ``direct`` mode those are this interpreter's own; in any other mode they are the sandbox's, which this
         process cannot read, so the plugin contributing that mode's executor states them here (e.g. our Daytona plugin,
-        from the lock of the Daytona sandbox snapshot). ``factory`` is called with the pipe_func config each time a
-        method declaring requirements loads, never here, and answers ``None`` when it cannot state the offer; a mode
-        with no offer, or a ``None`` answer, meets no requirement. Fail-loud on a duplicate mode, naming both plugins.
+        from the lock of the Daytona sandbox snapshot). ``factory`` is called with a ``PipeFuncPackageOfferRequest``,
+        the pipe_func config and one method's requirements, each time a method declaring requirements loads, never
+        here. It answers the offer meeting them, such as an environment built for them, a ``PipeFuncPackageRefusal``
+        carrying its reason when no environment of the mode holds them, or ``None`` when it cannot state the offer; a
+        mode with no offer, or a ``None`` answer, meets no requirement. The call is synchronous, so a factory caches its
+        answers by the requirements. Fail-loud on a duplicate mode, naming both plugins.
         """
         self._require_interpreter_layer(capability=f"pipe_func package offer {mode}")
         self._add(
