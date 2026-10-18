@@ -404,7 +404,7 @@ def accepted_params(*, code: ErrorCode, params: Mapping[str, Any]) -> dict[str, 
         if value is None:
             continue
         if name not in spec.param_names:
-            _warn(message="An error gives a parameter its code does not declare", fields={"error.code": code, "param": name})
+            _warn(message=UNDECLARED_PARAM_MESSAGE, fields={"error.code": code, "param": name})
             continue
         param_value = _param_value(value=value)
         if not _holds_only_finite_numbers(value=param_value):
@@ -448,6 +448,9 @@ def _drop_refused_params(*, accepted: dict[str, Any], params_model: type[BaseMod
             )
             accepted.clear()
 
+
+UNDECLARED_PARAM_MESSAGE = "An error gives a parameter its code does not declare"
+"""The message of the warning logged when an error gives a parameter its code does not declare, which is dropped."""
 
 MISSING_REQUIRED_PARAMS_MESSAGE = "A problem lacks a parameter its code requires"
 """The message of the warning logged when a problem or an item is built without a parameter its code requires.

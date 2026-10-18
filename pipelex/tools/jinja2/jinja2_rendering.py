@@ -54,12 +54,13 @@ def _add_to_templating_context(
     templating_context: dict[str, Any], *, jinja2_context_key: Jinja2ContextKey, value: Any, template_owner: TemplateOwner
 ) -> None:
     if jinja2_context_key in templating_context:
-        # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default.
+        # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default,
+        # which names the key; on Pipelex's own, `runtime.unexpected`, which declares no parameter.
         msg = f"Jinja2 context key '{jinja2_context_key}' already in templating_context"
-        raise _coded_by_owner(
-            error=Jinja2StuffError(msg).with_params(name=jinja2_context_key, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION),
-            template_owner=template_owner,
-        )
+        refusal = Jinja2StuffError(msg)
+        if template_owner == TemplateOwner.METHOD:
+            refusal = refusal.with_params(name=jinja2_context_key, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+        raise _coded_by_owner(error=refusal, template_owner=template_owner)
     templating_context[jinja2_context_key] = value
 
 

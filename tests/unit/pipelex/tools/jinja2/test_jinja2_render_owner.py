@@ -6,7 +6,7 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict, ProblemDomain
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.problem import ProblemView
+from pipelex.errors.problem import UNDECLARED_PARAM_MESSAGE, ProblemView
 from pipelex.tools.jinja2.exceptions import (
     Jinja2StuffError,
     Jinja2TemplateBudgetError,
@@ -207,6 +207,17 @@ class TestJinja2RenderOwner:
         assert caller.code == CoreCode.METHOD_NAME_CONFLICT
         assert caller.params is not None
         assert caller.params.as_wire() == {"name": Jinja2ContextKey.TAG_STYLE, "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_reserved_key_on_a_pipelex_template_gives_no_parameter_its_code_lacks(self, caplog: pytest.LogCaptureFixture) -> None:
+        error = await _render_failure(
+            "{{ lane }}", template_owner=TemplateOwner.PIPELEX, context={"lane": "express", Jinja2ContextKey.TAG_STYLE: "taken"}
+        )
+
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+
+        assert operator.code == CoreCode.RUNTIME_UNEXPECTED
+        assert [record for record in caplog.records if record.getMessage() == UNDECLARED_PARAM_MESSAGE] == []
 
     @pytest.mark.builds_problems_without_required_params(
         reason="renders outside any pipe, whose failure location names the pipe; the render does not know which field of the pipe the template is"
