@@ -1,9 +1,10 @@
+import hashlib
 from abc import ABC, abstractmethod
 from typing import ClassVar, Literal, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError
+from pipelex.tools.storage.exceptions import StorageChecksumMismatchError, StorageFileNotFoundError, StorageInvalidKeyError
 
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
 
@@ -188,6 +189,68 @@ class StorageProviderAbstract(ABC):
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data.
         """
+
+    async def store_if_absent(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None = None,
+        checksum_sha256_hex: str | None = None,
+    ) -> bool:
+        """Create the object at `key` unless one exists there, and say whether this call created it.
+
+        A create-only write never replaces an object: when the key already holds one, nothing is written and the
+        answer is False, whatever the object holds. With `checksum_sha256_hex`, the bytes are checked against it
+        before anything is sent, and a provider whose storage can check a write's checksum itself sends it too, so
+        the object holds exactly the bytes the checksum names (S3 checks `x-amz-checksum-sha256` against the body it
+        receives).
+
+        Args:
+            data: The bytes to store.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the data (used by cloud providers).
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, or None to send no checksum.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageInvalidKeyError: If the key includes the scheme prefix.
+            StorageChecksumMismatchError: If `data` does not hash to `checksum_sha256_hex`.
+        """
+        self._add_scheme(key)
+        if checksum_sha256_hex is not None and hashlib.sha256(data).hexdigest() != checksum_sha256_hex:
+            msg = f"The bytes to store under '{key}' do not hash to the checksum {checksum_sha256_hex!r} given with them: nothing was stored."
+            raise StorageChecksumMismatchError(msg)
+        return await self._store_if_absent(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
+
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Create the object at `key` unless one exists there, by key.
+
+        This default looks the key up, then stores the bytes when it holds nothing, so a provider that cannot make a
+        write conditional, an external storage plugin included, keeps working. Two writers racing on one free key may
+        then both store, the last one winning, which a caller keying objects by their content, as a blob store does,
+        can live with, since both write the same bytes. A provider that can create an object only when its key is
+        free overrides it, and a storage that refuses unconditional writes needs that override.
+
+        Args:
+            data: The bytes to store, already checked against `checksum_sha256_hex`.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the data.
+            checksum_sha256_hex: The SHA-256 of `data`, or None. This default sends it nowhere.
+
+        Returns:
+            True when this call stored the object, False when the key already held one.
+        """
+        # A plain store has nowhere to send a checksum: `store_if_absent` checked the bytes against it already.
+        _ = checksum_sha256_hex
+        try:
+            await self._load_size(key)
+        except StorageFileNotFoundError:
+            await self._store(data=data, key=key, content_type=content_type)
+            return True
+        return False
 
     @abstractmethod
     async def public_url(self, uri: str) -> str | None:

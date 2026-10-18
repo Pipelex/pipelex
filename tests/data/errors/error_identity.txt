@@ -18,6 +18,7 @@ AnthropicSDKUnsupportedError | runtime.unsupported
 AnthropicWorkerConfigurationError | pipelex.config.invalid
 ArgumentTypeError | runtime.unexpected
 AsyncExecutionNotEnabledError | runtime.unsupported
+AutoDetectedInputsFileError | request.invalid
 AwsCredentialsError | pipelex.config.credential_missing
 AzureCredentialsError | pipelex.config.credential_missing
 AzureWorkerConfigurationError | pipelex.config.invalid
@@ -90,6 +91,7 @@ DuplicatePipeFuncPackageOfferError | pipelex.plugin.conflict
 DuplicateSecretsProviderError | pipelex.plugin.conflict
 DuplicateServiceErrorCodeError | pipelex.plugin.conflict
 DuplicateStorageProviderError | pipelex.plugin.conflict
+EmptyMethodTreeError | method.invalid
 EntryPipeAmbiguousError | one of request.pipe_ambiguous, request.pipe_unspecified, method.ref_ambiguous
 EntryPipeNotFoundError | one of request.pipe_not_found, request.pipe_unspecified, method.pipe_unresolved
 EnvVarNotFoundError | pipelex.config.variable_missing
@@ -193,7 +195,8 @@ LogSinkVariableError | pipelex.config.variable_missing
 MarkdownFormattingBudgetError | input.too_large
 MarkdownParserDependencyError | pipelex.config.dependency_missing
 MethodDependencyFetchError | method.dependency_missing
-MethodEntryError | one of request.pipe_unspecified, method.ref_ambiguous, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
+MethodDependencyNotShippedError | method.dependency_missing
+MethodEntryError | one of request.pipe_unspecified, method.ref_ambiguous, request.pipe_ambiguous, request.pipe_not_found, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
 MethodFetchDisabledError | method.dependency_missing
 MethodFetchError | one of method.fetch_failed, pipelex.config.dependency_missing, method.not_found, method.package_invalid
 MethodFileUnavailableError | one of runtime.unexpected, method.resource_missing
@@ -336,6 +339,7 @@ SecretVersionUnsupportedError | runtime.unsupported
 SecurityError | abstract
 SemVerError | method.package_invalid
 SsrfBlockedError | one of security.input_url_refused, security.method_url_refused, security.provider_url_refused
+StorageChecksumMismatchError | runtime.unexpected
 StorageConfigError | pipelex.config.invalid
 StorageDeliveryError | inherits cause, else pipelex.storage.unavailable
 StorageError | abstract

@@ -124,6 +124,18 @@ def _tree_limit_reason(*, kind: TreeLimitKind) -> MethodPackageReason:
             return MethodPackageReason.FILE_TOO_LARGE
 
 
+class EmptyMethodTreeError(MethodTreeLoadError):
+    """Raised when a folder handed over as a method holds no bundle.
+
+    The membership rule keeps every file of the folder out of its method tree, which holds at least one, or none of the
+    files it keeps is a bundle. A command handed the folder finds nothing to judge and no pipe to start at: it reports
+    the folder as holding no bundle rather than as a method refused. It carries ``method.invalid``, as a method entry
+    holding no bundle does.
+    """
+
+    error_code = CoreCode.METHOD_INVALID
+
+
 class HostLibraryTreeError(PipelexError):
     """Raised when a library directory of this host, one a load reads beside a caller's bundles, cannot be read as a method tree.
 
@@ -165,8 +177,9 @@ class MethodRequirementsNotMetError(MethodRequirementsError):
     """Raised when the Python environment a method's PipeFunc steps run in does not satisfy its `requirements.txt`.
 
     Locally that environment is the interpreter Pipelex runs in, which Pipelex never installs anything into; on a
-    sandbox-hosted deployment it is the package set the deployment states for its PipeFunc sandbox, which is the whole
-    offer. The message names each requirement not met and why.
+    sandbox-hosted deployment it is the package set the deployment states its PipeFunc sandbox offers for the method's
+    requirements, which is the whole offer. The message names each requirement not met and why, or, when the deployment
+    refuses the requirements because no environment it can build holds them, carries the deployment's own reason.
     """
 
     error_code = CoreCode.METHOD_DEPENDENCY_MISSING

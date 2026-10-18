@@ -471,6 +471,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             created_at=created_at,
             state=RunState.COMPLETED,
             finished_at=finished_at,
+            crate_fingerprint=pipe_job.job_metadata.run_metadata.crate_fingerprint,
         )
 
     @override

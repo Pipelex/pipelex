@@ -877,3 +877,65 @@ inputs = { note = "Text" }
 output = "Tally"
 prompt = "Count the items in $note"
 """
+
+
+class ResolveBundleTestData:
+    """Bundles the host-facing resolve cores are pinned with."""
+
+    MAIN_MTHDS: ClassVar[str] = """\
+domain = "pipeline"
+description = "Pipeline domain"
+
+[concept.Report]
+description = "A report"
+structure.score = { description = "the score", type = "concept", concept_ref = "Score" }
+structure.label = { description = "a label", type = "concept", concept_ref = "Text" }
+
+[pipe.run_pipeline]
+type = "PipeSequence"
+description = "Run the pipeline"
+inputs = { doc = "Text" }
+output = "Score"
+steps = [{ pipe = "compute_score", result = "score" }]
+"""
+
+    STEPS_MTHDS: ClassVar[str] = """\
+domain = "pipeline"
+
+[concept.Score]
+description = "A score"
+structure = { value = { description = "the value", type = "number" } }
+
+[pipe.compute_score]
+type = "PipeLLM"
+description = "Compute a score"
+inputs = { doc = "Text" }
+output = "Score"
+model = "$quick-reasoning"
+prompt = "Compute a score from $doc"
+"""
+
+    # The pipe references a concept that no bundle declares — a load-stage library error, translated
+    # by the shared cascade into a ValidateBundleError carrying structured validation errors.
+    INVALID_MTHDS: ClassVar[str] = """\
+domain = "broken"
+description = "Broken domain"
+
+[pipe.bad_pipe]
+type = "PipeLLM"
+description = "References an undeclared concept"
+inputs = { doc = "NoSuchConcept" }
+output = "Text"
+prompt = "Do something with $doc"
+"""
+
+    ADDRESS_DEPENDENCY_MTHDS: ClassVar[str] = """\
+domain = "host"
+
+[pipe.run_host]
+type = "PipeSequence"
+description = "Run an installed dependency"
+inputs = { doc = "Text" }
+output = "Text"
+steps = [{ pipe = "github.com/org/pkg->remote.process", result = "result" }]
+"""

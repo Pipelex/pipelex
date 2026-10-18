@@ -3,10 +3,11 @@
 This router mounts OUTSIDE the authenticated composite `/v1` router, like `/v1/version`: the upload is authorized by
 the signed query of its target (`pipelex_api.blob_upload`), which only a caller who passed the deployment's
 authentication on `POST /v1/blobs/missing` holds, so a sender uploads with exactly the headers the target names. The
-bytes are written under the scope the signature binds, whole: a blob is never changed, so uploading bytes the runner
-already holds at their size succeeds and changes nothing, and only bytes held short, which a storage that does not
-publish writes whole could leave, are written over. Only `blobs/` is ever written here, never a tree's listing under `trees/`,
-so an uploaded file that happens to read as a listing proves nothing.
+bytes are written under the scope the signature binds, whole and create-only (`pipelex_api.blob_store`): a blob is never
+changed, so uploading bytes the runner already holds succeeds and changes nothing, and bytes of another size than the
+object held under their hash, which only damaged storage could hold, are a 500 `pipelex.storage.not_found` rather than
+written over it. Only `blobs/` is ever written here, never a tree's listing under `trees/`, so an uploaded file that
+happens to read as a listing proves nothing.
 """
 
 from typing import Annotated
@@ -19,7 +20,7 @@ from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.blob_upload import EXPIRES_PARAM, SCOPE_PARAM, SIGNATURE_PARAM, is_upload_authorized
 from pipelex_api.exceptions import RunnerAuthError, RunnerRequestError
 from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES
-from pipelex_api.openapi_responses import PROBLEM_403_BLOB_UPLOAD, PROBLEM_413, PROBLEM_422, PROBLEM_500
+from pipelex_api.openapi_responses import PROBLEM_403_BLOB_UPLOAD, PROBLEM_413, PROBLEM_422, PROBLEM_500_HELD_BLOBS
 
 router = APIRouter(tags=["blobs"])
 
@@ -35,7 +36,7 @@ SIGNED_UPLOAD_TARGET_REQUIREMENT = "signed_upload_target"
     summary="Upload one blob's bytes to the target POST /blobs/missing named.",
     # Mounted outside the composite `/v1` router, so it inherits none of its shared problem responses: it declares
     # the statuses it can produce itself, and never answers 401.
-    responses={403: PROBLEM_403_BLOB_UPLOAD, 413: PROBLEM_413, 422: PROBLEM_422, 500: PROBLEM_500},
+    responses={403: PROBLEM_403_BLOB_UPLOAD, 413: PROBLEM_413, 422: PROBLEM_422, 500: PROBLEM_500_HELD_BLOBS},
     openapi_extra={
         "x-mthds-protocol": True,
         "requestBody": {
@@ -57,7 +58,9 @@ async def put_blob(
     403 `auth.forbidden` whose `requirement` is a signed upload target, as is a query that is not one this runner signs,
     such as an expiry that is not a decimal integer; a body past `MAX_METHOD_TREE_FILE_KIB` a 413 `request.too_large`;
     and a body whose SHA-256 is not the path's a 422 `request.invalid` naming the body. A blob is never changed:
-    uploading bytes the runner already holds answers 204 and changes nothing.
+    uploading bytes the runner already holds answers 204 and changes nothing, and uploading bytes whose hash names an
+    object of another size, which only damaged storage could hold, is a 500 `pipelex.storage.not_found` that leaves the
+    object as it is.
     """
     if not is_upload_authorized(scope=scope, sha256=sha256, expires=expires, signature=signature) or scope is None:
         msg = "This upload carries no valid target: ask POST /v1/blobs/missing for one, and upload to the URL it names before it expires."

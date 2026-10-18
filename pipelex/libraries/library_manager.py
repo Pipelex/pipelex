@@ -71,7 +71,8 @@ from pipelex.libraries.method_trees import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.visibility_utils import make_visibility_checker
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
-from pipelex.methods.exceptions import MethodDependencyFetchError, MethodFetchDisabledError
+from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
+from pipelex.methods.exceptions import MethodDependencyFetchError, MethodDependencyNotShippedError, MethodFetchDisabledError
 from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
 from pipelex.mthds_parsing.exceptions import MthdsParserError
@@ -697,9 +698,12 @@ class LibraryManager(LibraryManagerAbstract):
         library_dirs: list[Path] | None = None,
         library_file_paths: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> list[PipeAbstract]:
         # `methods_dirs` are laid out like `.mthds/methods/` and hold the packages a caller ships with the method these
         # directories hold, searched first for an address-based reference of their bundles and never written.
+        # `address_dependency_sources` says whether a reference they do not answer may be looked up on this host and
+        # fetched (`ANYWHERE`), or is refused (`SHIPPED`, a static resolution of a caller's method).
         # Ensure libraries exist for this library_id
         if library_id not in self._libraries:
             msg = f"Trying to load a library that does not exist: '{library_id}'"
@@ -794,7 +798,12 @@ class LibraryManager(LibraryManagerAbstract):
                 "Loading the MTHDS files into the library",
                 fields={"library_id": library_id, "mthds_paths": [str(bundle_file.path) for bundle_file in bundle_files]},
             )
-            return self._load_mthds_files_into_library(library_id=library_id, bundle_files=bundle_files, methods_dirs=methods_dirs)
+            return self._load_mthds_files_into_library(
+                library_id=library_id,
+                bundle_files=bundle_files,
+                methods_dirs=methods_dirs,
+                address_dependency_sources=address_dependency_sources,
+            )
 
     @override
     def is_crate_loaded(self, *, library_id: str, fingerprint: str) -> bool:
@@ -1019,7 +1028,12 @@ class LibraryManager(LibraryManagerAbstract):
 
     @override
     def load_from_blueprints(
-        self, *, library_id: str, blueprints: list[PipelexBundleBlueprint], methods_dirs: list[Path] | None = None
+        self,
+        *,
+        library_id: str,
+        blueprints: list[PipelexBundleBlueprint],
+        methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
@@ -1032,6 +1046,8 @@ class LibraryManager(LibraryManagerAbstract):
             methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone, such as
                 the ones a request ships with its bundle. An address-based reference is looked up there first, and a
                 package found there is never installed anywhere.
+            address_dependency_sources: Whether a reference ``methods_dirs`` do not answer is looked up among the methods
+                installed on this host and fetched on a miss (``ANYWHERE``), or refused (``SHIPPED``).
 
         Returns:
             List of all pipes that were loaded
@@ -1078,6 +1094,7 @@ class LibraryManager(LibraryManagerAbstract):
                 library_id=library_id,
                 blueprints=blueprints,
                 methods_dirs=methods_dirs,
+                address_dependency_sources=address_dependency_sources,
             )
 
             # Build the crate (merges, qualifies, detects duplicates)
@@ -1295,7 +1312,12 @@ class LibraryManager(LibraryManagerAbstract):
         return live_trees
 
     def _load_mthds_files_into_library(
-        self, *, library_id: str, bundle_files: list[LibraryBundleFile], methods_dirs: list[Path] | None = None
+        self,
+        *,
+        library_id: str,
+        bundle_files: list[LibraryBundleFile],
+        methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
@@ -1308,9 +1330,12 @@ class LibraryManager(LibraryManagerAbstract):
             library_id: The ID of the library to load into
             bundle_files: The bundle files to load, each the member of its method tree
             methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone
+            address_dependency_sources: Where a package the bundles call by address may be found (``load_libraries``)
         """
         valid_mthds_paths = [bundle_file.path for bundle_file in bundle_files]
         blueprints: list[PipelexBundleBlueprint] = []
+        # Each bundle as a message names it, which for a tree a host wrote out is its tree path, as for its blueprint.
+        bundle_sources: list[str] = []
         for bundle_file in bundle_files:
             mthds_file_path = bundle_file.path
             # A bundle of a tree a host wrote out for a caller is named by its tree path, never by the host's directory.
@@ -1319,6 +1344,7 @@ class LibraryManager(LibraryManagerAbstract):
                 if bundle_file.tree_bundle.tree_path is not None and WRITTEN_METHOD_TREES.holds_tree(tree=bundle_file.tree_bundle.tree)
                 else str(mthds_file_path)
             )
+            bundle_sources.append(bundle_source)
             try:
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path, mthds_source=bundle_source)
                 blueprint.place_in_tree(tree_bundle=bundle_file.tree_bundle)
@@ -1364,7 +1390,12 @@ class LibraryManager(LibraryManagerAbstract):
             library.loaded_mthds_paths.append(resolved_path)
 
         try:
-            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints, methods_dirs=methods_dirs)
+            return self.load_from_blueprints(
+                library_id=library_id,
+                blueprints=blueprints,
+                methods_dirs=methods_dirs,
+                address_dependency_sources=address_dependency_sources,
+            )
         except ValidationError as validation_error:
             # Categorize before wrapping. `translate_to_validate_bundle_error` has its own
             # `except ValidationError` arm that categorizes, but it never sees this error: wrapping it
@@ -1375,7 +1406,7 @@ class LibraryManager(LibraryManagerAbstract):
             # reachable through `resolve_crate_from_contents` but not through a library directory.
             raise LibraryLoadingError(
                 message=(
-                    f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: "
+                    f"Could not load blueprints from {bundle_sources} because of: "
                     f"{report_validation_error(validation_error=validation_error).message}"
                 ),
                 pipe_concept_validation_errors=categorize_pipe_validation_error(validation_error=validation_error),
@@ -1389,7 +1420,7 @@ class LibraryManager(LibraryManagerAbstract):
             # `ConceptLibraryError` is a `LibraryLoadingError` and reaches here holding the per-reference
             # items that make an unresolved concept a categorized `unresolved_concept` rather than a
             # bare residual. Reconstructing it message-only silently dropped them.
-            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {ref_error}"
+            msg = f"Could not load blueprints from {bundle_sources} because of: {ref_error}"
             # The new error keeps the code its raise site chose, which a fresh instance of the class would not carry.
             rewrapped_error: ConceptLibraryError | PipeLibraryError
             if isinstance(ref_error, LibraryLoadingError):
@@ -1783,6 +1814,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         blueprints: list[PipelexBundleBlueprint],
         methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
 
@@ -1793,6 +1825,10 @@ class LibraryManager(LibraryManagerAbstract):
         the packages of ``methods_dirs``, the load's own, then among the
         installed methods; one missing from both is fetched by address
         (honoring an ``@<tag>`` pin) and installed when fetch-on-miss is enabled.
+        With ``AddressDependencySources.SHIPPED``, only ``methods_dirs`` are
+        searched: nothing installed on this host is read and nothing is fetched,
+        and an address they do not answer is unresolved, its item carrying
+        ``unshipped_address_dependency_message``.
 
         A package that cannot be resolved is the caller's to fix, since the reference is part of their bundle: every
         address is tried, then the load is refused with one ``unresolved_package_dependency`` item per address that
@@ -1807,6 +1843,7 @@ class LibraryManager(LibraryManagerAbstract):
             library_id: The library to load into
             blueprints: The parsed bundle blueprints to scan
             methods_dirs: The load's own methods directories, searched before everything else and never written
+            address_dependency_sources: Whether an address ``methods_dirs`` do not answer may be looked up on this host
 
         Raises:
             LibraryLoadingError: One or more referenced packages could not be resolved.
@@ -1825,8 +1862,13 @@ class LibraryManager(LibraryManagerAbstract):
         if not first_references:
             return
 
-        # Derive extra search dirs from bundle source paths
-        extra_search_dirs = find_methods_dirs_from_blueprints(blueprints)
+        # Derive extra search dirs from bundle source paths, which only a load that may read this host's methods searches.
+        extra_search_dirs: list[Path] | None
+        match address_dependency_sources:
+            case AddressDependencySources.SHIPPED:
+                extra_search_dirs = None
+            case AddressDependencySources.ANYWHERE:
+                extra_search_dirs = find_methods_dirs_from_blueprints(blueprints)
 
         unresolved_items: list[PipesAndConceptValidationErrorData] = []
         for full_address, (reference, blueprint) in first_references.items():
@@ -1839,8 +1881,9 @@ class LibraryManager(LibraryManagerAbstract):
                     full_address=full_address,
                     extra_search_dirs=extra_search_dirs,
                     methods_dirs=methods_dirs,
+                    address_dependency_sources=address_dependency_sources,
                 )
-            except (MethodFetchDisabledError, MethodDependencyFetchError) as exc:
+            except (MethodFetchDisabledError, MethodDependencyFetchError, MethodDependencyNotShippedError) as exc:
                 # The item carries the sentence its code renders; the host's log keeps the whole cause chain, git's raw output
                 # included, since a cause on the host (git missing, an unwritable clone directory) becomes an item too.
                 causes = " <- ".join(f"{type(cause).__name__}: {cause}" for cause in iter_cause_chain(exc))
@@ -1874,6 +1917,7 @@ class LibraryManager(LibraryManagerAbstract):
         full_address: str,
         extra_search_dirs: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
+        address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
     ) -> None:
         """Load a method package on demand using its full address, fetching it on a miss.
 
@@ -1889,14 +1933,23 @@ class LibraryManager(LibraryManagerAbstract):
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
             extra_search_dirs: Additional .mthds/methods/ directories to scan
             methods_dirs: The load's own methods directories, searched before everything else and never written
+            address_dependency_sources: ``SHIPPED`` refuses an address ``methods_dirs`` do not answer, reading nothing
+                installed on this host and fetching nothing; ``ANYWHERE`` falls back to the installed methods and a fetch
 
         Raises:
             MethodRefError: The address resolves to no vendored or installed method and could not be
                 fetched — fetch-on-miss disabled, an unfetchable address, a failed fetch,
                 or a failed install. Never a silent pass.
+            MethodDependencyNotShippedError: Under ``SHIPPED``, no package of ``methods_dirs`` answers the address.
         """
         vendored = find_vendored_method(full_address=full_address, methods_dirs=methods_dirs) if methods_dirs else None
-        installed = vendored or resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
+        match address_dependency_sources:
+            case AddressDependencySources.SHIPPED:
+                if vendored is None:
+                    raise MethodDependencyNotShippedError(unshipped_address_dependency_message(alias=full_address))
+                installed = vendored
+            case AddressDependencySources.ANYWHERE:
+                installed = vendored or resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
 
         exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
 

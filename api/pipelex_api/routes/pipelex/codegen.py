@@ -7,7 +7,6 @@ from pipelex.codegen.emission import build_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
-from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport, usage_stats_codegen_target
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
@@ -17,16 +16,16 @@ from pydantic import BaseModel, Field, model_validator
 
 from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import PROBLEM_404_METHOD_PACKAGE
+from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
 from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
     GeneratedArtifact,
+    ResolvedMethod,
     invalid_crate_report_response,
-    resolve_requested_crate,
-    teardown_current_library,
+    project_resolved_method,
 )
-from pipelex_api.schemas.models import MthdsFilesRequest
+from pipelex_api.schemas.models import MethodTreeRequest
 
 router = APIRouter(tags=["codegen"], route_class=JsonBodyRoute)
 
@@ -53,8 +52,8 @@ class CodegenRouteKind(StrEnum):
                 return CodegenKind.TYPES
 
 
-class CodegenRequest(MthdsFilesRequest):
-    """The codegen request: the shared closure selector plus the two explicit projection axes."""
+class CodegenRequest(MethodTreeRequest):
+    """The codegen request: the crate routes' method selector plus the two explicit projection axes."""
 
     kind: CodegenRouteKind = Field(..., description="What to project. `types` projects the crate's concept set into typed models.")
     target: CodegenTarget = Field(
@@ -115,17 +114,18 @@ CodegenResponse = Annotated[Union[CodegenValidReport, CrateInvalidReport], Field
 @router.post(
     "/codegen",
     response_model=CodegenResponse,
-    # On top of the composite router's shared 401/413/422/500: the `method_ref` package-not-found 404
-    # (shared with `/resolve`).
-    responses={404: PROBLEM_404_METHOD_PACKAGE},
+    # On top of the composite router's shared 401/413/422/500: the refusals of the method's tree shared with `/resolve`,
+    # a `read_scope` outside the caller's own, the `method_ref` package-not-found 404, a damaged blob a hash entry
+    # names, and the Python policy's 501.
+    responses={403: PROBLEM_403_READ_SCOPE, 404: PROBLEM_404_METHOD_PACKAGE, 500: PROBLEM_500_HELD_BLOBS, 501: PROBLEM_501_RUN_POLICY},
     # NOT tagged `x-mthds-protocol` — a Pipelex API extension, like `/resolve`. The MTHDS standard
     # specifies the crate this reads (the Library Crate Format); it specifies no type projection, so
     # every `target` here — `ts-zod` and `python-pydantic` no less than `python-structures` — is ours.
 )
 async def codegen_mthds(request: Request, request_data: CodegenRequest) -> JSONResponse:
-    """Generate typed artifacts from a library closure (Pipelex API extension).
+    """Generate typed artifacts from a method (Pipelex API extension).
 
-    Resolves the closure to its normalized crate (exactly like `POST /resolve`), then projects it
+    Resolves the method to its normalized crate (exactly like `POST /resolve`), then projects it
     through the requested `kind`/`target` axes and returns the **stamped** artifact set plus its
     `codegen.lock` — everything a client needs to materialize a byte-identical local projection
     and run the offline drift check. There is deliberately **no** server-side check route: the
@@ -137,27 +137,25 @@ async def codegen_mthds(request: Request, request_data: CodegenRequest) -> JSONR
     - **Invalid verdict (200, `is_valid: false`):** the library could not be parsed, loaded, or
       validated — `errors[]`, one problem item per error; no artifacts exist.
     - **No verdict (non-2xx):** an unknown projection `kind`/`target`, a `pipe_ref` on a
-      concept-set-wide kind, or a malformed closure selector is a request-shape 422 problem+json;
-      a registry-form `method_ref` is a 422 `request.unsupported` until server-side method registry
-      resolution exists; auth is 401/403; server fault is 5xx.
+      concept-set-wide kind, or a malformed method selector is a request-shape 422 problem+json; the
+      method's tree is refused as `/resolve` refuses it (a 422 `method.package_invalid` or
+      `request.blobs_missing`, the Python policy's refusals, the `method_ref` fetch outcomes, a 422
+      `request.unsupported` for a registry-form `method_ref`); auth is 401/403; server fault is 5xx.
     """
     with CodeGenerationReport(
         artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=request_data.target)
     ) as generation_report:
-        return await _generate_codegen_response(request_data=request_data, generation_report=generation_report, view=problem_view_of(request))
+        return await _generate_codegen_response(request=request, request_data=request_data, generation_report=generation_report)
 
 
-async def _generate_codegen_response(*, request_data: CodegenRequest, generation_report: CodeGenerationReport, view: ProblemView) -> JSONResponse:
+async def _generate_codegen_response(*, request: Request, request_data: CodegenRequest, generation_report: CodeGenerationReport) -> JSONResponse:
     """The body of `codegen_mthds`, timed by `generation_report`, which an invalid verdict declares failed."""
-    try:
-        # `types` is concept-set-wide: no pipe is selected, so the manifest's `main_pipe` beside the crate is unused.
-        # A future per-pipe kind takes it from the `ResolvedClosure` and hands it to `resolve_requested_pipe`.
-        crate = (await resolve_requested_crate(request_data)).crate
-    except ValidateBundleError as validate_error:
-        generation_report.declare_failed()
-        return invalid_crate_report_response(validate_error, view=view)
-    generation_report.describe(crate=crate)
-    try:
+
+    def _projection_response(resolution: ResolvedMethod) -> JSONResponse:
+        # `types` is concept-set-wide: no pipe is selected, so the method's manifest `main_pipe` is unused. A future
+        # per-pipe kind reads it off the resolution and hands it to `resolve_requested_pipe`.
+        crate = resolution.crate
+        generation_report.describe(crate=crate)
         emitted = emit_types(crate, target=request_data.target)
         projection = build_stamped_projection(
             emitted,
@@ -175,5 +173,9 @@ async def _generate_codegen_response(*, request_data: CodegenRequest, generation
             lock=projection.lock_content,
         )
         return JSONResponse(content=report.model_dump(mode="json", by_alias=True))
-    finally:
-        teardown_current_library()
+
+    outcome = await project_resolved_method(request=request, request_data=request_data, project=_projection_response)
+    if isinstance(outcome, ValidateBundleError):
+        generation_report.declare_failed()
+        return invalid_crate_report_response(outcome, view=problem_view_of(request))
+    return outcome

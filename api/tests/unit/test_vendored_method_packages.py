@@ -31,7 +31,7 @@ from pytest_mock import MockerFixture
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.exceptions import RequestMethodError
-from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
+from pipelex_api.method_source import fetched_method
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
@@ -283,9 +283,6 @@ class TestVendoredMethodPackages:
         assert sorted(fetched.request_method.dependencies[VENDORED_PROBE_ADDRESS].contents) == ["METHODS.toml", "probe.mthds"]
         assert fetched.provenance.tree_digest == fetched.request_method.tree.tree.digest
 
-        tooling = fetch_method_mthds_files(_METHOD_REF)
-        assert [item.source for item in tooling.files] == ["smoke.mthds"]
-
     def test_a_dot_directory_under_the_shipped_packages_is_no_package_of_a_method_ref(self, install_method_package: Callable[..., Path]):
         """A fetched package and an archive hold `.mthds/methods/<name>/` to one rule: a dot directory there is no package.
 
@@ -301,25 +298,84 @@ class TestVendoredMethodPackages:
 
         assert list(fetched.request_method.dependencies) == [VENDORED_PROBE_ADDRESS]
 
-    def test_the_tooling_read_keeps_the_tree_s_bundles_alone(self, install_method_package: Callable[..., Path]):
-        """The tooling routes read the `.mthds` files the tree keeps, without the shipped packages a run needs whole."""
-        no_manifest = {".mthds/methods/unfinished/draft.mthds": UNRESOLVED_PACKAGE_MTHDS}
-        install_method_package(
-            files={
-                "smoke.mthds": UNRESOLVED_PACKAGE_MTHDS,
-                "ignored/old.mthds": UNRESOLVED_PACKAGE_MTHDS,
-                ".gitignore": "ignored/\n",
-                "notes/readme.txt": "Not read by the tooling routes",
-                **no_manifest,
-            }
-        )
+    def test_a_method_ref_package_shipping_a_directory_without_a_manifest_is_refused(
+        self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]
+    ):
+        """A directory under `.mthds/methods/` is a package the method ships, so one with no manifest is refused on every route."""
+        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, ".mthds/methods/unfinished/draft.mthds": UNRESOLVED_PACKAGE_MTHDS})
+        client = _build_client(mocker, tmp_path=tmp_path)
 
-        tooling = fetch_method_mthds_files(_METHOD_REF)
-
-        assert [item.source for item in tooling.files] == ["smoke.mthds"]
-        assert tooling.main_pipe == "echo"
         with pytest.raises(RequestMethodError, match="unfinished"):
             fetched_method(_METHOD_REF)
+        response = client.post("/v1/pipe-io", json={"method_ref": _METHOD_REF})
+
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "manifest_missing", "path": ".mthds/methods/unfinished/METHODS.toml"}, problem
+
+    @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    def test_a_crate_route_resolves_the_dependency_a_method_ref_ships(
+        self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path], route: str
+    ):
+        """The crate routes read a fetched package's tree with the packages it ships, as `/v1/validate` and a run do."""
+        install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
+        client = _build_client(mocker, tmp_path=tmp_path)
+        body: dict[str, Any] = {"method_ref": _METHOD_REF}
+        if route == "/v1/codegen":
+            body |= {"kind": "types", "target": "ts-zod"}
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        assert response.json()["is_valid"] is True, response.text
+
+    @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    @pytest.mark.parametrize("sends_the_dependency", [True, False])
+    def test_a_crate_route_resolves_a_dependency_sent_beside_the_tree(
+        self, mocker: MockerFixture, tmp_path: Path, route: str, sends_the_dependency: bool
+    ):
+        """A dependency sent in `dependencies` answers the call; without it, the call is the invalid verdict `/v1/validate` gives."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        body = _tree_body(VENDORED_PROBE_FILES)
+        if not sends_the_dependency:
+            body.pop("dependencies")
+        if route == "/v1/codegen":
+            body |= {"kind": "types", "target": "ts-zod"}
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is sends_the_dependency, response.text
+        if not sends_the_dependency:
+            package_address = UNRESOLVED_PACKAGE_REFERENCE.split("->", maxsplit=1)[0]
+            assert [(item["code"], item["params"]) for item in verdict["errors"]] == [
+                ("method.dependency_missing", {"kind": "package", "name": package_address, "reason": "not_found"})
+            ], verdict
+
+    @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
+    def test_a_crate_route_never_looks_up_or_fetches_a_dependency_nothing_shipped(self, mocker: MockerFixture, tmp_path: Path, route: str):
+        """Even with fetch-on-miss on, a crate route resolves statically, its verdict naming the missing package by its code."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
+        lookup = mocker.patch(
+            "pipelex.libraries.library_manager.resolve_address_based_method",
+            side_effect=AssertionError("a crate route must not look up installed methods or fetch by address"),
+        )
+        body = _tree_body(VENDORED_PROBE_FILES)
+        body.pop("dependencies")
+        if route == "/v1/codegen":
+            body |= {"kind": "types", "target": "ts-zod"}
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is False, response.text
+        lookup.assert_not_called()
+        [item] = verdict["errors"]
+        assert item["code"] == "method.dependency_missing"
+        assert item["params"] == {"kind": "package", "name": VENDORED_PROBE_ADDRESS, "reason": "not_found"}
+        assert item["location"]["file"] == "bundle.mthds"
 
     def test_validate_by_method_ref_resolves_the_dependency_it_ships(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]

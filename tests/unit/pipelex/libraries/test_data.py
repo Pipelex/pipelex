@@ -102,6 +102,16 @@ class MethodRequirementsTestData:
     ]
 
     SANDBOX_ENVIRONMENT = "the Daytona sandbox snapshot 'pipelex-base-test'"
+    # A Linux CPython 3.12, the marker environment of every box of the Daytona sandbox.
+    SANDBOX_MARKER_ENVIRONMENT: ClassVar[dict[str, str]] = {
+        "implementation_name": "cpython",
+        "os_name": "posix",
+        "platform_machine": "x86_64",
+        "platform_python_implementation": "CPython",
+        "platform_system": "Linux",
+        "python_version": "3.12",
+        "sys_platform": "linux",
+    }
 
     @classmethod
     def sandbox_offer(cls) -> PipeFuncPackageOffer:
@@ -109,15 +119,16 @@ class MethodRequirementsTestData:
         return PipeFuncPackageOffer(
             environment=cls.SANDBOX_ENVIRONMENT,
             distributions={"pandas": "2.2.3", "openpyxl": "3.1.5", "numpy": "2.1.0rc1", "Zope.Interface": "7.0"},
-            marker_environment={
-                "implementation_name": "cpython",
-                "os_name": "posix",
-                "platform_machine": "x86_64",
-                "platform_python_implementation": "CPython",
-                "platform_system": "Linux",
-                "python_version": "3.12",
-                "sys_platform": "linux",
-            },
+            marker_environment=dict(cls.SANDBOX_MARKER_ENVIRONMENT),
+        )
+
+    @classmethod
+    def environment_offer(cls, *, snapshot_name: str, distributions: dict[str, str]) -> PipeFuncPackageOffer:
+        """An environment a sandbox mode builds for one method's requirements, as it would state it: its own snapshot and packages."""
+        return PipeFuncPackageOffer(
+            environment=f"the Daytona sandbox environment '{snapshot_name}'",
+            distributions=distributions,
+            marker_environment=dict(cls.SANDBOX_MARKER_ENVIRONMENT),
         )
 
 

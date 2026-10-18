@@ -1,5 +1,6 @@
 import shlex
 import sys
+from collections.abc import Callable
 from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 
@@ -21,11 +22,14 @@ from pipelex.libraries.method_requirements import (
     ensure_method_requirements_met,
     ensure_package_requirements_met,
     ensure_served_method_requirements_met,
+    requirements_needed_in,
 )
 from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import OfferedPackageEnvironment
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
+from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
 from tests.unit.pipelex.libraries.test_data import MethodRequirementsTestData
 
 _MODULE = "pipelex.libraries.method_requirements"
@@ -176,17 +180,114 @@ class TestMethodRequirementsCheck:
         assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in message
         assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", 2), ("requirements.txt", 3)]
 
-    def test_the_environment_is_resolved_once_and_each_tree_judged_once(self, mocker: MockerFixture, tmp_path: Path) -> None:
+    def test_each_tree_is_judged_once_against_the_environment_resolved_for_its_own_requirements(self, mocker: MockerFixture, tmp_path: Path) -> None:
         resolve = mocker.patch(
             f"{_MODULE}.resolve_pipe_func_package_environment",
             return_value=OfferedPackageEnvironment(offer=MethodRequirementsTestData.sandbox_offer()),
         )
         first = list_method_tree(_method(directory=tmp_path / "first", requirements="pandas\n"))
-        second = list_method_tree(_method(directory=tmp_path / "second", requirements="openpyxl\n"))
+        second = list_method_tree(_method(directory=tmp_path / "second", requirements="# spreadsheets\nopenpyxl\n"))
 
         ensure_method_requirements_met(trees=[first, second, first], names_host_paths=True)
 
-        resolve.assert_called_once_with(names_host_paths=True)
+        resolved_for = [
+            ([(line.line_number, line.text) for line in call.kwargs["requirements"]], call.kwargs["names_host_paths"])
+            for call in resolve.call_args_list
+        ]
+        assert resolved_for == [([(1, "pandas")], True), ([(2, "openpyxl")], True)]
+
+    def test_trees_judged_in_one_check_each_get_the_offer_stated_for_their_own_requirements(
+        self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
+    ) -> None:
+        """A sandbox mode building an environment per method states one for each tree, and each tree is judged against its own."""
+        offers_by_requirements: dict[tuple[str, ...], PipeFuncPackageOffer] = {
+            ("polars>=1",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
+            ("pandas>=3",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-pandas", distributions={"pandas": "3.0.1"}),
+            ("pandas>=4",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
+        }
+        asked: list[tuple[str, ...]] = []
+
+        def offer_for(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            requirement_texts = tuple(line.text for line in request.requirements)
+            asked.append(requirement_texts)
+            return offers_by_requirements[requirement_texts]
+
+        sandbox_offering(offers={"daytona": offer_for})
+        polars_tree = list_method_tree(_method(directory=tmp_path / "polars", requirements="polars>=1\n"))
+        pandas_tree = list_method_tree(_method(directory=tmp_path / "pandas", requirements="pandas>=3\n"))
+        stale_tree = list_method_tree(_method(directory=tmp_path / "stale", requirements="pandas>=4\n"))
+
+        ensure_method_requirements_met(trees=[polars_tree, pandas_tree], names_host_paths=False)
+        assert asked == [("polars>=1",), ("pandas>=3",)]
+
+        with pytest.raises(MethodRequirementsNotMetError) as exc_info:
+            ensure_method_requirements_met(trees=[pandas_tree, stale_tree], names_host_paths=False)
+
+        message = exc_info.value.message
+        assert message.startswith("The method needs Python packages that the Daytona sandbox environment 'pipelex-env-stale' does not have")
+        assert "line 1 'pandas>=4' (pandas 3.0.1 is there)" in message
+        assert "pipelex-env-pandas" not in message
+        assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", 1)]
+
+    def test_a_factory_refusing_only_what_its_sandbox_needs_lets_a_false_marker_requirement_load(
+        self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
+    ) -> None:
+        """The factory sees every requirement, markers unevaluated, and rests a refusal only on those its sandbox needs."""
+        base = MethodRequirementsTestData.sandbox_offer()
+        asked: list[list[str]] = []
+
+        def offer_or_refuse(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            asked.append([line.text for line in request.requirements])
+            needed = requirements_needed_in(requirements=request.requirements, marker_environment=base.marker_environment)
+            beyond = [line.text for line in needed if line.requirement.name not in base.distributions]
+            if beyond:
+                return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=f"no environment holds {', '.join(beyond)}")
+            return base
+
+        sandbox_offering(offers={"daytona": offer_or_refuse})
+        windows_only = list_method_tree(
+            _method(directory=tmp_path / "windows-only", requirements="pandas>=2\npywin32>=306; sys_platform == 'win32'\n")
+        )
+        everywhere = list_method_tree(_method(directory=tmp_path / "everywhere", requirements="pandas>=2\npywin32>=306\n"))
+
+        ensure_method_requirements_met(trees=[windows_only], names_host_paths=False)
+        assert asked == [["pandas>=2", "pywin32>=306; sys_platform == 'win32'"]]
+
+        with pytest.raises(MethodRequirementsNotMetError) as exc_info:
+            ensure_method_requirements_met(trees=[everywhere], names_host_paths=False)
+
+        assert exc_info.value.message == (
+            "The method needs Python packages that the Daytona sandbox cannot offer, "
+            "as its requirements.txt declares: no environment holds pywin32>=306"
+        )
+
+    def test_a_deployment_refusing_the_requirements_refuses_the_method_with_its_reason(
+        self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
+    ) -> None:
+        """No environment of the mode can hold them: the method is refused as its own fault, carrying the plugin's words."""
+        reason = "uv explains: Because pandas<3 conflicts with the base snapshot's pandas==3.0.1, the requirements are unsatisfiable."
+
+        def refuse(_request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=reason)
+
+        sandbox_offering(offers={"daytona": refuse})
+        method_dir = _method(directory=tmp_path / "request-files", requirements="pandas<3\n")
+
+        with pytest.raises(MethodRequirementsNotMetError) as refusal_info:
+            ensure_served_method_requirements_met(library_dirs=[method_dir])
+        with pytest.raises(ValidateBundleError) as verdict_info, translate_to_validate_bundle_error():
+            ensure_served_method_requirements_met(library_dirs=[method_dir])
+
+        message = refusal_info.value.message
+        assert message == f"The method needs Python packages that the Daytona sandbox cannot offer, as its requirements.txt declares: {reason}"
+        refusal = refusal_info.value.to_problem(view=ProblemView.CALLER)
+        assert refusal.code == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert refusal.domain == ProblemDomain.METHOD
+        (item,) = verdict_info.value.validation_error_items()
+        assert (item.source, item.line) == ("requirements.txt", None)
+        assert item.message == f"The requirements are refused by the Daytona sandbox: {reason}"
+        for disclosed in (message, str(refusal.to_wire()), str(item)):
+            assert str(tmp_path) not in disclosed
 
     def test_a_served_method_checks_the_packages_nested_in_its_directory(self, tmp_path: Path) -> None:
         _write(directory=tmp_path, tree_path="top.mthds", content="domain = 'requirements_top'\n")

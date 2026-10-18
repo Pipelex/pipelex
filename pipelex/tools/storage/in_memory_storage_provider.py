@@ -71,6 +71,24 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         self.root[key] = data
 
     @override
+    async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
+        """Hold the bytes under `key` unless it holds some already, never replacing them.
+
+        Args:
+            data: The bytes to store, already checked against their checksum.
+            key: Storage key (without scheme prefix).
+            content_type: Ignored for in-memory storage.
+            checksum_sha256_hex: Checked before this call; memory has no checksum of its own to send it to.
+
+        Returns:
+            True when this call stored the bytes, False when the key already held some.
+        """
+        if key in self.root:
+            return False
+        self.root[key] = data
+        return True
+
+    @override
     async def public_url(self, uri: str) -> str | None:
         """In-memory storage cannot generate a public URL.
 

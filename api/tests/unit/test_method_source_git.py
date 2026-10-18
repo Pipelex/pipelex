@@ -14,13 +14,9 @@ from pathlib import Path
 import pytest
 from mthds.method_tree.digest import digest_of_contents
 from pipelex.methods.exceptions import MethodPackageSymlinkError
-from pipelex.methods.package_reason import MethodPackageReason
-from pytest_mock import MockerFixture
 
-from pipelex_api.exceptions import RequestMethodError
-from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
+from pipelex_api.method_source import fetched_method
 from tests.unit._constants import STUB_METHOD_ADDRESS, STUB_METHOD_MANIFEST, VALID_MTHDS
-from tests.unit._problems import problem_of
 
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 
@@ -64,17 +60,3 @@ class TestMethodSourceGit:
         assert STUB_METHOD_ADDRESS in message
         assert "pipelex-package-" not in message
         assert tempfile.gettempdir() not in message
-
-    def test_a_fetched_mthds_file_past_its_limit_names_that_limit(self, install_method_package: Callable[..., Path], mocker: MockerFixture) -> None:
-        """The tooling routes' limit on one `.mthds` file is its own reason, never the tree's per-file limit."""
-        install_method_package(files={"documents.mthds": VALID_MTHDS})
-        mocker.patch("pipelex_api.method_source.MAX_MTHDS_FILE_BYTES", len(VALID_MTHDS.encode("utf-8")) - 1)
-
-        with pytest.raises(RequestMethodError) as exc_info:
-            fetch_method_mthds_files(_METHOD_REF)
-
-        assert problem_of(exc_info.value)["params"] == {
-            "reason": MethodPackageReason.MTHDS_FILE_TOO_LARGE,
-            "path": "documents.mthds",
-            "limit": len(VALID_MTHDS.encode("utf-8")) - 1,
-        }

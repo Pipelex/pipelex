@@ -379,3 +379,42 @@ class TestGcpStorageProvider:
 
         with pytest.raises(StorageFileNotFoundError, match=r"missing/file\.pdf"):
             await gcp_provider_no_signed_urls.load_size(uri=f"{PIPELEX_STORAGE_SCHEME}missing/file.pdf")
+
+    async def test_store_if_absent_uploads_only_over_no_object(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        """Generation 0 matches only a key holding no object, so GCS itself refuses to replace one."""
+        created = await gcp_provider_no_signed_urls.store_if_absent(
+            data=b"blob bytes", key="scope/blobs/one", content_type="application/octet-stream"
+        )
+
+        assert created is True
+        mock_gcp_storage["bucket"].blob.assert_called_with("scope/blobs/one")
+        mock_gcp_storage["blob"].upload_from_string.assert_called_once_with(
+            b"blob bytes", content_type="application/octet-stream", if_generation_match=0
+        )
+
+    async def test_store_if_absent_over_a_held_object_is_no_error(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        from google.api_core.exceptions import PreconditionFailed  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+
+        mock_gcp_storage["blob"].upload_from_string.side_effect = PreconditionFailed("conditionNotMet")
+
+        assert await gcp_provider_no_signed_urls.store_if_absent(data=b"blob bytes", key="scope/blobs/one") is False
+
+    async def test_store_if_absent_maps_other_failures(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        from google.api_core.exceptions import Forbidden  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level]
+
+        mock_gcp_storage["blob"].upload_from_string.side_effect = Forbidden("denied")
+
+        with pytest.raises(StorageGcpError, match="denied"):
+            await gcp_provider_no_signed_urls.store_if_absent(data=b"blob bytes", key="scope/blobs/one")
