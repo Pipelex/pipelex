@@ -367,7 +367,7 @@ class TestPipelineRoutes:
             "/v1/start",
             json={
                 "pipe_code": body_pipe_code,
-                # An AWS-metadata URL — blocked by `_is_disallowed_host`, so
+                # An AWS-metadata URL — blocked by `is_disallowed_host`, so
                 # `_validate_extras` raises 422 before `from_body` runs.
                 "callback_urls": ["http://169.254.169.254/latest/meta-data/"],
             },

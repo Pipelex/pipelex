@@ -15,10 +15,12 @@ Refusals, in the order they are checked:
   it breaks, before any value is decoded, which also logs a security event, as a key of a method tree does;
 - a path of the wrong shape (a backslash, a colon, empty, or a second spelling of a path already submitted) → 422
   `request.invalid`, naming the field;
-- a file whose encoded length already exceeds the per-file ceiling → 413 `request.too_large`, before decoding;
+- a file whose size, read off its encoded length, exceeds `MAX_RESOURCE_FILE_BYTES` → 413 `request.too_large`, before
+  decoding;
 - a value that is not valid base64 → 422 `request.malformed`, as `bundle_b64` is;
-- a decoded file over `MAX_RESOURCE_FILE_BYTES`, or a running total over `MAX_RESOURCES_TOTAL_BYTES` → 413
-  `request.too_large`.
+- a running total of decoded files over `MAX_RESOURCES_TOTAL_BYTES` → 413 `request.too_large`.
+
+Every `request.too_large` states its `limit` and its `size` in bytes, never in encoded characters.
 """
 
 import base64
@@ -31,11 +33,7 @@ from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD,
 from pipelex.tools.log.error_fields import error_fields
 
 from pipelex_api.exceptions import RunnerRequestError
-from pipelex_api.limits import MAX_RESOURCE_FILE_BYTES, MAX_RESOURCES_PER_REQUEST, MAX_RESOURCES_TOTAL_BYTES
-
-# Base64 inflates by 4/3, so a file within the ceiling encodes to at most this many characters (+4 covers padding).
-# Checking the encoded length first refuses an oversized file before it is decoded into memory.
-_MAX_RESOURCE_B64_CHARS = MAX_RESOURCE_FILE_BYTES * 4 // 3 + 4
+from pipelex_api.limits import MAX_RESOURCE_FILE_BYTES, MAX_RESOURCES_PER_REQUEST, MAX_RESOURCES_TOTAL_BYTES, base64_decoded_size
 
 
 def refuse_two_files_under_one_path(*, path: str, where: str) -> NoReturn:
@@ -73,9 +71,11 @@ def decode_bundle_resources(*, resources: dict[str, str] | None) -> dict[str, by
     files: dict[str, bytes] = {}
     total_bytes = 0
     for canonical_path, (path, encoded) in sent_by_path.items():
-        if len(encoded) > _MAX_RESOURCE_B64_CHARS:
+        # Read off the encoded length, so an oversized file is refused before it is decoded into memory.
+        file_bytes = base64_decoded_size(encoded=encoded)
+        if file_bytes > MAX_RESOURCE_FILE_BYTES:
             msg = f"The file '{path}' in resources exceeds the {MAX_RESOURCE_FILE_BYTES // 1024} KiB per-file limit"
-            raise _too_large(message=msg, limit=_MAX_RESOURCE_B64_CHARS, size=len(encoded))
+            raise _too_large(message=msg, limit=MAX_RESOURCE_FILE_BYTES, size=file_bytes)
         try:
             data = base64.b64decode(encoded, validate=True)
         except (binascii.Error, ValueError) as decode_error:
@@ -87,9 +87,6 @@ def decode_bundle_resources(*, resources: dict[str, str] | None) -> dict[str, by
                 .with_error_code(CoreCode.REQUEST_MALFORMED)
                 .with_params(reason=RequestMalformedReason.BAD_BASE64)
             ) from decode_error
-        if len(data) > MAX_RESOURCE_FILE_BYTES:
-            msg = f"The file '{canonical_path}' a step reads exceeds the {MAX_RESOURCE_FILE_BYTES // 1024} KiB per-file limit"
-            raise _too_large(message=msg, limit=MAX_RESOURCE_FILE_BYTES, size=len(data))
         total_bytes += len(data)
         if total_bytes > MAX_RESOURCES_TOTAL_BYTES:
             msg = f"The files the bundle's steps read exceed the {MAX_RESOURCES_TOTAL_BYTES // 1024} KiB total-size limit"

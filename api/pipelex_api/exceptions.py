@@ -88,7 +88,7 @@ class CallbackUrlRefusedError(PipelexError, ValueError):
         # A host the rules could not classify has no class to state: the parameter is left out rather than given as a
         # `None` its code would refuse, and the sentence that names it falls back on the code's generic one.
         if target_class is not None:
-            params["target_class"] = target_class
+            params["target_class"] = target_class.listed_target_class
         return params
 
     @override
@@ -104,10 +104,10 @@ class RunnerRequestError(PipelexError):
     one, that cannot be parsed, ``request.too_large`` for a request past one of this runner's size limits,
     ``request.unsupported`` for a form this runner does not accept, ``request.blobs_missing`` for files sent by hash
     that this runner does not hold, ``request.not_found`` and ``request.method_not_allowed`` for a request no route
-    serves, and ``account.rate_limited`` for a request a rate limit in front of a route refused, which only the web
-    framework's own refusal answers (``pipelex_api.exception_handlers.handle_http_exception``). A dependency keyed by
-    another address than its manifest declares is ``pipelex.request.dependency_key_mismatch``, which names the address
-    to key it by.
+    serves, and ``runtime.unavailable``, naming the rate limiter as its ``dependency``, for a request a rate limit in
+    front of a route refused, which only the web framework's own refusal answers
+    (``pipelex_api.exception_handlers.framework_refusal``). A dependency keyed by another address than its manifest
+    declares is ``pipelex.request.dependency_key_mismatch``, which names the address to key it by.
     """
 
     error_code = ErrorCodeSet(
@@ -120,7 +120,7 @@ class RunnerRequestError(PipelexError):
             CoreCode.REQUEST_BLOBS_MISSING,
             CoreCode.REQUEST_NOT_FOUND,
             CoreCode.REQUEST_METHOD_NOT_ALLOWED,
-            CoreCode.ACCOUNT_RATE_LIMITED,
+            CoreCode.RUNTIME_UNAVAILABLE,
         ),
     )
 

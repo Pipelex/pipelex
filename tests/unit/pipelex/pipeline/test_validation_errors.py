@@ -493,6 +493,8 @@ class TestBuildValidationErrorItems:
                 "code": "method.hint_invalid",
                 "detail": items[0].detail,
                 "params": {"reason": "unknown_key", "hint": "emphasis"},
+                # The declaration the hint is on, which neither parameter names.
+                "location": {"field": "concept.Essay"},
             },
             {
                 "code": "pipelex.docgen.template_warning",

@@ -67,6 +67,7 @@ from pipelex_api.openapi_responses import (
 from pipelex_api.problem_view import problem_view_of
 from pipelex_api.request_refusals import WHOLE_BODY_FIELD, callback_url_refusal_in, refused_request_error
 from pipelex_api.routes.pipelex.utils import get_current_iso_timestamp
+from pipelex_api.run_extras_binding import bind_run_extras
 from pipelex_api.schemas.models import (
     PipelexApiExecuteRequest,
     PipelexApiExecuteResponse,
@@ -756,19 +757,6 @@ def _validate_extras(request_data: dict[str, Any]) -> PipelineApiExtras:
         raise (callback_url_refusal_in(faults=faults) or refused_request_error(faults=faults, located_by_request_part=False)) from exc
 
 
-def _validated_run_extras_or_none(request_data: dict[str, Any]) -> dict[str, str] | None:
-    """The body's `analytics_groups` when they pass the runtime's rules on their own, else `None`.
-
-    Read before anything else is refused, so that the security event of a refusal before the extras are validated,
-    such as a reserved object key or a callback URL, still names whose request it was, with values the runtime's
-    own rules accepted.
-    """
-    try:
-        return PipelineApiExtras.model_validate({"analytics_groups": request_data.get("analytics_groups")}).analytics_groups
-    except ValidationError:
-        return None
-
-
 # Per-field bound applied at the request.state binding site so an oversized
 # caller-supplied `pipe_code` cannot blow up the size of every record the request emits.
 # `RunRequest.pipe_code` carries no Pydantic `max_length`; this is the
@@ -817,8 +805,9 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     """
     body = await request.body()
     request_data = _decode_body(body)
-    # The run's opaque extras, for the security event a refusal of this request logs before any run carries them.
-    request.state.run_extras = _validated_run_extras_or_none(request_data)
+    # The run's opaque extras, read before anything else is refused, so that the security event a refusal of this request
+    # logs before any run carries them, a reserved object key or a callback URL, still names whose request it was.
+    bind_run_extras(request=request, body=request_data)
     _refuse_reserved_object_keys(request_data)
     # Bind body-derived correlation identifiers onto `request.state` as soon as
     # the raw dict is in hand — before `_validate_extras` or `from_body`, so a

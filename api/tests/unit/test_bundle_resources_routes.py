@@ -308,17 +308,12 @@ class TestBundleResourcesRoutes:
                 (422, "request.invalid", {"field": "resources"}),
                 id="count",
             ),
-            pytest.param(
-                {"MAX_RESOURCE_FILE_BYTES": 2048, "_MAX_RESOURCE_B64_CHARS": 1024},
-                {"a.docx": _b64(bytes(1000))},
-                (413, "request.too_large", {"limit": 1024, "size": len(_b64(bytes(1000)))}),
-                id="encoded",
-            ),
+            # The limit and the size are bytes, the size read off the encoded length, never a count of encoded characters.
             pytest.param(
                 {"MAX_RESOURCE_FILE_BYTES": 1024},
                 {"a.docx": _b64(bytes(1025))},
                 (413, "request.too_large", {"limit": 1024, "size": 1025}),
-                id="decoded",
+                id="per_file",
             ),
             pytest.param(
                 {"MAX_RESOURCES_TOTAL_BYTES": 1024},
@@ -595,3 +590,12 @@ class TestBundleResourcesRoutes:
             params={"reason": "file_too_large", "path": _TEMPLATE_PATH, "limit": len(_INVOICE_MTHDS.encode("utf-8")) + 1},
         )
         assert problem["location"] == {"file": _TEMPLATE_PATH}
+
+    def test_a_file_past_its_limit_is_refused_before_it_is_decoded(self, mocker: MockerFixture) -> None:
+        mocker.patch(f"{_RESOURCES_NS}.MAX_RESOURCE_FILE_BYTES", 1024)
+        decode_spy = mocker.spy(base64, "b64decode")
+
+        response = _build_client().post("/v1/validate", json={"mthds_contents": [_INVOICE_MTHDS], "resources": {"a.docx": _b64(bytes(1024 * 3))}})
+
+        _assert_refusal(response, status=413, code="request.too_large", params={"limit": 1024, "size": 1024 * 3})
+        decode_spy.assert_not_called()

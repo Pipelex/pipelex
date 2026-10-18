@@ -23,7 +23,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import ERROR_FRAMES_FIELD, register_exception_handlers
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import (
@@ -277,10 +277,16 @@ class TestPipelineBundle:
     def test_python_bundle_forbidden_when_not_hosted(self, mocker: MockerFixture):
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
         client, snapshot = _build_client(mocker)
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = client.post("/v1/execute", json={"files": {"main.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}})
         problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
         assert problem["params"] == {"origin": "bundle"}
         assert snapshot == {}, "the runner was reached"
+        # A caller sending custom code to a deployment without a sandbox can do so at will: a warning without frames.
+        log_spy.error.assert_not_called()
+        fields = log_spy.warning.call_args.kwargs["fields"]
+        assert fields["error.code"] == "pipelex.deployment.custom_code_requires_sandbox"
+        assert ERROR_FRAMES_FIELD not in fields
 
     def test_python_bundle_is_written_with_its_tree_when_hosted(self, mocker: MockerFixture):
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)

@@ -406,6 +406,64 @@ class TestSecurityEventRoutes:
         assert "passwd" not in json.dumps(line)
 
     @pytest.mark.parametrize(
+        ("route", "body", "event_error_type"),
+        [
+            pytest.param(
+                "/v1/validate",
+                {"mthds_contents": [_DESCRIBE_IMAGE_MTHDS], "resources": {"../private": "YQ=="}},
+                "BundleResourcePathError",
+                id="validate_resource",
+            ),
+            pytest.param(
+                "/v1/validate",
+                {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}},
+                "RequestMethodError",
+                id="validate_tree",
+            ),
+            pytest.param(
+                "/v1/resolve", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="resolve"
+            ),
+            pytest.param(
+                "/v1/codegen",
+                {"kind": "types", "target": "ts-zod", "files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}},
+                "RequestMethodError",
+                id="codegen",
+            ),
+            pytest.param(
+                "/v1/pipe-io", {"files": {"main.mthds": _DESCRIBE_IMAGE_MTHDS, "../secrets/key.pem": "x"}}, "RequestMethodError", id="pipe_io"
+            ),
+        ],
+    )
+    def test_a_diagnostic_route_s_refusal_names_whose_request_it_was(
+        self, mocker: MockerFixture, route: str, body: dict[str, Any], event_error_type: str
+    ) -> None:
+        """A route that runs nothing still binds the labels its body names before refusing it, so its event carries them."""
+        client = _build_client(mocker)
+
+        with _security_event_lines() as lines:
+            response = client.post(route, json={**body, "analytics_groups": {"org_id": "org_abc"}}, headers={REQUEST_ID_HEADER: _REQUEST_ID})
+
+        assert_problem(response, status=422, code=CoreCode.SECURITY_INPUT_PATH_REFUSED)
+        (line,) = lines
+        assert line["error.type"] == event_error_type
+        assert line["run.extras.org_id"] == "org_abc"
+        assert line["request_id"] == _REQUEST_ID
+        assert "private" not in json.dumps(line)
+        assert "key.pem" not in json.dumps(line)
+
+    def test_labels_the_runtime_refuses_ride_no_event(self, mocker: MockerFixture) -> None:
+        """Only labels that pass the runtime's own rules are bound: a refused value never reaches a security event."""
+        client = _build_client(mocker)
+        body = {"mthds_contents": [_DESCRIBE_IMAGE_MTHDS], "resources": {"../private": "YQ=="}, "analytics_groups": {"org_id": "org abc\nforged"}}
+
+        with _security_event_lines() as lines:
+            response = client.post("/v1/validate", json=body)
+
+        # The labels are the request's own mistake, which its model refuses before the route reads any resource.
+        assert_problem(response, status=422, code="request.invalid", field="analytics_groups")
+        assert lines == []
+
+    @pytest.mark.parametrize(
         ("route", "body", "code"),
         [
             pytest.param("/v1/start", {"callback_urls": [""]}, "request.invalid", id="empty_callback_url"),

@@ -60,8 +60,8 @@ def problem_json_response(
         problem: The problem, in the operator's view.
         view: The view of whoever receives the response.
         headers: Further headers of the response.
-        status: The status to answer with in place of the code's, which only a refusal the web framework raised with a
-            status no code declares gives, so that it keeps the status it was raised with.
+        status: The status to answer with in place of the code's, which only a refusal the web framework raised gives,
+            when the code it is answered under declares another, so that it keeps the status it was raised with.
 
     Returns:
         The response.

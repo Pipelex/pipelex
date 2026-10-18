@@ -19,7 +19,7 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import ERROR_FRAMES_FIELD, register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
@@ -111,6 +111,7 @@ class TestStartCapabilityGate:
         # reached, so this value is never observed.
         stub = _RecordingStub(workflow_id="wf-unused", supports_fire_and_forget=False)
         _register_stub(mocker, mode="direct", stub=stub)
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
 
         response = _build_client().post(
             "/v1/start",
@@ -120,3 +121,9 @@ class TestStartCapabilityGate:
         problem = assert_problem(response, status=501, code="runtime.unsupported")
         assert problem["params"] == {"capability": "asynchronous execution"}
         assert stub.calls == []
+        # Any caller can ask this deployment again and again for what it does not offer: the refusal is recorded as a
+        # warning without frames, never as an error filling the alerts.
+        log_spy.error.assert_not_called()
+        fields = log_spy.warning.call_args.kwargs["fields"]
+        assert fields["error.code"] == "runtime.unsupported"
+        assert ERROR_FRAMES_FIELD not in fields

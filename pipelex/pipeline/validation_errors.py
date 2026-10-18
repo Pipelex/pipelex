@@ -21,7 +21,7 @@ is no import cycle.
 
 from typing import Any
 
-from mthds.protocol.problem.models import ProblemItem
+from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import (
     CoreCode,
     MethodDependencyMissingKind,
@@ -401,6 +401,21 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
     if "suggestions" in spec.required_params:
         # A stage that offers close matches leaves the list out when it found none, which the code reads as an empty one.
         item_params.setdefault("suggestions", [])
+    return make_problem_item(
+        code=code,
+        params=item_params,
+        location=_item_location(item=item, code=code),
+        suggestions=item.suggestions,
+        suggested_fix=_problem_fix(item=item),
+    )
+
+
+def _item_location(*, item: ValidationErrorItem, code: ErrorCode) -> ProblemLocation | None:
+    """Where in the method a validation item is: the declaration a hint lint is on, the declaration a name conflict
+    collides on, else the pipe, field and file it names.
+    """
+    if isinstance(item.error_type, HintLintErrorType):
+        return _hint_location(item=item)
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
     if code == CoreCode.METHOD_NAME_CONFLICT and item.error_type not in _PIPE_NAME_CONFLICTS:
@@ -408,16 +423,25 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
         # declaration that collides, by its path from the bundle's root, such as `concept.Rating` or `pipe.compute_score`,
         # which a caller edits. A `field` beside no `pipe` reads from the bundle's root, so the location names no `pipe` a
         # reader would join that path to.
-        location = make_location(field=item.field_path or _declaration_path(item=item), file=item.source, line=line, column=column)
-    else:
-        location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
-    return make_problem_item(
-        code=code,
-        params=item_params,
-        location=location,
-        suggestions=item.suggestions,
-        suggested_fix=_problem_fix(item=item),
-    )
+        return make_location(field=item.field_path or _declaration_path(item=item), file=item.source, line=line, column=column)
+    return make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
+
+
+def _hint_location(*, item: ValidationErrorItem) -> ProblemLocation | None:
+    """The declaration a hint lint finding is on, which neither of `method.hint_invalid`'s parameters names.
+
+    A hint sits on one of three sites (`pipelex.pipeline.hint_warnings`): an input of a pipe, located at the pipe and the
+    input; a concept, located at its bundle-root path, `concept.<Concept>`; a field of a concept's structure, at the
+    field's, `concept.<Concept>.structure.<field>`. The domain is not part of the path, as no item's is: a bundle-root
+    path is read in the bundle that declares the concept.
+    """
+    if item.pipe_code is not None:
+        input_name = item.variable_names[0] if item.variable_names else None
+        return make_location(pipe=item.pipe_code, input_name=input_name)
+    if item.concept_code is not None:
+        concept_path = f"concept.{item.concept_code}"
+        return make_location(field=f"{concept_path}.structure.{item.field_name}" if item.field_name else concept_path)
+    return None
 
 
 def _problem_fix(*, item: ValidationErrorItem) -> dict[str, Any] | None:

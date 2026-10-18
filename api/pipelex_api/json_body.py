@@ -36,6 +36,7 @@ from typing_extensions import override
 
 from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH
+from pipelex_api.run_extras_binding import bind_run_extras
 
 # The two escape sequences that can hide a quote. Once they are gone, every quote left delimits a string.
 _ESCAPED_BACKSLASH = b"\\\\"
@@ -239,6 +240,8 @@ class JsonBodyRoute(APIRoute):
 
     The body is parsed only where FastAPI would parse it, a body with bytes whose content type is JSON (`_reads_as_json`):
     FastAPI hands any other body to the model as raw bytes, which the model refuses field by field, and so does this route.
+    A parsed body's `analytics_groups` are bound on the request before FastAPI validates any field
+    (`pipelex_api.run_extras_binding`), so the security event of a refusal of the request names whose request it was.
     """
 
     @override
@@ -254,7 +257,10 @@ class JsonBodyRoute(APIRoute):
             body = await parsed_request.body()
             ensure_json_nesting_within_limit(body)
             if body and _reads_as_json(content_type=parsed_request.headers.get("content-type"), is_strict=is_strict):
-                parsed_request.hold_parsed_body(parse_typed_json_body(body))
+                parsed_body = parse_typed_json_body(body)
+                # Before FastAPI validates a field, so a refusal of this request names whose request it was.
+                bind_run_extras(request=parsed_request, body=parsed_body)
+                parsed_request.hold_parsed_body(parsed_body)
             return await handler(parsed_request)
 
         return parsing_handler

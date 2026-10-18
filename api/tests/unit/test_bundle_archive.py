@@ -15,6 +15,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.exceptions import RequestMethodError, RunnerRequestError
+from pipelex_api.limits import base64_decoded_size
 from tests.unit._problems import problem_of
 
 _MAIN_MTHDS = 'domain = "b"\nmain_pipe = "echo"\n'
@@ -99,12 +100,18 @@ class TestBundleArchive:
 
     def test_oversized_base64_rejected_before_decode(self, mocker: MockerFixture):
         # The cheap length check on the still-encoded string fires before any b64decode.
-        mocker.patch("pipelex_api.bundle._MAX_BUNDLE_B64_CHARS", 16)
+        mocker.patch("pipelex_api.bundle.MAX_BUNDLE_TOTAL_BYTES", 16)
         decode_spy = mocker.spy(base64, "b64decode")
         with pytest.raises(RunnerRequestError) as exc:
             decode_bundle_archive(bundle_b64="A" * 64)
         problem = problem_of(exc.value)
         assert problem["status"] == 413
         assert problem["code"] == "request.too_large"
-        assert problem["params"] == {"limit": 16, "size": 64}
+        # The limit and the size are bytes, the archive's size read off the encoded length: 64 characters carry 48 bytes.
+        assert problem["params"] == {"limit": 16, "size": 48}
         decode_spy.assert_not_called()
+
+    @pytest.mark.parametrize("byte_count", [*range(10), 1023, 1024, 1025])
+    def test_the_size_read_off_an_encoded_value_is_its_decoded_size(self, byte_count: int):
+        encoded = base64.b64encode(bytes(byte_count)).decode("ascii")
+        assert base64_decoded_size(encoded=encoded) == byte_count
