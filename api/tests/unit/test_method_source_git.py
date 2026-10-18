@@ -14,9 +14,10 @@ from pathlib import Path
 import pytest
 from mthds.method_tree.digest import digest_of_contents
 from pipelex.methods.exceptions import MethodPackageSymlinkError
+from pipelex.methods.package_reason import MethodPackageReason
 from pytest_mock import MockerFixture
 
-from pipelex_api.exceptions import MethodPackageReason, RequestMethodError
+from pipelex_api.exceptions import RequestMethodError
 from pipelex_api.method_source import fetch_method_mthds_files, fetched_method
 from tests.unit._constants import STUB_METHOD_ADDRESS, STUB_METHOD_MANIFEST, VALID_MTHDS
 from tests.unit._problems import problem_of

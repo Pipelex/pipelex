@@ -94,7 +94,7 @@ class TestModelsCheckRoute:
         assert report["is_valid"] is False
         (item,) = report["errors"]
         assert item["code"] == "model.unknown"
-        assert item["params"] == {"model": llm_handle, "model_type": "img_gen"}
+        assert item["params"] == {"model": llm_handle, "model_type": "img_gen", "suggestions": []}
         assert item["location"]["field"] == "model"
 
     def test_doc_gen_is_a_category_of_the_check(self):

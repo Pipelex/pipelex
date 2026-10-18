@@ -22,7 +22,7 @@ from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware, reque
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.version import router as version_router
 from pipelex_api.security import RequestUser, get_request_user, verify_api_key
-from tests.unit._problems import assert_problem, problem_items_fields
+from tests.unit._problems import assert_problem
 
 USER_A = "aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
 USER_B = "bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb"
@@ -75,7 +75,8 @@ class TestErrorResponses:
         body = assert_problem(response, status=422, code="request.invalid", field="mthds_contents")
         assert body["domain"] == "input"
         assert body["detail"] == "The request's field 'mthds_contents' does not match the route's schema."
-        assert problem_items_fields(body) == ["mthds_contents"]
+        # A single refused field is the problem itself, with no list restating it.
+        assert "errors" not in body, body
         assert body["request_id"] == response.headers[REQUEST_ID_HEADER]
         assert body["retry"] == "no"
 

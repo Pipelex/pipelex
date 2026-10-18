@@ -23,6 +23,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeNotFoundError
+from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION
 from pipelex.methods.method_ref import looks_like_method_ref
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -212,7 +213,8 @@ class PipeSelectionMiss(NamedTuple):
     """The selector that missed, the request's `pipe_ref` or a declared `main_pipe`; `None` when there was none."""
 
     candidates: list[str] | None = None
-    """The qualified refs of the `main_pipe`s the closure declares, when it declares several."""
+    """The qualified refs the refusal offers: the `main_pipe`s the closure declares, when it declares several; the
+    pipes nearest a selector that names none; every pipe of the closure, when it gives no `main_pipe` to start from."""
 
 
 def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifest_main_pipe: str | None) -> RequestedPipe:
@@ -261,15 +263,25 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
     several domains is `method.ref_ambiguous`, naming it as the `ref` with its `candidates`, so the refusal
     never says a pipe that exists twice does not exist.
     """
+    candidates = miss.candidates or []
     match miss.kind:
         case PipeSelectionMissKind.NOT_FOUND:
             match miss.origin:
                 case SelectorOrigin.REQUEST:
-                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND).with_params(pipe=miss.selector))
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND)
+                        .with_params(pipe=miss.selector, suggestions=candidates)
+                    )
                 case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
-                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED).with_params(missing=miss.selector))
+                    # The reference is the method's `main_pipe` declaration, which no pipe declares: it is the `pipe` naming it.
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
+                        .with_params(pipe=MAIN_PIPE_DECLARATION, missing=miss.selector, candidates=candidates)
+                    )
                 case None:
-                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED))
+                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates))
         case PipeSelectionMissKind.AMBIGUOUS:
             match miss.origin:
                 case SelectorOrigin.REQUEST:
@@ -280,9 +292,7 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
                     )
                 case None:
                     raise (
-                        EntryPipeAmbiguousError(miss.message)
-                        .with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
-                        .with_params(candidates=miss.candidates)
+                        EntryPipeAmbiguousError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
                     )
                 case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
                     raise (
@@ -321,6 +331,8 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
             kind=PipeSelectionMissKind.NOT_FOUND,
             message="No `pipe_ref` was given and the closure declares no `main_pipe` — name the pipe explicitly.",
             origin=None,
+            # With no entry pipe to start from, the request may select any pipe of the closure.
+            candidates=sorted(crate.pipes),
         )
     if len(candidates) > 1:
         joined = ", ".join(sorted(candidates))
@@ -370,7 +382,12 @@ def _select_entry_pipe(selector: str, *, origin: SelectorOrigin) -> RequestedPip
         )
     except PipeNotFoundError as exc:
         return PipeSelectionMiss(
-            kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}", origin=origin, selector=selector
+            kind=PipeSelectionMissKind.NOT_FOUND,
+            message=f"{described} not found in {scope}: {exc}",
+            origin=origin,
+            selector=selector,
+            # The pipes of the closure nearest the selector, which the entry lookup found.
+            candidates=exc.given_params.get("suggestions"),
         )
     return RequestedPipe(ref=the_pipe.pipe_ref, pipe=the_pipe)
 

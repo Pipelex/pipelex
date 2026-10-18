@@ -20,6 +20,7 @@ Asserts the in-process wire response via `TestClient`; the conformance HTTP arm 
 
 from typing import Any
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
@@ -100,6 +101,7 @@ def _multi_category_error() -> ValidateBundleError:
                 field_name="output",
                 field_path="pipe.summarize.output",
                 message="Output concept is inadequate.",
+                params={"declared": "Summary", "expected": ["Contract"], "pipe_type": "PipeLLM"},
             )
         ],
     )
@@ -183,7 +185,7 @@ class TestValidateErrors:
         assert len(items) == 1, items
         item = items[0]
         assert item["code"] == "model.unknown"
-        assert item["params"] == {"model": "no-such-model-in-any-deck", "model_type": "llm"}
+        assert item["params"] == {"model": "no-such-model-in-any-deck", "model_type": "llm", "suggestions": []}
         assert item["location"] == {"pipe": "echo", "field": "model", "file": "echo.mthds"}
         assert item["detail"] == "The method names the llm model 'no-such-model-in-any-deck', which no catalog knows."
 
@@ -209,10 +211,14 @@ class TestValidateErrors:
         # The union of members across the items covers every member of a problem item and every locator.
         assert {key for item in items for key in item} == {"code", "detail", "params", "location"}
         assert {key for item in items for key in item.get("location", {})} == {"pipe", "field", "file"}
-        undeclared, unresolved, _ = items
+        undeclared, unresolved, mismatched = items
         assert undeclared["params"] == {"pipe": "summarize", "variables": ["contract"]}
-        assert unresolved["params"] == {"concept": "Summari"}
+        # The concepts the domain declares nearest the one that resolves to nothing are offered in its place.
+        assert unresolved["params"] == {"concept": "Summari", "suggestions": ["Summary"]}
+        # The facts the raise site gave ride the item beside those its locators give.
+        assert mismatched["params"] == {"pipe": "summarize", "declared": "Summary", "expected": ["Contract"], "pipe_type": "PipeLLM"}
 
+    @pytest.mark.builds_problems_without_required_params(reason="a dry-run failure the sweep could not locate names no pipe")
     def test_dry_run_failures_become_one_located_item_per_failing_pipe(self, mocker: MockerFixture):
         # A failing dry run is one `dry_run` item per failing pipe, located at the innermost pipe
         # that failed (its `pipe_code`, `domain_code` and `source`), never one item holding the whole
@@ -228,8 +234,11 @@ class TestValidateErrors:
                     domain_code="legal",
                     source="pipe.mthds",
                     message="Pipe 'summarize' failed: boom.",
+                    params={"variable_path": "contract.title"},
                 ),
-                DryRunFailureErrorData(code=CoreCode.METHOD_WIRING_INVALID, message="Dry run failed: unlocated."),
+                DryRunFailureErrorData(
+                    code=CoreCode.METHOD_WIRING_INVALID, message="Dry run failed: unlocated.", params={"variable_path": "contract"}
+                ),
             ],
         )
         mocker.patch.object(ApiRunner, "validate_verdict", new=mocker.AsyncMock(return_value=_failure_of(failing_dry_run)))
@@ -246,7 +255,7 @@ class TestValidateErrors:
         located_item, unlocated_item = items
         assert located_item["location"] == {"pipe": "summarize", "file": "pipe.mthds"}
         assert located_item["params"]["finding"] == "Pipe 'summarize' failed: boom."
-        assert unlocated_item["params"] == {"finding": "Dry run failed: unlocated."}
+        assert unlocated_item["params"] == {"finding": "Dry run failed: unlocated.", "variable_path": "contract"}
         assert "location" not in unlocated_item, unlocated_item
 
     def test_non_verdict_failure_is_not_a_200_verdict(self, mocker: MockerFixture):

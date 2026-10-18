@@ -54,7 +54,7 @@ class _InvalidVerdictValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
-        located_item = make_problem_item(code=CoreCode.METHOD_SCHEMA_VIOLATION)
+        located_item = make_problem_item(code=CoreCode.METHOD_SCHEMA_VIOLATION, params={"field_path": "pipe.echo", "finding": "it is not a pipe"})
         # Built by hand, as a stored record read back may be, with a parameter only the operator reads.
         read_back_item = ProblemItem.model_validate(
             {

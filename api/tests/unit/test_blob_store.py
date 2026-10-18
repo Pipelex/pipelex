@@ -221,10 +221,10 @@ class TestProblemScheme:
             (StorageMethod.IN_MEMORY, "memory"),
             (StorageMethod.S3, "s3"),
             (StorageMethod.GCP, "gcs"),
-            ("azure", None),
+            ("azure", "plugin"),
         ],
     )
-    def test_the_problem_names_the_kind_of_storage_as_the_registry_spells_it(self, storage_method: str, scheme: str | None) -> None:
+    def test_the_problem_names_the_kind_of_storage_as_the_registry_spells_it(self, storage_method: str, scheme: str) -> None:
         assert problem_scheme_of(storage_method=storage_method) == scheme
         params = problem_of(BlobStoreDamagedError("damaged", scheme=scheme)).get("params")
-        assert params == ({"scheme": scheme} if scheme is not None else None)
+        assert params == {"scheme": scheme}

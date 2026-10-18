@@ -18,9 +18,10 @@ from io import BytesIO
 
 from mthds.protocol.problem.registry import CoreCode, RequestMalformedReason
 from pipelex import log
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.tools.log.error_fields import error_fields
 
-from pipelex_api.exceptions import MethodPackageReason, RequestMethodError, RunnerRequestError
+from pipelex_api.exceptions import RequestMethodError, RunnerRequestError
 from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES
 
 # The request field the archive rides, which the refusals of its encoding name.

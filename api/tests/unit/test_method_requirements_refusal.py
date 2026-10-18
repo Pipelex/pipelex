@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKind, MethodDependencyMissingReason
 from pipelex.config import get_config
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -236,7 +236,9 @@ class TestMethodRequirementsRefusal:
             else:
                 threads_holding_a_loop.append(True)
             msg = "The method needs Python packages."
-            raise MethodRequirementsNotMetError(msg, items=[])
+            raise MethodRequirementsNotMetError(msg, items=[]).with_params(
+                kind=MethodDependencyMissingKind.REQUIREMENT, name="pandas", reason=MethodDependencyMissingReason.NOT_FOUND
+            )
 
         mocker.patch(f"{_PIPELINE_NS}.ensure_served_method_requirements_met", side_effect=refuse_after_noting_the_thread)
         validator = _UnreachableValidator()

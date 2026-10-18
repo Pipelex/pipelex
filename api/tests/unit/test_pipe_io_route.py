@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.interpreter_hub import get_library_manager
-from pipelex.pipeline.exceptions import PipeIOContractError
+from pipelex.pipeline.exceptions import SCHEMA_UNRENDERABLE_FINDING, PipeIOContractError
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
@@ -236,7 +236,10 @@ class TestPipeIoRoute:
         _assert_keys(body, {"other.shout"})
         response = _build_client(as_operator=True).post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
         # The author's manifest names a pipe the method lacks: the method's fault, not the caller's selector.
-        problem = _assert_selection_refusal(response, code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"missing": "echo"})
+        # The refusal names the declaration that holds the reference, the manifest's `main_pipe`, and no pipe is near `echo`.
+        problem = _assert_selection_refusal(
+            response, code=CoreCode.METHOD_PIPE_UNRESOLVED, params={"pipe": "main_pipe", "missing": "echo", "candidates": []}
+        )
         assert problem["domain"] == "method"
         assert problem["diagnostics"]["error_class"] == "EntryPipeNotFoundError"
         message = problem["diagnostics"]["message"]
@@ -347,7 +350,7 @@ class TestPipeIoRoute:
                 (VALID_MTHDS,),
                 {"pipe_ref": "smoke.not_a_pipe"},
                 CoreCode.REQUEST_PIPE_NOT_FOUND,
-                {"pipe": "smoke.not_a_pipe"},
+                {"pipe": "smoke.not_a_pipe", "suggestions": []},
                 ("EntryPipeNotFoundError", "not found"),
                 id="unknown-ref",
             ),
@@ -355,15 +358,16 @@ class TestPipeIoRoute:
                 (VALID_MTHDS,),
                 {"pipe_ref": "smoke.not_a_pipe", "all_pipes": True},
                 CoreCode.REQUEST_PIPE_NOT_FOUND,
-                {"pipe": "smoke.not_a_pipe"},
+                {"pipe": "smoke.not_a_pipe", "suggestions": []},
                 ("EntryPipeNotFoundError", "not found"),
                 id="unknown-ref-under-all-pipes",
             ),
             pytest.param(
                 (NO_MAIN_PIPE_MTHDS,),
                 {},
+                # The caller may select any pipe the method declares.
                 CoreCode.REQUEST_PIPE_UNSPECIFIED,
-                {},
+                {"candidates": ["nomain.echo"]},
                 ("EntryPipeNotFoundError", "declares no `main_pipe`"),
                 id="no-entry-pipe",
             ),
@@ -448,7 +452,7 @@ class TestPipeIoRoute:
         install_method_package(files={"documents.mthds": NO_MAIN_PIPE_MTHDS}, manifest_toml=STUB_METHOD_MANIFEST_NO_MAIN_PIPE)
         client = _build_client()
         response = client.post(PIPE_IO_PATH, json={"method_ref": STUB_METHOD_REF})
-        _assert_selection_refusal(response, code=CoreCode.REQUEST_PIPE_UNSPECIFIED, params={})
+        _assert_selection_refusal(response, code=CoreCode.REQUEST_PIPE_UNSPECIFIED, params={"candidates": ["nomain.echo"]})
 
     @pytest.mark.parametrize(
         ("contents", "request_fields"),
@@ -539,7 +543,9 @@ class TestPipeIoRoute:
         # described. The library is still torn down.
         mocker.patch(
             "pipelex_api.routes.pipelex.pipe_io.build_pipe_io_artifacts",
-            side_effect=PipeIOContractError(message="Failed to render the JSON Schema for the output of pipe 'smoke.echo'"),
+            side_effect=PipeIOContractError(message="Failed to render the JSON Schema for the output of pipe 'smoke.echo'").with_params(
+                concept="native.Text", finding=SCHEMA_UNRENDERABLE_FINDING
+            ),
         )
         library_manager = get_library_manager()
         open_spy = mocker.spy(library_manager, "open_library")
