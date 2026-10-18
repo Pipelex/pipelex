@@ -167,6 +167,9 @@ class TestValidateExitCodes:
         mocker.patch(f"{AGENT_BUNDLE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{AGENT_BUNDLE_MODULE}.Pipelex.teardown_if_needed")
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="hands the command dry-run failures built in the test, without the parameters a sweep records"
+    )
     def test_invalid_bundle_is_negative_verdict_exit_1(self, mocker: MockerFixture, tmp_path: Path) -> None:
         self._patch_boot(mocker)
         mocker.patch(
@@ -242,6 +245,9 @@ class TestValidateExitCodes:
         mocker.patch(f"{AGENT_PIPE_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{AGENT_PIPE_MODULE}.Pipelex.teardown_if_needed")
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="hands the command dry-run failures built in the test, without the parameters a sweep records"
+    )
     def test_agent_validate_all_dry_run_failure_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
         # `validate --all` sweeps through the bundle-loading cascade, which turns the sweep's DryRunError
         # into the invalid verdict (one located dry_run item per failing pipe) → exit 1, NOT the
@@ -252,6 +258,9 @@ class TestValidateExitCodes:
             agent_validate_pipe_cmd(pipe_code=None, validate_all=True, output_format=CliOutputFormat.JSON)
         assert exc_info.value.exit_code == 1
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="hands the command dry-run failures built in the test, without the parameters a sweep records"
+    )
     def test_agent_validate_pipe_dry_run_failure_is_negative_verdict_exit_1(self, mocker: MockerFixture) -> None:
         # Single-pipe validate_pipe_core sweeps through the same cascade.
         self._patch_pipe_boot(mocker)

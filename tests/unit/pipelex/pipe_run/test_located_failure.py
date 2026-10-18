@@ -119,6 +119,9 @@ class TestLocatedFailureProblem:
         assert problem.diagnostics is not None
         assert problem.diagnostics.message == "Size tier '4k' is not satisfiable: use '1k' or '2k'"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_the_problem_is_the_root_faults_located_at_the_failing_pipe(self) -> None:
         """Through the router, a bridge and the runner, the problem is the root fault's, located once at the innermost pipe."""
         root_fault = LLMCompletionError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).with_error_code(
@@ -277,6 +280,9 @@ class TestLocatedFailureProblem:
         assert problem.diagnostics.error_class == "PipeRouterError"
         assert problem.diagnostics.message.endswith("combine failed")
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds items with no parameters, to check how the wrappers' items follow their cause's"
+    )
     def test_what_the_wrappers_above_a_coded_cause_give_reaches_its_problem(self, caplog: pytest.LogCaptureFixture) -> None:
         """A wrapper fills a parameter its coded cause did not give, the nearest one winning, and its items follow the cause's."""
         carrier = (

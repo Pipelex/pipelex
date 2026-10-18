@@ -1171,7 +1171,9 @@ class ModelDeck(ConfigModel):
             f"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order) "
             "but none of the fallback models were found in the model deck"
         )
-        raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list)
+        raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list).with_params(
+            model=waterfall_name, model_type=model_type, reason=ModelUnavailableReason.NO_FALLBACK_SERVED
+        )
 
     def _resolve_alias(
         self,

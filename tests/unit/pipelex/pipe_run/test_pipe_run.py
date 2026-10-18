@@ -178,6 +178,9 @@ class TestPipeRun:
         assert event_fields["run.extras.org_id"] == "org_abc"
         assert not emit_security_event(error=refusal)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises SSRF refusals built in the test, without the input and the rule their raise sites name"
+    )
     async def test_a_run_refused_then_its_webhook_refused_logs_both_refusals(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
         """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two refusals of one code, two events."""
         input_refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)

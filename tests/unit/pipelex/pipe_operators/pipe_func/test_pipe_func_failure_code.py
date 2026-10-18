@@ -72,7 +72,8 @@ class _TimedOutExecutor(PipeFuncExecutorProtocol):
         pipe_run_params: PipeRunParams,
     ) -> PipeFuncExecutionResult:
         msg = f"PipeFunc '{function_name}' exceeded its 30s timeout"
-        raise PipeFuncExecutionError(msg).with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT)
+        # As the executor's own deadline raises it: the function and the limit it passed.
+        raise PipeFuncExecutionError(msg).with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT).with_params(function=function_name, timeout=30)
 
     @override
     async def run_pipe_func_transported(self, *, request: PipeFuncExecutionRequest) -> PipeFuncExecutionResponse:
@@ -182,6 +183,9 @@ class TestPipeFuncFailureCode:
 
         assert failure.to_problem(view=ProblemView.CALLER).code == expected_code
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the coercion of a function's return knows neither the step's output concept nor a field of it"
+    )
     @pytest.mark.parametrize(
         "function",
         [_returns_a_list_holding_a_dict, _returns_a_list_holding_a_number],

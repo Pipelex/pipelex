@@ -27,6 +27,9 @@ class TestFetchFileFromUrl:
         raw_bytes = await fetch_file_from_url_httpx(url=URL, transport=_transport_answering(200, b"%PDF-1.4"))
         assert raw_bytes == b"%PDF-1.4"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the URL fetch knows neither the input the URL came from nor the kind of file its caller wants"
+    )
     @pytest.mark.parametrize(
         ("status_code", "expected_code"),
         [
@@ -51,6 +54,11 @@ class TestFetchFileFromUrl:
         assert caller.code == expected_code
         assert caller.domain == ProblemDomain.INPUT
         assert caller.is_retryable is error_code_spec(expected_code).invites_retry
+        # The fetch names what it knows, the URL's host or why the file could not be read; its caller knows the input.
+        assert caller.params is not None
+        assert caller.params.as_wire() == (
+            {"host": "example.com"} if expected_code == CoreCode.INPUT_URL_UNREACHABLE else {"reason": f"the server answered HTTP {status_code}"}
+        )
         operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
         assert operator.diagnostics is not None
         assert f"HTTP {status_code}" in operator.diagnostics.message

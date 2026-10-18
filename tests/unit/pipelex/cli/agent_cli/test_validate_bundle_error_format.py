@@ -132,6 +132,9 @@ class TestValidateBundleErrorFormat:
         with pytest.raises(json.JSONDecodeError):
             json.loads(captured.err)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_json_dispatch_emits_unchanged_structured_envelope(self, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
         """In JSON mode the dispatcher emits the byte-stable structured envelope hooks branch on."""
         set_agent_cli_error_format(CliOutputFormat.JSON)

@@ -198,6 +198,9 @@ class TestFalWorkerErrorHandling:
         assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_problem_includes_category(self, mocker: MockerFixture) -> None:
         """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_fal_img_gen_worker(mocker)

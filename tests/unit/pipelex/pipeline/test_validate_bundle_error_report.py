@@ -6,6 +6,7 @@ machine-mappable per-error diagnostics instead of only a single ``detail`` strin
 ``build_validation_error_items`` builds ride beside it, one per problem item.
 """
 
+import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict, StepKind
 
 from pipelex.base_exceptions import ValidationErrorCategory
@@ -23,6 +24,8 @@ def _error_with_two_categories() -> ValidateBundleError:
             PipelexBundleBlueprintValidationErrorData(
                 error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
                 source="main.mthds",
+                # The offending code, which the blueprint categorizer recovers from the refusal.
+                pipe_code="Not A Pipe",
                 message="Invalid main pipe syntax 'Not A Pipe'",
             ),
         ],
@@ -67,6 +70,9 @@ class TestValidateBundleErrorProblem:
         assert operator.diagnostics is not None
         assert operator.diagnostics.error_class == "ValidateBundleError"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_message_only_error_surfaces_a_residual_item(self) -> None:
         """No categorized errors → a ``blueprint_validation`` residual still rides the verdict (the invariant is total).
 

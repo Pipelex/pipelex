@@ -10,6 +10,7 @@ that the older CLI-only extractor dropped — and the CLI↔API shape parity.
 
 import json
 
+import pytest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
@@ -177,6 +178,7 @@ class TestBuildValidationErrorItems:
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY, ValidationErrorCategory.DRY_RUN]
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_a_verdict_projects_its_dry_run_failures(self) -> None:
         """A ``ValidateBundleError`` carrying dry-run failures lists one ``dry_run`` item per failure, and its problem one item each."""
         exc = ValidateBundleError(
@@ -245,6 +247,9 @@ class TestBuildValidationErrorItems:
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_validation_items_are_total_for_message_only_error(self) -> None:
         """A bare-message ``ValidateBundleError`` still lists a non-empty set of items — the invariant is total.
 
@@ -457,6 +462,9 @@ class TestBuildValidationErrorItems:
         # And the verdict lists it (it would be missing if the list were dropped).
         assert [item.pipe_code for item in exc.validation_error_items()] == ["pipe_inst"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a warning no type classifies names no declaration, so its item carries no field path"
+    )
     def test_warnings_become_problem_items_under_the_code_their_type_names(self) -> None:
         """A valid report's warnings, as a surface speaking problem items carries them: each type names its code, and a
         warning no type classifies takes `method.schema_violation`, as an unclassified item of an invalid verdict does.

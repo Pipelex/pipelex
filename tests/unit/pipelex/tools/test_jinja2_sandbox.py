@@ -188,6 +188,7 @@ class TestTemplateSandbox:
         with pytest.raises(Jinja2TemplateSecurityError, match=r"may not call the method 'model_copy' of a 'ImageContent' value"):
             await _render("{{ photos[0].model_copy() }}")
 
+    @pytest.mark.builds_problems_without_required_params(reason="renders outside any pipe, whose failure location names the pipe")
     @pytest.mark.parametrize(
         ("_topic", "template_source", "refused_name"),
         [

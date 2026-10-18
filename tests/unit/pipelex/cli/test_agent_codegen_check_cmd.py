@@ -81,6 +81,7 @@ class TestAgentCodegenCheckCmd:
         error = json.loads(capsys.readouterr().err)
         assert error["error_type"] == "CodegenLockNotFoundError"
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the command an error built in the test, without the file its raise site names")
     def test_unreadable_lock_is_no_verdict_exit_2(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         mocker.patch(f"{CMD_MODULE}.run_codegen_check", side_effect=CodegenLockError("codegen.lock is not valid TOML"))
 

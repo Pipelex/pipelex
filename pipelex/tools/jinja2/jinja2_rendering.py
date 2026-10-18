@@ -10,7 +10,7 @@ from jinja2.exceptions import (
     TemplateSyntaxError,
     UndefinedError,
 )
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.system.exceptions import ToolError
@@ -56,7 +56,10 @@ def _add_to_templating_context(
     if jinja2_context_key in templating_context:
         # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default.
         msg = f"Jinja2 context key '{jinja2_context_key}' already in templating_context"
-        raise _coded_by_owner(error=Jinja2StuffError(msg), template_owner=template_owner)
+        raise _coded_by_owner(
+            error=Jinja2StuffError(msg).with_params(name=jinja2_context_key, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION),
+            template_owner=template_owner,
+        )
     templating_context[jinja2_context_key] = value
 
 

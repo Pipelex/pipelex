@@ -9,6 +9,8 @@ worker's error family, with a human-readable message and a structured
 
 import math
 
+from mthds.protocol.problem.registry import ModelUnavailableReason
+
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -25,6 +27,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
+from pipelex.cogt.model_backends.model_type import ModelType
 
 # Generic failure error class per family — used when the error is not a missing model.
 _FAILURE_CLASSES: dict[InferenceErrorFamily, type[CogtError]] = {
@@ -42,6 +45,16 @@ _NOT_FOUND_CLASSES: dict[InferenceErrorFamily, type[ModelNotFoundError]] = {
     InferenceErrorFamily.EXTRACT: ExtractModelNotFoundError,
     InferenceErrorFamily.SEARCH: SearchModelNotFoundError,
     InferenceErrorFamily.JUDGMENT: JudgmentModelNotFoundError,
+}
+
+
+# The kind of model each family's worker calls, which `model.unavailable` names.
+_FAMILY_MODEL_TYPES: dict[InferenceErrorFamily, ModelType] = {
+    InferenceErrorFamily.LLM: ModelType.LLM,
+    InferenceErrorFamily.IMG_GEN: ModelType.IMG_GEN,
+    InferenceErrorFamily.EXTRACT: ModelType.TEXT_EXTRACTOR,
+    InferenceErrorFamily.SEARCH: ModelType.SEARCH,
+    InferenceErrorFamily.JUDGMENT: ModelType.JUDGMENT,
 }
 
 
@@ -143,14 +156,18 @@ def render_inference_error(
             error_category=classification.category,
             user_action=user_action,
             provider_metadata=metadata,
-        )
+        ).with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.UNKNOWN_AT_PROVIDER)
     # The not-found classes report ``model.unavailable`` alone, which the classification guarantees. A failure
     # class declares every classified code, and its code is chosen here rather than inherited, since the
     # provider's exception it is raised from carries none.
     failure_class = _FAILURE_CLASSES[family]
-    return failure_class(
+    failure = failure_class(
         message,
         error_category=classification.category,
         user_action=user_action,
         provider_metadata=metadata,
     ).with_error_code(classification.error_code)
+    if classification.is_model_not_allowed:
+        # The provider serves the model but does not allow it for this caller.
+        failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
+    return failure

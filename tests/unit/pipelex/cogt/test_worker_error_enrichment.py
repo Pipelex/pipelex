@@ -178,6 +178,9 @@ class TestWorkerErrorEnrichment:
         assert diagnostics.provider is not None
         assert diagnostics.provider.name == WORKER_PROVIDER
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises a not-found failure built in the test, without the kind of model and the reason its raise site gives"
+    )
     async def test_llm_worker_does_not_overwrite_existing_model(self, mocker: MockerFixture) -> None:
         """An inner error that already set model_handle keeps its value; only the missing provider is filled."""
         inner_model = "preset-only-model"
@@ -192,6 +195,9 @@ class TestWorkerErrorEnrichment:
         assert diagnostics.provider is not None
         assert diagnostics.provider.name == WORKER_PROVIDER
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a worker that does not know its provider leaves the provider unnamed, which is what the test checks"
+    )
     async def test_llm_worker_skips_unknown_provider(self, mocker: MockerFixture) -> None:
         """A worker that does not know its provider ('unknown' default) leaves provider unset."""
         error = LLMCompletionError("LLM worker failed", error_category=InferenceErrorCategory.TRANSIENT)

@@ -90,6 +90,9 @@ class TestDryRunFailureLocation:
         assert raised.value.__cause__ is failure
         assert recorder.find_failing_pipe(error=raised.value) is pipe
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises failures built with a message alone, to check that the sweep reads their code's sentence"
+    )
     @pytest.mark.parametrize(
         ("error", "expected_code", "expected_text", "own_text"),
         [
@@ -170,6 +173,9 @@ class TestDryRunFailureLocation:
 
         assert failures == [inner_failure_own, other_failure]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises failures of a test class with a message alone, to check where the sweep locates them"
+    )
     @pytest.mark.asyncio
     async def test_a_failure_met_at_a_pipe_allowed_to_fail_stays_on_the_swept_pipe(self, mocker: MockerFixture) -> None:
         """The tolerated pipe is not the failure: the swept pipe that failed because of it is."""
@@ -197,6 +203,9 @@ class TestDryRunFailureLocation:
         (located_failure,) = exc_info.value.failures
         assert (located_failure.pipe_code, located_failure.domain_code) == ("run_workshop", "board")
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises a failure of a test class with a message alone, to check the source it is given"
+    )
     @pytest.mark.asyncio
     async def test_a_source_the_library_manager_gives_as_a_path_is_kept_as_text(self, mocker: MockerFixture) -> None:
         """Injected managers written against the previous protocol may still return ``Path``."""

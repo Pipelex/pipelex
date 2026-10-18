@@ -4,13 +4,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
-from pipelex.errors import problem as problem_module
-from pipelex.errors.problem import MISSING_REQUIRED_PARAMS_MESSAGE
 from pipelex.methods.fetching import FetchedMethodPackage, ensure_package_within_bounds
 from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
+from pipelex.test_extras.required_params_sweep import assert_problems_carried_required_params, spy_on_problem_warnings
 from pipelex.test_extras.shared_pytest_plugins import needs_inference_in_pipelex
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest import FixtureRequest
@@ -24,19 +23,13 @@ from tests.unit._constants import STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST
 def problems_carry_their_required_params_fixture(request: FixtureRequest, mocker: MockerFixture) -> Generator[None, None, None]:
     """Fail a test during which a problem or an item was built without a parameter its code requires.
 
-    The sweep of every code the runner emits: whatever a test makes the runner answer, a refusal of a route, an item
-    of a verdict or a run's failure, is built by `make_problem` or `make_problem_item`, which log each required
-    parameter a raise site did not give (`pipelex.errors.problem.missing_required_params`). A test that builds such
-    a problem on purpose, to check something its parameters do not decide, says so with the
+    The sweep of every code the runner emits (`pipelex.test_extras.required_params_sweep`), the library's unit tests
+    running the same one: a test that builds such a problem on purpose says so with the
     `builds_problems_without_required_params` marker and its reason.
     """
-    warn_spy = mocker.spy(problem_module, "_warn")
+    warn_spy = spy_on_problem_warnings(mocker=mocker)
     yield
-    # A marker on the test, its class or its module is among the test's keywords.
-    if "builds_problems_without_required_params" in request.keywords:
-        return
-    lacking = [call.kwargs["fields"] for call in warn_spy.call_args_list if call.kwargs.get("message") == MISSING_REQUIRED_PARAMS_MESSAGE]
-    assert not lacking, f"A problem or an item was built without a parameter its code requires: {lacking}"
+    assert_problems_carried_required_params(warn_spy=warn_spy, keywords=request.keywords)
 
 
 @pytest.fixture(autouse=True, name="blob_storage")

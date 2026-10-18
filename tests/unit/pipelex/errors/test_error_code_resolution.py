@@ -48,6 +48,9 @@ def _raise_chain(*errors: BaseException) -> BaseException:
 
 
 class TestErrorCodeResolution:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds errors of test classes with a message alone, to check how their code resolves"
+    )
     def test_a_class_code_decides_the_problem(self) -> None:
         problem = _ModelUnknownError("no such model").to_problem(view=ProblemView.CALLER)
         spec = CORE_CODE_SPECS[CoreCode.MODEL_UNKNOWN]
@@ -64,6 +67,9 @@ class TestErrorCodeResolution:
         assert problem.title == error_code_spec(PipelexErrorCode.CONFIG_INVALID).title
         assert problem.domain == ProblemDomain.OPERATOR
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds errors of test classes with a message alone, to check how their code resolves"
+    )
     def test_a_raise_site_chooses_from_the_set(self) -> None:
         assert _ProviderError("boom").to_problem(view=ProblemView.CALLER).code == CoreCode.PROVIDER_FAILED
         chosen = _ProviderError("slow down").with_error_code(CoreCode.PROVIDER_RATE_LIMITED).to_problem(view=ProblemView.CALLER)
@@ -74,6 +80,9 @@ class TestErrorCodeResolution:
         with pytest.raises(ValueError, match=re.escape("does not declare the code 'model.unknown'")):
             _ProviderError("boom").with_error_code(CoreCode.MODEL_UNKNOWN)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds errors of test classes with a message alone, to check how their code resolves"
+    )
     def test_an_inheriting_wrapper_takes_its_cause_code(self) -> None:
         error = _raise_chain(_WrapperError("outer"), _ModelUnknownError("inner"))
         assert isinstance(error, PipelexError)
@@ -98,6 +107,9 @@ class TestErrorCodeResolution:
         assert isinstance(error, PipelexError)
         assert error.resolve_error_code() == CoreCode.INPUT_INVALID
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds errors of test classes with a message alone, to check what crosses a foreign exception"
+    )
     def test_nothing_crosses_a_foreign_exception(self) -> None:
         """An earlier failure below a foreign exception lends the error above it no fact and no advice."""
         earlier_failure = LLMCompletionError(

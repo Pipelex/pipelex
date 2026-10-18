@@ -105,12 +105,18 @@ class TestFormattedMarkdown:
         formatted = format_markdown(markdown=MarkdownFormattingTestData.LONG_REPORT)
         assert sum(isinstance(block, FormattedHeading) for block in formatted.blocks) == 300
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="outside a render, the Markdown conversion knows neither the input it formats nor the size it would reach; the engine that called it "
+        "names where the value goes"
+    )
     def test_the_budget_error_is_the_caller_s(self) -> None:
         with pytest.raises(MarkdownFormattingBudgetError) as caught:
             format_markdown(markdown=MarkdownFormattingTestData.PADDED_TABLE)
         caller = caught.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.INPUT_TOO_LARGE
         assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"limit": DEFAULT_RENDER_BUDGET_UNITS}
         assert f"{DEFAULT_RENDER_BUDGET_UNITS:,} work units" in caught.value.message
 
     def test_inside_a_render_the_render_s_budget_is_charged_for_the_source_the_tables_and_the_result(self) -> None:

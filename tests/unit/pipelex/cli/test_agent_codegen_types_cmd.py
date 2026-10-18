@@ -104,6 +104,9 @@ class TestAgentCodegenTypesCmd:
         assert error["error_type"] == "LibraryLoadingError"
         assert "duplicate pipe" in error["message"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="hands the command an error built in the test, without the method reference its raise site names"
+    )
     @pytest.mark.parametrize(
         ("raised", "expected_error_type"),
         [

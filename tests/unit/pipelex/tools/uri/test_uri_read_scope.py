@@ -129,9 +129,11 @@ class TestAuthorizeUriRead:
 
     def test_the_refusal_is_an_input_error_answered_as_a_422_quoting_no_uri(self) -> None:
         with pytest.raises(UriReadRefusedError) as exc_info:
-            authorize_uri_read(uri="/etc/passwd", read_scope=READ_SCOPE, position="the input 'photo'")
+            authorize_uri_read(uri="/etc/passwd", read_scope=READ_SCOPE, position="the input 'photo'", input_name="photo")
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert caller.params is not None
+        assert caller.params.as_wire()["input"] == "photo"
         assert caller.domain == ProblemDomain.INPUT
         assert error_code_spec(CoreCode.SECURITY_INPUT_URL_REFUSED).status == 422
         assert "/etc/passwd" not in str(caller.to_wire())

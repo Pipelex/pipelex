@@ -119,6 +119,10 @@ class TestBuildInputsForPipe:
 
         assert str(bundle_path) in str(exc_info.value)
         assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        # The method declares no main pipe, so it has none to offer as a candidate.
+        caller_params = exc_info.value.to_problem(view=ProblemView.CALLER).params
+        assert caller_params is not None
+        assert caller_params.as_wire() == {"candidates": []}
 
     def test_bundle_path_explicit_pipe_code_wins(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
         """With a bundle path, an explicit pipe code overrides the bundle's main_pipe, and the result names it qualified."""
@@ -157,6 +161,10 @@ class TestBuildInputsForPipe:
             asyncio.run(build_inputs_for_pipe())
 
         assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        # The method declares no main pipe, so it has none to offer as a candidate.
+        caller_params = exc_info.value.to_problem(view=ProblemView.CALLER).params
+        assert caller_params is not None
+        assert caller_params.as_wire() == {"candidates": []}
 
         ops_mocks["get_required_entry_pipe"].assert_not_called()
 

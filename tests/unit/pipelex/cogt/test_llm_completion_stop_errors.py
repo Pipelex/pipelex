@@ -138,6 +138,9 @@ class TestLLMCompletionStopErrors:
             "so the text cannot be used. Revise the prompt or the input."
         )
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a context-window stop signal carries neither the prompt's size nor the window's, the counts of model.context_exceeded"
+    )
     @pytest.mark.parametrize(
         ("error_class", "error", "expected_code", "expected_domain", "user_action_detail"),
         [
@@ -183,6 +186,9 @@ class TestLLMCompletionStopErrors:
         assert advice.kind == UserActionKind.CHANGE_INPUT
         assert advice.detail == user_action_detail
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a context-window stop signal carries neither the prompt's size nor the window's, the counts of model.context_exceeded"
+    )
     @pytest.mark.parametrize("error", [_truncated_error(), _context_window_error(), _refused_error()])
     def test_the_caller_reads_the_model_without_the_partial_text(self, error: LLMCompletionError) -> None:
         """The caller's problem names the model in the code's parameters, and no view carries the partial text."""
@@ -216,3 +222,14 @@ class TestLLMCompletionStopErrors:
         assert problem.diagnostics is not None
         assert problem.diagnostics.error_class == "LLMCompletionTruncatedError"
         assert problem.diagnostics.message == TRUNCATED_MESSAGE
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a context-window stop signal carries neither the prompt's size nor the window's, the counts of model.context_exceeded"
+    )
+    def test_a_context_window_stop_names_the_bound_it_passed(self) -> None:
+        """The stop signal names the bound, the context window, and neither the prompt's size nor the window's."""
+        caller = _context_window_error().to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.MODEL_CONTEXT_EXCEEDED
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": "claude-5-sonnet", "limit": "context_window"}

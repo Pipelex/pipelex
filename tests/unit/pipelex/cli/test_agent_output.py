@@ -288,6 +288,7 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "Check your API key and try again"
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the envelope a fetch failure built in the test, which names no input")
     def test_agent_error_uses_report_retryable_from_the_code(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error sets retryable=True when the cause's code says a retry can succeed."""
         cause = RemoteFileFetchError("Could not fetch 'https://example.com/a.pdf': the request timed out").with_error_code(
@@ -300,6 +301,7 @@ class TestAgentOutput:
         assert parsed["retryable"] is True
         assert parsed["error_domain"] == "input"
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the envelope a fetch failure built in the test, which names no input")
     def test_agent_error_carries_the_cause_registry_code(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error names the cause's registry code as error_code, the member a hosted refusal carries too."""
         cause = RemoteFileFetchError("Could not fetch 'https://example.com/a.pdf': the request timed out").with_error_code(
@@ -338,6 +340,9 @@ class TestAgentOutput:
         assert parsed["error_code"] == CoreCode.RUNTIME_UNEXPECTED
         assert "validation_errors" not in parsed
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_agent_error_lists_the_items_of_a_verdict_under_pipelex_wrappers(self, capsys: pytest.CaptureFixture[str]) -> None:
         verdict = ValidateBundleError(message="Pipe 'post_notice' could not be loaded")
         wrapper = PipelexError("the run was refused")

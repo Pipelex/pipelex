@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar
 
-from mthds.protocol.problem.registry import CoreCode, ModelUnavailableReason
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit, ModelUnavailableReason
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, ProblemFacts, iter_cause_chain
@@ -648,12 +648,15 @@ class LLMCompletionTruncatedError(LLMCompletionError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
+        # At the context window the bound passed is known, and the counts are not: the stop signal carries neither the
+        # prompt's size nor the window's.
         return {
             **super().problem_params(),
             "pipe": self.pipe_code,
             "model": self.model_handle,
             "max_tokens": self.max_tokens,
             "output_tokens": self.output_tokens,
+            "limit": ModelContextExceededLimit.CONTEXT_WINDOW,
         }
 
 

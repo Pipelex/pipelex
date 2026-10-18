@@ -158,6 +158,9 @@ class TestLLMSettingCheck:
         assert message.endswith(expected_remedy)
         assert "choice_defaults" not in message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a worker's own refusal, built with a message alone, is named by its code's title, which is what the test checks"
+    )
     def test_a_refusal_not_worded_for_the_caller_is_named_by_its_title(self, mocker: MockerFixture) -> None:
         """A worker's own refusal names the SDK and the backend, which a verdict kept under strict disclosure must not show."""
         self._patch_deck_overrides(mocker, for_text=None, for_object=None)

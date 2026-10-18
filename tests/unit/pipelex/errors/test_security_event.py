@@ -147,6 +147,7 @@ class TestSecurityEvent:
         assert security_codes
         assert set(SECURITY_TARGET_KIND_BY_CODE) == security_codes
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each refusal with a message alone, to check its code and the event it logs")
     @pytest.mark.parametrize(
         ("error", "code", "domain", "error_type", "target_kind", "target_class"),
         [

@@ -293,6 +293,9 @@ class TestOpenAIImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata.status_code == 404
         assert exc_info.value.model_handle == "gpt-image-1"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_problem_includes_provider_metadata(self, mocker: MockerFixture) -> None:
         worker = _make_openai_img_gen_worker(mocker)
         sdk_exc = openai.RateLimitError(

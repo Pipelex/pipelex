@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict, ProblemDomain
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
@@ -57,6 +57,9 @@ async def _render_failure(
 
 
 class TestJinja2RenderOwner:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, whose failure location names the pipe; the render does not know which field of the pipe the template is"
+    )
     @pytest.mark.parametrize(
         ("template_source", "fault"),
         [
@@ -99,6 +102,10 @@ class TestJinja2RenderOwner:
         assert operator.diagnostics is not None
         assert "frob_the_lane" in operator.diagnostics.message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, whose failure location names the pipe; the render knows neither the template's field nor the budget "
+        "operation's kind nor the input a Pipelex template displays"
+    )
     @pytest.mark.parametrize(
         ("topic", "template_source", "context", "is_undefined_strict", "error_class", "method_code", "pipelex_code"),
         [
@@ -190,6 +197,20 @@ class TestJinja2RenderOwner:
             assert type(error) is error_class, topic
             assert error.to_problem(view=ProblemView.CALLER).code == expected_code, f"{topic} on a {template_owner} template"
 
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_method_variable_named_like_a_reserved_key_is_a_name_conflict_naming_it(self) -> None:
+        error = await _render_failure(
+            "{{ lane }}", template_owner=TemplateOwner.METHOD, context={"lane": "express", Jinja2ContextKey.TAG_STYLE: "taken"}
+        )
+
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_NAME_CONFLICT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"name": Jinja2ContextKey.TAG_STYLE, "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, whose failure location names the pipe; the render does not know which field of the pipe the template is"
+    )
     def test_the_sync_render_is_coded_alike(self) -> None:
         with pytest.raises(Jinja2TemplateInvalidError) as exc_info:
             render_jinja2_sync(

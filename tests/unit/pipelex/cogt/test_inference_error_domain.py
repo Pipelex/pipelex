@@ -31,6 +31,9 @@ class _WrapperError(PipelexError):
 
 
 class TestInferenceErrorDomain:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds inference failures by hand, below the worker that names their model and provider"
+    )
     @pytest.mark.parametrize(
         ("_topic", "category", "expected_code", "expected_domain", "expected_retryable"),
         ExceptionTestData.CATEGORY_CODE_CASES,
@@ -57,6 +60,9 @@ class TestInferenceErrorDomain:
         covered = {category for _topic, category, _code, _domain, _retryable in ExceptionTestData.CATEGORY_CODE_CASES}
         assert covered == set(InferenceErrorCategory)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds inference failures by hand, below the worker that names their model and provider"
+    )
     def test_a_retryable_category_never_reports_a_code_no_retry_clears(self) -> None:
         """The run repeats a call whose category is retryable, so the problem of one built with no code must invite a retry too."""
         for category in InferenceErrorCategory:
@@ -84,6 +90,9 @@ class TestInferenceErrorDomain:
 
         assert error.resolve_error_code() == CoreCode.PROVIDER_UNAVAILABLE
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_a_wrapper_reports_the_category_s_code(self) -> None:
         """The pipe and run wrappers take their cause's code, so a transient failure stays retryable through them."""
         failure = LLMCompletionError("connection reset", error_category=InferenceErrorCategory.TRANSIENT)
@@ -95,6 +104,9 @@ class TestInferenceErrorDomain:
         assert problem.code == CoreCode.PROVIDER_UNAVAILABLE
         assert problem.is_retryable is True
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds inference failures by hand, below the worker that names their model and provider"
+    )
     def test_a_cyclic_pair_of_category_failures_reports_without_recursing(self) -> None:
         """Two failures chained to each other report the category's code, under a wrapper too, where the walk of each recursed."""
         outer = LLMCompletionError("connection reset", error_category=InferenceErrorCategory.TRANSIENT)

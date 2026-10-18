@@ -75,6 +75,7 @@ class TestDoclingWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is expected_user_action_kind
 
+    @pytest.mark.builds_problems_without_required_params(reason="an extract worker reads its source by URI and never learns the input it came from")
     async def test_problem_for_file_not_found(self, mocker: MockerFixture) -> None:
         """A FileNotFoundError is a CONTENT failure, and its problem invites no retry."""
         worker = _make_docling_extract_worker(mocker)

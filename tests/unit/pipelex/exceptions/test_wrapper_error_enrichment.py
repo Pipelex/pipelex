@@ -1,3 +1,4 @@
+import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain, StepKind
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, find_inference_error_category_in_chain
@@ -26,6 +27,9 @@ def _make_pipeline_execution_error(cause: BaseException | None) -> PipelineExecu
 class TestWrapperErrorEnrichment:
     """PipelineExecutionError must surface the wrapped cause's code and categorized action, not mask them."""
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_preserves_categorized_cause_action(self) -> None:
         """A transient inference failure wrapped through PipeRunError/PipeRouterError keeps its action, its category and its retryable code."""
         cogt_error = LLMCompletionError(
@@ -56,6 +60,7 @@ class TestWrapperErrorEnrichment:
         assert problem.code == CoreCode.PROVIDER_UNAVAILABLE
         assert problem.is_retryable is True
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds an inference failure by hand, below the worker that names its model")
     def test_surfaces_the_code_of_a_caller_fixable_cause(self) -> None:
         """A content refusal coded `model.content_refused` reaches the wrapper as its code, the input's at 422, not a runtime fault.
 

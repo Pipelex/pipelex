@@ -108,7 +108,10 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
             f"which model '{self.inference_model.name}' cannot extract: it reads {describe_format_keys(format_keys=listed_formats)}. "
             "Give a file in one of those formats, or use an extract model that reads this one."
         )
-        raise ExtractInputFormatError(msg)
+        refusal = ExtractInputFormatError(msg).with_params(format=format_key, model=self.inference_model.name)
+        if extract_input.input_name:
+            refusal = refusal.with_params(input=extract_input.input_name)
+        raise refusal
 
     def _call_summary(self, *, extract_job: ExtractJob) -> InferenceCallSummary:
         """The event the call ends with, its model and its usage read off the worker and the job it reports when it ends."""

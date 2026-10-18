@@ -23,6 +23,7 @@ def _failure(*, code: ErrorCode, pipe_code: str) -> DryRunFailureErrorData:
 
 
 class TestDryRunFaultAnswer:
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_a_dry_run_failing_on_a_fault_of_ours_answers_that_fault(self) -> None:
         """No item is the method's, so validation gives no verdict: it answers the fault, every failure among its items."""
         failures = [
@@ -44,6 +45,7 @@ class TestDryRunFaultAnswer:
             (CoreCode.RUNTIME_UNEXPECTED, "summarize"),
         ]
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_one_failure_of_the_method_makes_the_dry_run_an_invalid_verdict(self) -> None:
         failures = [
             _failure(code=CoreCode.RUNTIME_UNEXPECTED, pipe_code="summarize"),
@@ -73,6 +75,7 @@ class TestDryRunFaultAnswer:
         assert not isinstance(exc_info.value, ValidateBundleError)
         assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.RUNTIME_UNEXPECTED
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the step's failure with a message alone, to check the verdict it makes")
     def test_a_pipe_run_failing_on_the_methods_fault_is_a_verdict(self) -> None:
         with pytest.raises(ValidateBundleError) as exc_info:
             _translate(

@@ -34,7 +34,8 @@ def check_prompt_images_are_images(*, model_name: str, prompt_images: Sequence[P
             f"Prompt image {image_index} given to model '{model_name}' is "
             f"{describe_file_format(format_key=format_key, mime_type=mime_type)}, not an image."
         )
-        raise PromptImageFormatError(msg)
+        # A prompt's file is known by its position alone here: no input name reaches the worker.
+        raise PromptImageFormatError(msg).with_params(format=format_key, model=model_name)
 
 
 def check_prompt_documents_are_read(*, model_name: str, supported_document_types: set[str], prompt_documents: Sequence[PromptDocument]) -> None:
@@ -49,4 +50,5 @@ def check_prompt_documents_are_read(*, model_name: str, supported_document_types
             f"{describe_file_format(format_key=format_key, mime_type=mime_type)}, which it does not read: "
             f"it reads {describe_format_keys(format_keys=supported_document_types)}."
         )
-        raise PromptDocumentFormatError(msg)
+        # A prompt's file is known by its position alone here: no input name reaches the worker.
+        raise PromptDocumentFormatError(msg).with_params(format=format_key, model=model_name)

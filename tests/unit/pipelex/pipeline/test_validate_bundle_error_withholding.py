@@ -42,6 +42,9 @@ class TestValidateBundleErrorWithholding:
         constructor_channels = set(inspect.signature(ValidateBundleError.__init__).parameters) - {"self"}
         assert constructor_channels == _CHANNELS, "a channel added to ValidateBundleError must be carried by withholding_files too"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds every channel's error data in the test, and a residual item names no declaration"
+    )
     def test_every_channel_names_no_withheld_file(self) -> None:
         verdict = ValidateBundleError(
             message=_mentioning_the_host_file(label="raw"),
@@ -90,6 +93,9 @@ class TestValidateBundleErrorWithholding:
         for view in (ProblemView.CALLER, ProblemView.OPERATOR):
             assert _HOST_FILE not in str(withheld.to_problem(view=view).to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_what_the_raise_site_chose_is_carried(self) -> None:
         """The code a raise site chose, and the parameters and items it gave, survive the withholding, withheld as the messages are."""
         item = make_problem_item(
