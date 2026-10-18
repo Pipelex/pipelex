@@ -668,7 +668,8 @@ class PipelexError(Exception):
             # Given in order from the reporter down, so a wrapper nearer the carrier wins over one above it; checked
             # against the carrier's code when the problem is built, an undeclared one being dropped and logged.
             params.update(wrapper.given_params)
-        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names})
+        # A fact the carrier does not hold is no parameter, so the location's pipe and the chain's model still fill it below.
+        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names and value is not None})
         params.update(carrier.given_params)
         location = reporter.chain_location(carrier=carrier)
         if failure_location is not None:

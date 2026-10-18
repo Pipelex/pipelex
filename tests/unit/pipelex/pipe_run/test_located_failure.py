@@ -12,7 +12,7 @@ from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
-from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunError
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_location, make_problem_item
@@ -21,6 +21,7 @@ from pipelex.pipe_run.located_failure import compose_located_message, find_forei
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class _RecoveredProblemError(PipelexError):
@@ -267,6 +268,22 @@ class TestLocatedFailureProblem:
         )
         assert run_problem.location is not None
         assert run_problem.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"], "field": "model", "file": "docs.mthds"}
+
+    def test_a_fact_the_root_fault_does_not_hold_is_filled_from_its_location(self) -> None:
+        """A pipe refusal raised without its pipe still names the pipe the run located it at."""
+        refusal = PipeValidationError(
+            "the prompt reads a variable no input declares",
+            error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
+            pipe_code=None,
+            variable_names=["topic"],
+        )
+        run_failure = _wrap_in_runner(_locate(refusal, pipe_stack=["flow", "summarize"]), entry_pipe_code="flow")
+
+        caller = run_failure.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.METHOD_INPUT_UNDECLARED
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"pipe": "summarize", "variables": ["topic"]}
 
     def test_a_cyclic_chain_reports_the_wrapper_as_itself(self) -> None:
         """A chain that loops back to the wrapper cannot make the problem recurse."""
