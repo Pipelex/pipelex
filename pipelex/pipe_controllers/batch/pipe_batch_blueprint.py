@@ -49,6 +49,7 @@ class PipeBatchBlueprint(PipeBlueprint):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
+                variable_names=[self.input_item_name],
             )
         # General guard: item name must not collide with any other input key either
         # (e.g. a batch pipe with inputs {"items": "Item[]", "context": "Text"} must not use "context" as item name)
@@ -62,6 +63,7 @@ class PipeBatchBlueprint(PipeBlueprint):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
+                variable_names=[self.input_item_name],
             )
 
     @override

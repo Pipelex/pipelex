@@ -8,11 +8,13 @@ the way a `[1]` does.
 """
 
 import pytest
+from mthds.protocol.problem.registry import MethodOutputMultiplicityMismatchExpected
 
 from pipelex.core.pipes.variable_multiplicity import (
     VariableMultiplicity,
     fixed_item_count,
     is_multiple_multiplicity,
+    multiplicity_kind,
     normalize_variable_multiplicity,
 )
 
@@ -64,6 +66,20 @@ class TestMultiplicityHelpers:
         through this, so the value `1` never reaches a consumer and none of them has to remember why.
         """
         assert normalize_variable_multiplicity(multiplicity=multiplicity) == expected
+
+    @pytest.mark.parametrize(
+        ("multiplicity", "expected"),
+        [
+            (None, MethodOutputMultiplicityMismatchExpected.SINGLE),
+            (False, MethodOutputMultiplicityMismatchExpected.SINGLE),
+            (1, MethodOutputMultiplicityMismatchExpected.SINGLE),
+            (True, MethodOutputMultiplicityMismatchExpected.LIST),
+            (2, MethodOutputMultiplicityMismatchExpected.FIXED),
+        ],
+    )
+    def test_multiplicity_kind(self, multiplicity: VariableMultiplicity | None, expected: MethodOutputMultiplicityMismatchExpected):
+        """The kind a multiplicity problem names: `[1]` is one item, `[]` a list, and a count above one a fixed-length list."""
+        assert multiplicity_kind(multiplicity=multiplicity) == expected
 
     def test_normalize_leaves_a_variable_list_alone(self):
         """`bool` is a subclass of `int` and `True == 1`, so `[]` must not collapse the way `[1]` does."""

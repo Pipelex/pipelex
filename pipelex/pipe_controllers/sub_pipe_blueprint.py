@@ -64,6 +64,7 @@ class SubPipeBlueprint(BaseModel):
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
+                variable_names=[self.batch_as],
             )
 
         return self

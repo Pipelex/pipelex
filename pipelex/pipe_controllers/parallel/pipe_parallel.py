@@ -2,7 +2,7 @@ import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite, MethodOutputMultiplicityMismatchExpected
 from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
@@ -18,6 +18,7 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import multiplicity_kind
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -169,7 +170,7 @@ class PipeParallel(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-            )
+            ).with_params(declared=multiplicity_kind(multiplicity=self.output.multiplicity), expected=MethodOutputMultiplicityMismatchExpected.SINGLE)
         output_concept = self.output.concept
         if Concept.is_native_concept(concept=output_concept):
             native_code = NativeConceptCode(output_concept.code)
@@ -185,7 +186,7 @@ class PipeParallel(PipeController):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     provided_concept_code=output_concept.concept_ref,
-                )
+                ).with_params(declared=output_concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
     @override
     def validate_output_with_library(self):
@@ -211,7 +212,7 @@ class PipeParallel(PipeController):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            ) from exc
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type) from exc
         if issubclass(structure_class, CompositeContent):
             return
 
@@ -233,7 +234,7 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=sorted(missing_required_fields),
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
         extraneous_result_names = result_names - declared_fields
         if extraneous_result_names:
@@ -250,7 +251,7 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=sorted(extraneous_result_names),
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
         self._validate_branch_output_types(structure_class=structure_class)
 
@@ -280,7 +281,7 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=self.output.concept.concept_ref,
                     variable_names=[result_name],
-                )
+                ).with_params(input=result_name, site=MethodOptionalUnhandledSite.PARALLEL_BRANCH)
 
     def analyze_branch_taint(self, *, visited_pipes: set[str] | None = None) -> ParallelTaintAnalysis:
         """Static taint over the branches (D6): which branch results are maybe-absent.
@@ -422,6 +423,8 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=branch_pipe.output.concept.concept_ref,
                     variable_names=[sub_pipe.output_name],
+                ).with_params(
+                    declared=branch_pipe.output.concept.concept_ref, expected=_concepts_held_as(content_class=field_annotation), pipe_type=self.type
                 ) from exc
             if not issubclass(branch_structure_class, field_annotation):
                 msg = (
@@ -438,6 +441,8 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=branch_pipe.output.concept.concept_ref,
                     variable_names=[sub_pipe.output_name],
+                ).with_params(
+                    declared=branch_pipe.output.concept.concept_ref, expected=_concepts_held_as(content_class=field_annotation), pipe_type=self.type
                 )
 
     @override
@@ -886,3 +891,8 @@ def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:
             return None
         refused_fields.add(str(location[0]))
     return refused_fields
+
+
+def _concepts_held_as(*, content_class: type[StuffContent]) -> list[str]:
+    """The refs of the concepts whose content is ``content_class``, those a field of that class holds as they are."""
+    return sorted(concept.concept_ref for concept in get_concept_library().list_concepts() if concept.structure_class_name == content_class.__name__)

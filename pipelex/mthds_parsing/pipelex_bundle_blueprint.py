@@ -197,11 +197,9 @@ class PipelexBundleBlueprint(BaseModel):
         if not is_pipe_code_valid(main_pipe):
             msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
             stripped = _strippable_same_domain_pipe_code(main_pipe, domain=cast("str | None", info.data.get("domain")))
-            if stripped is not None:
-                # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the
-                # blueprint categorizer recovers the strip target structurally for the fix planner.
-                raise InvalidPipeCodeSyntaxError(msg, offending_code=main_pipe, stripped_code=stripped)
-            raise ValueError(msg)
+            # Typed (still a ValueError, so pydantic wraps it into ``ctx["error"]``) so the blueprint categorizer
+            # recovers the name, and the strip target when there is one, structurally.
+            raise InvalidPipeCodeSyntaxError(msg, offending_code=main_pipe, stripped_code=stripped)
         return main_pipe
 
     @field_validator("pipe", mode="before")
@@ -229,11 +227,9 @@ class PipelexBundleBlueprint(BaseModel):
             if isinstance(pipe_code, str) and not is_pipe_code_valid(pipe_code=pipe_code):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 stripped = _strippable_same_domain_pipe_code(pipe_code, domain=domain, existing_pipe_codes=existing_pipe_codes)
-                if stripped is not None:
-                    # Typed (still a ValueError) so the categorizer recovers the rename target
-                    # (offending dotted key + stripped bare key) structurally for the fix planner.
-                    raise InvalidPipeCodeSyntaxError(msg, offending_code=pipe_code, stripped_code=stripped)
-                raise ValueError(msg)
+                # Typed (still a ValueError) so the categorizer recovers the offending key, and the rename
+                # target when there is one, structurally.
+                raise InvalidPipeCodeSyntaxError(msg, offending_code=pipe_code, stripped_code=stripped)
             normalized[pipe_code] = normalize_typeless_signature_section(pipe_code=pipe_code, pipe_section=pipe_section)
         return normalized
 

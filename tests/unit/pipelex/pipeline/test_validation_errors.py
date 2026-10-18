@@ -22,7 +22,8 @@ from pipelex.core.exceptions import (
 )
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipeline.exceptions import TreePythonSyntaxError, ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items, warning_problem_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
 from pipelex.validation_error_types import HintLintErrorType, PipeFactoryErrorType, PipeValidationErrorType, TemplateCheckErrorType
@@ -498,3 +499,45 @@ class TestBuildValidationErrorItems:
             },
         ]
         assert "emphasis" in items[0].detail
+
+    def test_a_pipe_refusal_s_own_facts_reach_its_problem_item(self) -> None:
+        """The facts the check that found the fault knows ride the item beside the pipe its locators give."""
+        verdict = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="summarize",
+                    message="The output does not fit.",
+                    field_path="summarize.output",
+                    params={"declared": "testapp.Summary", "expected": ["native.Text", "native.Html"], "pipe_type": "PipeCompose"},
+                ),
+            ],
+        )
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH
+        assert item.params is not None
+        assert item.params.as_wire() == {
+            "pipe": "summarize",
+            "declared": "testapp.Summary",
+            "expected": ["native.Text", "native.Html"],
+            "pipe_type": "PipeCompose",
+        }
+
+    def test_an_unclassified_item_reads_through_the_verdict_s_umbrella_to_the_refusal_it_forwards(self) -> None:
+        """A library that could not load a bundle forwards the parser's refusal under `method.invalid`: the item takes the parser's code and facts."""
+        syntax_refusal = TreePythonSyntaxError("The file does not parse.").with_params(finding="invalid syntax at line 3")
+        umbrella = LibraryLoadingError("The library could not be loaded.")
+        umbrella.__cause__ = syntax_refusal
+        verdict = ValidateBundleError(message="The library could not be loaded.")
+        verdict.__cause__ = umbrella
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_SYNTAX
+        assert item.params is not None
+        assert item.params.as_wire() == {"finding": "invalid syntax at line 3"}

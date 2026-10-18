@@ -153,7 +153,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            )
+            ).with_params(declared=self.output.concept.concept_ref, pipe_type=self.type)
 
         self._refuse_a_setting_its_model_refuses(is_dynamic_output=is_dynamic_output)
 

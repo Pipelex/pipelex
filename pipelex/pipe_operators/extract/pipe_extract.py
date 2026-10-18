@@ -99,7 +99,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.PAGE.concept_ref],
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.PAGE.concept_ref], pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(

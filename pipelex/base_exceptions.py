@@ -26,6 +26,7 @@ from pipelex.errors.problem import (
     ProblemDiagnostics,
     ProblemView,
     ProviderDiagnostics,
+    accepted_params,
     cap_problem_text,
     make_problem,
     merge_locations,
@@ -245,9 +246,19 @@ class ValidationErrorItem(BaseModel):
     # (a defined name, a Table, a cell, a shape, a tag). Optional and additive, like ``declared_concepts``.
     template_file: str | None = None
     template_location: str | None = None
+    # The identifier locator, carried by an ``invalid_pipe_code_syntax`` item: the name that breaks the naming rules, as
+    # the method writes it, a declaration key or the ``main_pipe`` value, which ``field_path`` (``main_pipe``) tells
+    # apart. Optional and additive, like ``declared_concepts``.
+    identifier_name: str | None = None
     # The hint locator, carried by a hint lint item: the hint key the finding is about, elided as its message quotes it,
     # which its problem item names as the code's ``hint`` parameter. Optional and additive, like ``declared_concepts``.
     hint_key: str | None = None
+    # The parameters of its problem item's code the stage that found it knows about this one item, by the registry's
+    # names, beside those its locators give: the facts a raise site gave its refusal (the concept a step declares and
+    # those it expects), and on an item no ``error_type`` classifies, which takes the code of the refusal it rides,
+    # those of this one fault where the refusal's own describe only its first. Optional and additive, like
+    # ``declared_concepts``.
+    params: dict[str, Any] | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.
@@ -626,6 +637,50 @@ class PipelexError(Exception):
             reporter=self, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
         )
 
+    def caller_params(self) -> dict[str, Any]:
+        """The parameters this error's problem carries as a caller reads them, read without building the problem.
+
+        They are the parameters :meth:`to_problem` gives in the caller's view, its items' aside: a refusal whose faults
+        its items carry gives none of its own for a code that requires some, which building its problem would log as a
+        fault, while a reader wanting only the parameters, such as a verdict whose items take this refusal's code, has
+        nothing to report.
+        """
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            recovered_params = self.to_problem(view=ProblemView.CALLER).params
+            return recovered_params.as_wire() if recovered_params is not None else {}
+        code = self.resolve_error_code()
+        params, _ = self._reported_params_and_location(reporter=self, failure_location=None)
+        operator_only_params = error_code_spec(code).operator_only_params
+        return {name: value for name, value in accepted_params(code=code, params=params).items() if name not in operator_only_params}
+
+    def _reported_params_and_location(
+        self, *, reporter: "PipelexError", failure_location: ProblemLocation | None
+    ) -> tuple[dict[str, Any], ProblemLocation | None]:
+        """The parameters and the location of this error's problem as ``reporter`` reports it (see :meth:`problem_reported_by`)."""
+        code = self.resolve_error_code()
+        carrier = self.code_carrier()
+        wrappers = reporter.errors_above(carrier=carrier)
+        facts = reporter.chain_facts()
+        spec = error_code_spec(code)
+        params: dict[str, Any] = {}
+        for wrapper in wrappers:
+            # Given in order from the reporter down, so a wrapper nearer the carrier wins over one above it; checked
+            # against the carrier's code when the problem is built, an undeclared one being dropped and logged.
+            params.update(wrapper.given_params)
+        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names})
+        params.update(carrier.given_params)
+        location = reporter.chain_location(carrier=carrier)
+        if failure_location is not None:
+            location = merge_locations(base=location, override=failure_location)
+        if location is not None and location.pipe is not None and "pipe" in spec.param_names:
+            params.setdefault("pipe", location.pipe)
+        if facts.model is not None and "model" in spec.param_names:
+            params.setdefault("model", facts.model)
+        if facts.provider is not None and facts.provider.name is not None and "provider" in spec.param_names:
+            params.setdefault("provider", facts.provider.name)
+        return params, location
+
     def problem_reported_by(
         self,
         *,
@@ -670,26 +725,10 @@ class PipelexError(Exception):
         # The wrappers between the reporter and the error whose code the problem reports, the reporter first.
         wrappers = reporter.errors_above(carrier=carrier)
         facts = reporter.chain_facts()
-        spec = error_code_spec(code)
-        params: dict[str, Any] = {}
-        for wrapper in wrappers:
-            # Given in order from the reporter down, so a wrapper nearer the carrier wins over one above it; checked
-            # against the carrier's code when the problem is built, an undeclared one being dropped and logged.
-            params.update(wrapper.given_params)
-        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names})
-        params.update(carrier.given_params)
+        params, location = self._reported_params_and_location(reporter=reporter, failure_location=failure_location)
         items = list(carrier.chain_items() or [])
         for wrapper in reversed(wrappers):
             items.extend(wrapper.problem_items() or [])
-        location = reporter.chain_location(carrier=carrier)
-        if failure_location is not None:
-            location = merge_locations(base=location, override=failure_location)
-        if location is not None and location.pipe is not None and "pipe" in spec.param_names:
-            params.setdefault("pipe", location.pipe)
-        if facts.model is not None and "model" in spec.param_names:
-            params.setdefault("model", facts.model)
-        if facts.provider is not None and facts.provider.name is not None and "provider" in spec.param_names:
-            params.setdefault("provider", facts.provider.name)
         return make_problem(
             code=code,
             view=view,

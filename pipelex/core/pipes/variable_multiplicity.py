@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 
 from mthds.protocol.pipe_io_contracts import PresenceMarker
+from mthds.protocol.problem.registry import MethodOutputMultiplicityMismatchExpected
 from pydantic import BaseModel, Field
 
 from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
@@ -19,6 +20,7 @@ __all__ = [
     "is_multiple_multiplicity",
     "is_multiplicity_compatible",
     "make_variable_multiplicity",
+    "multiplicity_kind",
     "multiplicity_from_bracket_content",
     "normalize_variable_multiplicity",
     "parse_concept_with_multiplicity",
@@ -172,6 +174,18 @@ def fixed_item_count(*, multiplicity: VariableMultiplicity | None) -> int | None
     if multiplicity is None or isinstance(multiplicity, bool):
         return None
     return multiplicity if multiplicity > 1 else None
+
+
+def multiplicity_kind(*, multiplicity: VariableMultiplicity | None) -> MethodOutputMultiplicityMismatchExpected:
+    """The kind of a multiplicity as a problem names it: one item, a list, or a list of a fixed length.
+
+    A fixed count of one (`[1]`) is one item, as everywhere else in the chain.
+    """
+    if fixed_item_count(multiplicity=multiplicity) is not None:
+        return MethodOutputMultiplicityMismatchExpected.FIXED
+    if is_multiple_multiplicity(multiplicity=multiplicity):
+        return MethodOutputMultiplicityMismatchExpected.LIST
+    return MethodOutputMultiplicityMismatchExpected.SINGLE
 
 
 class MultiplicityParseResult(BaseModel):

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSite
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
@@ -8,7 +8,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
-from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
+from pipelex.core.pipes.exceptions import PIPE_OUTPUT_NAME, PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -292,7 +292,7 @@ class PipeCondition(PipeController):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            )
+            ).with_params(input=PIPE_OUTPUT_NAME, site=MethodOptionalUnhandledSite.CONDITION_OUTPUT)
 
     @override
     def validate_output_with_library(self):
@@ -329,7 +329,7 @@ class PipeCondition(PipeController):
                         domain_code=self.domain_code,
                         pipe_code=self.code,
                         provided_concept_code=self.output.concept.concept_ref,
-                    )
+                    ).with_params(input=pipe_code, site=MethodOptionalUnhandledSite.CONDITION)
             # An outcome that the condition's own `?` inputs may lift resolves the condition's result absent, unless the
             # result is a list, which the lift leaves empty (D4). The expression is not read, so an outcome it chooses only
             # when the input is present is refused too, and forcing the input on that outcome (`!`) is the guarded remedy.
@@ -356,7 +356,7 @@ class PipeCondition(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=self.output.concept.concept_ref,
                     variable_names=[trigger_name],
-                )
+                ).with_params(input=trigger_name, site=MethodOptionalUnhandledSite.CONDITION)
 
         # Collect all unique output concept refs from mapped pipes
         mapped_output_refs: set[str] = set()
@@ -382,6 +382,10 @@ class PipeCondition(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=self.output.concept.concept_ref,
                     required_concept_codes=[expected_output_ref],
+                ).with_params(
+                    declared=self.output.concept.concept_ref,
+                    expected=[expected_output_ref, NativeConceptCode.ANYTHING.concept_ref],
+                    pipe_type=self.type,
                 )
         # Mapped pipes have different outputs - PipeCondition MUST use Dynamic
         elif self.output.concept.concept_ref != NativeConceptCode.ANYTHING.concept_ref:
@@ -398,7 +402,7 @@ class PipeCondition(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.ANYTHING.concept_ref],
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.ANYTHING.concept_ref], pipe_type=self.type)
 
     @override
     async def _validate_before_run(

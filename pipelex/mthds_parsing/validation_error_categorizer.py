@@ -214,45 +214,6 @@ def _categorize_typeless_pipe_error(
     )
 
 
-def _categorize_syntax_validation_error(
-    message: str,
-    *,
-    domain: str | None,
-    source: str | None,
-) -> PipelexBundleBlueprintValidationErrorData | None:
-    """Categorize syntax validation errors (invalid pipe code, invalid main_pipe).
-
-    Args:
-        message: The error message from the validation
-        domain: Domain code
-        source: Source file path
-
-    Returns:
-        Categorized error data, or None if not a syntax validation error
-    """
-    message_lower = message.lower()
-
-    # Detect invalid main_pipe syntax
-    if "invalid main pipe syntax" in message_lower:
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
-            domain_code=domain,
-            source=source,
-            message=message,
-        )
-
-    # Detect invalid pipe code syntax
-    if "is not a valid pipe code" in message_lower:
-        return PipelexBundleBlueprintValidationErrorData(
-            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
-            domain_code=domain,
-            source=source,
-            message=message,
-        )
-
-    return None
-
-
 def _is_pydantic_internal_loc_element(element: str) -> bool:
     """Check if a loc element is a pydantic internal type discriminator rather than a user-facing field name.
 
@@ -450,13 +411,13 @@ def categorize_blueprint_validation_error(
             message=str(wrapped_native_redeclaration),
         )
 
-    # A strippable same-domain over-qualified pipe code: ``validate_pipe_keys`` /
-    # ``validate_main_pipe_syntax`` raised a typed ``ValueError`` carrying the stripped bare code
-    # (which the message text and pydantic ``loc`` — ``("pipe",)`` / ``("main_pipe",)`` — cannot).
-    # ``pipe_code`` discriminates the two raise sites for the planner: the offending dotted code for
-    # a declaration-key rename, ``None`` for a ``main_pipe`` value strip (loc's first element names
-    # the field). The bare ``ValueError`` path (malformed codes, cross-package refs) still falls
-    # through to the message-matching ``_categorize_syntax_validation_error`` → unfixable.
+    # A pipe code that breaks the naming rules: ``validate_pipe_keys`` / ``validate_main_pipe_syntax``
+    # raised a typed ``ValueError`` carrying the offending name, and the stripped bare code when the
+    # name is a strippable same-domain over-qualified one (which the message text and pydantic ``loc``
+    # — ``("pipe",)`` / ``("main_pipe",)`` — cannot carry). ``pipe_code`` discriminates the two raise
+    # sites for the planner: the offending code for a declaration-key rename, ``None`` for a
+    # ``main_pipe`` value strip (loc's first element names the field, which ``field_path`` keeps). A
+    # malformed code or a cross-package ref carries no stripped code → unfixable.
     #
     # The ``main_pipe`` raise site cannot see the declarations (the ``pipe`` field validates after
     # it), so the safety gate lives here, on the raw bundle dict: a strip that would retarget
@@ -466,10 +427,14 @@ def categorize_blueprint_validation_error(
     if wrapped_invalid_pipe_code is not None:
         is_main_pipe = bool(loc) and loc[0] == PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD
         stripped_pipe_code: str | None = wrapped_invalid_pipe_code.stripped_code
-        if is_main_pipe and not _main_pipe_strip_is_safe(
-            offending_code=wrapped_invalid_pipe_code.offending_code,
-            stripped_code=wrapped_invalid_pipe_code.stripped_code,
-            blueprint_dict=blueprint_dict,
+        if (
+            is_main_pipe
+            and stripped_pipe_code is not None
+            and not _main_pipe_strip_is_safe(
+                offending_code=wrapped_invalid_pipe_code.offending_code,
+                stripped_code=stripped_pipe_code,
+                blueprint_dict=blueprint_dict,
+            )
         ):
             stripped_pipe_code = None
         return PipelexBundleBlueprintValidationErrorData(
@@ -477,6 +442,8 @@ def categorize_blueprint_validation_error(
             domain_code=domain,
             source=source,
             pipe_code=None if is_main_pipe else wrapped_invalid_pipe_code.offending_code,
+            field_path=PIPELEX_BUNDLE_BLUEPRINT_MAIN_PIPE_FIELD if is_main_pipe else None,
+            identifier_name=wrapped_invalid_pipe_code.offending_code,
             stripped_pipe_code=stripped_pipe_code,
             message=str(wrapped_invalid_pipe_code),
         )
@@ -519,15 +486,6 @@ def categorize_blueprint_validation_error(
     )
     if missing_type_error:
         return missing_type_error
-
-    # Try to categorize syntax validation errors (invalid pipe code, main_pipe)
-    syntax_error = _categorize_syntax_validation_error(
-        message=message,
-        domain=domain,
-        source=source,
-    )
-    if syntax_error:
-        return syntax_error
 
     # No categorizer knows it: keep it as an item of its own, never dropped because another item exists.
     log.verbose(f"A bundle blueprint validation error is not categorized: {error_scope} - {source} - {domain}")

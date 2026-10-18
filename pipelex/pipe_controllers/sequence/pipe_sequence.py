@@ -1,6 +1,7 @@
 import sys
 from typing import TYPE_CHECKING, Literal
 
+from mthds.protocol.problem.registry import MethodOptionalUnhandledSite
 from pydantic import PrivateAttr, field_validator
 from typing_extensions import override
 
@@ -12,7 +13,13 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
-from pipelex.core.pipes.variable_multiplicity import PresenceMarker, VariableMultiplicity, is_multiple_multiplicity, is_multiplicity_compatible
+from pipelex.core.pipes.variable_multiplicity import (
+    PresenceMarker,
+    VariableMultiplicity,
+    is_multiple_multiplicity,
+    is_multiplicity_compatible,
+    multiplicity_kind,
+)
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -472,6 +479,10 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=bound_spec.concept.concept_ref,
                 required_concept_codes=[step_pipe.output.concept.concept_ref],
+            ).with_params(
+                pipe=step_pipe.code,
+                declared=multiplicity_kind(multiplicity=bound_spec.multiplicity),
+                expected=multiplicity_kind(multiplicity=requested_multiplicity),
             )
 
     def _render_spec(self, *, stuff_spec: StuffSpec) -> str:
@@ -538,6 +549,11 @@ class PipeSequence(PipeController):
                 variable_names=[variable_name],
                 provided_concept_code=unreadable_specs[0].concept.concept_ref,
                 required_concept_codes=[needed_spec.concept.concept_ref],
+            ).with_params(
+                pipe=step_pipe_code,
+                input=variable_name,
+                declared=needed_ref,
+                expected=sorted({self._render_spec(stuff_spec=unreadable_spec) for unreadable_spec in unreadable_specs}),
             )
         if self._is_readable_as(provided_spec=provided_spec, needed_spec=needed_spec, is_stored_by_pipe_step=slot.is_stored_by_pipe_step):
             return None
@@ -562,7 +578,7 @@ class PipeSequence(PipeController):
             variable_names=[variable_name],
             provided_concept_code=provided_spec.concept.concept_ref,
             required_concept_codes=[needed_spec.concept.concept_ref],
-        )
+        ).with_params(pipe=step_pipe_code, input=variable_name, declared=needed_ref, expected=[provided_ref])
 
     @classmethod
     def _is_readable_as(cls, *, provided_spec: StuffSpec, needed_spec: StuffSpec, is_stored_by_pipe_step: bool) -> bool:
@@ -648,6 +664,10 @@ class PipeSequence(PipeController):
                     pipe_code=self.code,
                     variable_names=[list_label],
                     provided_concept_code=stored_spec.concept.concept_ref,
+                ).with_params(
+                    input=list_label,
+                    declared=stored_ref,
+                    expected=[self._render_spec(stuff_spec=StuffSpec(concept=stored_spec.concept, multiplicity=True))],
                 )
             if item_need is None or item_need.concept.code in {NativeConceptCode.DYNAMIC, NativeConceptCode.ANYTHING}:
                 continue
@@ -671,7 +691,7 @@ class PipeSequence(PipeController):
                 variable_names=[item_name],
                 provided_concept_code=stored_spec.concept.concept_ref,
                 required_concept_codes=[item_need.concept.concept_ref],
-            )
+            ).with_params(pipe=step_pipe_code, input=item_name, declared=needed_ref, expected=[item_ref])
         return None
 
     @override
@@ -757,7 +777,7 @@ class PipeSequence(PipeController):
                 provided_concept_code=last_step_concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
                 expected_output_ref=expected_output_ref,
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[last_step_concept.concept_ref], pipe_type=self.type)
 
         # Check multiplicity compatibility
         if not is_multiplicity_compatible(
@@ -778,6 +798,9 @@ class PipeSequence(PipeController):
                 provided_concept_code=last_step_concept.concept_ref,
                 required_concept_codes=[self.output.concept.concept_ref],
                 expected_output_ref=expected_output_ref,
+            ).with_params(
+                declared=multiplicity_kind(multiplicity=self.output.multiplicity),
+                expected=multiplicity_kind(multiplicity=effective_last_step_output_multiplicity),
             )
 
         self._refuse_escaping_absence(taint_analysis=taint_analysis)
@@ -801,7 +824,7 @@ class PipeSequence(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=[taint_analysis.output_taint.origin_slot_name],
-            )
+            ).with_params(input=taint_analysis.output_taint.origin_slot_name, site=MethodOptionalUnhandledSite.SEQUENCE_STEP)
 
     def analyze_taint(self) -> SequenceTaintAnalysis:
         """Static absence-taint walk over the steps (D6), computing per-slot presence.

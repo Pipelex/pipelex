@@ -195,7 +195,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 variable_names=question_file_paths,
-            )
+            ).with_params(input=question_file_paths[0])
 
         # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         labelled_templates = [(self.prompt_content.template, "prompt")]
@@ -370,6 +370,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         raise self._inadequate_output_error(message=msg, required_concept_codes=[verdict_native.concept_ref])
 
     def _inadequate_output_error(self, *, message: str, required_concept_codes: list[str] | None = None) -> PipeValidationError:
+        # A refusal of the output's structure, rather than of its concept, has no concepts to offer as the ones that fit.
         return PipeValidationError(
             message=message,
             error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
@@ -377,7 +378,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             pipe_code=self.code,
             provided_concept_code=self.output.concept.concept_ref,
             required_concept_codes=required_concept_codes,
-        )
+        ).with_params(declared=self.output.concept.concept_ref, expected=required_concept_codes, pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(

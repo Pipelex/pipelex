@@ -310,6 +310,10 @@ def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) ->
             return CoreCode.METHOD_SCHEMA_VIOLATION
 
 
+# The name a refusal gives a pipe's own output where its code names an input or an output: the field that declares it.
+PIPE_OUTPUT_NAME = "output"
+
+
 class PipeValidationError(PipelexError, ValueError):
     """A pipe that breaks a rule of the language or of its pipe type, found when the bundle is validated.
 
@@ -406,6 +410,11 @@ class PipeValidationError(PipelexError, ValueError):
         self.explanation = explanation
         super().__init__(message)
         self.with_error_code(pipe_validation_error_code(error_type=error_type))
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The facts every refusal of a pipe holds; its raise site gives the others its code requires with `with_params`.
+        return {"pipe": self.pipe_code, "variables": self.variable_names, "model": self.model_reference}
 
     def desc(self) -> str:
         msg = f"{self.error_type} • domain_code='{self.domain_code}'"

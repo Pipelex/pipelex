@@ -164,6 +164,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+            ).with_params(
+                declared=self.output.concept.concept_ref,
+                expected=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+                pipe_type=self.type,
             )
 
     @override
