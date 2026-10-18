@@ -111,6 +111,7 @@ def build_validation_error_items(
                 domain_code=blueprint_error.domain_code,
                 source=blueprint_error.source,
                 field_path=blueprint_error.field_path,
+                field_name=blueprint_error.field_name,
                 variable_names=blueprint_error.variable_names or None,
                 declared_concepts=blueprint_error.declared_concepts or None,
                 identifier_name=blueprint_error.identifier_name,
@@ -328,6 +329,11 @@ _NAME_CONFLICTS: dict[PipeValidationErrorType, MethodNameConflictConflict] = {
 }
 
 
+# The name conflicts no declaration makes: a batch item named as its list or as another input of its pipe is a name that
+# pipe uses twice, located on the pipe and on the field it collides on, as any other item about a pipe is.
+_PIPE_NAME_CONFLICTS: frozenset[PipeValidationErrorType] = frozenset({PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION})
+
+
 def _name_conflict_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     """The name and the conflict of a name-conflict item: the concept a bundle redeclares, or the batch item's name."""
     conflict = _NAME_CONFLICTS.get(item.error_type) if isinstance(item.error_type, PipeValidationErrorType) else None
@@ -397,10 +403,11 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
         item_params.setdefault("suggestions", [])
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
-    if code == CoreCode.METHOD_NAME_CONFLICT:
-        # A name conflict is located on the declaration that collides, by its path from the bundle's root, such as
-        # `concept.Rating` or `pipe.compute_score`, which a caller edits. A `field` beside no `pipe` reads from the bundle's
-        # root, so the location names no `pipe` a reader would join that path to.
+    if code == CoreCode.METHOD_NAME_CONFLICT and item.error_type not in _PIPE_NAME_CONFLICTS:
+        # A declaration's name conflict, a duplicate declaration or a native concept's redeclaration, is located on the
+        # declaration that collides, by its path from the bundle's root, such as `concept.Rating` or `pipe.compute_score`,
+        # which a caller edits. A `field` beside no `pipe` reads from the bundle's root, so the location names no `pipe` a
+        # reader would join that path to.
         location = make_location(field=item.field_path or _declaration_path(item=item), file=item.source, line=line, column=column)
     else:
         location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)

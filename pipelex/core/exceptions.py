@@ -53,6 +53,10 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # so the item keeps the location its pydantic ``loc`` named (``pipe.<code>.<field>``).
     field_path: str | None = None
 
+    # The dot path of the failing field inside the table of the pipe ``pipe_code`` names, set when a blueprint-stage
+    # ``PipeValidationError`` names its field: ``input_item_name`` on a PipeBatch, or ``steps.0.batch_as`` on a step.
+    field_name: str | None = None
+
     # The 1-based position where a TOML syntax error was found, in the file ``source`` names or in
     # the submitted content when there is none.
     line: int | None = None

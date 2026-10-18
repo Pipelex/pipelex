@@ -65,6 +65,49 @@ output = "Text"
 template = "{{ text }}"
 """
 
+    # A PipeBatch naming its item as its list, which is no declaration but a name the pipe uses twice.
+    BATCH_ITEM_AS_LIST: ClassVar[str] = """
+domain = "name_conflict_batch"
+main_pipe = "batch_echo"
+
+[pipe.batch_echo]
+type = "PipeBatch"
+description = "Echo each item"
+inputs = { items = "Text[]" }
+output = "Text[]"
+branch_pipe_code = "echo"
+input_list_name = "items"
+input_item_name = "items"
+
+[pipe.echo]
+type = "PipeCompose"
+description = "Echo"
+inputs = { items = "Text" }
+output = "Text"
+template = "{{ items }}"
+"""
+    # A sequence step batching over a list under the list's own name.
+    STEP_BATCH_AS_LIST: ClassVar[str] = """
+domain = "name_conflict_step"
+main_pipe = "run_all"
+
+[pipe.run_all]
+type = "PipeSequence"
+description = "Echo each item"
+inputs = { items = "Text[]" }
+output = "Text[]"
+steps = [
+  { pipe = "echo", result = "echoes", batch_over = "items", batch_as = "items" },
+]
+
+[pipe.echo]
+type = "PipeCompose"
+description = "Echo"
+inputs = { items = "Text" }
+output = "Text"
+template = "{{ items }}"
+"""
+
 
 def _name_conflict_locations(error: PipelexError) -> list[dict[str, Any]]:
     """The locations of the caller's `method.name_conflict` items, or of the problem itself when it is the one fault."""
@@ -118,6 +161,26 @@ class TestNameConflictLocation:
             {"field": "pipe.echo", "file": "first.mthds"},
             {"field": "pipe.echo", "file": "second.mthds"},
         ]
+
+    @pytest.mark.parametrize(
+        ("content", "expected_location"),
+        [
+            pytest.param(
+                _NameConflictData.BATCH_ITEM_AS_LIST, {"pipe": "batch_echo", "field": "input_item_name", "file": "bundle.mthds"}, id="pipe_batch"
+            ),
+            pytest.param(
+                _NameConflictData.STEP_BATCH_AS_LIST, {"pipe": "run_all", "field": "steps.0.batch_as", "file": "bundle.mthds"}, id="sequence_step"
+            ),
+        ],
+    )
+    async def test_a_batch_item_collision_is_located_on_its_pipe_and_the_field_it_collides_on(
+        self, content: str, expected_location: dict[str, Any]
+    ) -> None:
+        """A batch item named as its list is no declaration: it stays on its pipe, with the field relative to that pipe."""
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[content], mthds_sources=["bundle.mthds"])
+
+        assert _name_conflict_locations(exc_info.value) == [expected_location]
 
     @pytest.mark.parametrize(
         ("contents", "expected_locations"),

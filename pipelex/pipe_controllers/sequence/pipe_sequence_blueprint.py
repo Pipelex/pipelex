@@ -15,6 +15,10 @@ from pipelex.pipe_machinery.pipe_blueprint import PipeBlueprint
 _PIPE_STEP_TAG = "pipe_step"
 _BINDING_STEP_TAG = "binding_step"
 
+# The tags of a sequence step's shapes, which pydantic puts in the location of an error inside a step
+# (`pipe.run_all.PipeSequence.steps.0.pipe_step.batch_as`) though the author never writes them.
+SEQUENCE_STEP_TAGS = frozenset({_PIPE_STEP_TAG, _BINDING_STEP_TAG})
+
 
 def _sequence_step_kind(step: Any) -> str:  # kw-only: ignore
     """Which shape a sequence step takes: a binding step when it carries `from`, a pipe step otherwise."""
