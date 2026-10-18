@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Any, ClassVar, Self, cast
+from collections.abc import Sequence
+from typing import Any, ClassVar, Self, cast, overload
 
 import pytest
 from mthds.protocol.problem.answers import MAX_BODY_NESTING, decode_json, nests_deeper_than
@@ -8,6 +9,7 @@ from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode, StepKind
 from pydantic import BaseModel, model_validator
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
@@ -18,6 +20,7 @@ from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import (
     MAX_PROBLEM_TEXT_LENGTH,
     TRUNCATION_MARKER,
+    UNKNOWN_CODE_ITEM_DETAIL,
     PipelexProblem,
     ProblemView,
     caller_view_of,
@@ -34,6 +37,35 @@ class _MisconfiguredError(PipelexError):
 
 class _TemplateRefusalError(PipelexError):
     error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.METHOD_TEMPLATE_INVALID
+
+
+class _AmbiguousPipeError(PipelexError):
+    error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.REQUEST_PIPE_AMBIGUOUS
+
+
+class _UnreadableSequence(Sequence[str]):
+    """A sequence of a raise site's own whose items cannot be read: reading one raises what no validation catches."""
+
+    @override
+    def __len__(self) -> int:
+        return 2
+
+    @overload
+    def __getitem__(self, index: int) -> str: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> Sequence[str]: ...
+
+    @override
+    def __getitem__(self, index: int | slice) -> str | Sequence[str]:
+        msg = "this sequence cannot be read"
+        raise KeyError(msg)
+
+
+def _cyclic_list() -> list[Any]:
+    cyclic: list[Any] = []
+    cyclic.append(cyclic)
+    return cyclic
 
 
 class _NodeHolder(BaseModel):
@@ -375,6 +407,80 @@ class TestProblemViews:
             assert problem.errors is not None
             assert problem.errors[0].as_wire() == {"code": "runtime.misconfigured", "detail": expected_detail, "location": {"pipe": "summarize"}}
             assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
+
+    def test_a_null_an_extension_member_holds_is_written_as_read(self) -> None:
+        """Only a member a model declares is left out when null: an extension member's null survives every write and the caller view."""
+        operator_wire = make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR).to_wire()
+        item_wire = {**ProblemViewsTestData.HAND_BUILT_OPERATOR_ITEM, **ProblemViewsTestData.NULL_HOLDING_ITEM_EXTENSIONS}
+        body = {
+            **operator_wire,
+            **ProblemViewsTestData.NULL_HOLDING_EXTENSIONS,
+            "errors": [item_wire],
+            "run_error": {**operator_wire, **ProblemViewsTestData.NULL_HOLDING_EXTENSIONS},
+        }
+        problem = PipelexProblem.model_validate(body)
+
+        caller = caller_view_of(problem=problem)
+        writes = {
+            "to_wire": problem.to_wire(),
+            "model_dump": problem.model_dump(mode="json"),
+            "nested": _NodeHolder(error=problem).model_dump(mode="json")["error"],
+            "caller": caller.to_wire(),
+            "caller_dump": caller.model_dump(mode="json"),
+            "round_trip": PipelexProblem.model_validate(json.loads(json.dumps(problem.to_wire()))).to_wire(),
+        }
+        for write_name, wire in writes.items():
+            for name, value in ProblemViewsTestData.NULL_HOLDING_EXTENSIONS.items():
+                assert wire[name] == value, write_name
+                assert wire["run_error"][name] == value, write_name
+            assert wire["errors"][0]["vendor"] == {"hint": None}, write_name
+            # A declared member with no value is still left out, the item's and the nested problem's included.
+            assert "suggestions" not in wire["errors"][0], write_name
+            assert "request_id" not in wire, write_name
+            assert "params" not in wire["run_error"], write_name
+
+    @pytest.mark.parametrize("view", list(ProblemView))
+    def test_an_item_whose_code_is_unknown_fails_closed_for_the_caller(self, view: ProblemView) -> None:
+        """The caller reads no parameter of an item whose code this process does not know, and a sentence quoting none."""
+        unknown_item = ProblemItem.model_validate(ProblemViewsTestData.UNKNOWN_CODE_ITEM)
+        built = make_problem(code=CoreCode.METHOD_INVALID, view=view, errors=[unknown_item])
+        stored = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR).model_copy(update={"errors": [unknown_item]})
+
+        match view:
+            case ProblemView.CALLER:
+                for problem in (built, caller_view_of(problem=stored)):
+                    assert problem.errors is not None
+                    assert problem.errors[0].as_wire() == {
+                        "code": "method.future_fault",
+                        "detail": UNKNOWN_CODE_ITEM_DETAIL,
+                        "location": {"pipe": "summarize"},
+                    }
+                    assert ProblemViewsTestData.PRIVATE_HOST_FILE not in str(problem.to_wire())
+            case ProblemView.OPERATOR:
+                assert built.errors is not None
+                assert built.errors[0].as_wire() == ProblemViewsTestData.UNKNOWN_CODE_ITEM
+
+    @pytest.mark.parametrize(
+        "unreadable",
+        [
+            pytest.param(_cyclic_list(), id="cyclic_list"),
+            pytest.param(_UnreadableSequence(), id="sequence_whose_items_raise"),
+            pytest.param([["summarize.a"], ["summarize.b"]], id="list_of_lists"),
+        ],
+    )
+    def test_a_value_that_is_no_parameter_value_is_dropped_without_replacing_the_error(
+        self, unreadable: object, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A malformed raise-site value is a parameter of the wrong type: it is dropped and logged, and the error keeps its code."""
+        error = _AmbiguousPipeError("ambiguous").with_params(pipe="summarize", candidates=unreadable)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = error.to_problem(view=ProblemView.CALLER)
+
+        assert problem.code == CoreCode.REQUEST_PIPE_AMBIGUOUS
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"pipe": "summarize"}
+        assert any(record.getMessage() == "An error gives a parameter of the wrong type for its code" for record in caplog.records)
 
     @pytest.mark.parametrize(
         ("code", "params"),
