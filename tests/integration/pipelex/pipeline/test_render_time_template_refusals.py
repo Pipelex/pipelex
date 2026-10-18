@@ -64,21 +64,31 @@ def _assert_is_the_refusal(*, error: PipelineExecutionError, message: str, detai
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestRenderTimeTemplateRefusals:
-    async def test_a_condition_expression_naming_an_unknown_filter_in_a_branch_is_refused(self) -> None:
-        """A live run taking the branch: `method.template_invalid` at the condition, its expression and the unknown filter named."""
+    @pytest.mark.parametrize(
+        ("expression_field", "expression_line"),
+        [
+            ("expression_template", RenderTimeTemplateTestData.EXPRESSION_TEMPLATE_LINE),
+            ("expression", RenderTimeTemplateTestData.EXPRESSION_LINE),
+        ],
+    )
+    async def test_a_condition_expression_naming_an_unknown_filter_in_a_branch_is_refused(self, expression_field: str, expression_line: str) -> None:
+        """A live run taking the branch: `method.template_invalid` at the condition, on the field the bundle wrote, the filter named."""
         error = await _failed_run(
             pipe_code="route_parcel",
-            bundle=RenderTimeTemplateTestData.CONDITION_MTHDS,
+            bundle=RenderTimeTemplateTestData.CONDITION_MTHDS.replace(RenderTimeTemplateTestData.EXPRESSION_LINE_SLOT, expression_line),
             inputs={"parcel": "a box of books", "lane": "express"},
             pipe_run_mode=PipeRunMode.LIVE,
         )
 
         _assert_is_the_refusal(
             error=error,
-            message=f"PipeCondition 'route_parcel': its expression cannot render: {_UNKNOWN_FILTER_FAULT}",
-            detail=f"The template 'expression' of pipe 'route_parcel' is invalid ({_UNKNOWN_FILTER_FAULT}).",
+            message=f"PipeCondition 'route_parcel': its {expression_field} cannot render: {_UNKNOWN_FILTER_FAULT}",
+            detail=f"The template '{expression_field}' of pipe 'route_parcel' is invalid ({_UNKNOWN_FILTER_FAULT}).",
             pipe_code="route_parcel",
         )
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.location is not None
+        assert caller.location.field == expression_field
 
     @pytest.mark.parametrize("prompt_field", ["prompt", "system_prompt"])
     async def test_an_llm_prompt_naming_an_unknown_filter_in_a_branch_is_refused(self, prompt_field: str) -> None:

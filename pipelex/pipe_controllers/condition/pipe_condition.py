@@ -25,7 +25,7 @@ from pipelex.pipe_controllers.absence_taint import (
     optional_input_taints,
     scan_taint_triggers,
 )
-from pipelex.pipe_controllers.condition.pipe_condition_blueprint import describe_expression_parse_failure
+from pipelex.pipe_controllers.condition.pipe_condition_blueprint import ConditionExpressionField, describe_expression_parse_failure
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_machinery.memory_writes import AlternativeWrites, MemoryWrite, SlotTaint, merge_alternative_writes, write_after_lift
@@ -77,6 +77,8 @@ class DryRunOutcomeSlot(BaseModel):
 class PipeCondition(PipeController):
     type: Literal["PipeCondition"] = "PipeCondition"
     expression: str
+    # The field the bundle wrote the expression in, which a refusal of the expression is located on and names.
+    expression_field: ConditionExpressionField
     outcome_map: ConditionOutcomeMap
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
@@ -264,7 +266,7 @@ class PipeCondition(PipeController):
             inputs=self.inputs,
             template_source=self.expression,
             template_category=TemplateCategory.EXPRESSION,
-            template_label="expression",
+            template_label=self.expression_field,
         )
 
     @override
@@ -434,11 +436,12 @@ class PipeCondition(PipeController):
         Raises:
             PipeRunError: `method.template_invalid` when the expression cannot render as written, such as a filter or
                 a test inside a branch that the expression environment does not define, which only rendering that
-                branch finds. The message names the pipe, its expression and what Jinja2 refused, never the
-                expression's text.
+                branch finds. The message names the pipe, the field the bundle wrote the expression in and what Jinja2
+                refused, never the expression's text, and the refusal is located on that field, as a refusal of the
+                template sandbox is.
         """
         try:
-            with locating_template_refusal(template_field="expression"):
+            with locating_template_refusal(template_field=self.expression_field):
                 return await render_template(
                     template=self.expression,
                     category=TemplateCategory.EXPRESSION,
@@ -448,11 +451,11 @@ class PipeCondition(PipeController):
             if not exc.template_owner.is_method:
                 # One of Pipelex's own templates, reached from the expression's render: ours, kept as it is.
                 raise
-            msg = f"PipeCondition '{self.code}': its expression cannot render: {exc.fault}"
+            msg = f"PipeCondition '{self.code}': its {self.expression_field} cannot render: {exc.fault}"
             raise (
-                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code, field=self.expression_field)
                 .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
-                .with_params(template="expression", finding=exc.fault)
+                .with_params(template=self.expression_field, finding=exc.fault)
             ) from exc
 
     async def _evaluate_expression(

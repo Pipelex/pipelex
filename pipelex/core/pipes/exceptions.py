@@ -97,9 +97,11 @@ class PipeRunError(PipelexError):
         ),
     )
 
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str):
+    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str, field: str | None = None):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
+        # The field of the pipe the failure is located on, as the bundle writes it, when one field is at fault.
+        self.field = field
         super().__init__(message)
 
     @override
@@ -108,7 +110,7 @@ class PipeRunError(PipelexError):
 
     @override
     def problem_location(self) -> ProblemLocation | None:
-        return make_location(pipe=self.pipe_code)
+        return make_location(pipe=self.pipe_code, field=self.field)
 
 
 class PipeOperatorModelChoiceError(PipelexError):

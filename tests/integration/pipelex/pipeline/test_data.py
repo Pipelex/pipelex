@@ -638,7 +638,7 @@ type                = "PipeCondition"
 description         = "Choose the lane a parcel goes down"
 inputs              = { parcel = "Parcel", lane = "Text" }
 output              = "Parcel"
-expression_template = "{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}"
+<expression-line>
 outcomes            = { express = "send_express" }
 default_outcome     = "send_standard"
 
@@ -656,6 +656,13 @@ inputs      = { parcel = "Parcel" }
 output      = "Parcel"
 template    = "Standard: $parcel"
 """
+
+    # Replaced by the condition's field, written as a template or as an expression, each with the branch in it.
+    EXPRESSION_LINE_SLOT: ClassVar[str] = "<expression-line>"
+    EXPRESSION_TEMPLATE_LINE: ClassVar[str] = (
+        "expression_template = \"{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}\""
+    )
+    EXPRESSION_LINE: ClassVar[str] = "expression = \"lane.text | frob_the_lane if lane.text == 'express' else 'quietly_routed'\""
 
     # Replaced by the prompt field each case puts the branch in, `prompt` or `system_prompt`.
     PROMPT_FIELD_SLOT: ClassVar[str] = "<prompt-field>"

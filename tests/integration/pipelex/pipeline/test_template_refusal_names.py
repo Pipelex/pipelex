@@ -37,6 +37,29 @@ caption = { template = "CAPTION_SLOT" }
 url = { template = "URL_SLOT" }
 """
 
+# A condition whose field, written as a template or as an expression, reads a private name its own source spells.
+_CONDITION_MTHDS = """
+domain = "template_refusal_condition"
+description = "Route a topic"
+main_pipe = "route_topic"
+
+[pipe.route_topic]
+type = "PipeCondition"
+description = "Choose where a topic goes"
+inputs = { topic = "Text" }
+output = "Text"
+EXPRESSION_LINE
+outcomes = { loud = "say_it" }
+default_outcome = "say_it"
+
+[pipe.say_it]
+type = "PipeCompose"
+description = "Say the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "$topic"
+"""
+
 
 def _compose_bundle(*, template: str) -> str:
     return SecurityRefusalTestData.COMPOSE_MTHDS.replace(SecurityRefusalTestData.COMPOSE_MTHDS_SLOT, template)
@@ -132,3 +155,22 @@ class TestTemplateRefusalNames:
         assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED
         assert caller.location is not None
         assert caller.location.as_wire() == {"pipe": "make_photo", "path": ["make_photo"], "field": expected_field}
+
+    @pytest.mark.parametrize(
+        ("expression_line", "expected_field"),
+        [
+            ("expression_template = \"{{ topic['_owner'] }}\"", "expression_template"),
+            ("expression = \"topic['_owner']\"", "expression"),
+        ],
+    )
+    async def test_a_condition_s_refusal_is_located_on_the_field_the_bundle_wrote(self, expression_line: str, expected_field: str) -> None:
+        """A condition writes its expression as a template or as an expression: its refusal names the field it wrote."""
+        bundle = _CONDITION_MTHDS.replace("EXPRESSION_LINE", expression_line)
+        with pytest.raises(PipelexError) as exc_info:
+            await PipelexMTHDSProtocol().execute(mthds_contents=[bundle], inputs={"topic": SecurityRefusalTestData.TOPIC})
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.SECURITY_TEMPLATE_REFUSED
+        assert caller.location is not None
+        assert caller.location.as_wire() == {"pipe": "route_topic", "path": ["route_topic"], "field": expected_field}
