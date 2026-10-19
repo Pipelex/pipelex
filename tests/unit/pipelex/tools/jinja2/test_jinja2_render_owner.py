@@ -6,6 +6,7 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, PipelexError
+from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import (
     Jinja2StuffError,
     Jinja2TemplateBudgetError,
@@ -42,8 +43,8 @@ async def _render_failure(
     category: TemplateCategory = TemplateCategory.LLM_PROMPT,
     is_undefined_strict: bool = False,
 ) -> PipelexError:
-    # A render fails with a `ToolError`, or with the sandbox's refusal, which is a `SecurityError`.
-    with pytest.raises(PipelexError) as exc_info:
+    # The sandbox's refusal is a `SecurityError`, not a `ToolError`: every other render failure is a `ToolError`.
+    with pytest.raises((ToolError, Jinja2TemplateSecurityError)) as exc_info:
         await render_jinja2_async(
             template_source=template_source,
             template_category=category,
