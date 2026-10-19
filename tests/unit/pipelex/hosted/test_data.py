@@ -65,6 +65,8 @@ class HostedVersions:
         '{"protocol_version":"0.1.0","implementation":"pipelex-hosted","implementation_version":"0.30.0","runtime_version":null,'
         '"extensions":["runs","method_id","method_ref"]}'
     )
+    #: A bare runner's, which keeps no runs, so a run on it takes the blocking `POST /v1/execute`.
+    BARE_RUNNER: ClassVar[str] = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
 
 
 class HostedPipeIoVerdicts:
@@ -72,12 +74,46 @@ class HostedPipeIoVerdicts:
 
     # A method calling a package by its address that the request did not ship: pipe-io loads only the packages shipped
     # with the method, and `/v1/start` fetches the dependency and runs. Built from the item
-    # `resolve_crate_from_method_dir`'s refusal carries on 2026-10-18.
+    # `resolve_crate_from_method_dir`'s refusal carries on 2026-10-18, in the shape that predates the standard, which a
+    # runner answering `validation_errors` alone sends.
     UNSHIPPED_ADDRESS_DEPENDENCY: ClassVar[str] = (
         '{"is_valid": false, "validation_errors": [{"category": "pipe_validation", "error_type": "unresolved_package_dependency", '
-        '"source": "bundle.mthds", "message": "In-memory resolve cannot load address-based dependency '
+        '"pipe_code": "score_invoice", "domain_code": "invoicing", "source": "bundle.mthds", '
+        '"field_path": "pipe.score_invoice.steps[0].pipe", "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score", '
+        '"message": "In-memory resolve cannot load address-based dependency '
         "'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents in the request or "
         'use directory-based resolution."}], "message": "The method does not validate."}'
+    )
+    # The same verdict from a runner speaking the standard, whose items are its problem's `errors`. The empty
+    # `validation_errors` is there only because the SDK model this package pins requires that member.
+    UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [], "errors": [{"code": "method.dependency_missing", "detail": "The method '
+        "depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: not_found).\", "
+        '"params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "not_found"}, '
+        '"location": {"pipe": "score_invoice", "field": "pipe.score_invoice.steps[0].pipe", "file": "bundle.mthds"}}], '
+        '"message": "The method does not validate."}'
+    )
+    # The same verdict from a runner answering both members, whose `errors` item this client cannot read (it gives no
+    # `detail`): its `validation_errors` still name the package.
+    UNSHIPPED_ADDRESS_DEPENDENCY_UNREADABLE_PROBLEM_ITEMS: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [{"category": "pipe_validation", "error_type": "unresolved_package_dependency", '
+        '"pipe_code": "score_invoice", "source": "bundle.mthds", "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score", '
+        '"message": "In-memory resolve cannot load address-based dependency \'github.com/mthds/scoring-lib/scoring\'."}], '
+        '"errors": [{"code": "method.dependency_missing", "params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", '
+        '"reason": "not_found"}}], "message": "The method does not validate."}'
+    )
+    # A package the method calls that was found in a cycle: the method's own fault, which no fetch cures.
+    DEPENDENCY_CYCLE_PROBLEM_ITEMS: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [], "errors": [{"code": "method.dependency_missing", "detail": "The method '
+        "depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: cycle).\", "
+        '"params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "cycle"}, '
+        '"location": {"pipe": "score_invoice", "file": "bundle.mthds"}}], "message": "The method does not validate."}'
+    )
+    # An item quoting the words of that refusal that no stage coded as a missing dependency: the method's own fault.
+    ADDRESS_DEPENDENCY_WORDS_ONLY: ClassVar[str] = (
+        '{"is_valid": false, "validation_errors": [{"category": "blueprint_validation", "source": "bundle.mthds", '
+        '"message": "In-memory resolve cannot load address-based dependency \'github.com/mthds/scoring-lib/scoring\'."}], '
+        '"message": "The method does not validate."}'
     )
 
 

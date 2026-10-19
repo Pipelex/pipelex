@@ -16,9 +16,10 @@ the Markdown says no more than the structured items it presents.
 ``format_validation_error_items_markdown`` is the markdown sibling of the human
 ``display_validation_error_items`` (``cli/error_handlers.py``): it renders typed
 :class:`ValidationErrorItem`s as category-grouped prose with per-item ``💡
-Suggested fix`` lines. It backs the agent ``validate`` failure surface and the
-agent ``fix`` still-invalid surface so the prose an agent reads mirrors the
-human panel and cannot drift. ``build_fix_command`` is the shared builder for the copy-pasteable
+Suggested fix`` lines, mirroring the human panel so that prose cannot drift. No
+failure surface reads it any longer: the agent CLI's failure surfaces and the API
+runner's ``rendered_markdown`` of an invalid verdict list the problem's items
+instead, as their JSON does. ``build_fix_command`` is the shared builder for the copy-pasteable
 ``<executable> fix bundle <path>`` footer, used by both the human and agent
 ``validate`` surfaces so the ``-L`` / ``--allow-signatures`` echo cannot drift.
 """

@@ -28,14 +28,6 @@ rationale = "Verb-object: iterates the Pipelex part of the exception's cause cha
 param = "exc"
 rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_build_error_source"]
-param = "exc"
-rationale = "Derives from the exc; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::_render_error_markdown"]
-param = "payload"
-rationale = "Renders the payload; single operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_argument_error"]
 param = "message"
 rationale = "Refuses an argument with the command's message; single operand, as agent_error."
@@ -43,10 +35,6 @@ rationale = "Refuses an argument with the command's message; single operand, as 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
 rationale = "Emits an agent error for the message; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_hosted_envelope"]
-param = "message"
-rationale = "Emits a hosted run's legacy error envelope for the message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_validate_bundle"]
 param = "exc"

@@ -14,7 +14,6 @@ from pipelex.base_exceptions import PipelexConfigError, PipelexError
 from pipelex.cli.agent_cli._agent_cli import app
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
-    _build_error_source,  # pyright: ignore[reportPrivateUsage]
     agent_argument_error,
     agent_error,
     agent_file_error,
@@ -297,6 +296,52 @@ class TestAgentOutput:
         assert "- **bundle_path:** /w/b.mthds" in rendered
         assert "is_valid" not in rendered
 
+    def test_render_problem_markdown_nests_the_run_s_own_problem(self) -> None:
+        """A read of a failed run's results renders the run's own problem under it as the problem itself renders, one heading
+        level down: its title, sentence, step, code, location and items.
+        """
+        item = make_problem_item(code=CoreCode.METHOD_CONCEPT_UNRESOLVED, params={"concept": "Missing"}, location=make_location(pipe="summarize"))
+        run_error = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.CALLER, location=make_location(pipe="summarize"), errors=[item])
+        read = make_problem(
+            code=CoreCode.RUN_FAILED, view=ProblemView.CALLER, params={"pipeline_run_id": "run-9", "run_status": "FAILED"}, pipeline_run_id="run-9"
+        ).with_members(run_error=run_error.to_wire())
+
+        rendered = render_problem_markdown(problem=read)
+
+        assert "- Code: `run.failed` (domain runtime, retry no)" in rendered
+        assert (
+            f"### The run's own problem\n\n#### {run_error.title}\n\n{run_error.detail}\n\n"
+            f"**Next step** (`{run_error.next_step.kind}`): {run_error.next_step.detail}\n\n"
+            "- Code: `method.invalid` (domain method, retry no)\n- Location: pipe 'summarize'\n\n"
+            f"##### Errors\n\n- `method.concept_unresolved`: {item.detail} (pipe 'summarize')"
+        ) in rendered
+
+    @pytest.mark.parametrize(
+        ("safety", "label"),
+        [("safe", "safe"), ("unsafe", "unsafe, confirm before applying"), ("reviewed", "unsafe, confirm before applying")],
+        ids=["safe", "unsafe", "unknown"],
+    )
+    def test_render_problem_markdown_labels_a_fix_by_its_safety(self, safety: str, label: str) -> None:
+        """A safety this reader does not know reads as unsafe (`SuggestedFix.effective_safety`), so it says it needs confirming."""
+        problem = make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.CALLER).with_members(
+            errors=[
+                {
+                    "code": "model.unknown",
+                    "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+                    "suggested_fix": {
+                        "fix_code": "rename-model",
+                        "description": "Replace model 'gpt-5.1' with 'gpt-5.5'",
+                        "safety": safety,
+                        "ops": [{"kind": "set_key", "table_path": ["pipe", "draft"], "key": "model", "value": "gpt-5.5"}],
+                    },
+                }
+            ]
+        )
+
+        rendered = render_problem_markdown(problem=problem)
+
+        assert f"  - Suggested fix (`rename-model`, {label}): Replace model 'gpt-5.1' with 'gpt-5.5'" in rendered
+
     def test_render_problem_markdown_names_the_model_and_the_provider(self) -> None:
         cause = InferenceBackendCredentialsError(
             credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
@@ -429,40 +474,3 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["working_memory"]["report_data"]["report_date"] == "2026-03-01"
         assert parsed["working_memory"]["report_data"]["items"][0]["timestamp"] == "2026-03-01T09:00:00"
-
-    # -------------------------------------------------------------------------
-    # _build_error_source, which a hosted run's envelope still carries
-    # -------------------------------------------------------------------------
-
-    def test_build_error_source_with_none_traceback(self) -> None:
-        exc = RuntimeError("constructed, not raised")
-        assert exc.__traceback__ is None
-
-        sources = _build_error_source(exc)
-        assert len(sources) == 1
-        assert "RuntimeError" in sources[0]
-        assert "no traceback" in sources[0]
-
-    def test_build_error_source_with_chained_none_tracebacks(self) -> None:
-        cause = ValueError("root cause")
-        outer = RuntimeError("wrapper")
-        outer.__cause__ = cause
-
-        sources = _build_error_source(outer)
-        assert len(sources) == 2
-        assert "RuntimeError" in sources[0]
-        assert "no traceback" in sources[0]
-        assert "ValueError" in sources[1]
-        assert "no traceback" in sources[1]
-
-    def test_build_error_source_with_real_traceback(self) -> None:
-        try:
-            msg = "actually raised"
-            raise RuntimeError(msg)
-        except RuntimeError as exc:
-            sources = _build_error_source(exc)
-
-        assert len(sources) == 1
-        assert "RuntimeError" in sources[0]
-        assert "no traceback" not in sources[0]
-        assert "test_agent_output.py" in sources[0]
