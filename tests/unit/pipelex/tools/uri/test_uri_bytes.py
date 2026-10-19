@@ -6,6 +6,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
+from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract, StoredData
 from pipelex.tools.uri import uri_bytes
 from pipelex.tools.uri.uri_bytes import UriBytes, load_bytes_and_mime_type_from_any_uri, load_bytes_from_any_uri
@@ -91,7 +92,7 @@ class TestLoadBytesAndMimeTypeFromAnyUri:
         load_with_metadata.assert_awaited_once_with(uri=storage_uri)
 
     async def test_a_storage_key_without_a_provider_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="without a storage provider"):
+        with pytest.raises(StorageNotConfiguredError, match="without a storage provider"):
             await load_bytes_and_mime_type_from_any_uri(f"{PIPELEX_STORAGE_SCHEME}scope/assets/theme.css")
 
     async def test_a_local_path_returns_no_type(self, tmp_path: Path) -> None:

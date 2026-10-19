@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.exceptions import ConceptStringError
 from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint
 
 
@@ -84,8 +85,8 @@ class TestGetStructureClassNameFromBlueprint:
         assert result == "MyConceptName"
 
     def test_invalid_concept_ref_or_code_raises_error(self):
-        """Invalid concept_ref_or_code raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid concept_ref_or_code"):
+        """Invalid concept_ref_or_code raises ConceptStringError."""
+        with pytest.raises(ConceptStringError, match="Invalid concept_ref_or_code"):
             get_structure_class_name_from_blueprint(
                 blueprint_or_string_description="A description",
                 concept_ref_or_code="invalid_lowercase_code",
@@ -100,8 +101,8 @@ class TestGetStructureClassNameFromBlueprint:
         assert result == "ConceptName"
 
     def test_empty_string_raises_error(self):
-        """Empty string raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid concept_ref_or_code"):
+        """Empty string raises ConceptStringError."""
+        with pytest.raises(ConceptStringError, match="Invalid concept_ref_or_code"):
             get_structure_class_name_from_blueprint(
                 blueprint_or_string_description="A description",
                 concept_ref_or_code="",

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 # TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
@@ -26,14 +27,18 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.method_trees import list_local_method_tree, reporting_host_library_tree_faults
+from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
+from pipelex.pipeline.validate_bundle_translation import (
+    reporting_host_library_faults,
+    translate_to_validate_bundle_error,
+    withholding_host_library_files,
+)
 from pipelex.system.caller_identity import CallerIdentity
 
 PYTHON_SUFFIX = ".py"
@@ -195,7 +200,7 @@ async def validate_bundle(
         # guard it would yield a blueprint-less result that downstream consumers (the canonical
         # report's primary-blueprint selection) cannot represent.
         msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
-        raise ValidateBundleError(message=msg)
+        raise ValidateBundleError(message=msg).with_error_code(CoreCode.REQUEST_INVALID)
     if mthds_sources is not None and (mthds_contents is None or len(mthds_sources) != len(mthds_contents)):
         # ``mthds_sources`` is a per-content source list (the host — e.g. an HTTP API —
         # threads each bundle's source onto the in-memory load path so its diagnostics carry a
@@ -241,7 +246,8 @@ async def validate_bundle(
         # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
         # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
         host_library_withholding: AbstractContextManager[None]
-        # A host's library directories whose trees cannot be listed are the host's fault, never the caller's verdict.
+        # A host's library directories whose trees cannot be listed, or whose methods refuse to load, are the host's
+        # fault, never the caller's verdict.
         host_library_tree_faults: AbstractContextManager[None]
         if mthds_contents is not None and not library_dirs_are_callers:
             host_library_withholding = withholding_host_library_files(
@@ -249,7 +255,7 @@ async def validate_bundle(
                 caller_sources=[source for source in mthds_sources or [] if source is not None],
                 caller_contents=mthds_contents,
             )
-            host_library_tree_faults = reporting_host_library_tree_faults()
+            host_library_tree_faults = reporting_host_library_faults()
         else:
             host_library_withholding = nullcontext()
             host_library_tree_faults = nullcontext()

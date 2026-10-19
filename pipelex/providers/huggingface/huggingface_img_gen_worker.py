@@ -11,9 +11,10 @@ from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_huggingface_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.image_utils import ImageFormat
 
@@ -39,7 +40,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> Image.Image:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
@@ -51,7 +52,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         model_id = args_dict.pop("model", None)
         if model_id is None:
             msg = f"Model '{self.inference_model.name}' rules must include a 'model_choice' entry"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         try:
             return await self.hf_async_client.text_to_image(
                 prompt=prompt,
@@ -60,7 +61,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             )
         except (InferenceTimeoutError, HfHubHTTPError) as exc:
             metadata = extract_huggingface_metadata(exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

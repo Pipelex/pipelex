@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -86,7 +87,7 @@ class TestDoclingWorkerErrorHandling:
         assert report.error_type == "ExtractJobFailureError"
 
     async def test_error_report_for_io_error(self, mocker: MockerFixture) -> None:
-        """to_error_report() for OSError has TRANSIENT category and is retryable."""
+        """A local disk failure is this machine's, not the input's and not one a retry is known to clear: runtime.unexpected."""
         worker = _make_docling_extract_worker(mocker)
         sdk_exc = OSError("Disk I/O failure")
 
@@ -99,5 +100,6 @@ class TestDoclingWorkerErrorHandling:
             await worker._extract_from_source(source_uri="/tmp/test.pdf")  # ruff: ignore[private-member-access, hardcoded-temp-file]  # pyright: ignore[reportPrivateUsage]
 
         report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
+        assert report.error_category == "unknown"
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+        assert report.retryable is False

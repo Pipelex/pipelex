@@ -6,29 +6,36 @@ Builds synthetic envelopes + classifications and asserts the rendered
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.exceptions import (
+    INFERENCE_FAILURE_CODES,
     CogtError,
     ExtractJobFailureError,
     ExtractModelNotFoundError,
     ImgGenGenerationError,
     ImgGenModelNotFoundError,
     InferenceErrorCategory,
+    JudgmentJobFailureError,
+    JudgmentModelNotFoundError,
     LLMCompletionError,
     LLMModelNotFoundError,
     SearchJobFailureError,
     SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserActionKind
-from pipelex.cogt.inference.error_classify import ClassificationResult
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.system.pipe_run_mode import PipeRunMode
+
+if TYPE_CHECKING:
+    from pipelex.errors.error_codes import ErrorCode
 
 
 class _TestCases:
@@ -38,6 +45,7 @@ class _TestCases:
         ("img_gen", InferenceErrorFamily.IMG_GEN, ImgGenGenerationError, ImgGenModelNotFoundError),
         ("extract", InferenceErrorFamily.EXTRACT, ExtractJobFailureError, ExtractModelNotFoundError),
         ("search", InferenceErrorFamily.SEARCH, SearchJobFailureError, SearchModelNotFoundError),
+        ("judgment", InferenceErrorFamily.JUDGMENT, JudgmentJobFailureError, JudgmentModelNotFoundError),
     ]
 
 
@@ -66,6 +74,7 @@ class TestRenderInferenceError:
         classification = ClassificationResult(
             category=InferenceErrorCategory.TRANSIENT,
             user_action_kind=UserActionKind.WAIT_AND_RETRY,
+            error_code=CoreCode.PROVIDER_FAILED,
         )
 
         rendered = render_inference_error(
@@ -77,6 +86,7 @@ class TestRenderInferenceError:
         )
 
         assert type(rendered) is expected_failure_class
+        assert rendered.resolve_error_code() == CoreCode.PROVIDER_FAILED
         assert rendered.error_category == InferenceErrorCategory.TRANSIENT
         assert rendered.user_action is not None
         assert rendered.user_action.kind == UserActionKind.WAIT_AND_RETRY
@@ -98,6 +108,7 @@ class TestRenderInferenceError:
         classification = ClassificationResult(
             category=InferenceErrorCategory.CONFIGURATION,
             user_action_kind=UserActionKind.CHANGE_MODEL,
+            error_code=CoreCode.MODEL_UNAVAILABLE,
             is_model_not_found=True,
         )
 
@@ -110,6 +121,7 @@ class TestRenderInferenceError:
         )
 
         assert type(rendered) is expected_not_found_class
+        assert rendered.resolve_error_code() == CoreCode.MODEL_UNAVAILABLE
         assert rendered.error_category == InferenceErrorCategory.CONFIGURATION
         assert rendered.model_handle == "fake-handle"
         assert rendered.provider_metadata is metadata
@@ -124,6 +136,7 @@ class TestRenderInferenceError:
         classification = ClassificationResult(
             category=InferenceErrorCategory.CONTENT,
             user_action_kind=UserActionKind.CHANGE_INPUT,
+            error_code=CoreCode.MODEL_CONTENT_REFUSED,
         )
 
         rendered = render_inference_error(
@@ -162,6 +175,7 @@ class TestRenderInferenceError:
         classification = ClassificationResult(
             category=InferenceErrorCategory.TRANSIENT,
             user_action_kind=UserActionKind.WAIT_AND_RETRY,
+            error_code=CoreCode.PROVIDER_RATE_LIMITED,
         )
         root_fault = render_inference_error(
             metadata=metadata,
@@ -191,3 +205,55 @@ class TestRenderInferenceError:
 
         assert report_payload["user_action"] == {"kind": "wait_and_retry", "detail": expected_detail}
         assert "automatically" not in report_payload["user_action"]["detail"]
+
+    @pytest.mark.parametrize("error_code", INFERENCE_FAILURE_CODES, ids=str)
+    @pytest.mark.parametrize(
+        ("_topic", "family", "expected_failure_class", "_expected_not_found_class"),
+        _TestCases.FAMILIES,
+    )
+    def test_every_classified_code_renders_for_every_family(
+        self,
+        _topic: str,
+        family: InferenceErrorFamily,
+        expected_failure_class: type[CogtError],
+        _expected_not_found_class: type[CogtError],
+        error_code: ErrorCode,
+    ) -> None:
+        """Each family's failure class declares every code a classification may carry, so the render never refuses one."""
+        classification = ClassificationResult(
+            category=InferenceErrorCategory.UNKNOWN,
+            user_action_kind=UserActionKind.CONTACT_SUPPORT,
+            error_code=error_code,
+        )
+
+        rendered = render_inference_error(
+            metadata=_metadata(),
+            classification=classification,
+            family=family,
+            model_desc="gpt-fake",
+            model_handle="fake-handle",
+        )
+
+        assert type(rendered) is expected_failure_class
+        assert rendered.resolve_error_code() == error_code
+
+    def test_an_outcome_nobody_knows_is_not_advised_to_be_run_again_blind(self) -> None:
+        """An image generation that may have run is checked for before it is repeated, whatever the kind says."""
+        classification = ClassificationResult(
+            category=InferenceErrorCategory.AMBIGUOUS,
+            user_action_kind=UserActionKind.WAIT_AND_RETRY,
+            error_code=CoreCode.PROVIDER_OUTCOME_UNKNOWN,
+        )
+
+        rendered = render_inference_error(
+            metadata=_metadata(),
+            classification=classification,
+            family=InferenceErrorFamily.IMG_GEN,
+            model_desc="gpt-image-fake",
+            model_handle="fake-handle",
+        )
+
+        assert type(rendered) is ImgGenGenerationError
+        assert rendered.resolve_error_code() == CoreCode.PROVIDER_OUTCOME_UNKNOWN
+        assert rendered.user_action is not None
+        assert "check for one before running it again" in rendered.user_action.detail

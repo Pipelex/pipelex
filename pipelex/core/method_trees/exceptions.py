@@ -1,8 +1,23 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
 
 
 class TreePythonError(PipelexError):
-    """A method tree's Python cannot be imported in this process."""
+    """A method tree's Python cannot be imported in this process.
+
+    The default ``runtime.unexpected`` is an invariant of the import hold; a raise site chooses ``request.unsupported``
+    for a tree handed over in a form that holds no directory of Python, and ``method.name_conflict`` for a module of the
+    tree that a module of the same name imported earlier hides.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.RUNTIME_UNEXPECTED,
+        others=(CoreCode.REQUEST_UNSUPPORTED, CoreCode.METHOD_NAME_CONFLICT),
+    )
 
 
 class TreePythonHeldError(TreePythonError):
@@ -10,8 +25,11 @@ class TreePythonHeldError(TreePythonError):
 
     A process imports one tree's Python at a time: the tree root goes first on `sys.path` and its modules keep their
     real names, so two trees defining the same module could not share the process, and evicting the earlier tree's
-    modules would pull them from under its run. The message names both trees.
+    modules would pull them from under its run. The message names both trees, and the same run succeeds once the run
+    in flight ends.
     """
+
+    error_code = CoreCode.RUNTIME_UNAVAILABLE
 
 
 class TreeModuleShadowingError(TreePythonError):
@@ -22,8 +40,7 @@ class TreeModuleShadowingError(TreePythonError):
     would shadow; it describes the caller's own method, so it is kept under STRICT disclosure.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code = CoreCode.METHOD_NAME_CONFLICT
     _authors_caller_facing_message = True
 
 
@@ -45,5 +62,8 @@ class MethodFileUnavailableError(PipelexError):
 
     The store does not hold it, such as a tree the process that assembled the run never handed over, or the bytes it
     holds no longer match the hash the tree's listing names, such as a file edited on disk after its tree was listed. The
-    message names the tree by its digest and the file by its tree path, never by a path of this host.
+    message names the tree by its digest and the file by its tree path, never by a path of this host. A tree that names
+    no file at the path a method refers to chooses ``method.resource_missing``; the rest is the store failing this run.
     """
+
+    error_code = ErrorCodeSet(default=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.METHOD_RESOURCE_MISSING,))

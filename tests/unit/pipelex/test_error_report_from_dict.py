@@ -23,6 +23,7 @@ class TestErrorReportFromDict:
         [
             pytest.param(
                 ErrorReport(
+                    code="runtime.unexpected",
                     error_type="X",
                     message="m",
                     title="X error",
@@ -32,6 +33,7 @@ class TestErrorReportFromDict:
             ),
             pytest.param(
                 ErrorReport(
+                    code="provider.quota_exhausted",
                     error_type="CogtError",
                     message="rate limited",
                     title="AI inference failed",
@@ -47,6 +49,7 @@ class TestErrorReportFromDict:
             ),
             pytest.param(
                 ErrorReport(
+                    code="runtime.unexpected",
                     error_type="LLMCompletionError",
                     message="429 Too Many Requests",
                     title="LLM completion",

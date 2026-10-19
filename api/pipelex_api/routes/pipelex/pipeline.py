@@ -9,9 +9,11 @@ from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
-from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -29,7 +31,7 @@ from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, SINGLE_TENANT_USER
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex_api.api_config import get_api_config, resolve_orchestration_mode
+from pipelex_api.api_config import ApiConfig, get_api_config, is_callers_override, resolve_orchestration_mode
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.error_types import ErrorType
@@ -295,6 +297,24 @@ class _OrchestratorPipeRun(PipeRunProtocol):
         return _pipe_output_from_run_output(run_output)
 
 
+def _missing_orchestrator_error(*, mode: str, api_config: ApiConfig) -> MissingOrchestratorError:
+    """The refusal of a run whose orchestration mode no installed plugin serves, coded by whose choice the mode was.
+
+    A mode the caller named as a per-request override is the caller's to change (`runtime.unsupported`); the
+    deployment's own default is the operator's, who installs its plugin (`pipelex.plugin.not_found`).
+    """
+    if is_callers_override(orchestration_mode=mode, config=api_config):
+        return MissingOrchestratorError(mode=mode).with_error_code(CoreCode.RUNTIME_UNSUPPORTED)
+    return MissingOrchestratorError(mode=mode).with_error_code(PipelexErrorCode.PLUGIN_NOT_FOUND)
+
+
+def _missing_bundle_validator_error(*, mode: str, api_config: ApiConfig) -> MissingBundleValidatorError:
+    """The `/validate` twin of `_missing_orchestrator_error`, coded the same way by whose choice the mode was."""
+    if is_callers_override(orchestration_mode=mode, config=api_config):
+        return MissingBundleValidatorError(mode=mode).with_error_code(CoreCode.RUNTIME_UNSUPPORTED)
+    return MissingBundleValidatorError(mode=mode).with_error_code(PipelexErrorCode.PLUGIN_NOT_FOUND)
+
+
 class ApiRunner(PipelexMTHDSProtocol):
     """API runner that dispatches `execute`, `start`, and `validate` through the per-call plugin registries.
 
@@ -349,10 +369,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         """
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (403) here, before any library load / run registration. Mirrors start().
-        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=get_api_config())
+        api_config = get_api_config()
+        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
-            raise MissingOrchestratorError(mode=orchestration_mode)
+            raise _missing_orchestrator_error(mode=orchestration_mode, api_config=api_config)
         await self._ensure_served_method_requirements_met()
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
@@ -419,17 +440,20 @@ class ApiRunner(PipelexMTHDSProtocol):
         `api.toml` policy and a forbidden override is refused with a 403.
         """
         if extra:
+            # Nothing on the wire reaches `extra`: the route parses the extras itself and passes them by name, so a
+            # value here is a fault of the in-process code calling this runner, never the caller's.
             msg = f"ApiRunner defines no extension args beyond its named ones; got {sorted(extra)}."
-            raise PipelineRequestError(msg)
+            raise PipelexUnexpectedError(msg)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (403) here. Then look up the orchestrator and check its async
         # capability: `/start` is fire-and-forget, so a blocking-only orchestrator (direct on the
         # agnostic base) is refused HONESTLY with a 400 instead of silently running blocking and
         # acking. Both gates run BEFORE pipeline_run_setup so a doomed request never loads a library.
-        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=get_api_config())
+        api_config = get_api_config()
+        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
-            raise MissingOrchestratorError(mode=orchestration_mode)
+            raise _missing_orchestrator_error(mode=orchestration_mode, api_config=api_config)
         if not orchestrator.supports_fire_and_forget:
             msg = (
                 f"Orchestration mode '{orchestration_mode}' cannot honor fire-and-forget delivery: /start requires an "
@@ -587,10 +611,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (403) here, before any validator dispatch / library load. Mirrors start().
-        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=get_api_config())
+        api_config = get_api_config()
+        orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         validator = get_bundle_validator_registry().get_optional(mode=orchestration_mode)
         if validator is None:
-            raise MissingBundleValidatorError(mode=orchestration_mode)
+            raise _missing_bundle_validator_error(mode=orchestration_mode, api_config=api_config)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
         # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
@@ -793,12 +818,12 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     extras = _validate_extras(request_data)
     try:
         run_request = RunRequest.from_body(request_data)
-    except (PipelineRequestError, ValidationError) as exc:
-        # `from_body` rejects a body where neither `pipe_code` nor
-        # `mthds_contents` is supplied (PipelineRequestError) and a body whose
-        # fields fail Pydantic coercion (ValidationError) — both are caller
-        # mistakes, not server faults, so they map to a 422 rather than
-        # escaping to the generic-500 fallback.
+    except ValidationError as exc:
+        # A body whose fields fail Pydantic coercion is a caller mistake, not a server fault, so it maps to
+        # a 422 rather than escaping to the generic-500 fallback. A body naming its run source wrongly, or
+        # none, is refused by `from_body` as a `PipelexRequestError` instead, which needs no catch here: it
+        # is a `PipelexError` carrying `request.invalid` or `request.unsupported`, and the global handler
+        # answers it with its code.
         raise_validation_error(message=str(exc))
     return _ParsedRunRequest(run_request=run_request, extras=extras, body=body)
 

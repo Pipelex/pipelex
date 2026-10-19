@@ -19,6 +19,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -159,7 +160,7 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         render_context = template_file.render_context
         if render_context is None:
             msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file.name}' with nothing to render it with."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         with _library_typing(render_context=render_context):
             working_memory = hydrate_working_memory(render_context.working_memory_raw)
             context = build_compose_context(memory=working_memory, runtime_params=render_context.runtime_params)

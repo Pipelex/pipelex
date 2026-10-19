@@ -275,7 +275,7 @@ The answer is `{"missing": [{"sha256": "…", "size": n, "upload": {"method": "P
 
 A method can call a pipe of another method package by its address, such as `github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views`. A request can carry that package with the method, so the run needs no copy installed on the server and no fetch:
 
-- **With `files`**, send each package in `dependencies`, a map from the package's address to the package's own map of file entries, its `METHODS.toml` at its root declaring that address. A package keyed by another address than its manifest declares is a `422 InvalidMethodFiles`, and so is `dependencies` without `files`.
+- **With `files`**, send each package in `dependencies`, a map from the package's address to the package's own map of file entries, its `METHODS.toml` at its root declaring that address. A package keyed by another address than its manifest declares is a `422 InvalidMethodFiles`; `dependencies` without `files` is a `422` `PipelexRequestError` carrying the code `request.invalid`.
 - **In a `bundle_b64` archive**, put each package under `.mthds/methods/<name>/`, with its `METHODS.toml` at `.mthds/methods/<name>/METHODS.toml`, which is the layout of a local method store. The store's `.provenance.json` sidecar is left out of the package.
 
 ```text

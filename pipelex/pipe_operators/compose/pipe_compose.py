@@ -3,6 +3,7 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.config import get_config
@@ -19,7 +20,7 @@ from pipelex.kernel.compose_ops import run_compose_template
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template, lint_template_private_names
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError, PipeComposeTemplateError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -82,7 +83,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"
-            raise ValueError(msg) from exc
+            raise PipeComposeTemplateError(msg) from exc
         roots: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
@@ -199,8 +200,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
+            # The factory refuses a template mode with no template, so this is a bug of ours.
             msg = "Template is required for template mode"
-            raise ValueError(msg)
+            raise PipelexUnexpectedError(msg)
 
         # Resolved here rather than inside the kernel: turning a concept into a class is a library's
         # business, and handing the class over is what spares the kernel a registry read.
@@ -243,8 +245,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     ) -> PipeComposeOutput:
         """Run PipeCompose in construct mode (produces StructuredContent output)."""
         if self.construct_blueprint is None:
+            # The factory refuses a construct mode with no construct, so this is a bug of ours.
             msg = "Construct blueprint is required for construct mode"
-            raise ValueError(msg)
+            raise PipelexUnexpectedError(msg)
 
         # Get the output class from the registry
         output_class = get_class_registry().get_required_subclass(

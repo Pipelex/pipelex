@@ -1,6 +1,8 @@
 """Errors raised while loading pipeline-inputs files for the run CLI surfaces."""
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 
@@ -11,7 +13,7 @@ class AmbiguousInputsFilesError(PipelexError):
     exist there is no safe pick, so the caller must choose explicitly.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.REQUEST_INVALID
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass --inputs explicitly to choose which inputs file to use",
@@ -28,8 +30,7 @@ class AutoDetectedInputsFileError(PipelexError):
     into a run; a directory or any other entry of either name is refused the same way.
     """
 
-    _declared_title = "Auto-detected inputs file is not a regular file"
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.REQUEST_INVALID
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Replace it with the file itself, or name the inputs file with --inputs <path>",

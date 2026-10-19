@@ -1,10 +1,11 @@
 import re
 from collections.abc import Collection
-from typing import NamedTuple, Self, TypeVar
+from typing import ClassVar, NamedTuple, Self, TypeVar
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import ErrorReport, PipelexError, ValidationErrorItem
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
@@ -12,6 +13,8 @@ from pipelex.core.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
 from pipelex.pipe_run.located_failure import build_located_failure_report, locate_failure_message
 from pipelex.pipeline.validation_errors import build_validation_error_items
@@ -19,7 +22,9 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class PipeExecutionError(PipelexError):
-    error_domain = ErrorDomain.RUNTIME
+    """A run the runner cannot set up: no pipe to start at, or inputs that do not fit the run's models."""
+
+    error_code = ErrorCodeSet(default=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.REQUEST_PIPE_UNSPECIFIED, CoreCode.INPUT_INVALID))
 
 
 class PipelineExecutionError(PipelexError):
@@ -32,14 +37,17 @@ class PipelineExecutionError(PipelexError):
     (it happened outside any routed pipe run, or it crossed a transport boundary as a report that
     already names its pipe), ``pipe_code`` is the entry pipe and ``pipe_stack`` is empty.
 
-    Its report is not its own. ``to_error_report()`` takes the identity (``error_type``, ``title``,
-    ``type_uri``), the message and the caller-facing flag of the root fault, the innermost
-    ``PipelexError`` on the cause chain, or the report such an error recovered across a transport
-    boundary; the message is prefixed with the failing pipe and its path. The classification is
+    Its report is not its own. It takes its cause's code, and ``to_error_report()`` takes the identity
+    (``code``, ``error_type``, ``title``, ``type_uri``, and the domain and retry verdict the code
+    decides), the message and the caller-facing flag of the root fault, the first ``PipelexError`` on
+    the cause chain that carries a code of its own, or the report such an error recovered across a
+    transport boundary; the message is prefixed with the failing pipe and its path. The diagnostics are
     inherited from the cause chain (so a categorized ``CogtError`` keeps its ``WAIT_AND_RETRY`` /
-    ``CHECK_BILLING`` action), with a ``RUNTIME`` floor and, when nothing on the chain advises an
-    action, a fallback that names the failing pipe. See ``pipelex.pipe_run.located_failure``.
+    ``CHECK_BILLING`` action) and, when nothing on the chain advises an action, a fallback names the
+    failing pipe. See ``pipelex.pipe_run.located_failure``.
     """
+
+    error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED)
 
     def __init__(
         self,
@@ -97,6 +105,10 @@ class PipelineExecutionError(PipelexError):
 
 
 class PipeStackOverflowError(PipelexError):
+    """A run nested pipes deeper than the configured limit, usually a method that recurses."""
+
+    error_code = CoreCode.PIPE_STACK_OVERFLOW
+
     def __init__(self, message: str, limit: int, pipe_stack: list[str]):
         self.limit = limit
         self.pipe_stack = list(pipe_stack)  # snapshot: the live stack unwinds after this error is raised
@@ -104,11 +116,15 @@ class PipeStackOverflowError(PipelexError):
 
 
 class PipelineManagerNotFoundError(PipelexError):
-    pass
+    """The pipeline manager holds no run under an id it was asked for: an internal lookup of ours."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class PipelineManagerAlreadyExistsError(PipelexError):
-    pass
+    """A run id the caller supplied is still in flight; the next step is to pick another id."""
+
+    error_code = PipelexErrorCode.RUN_ALREADY_EXISTS
 
 
 def _summarize_bundle_validation_message(
@@ -231,9 +247,12 @@ class ValidateBundleError(PipelexError):
     + ``is_runnable``), not a validation failure — so this error no longer carries a signature channel.
 
     All errors are categorized and stored in their respective lists.
+
+    Its code is ``method.invalid``, each item keeping its own; a request that names nothing to validate, such
+    as an empty set of bundle contents, is ``request.invalid``, chosen at its raise site.
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code = ErrorCodeSet(default=CoreCode.METHOD_INVALID, others=(CoreCode.REQUEST_INVALID,))
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         # The next step points at the items' own: each item says what is wrong and where, and carries a
@@ -359,6 +378,22 @@ class ValidateBundleError(PipelexError):
         return report.model_copy(update={"validation_errors": self.validation_error_items() or None})
 
 
+class HostLibraryLoadRefusalError(PipelexError):
+    """A method of this host's own library directories refused to load: the deployment's fault, never the caller's input.
+
+    A server loads its library directories beside a request's bundles (`library_dirs_are_callers` False), and they are
+    the deployment's, so a pipe there that its factory refuses, that names a model the deck does not define, or that
+    refuses in any other way the caller's own content would be refused, is the deployment's configuration failing to
+    validate: `pipelex.config.invalid`, the code the registry gives the libraries among the runtime's own
+    configuration, and the one `HostLibraryTreeError` and `HostLibraryRequirementsError` carry for the same
+    directories. Its message names the method's refusal for the operator and is not caller-facing, so STRICT
+    disclosure answers with the placeholder and none of the host library's text. It is deliberately no
+    `LibraryError`, which a validation would report as the caller's invalid bundle.
+    """
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
+
+
 class PipeIOContractError(PipelexError):
     """Raised when projecting a validated pipe into its `pipe_io_contracts` IO contract fails.
 
@@ -368,6 +403,8 @@ class PipeIOContractError(PipelexError):
     third-party exception (which the Temporal error boundary would not convert and
     Temporal would pointlessly retry).
     """
+
+    error_code = CoreCode.METHOD_CONCEPT_INVALID
 
 
 class PipelineInputContentError(PipelexError):
@@ -387,9 +424,17 @@ class PipelineInputContentError(PipelexError):
     differently from ``FileNotFoundError`` on one that does not. The
     caller-facing half of this family is ``PipelineInputUrlMissingError``,
     whose message carries nothing but the accepted schemes.
+
+    It takes its cause's code, so a storage key refused as a traversal reports the storage error's own code,
+    and a key refused for another reason the fallback, a malformed storage address. A raise site that knows
+    better chooses: a reference to nothing stored (``input.reference_not_found``), a data URL or a local
+    file that cannot be read (``input.file_unreadable``).
     """
 
-    error_domain = ErrorDomain.INPUT
+    error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(
+        fallback=PipelexErrorCode.STORAGE_URI_INVALID,
+        others=(CoreCode.INPUT_REFERENCE_NOT_FOUND, CoreCode.INPUT_FILE_UNREADABLE),
+    )
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail=(
@@ -407,6 +452,7 @@ class PipelineInputUrlInvalidError(PipelineInputContentError):
     that consumes the input fetches it and reports a real failure.
     """
 
+    error_code = CoreCode.INPUT_INVALID
     _authors_caller_facing_message = True
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
@@ -424,6 +470,7 @@ class PipelineInputFormatError(PipelineInputContentError):
     model, the formats that model reads), never a url, a storage key or a server-side reason.
     """
 
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     _authors_caller_facing_message = True
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
@@ -438,6 +485,8 @@ class PipelineInputNotAnImageError(PipelineInputFormatError):
     needs no model. It fires only on a positive identification, so an image the sniffer cannot
     identify, an SVG for one, is left to its consumer.
     """
+
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
 
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
@@ -455,6 +504,8 @@ class PipelineInputFormatUnsupportedError(PipelineInputFormatError):
     and the formats that model reads.
     """
 
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Give each file input in a format the model of the pipe that consumes it reads.",
@@ -471,6 +522,7 @@ class PipelineInputUrlMissingError(PipelineInputContentError):
     sets it is ``_authors_caller_facing_message``.)
     """
 
+    error_code = CoreCode.INPUT_INVALID
     _authors_caller_facing_message = True
 
 
@@ -485,10 +537,26 @@ class MethodEntryError(PipelexError):
     defining it, when no single bundle of the method defines that pipe. A command judging the whole method, such as
     `validate`, needs no pipe to start at and is not refused. The method is the caller's own, so the message is theirs
     to read.
+
+    Its code defaults to ``request.pipe_unspecified``, a run naming no pipe of a method that declares no
+    ``main_pipe``; the raise site chooses ``request.pipe_ambiguous`` when several pipes qualify,
+    ``request.pipe_not_found`` when no bundle of the method defines the pipe the caller named,
+    ``method.pipe_unresolved`` when the manifest names a pipe no bundle defines, ``method.package_invalid``
+    when the manifest cannot be read, ``method.syntax`` when a bundle is not text, and ``method.invalid`` when
+    the method holds no bundle at all.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code = ErrorCodeSet(
+        default=CoreCode.REQUEST_PIPE_UNSPECIFIED,
+        others=(
+            CoreCode.REQUEST_PIPE_AMBIGUOUS,
+            CoreCode.REQUEST_PIPE_NOT_FOUND,
+            CoreCode.METHOD_PIPE_UNRESOLVED,
+            CoreCode.METHOD_PACKAGE_INVALID,
+            CoreCode.METHOD_SYNTAX,
+            CoreCode.METHOD_INVALID,
+        ),
+    )
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Name the pipe, or declare the method's one main_pipe: in its METHODS.toml, or in one of its bundles",

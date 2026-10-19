@@ -1,5 +1,6 @@
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.assignment_models import (
@@ -27,6 +28,7 @@ from pipelex.cogt.content_generation.search_generate import search_gen_sourced_a
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import DocumentComposition
+from pipelex.cogt.exceptions import ExtractJobFailureError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -294,7 +296,7 @@ class ContentGenerator(ContentGeneratorProtocol):
                 page_view_contents = [ImageContent(url=extract_input.image_uri)]
             if len(page_view_contents) != len(page_contents):
                 msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
-                raise ValueError(msg)
+                raise ExtractJobFailureError(msg).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             for page_content in page_contents:
                 page_content.page_view = page_view_contents.pop(0)
 

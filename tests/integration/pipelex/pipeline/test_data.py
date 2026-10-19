@@ -569,6 +569,90 @@ prompt = "Pitch this company in one sentence: $description"
 """
 
 
+class RenderTimeTemplateTestData:
+    """Bundles whose template names a filter its environment lacks inside a branch, which only rendering that branch finds."""
+
+    UNKNOWN_FILTER: ClassVar[str] = "frob_the_lane"
+    # Text of the templates that no refusal may quote.
+    TEMPLATE_TEXT: ClassVar[str] = "quietly_routed"
+
+    # A condition whose expression parses and compiles, since its unknown filter sits in a branch, and which a run taking
+    # that branch cannot render.
+    CONDITION_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_condition"
+description = "Send a parcel down the lane the request names"
+main_pipe   = "route_parcel"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_parcel]
+type                = "PipeCondition"
+description         = "Choose the lane a parcel goes down"
+inputs              = { parcel = "Parcel", lane = "Text" }
+output              = "Parcel"
+expression_template = "{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}"
+outcomes            = { express = "send_express" }
+default_outcome     = "send_standard"
+
+[pipe.send_express]
+type        = "PipeCompose"
+description = "Note the parcel onto the express lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Express: $parcel"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+"""
+
+    # Replaced by the prompt field each case puts the branch in, `prompt` or `system_prompt`.
+    PROMPT_FIELD_SLOT: ClassVar[str] = "<prompt-field>"
+    # A step whose prompt is only parsed at load, so its unknown filter in a branch passes the load and fails the render.
+    LLM_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_llm"
+description = "Summarize a topic"
+main_pipe   = "summarize"
+
+[pipe.summarize]
+type        = "PipeLLM"
+description = "Summarize the topic"
+inputs      = { topic = "Text" }
+output      = "Text"
+<prompt-field> = "{% if topic %}Summarize {{ topic.text | frob_the_lane }}{% else %}quietly_routed{% endif %}"
+"""
+    # The other prompt field, which renders, beside the one naming the unknown filter.
+    PLAIN_PROMPT: ClassVar[str] = 'prompt = "Summarize $topic"'
+
+    # A filter the deployment's structure-prompt template names and its environment lacks, which no method wrote.
+    UNKNOWN_STRUCTURE_FILTER: ClassVar[str] = "frob_the_structure"
+    # The deployment's structure-prompt template, edited to name that filter inside a branch.
+    BROKEN_STRUCTURE_PROMPT: ClassVar[str] = "{% if class_structure_str %}{{ class_structure_str | frob_the_structure }}{% endif %}"
+    # A step with a structured output, whose prompt renders and whose structure prompt is the deployment's template.
+    STRUCTURED_LLM_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_structure"
+description = "Read a parcel label"
+main_pipe   = "read_label"
+
+[concept.ParcelLabel]
+description = "The label on a parcel"
+
+[concept.ParcelLabel.structure]
+recipient = { type = "text", description = "Who the parcel is for" }
+
+[pipe.read_label]
+type        = "PipeLLM"
+description = "Read the label off a note"
+inputs      = { note = "Text" }
+output      = "ParcelLabel"
+prompt      = "Read the label from $note"
+"""
+
+
 class ResolveBundleTestData:
     """Bundles the host-facing resolve cores are pinned with."""
 

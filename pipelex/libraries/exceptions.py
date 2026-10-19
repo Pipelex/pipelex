@@ -1,15 +1,34 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class LibraryError(PipelexError):
-    _declared_title = "Library error"
+    """A library that cannot hold what it is asked to hold.
+
+    The default ``runtime.unexpected`` is an invariant of the library manager, such as a library id that does not
+    exist; a raise site that finds a fault of the request, of the method or of the library directories chooses
+    ``request.invalid``, ``method.concept_unresolved`` or ``pipelex.config.invalid``.
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.RUNTIME_UNEXPECTED,
+        others=(CoreCode.REQUEST_INVALID, CoreCode.METHOD_CONCEPT_UNRESOLVED, PipelexErrorCode.CONFIG_INVALID),
+    )
 
 
 class CrateNormalizationError(LibraryError):
-    """Raised when a library crate cannot be normalized (e.g. a non-domain-qualified key, or a pipe ref matching no crate pipe, or several)."""
+    """Raised when a library crate cannot be normalized (e.g. a non-domain-qualified key, or a pipe ref matching no crate pipe, or several).
 
-    _declared_title = "Crate normalization error"
+    A key the crate builder failed to qualify is an invariant; a refinement cycle chooses ``method.cycle``.
+    """
+
+    error_code = ErrorCodeSet(default=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.METHOD_CYCLE,))
 
 
 class LibraryLoadingError(LibraryError):
@@ -27,7 +46,22 @@ class LibraryLoadingError(LibraryError):
     Also handles:
     - Factory errors (Domain, Concept, Pipe)
     - Interpreter errors (blueprint parsing)
+
+    The default ``method.invalid`` is the umbrella whose items carry their own codes; a raise site that finds one
+    fault chooses its code.
     """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.METHOD_INVALID,
+        others=(
+            CoreCode.METHOD_CYCLE,
+            CoreCode.METHOD_NAME_CONFLICT,
+            CoreCode.METHOD_PIPE_NOT_EXPORTED,
+            CoreCode.METHOD_DEPENDENCY_MISSING,
+            CoreCode.METHOD_CONCEPT_INVALID,
+            CoreCode.METHOD_NOT_FOUND,
+        ),
+    )
 
     def __init__(
         self,
@@ -47,46 +81,6 @@ class LibraryLoadingError(LibraryError):
         super().__init__(message)
 
 
-class DomainLoadingError(LibraryLoadingError):
-    def __init__(self, message: str, domain_code: str, description: str, source: str | None = None):
-        self.domain_code = domain_code
-        self.description = description
-        self.source = source
-        super().__init__(message)
-
-
-class ConceptLoadingError(LibraryLoadingError):
-    def __init__(
-        self,
-        message: str,
-        concept_code: str,
-        description: str,
-        source: str | None = None,
-        original_error: Exception | None = None,
-    ):
-        self.concept_code = concept_code
-        self.description = description
-        self.source = source
-        self.original_error = original_error
-        super().__init__(message)
-
-
-class PipeLoadingError(LibraryLoadingError):
-    def __init__(
-        self,
-        message: str,
-        pipe_code: str,
-        description: str,
-        source: str | None = None,
-        original_error: Exception | None = None,
-    ):
-        self.pipe_code = pipe_code
-        self.description = description
-        self.source = source
-        self.original_error = original_error
-        super().__init__(message)
-
-
 class MethodTreeLoadError(LibraryLoadingError):
     """Raised when a method tree a load reads from this host's disk cannot be listed.
 
@@ -97,8 +91,7 @@ class MethodTreeLoadError(LibraryLoadingError):
     is theirs to read, and the same load is refused again until the tree changes.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
     _authors_caller_facing_message = True
 
 
@@ -107,8 +100,11 @@ class EmptyMethodTreeError(MethodTreeLoadError):
 
     The membership rule keeps every file of the folder out of its method tree, which holds at least one, or none of the
     files it keeps is a bundle. A command handed the folder finds nothing to judge and no pipe to start at: it reports
-    the folder as holding no bundle rather than as a method refused.
+    the folder as holding no bundle rather than as a method refused. It carries ``method.invalid``, as a method entry
+    holding no bundle does.
     """
+
+    error_code = CoreCode.METHOD_INVALID
 
 
 class HostLibraryTreeError(PipelexError):
@@ -120,8 +116,7 @@ class HostLibraryTreeError(PipelexError):
     caller-facing. It is deliberately no `LibraryError`, which a validation would report as the caller's invalid bundle.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    retryable = False
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class MethodRequirementsError(LibraryLoadingError):
@@ -133,8 +128,7 @@ class MethodRequirementsError(LibraryLoadingError):
     (`reporting_host_library_tree_faults`).
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
     _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, items: list[PipelexBundleBlueprintValidationErrorData]):
@@ -148,6 +142,8 @@ class MethodRequirementsFileError(MethodRequirementsError):
     `-r`, `-e` or `--index-url`, a comment after a requirement and a line continued with a backslash are refused.
     """
 
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
+
 
 class MethodRequirementsNotMetError(MethodRequirementsError):
     """Raised when the Python environment a method's PipeFunc steps run in does not satisfy its `requirements.txt`.
@@ -157,6 +153,8 @@ class MethodRequirementsNotMetError(MethodRequirementsError):
     requirements, which is the whole offer. The message names each requirement not met and why, or, when the deployment
     refuses the requirements because no environment it can build holds them, carries the deployment's own reason.
     """
+
+    error_code = CoreCode.METHOD_DEPENDENCY_MISSING
 
 
 class HostLibraryRequirementsError(PipelexError):
@@ -168,8 +166,7 @@ class HostLibraryRequirementsError(PipelexError):
     the host, is not caller-facing. Like `HostLibraryTreeError`, it is deliberately no `LibraryError`.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    retryable = False
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 class PipeFuncPackageSetUnstatedError(PipelexError):
@@ -182,8 +179,7 @@ class PipeFuncPackageSetUnstatedError(PipelexError):
     the caller's invalid bundle, and its message is not caller-facing.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    retryable = False
+    error_code = CoreCode.RUNTIME_MISCONFIGURED
 
     def __init__(self, *, execution_mode: str, offer_registered: bool):
         self.execution_mode = execution_mode

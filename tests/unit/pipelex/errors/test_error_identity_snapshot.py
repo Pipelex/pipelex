@@ -1,4 +1,4 @@
-"""Gate on the committed ``(error_type, title, type_uri)`` snapshot.
+"""Gate on the committed ``(error_type, code declaration)`` snapshot.
 
 ``error_type`` is the Python class name with no indirection, and consumers
 outside this repo branch on that string, so renaming an error class breaks them
@@ -49,7 +49,7 @@ class TestErrorIdentitySnapshot:
                 "",
                 *(f"  - {row.error_type}: {row!r}" for row in offenders),
                 "",
-                "Rename the class or curate a _declared_title without the separator.",
+                "Rename the class.",
             ]
             raise AssertionError("\n".join(lines))
 
@@ -75,9 +75,10 @@ class TestErrorIdentitySnapshot:
         lines = [
             "The committed error-identity snapshot is out of date.",
             "",
-            "A diff on `error_type` is a WIRE BREAK: consumers outside this repo switch on that",
-            "string and fall through silently when it changes. Confirm the rename is intended and",
-            "that the consumers are updated in the cross-repo sweep, then run `make gei`.",
+            "A diff on `error_type` or on a code declaration is a WIRE CHANGE: consumers outside this",
+            "repo switch on the class name and on the code, and fall through silently when either changes.",
+            "Confirm the change is intended and that the consumers are updated in the cross-repo sweep,",
+            "then run `make gei`.",
             "",
             *(line.rstrip("\n") for line in diff),
         ]

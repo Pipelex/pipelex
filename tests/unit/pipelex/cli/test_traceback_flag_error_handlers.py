@@ -14,15 +14,15 @@ import typer
 from rich.traceback import Traceback
 
 from pipelex.cli.error_handlers import ErrorContext, handle_model_deck_preset_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _deck_preset_error() -> ModelDeckPresetValidatonError:
-    return ModelDeckPresetValidatonError(
+def _deck_preset_error() -> ModelDeckPresetValidationError:
+    return ModelDeckPresetValidationError(
         message="preset references unavailable model",
         model_type=ModelType.LLM,
         preset_id="default",
@@ -44,7 +44,7 @@ class TestTracebackFlagInErrorHandlers:
         with ctx:
             try:
                 raise exc
-            except ModelDeckPresetValidatonError:
+            except ModelDeckPresetValidationError:
                 with pytest.raises(typer.Exit):
                     handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
@@ -62,7 +62,7 @@ class TestTracebackFlagInErrorHandlers:
         with ctx:
             try:
                 raise exc
-            except ModelDeckPresetValidatonError:
+            except ModelDeckPresetValidationError:
                 with pytest.raises(typer.Exit):
                     handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 

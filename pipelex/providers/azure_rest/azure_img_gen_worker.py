@@ -1,9 +1,10 @@
 import json
 
 import httpx
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import CogtError, ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImageFileTuple, ImgGenArgsFactory
@@ -15,14 +16,15 @@ from pipelex.cogt.inference.error_classification import (
     extract_azure_metadata,
     extract_azure_metadata_from_response,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.transport_retry import request_with_transport_retry
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.plugins.model_handle import ModelHandle
-from pipelex.providers.azure_rest.azure_exceptions import AzureCredentialsError
+from pipelex.providers.azure_rest.azure_exceptions import AzureCredentialsError, AzureWorkerConfigurationError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.runtime_hub import get_models_manager
 
@@ -46,7 +48,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
         self.api_version = backend.extra_config.get("api_version")
         if not self.api_version:
             msg = "Azure OpenAI API version is not configured"
-            raise CogtError(msg)
+            raise AzureWorkerConfigurationError(msg)
         if not backend.api_key:
             msg = "Azure OpenAI API key (subscription_key) is not configured"
             raise AzureCredentialsError(msg)
@@ -81,8 +83,8 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     detail="Azure server error after submission — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
-            ) from exc
-        classification = classify_inference_error(metadata)
+            ).with_error_code(CoreCode.PROVIDER_OUTCOME_UNKNOWN) from exc
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
         raise render_inference_error(
             metadata=metadata,
             classification=classification,
@@ -108,7 +110,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
     ) -> list[GeneratedImageRawDetails]:
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
 
         args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
@@ -184,7 +186,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             # Must precede the httpx.TimeoutException clause below (ConnectTimeout / PoolTimeout are
             # subclasses).
             metadata = extract_azure_metadata(exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -208,7 +210,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     detail="Azure timed out mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
-            ) from exc
+            ).with_error_code(CoreCode.PROVIDER_OUTCOME_UNKNOWN) from exc
         except httpx.TransportError as exc:
             # Catch-all for the remaining httpx.TransportError family — ReadError / WriteError /
             # RemoteProtocolError and the like — which fire when the connection drops mid-request.
@@ -227,7 +229,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     detail="The connection to Azure failed mid-request — the outcome is unknown; retry manually after checking for a duplicate image",
                 ),
                 provider_metadata=metadata,
-            ) from exc
+            ).with_error_code(CoreCode.PROVIDER_OUTCOME_UNKNOWN) from exc
 
         # The HTTP status was successful, but Azure (or an intermediary gateway) can still
         # return a malformed or non-JSON body. json() raises a json.JSONDecodeError here, so
@@ -236,7 +238,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             response_dict = response.json()
         except json.JSONDecodeError as exc:
             metadata = extract_azure_metadata_from_response(response, sdk_exception_type=type(exc).__name__, message=str(exc))
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -271,7 +273,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     detail="Azure returned an image without an output format — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             size = response_dict.get("size")
@@ -285,7 +287,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                         detail="Azure returned a malformed image size — try a different model",
                     ),
                     provider_metadata=None,
-                )
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             size_split = size.split("x")
             if len(size_split) != 2:
                 msg = f"Size from img gen response is not a valid size: '{size}'"
@@ -297,7 +299,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                         detail="Azure returned a malformed image size — try a different model",
                     ),
                     provider_metadata=None,
-                )
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             width_str, height_str = size_split
             try:
                 width = int(width_str)
@@ -312,7 +314,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                         detail="Azure returned a malformed image size — try a different model",
                     ),
                     provider_metadata=None,
-                ) from exc
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID) from exc
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
@@ -325,7 +327,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                             detail="Azure returned no image data — try rephrasing the prompt or using a different model",
                         ),
                         provider_metadata=None,
-                    )
+                    ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
                 generated_images.append(
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
@@ -343,6 +345,6 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     detail="Azure returned an unexpected response shape — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return generated_images

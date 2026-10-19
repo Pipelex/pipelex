@@ -1,12 +1,13 @@
 import functools
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
@@ -65,7 +66,7 @@ class PipeBatch(PipeController):
         # 2. Check that the input_list_stuff_name is in the inputs of the pipe
         if self.batch_params.input_item_stuff_name not in required_variables:
             msg = f"Input item name '{self.batch_params.input_item_stuff_name}' not found in inputs of branch pipe '{self.branch_pipe_code}'"
-            raise ValueError(msg)
+            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code).with_error_code(CoreCode.METHOD_WIRING_INVALID)
         required_variables.remove(self.batch_params.input_item_stuff_name)
         required_variables.add(self.batch_params.input_list_stuff_name)
         return required_variables
@@ -88,7 +89,7 @@ class PipeBatch(PipeController):
         branch_pipe = get_required_pipe(pipe_code=self.branch_pipe_code)
         if self.batch_params.input_item_stuff_name not in branch_pipe.inputs.variables:
             msg = f"Input item name '{self.batch_params.input_item_stuff_name}' not found in inputs of branch pipe '{self.branch_pipe_code}'"
-            raise ValueError(msg)
+            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code).with_error_code(CoreCode.METHOD_WIRING_INVALID)
 
     @override
     def validate_output_static(self):
@@ -109,7 +110,7 @@ class PipeBatch(PipeController):
         if not self.inputs.is_variable_existing(variable_name=input_list_stuff_name):
             input_names = ", ".join(f"'{input_name}'" for input_name in self.inputs.variables) or "none"
             msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not among its inputs: {input_names}."
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(CoreCode.METHOD_WIRING_INVALID)
 
         if not working_memory.is_stuff_exists(input_list_stuff_name):
             msg = f"The list '{list_label}' that PipeBatch '{self.code}' batches over is not in working memory."
@@ -121,7 +122,7 @@ class PipeBatch(PipeController):
                 f"The value '{list_label}' that PipeBatch '{self.code}' batches over is not a list: it holds a "
                 f"'{input_stuff.concept.concept_ref}', and a batch runs its pipe once per item of a list."
             )
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(CoreCode.METHOD_WIRING_INVALID)
 
     @override
     async def _live_run_controller_pipe(

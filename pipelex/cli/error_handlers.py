@@ -10,7 +10,7 @@ from rich.markup import escape
 from rich.traceback import Traceback
 
 from pipelex.base_exceptions import PipelexConfigError, ValidationErrorCategory, ValidationErrorItem, error_domain_is_input, iter_cause_chain
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -232,8 +232,8 @@ def handle_dedicated_failure_panel(*, error: BaseException, context: ErrorContex
             handle_model_choice_error(node, context=context)
 
 
-def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, *, context: ErrorContext) -> NoReturn:
-    """Handle and display ModelDeckPresetValidatonError with formatted output.
+def handle_model_deck_preset_error(exc: ModelDeckPresetValidationError, *, context: ErrorContext) -> NoReturn:
+    """Handle and display ModelDeckPresetValidationError with formatted output.
 
     Args:
         exc: The model deck preset validation error exception

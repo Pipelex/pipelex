@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_bytes, load_inputs_dict_from_path, read_default_inputs_file
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
@@ -229,7 +231,8 @@ def _parse_inputs_file(*, inputs_path: Path, label: str, data: bytes | None) -> 
     except JsonTypeError as exc:
         agent_error(f"Input file must be a valid JSON dictionary: {label}", error_type="JsonTypeError", cause=exc)
     except TomlError as exc:
-        agent_error(exc.message, error_type="TomlError", cause=exc)
+        # The inputs file is the caller's request, not the runtime's configuration.
+        agent_error(exc.message, error_type="TomlError", cause=exc.with_error_code(CoreCode.REQUEST_MALFORMED))
 
 
 def _read_stdin_inputs() -> dict[str, Any] | None:

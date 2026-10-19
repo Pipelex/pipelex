@@ -29,6 +29,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
+from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
@@ -124,7 +125,7 @@ def run_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    except ExportedPipeAmbiguousError as exc:
         agent_error(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             error_type="ArgumentError",

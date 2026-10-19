@@ -17,6 +17,7 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.codegen.types_cmd import agent_codegen_types_cmd
+from pipelex.cli.exceptions import BundleClosureEmptyError
 from pipelex.codegen.emitters.target import CodegenTarget, EmittedFile
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
 from pipelex.libraries.exceptions import LibraryLoadingError
@@ -103,9 +104,23 @@ class TestAgentCodegenTypesCmd:
         assert error["error_type"] == "LibraryLoadingError"
         assert "duplicate pipe" in error["message"]
 
-    def test_unassembled_closure_is_no_verdict_exit_2(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    @pytest.mark.parametrize(
+        ("raised", "expected_error_type"),
+        [
+            (FileNotFoundError("the library directory does not exist."), "FileNotFoundError"),
+            (BundleClosureEmptyError("no .mthds bundles found in the closure."), "BundleClosureEmptyError"),
+        ],
+    )
+    def test_unassembled_closure_is_no_verdict_exit_2(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+        raised: Exception,
+        expected_error_type: str,
+    ) -> None:
         self._neutralize_boot(mocker)
-        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", side_effect=FileNotFoundError("no .mthds bundles found in the closure."))
+        mocker.patch(f"{CMD_MODULE}.load_normalized_crate", side_effect=raised)
 
         with pytest.raises(typer.Exit) as exc_info:
             agent_codegen_types_cmd(
@@ -119,7 +134,7 @@ class TestAgentCodegenTypesCmd:
 
         assert exc_info.value.exit_code == 2
         error = json.loads(capsys.readouterr().err)
-        assert error["error_type"] == "FileNotFoundError"
+        assert error["error_type"] == expected_error_type
 
     def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Like the bare CLI, the agent mirror boots offline but WITH model specs: library validation

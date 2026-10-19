@@ -1,6 +1,7 @@
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import ErrorDomain
@@ -93,6 +94,7 @@ class TestPipeLibraryLookup:
         assert "scoring.compute_score" in str(exc_info.value)
 
         report = exc_info.value.to_error_report()
+        assert report.code == CoreCode.REQUEST_PIPE_AMBIGUOUS
         assert report.error_domain == ErrorDomain.INPUT
         assert report.http_status == 422
 
@@ -107,6 +109,7 @@ class TestPipeLibraryLookup:
             library.get_required_entry_pipe("nonexistent")
 
         report = exc_info.value.to_error_report()
+        assert report.code == CoreCode.REQUEST_PIPE_NOT_FOUND
         assert report.error_domain == ErrorDomain.INPUT
         assert report.http_status == 422
 
@@ -147,10 +150,10 @@ class TestPipeLibraryLookup:
         assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
 
     def test_in_body_aliased_ambiguity_is_not_translated(self, mocker: MockerFixture):
-        """The same lookup through the in-body door keeps the plain, unclassified error.
+        """The same lookup through the in-body door keeps the plain error, with the method's code.
 
-        In-body resolution failures are not a caller's input mistake — the ref was written in a
-        bundle — so the entry classification must not leak onto them.
+        In-body resolution failures are not a caller's request mistake — the ref was written in a
+        bundle — so the entry classification must not leak onto them: the method's author fixes it.
         """
         library = PipeLibrary.make_empty()
         library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
@@ -159,15 +162,19 @@ class TestPipeLibraryLookup:
         with pytest.raises(PipeLibraryError) as exc_info:
             library.get_optional_pipe("lib->compute_score")
         assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
-        assert exc_info.value.to_error_report().error_domain is None
+        report = exc_info.value.to_error_report()
+        assert report.code == CoreCode.METHOD_REF_AMBIGUOUS
+        assert report.caller_facing_message is False
 
-    def test_in_body_required_miss_stays_unclassified(self):
-        """`get_required_pipe` is the in-body door and keeps raising the plain, domain-less error."""
+    def test_in_body_required_miss_carries_the_method_code(self):
+        """`get_required_pipe` is the in-body door and keeps raising the plain error, with the method's code."""
         library = PipeLibrary.make_empty()
         with pytest.raises(PipeNotFoundError) as exc_info:
             library.get_required_pipe("scoring.nonexistent")
         assert not isinstance(exc_info.value, EntryPipeNotFoundError)
-        assert exc_info.value.to_error_report().error_domain is None
+        report = exc_info.value.to_error_report()
+        assert report.code == CoreCode.METHOD_PIPE_UNRESOLVED
+        assert report.caller_facing_message is False
 
     def test_entry_pipe_ignores_aliased_dependency_entries(self, mocker: MockerFixture):
         """An installed package must not make a host pipe's bare code ambiguous.

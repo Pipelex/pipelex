@@ -1,7 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 
 
 class TestQualifiedRef:

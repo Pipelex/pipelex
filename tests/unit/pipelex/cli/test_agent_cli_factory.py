@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.misc.pretty import PrettyPrinter
@@ -79,8 +79,8 @@ class TestMakePipelexForAgentCli:
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """ModelDeckPresetValidatonError should include preset_id, model_type, model_handle, enabled_backends."""
-        exc = ModelDeckPresetValidatonError(
+        """ModelDeckPresetValidationError should include preset_id, model_type, model_handle, enabled_backends."""
+        exc = ModelDeckPresetValidationError(
             message="preset validation failed",
             preset_id="my_preset",
             model_type=ModelType.LLM,
@@ -96,7 +96,7 @@ class TestMakePipelexForAgentCli:
             make_pipelex_for_agent_cli()
 
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error_type"] == "ModelDeckPresetValidatonError"
+        assert parsed["error_type"] == "ModelDeckPresetValidationError"
         assert parsed["preset_id"] == "my_preset"
         assert parsed["model_handle"] == "claude-3-opus"
         assert sorted(parsed["enabled_backends"]) == ["anthropic", "openai"]

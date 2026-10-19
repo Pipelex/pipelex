@@ -49,6 +49,7 @@ from mthds.method_tree.vocabulary import TreeRefusalCode
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
@@ -454,10 +455,10 @@ def manifest_of(*, tree: RequestTree, label: str) -> MethodsManifest | None:
         return parse_methods_toml(manifest_bytes.decode("utf-8"))
     except UnicodeDecodeError as exc:
         msg = f"The {MANIFEST_NAME} of {label} is not UTF-8 text."
-        raise MethodEntryError(msg) from exc
+        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
     except ManifestError as exc:
         msg = f"The {MANIFEST_NAME} of {label} is not a valid manifest: {exc.message}"
-        raise MethodEntryError(msg) from exc
+        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
 
 
 def is_package_dir_name(name: str) -> bool:
@@ -695,7 +696,7 @@ def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:
             content = tree.contents[tree_path].decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"The bundle '{tree_path}' of the method {method_label} is not UTF-8 text."
-            raise MethodEntryError(msg) from exc
+            raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_SYNTAX) from exc
         with translate_to_validate_bundle_error():
             blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=tree_path)
         candidates.append(EntryCandidate.of_blueprint(tree_path=tree_path, blueprint=blueprint))

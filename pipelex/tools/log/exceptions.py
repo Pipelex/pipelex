@@ -1,4 +1,5 @@
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import CredentialsError
 
 
@@ -10,8 +11,7 @@ class GcpLogSinkCredentialsError(CredentialsError):
     sink, not by the caller correcting input.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Log sink credentials missing or refused"
+    error_code = ErrorCodeSet(default=PipelexErrorCode.CONFIG_FILE_MISSING, others=(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED,))
 
 
 class LogSinkVariableError(CredentialsError):
@@ -24,8 +24,7 @@ class LogSinkVariableError(CredentialsError):
     variable, never a value. Fixed by an operator setting the variable or selecting another sink.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Log sink variable did not resolve"
+    error_code = PipelexErrorCode.CONFIG_VARIABLE_MISSING
 
     def __init__(self, *, sink_method: str, section: str, key: str, variable: str, cause: str):
         self.sink_method = sink_method
@@ -50,8 +49,7 @@ class LogSinkHeaderValueError(CredentialsError):
     without the line break.
     """
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Log sink header value holds a line break"
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
     def __init__(self, *, sink_method: str, section: str, key: str):
         self.sink_method = sink_method

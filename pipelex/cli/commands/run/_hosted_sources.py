@@ -23,7 +23,8 @@ from pipelex_sdk.crate_models import MthdsFileItem
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.cli.commands.run._run_output_folder import run_output_label
-from pipelex.cli.installed_methods import DuplicateMethodNameError, MethodNotFoundError, find_method_by_name
+from pipelex.cli.exceptions import DuplicateMethodNameError, MethodNotFoundError
+from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import method_output_base_dir, resolve_method_target
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.libraries.exceptions import MethodTreeLoadError

@@ -6,6 +6,7 @@ from mistralai.client.errors import MistralError
 from mistralai.client.models import ReasoningEffort as MistralReasoningEffort
 from mistralai.client.models import TextChunk, ThinkChunk
 from mistralai.client.types import UNSET
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
@@ -15,8 +16,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_mistral_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
@@ -157,7 +158,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             )
         except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -176,7 +177,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="Mistral returned an empty response — wait a moment, then run it again",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         if not response.choices:
             msg = "Mistral response.choices is None"
             raise LLMCompletionError(
@@ -187,7 +188,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="Mistral returned a response with no choices — wait a moment, then run it again",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         message = response.choices[0].message
         if message is None:
             msg = "Mistral response.choices[0].message is None"
@@ -199,7 +200,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.WAIT_AND_RETRY,
                     detail="Mistral returned a choice with no message — wait a moment, then run it again",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 
@@ -232,7 +233,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CONTACT_SUPPORT,
                     detail="Mistral returned an unrecognized content type — report this to Pipelex support",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         if not result_text:
             msg = "Mistral response text is empty"
@@ -244,7 +245,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Mistral returned an empty text response — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return result_text
 
@@ -284,7 +285,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
                 metadata = extract_mistral_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -300,10 +301,10 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CONTACT_SUPPORT,
                     detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
                 ),
-            ) from instructor_exc
+            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from instructor_exc
         except (MistralError, httpx.TransportError) as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

@@ -2,6 +2,7 @@ import datetime
 import inspect
 from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
 from pipelex.cogt.templating.template_rendering import render_template
@@ -255,7 +256,7 @@ class StructuredContentComposer:
 
         if find_private_path_segment(path=key_attr):
             msg = f"list_to_dict_keyed_by names '{key_attr}', which starts with an underscore: it names a public field only"
-            raise StructuredContentComposerValueError(msg)
+            raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
         result: dict[str, Any] = {}
         for idx, item in enumerate(items):
@@ -266,7 +267,7 @@ class StructuredContentComposer:
                 key = item[key_attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Item at index {idx} does not have attribute '{key_attr}'"
-                raise StructuredContentComposerValueError(msg)
+                raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
             if not isinstance(key, str):
                 msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"  # pyright: ignore[reportUnknownArgumentType]
@@ -299,7 +300,7 @@ class StructuredContentComposer:
         # The blueprint refuses these at load; the walk below is raw `getattr`, so it refuses them again.
         if private_segment := find_private_path_segment(path=path):
             msg = f"Cannot resolve path '{path}': '{private_segment}' starts with an underscore, and a path reads public fields only"
-            raise StructuredContentComposerValueError(msg)
+            raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
         parts = path.split(".", 1)
         base_name = parts[0]
         attr_path = parts[1]
@@ -316,7 +317,7 @@ class StructuredContentComposer:
                 current_value = current_value[attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
-                raise StructuredContentComposerValueError(msg)
+                raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
         # Apply type conversion if the resolved value is a StuffContent
         if isinstance(current_value, StuffContent):

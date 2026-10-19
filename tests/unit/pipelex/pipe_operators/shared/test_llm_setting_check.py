@@ -4,12 +4,14 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -175,4 +177,5 @@ class TestLLMSettingCheck:
             )
         message = str(exc_info.value)
         assert "internal" not in message
-        assert "which the model it resolves to refuses: LLM capability. " in message
+        capability_title = error_code_spec(CoreCode.MODEL_CAPABILITY_UNSUPPORTED).title.rstrip(".")
+        assert f"which the model it resolves to refuses: {capability_title}. " in message

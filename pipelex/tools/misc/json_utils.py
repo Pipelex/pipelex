@@ -8,6 +8,7 @@ from typing import Any, Union, cast
 
 from kajson import kajson
 from kajson.exceptions import UnijsonEncoderError
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 from pipelex.tools.misc.exceptions import ArgumentTypeError, JsonTypeError
@@ -326,7 +327,7 @@ def remove_none_values_from_dict(data: Mapping[str, Any]) -> dict[str, Any]:
     processed = remove_none_values(json_content=data)
     if not isinstance(processed, dict):
         msg = "Removing None values from a dict, we expected a dict in return"
-        raise JsonTypeError(msg)
+        raise JsonTypeError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
     return cast("dict[str, Any]", processed)  # pyright: ignore[reportUnnecessaryCast]
 
 

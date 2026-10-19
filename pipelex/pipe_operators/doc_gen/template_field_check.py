@@ -13,6 +13,7 @@ import typing
 from collections.abc import Sequence
 from typing import Any, Union
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
@@ -121,7 +122,7 @@ def _check_path(*, path: TemplateFieldPath, inputs: InputStuffSpecs, pipe_code: 
         f"PipeDocGen '{pipe_code}': the {label} reads '{path.written}'{reached}, but {holder} has no field '{missing_field}'. "
         f"Its fields are: {_describe_fields(model_class)}."
     )
-    raise PipeDocGenFactoryError(msg)
+    raise PipeDocGenFactoryError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
 
 def check_template_field_paths(

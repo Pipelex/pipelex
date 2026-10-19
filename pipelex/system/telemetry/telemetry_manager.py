@@ -9,13 +9,13 @@ from posthog.args import ExceptionArg, OptionalCaptureArgs
 from typing_extensions import Unpack, override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
 from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.exception_capture import ExceptionCapture
+from pipelex.system.telemetry.exceptions import TelemetryApiKeyMissingError
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
@@ -45,8 +45,8 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.custom_posthog_client: Posthog | None = None
         if telemetry_config.custom_posthog.mode.is_enabled:
             if not telemetry_config.custom_posthog.api_key:
-                msg = "Custom PostHog API key is not set"
-                raise PipelexUnexpectedError(msg)
+                msg = "Custom PostHog is enabled in the telemetry configuration, but its API key is not set"
+                raise TelemetryApiKeyMissingError(msg)
             self.custom_posthog_client = Posthog(
                 project_api_key=telemetry_config.custom_posthog.api_key,
                 host=telemetry_config.custom_posthog.endpoint,

@@ -4,6 +4,7 @@ from typing import Any
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
 from markupsafe import Markup
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.html_renderable import HtmlRenderable
@@ -40,7 +41,7 @@ def require_templating_style_value(*, context: Context, jinja2_context_key: Jinj
             "The tag, format and with_images filters have no default to fall back on — the caller "
             "must resolve a templating style and pass it to the render call."
         )
-        raise Jinja2ContextError(msg)
+        raise Jinja2ContextError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
     return str(value)
 
 
@@ -64,7 +65,7 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | st
             named_text_format = TextFormat(text_format)
         except ValueError as exc:
             msg = f"Invalid text format: '{text_format}'"
-            raise Jinja2ContextError(msg) from exc
+            raise Jinja2ContextError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID) from exc
     else:
         named_text_format = None
 

@@ -213,7 +213,7 @@ def generate_corpus_vocabulary_command(
         sys.exit(1)
 
 
-@app.command(name="generate-error-identity", help="Regenerate the committed (error_type, title, type_uri) snapshot of every PipelexError subclass")
+@app.command(name="generate-error-identity", help="Regenerate the committed (error_type, code declaration) snapshot of every PipelexError subclass")
 def generate_error_identity_command(
     output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output path for the snapshot file")] = None,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,

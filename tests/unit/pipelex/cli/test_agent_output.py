@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from typer.testing import CliRunner
 
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
@@ -36,6 +37,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -282,14 +284,36 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["hint"] == "Check your API key and try again"
 
-    def test_agent_error_uses_report_retryable_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should set retryable=True when error_category is TRANSIENT."""
-        cause = CogtError("rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+    def test_agent_error_uses_report_retryable_from_the_code(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error sets retryable=True when the cause's code says a retry can succeed."""
+        cause = RemoteFileFetchError("Could not fetch 'https://example.com/a.pdf': the request timed out").with_error_code(
+            CoreCode.INPUT_URL_UNREACHABLE
+        )
         with pytest.raises(typer.Exit):
-            agent_error("rate limited", error_type="CogtError", cause=cause)
+            agent_error("fetch timed out", error_type="RemoteFileFetchError", cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["retryable"] is True
+        assert parsed["error_domain"] == "input"
+
+    def test_agent_error_carries_the_cause_registry_code(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error names the cause's registry code as error_code, the member a hosted refusal carries too."""
+        cause = RemoteFileFetchError("Could not fetch 'https://example.com/a.pdf': the request timed out").with_error_code(
+            CoreCode.INPUT_URL_UNREACHABLE
+        )
+        with pytest.raises(typer.Exit):
+            agent_error("fetch timed out", error_type="RemoteFileFetchError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_code"] == CoreCode.INPUT_URL_UNREACHABLE
+
+    def test_agent_error_has_no_error_code_without_a_coded_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A builtin cause carries no registry code, so the envelope names none rather than inventing one."""
+        with pytest.raises(typer.Exit):
+            agent_error("file not found", error_type="FileNotFoundError", cause=FileNotFoundError("missing.mthds"))
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert "error_code" not in parsed
 
     def test_agent_error_uses_report_error_category(self, capsys: pytest.CaptureFixture[str]) -> None:
         """agent_error should include error_category from to_error_report()."""
@@ -369,27 +393,23 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert "retryable" not in parsed
 
-    def test_agent_error_error_domain_and_category_coexist(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """error_domain (from lookup) and error_category (from report) should both appear.
+    def test_agent_error_domain_lookup_serves_an_uncoded_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """An error that carries no registry code takes its domain from the lookup, and no category.
 
-        The cause carries the ``UNKNOWN`` category deliberately: every other category derives an
-        ``error_domain`` onto the report, and the report-first read then wins outright, so the
-        lookup fallback would never be exercised. ``UNKNOWN`` asserts no domain — classification
-        itself failed — which leaves exactly the composition this test is about: the category comes
-        from the report, the domain from the lookup.
+        Every ``PipelexError`` carries a code, whose domain the report always holds, so the lookup is read only
+        for a builtin or third-party cause, or for a synthetic label with no cause at all.
         """
-        # An error_type in AGENT_ERROR_DOMAINS that is NOT a CogtError subclass, so no derived
-        # domain can pre-empt the lookup.
-        error_type = "PipeOperatorModelAvailabilityError"
+        error_type = "FileNotFoundError"
         assert error_type in AGENT_ERROR_DOMAINS, "precondition: error_type must be in AGENT_ERROR_DOMAINS"
 
-        cause = CogtError("model not found", error_category=InferenceErrorCategory.UNKNOWN)
+        cause = FileNotFoundError("inputs.json")
         with pytest.raises(typer.Exit):
-            agent_error("model not found", error_type=error_type, cause=cause)
+            agent_error("Input file not found", error_type=error_type, cause=cause)
 
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_domain"] == AGENT_ERROR_DOMAINS[error_type]
-        assert parsed["error_category"] == "unknown"
+        assert "error_category" not in parsed
+        assert "retryable" not in parsed
 
     def test_agent_error_report_domain_beats_the_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A categorized CogtError cause supplies the domain itself, so the lookup is not consulted.

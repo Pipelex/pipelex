@@ -4,8 +4,10 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from typing_extensions import override
 
+from pipelex.base_exceptions import DisclosureMode
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
+from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -15,6 +17,7 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.method_trees.method_file_store import MethodFileStoreProtocol
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_current_library, get_library_manager, set_current_library
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -153,6 +156,21 @@ def make_models_manager(*, plugin_model_declarations: PluginModelDeclarations, b
         backends_dir_path=str(backends_dir_path) if backends_dir_path is not None else None,
     )
     return models_manager
+
+
+async def engine_unavailable_report(*, step_fields: str) -> str:
+    """The error report, as text, of validating the test bundle with a PipeDocGen step no engine of this runtime prints.
+
+    The bundle is not at fault: the runtime lacks the engine, which is the operator's to install or enable, so validation
+    gives no verdict and the load's `DocGenEngineMissingError` propagates as `pipelex.docgen.engine_unavailable`, its
+    message kept for the caller under STRICT disclosure.
+    """
+    with pytest.raises(DocGenEngineMissingError) as exc_info:
+        await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
+    report = exc_info.value.to_error_report()
+    assert report.code == PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
+    assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == report.message
+    return str(report.model_dump())
 
 
 async def refusal_report(*, step_fields: str) -> str:

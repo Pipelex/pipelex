@@ -43,20 +43,37 @@ class ProblemDocument(BaseModel):
 
     Standard RFC 7807 members (`type`, `title`, `status`, `detail`, `instance`)
     plus the extension members pipelex's classification adds. Only `type`,
-    `title`, `status`, `detail`, and `error_type` are always present: the rest
-    ride along when the originating error populates them, so a consumer must
-    treat them as optional. `extra="allow"` mirrors RFC 7807's open-ended
-    extension-member rule.
+    `title`, `status`, `detail`, and `error_type` are always present, and `code`
+    on every error the runtime raises: the rest ride along when the originating
+    error populates them, so a consumer must treat them as optional.
+    `extra="allow"` mirrors RFC 7807's open-ended extension-member rule.
     """
 
     model_config = ConfigDict(extra="allow")
 
-    type: str = Field(..., description="Stable URI for the error class: `https://docs.pipelex.com/latest/errors/<kebab-class-name>/`.")
-    title: str = Field(..., description="Short, human-readable summary of the error class.")
+    type: str = Field(
+        ...,
+        description=(
+            "Stable URI of the error's documentation page: the page of its `code` (`https://mthds.ai/errors/<code>` for a core code, "
+            "`https://docs.pipelex.com/errors/<code>` for a Pipelex code), or `https://docs.pipelex.com/latest/errors/<kebab-error-type>/` "
+            "for an API-authored error, which carries no `code` yet."
+        ),
+    )
+    title: str = Field(
+        ..., description="Short, human-readable summary: the title of the error's `code`, or of its `error_type` when it carries none."
+    )
     status: int = Field(..., description="HTTP status code, repeated in the body per RFC 7807.")
     detail: str = Field(..., description="Human-readable explanation of this specific failure. Redacted under `ERROR_DISCLOSURE=strict`.")
     instance: str | None = Field(default=None, description="Path of the request that failed.")
     request_id: str | None = Field(default=None, description="Correlation id, echoed in the `X-Request-ID` response header.")
+    code: str | None = Field(
+        default=None,
+        description=(
+            "Registry code of the error, what a client branches on: a core code of the MTHDS standard (e.g. `request.invalid`) "
+            "or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises, under every "
+            "`ERROR_DISCLOSURE` mode; absent on an API-authored error."
+        ),
+    )
     error_type: str = Field(..., description="Stable class name of the originating error (e.g. `ValidateBundleError`, `Unauthenticated`).")
     error_domain: str | None = Field(
         default=None,
@@ -65,8 +82,7 @@ class ProblemDocument(BaseModel):
     retryable: bool | None = Field(
         default=None,
         description=(
-            "Whether retrying the same request can plausibly succeed. Always present on API-authored errors; "
-            "on pipelex errors only when the originating error classifies it."
+            "Whether retrying the same request can plausibly succeed. Always present: on an error carrying a `code`, it is that code's retry verdict."
         ),
     )
     error_category: str | None = Field(default=None, description="Finer classification, when the originating error provides one (inference errors).")

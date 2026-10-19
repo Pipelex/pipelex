@@ -101,7 +101,7 @@ class TestHuggingFaceWorkerErrorHandling:
         ("_topic", "expected_category", "expected_user_action_kind"),
         HuggingFaceErrorHandlingTestData.TIMEOUT_CASES,
     )
-    async def test_inference_timeout_is_transient(
+    async def test_inference_timeout_is_an_unknown_outcome(
         self,
         mocker: MockerFixture,
         _topic: str,

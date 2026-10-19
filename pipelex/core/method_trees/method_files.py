@@ -11,6 +11,7 @@ from collections.abc import Callable, Iterable
 
 from mthds.method_tree.digest import DIGEST_PREFIX, is_sha256_hex, sha256_hex
 from mthds.method_tree.tree_path import tree_path_violation
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
@@ -84,7 +85,7 @@ async def read_listed_file(*, listing: TreeListing, tree_path: str, read_scope: 
     sha256 = listing.files.get(tree_path)
     if sha256 is None:
         msg = f"The tree '{listing.tree_digest}' holds no file '{tree_path}'."
-        raise MethodFileUnavailableError(msg)
+        raise MethodFileUnavailableError(msg).with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
     data = await get_method_file_store().read_blob(sha256=sha256, read_scope=read_scope)
     if data is None:
         msg = f"The method file store does not hold the file '{tree_path}' of the tree '{listing.tree_digest}' for this run."

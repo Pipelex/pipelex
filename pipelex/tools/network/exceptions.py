@@ -1,4 +1,7 @@
-from pipelex.base_exceptions import ErrorDomain, SecurityError
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import SecurityError
+from pipelex.errors.error_code_declaration import ErrorCodeSet
 
 
 class SsrfBlockedError(SecurityError):
@@ -20,9 +23,12 @@ class SsrfBlockedError(SecurityError):
     delivery or a download's fallback — it surfaces and fails the delivery or the
     pipe.
 
-    ``error_domain = INPUT`` because the destination was supplied from outside the
-    runtime (a callback URL on the originating request, or a URL a method's value
-    carried); the caller fixes it by providing a public URL.
+    The guard cannot tell who supplied the URL, so the default is
+    ``security.input_url_refused``: the destination was supplied from outside the
+    runtime (a callback URL on the originating request, or a URL an input carried),
+    and the caller fixes it by providing a public URL. A raise or catch site that
+    knows the method named the URL chooses ``security.method_url_refused``, and one
+    that knows a provider's answer named it ``security.provider_url_refused``.
     ``_authors_caller_facing_message`` lets the message survive STRICT
     disclosure — it deliberately names only the requested hostname, never the
     resolved private IP, so it never reveals an internal address to a probing
@@ -30,6 +36,8 @@ class SsrfBlockedError(SecurityError):
     since the refusal is told apart from a host that cannot be reached.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _declared_title = "Outbound request blocked (SSRF guard)"
+    error_code = ErrorCodeSet(
+        default=CoreCode.SECURITY_INPUT_URL_REFUSED,
+        others=(CoreCode.SECURITY_METHOD_URL_REFUSED, CoreCode.SECURITY_PROVIDER_URL_REFUSED),
+    )
     _authors_caller_facing_message = True

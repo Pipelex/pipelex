@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 from typing_extensions import override
 
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.html_renderable import HtmlRenderable
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.jinja2.renderable_dispatch import type_implements
@@ -450,7 +451,8 @@ class StuffArtefact:
             String with [Image N] tokens where images appear.
 
         Raises:
-            TypeError: If content type does not implement ImageRenderable.
+            Jinja2ContextError: If content type does not implement ImageRenderable, which the render reports as the
+                template's failure, as it does the filter's own refusal of such a value.
         """
         content = self._stuff.content
         if not isinstance(content, ImageRenderable):
@@ -459,7 +461,7 @@ class StuffArtefact:
                 f"The | with_images filter can only be used with content types that may contain images: "
                 f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
             )
-            raise TypeError(msg)
+            raise Jinja2ContextError(msg)
         return content.render_with_images(registry=registry, text_format=text_format)
 
     @override

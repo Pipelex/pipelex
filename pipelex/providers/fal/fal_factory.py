@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
@@ -22,7 +23,7 @@ class FalFactory:
                     detail="FAL returned an unexpected number of images — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         return generated_image_list[0]
 
     @classmethod
@@ -40,7 +41,7 @@ class FalFactory:
                         detail="FAL returned an unexpected response shape — try a different model",
                     ),
                     provider_metadata=None,
-                )
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             image_dicts = cast("list[dict[str, Any]]", image_dicts)
             for image_dict in image_dicts:
                 generated_image = GeneratedImageRawDetails(
@@ -59,6 +60,6 @@ class FalFactory:
                     detail="FAL returned a malformed image response — try a different model",
                 ),
                 provider_metadata=None,
-            ) from exc
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID) from exc
 
         return generated_image_list

@@ -14,6 +14,7 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
@@ -58,11 +59,10 @@ class _RecordingBundleValidator:
         read_scope: str | None,  # noqa: ARG002
     ) -> ErrorReport:
         self.graph_pipe_codes.append(graph_pipe_code)
-        return ErrorReport(
+        return ErrorReport.make_for_code(
+            code=CoreCode.METHOD_INVALID,
             error_type="ValidateBundleError",
             message="bundle is invalid",
-            title="Validate bundle error",
-            type_uri="https://errors.pipelex.com/validate-bundle-error/",
             validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
         )
 

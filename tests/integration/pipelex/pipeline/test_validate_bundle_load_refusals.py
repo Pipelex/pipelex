@@ -24,15 +24,17 @@ full, except for the one-suggestion alias whose rename fix is the point of its c
 """
 
 from pathlib import Path
-from typing import ClassVar, NamedTuple
+from typing import NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import DisclosureMode, PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.errors.error_codes import PipelexErrorCode, error_code_spec
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.planner import RENAME_MODEL_FIX_CODE
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
@@ -236,21 +238,20 @@ async def _single_item(*, bundle_path: Path) -> ValidationErrorItem:
 class _CallerFacingRefusalError(PipelexError):
     """An input refusal whose message was authored for the caller — stands in for any future one."""
 
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.METHOD_INVALID
     _authors_caller_facing_message = True
 
 
 class _InternalInputRefusalError(PipelexError):
     """An input refusal whose message is internal text the verdict must not carry."""
 
-    error_domain = ErrorDomain.INPUT
-    _declared_title: ClassVar[str | None] = "Harbour board refusal"
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
 
 
 class _ConfigFaultError(PipelexError):
     """A fault of the environment, which is no verdict about the bundle."""
 
-    error_domain = ErrorDomain.CONFIG
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -372,7 +373,7 @@ class TestValidateBundleLoadRefusals:
 
         assert item.pipe_code == "write_tide_note"
         assert item.source == str(bundle_path)
-        assert "Harbour board refusal" in item.message
+        assert error_code_spec(CoreCode.METHOD_SCHEMA_VIOLATION).title in item.message
         assert "registry slot 7" not in item.message
 
     async def test_config_fault_at_load_stays_no_verdict(self, tmp_path: Path, mocker: MockerFixture) -> None:

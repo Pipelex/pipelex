@@ -8,7 +8,7 @@ from types import MappingProxyType
 from typing import Any, NoReturn
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
@@ -176,10 +176,10 @@ def report_agent_init_failure(*, error: Exception) -> NoReturn:
         # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
         # everything but what a former release left, and an agent can run it.
         agent_error(error.message, error_type="FormerReleaseConfigError", cause=error)
-    if isinstance(error, ModelDeckPresetValidatonError):
+    if isinstance(error, ModelDeckPresetValidationError):
         agent_error(
             error.message,
-            error_type="ModelDeckPresetValidatonError",
+            error_type="ModelDeckPresetValidationError",
             cause=error,
             preset_id=error.preset_id,
             model_type=str(error.model_type),

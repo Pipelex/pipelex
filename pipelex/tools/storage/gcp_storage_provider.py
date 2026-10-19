@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from typing_extensions import override
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
@@ -98,8 +99,10 @@ class GcpStorageProvider(StorageProviderAbstract):
         bucket = self._get_bucket()
 
         from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
             GoogleAPIError,
             NotFound,
+            Unauthorized,
         )
 
         try:
@@ -112,6 +115,9 @@ class GcpStorageProvider(StorageProviderAbstract):
         except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Object not found in GCS: '{key}'"
             raise StorageFileNotFoundError(msg) from exc
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to load object from GCS: '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to load object from GCS: '{key}': {exc}"
             raise StorageGcpError(msg) from exc
@@ -149,9 +155,11 @@ class GcpStorageProvider(StorageProviderAbstract):
         bucket = self._get_bucket()
 
         from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
             GoogleAPIError,
             NotFound,
             RequestRangeNotSatisfiable,
+            Unauthorized,
         )
 
         try:
@@ -165,6 +173,9 @@ class GcpStorageProvider(StorageProviderAbstract):
         except RequestRangeNotSatisfiable:  # pyright: ignore[reportUnknownVariableType]
             # GCS refuses any range over an empty object: its head is empty.
             return b""
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to load object from GCS: '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to load object from GCS: '{key}': {exc}"
             raise StorageGcpError(msg) from exc
@@ -196,12 +207,17 @@ class GcpStorageProvider(StorageProviderAbstract):
         bucket = self._get_bucket()
 
         from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
             GoogleAPIError,
+            Unauthorized,
         )
 
         try:
             # Fetches the object's metadata alone, None when there is no such object.
             blob = bucket.get_blob(key)
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to read the size of the GCS object '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to read the size of the GCS object '{key}': {exc}"
             raise StorageGcpError(msg) from exc
@@ -235,12 +251,17 @@ class GcpStorageProvider(StorageProviderAbstract):
         bucket = self._get_bucket()
 
         from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
             GoogleAPIError,
+            Unauthorized,
         )
 
         try:
             blob = bucket.blob(key)
             blob.upload_from_string(data, content_type=content_type)
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to store object to GCS: '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to store object to GCS: '{key}': {exc}"
             raise StorageGcpError(msg) from exc
@@ -268,8 +289,10 @@ class GcpStorageProvider(StorageProviderAbstract):
         bucket = self._get_bucket()
 
         from google.api_core.exceptions import (  # type: ignore[import-untyped]  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
+            Forbidden,
             GoogleAPIError,
             PreconditionFailed,
+            Unauthorized,
         )
 
         try:
@@ -278,6 +301,9 @@ class GcpStorageProvider(StorageProviderAbstract):
             blob.upload_from_string(data, content_type=content_type, if_generation_match=0)
         except PreconditionFailed:  # pyright: ignore[reportUnknownVariableType]
             return False
+        except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to store object to GCS: '{key}': {exc}"
+            raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to store object to GCS: '{key}': {exc}"
             raise StorageGcpError(msg) from exc

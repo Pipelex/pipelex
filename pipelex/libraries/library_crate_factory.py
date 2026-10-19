@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.collision_messages import duplicate_ref_msg
@@ -119,7 +121,7 @@ class LibraryCrateFactory:
                                 existing_source=source_map.get(concept_ref),
                                 incoming_source=source,
                             )
-                        )
+                        ).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
                     concepts[concept_ref] = value
                     if source:
                         source_map[concept_ref] = source
@@ -221,7 +223,9 @@ class LibraryCrateFactory:
 
         # At least one is a signature: the declarations' contracts must match (normalized identity).
         if not contracts_match(existing=existing.blueprint, incoming=incoming.blueprint, domain_code=domain_code):
-            raise PipeLibraryError(cls._contract_mismatch_msg(pipe_ref=pipe_ref, existing=existing, incoming=incoming))
+            raise PipeLibraryError(cls._contract_mismatch_msg(pipe_ref=pipe_ref, existing=existing, incoming=incoming)).with_error_code(
+                CoreCode.METHOD_SIGNATURE_MISMATCH
+            )
 
         # A concrete definition beats a forward declaration.
         if existing_is_signature and not incoming_is_signature:

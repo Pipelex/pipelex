@@ -14,7 +14,6 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
 from pipelex.pipe_machinery.rendering.output_renderer import render_output
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -73,9 +72,6 @@ async def _generate_output_core(
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         except ValidateBundleError as exc:
-            typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
-        except PipeInputError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     else:

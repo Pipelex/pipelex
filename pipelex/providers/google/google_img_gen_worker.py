@@ -5,6 +5,7 @@ import httpx
 from google.genai import errors as genai_errors
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -15,8 +16,8 @@ from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -121,7 +122,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             )
         except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as exc:
             metadata = extract_google_metadata(exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -152,7 +153,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     detail="Google returned no image candidates — try rephrasing the prompt or using a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         candidate = response.candidates[0]
         if not candidate.content or not candidate.content.parts:
@@ -165,7 +166,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     detail="Google returned an empty response — try rephrasing the prompt or using a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         # Look for image data in response parts
         for part in candidate.content.parts:
@@ -184,7 +185,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                             detail="Google returned image data without a mime type — try a different model",
                         ),
                         provider_metadata=None,
-                    )
+                    ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
                 return GeneratedImageRawDetails(
                     actual_bytes=image_bytes,
                     size=ImageSize(width=resolved.width, height=resolved.height),
@@ -200,7 +201,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 detail="Google returned no image data — try rephrasing the prompt or using a different model",
             ),
             provider_metadata=None,
-        )
+        ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
     @override
     async def _gen_image_list(

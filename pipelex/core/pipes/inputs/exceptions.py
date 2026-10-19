@@ -1,37 +1,44 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class InputStuffSpecsError(PipelexError):
-    pass
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class InputStuffSpecsFactoryError(InputStuffSpecsError):
-    pass
+    """An input's concept spec that does not parse, which the blueprint validators refuse first in practice."""
+
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
 
 
 class InputStuffSpecNotFoundError(InputStuffSpecsError):
-    pass
+    """A pipe's inputs lack a variable its wiring names."""
 
-
-class PipeInputError(PipelexError):
-    def __init__(
-        self,
-        message: str,
-        pipe_code: str,
-        variable_name: str | None = None,
-        concept_code: str | None = None,
-    ):
-        self.pipe_code = pipe_code
-        self.variable_name = variable_name
-        self.concept_code = concept_code
-        super().__init__(message)
+    error_code = CoreCode.METHOD_WIRING_INVALID
 
 
 class PipeRunInputsError(PipeRunError):
+    """A pipe's input cannot be found when it runs.
+
+    Its raise site chooses the code: ``input.missing`` for an input the run's caller did not send,
+    ``input.reference_not_found`` for an input whose resource does not resolve, ``method.wiring_invalid`` for a
+    wiring that names no input, and the default ``pipe.input_unresolved`` for a value no earlier step produced.
+    """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.PIPE_INPUT_UNRESOLVED,
+        others=(CoreCode.INPUT_MISSING, CoreCode.INPUT_REFERENCE_NOT_FOUND, CoreCode.METHOD_WIRING_INVALID),
+    )
+
     def __init__(
         self,
         message: str,
@@ -54,7 +61,7 @@ class OptionalValueAbsentError(PipeRunError):
     variable name, the consuming pipe, and the full provenance chain from the absence ledger,
     so the report can say where the absence entered the flow and why.
 
-    ``error_domain = RUNTIME``: the failure is data-dependent — the method's assumption failed
+    ``pipe.forced_input_absent``: the failure is data-dependent — the method's assumption failed
     on this input data, not on the caller's request shape.
 
     ``_authors_caller_facing_message``: the message and user action describe the caller's own
@@ -62,7 +69,7 @@ class OptionalValueAbsentError(PipeRunError):
     caller is the only one who can act on them; they must survive STRICT disclosure.
     """
 
-    error_domain = ErrorDomain.RUNTIME
+    error_code = CoreCode.PIPE_FORCED_INPUT_ABSENT
     _authors_caller_facing_message = True
 
     def __init__(
@@ -117,5 +124,11 @@ class OptionalValueAbsentError(PipeRunError):
         )
 
 
-class NoInputsRequiredError(Exception):
-    """Raised when a pipe has no inputs."""
+class NoInputsRequiredError(PipelexError):
+    """Raised when a pipe has no inputs.
+
+    A signal rather than an error: every caller answers it with an empty template or a notice. It carries
+    ``request.unsupported`` until it becomes a return value.
+    """
+
+    error_code = CoreCode.REQUEST_UNSUPPORTED

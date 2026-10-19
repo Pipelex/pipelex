@@ -16,6 +16,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.commands.show_cmd import do_list_pipes, do_show_backends, do_show_config, do_show_pipe
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.cogt.model_backends.credential_resolution import CredentialResolution
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.misc.exceptions import TomlError
 
 if TYPE_CHECKING:
@@ -88,13 +89,27 @@ class TestShowCmd:
 
         pretty_print_mock.assert_called_once_with(fake_config, title="Pipelex configuration")
 
-    def test_do_show_config_wraps_toml_error(self, mocker: MockerFixture) -> None:
-        """A TOML load failure surfaces as PipelexConfigError with context."""
+    @pytest.mark.parametrize(
+        ("failure", "expected_message", "expected_code"),
+        [
+            (TomlError(message="bad toml", doc="", pos=0, lineno=1, colno=1), "bad toml", PipelexErrorCode.CONFIG_SYNTAX),
+            (FileNotFoundError("pipelex.toml"), "pipelex.toml", PipelexErrorCode.CONFIG_FILE_MISSING),
+        ],
+    )
+    def test_do_show_config_wraps_load_failures(
+        self,
+        mocker: MockerFixture,
+        failure: Exception,
+        expected_message: str,
+        expected_code: PipelexErrorCode,
+    ) -> None:
+        """A load failure surfaces as PipelexConfigError with context: a syntax error, or a file that cannot be read."""
         mocked_manager = mocker.patch("pipelex.cli.commands.show_cmd.config_manager")
-        mocked_manager.load_config.side_effect = TomlError(message="bad toml", doc="", pos=0, lineno=1, colno=1)
+        mocked_manager.load_config.side_effect = failure
 
-        with pytest.raises(PipelexConfigError, match="Error loading configuration: bad toml"):
+        with pytest.raises(PipelexConfigError, match=f"Error loading configuration: {expected_message}") as exc_info:
             do_show_config()
+        assert exc_info.value.resolve_error_code() == expected_code
 
     def test_do_list_pipes_tracks_pipe_count(self, mocker: MockerFixture, telemetry: Any) -> None:
         """Listing pipes delegates to the library and reports the count to telemetry."""
@@ -261,5 +276,6 @@ class TestShowCmd:
         """Failures while accessing backend config surface as PipelexCLIError."""
         mocker.patch("pipelex.cli.commands.show_cmd.get_secrets_provider", side_effect=OSError("denied"))
 
-        with pytest.raises(PipelexCLIError, match="Error accessing backend or routing configuration: denied"):
+        with pytest.raises(PipelexCLIError, match="Error accessing backend or routing configuration: denied") as exc_info:
             do_show_backends()
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.CONFIG_INVALID

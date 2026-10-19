@@ -3,9 +3,10 @@ from pathlib import Path
 import pytest
 from mthds.package.dependency_resolver import ResolvedDependency
 from mthds.package.manifest.schema import MethodsManifest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError, PipeOperatorModelChoiceError
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.library_factory import LibraryFactory
@@ -46,7 +47,7 @@ def _dep_bundle(*, pipes: str) -> str:
 
 
 class _InternalInputRefusalError(PipelexError):
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.INPUT_INVALID
 
 
 class TestDependencyPipeBuildRefusals:

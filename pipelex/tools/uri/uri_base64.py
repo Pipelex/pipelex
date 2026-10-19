@@ -10,6 +10,7 @@ from pathlib import Path
 
 from pipelex.tools.misc.base64_utils import make_base64_url_from_bytes, make_base64_url_from_path
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
+from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
@@ -52,7 +53,7 @@ async def make_base64_url_from_any_uri(
         A base64 data URL string containing the base64-encoded data, whichever way we got it.
 
     Raises:
-        ValueError: If the URI is a pipelex-storage:// URI and no storage provider is given.
+        StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.
         SsrfBlockedError: If the URI is an http(s) URL whose destination, or a redirect hop's,
             is a private, loopback, link-local or metadata address.
     """
@@ -69,7 +70,7 @@ async def make_base64_url_from_any_uri(
         case ResolvedPipelexStorage():
             if storage_provider is None:
                 msg = f"Cannot convert pipelex-storage:// URI to base64 without a storage provider: {uri}"
-                raise ValueError(msg)
+                raise StorageNotConfiguredError(msg)
             raw_bytes = await storage_provider.load(uri=resolved_uri.storage_uri)
             base64_url = make_base64_url_from_bytes(raw_bytes=raw_bytes)
     return base64_url

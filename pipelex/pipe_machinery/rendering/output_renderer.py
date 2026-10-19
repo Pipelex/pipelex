@@ -8,6 +8,7 @@ from pipelex.interpreter_hub import get_concept_library, get_required_pipe
 from pipelex.pipe_controllers.binding.binding_step import BindingStep
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_machinery.pipe_blueprint import PipeType
+from pipelex.pipe_machinery.rendering.exceptions import OutputShapeUnavailableError
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -197,7 +198,7 @@ def _render_json_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
-            raise ValueError(msg)
+            raise OutputShapeUnavailableError(msg)
 
         # Build dict with "output_option_1", "output_option_2", etc.
         # Each option includes "concept" and "content" fields
@@ -233,7 +234,7 @@ def _render_python_output(the_pipe: PipeAbstract) -> str:
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
-            raise ValueError(msg)
+            raise OutputShapeUnavailableError(msg)
 
         # Generate Python code for multiple possible outputs
         lines: list[str] = [
@@ -283,7 +284,7 @@ def _render_schema_output(the_pipe: PipeAbstract, *, indent: int = 2) -> str:
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
-            raise ValueError(msg)
+            raise OutputShapeUnavailableError(msg)
 
         # Build dict with schema options
         result: dict[str, Any] = {}

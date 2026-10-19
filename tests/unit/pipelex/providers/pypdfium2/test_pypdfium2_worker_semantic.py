@@ -43,7 +43,7 @@ class TestPypdfium2WorkerSemantic:
             (FileNotFoundError, "No such file", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (ValueError, "Invalid PDF", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
             (RuntimeError, "PDF parsing failed", InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
-            (OSError, "Disk read error", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            (OSError, "Disk read error", InferenceErrorCategory.UNKNOWN, UserActionKind.CONTACT_SUPPORT),
         ],
     )
     async def test_local_exception_carries_semantic_user_action(

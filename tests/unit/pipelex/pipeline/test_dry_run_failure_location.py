@@ -2,12 +2,15 @@ from pathlib import Path
 from typing import ClassVar
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from polyfactory.exceptions import FactoryException
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
 from pipelex.pipeline.bundle_validator import (
     BundleValidator,
@@ -21,12 +24,12 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 
 
 class _CallerFacingMethodFaultError(PipelexError):
-    error_domain = ErrorDomain.INPUT
+    error_code = CoreCode.METHOD_WIRING_INVALID
     _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class _StorageFaultError(PipelexError):
-    error_domain = ErrorDomain.CONFIG
+    error_code = PipelexErrorCode.STORAGE_UNAVAILABLE
 
 
 class TestDryRunFailureLocation:
@@ -93,8 +96,11 @@ class TestDryRunFailureLocation:
         ("error", "expected_text"),
         [
             (_CallerFacingMethodFaultError("branch 'ideas' is plural"), "branch 'ideas' is plural"),
-            (_StorageFaultError("bucket s3://internal-bucket refused the write"), _StorageFaultError.title()),
-            (PipeRunError(message="expression rendered nothing", run_mode=PipeRunMode.DRY, pipe_code="route"), PipeRunError.title()),
+            (_StorageFaultError("bucket s3://internal-bucket refused the write"), error_code_spec(PipelexErrorCode.STORAGE_UNAVAILABLE).title),
+            (
+                PipeRunError(message="expression rendered nothing", run_mode=PipeRunMode.DRY, pipe_code="route"),
+                error_code_spec(CoreCode.RUNTIME_UNEXPECTED).title,
+            ),
             (FactoryException("polyfactory internals"), "The dry run could not generate mock data for this pipe"),
         ],
         ids=["caller_facing", "config_fault", "not_caller_facing", "foreign"],

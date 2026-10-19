@@ -4,13 +4,14 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import ExtractCapabilityError
 from pipelex.cogt.extract.exceptions import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import extract_local_extract_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -68,7 +69,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
     ) -> ExtractOutput:
         if extract_job.extract_input.image_uri:
             msg = "Pypdfium2 only extracts text from PDFs, not from images"
-            raise NotImplementedError(msg)
+            raise ExtractCapabilityError(msg)
 
         pdf_uri = extract_job.extract_input.document_uri
         if not pdf_uri:
@@ -92,7 +93,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         # The exceptions below are raised by pypdfium2_renderer for corrupt/invalid PDFs or file system issues.
         except (FileNotFoundError, ValueError, RuntimeError, OSError) as sdk_exc:
             metadata = extract_local_extract_metadata(sdk_exc, provider=ProviderName.PYPDFIUM2)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.EXTRACT)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

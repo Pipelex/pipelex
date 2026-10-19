@@ -1,11 +1,12 @@
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -111,15 +112,19 @@ class TestPipeRouterRun:
         Pins the "direct = single attempt" contract against a future re-introduction of a retry loop.
         The error leaves located at the pipe, chained to the CogtError, and still reports as it.
         """
-        error = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        error = LLMCompletionError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).with_error_code(
+            CoreCode.PROVIDER_RATE_LIMITED
+        )
         router = _StubPipeRouter(error=error)
 
         with pytest.raises(PipeRouterError) as exc_info:
             await router.run(_make_pipe_job())
 
         assert exc_info.value.__cause__ is error
-        assert exc_info.value.to_error_report().error_type == "CogtError"
-        assert exc_info.value.to_error_report().retryable is True
+        report = exc_info.value.to_error_report()
+        assert report.error_type == "LLMCompletionError"
+        assert report.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert report.retryable is True
         assert router.call_count == 1
 
     async def test_pipe_run_error_wraps_as_pipe_router_error(self) -> None:

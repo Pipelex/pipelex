@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Sequence
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.method_trees.file_references import BundleFileOrigin
@@ -191,4 +192,4 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
             alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref)
             if QualifiedRef.is_address_based_alias(alias):
                 msg = unshipped_address_dependency_message(alias=alias)
-                raise PipeLibraryError(msg)
+                raise PipeLibraryError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)

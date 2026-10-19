@@ -14,7 +14,7 @@ from pipelex.cli.error_handlers import (
     handle_model_deck_preset_error,
     handle_validate_bundle_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -71,7 +71,7 @@ class TestErrorHandlers:
     def test_handle_model_deck_preset_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error should call to_error_report() and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_console")
-        exc = ModelDeckPresetValidatonError(
+        exc = ModelDeckPresetValidationError(
             message="preset references unavailable model",
             model_type=ModelType.LLM,
             preset_id="default",

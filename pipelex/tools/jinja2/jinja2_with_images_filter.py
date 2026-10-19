@@ -4,6 +4,7 @@ from typing import Any
 
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
@@ -53,7 +54,7 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
         # we create a temporary one (images won't persist across expressions)
     if not isinstance(registry, ImageRegistry):
         msg = f"Expected ImageRegistry in context, got {type(registry).__name__}"
-        raise Jinja2ContextError(msg)
+        raise Jinja2ContextError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
     # Get text format from context — no fallback, same as the tag and format filters
     text_format = TextFormat(require_templating_style_value(context=context, jinja2_context_key=Jinja2ContextKey.TEXT_FORMAT))

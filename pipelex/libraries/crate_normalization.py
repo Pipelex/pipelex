@@ -35,6 +35,8 @@ are not yet applied here, mirroring the spec's own "Specification Status" callou
 
 from typing import NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.codegen.native_expansion import collect_native_refs_from_structure, materialize_native_concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
@@ -172,7 +174,7 @@ def _resolve_refinement(
             first_index = cycle.index(first_ref)
             ordered_cycle = cycle[first_index:] + cycle[:first_index] + [first_ref]
             msg = f"Refinement cycle detected: {' -> '.join(ordered_cycle)}"
-            raise CrateNormalizationError(msg)
+            raise CrateNormalizationError(msg).with_error_code(CoreCode.METHOD_CYCLE)
 
         path_index_by_ref[current_ref] = len(path)
         path.append(current_ref)

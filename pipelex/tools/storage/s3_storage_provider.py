@@ -6,12 +6,27 @@ from urllib.parse import quote
 
 from typing_extensions import override
 
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
     StorageS3Error,
 )
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+
+# The S3 error codes by which S3 refuses the credentials themselves, rather than failing to serve: an operator fixes these.
+_S3_CREDENTIAL_REFUSAL_CODES = frozenset({"AccessDenied", "InvalidAccessKeyId", "SignatureDoesNotMatch", "ExpiredToken", "InvalidToken"})
+
+
+def _code_for_s3_client_error(*, s3_error_code: str) -> ErrorCode:
+    """The registry code of an S3 ``ClientError`` that is not a missing object, read from the code S3 answered."""
+    if s3_error_code == "NoSuchBucket":
+        return PipelexErrorCode.CONFIG_INVALID
+    if s3_error_code in _S3_CREDENTIAL_REFUSAL_CODES:
+        return PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED
+    return PipelexErrorCode.STORAGE_UNAVAILABLE
+
 
 # What S3 answers a conditional write whose condition fails: `412` when the key holds an object (`If-None-Match: *`),
 # `409 ConditionalRequestConflict` when another conditional write to the same key is in flight.
@@ -125,6 +140,7 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
+            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -143,14 +159,17 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageFileNotFoundError(msg) from exc
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
             except ClientError as exc:
                 error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
                 if error_code == "NoSuchKey":
                     msg = f"Object not found in S3: '{key}'"
                     raise StorageFileNotFoundError(msg) from exc
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
+            except NoCredentialsError as exc:
+                msg = f"S3 credentials not found for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_MISSING) from exc
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
@@ -173,6 +192,7 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
+            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -190,7 +210,7 @@ class S3StorageProvider(StorageProviderAbstract):
                 raise StorageFileNotFoundError(msg) from exc
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
             except ClientError as exc:
                 error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
                 if error_code == "InvalidRange":
@@ -200,7 +220,10 @@ class S3StorageProvider(StorageProviderAbstract):
                     msg = f"Object not found in S3: '{key}'"
                     raise StorageFileNotFoundError(msg) from exc
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
+            except NoCredentialsError as exc:
+                msg = f"S3 credentials not found for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_MISSING) from exc
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
@@ -222,6 +245,7 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
+            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -237,7 +261,10 @@ class S3StorageProvider(StorageProviderAbstract):
                     msg = f"Object not found in S3: '{key}'"
                     raise StorageFileNotFoundError(msg) from exc
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
+            except NoCredentialsError as exc:
+                msg = f"S3 credentials not found for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_MISSING) from exc
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
@@ -259,6 +286,7 @@ class S3StorageProvider(StorageProviderAbstract):
         from botocore.exceptions import (  # ruff: ignore[import-outside-top-level] - optional dependency, lazy import
             BotoCoreError,
             ClientError,
+            NoCredentialsError,
         )
 
         session = self._get_session()
@@ -276,11 +304,14 @@ class S3StorageProvider(StorageProviderAbstract):
                 await client.put_object(**put_params)
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
             except ClientError as exc:
                 error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
                 msg = f"S3 ClientError ({error_code}) for key '{key}'"
-                raise StorageS3Error(msg) from exc
+                raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
+            except NoCredentialsError as exc:
+                msg = f"S3 credentials not found for key '{key}': {type(exc).__name__}"
+                raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_MISSING) from exc
             except BotoCoreError as exc:
                 msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
                 raise StorageS3Error(msg) from exc
@@ -341,14 +372,14 @@ class S3StorageProvider(StorageProviderAbstract):
                     await client.put_object(**put_params)
                 except client.exceptions.NoSuchBucket as exc:
                     msg = f"Bucket not found in S3: '{self._bucket_name}'"
-                    raise StorageS3Error(msg) from exc
+                    raise StorageS3Error(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID) from exc
                 except ClientError as exc:
                     error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
                     if error_code in _PRECONDITION_FAILED_CODES:
                         return False
                     if error_code not in _CONDITIONAL_CONFLICT_CODES:
                         msg = f"S3 ClientError ({error_code}) for key '{key}'"
-                        raise StorageS3Error(msg) from exc
+                        raise StorageS3Error(msg).with_error_code(_code_for_s3_client_error(s3_error_code=error_code)) from exc
                     conditional_conflict = exc
                     continue
                 except BotoCoreError as exc:

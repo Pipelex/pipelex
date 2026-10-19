@@ -2,8 +2,8 @@
 import pytest
 from semantic_version import SimpleSpec, Version  # type: ignore[import-untyped]
 
+from pipelex.tools.misc.exceptions import SemVerError
 from pipelex.tools.misc.semver import (
-    SemVerError,
     parse_constraint,
     parse_version,
     parse_version_tag,

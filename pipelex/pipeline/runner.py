@@ -5,11 +5,11 @@ from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
 from mthds.protocol.models import VersionInfo
+from mthds.protocol.problem.registry import CoreCode
 from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
@@ -26,9 +26,11 @@ from pipelex.interpreter_hub import (
     get_pipeline_manager,
     set_current_library,
 )
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.caller_identity import CallerIdentity
@@ -149,14 +151,14 @@ def _extract_validate_graph_pipe_code(extra: dict[str, Any] | None) -> str | Non
     unknown_keys = sorted(key for key in extra if key != _VALIDATE_EXTRA_GRAPH_PIPE_CODE)
     if unknown_keys:
         msg = f"The local runtime defines no extension args for: {unknown_keys}."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field="extra", unsupported_reason="unknown_validate_extension_args")
     graph_pipe_code = extra.get(_VALIDATE_EXTRA_GRAPH_PIPE_CODE)
     if graph_pipe_code is not None and not isinstance(graph_pipe_code, str):
         msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must be a string when provided."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field=f"extra.{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}")
     if graph_pipe_code is not None and not graph_pipe_code.strip():
         msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must not be blank when provided."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field=f"extra.{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}")
     return graph_pipe_code
 
 
@@ -318,7 +320,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         """
         if extra:
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
-            raise PipelineRequestError(msg)
+            raise PipelexRequestError(msg, field="extra", unsupported_reason="extension_args_on_local_execute")
         # Refused here, before the `try`: `RunMetadata` would refuse it inside the setup, where the
         # `ValidationError` arm below would report the host's bug as the caller's invalid input.
         if request_id is not None:
@@ -397,7 +399,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             formatted_error = format_pydantic_validation_error(exc)
             model_name = exc.title
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
-            raise PipeExecutionError(message=msg) from exc
+            raise PipeExecutionError(message=msg).with_error_code(CoreCode.INPUT_INVALID) from exc
         finally:
             # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
             # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
@@ -473,7 +475,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         Asynchronous execution is owned by the API layer (pipelex-api overrides
         this with Temporal dispatch) and the hosted platform; locally, use
-        `execute`.
+        `execute`. It raises `AsyncExecutionNotEnabledError`, whose code is
+        `runtime.unsupported`.
         """
         _ = (
             pipe_code,
@@ -485,7 +488,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             extra,
         )
         msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."
-        raise NotImplementedError(msg)
+        raise AsyncExecutionNotEnabledError(msg)
 
     @override
     async def validate(

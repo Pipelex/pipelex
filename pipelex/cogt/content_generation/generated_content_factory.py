@@ -1,6 +1,8 @@
 import base64
 import hashlib
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex import log
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.extract.extract_output import ExtractOutput
@@ -18,6 +20,7 @@ from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, mime_type_to_extension
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 
@@ -108,8 +111,19 @@ class GeneratedContentFactory:
         What is dropped is everything that is not an image at all: the
         `application/octet-stream` of a store that never learned better, or the
         `text/html` of an error page a server dressed as a 200.
+
+        The URL is one a provider's answer named, so a refusal or a failure to fetch it is the provider's:
+        ``security.provider_url_refused`` for a destination the SSRF guard refuses, ``provider.response_invalid``
+        for a file that could not be fetched.
         """
-        raw_bytes, media_type = await fetch_file_and_content_type_from_url_httpx(url)
+        try:
+            raw_bytes, media_type = await fetch_file_and_content_type_from_url_httpx(url)
+        except SsrfBlockedError as exc:
+            exc.with_error_code(CoreCode.SECURITY_PROVIDER_URL_REFUSED)
+            raise
+        except RemoteFileFetchError as exc:
+            exc.with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
+            raise
         if media_type and media_type.startswith("image/"):
             return raw_bytes, media_type
         return raw_bytes, None

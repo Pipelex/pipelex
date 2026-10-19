@@ -3,12 +3,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.class_registry import ClassRegistry
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, Field, PrivateAttr
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
@@ -362,7 +364,7 @@ class Library(BaseModel):
                             f"Concept '{concept.concept_ref}' refines cross-package concept '{concept.refines}' "
                             f"but '{remainder}' was not found in dependency '{alias}'"
                         )
-                        raise LibraryError(msg)
+                        raise LibraryError(msg).with_error_code(CoreCode.METHOD_CONCEPT_UNRESOLVED)
                     log.verbose(
                         f"The validation of concept '{concept.concept_ref}' was skipped: it refines cross-package concept "
                         f"'{concept.refines}' from unloaded dependency '{alias}'"

@@ -1,4 +1,5 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorReport
 from pipelex.cogt.config_cogt import ModelDeckConfig
@@ -98,6 +99,7 @@ class TestModelDeckUnknownReference:
 
         assert report.error_type == "ModelNotFoundError"
         assert report.message == f"Model handle '{model_handle}' was not found in the model deck."
+        assert report.code == CoreCode.MODEL_UNKNOWN
         assert report.error_domain == "input"
         assert report.caller_facing_message is True
         assert report.http_status == 422
@@ -131,6 +133,7 @@ class TestModelDeckUnknownReference:
         report = _raise_not_found(model_handle=model_handle, model_type=model_type).to_error_report()
 
         assert report.error_type == "ModelNotFoundError"
+        assert report.code == CoreCode.MODEL_UNAVAILABLE
         assert report.error_domain == "config"
         assert report.caller_facing_message is False
         assert report.http_status == 500

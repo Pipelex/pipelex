@@ -9,6 +9,7 @@ from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
+from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.mthds_parsing.helpers import MTHDS_EXTENSION, is_pipelex_file
@@ -144,7 +145,7 @@ def run_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         extra_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    except ExportedPipeAmbiguousError as exc:
         typer.secho(
             f"Ambiguous pipe code '{pipe_code}': {exc}",
             fg=typer.colors.RED,

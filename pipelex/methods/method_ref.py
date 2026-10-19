@@ -13,6 +13,7 @@ This module is the single place the CLI, the API, and the tests parse that gramm
 import re
 
 from mthds.package.vcs_resolver import address_to_clone_url
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.methods.exceptions import MethodRefParseError
@@ -117,7 +118,7 @@ def parse_method_ref(ref: str) -> MethodRef:
 
     if not body.startswith(f"{GITHUB_HOST}/"):
         msg = f"Unsupported method address '{raw}': only '{GITHUB_HOST}/...' addresses are supported."
-        raise MethodRefParseError(msg)
+        raise MethodRefParseError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)
 
     parts = body.split("/")
 

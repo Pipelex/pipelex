@@ -2,7 +2,7 @@ from typing_extensions import override
 
 from pipelex.system.environment import get_optional_env, get_required_env
 from pipelex.system.exceptions import EnvVarNotFoundError
-from pipelex.tools.secrets.exceptions import SecretNotFoundError
+from pipelex.tools.secrets.exceptions import SecretNotFoundError, SecretVersionUnsupportedError
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -22,12 +22,12 @@ class EnvSecretsProvider(SecretsProviderAbstract):
     @override
     def get_required_secret_specific_version(self, secret_id: str, *, version_id: str) -> str:
         msg = "EnvSecretsProvider does not support specific versions"
-        raise NotImplementedError(msg)
+        raise SecretVersionUnsupportedError(msg)
 
     @override
     def get_optional_secret_specific_version(self, secret_id: str, *, version_id: str) -> str | None:
         msg = "EnvSecretsProvider does not support specific versions"
-        raise NotImplementedError(msg)
+        raise SecretVersionUnsupportedError(msg)
 
     @override
     def set_secret_as_env_var(self, secret_id: str, *, version_id: str = "latest"):
