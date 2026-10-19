@@ -31,8 +31,8 @@ from pipelex.core.pipes.exceptions import (
     refusal_detail,
 )
 from pipelex.core.validation import report_validation_error
-from pipelex.errors.security_event import is_security_refusal
 from pipelex.errors.error_codes import code_is_method_domain
+from pipelex.errors.security_event import is_security_refusal
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs

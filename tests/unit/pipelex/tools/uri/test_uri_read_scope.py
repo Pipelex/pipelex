@@ -3,9 +3,9 @@
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.uri_read_scope import UriReference, authorize_uri_read, authorize_uri_reads
 
