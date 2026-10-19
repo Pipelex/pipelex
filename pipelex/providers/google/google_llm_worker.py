@@ -267,15 +267,15 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(response.usage_metadata)
 
         # Read before the text, so a candidate cut or filtered with no text left is reported for what stopped it
-        if response.candidates:
-            if finish_reason := response.candidates[0].finish_reason:
-                self._check_completion_stop(llm_job=llm_job, stop_reason=finish_reason.value, max_tokens=job_params.max_tokens)
-        elif response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
+        stop_signal = GoogleFactory.read_stop_signal(response=response)
+        if stop_signal.finish_reason is not None:
+            self._check_completion_stop(llm_job=llm_job, stop_reason=stop_signal.finish_reason, max_tokens=job_params.max_tokens)
+        elif stop_signal.block_reason is not None:
             # A blocked prompt gets no candidate at all, its block reason in the prompt feedback: a refusal, named for its reason
             self._raise_for_completion_stop(
                 llm_job=llm_job,
-                outcome=classify_prompt_block_reason(block_reason=block_reason.value, model_handle=self.inference_model.name),
-                stop_reason=block_reason.value,
+                outcome=classify_prompt_block_reason(block_reason=stop_signal.block_reason, model_handle=self.inference_model.name),
+                stop_reason=stop_signal.block_reason,
                 max_tokens=job_params.max_tokens,
             )
 
