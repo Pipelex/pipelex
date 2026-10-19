@@ -598,7 +598,7 @@ class RefusedBundles:
             "validation_failure",
             VALIDATION_FAILURE,
             ["method.name_conflict", "method.input_undeclared", "method.input_unused"],
-            [{}, {"pipe": "summarize"}, {"pipe": "rate"}],
+            [{"field": "concept.Rating"}, {"pipe": "summarize"}, {"pipe": "rate"}],
         ),
         ("template_refusal", TEMPLATE_REFUSAL, ["method.schema_violation"], [{"pipe": "say", "field": "pipe.say"}]),
     ]
