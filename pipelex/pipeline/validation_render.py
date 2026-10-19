@@ -13,13 +13,7 @@ cannot drift.
 problem items, the ``errors`` a host answers in the view of whoever asked, so
 the Markdown says no more than the structured items it presents.
 
-``format_validation_error_items_markdown`` is the markdown sibling of the human
-``display_validation_error_items`` (``cli/error_handlers.py``): it renders typed
-:class:`ValidationErrorItem`s as category-grouped prose with per-item ``💡
-Suggested fix`` lines, mirroring the human panel so that prose cannot drift. No
-failure surface reads it any longer: the agent CLI's failure surfaces and the API
-runner's ``rendered_markdown`` of an invalid verdict list the problem's items
-instead, as their JSON does. ``build_fix_command`` is the shared builder for the copy-pasteable
+``build_fix_command`` is the shared builder for the copy-pasteable
 ``<executable> fix bundle <path>`` footer, used by both the human and agent
 ``validate`` surfaces so the ``-L`` / ``--allow-signatures`` echo cannot drift.
 """
@@ -30,7 +24,6 @@ import shlex
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.errors.error_codes import error_code_spec, parse_error_code
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
@@ -41,6 +34,8 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from mthds.protocol.problem.models import ProblemItem
+
+    from pipelex.base_exceptions import ValidationErrorItem
 
 
 def format_validate_markdown(result: dict[str, Any]) -> str:
@@ -203,19 +198,6 @@ def validation_item_title(*, item: ValidationErrorItem) -> str:
     return pascal_case_to_sentence(error_type).title()
 
 
-def _markdown_category_header(category: ValidationErrorCategory) -> str:
-    """The section heading for one validation-error category — markdown sibling of the human header."""
-    match category:
-        case ValidationErrorCategory.BLUEPRINT_VALIDATION:
-            return "Blueprint validation errors"
-        case ValidationErrorCategory.PIPE_FACTORY:
-            return "Pipe factory errors"
-        case ValidationErrorCategory.PIPE_VALIDATION:
-            return "Pipe validation errors"
-        case ValidationErrorCategory.DRY_RUN:
-            return "Dry run errors"
-
-
 def suggested_fix_label(*, fix: SuggestedFix) -> str:
     """The label a rendered suggested fix opens with, saying whether it may be applied without asking.
 
@@ -236,80 +218,6 @@ def fix_safety_label(*, safety: FixSafety) -> str:
             return "Suggested fix"
         case FixSafety.UNSAFE:
             return "Suggested fix (unsafe, confirm before applying)"
-
-
-def _render_error_item_markdown(item: ValidationErrorItem, *, index: int) -> list[str]:
-    """Render one structured item as prose: humanized title, identity fields, message, fix, locators.
-
-    Markdown sibling of the human ``_display_validation_error_item`` — same fields in the same
-    order, emitting ``**bold**`` / backticks instead of Rich markup.
-    """
-    lines: list[str] = [f"{index}. **{validation_item_title(item=item)}**"]
-    if item.pipe_code:
-        lines.append(f"   - Pipe: `{item.pipe_code}`")
-    if item.concept_code:
-        lines.append(f"   - Concept: `{item.concept_code}`")
-    if item.domain_code:
-        lines.append(f"   - Domain: `{item.domain_code}`")
-    if item.field_name:
-        lines.append(f"   - Field: `{item.field_name}`")
-    if item.missing_concept_code:
-        lines.append(f"   - Missing concept: `{item.missing_concept_code}`")
-    if item.missing_pipe_code:
-        lines.append(f"   - Missing pipe: `{item.missing_pipe_code}`")
-    if item.declared_concepts:
-        declared = ", ".join(f"`{concept_code}`" for concept_code in item.declared_concepts)
-        lines.append(f"   - Declared concepts: {declared}")
-    if item.variable_names:
-        variables = ", ".join(f"`{variable_name}`" for variable_name in item.variable_names)
-        lines.append(f"   - Variables: {variables}")
-    lines.append(f"   - {item.message}")
-    if item.suggested_fix is not None:
-        lines.append(f"   - 💡 {suggested_fix_label(fix=item.suggested_fix)}: {item.suggested_fix.description}")
-    if item.field_path:
-        lines.append(f"   - Path: `{item.field_path}`")
-    if item.source:
-        lines.append(f"   - Source: `{item.source}`")
-    return lines
-
-
-def format_validation_error_items_markdown(items: list[ValidationErrorItem]) -> str:
-    """Render structured validation-error items grouped by category as agent-readable markdown.
-
-    The markdown sibling of the human ``display_validation_error_items``
-    (``cli/error_handlers.py``): same category grouping, same per-item identity fields + message
-    + ``💡 Suggested fix`` line, emitting markdown instead of Rich markup. Consumes the typed
-    items produced by the shared ``build_validation_error_items`` builder — the same source the
-    human panel and the structured wire draw from — so the prose an agent reads cannot drift from
-    what a human sees. Returns only the grouped items block (no heading, no footer); callers wrap
-    it with the surface-specific framing.
-
-    Args:
-        items: The structured validation-error items to render, in builder order.
-
-    Returns:
-        A markdown string: one ``## <Category>`` section per populated category, each holding
-        numbered prose items (one per failing pipe in the ``dry_run`` section).
-    """
-    items_by_category: dict[ValidationErrorCategory, list[ValidationErrorItem]] = {}
-    for item in items:
-        items_by_category.setdefault(item.category, []).append(item)
-
-    lines: list[str] = []
-    for category in ValidationErrorCategory:
-        category_items = items_by_category.get(category, [])
-        if not category_items:
-            continue
-        if lines:
-            lines.append("")
-        lines += [f"## {_markdown_category_header(category)}", ""]
-        # Every category, dry run included, renders numbered items: a dry-run item is located on its
-        # failing pipe like any other, so it names the pipe, the domain and the source.
-        for error_index, item in enumerate(category_items, 1):
-            lines += _render_error_item_markdown(item, index=error_index)
-            lines.append("")
-
-    return "\n".join(lines).rstrip()
 
 
 def build_fix_command(*, executable: str, bundle_path: Path, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> str:

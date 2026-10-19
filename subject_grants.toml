@@ -4612,14 +4612,6 @@ rationale = "Verb-object: validates bundles from the directory; options stay key
 param = "pipe_error"
 rationale = "Verb-object: backfills the pipe error in place; single operand."
 
-["pipelex/pipeline/validation_render.py::_markdown_category_header"]
-param = "category"
-rationale = "Noun-named derivation: the header text for the category; single operand."
-
-["pipelex/pipeline/validation_render.py::_render_error_item_markdown"]
-param = "item"
-rationale = "Verb-object: renders the error item; index is context."
-
 ["pipelex/pipeline/validation_render.py::count_applicable_fixes"]
 param = "items"
 rationale = "Single-operand count over the error items; scope stays keyword."
@@ -4627,10 +4619,6 @@ rationale = "Single-operand count over the error items; scope stays keyword."
 ["pipelex/pipeline/validation_render.py::format_validate_markdown"]
 param = "result"
 rationale = "Verb-object: formats the validate result; single operand."
-
-["pipelex/pipeline/validation_render.py::format_validation_error_items_markdown"]
-param = "items"
-rationale = "Verb-object: formats the error items; single operand."
 
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"
