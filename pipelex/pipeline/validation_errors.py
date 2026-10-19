@@ -242,8 +242,7 @@ def _dependency_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     """The package an unresolved package reference names, the prefix of its ``->`` reference, as a missing dependency."""
     if item.error_type not in _PACKAGE_DEPENDENCY_TYPES or not item.missing_pipe_code:
         return {}
-    reference = item.missing_pipe_code
-    package = QualifiedRef.split_cross_package_ref(reference).alias if QualifiedRef.has_cross_package_prefix(reference) else reference
+    package = QualifiedRef.package_named_by(raw=item.missing_pipe_code)
     return {
         "kind": MethodDependencyMissingKind.PACKAGE,
         "name": package,

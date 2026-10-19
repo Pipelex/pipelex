@@ -154,7 +154,7 @@ class TestRunBundleVerdictCli:
         assert item["location"]["field"] == "output"
         assert item["location"]["file"] == str(bundle_path)
 
-    def test_agent_run_bundle_markdown_renders_the_items_as_prose(
+    def test_agent_run_bundle_markdown_renders_the_problem_items(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         mocker.patch("pipelex.cli.agent_cli.commands.run.bundle_cmd.make_pipelex_for_agent_cli")
@@ -167,6 +167,9 @@ class TestRunBundleVerdictCli:
         assert exc_info.value.exit_code == 1
         markdown = capsys.readouterr().err
         assert markdown.startswith("## The method does not validate")
-        assert "## Pipe validation errors" in markdown
-        assert "Concept 'TideNotise' in pipe.write_tide_notice.output is not declared" in markdown
+        assert (
+            "### Errors\n\n- `method.concept_unresolved`: The method names the concept 'TideNotise', which no library declares. "
+            f"(pipe 'write_tide_notice', field 'output', file '{bundle_path}')"
+        ) in markdown
+        assert "## Pipe validation errors" not in markdown
         assert '"validation_errors"' not in markdown

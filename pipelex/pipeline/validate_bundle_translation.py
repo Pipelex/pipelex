@@ -15,6 +15,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import NamedTuple, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError
@@ -32,6 +33,7 @@ from pipelex.core.pipes.exceptions import (
 )
 from pipelex.core.validation import report_validation_error
 from pipelex.errors.error_codes import code_is_method_domain
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.security_event import is_security_refusal
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryError, LibraryLoadingError, MethodTreeLoadError
@@ -168,6 +170,11 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
         else:
             blueprint_validation_errors = None
             pipe_concept_validation_errors = None
+        if not blueprint_validation_errors and not pipe_concept_validation_errors:
+            # A tree the package rules refuse, such as one holding a symbolic link, gives its one item the file at fault.
+            refused_path = _refused_tree_path(refusal=library_error)
+            if refused_path is not None:
+                blueprint_validation_errors = [PipelexBundleBlueprintValidationErrorData(message=library_error.message, source=refused_path)]
         raise ValidateBundleError(
             message=library_error.message,
             pipelex_bundle_blueprint_validation_errors=blueprint_validation_errors,
@@ -301,6 +308,19 @@ def _make_refusal_verdict(*, refusal: PipelexError) -> ValidateBundleError | Non
         message=message,
         pipelex_bundle_blueprint_validation_errors=[PipelexBundleBlueprintValidationErrorData(message=message)],
     )
+
+
+def _refused_tree_path(*, refusal: PipelexError) -> str | None:
+    """The tree path a refusal of the method's package names as its `path`, which locates the verdict's item, else ``None``.
+
+    Read from the parameters a caller may read, as the item's sentence is, so the item names the file the package rule
+    refuses (a symbolic link of the tree, say) in its `location.file`, where a caller reads it without the message.
+    """
+    if refusal.resolve_error_code() != CoreCode.METHOD_PACKAGE_INVALID:
+        return None
+    params = refusal.to_problem(view=ProblemView.CALLER).params
+    path = params.as_wire().get("path") if params is not None else None
+    return path if isinstance(path, str) else None
 
 
 @contextmanager
