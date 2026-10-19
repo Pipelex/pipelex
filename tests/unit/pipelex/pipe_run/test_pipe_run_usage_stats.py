@@ -17,7 +17,7 @@ from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.trace_context import TraceContext
 from pipelex.system.usage_stats.usage_stats_client import configure_usage_stats_for_runtime
-from pipelex.system.usage_stats.usage_stats_runs import current_run_tally, usage_stats_error_domain
+from pipelex.system.usage_stats.usage_stats_runs import current_run_tally, usage_stats_error
 from tests.helpers.usage_stats_process import make_project_dir, usage_stats_switched_on
 from tests.helpers.usage_stats_run_events import USAGE_STATS_RUN_ID, llm_usage_event
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
@@ -53,7 +53,7 @@ def _job(*, mocker: MockerFixture, is_traced: bool) -> Any:
 def _note_one_call() -> None:
     tally = current_run_tally()
     assert tally is not None
-    tally.note_call(model_handle=_MODEL, backend_name="anthropic", failed=False, failure_category=None, images_generated=0, pages_extracted=0)
+    tally.note_call(model_handle=_MODEL, backend_name="anthropic", failure_domain=None, images_generated=0, pages_extracted=0)
 
 
 def _call_then_fail(pipe_job: Any) -> Any:
@@ -152,7 +152,7 @@ class TestPipeRunUsageStats:
         assert (run["inference_calls"], run["input_tokens"], run["output_tokens"], run["models_used"]) == (1, 120, 30, 1)
         assert run["surface"] == "python"
         if outcome == "failed":
-            assert run["error_domain"] == usage_stats_error_domain(error=_FAILURE)
+            assert (run["error_code"], run["error_domain"]) == usage_stats_error(error=_FAILURE)
         assert model_event["event"] == "model_used"
         assert (model_event["properties"]["provider"], model_event["properties"]["model"]) == ("anthropic", _MODEL)
 

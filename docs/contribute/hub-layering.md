@@ -36,7 +36,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `RuntimeHub`, `get_runtime_hub`, `set_runtime_hub` |
 | config | `get_required_config`, `get_optional_config` |
-| console | `get_console` |
+| console | `get_console`, `get_error_console` |
 | secrets | `get_secrets_provider`, `get_secret` |
 | system registries | `get_class_registry` |
 | storage | `get_storage_provider` |

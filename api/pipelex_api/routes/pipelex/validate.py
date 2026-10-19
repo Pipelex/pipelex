@@ -477,10 +477,10 @@ def _invalid_report_response(failure: BundleValidationFailure, *, requested_form
         validation_errors=failure.validation_errors,
         message=failure.problem.detail,
     )
-    # `exclude_none` drops each item's unset locators, so the wire items match the agent CLI's
-    # `extract_validation_errors` byte-for-byte (it dumps items the same way) — the "one error item,
-    # two surfaces" guarantee. The invalid arm's own fields are all non-None, so none are lost; and
-    # `rendered_markdown` stays absent here unless explicitly requested below.
+    # `exclude_none` drops each item's unset locators, so a wire item carries only what its fault has. The
+    # items are `ValidateBundleError.validation_error_items()`, the ones the agent CLI's problem turns into its
+    # `errors` — the "one error item, two surfaces" guarantee. The invalid arm's own fields are all non-None,
+    # so none are lost; and `rendered_markdown` stays absent here unless explicitly requested below.
     content = invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True)
     # Opt-in presentation extra (D-D): a faithful render of the structured `validation_errors`,
     # attached only when `markdown` was requested. Built from the just-dumped content so the renderer

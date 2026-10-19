@@ -22,7 +22,7 @@ _STEP_FIELDS = 'format = "docx"\ntemplate_file = "letter.docx"'
 
 
 def _run_agent_bundle(*, path: Path, pipe: str | None = None) -> dict[str, Any]:
-    """Run `run bundle` on `path` as a dry run with JSON errors, and return the error envelope it exits with."""
+    """Run `run bundle` on `path` as a dry run with JSON errors, which exits with the problem on stderr."""
     try:
         agent_run_bundle_cmd(
             path=str(path),
@@ -59,13 +59,12 @@ class TestPipeDocGenRunBundleTrees:
             _run_agent_bundle(path=bundle_path)
 
         assert exc_info.value.exit_code == 1
-        envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "ValidateBundleError"
-        assert envelope["error_code"] == CoreCode.METHOD_INVALID
-        assert envelope["error_domain"] == "input"
+        problem: dict[str, Any] = json.loads(capsys.readouterr().err)
+        assert problem["code"] == CoreCode.METHOD_INVALID
+        assert problem["domain"] == "method"
         # The item reads the sentence of the refusal's code, which names the file the step could not read.
-        (item,) = envelope["validation_errors"]
-        assert "'letter.docx'" in item["message"]
+        (item,) = problem["errors"]
+        assert "'letter.docx'" in item["detail"]
 
     def test_a_folder_whose_bundles_declare_several_main_pipes_is_refused_naming_them(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -78,9 +77,9 @@ class TestPipeDocGenRunBundleTrees:
         with pytest.raises(typer.Exit):
             _run_agent_bundle(path=tmp_path)
 
-        envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
-        assert envelope["error_domain"] == "input"
-        rendered = json.dumps(envelope)
+        problem: dict[str, Any] = json.loads(capsys.readouterr().err)
+        assert problem["domain"] == "input"
+        rendered = json.dumps(problem)
         assert "several of its bundles declare a main_pipe" in rendered
         assert "'invoice.mthds' declares 'print_invoice'" in rendered
         assert "'other/invoice.mthds' declares 'print_invoice'" in rendered

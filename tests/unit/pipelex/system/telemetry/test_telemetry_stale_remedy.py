@@ -17,6 +17,7 @@ The stale documents here are the package's own: `telemetry-config@2` is the ship
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -101,6 +102,20 @@ class TestTheErrorSaysWhetherTheFileIsOldOrWrong:
         assert exc.migration is None
         assert MIGRATE_COMMAND not in exc.message
         assert "custom_posthog.mode" in exc.message
+
+    def test_the_operator_s_step_names_the_setting_the_file_and_the_surface(self, global_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """The code's step renders from the refused setting, never falling back on the generic sentence; the advice is doctor's."""
+        exc = load_and_capture(config_dir=global_dir, body='[custom_posthog]\nmode = "no-such-mode"\n')
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = exc.to_problem(view=ProblemView.OPERATOR)
+        assert problem.next_step.detail == (
+            "Correct the setting 'custom_posthog.mode' in the file 'telemetry.toml' of the telemetry configuration, then restart the runtime."
+        )
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
+        advice = exc.advised_action()
+        assert advice is not None
+        assert "'pipelex-agent doctor'" in advice.detail
 
     def test_a_key_no_build_knows_is_named_even_with_nothing_to_migrate(self, global_dir: Path) -> None:
         """The diagnosis speaks on its own: an unknown root key is a finding without a single step."""

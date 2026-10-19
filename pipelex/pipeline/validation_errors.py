@@ -3,11 +3,11 @@
 ``build_validation_error_items`` is the single source of truth behind every
 structured-error surface:
 
-- the agent CLI's ``validation_errors`` JSON array (via
-  ``pipelex.cli.agent_cli.commands.agent_output.extract_validation_errors``),
-- the ``/validate`` route's invalid verdict, and
+- the ``/validate`` route's invalid verdict,
 - the problem's ``errors`` (via ``ValidateBundleError.problem_items``, which
-  turns each item into a problem item with :func:`problem_item_of`).
+  turns each item into a problem item with :func:`problem_item_of`), which the
+  agent CLI prints, and
+- the agent CLI's Markdown, which renders the items themselves as prose.
 
 All of them reach it through ``ValidateBundleError.validation_error_items``, so the CLI
 and API structured shapes cannot drift. It takes the error-data lists directly
@@ -25,6 +25,7 @@ from mthds.protocol.problem.registry import (
     MethodDependencyMissingReason,
     MethodIdentifierInvalidIdentifierKind,
 )
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.core.exceptions import (
@@ -172,6 +173,19 @@ def build_validation_error_items(
         )
 
     return items
+
+
+class ValidationItemCode(BaseModel):
+    """The code a validation item takes in its verdict's problem, with the parameters known beside the item that it renders from.
+
+    A verdict decides it (``ValidateBundleError.item_codes``) from more than the item holds, the refusal it was built from and
+    its dry-run failures, so a surface that reports the items after the verdict is gone, ``fix bundle``'s, keeps it beside them.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    code: ErrorCode
+    params: dict[str, Any] | None = None
 
 
 def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode) -> ErrorCode:

@@ -71,10 +71,10 @@ class TestResolveBundleTarget:
             resolve_bundle_target(str(tmp_path), library_dir=None)
 
         assert exc_info.value.exit_code == 2
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "EmptyMethodTreeError"
-        assert envelope["error_domain"] == "input"
-        assert envelope["message"] == f"The folder '{tmp_path}' holds no .mthds bundle."
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "method.invalid"
+        assert problem["diagnostics"]["error_class"] == "EmptyMethodTreeError"
+        assert problem["message"] == f"The folder '{tmp_path}' holds no .mthds bundle."
 
     def test_a_folder_whose_tree_is_refused_raises_the_verdict_for_the_command(self, tmp_path: Path) -> None:
         """A symbolic link in the tree is the invalid verdict, which each command renders as its surface does."""
@@ -91,6 +91,7 @@ class TestResolveBundleTarget:
             resolve_bundle_target(str(tmp_path / "nope.txt"), library_dir=None)
 
         assert exc_info.value.exit_code == 2
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "ArgumentError"
-        assert "is not a .mthds file or directory" in envelope["message"]
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.argument_invalid"
+        assert problem["params"] == {"argument": str(tmp_path / "nope.txt"), "reason": "not a .mthds file or a directory"}
+        assert "is not a .mthds file or directory" in problem["message"]

@@ -10,7 +10,7 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import (
     apply_agent_cli_output_discipline,
     silence_logging_for_agent_cli,
 )
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, use_agent_cli_error_format
 from pipelex.cli.commands.doctor_cmd import (
     LOCAL_RUNS_ONLY_NOTE,
     BackendFileReport,
@@ -245,7 +245,7 @@ def agent_doctor_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Check Pipelex configuration health and output a diagnostic report.
@@ -272,7 +272,7 @@ def agent_doctor_cmd(
 
 def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error_format: CliOutputFormat | None) -> None:
     """The report itself; ``agent_doctor_cmd`` is the entry point that releases what this configured."""
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     # Process-global logging cutoff, BEFORE setup_doctor_runtime / check_* can trigger
     # any third-party log line.
     silence_logging_for_agent_cli()
@@ -347,9 +347,9 @@ def _do_agent_doctor_cmd(*, global_: bool, output_format: CliOutputFormat, error
             backend_file_reports = {}
     except Exception as exc:  # ruff: ignore[blind-except]
         # Agent CLI command boundary: agent_error() (NoReturn) converts any genuinely
-        # unexpected failure into the structured error payload. PipelexConfigError is
+        # unexpected failure into its problem. PipelexConfigError is
         # handled by the inner arm above and never reaches here.
-        agent_error(f"Health check failed unexpectedly: {exc}", error_type=type(exc).__name__, cause=exc)
+        agent_error(f"Health check failed unexpectedly: {exc}", cause=exc)
 
     # Pin stdout discipline regardless of bootstrap path (broken-config branch never
     # installed a hub or configured log — the helper guards both internally).

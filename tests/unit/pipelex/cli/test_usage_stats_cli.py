@@ -18,13 +18,14 @@ from pipelex.system.usage_stats.usage_stats_client import (
     UsageStatsClient,
     configure_usage_stats_for_cli,
     configure_usage_stats_for_runtime,
-    note_command_error_domain,
+    note_command_error,
     note_command_hosted,
     show_usage_stats_notice,
 )
 from pipelex.system.usage_stats.usage_stats_contract import (
     NOTICE_VERSION,
     UsageStatsEnvVar,
+    UsageStatsError,
     UsageStatsErrorDomain,
     UsageStatsProvider,
     UsageStatsSurface,
@@ -59,7 +60,7 @@ def _succeed() -> None:
 
 
 def _fail_with_input_error() -> None:
-    note_command_error_domain(error_domain=UsageStatsErrorDomain.INPUT)
+    note_command_error(error=UsageStatsError(code="client.argument_invalid", domain=UsageStatsErrorDomain.INPUT))
     raise SystemExit(1)
 
 
@@ -144,7 +145,29 @@ class TestUsageStatsCli:
                 False,
             ),
             (UsageStatsSurface.PIPELEX_AGENT, ["inputs", "pipe", "my_pipe"], "inputs pipe", True),
+            # `inputs`' `--format` is a template's serialization, which its errors never follow.
+            (UsageStatsSurface.PIPELEX_AGENT, ["inputs", "pipe", "my_pipe", "--format", "toml"], "inputs pipe", True),
             (UsageStatsSurface.PIPELEX_AGENT, ["models"], "models", False),
+            # The program's `--error-format`, given before the command, wins over the command's `--format`...
+            (UsageStatsSurface.PIPELEX_AGENT, ["--error-format", "json", "validate", "bundle", "x.mthds"], "validate bundle", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["--error-format=json", "validate", "bundle", "x.mthds"], "validate bundle", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["--error-format", "json", "models"], "models", True),
+            (
+                UsageStatsSurface.PIPELEX_AGENT,
+                ["--error-format", "markdown", "validate", "bundle", "x.mthds", "--format", "json"],
+                "validate bundle",
+                False,
+            ),
+            (UsageStatsSurface.PIPELEX_AGENT, ["--error-format", "markdown", "inputs", "pipe", "my_pipe"], "inputs pipe", False),
+            # ...and the command's own `--error-format` wins over the program's.
+            (
+                UsageStatsSurface.PIPELEX_AGENT,
+                ["--error-format", "json", "validate", "bundle", "x.mthds", "--error-format", "markdown"],
+                "validate bundle",
+                False,
+            ),
+            (UsageStatsSurface.PIPELEX_AGENT, ["no-such-command"], "other", True),
+            (UsageStatsSurface.PIPELEX_AGENT, ["--error-format", "markdown", "no-such-command"], "other", False),
         ],
     )
     def test_invocation_is_resolved_without_reading_arguments(
@@ -192,12 +215,35 @@ class TestUsageStatsCli:
         assert events[0]["properties"]["surface"] == "pipelex-agent"
         assert events[0]["properties"]["outcome"] == "failed"
         assert events[0]["properties"]["error_domain"] == "input"
+        assert events[0]["properties"]["error_code"] == "client.argument_invalid"
+
+    def test_the_program_s_error_format_keeps_the_notice_off_a_json_problem(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """`pipelex-agent --error-format json validate bundle …` writes one JSON problem on stderr, and no notice ahead of it.
+
+        The command's own default is Markdown, so reading the command's options alone took the stream for one a person
+        reads, printed the notice first, and left stderr no longer parseable as the JSON its caller asked for.
+        """
+        # Refused before any boot: the session's own Pipelex stays out of it.
+        not_a_bundle = tmp_path / "notes.txt"
+        with usage_stats_switched_on(monkeypatch=monkeypatch, home=tmp_path / "home", cwd=make_project_dir(parent=tmp_path), is_debug=False) as state:
+            with pytest.raises(SystemExit) as exit_info:
+                _root_of(UsageStatsSurface.PIPELEX_AGENT).main(
+                    args=["--error-format", "json", "validate", "bundle", str(not_a_bundle)], prog_name="pipelex-agent"
+                )
+            captured = capsys.readouterr()
+        assert exit_info.value.code != 0
+        assert captured.out == ""
+        problem: dict[str, Any] = json.loads(captured.err)
+        assert problem["code"] == "client.argument_invalid"
+        assert not state.notice_marker(version=NOTICE_VERSION).exists()
 
     @pytest.mark.parametrize(
         ("invoke", "expected"),
         [
             (_succeed, {"outcome": "succeeded"}),
-            (_fail_with_input_error, {"outcome": "failed", "error_domain": "input"}),
+            (_fail_with_input_error, {"outcome": "failed", "error_code": "client.argument_invalid", "error_domain": "input"}),
             (_interrupted, {"outcome": "cancelled"}),
             (_cancelled_exit, {"outcome": "cancelled"}),
             (_hosted_run, {"outcome": "succeeded", "hosted": True}),
@@ -223,6 +269,7 @@ class TestUsageStatsCli:
         for name, value in expected.items():
             assert properties[name] == value
         assert ("error_domain" in properties) is ("error_domain" in expected)
+        assert ("error_code" in properties) is ("error_code" in expected)
         assert ("hosted" in properties) is ("hosted" in expected)
 
     @pytest.mark.parametrize(

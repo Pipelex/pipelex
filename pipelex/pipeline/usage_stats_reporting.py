@@ -37,13 +37,14 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.system.usage_stats.usage_stats_client import note_command_error_domain, record_usage_stats_event, usage_stats_are_enabled
+from pipelex.system.usage_stats.usage_stats_client import note_command_error, record_usage_stats_event, usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import (
     MODEL_HANDLE_PATTERN,
     OTHER_MODEL,
     UsageStatsCodegenArtifact,
     UsageStatsCodegenOutcome,
     UsageStatsCodegenTarget,
+    UsageStatsErrorDomain,
     UsageStatsEventName,
     UsageStatsOutcome,
     UsageStatsProvider,
@@ -70,10 +71,9 @@ from pipelex.system.usage_stats.usage_stats_events import (
     bounded_duration_ms,
 )
 from pipelex.system.usage_stats.usage_stats_runs import (
-    FAILURE_CATEGORIES,
     RunInferenceTally,
     current_method_source,
-    usage_stats_error_domain,
+    usage_stats_error,
 )
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.trace_events import PipeStartEvent, TraceEvent, UsageReportEvent
@@ -265,7 +265,7 @@ class _ModelUsageRow:
         self.tallied_calls = 0
         self.usage_reports = 0
         self.failures = 0
-        self.failures_by_category: dict[str, int] = dict.fromkeys(FAILURE_CATEGORIES, 0)
+        self.failures_by_domain: dict[UsageStatsErrorDomain, int] = dict.fromkeys(UsageStatsErrorDomain, 0)
         self.input_tokens = 0
         self.output_tokens = 0
         self.cached_tokens = 0
@@ -299,8 +299,8 @@ def _model_usage_rows(*, tally: RunInferenceTally | None, events: Sequence[Trace
             row = row_for(model_handle=tallied_handle, backend_name=tallied_backend)
             row.tallied_calls += model_tally.calls
             row.failures += model_tally.failures
-            for category, count in model_tally.failures_by_category.items():
-                row.failures_by_category[category] += count
+            for domain, count in model_tally.failures_by_domain.items():
+                row.failures_by_domain[domain] += count
             row.images_generated += model_tally.images_generated
             row.pages_extracted += model_tally.pages_extracted
 
@@ -365,9 +365,11 @@ def build_run_usage_events(*, facts: RunUsageFacts) -> list[UsageStatsEvent]:
     shape = bundle_shape_of(pipes=facts.own_pipes, concepts=facts.own_concepts, main_pipe=facts.main_pipe)
     features = bundle_features_of(pipes=facts.own_pipes)
     is_usage_known = facts.events is not None
+    run_error = usage_stats_error(error=facts.error) if facts.outcome.is_failed else None
     run_properties = RunCompletedProperties(
         outcome=facts.outcome,
-        error_domain=usage_stats_error_domain(error=facts.error) if facts.outcome.is_failed else None,
+        error_code=run_error.code if run_error is not None else None,
+        error_domain=run_error.domain if run_error is not None else None,
         dry_run=facts.is_dry_run,
         method_source=current_method_source(),
         duration_ms=bounded_duration_ms(seconds=facts.duration_seconds),
@@ -418,12 +420,11 @@ def build_run_usage_events(*, facts: RunUsageFacts) -> list[UsageStatsEvent]:
                     model=model,
                     calls=bounded(value=row.calls, maximum=MAX_CALLS),
                     failures=bounded(value=row.failures, maximum=MAX_CALLS),
-                    failures_transient=bounded(value=row.failures_by_category["transient"], maximum=MAX_CALLS),
-                    failures_configuration=bounded(value=row.failures_by_category["configuration"], maximum=MAX_CALLS),
-                    failures_content=bounded(value=row.failures_by_category["content"], maximum=MAX_CALLS),
-                    failures_capacity=bounded(value=row.failures_by_category["capacity"], maximum=MAX_CALLS),
-                    failures_ambiguous=bounded(value=row.failures_by_category["ambiguous"], maximum=MAX_CALLS),
-                    failures_unknown=bounded(value=row.failures_by_category["unknown"], maximum=MAX_CALLS),
+                    failures_input=bounded(value=row.failures_by_domain[UsageStatsErrorDomain.INPUT], maximum=MAX_CALLS),
+                    failures_method=bounded(value=row.failures_by_domain[UsageStatsErrorDomain.METHOD], maximum=MAX_CALLS),
+                    failures_account=bounded(value=row.failures_by_domain[UsageStatsErrorDomain.ACCOUNT], maximum=MAX_CALLS),
+                    failures_operator=bounded(value=row.failures_by_domain[UsageStatsErrorDomain.OPERATOR], maximum=MAX_CALLS),
+                    failures_runtime=bounded(value=row.failures_by_domain[UsageStatsErrorDomain.RUNTIME], maximum=MAX_CALLS),
                     input_tokens=bounded(value=row.input_tokens, maximum=MAX_TOKENS),
                     output_tokens=bounded(value=row.output_tokens, maximum=MAX_TOKENS),
                     cached_tokens=bounded(value=row.cached_tokens, maximum=MAX_TOKENS),
@@ -437,10 +438,10 @@ def build_run_usage_events(*, facts: RunUsageFacts) -> list[UsageStatsEvent]:
 
 
 def report_run_usage(*, facts: RunUsageFacts) -> None:
-    """Record a run's `run_completed` and `model_used` events, and its error domain for the command that ran it."""
+    """Record a run's `run_completed` and `model_used` events, and its error's code and domain for the command that ran it."""
     usage_events = build_run_usage_events(facts=facts)
     if facts.outcome.is_failed:
-        note_command_error_domain(error_domain=usage_stats_error_domain(error=facts.error))
+        note_command_error(error=usage_stats_error(error=facts.error))
     for usage_event in usage_events:
         record_usage_stats_event(event=usage_event)
 

@@ -72,12 +72,19 @@ class TestRunTruncatedCompletion:
         mocker: MockerFixture,
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """`pipelex run` on a step whose completion stops at its limit exits non-zero, naming the pipe and the truncation, and prints no output."""
+        """`pipelex run` on a step whose completion stops at its limit exits non-zero, naming the pipe and its truncation on stderr.
+
+        Nothing of the failure is printed on stdout.
+        """
         mocker.patch("pipelex.cogt.content_generation.llm_generate.get_llm_worker", return_value=_truncating_worker())
+        # The output console, stdout, is recorded to show the failure never reaches it; the report goes to stderr,
+        # wide enough that no sentence of it wraps.
         console = Console(width=400, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=console)
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
+        monkeypatch.setenv("COLUMNS", "400")
         bundle_path = tmp_path / "truncated_completion.mthds"
         bundle_path.write_text(TruncatedCompletionRunTestData.MTHDS, encoding="utf-8")
 
@@ -100,14 +107,20 @@ class TestRunTruncatedCompletion:
             )
 
         assert exit_info.value.exit_code == 1
-        stderr = capsys.readouterr().err
+        captured = capsys.readouterr()
+        printed = captured.err
         pipe_code = TruncatedCompletionRunTestData.PIPE_CODE
         model_handle = TruncatedCompletionRunTestData.MODEL_HANDLE
-        assert f"Failed to execute pipeline '{pipe_code}': Pipe '{pipe_code}' failed: " in stderr
+        assert f"Failed to execute pipeline '{pipe_code}'" in printed
+        assert f"Pipe '{pipe_code}' failed: " in printed
         assert (
             f"The model '{model_handle}' was cut off before it finished the text of pipe '{pipe_code}' "
             "(stop reason 'length', 64 output tokens used, no max_tokens sent), so the text is incomplete. "
             "Set the pipe's max_tokens up to the model's limit, lower its reasoning effort, or shorten its input."
-        ) in stderr
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in stderr
-        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in console.export_text()
+        ) in printed
+        # The panel names the problem's code and where it happened.
+        assert "Code:      model.output_truncated (domain method, retry no)" in printed
+        assert f"Location:  pipe '{pipe_code}', path {pipe_code}" in printed
+        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in printed
+        assert TruncatedCompletionRunTestData.PARTIAL_TEXT not in captured.out
+        assert "Failed to execute pipeline" not in console.export_text()

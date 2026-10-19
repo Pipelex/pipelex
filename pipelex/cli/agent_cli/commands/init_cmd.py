@@ -10,9 +10,12 @@ from tomlkit import table
 
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
+    agent_file_error,
     agent_success_formatted,
-    set_agent_cli_error_format,
+    file_read_failure_reason,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.commands.init.backends import get_selected_backend_keys, update_backends_in_toml
 from pipelex.cli.commands.init.config_files import init_config
@@ -21,11 +24,13 @@ from pipelex.cli.commands.init.setup_path import describe_project_execution_shad
 from pipelex.cli.commands.init.ui.backends_ui import get_backend_options_from_toml
 from pipelex.cli.commands.login.api_key_store import find_pipelex_api_key
 from pipelex.cogt.models.deck_manifest import stamp_kit_manifests
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
 from pipelex.hosted.run_config import RunExecution
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TELEMETRY_PROJECT_TEMPLATE_FILE_NAME
+from pipelex.tools.misc.file_utils import path_label
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
 
@@ -46,18 +51,23 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
             result: dict[str, Any] = json.loads(config_arg)
             return result
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse inline JSON config: {exc}", error_type="JSONDecodeError", cause=exc)
+            agent_argument_error(f"Failed to parse inline JSON config: {exc}", argument="--config", reason="not valid JSON", cause=exc)
     else:
         try:
             with open(config_arg, encoding="utf-8") as file:
                 loaded: Any = json.load(file)
                 if not isinstance(loaded, dict):
-                    agent_error(f"Config file must contain a JSON object, got {type(loaded).__name__}", error_type="JSONDecodeError")
+                    agent_argument_error(
+                        f"Config file must contain a JSON object, got {type(loaded).__name__}", argument="--config", reason="not a JSON object"
+                    )
                 return cast("dict[str, Any]", loaded)
         except FileNotFoundError as exc:
-            agent_error(f"Config file not found: {config_arg}", error_type="FileNotFoundError", cause=exc)
+            agent_file_error(f"Config file not found: {config_arg}", path=config_arg, reason="not found", cause=exc)
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse config file JSON: {exc}", error_type="JSONDecodeError", cause=exc)
+            agent_argument_error(f"Failed to parse config file JSON: {exc}", argument="--config", reason="the file is not valid JSON", cause=exc)
+        except (OSError, UnicodeDecodeError) as exc:
+            reason = file_read_failure_reason(error=exc)
+            agent_file_error(f"Config file cannot be read: {config_arg}: {reason}", path=config_arg, reason=reason, cause=exc)
 
     return {}
 
@@ -110,17 +120,19 @@ def _resolve_execution(*, config: dict[str, Any]) -> RunExecution:
     try:
         execution = RunExecution(requested)
     except ValueError:
-        agent_error(
+        agent_argument_error(
             f"Unknown execution: {requested!r}. Available: {', '.join(RunExecution)}",
-            error_type="ArgumentError",
+            argument="execution",
+            reason="unknown execution",
         )
     if execution.is_hosted:
         local_only_keys = [key for key in _LOCAL_ONLY_CONFIG_KEYS if key in config]
         if local_only_keys:
-            agent_error(
+            agent_argument_error(
                 f"{', '.join(local_only_keys)} configure the backends of runs on this machine, which a hosted setup does not: "
                 'drop them, or set "execution": "local"',
-                error_type="ArgumentError",
+                argument=", ".join(local_only_keys),
+                reason="configures runs on this machine, which a hosted setup has none of",
             )
     return execution
 
@@ -139,10 +151,11 @@ def _resolve_target_dir(*, global_: bool) -> Path:
     # Default: project-level .pipelex/ at detected project root
     project_root = config_manager.project_root
     if project_root is None:
-        agent_error(
+        agent_argument_error(
             "No project root found (no .git, pyproject.toml, etc. in parent directories). "
             "Use --global/-g to target the home configuration directory (~/.pipelex/, or PIPELEX_HOME).",
-            error_type="ArgumentError",
+            argument="--global",
+            reason="omitted outside a project",
         )
     return project_root / ".pipelex"
 
@@ -227,7 +240,11 @@ def _configure_backends(
         List of enabled backend keys.
     """
     if not backends_toml_path.exists():
-        agent_error("backends.toml not found after config initialization", error_type="InitConfigError")
+        agent_error(
+            "backends.toml not found after config initialization",
+            code=PipelexErrorCode.CONFIG_FILE_MISSING,
+            params={"surface": "inference", "file": path_label(path=backends_toml_path)},
+        )
 
     requested_backends: list[str] | None = config.get("backends")
 
@@ -241,9 +258,10 @@ def _configure_backends(
 
     for backend_key in requested_backends:
         if backend_key not in available_keys:
-            agent_error(
+            agent_argument_error(
                 f"Unknown backend: {backend_key}. Available: {', '.join(available_keys)}",
-                error_type="ArgumentError",
+                argument="backends",
+                reason="unknown backend",
             )
 
     # Build selected indices from requested backend keys
@@ -272,7 +290,11 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
     routing_profiles_toml_path = target_dir / "inference" / "routing_profiles.toml"
 
     if not routing_profiles_toml_path.exists():
-        agent_error("routing_profiles.toml not found after config initialization", error_type="InitConfigError")
+        agent_error(
+            "routing_profiles.toml not found after config initialization",
+            code=PipelexErrorCode.CONFIG_FILE_MISSING,
+            params={"surface": "inference", "file": path_label(path=routing_profiles_toml_path)},
+        )
 
     toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
@@ -305,15 +327,17 @@ def _configure_routing(selected_backend_keys: list[str], *, config: dict[str, An
     primary_backend: str | None = config.get("primary_backend")
 
     if primary_backend is None:
-        agent_error(
+        agent_argument_error(
             f"primary_backend is required when multiple backends are selected ({', '.join(selected_backend_keys)})",
-            error_type="ArgumentError",
+            argument="primary_backend",
+            reason="required when several backends are selected",
         )
 
     if primary_backend not in selected_backend_keys:
-        agent_error(
+        agent_argument_error(
             f"primary_backend '{primary_backend}' is not in the selected backends: {', '.join(selected_backend_keys)}",
-            error_type="ArgumentError",
+            argument="primary_backend",
+            reason="not among the selected backends",
         )
 
     # Build custom_routing profile
@@ -378,7 +402,7 @@ def agent_init_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Initialize Pipelex configuration (non-interactive).
@@ -412,7 +436,7 @@ def agent_init_cmd(
     off; project init drops in a commented-out template that inherits the user's global
     telemetry settings via layered loading. Edit `telemetry.toml` to enable destinations.
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     try:
         # Parse config
@@ -476,5 +500,5 @@ def agent_init_cmd(
     except typer.Exit:
         raise
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(f"Initialization failed: {exc}", error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(f"Initialization failed: {exc}", cause=exc)

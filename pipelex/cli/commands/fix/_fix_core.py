@@ -26,7 +26,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.fixes.fix_loop import unfixable_method_result
 from pipelex.pipeline.validate_bundle import dirs_beside_method
-from pipelex.runtime_hub import get_console, get_telemetry_manager
+from pipelex.runtime_hub import get_console, get_error_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -273,7 +273,7 @@ def render_refused_method(*, error: ValidateBundleError, method_dir: Path, allow
     The verdict is the fix loop's still-invalid one, with nothing applied and the refusal as its remaining errors, so
     the output names the folder and reads as a fix that could not be made, as `validate` names it in its invalid one.
     """
-    print_traceback_if_requested(console=get_console())
+    print_traceback_if_requested(console=get_error_console())
     _render_fix_result(
         console=get_console(),
         result=unfixable_method_result(error=error),
@@ -336,7 +336,7 @@ def execute_fix(
             )
             _render_fix_result(console=get_console(), result=result, bundle_path=judged_path, allow_signatures=allow_signatures)
     except FileNotFoundError as exc:
-        print_traceback_if_requested(console=get_console())
+        print_traceback_if_requested(console=get_error_console())
         typer.secho(f"Failed to fix: bundle file not found: '{judged_path}'", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     except PipeOperatorModelChoiceError as exc:
@@ -347,7 +347,7 @@ def execute_fix(
         raise
     except Exception as exc:
         # Human CLI command boundary: an unexpected failure produced no verdict — exit 2.
-        print_traceback_if_requested(console=get_console())
+        print_traceback_if_requested(console=get_error_console())
         typer.secho(f"Failed to fix: {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc
     finally:

@@ -8,7 +8,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import UserAction
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import (
     ABSTRACT_ERROR,
     AbstractError,
@@ -170,9 +170,9 @@ class ValidationErrorItem(BaseModel):
     ``exclude_none`` wire projection.
 
     The error channel is built exclusively by
-    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which both the agent
-    CLI (``extract_validation_errors``) and the API path
-    (``ValidateBundleError.validation_error_items``) call — so the CLI's structured
+    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which the agent
+    CLI's problem (``ValidateBundleError.problem_items``) and the API path
+    (``ValidateBundleError.validation_error_items``) both reach — so the CLI's structured
     output and the API's invalid verdict can never drift. The same
     item type also carries the report's advisory ``warnings``, built by
     ``pipelex.pipeline.advisory_warnings``: a warning is the same shape of
@@ -383,11 +383,19 @@ class PipelexError(Exception):
         self._given_items = list(items)
         return self
 
+    def own_advice(self) -> UserAction | None:
+        """The advice this error gives by itself, before its causes': its ``user_action``.
+
+        A class whose advice follows what its raise site chose, such as a configuration refusal's code, overrides it.
+        """
+        return self.user_action
+
     def advised_action(self) -> UserAction | None:
         """The advice nearest this error along its cause chain, which a local CLI prints as a tip; never part of a problem."""
         for node in iter_pipelex_cause_chain(self):
-            if node.user_action is not None:
-                return node.user_action
+            advice = node.own_advice()
+            if advice is not None:
+                return advice
         return None
 
     @property
@@ -683,17 +691,119 @@ class PipelexUnexpectedError(PipelexError):
     error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.RUNTIME_UNEXPECTED
 
 
+#: The advice a configuration that does not validate gives when no pending migration explains it.
+CONFIG_DOCTOR_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "Run 'pipelex doctor' (from an agent, 'pipelex-agent doctor') to find what in the configuration does not "
+        "validate, correct it, then run the command again."
+    ),
+)
+
+#: The advice a stale configuration gives, which a migration brings up to date.
+CONFIG_MIGRATE_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "The configuration is out of date: run 'pipelex migrate' to bring it up to date, which keeps a copy of each file it "
+        "changes. From an agent, run 'pipelex-agent migrate --dry-run --format json' to see what it would change, show the "
+        "user, then run 'pipelex-agent migrate --yes'. 'pipelex-agent init' (with --global for the home configuration) "
+        "writes a fresh configuration instead, discarding its settings."
+    ),
+)
+
+#: The advice a configuration gives when a migration has something to say but would write nothing.
+CONFIG_MIGRATE_BY_HAND_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A migration would rewrite nothing here: correct by hand what the migration's plans name (the problem's "
+        "'diagnostics.migration', or 'pipelex-agent migrate --dry-run --format json'), then run the command again. "
+        "Do not write a fresh configuration over it, which would discard settings a migration keeps."
+    ),
+)
+
+
+#: The advice a configuration file that is missing gives: restore it, or write the default one.
+CONFIG_INIT_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A configuration file is missing: restore it, or run 'pipelex init' (from an agent, 'pipelex-agent init', with "
+        "--global for the home configuration) to write the default configuration, then run the command again."
+    ),
+)
+
+#: The advice a variable the configuration reads and finds unset gives: set it where the configuration reads it.
+CONFIG_VARIABLE_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A variable the configuration reads is not set: set the one the message names, in the environment or in the "
+        "secrets provider the configuration reads it from, then run the command again."
+    ),
+)
+
+#: The advice of a configuration refusal no migration explains, by its code; any other code is a configuration that
+#: does not validate or does not parse, which ``doctor`` finds.
+_CONFIG_ADVICE_BY_CODE: dict[ErrorCode, UserAction] = {
+    PipelexErrorCode.CONFIG_FILE_MISSING: CONFIG_INIT_ADVICE,
+    PipelexErrorCode.CONFIG_VARIABLE_MISSING: CONFIG_VARIABLE_ADVICE,
+}
+
+
+def config_refusal_advice(*, migration: MigrationErrorBlock | None, code: ErrorCode | None) -> UserAction:
+    """The advice a refused configuration gives: the migration's that explains it, when one does, else its code's.
+
+    A migration that would write: the configuration is old, and a migration brings it up to date. One that would write
+    nothing: the plans are a diagnosis, to act on by hand. No migration: a missing file is restored or written by
+    ``init``, a variable that is not set is set, and a configuration that does not validate or parse is what ``doctor``
+    finds.
+    """
+    if migration is None:
+        if code is None:
+            return CONFIG_DOCTOR_ADVICE
+        return _CONFIG_ADVICE_BY_CODE.get(code, CONFIG_DOCTOR_ADVICE)
+    if migration.would_write:
+        return CONFIG_MIGRATE_ADVICE
+    return CONFIG_MIGRATE_BY_HAND_ADVICE
+
+
 class PipelexConfigError(PipelexError):
-    """A configuration this process cannot use, optionally with the migration that explains it."""
+    """A configuration this process cannot use, optionally with the migration that explains it.
+
+    Its raise site names what its code's step reads, as far as it knows them: the part of the configuration at fault
+    (``surface``), the file (``file``) and the setting (``setting``). Its advice, the tip a local CLI prints, is read
+    off the migration and the code (:func:`config_refusal_advice`): migrate, or correct what the plans name, or else
+    write a missing file with ``init``, set a missing variable, or find with ``doctor`` what does not validate.
+    """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
         default=PipelexErrorCode.CONFIG_INVALID,
         others=(PipelexErrorCode.CONFIG_SYNTAX, PipelexErrorCode.CONFIG_FILE_MISSING),
     )
 
-    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        migration: MigrationErrorBlock | None = None,
+        surface: str | None = None,
+        file: str | None = None,
+        setting: str | None = None,
+    ):
         super().__init__(message)
         self.migration = migration
+        self.surface = surface
+        self.file = file
+        self.setting = setting
+
+    @override
+    def own_advice(self) -> UserAction | None:
+        # Read when the advice is, so it follows the code a raise site chose after building the error.
+        if self.user_action is not None:
+            return self.user_action
+        return config_refusal_advice(migration=self.migration, code=self.own_error_code)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {name: value for name, value in {"surface": self.surface, "file": self.file, "setting": self.setting}.items() if value is not None}
 
     @override
     def problem_facts(self) -> ProblemFacts:

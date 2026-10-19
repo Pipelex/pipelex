@@ -80,16 +80,15 @@ class TestErrorFormatIndependent:
         expected_error_is_markdown: bool,
     ) -> None:
         """Error output follows --error-format (or --format when --error-format is omitted)."""
-        # Passing a pipe_code that ends in .mthds triggers the ArgumentError branch in run_pipe_cmd.
+        # Passing a pipe_code that ends in .mthds triggers the argument refusal in run_pipe_cmd.
         with pytest.raises(typer.Exit):
             run_pipe_cmd(pipe_code="my_pipe.mthds", output_format=output_format, error_format=error_format)
 
         err = capsys.readouterr().err
         if expected_error_is_markdown:
-            assert err.startswith("# Error: ArgumentError")
+            assert err.startswith("## An argument was refused before sending")
             with pytest.raises(json.JSONDecodeError):
                 json.loads(err)
         else:
             parsed = json.loads(err)
-            assert parsed["error"] is True
-            assert parsed["error_type"] == "ArgumentError"
+            assert parsed["code"] == "client.argument_invalid"

@@ -28,9 +28,10 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import describe_former_release_boot_refusal, former_release_boot_blockers
+from pipelex.migration.former_release_cleanup import former_release_pending_migration
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.tools.misc.file_utils import find_files_in_dir, path_label
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -94,7 +95,13 @@ class ModelManager(ModelManagerAbstract):
             routing_profile_library_paths=resolved_routing_profile_library_paths,
         ):
             msg = describe_former_release_boot_refusal(blockers=blockers)
-            raise FormerReleaseConfigError(msg)
+            # The step names the first of them, the backend library's before the routing profiles'.
+            first_blocker = blockers[0]
+            # What `pipelex migrate` would do about them rides the problem as its pending migration, for a JSON reader.
+            migration = former_release_pending_migration(config_dirs=config_manager.existing_config_dirs)
+            raise FormerReleaseConfigError(msg, migration=migration).with_params(
+                surface="inference", file=path_label(path=first_blocker.file_path), setting=first_blocker.setting
+            )
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_paths=resolved_backends_library_paths,
