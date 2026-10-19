@@ -83,11 +83,12 @@ async def fetch_file_and_content_type_from_url_httpx(
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
-        msg = f"Could not fetch a remote file: the server answered HTTP {status_code}"
+        reason = f"the server answered HTTP {status_code}"
+        msg = f"Could not fetch a remote file: {reason}"
         if status_code in _TRANSIENT_HTTP_STATUSES or status_code >= _HTTP_SERVER_ERROR_FLOOR:
             # The server is there but cannot answer now: a retry may get the file.
             raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
-        raise RemoteFileFetchError(msg, host=host) from exc
+        raise RemoteFileFetchError(msg, host=host, reason=reason) from exc
     except httpx.TimeoutException as exc:
         msg = "Could not fetch a remote file: the request timed out"
         raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
@@ -95,13 +96,15 @@ async def fetch_file_and_content_type_from_url_httpx(
         msg = "Could not fetch a remote file: the host could not be reached"
         raise RemoteFileFetchError(msg, host=host).with_error_code(CoreCode.INPUT_URL_UNREACHABLE) from exc
     except httpx.RequestError as exc:
-        msg = f"Could not fetch a remote file: the request failed ({type(exc).__name__})"
-        raise RemoteFileFetchError(msg, host=host) from exc
+        reason = f"the request failed ({type(exc).__name__})"
+        msg = f"Could not fetch a remote file: {reason}"
+        raise RemoteFileFetchError(msg, host=host, reason=reason) from exc
     except httpx.InvalidURL as exc:
         # Raised while the request is built, before anything is sent, and not a `RequestError`: its text quotes the
         # part of the URL the parser refused, so it is named by what failed alone.
-        msg = "Could not fetch a remote file: the URL does not parse"
-        raise RemoteFileFetchError(msg) from exc
+        reason = "the URL does not parse"
+        msg = f"Could not fetch a remote file: {reason}"
+        raise RemoteFileFetchError(msg, reason=reason) from exc
 
     declared_content_type: str | None = response.headers.get("content-type")
     if declared_content_type is None:

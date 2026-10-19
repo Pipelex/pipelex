@@ -25,6 +25,7 @@ from pipelex.cogt.model_backends.credential_resolution import CredentialResoluti
 from pipelex.cogt.model_backends.model_spec_document import (
     MODEL_SPEC_DEFAULTS_TABLE,
     MODEL_SPEC_HANDLE_FIELD,
+    DeclaredModelSpec,
     describe_defaults_not_a_table,
     describe_duplicate_declared_model,
     describe_handle_in_defaults,
@@ -112,10 +113,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
     root: InferenceBackendLibraryRoot = Field(default_factory=dict)
 
     _stale_warning: StaleConfigurationWarning | None = PrivateAttr(default=None)
+    # The models each disabled backend's file declares, read for their names and types only: what this deployment's
+    # catalogs know of, beyond what an enabled backend serves.
+    _disabled_backend_declarations: dict[str, list[DeclaredModelSpec]] = PrivateAttr(default_factory=dict)
 
     def reset(self):
         self.root = {}
         self._stale_warning = None
+        self._disabled_backend_declarations = {}
 
     @classmethod
     def make_empty(cls) -> Self:
@@ -225,6 +230,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             inference_backend_blueprint_dict_raw = backend_table.copy()
             enabled = inference_backend_blueprint_dict_raw.get("enabled", True)
             if not enabled and not include_disabled:
+                self._note_disabled_backend_declarations(backend_name=backend_name, backends_dir_path=backends_dir_path)
                 continue
             if enabled and MODEL_SPECS_SECTION_KEY in backend_table:
                 # The key once pointed at specs the remote config served. Read as an extra key, it would
@@ -779,6 +785,40 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 merged_model_specs.add(plugin_model_spec)
         self.root[PipelexBackend.INTERNAL] = internal_backend.model_copy(update={"model_specs": merged_model_specs})
         return True
+
+    def _note_disabled_backend_declarations(self, *, backend_name: str, backends_dir_path: str) -> None:
+        """Note the models a disabled backend's file declares, which this deployment knows of but does not serve.
+
+        Only their names and types are read, nothing validated or substituted: a disabled backend's file is never
+        loaded, so a file that is missing, is not UTF-8 text or does not parse declares nothing here, as it refuses
+        nothing at boot. A backend's file has no override files, enabled or not (`_load_local_model_specs`), so the
+        one file is all it declares.
+        """
+        path = backend_toml_path(backends_dir_path=backends_dir_path, backend_name=backend_name)
+        try:
+            document = load_toml_from_path(path=path)
+        except (OSError, UnicodeDecodeError, TomlError):
+            return
+        self._disabled_backend_declarations[backend_name] = list_declared_model_specs(document=document)
+
+    def get_cataloged_types_by_handle(self) -> dict[str, list[ModelType]]:
+        """Every handle a backend file of this deployment declares, enabled or not, with each model type it is declared as.
+
+        What the catalogs this runtime reads know: a handle here that the model deck does not serve as a type it is
+        declared as names a model that exists, which no enabled backend of this deployment serves.
+        """
+        cataloged_types_by_handle = self.get_declared_types_by_handle()
+        for declarations in self._disabled_backend_declarations.values():
+            for declared in declarations:
+                try:
+                    model_type = ModelType(declared.model_type)
+                except ValueError:
+                    # A type no model type names: the file is not loaded, so nothing refuses it, and it declares nothing.
+                    continue
+                declared_types = cataloged_types_by_handle.setdefault(declared.handle, [])
+                if model_type not in declared_types:
+                    declared_types.append(model_type)
+        return cataloged_types_by_handle
 
     def list_backend_names(self) -> list[str]:
         return list(self.root.keys())

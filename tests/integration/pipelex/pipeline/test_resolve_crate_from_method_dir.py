@@ -106,7 +106,12 @@ class TestResolveCrateFromMethodDir:
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
-        assert "['first.mthds', 'second.mthds']" in exc_info.value.message
+        # Each declaration is an item located on its own bundle, its message naming the other bundle by its tree path.
+        items = exc_info.value.validation_error_items()
+        assert sorted((item.source, item.message) for item in items) == [
+            ("first.mthds", "Concept 'pipeline.Report' is declared here and in 'second.mthds'."),
+            ("second.mthds", "Concept 'pipeline.Report' is declared here and in 'first.mthds'."),
+        ]
         report_text = str(exc_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
         assert str(tmp_path) not in report_text
         assert str(tmp_path.resolve()) not in report_text

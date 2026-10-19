@@ -21,6 +21,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.kernel.prompt_assembly import PromptFiles
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.templating.templating_style import TemplatingStyle
@@ -77,21 +78,23 @@ async def assemble_llm_prompt(
 
     system_text: str | None = None
     if prompt_content.system_template:
-        system_text = await prompt_files.render(
-            template_blueprint=prompt_content.system_template,
-            context_provider=context_provider,
-            extra_params=template_params,
-            templating_style=templating_style,
-        )
+        with locating_template_refusal(template_field="system_prompt"):
+            system_text = await prompt_files.render(
+                template_blueprint=prompt_content.system_template,
+                context_provider=context_provider,
+                extra_params=template_params,
+                templating_style=templating_style,
+            )
 
     user_text: str | None
     if prompt_content.user_template:
-        user_text = await prompt_files.render(
-            template_blueprint=prompt_content.user_template,
-            context_provider=context_provider,
-            extra_params=template_params,
-            templating_style=templating_style,
-        )
+        with locating_template_refusal(template_field="prompt"):
+            user_text = await prompt_files.render(
+                template_blueprint=prompt_content.user_template,
+                context_provider=context_provider,
+                extra_params=template_params,
+                templating_style=templating_style,
+            )
         if output_structure_prompt:
             user_text += output_structure_prompt
     else:

@@ -173,7 +173,9 @@ class TestPipelineRunSetupConsumerCheck:
         assert problem.code == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
         assert problem.domain == ProblemDomain.INPUT
         assert error_code_spec(CoreCode.INPUT_FILE_TYPE_UNSUPPORTED).status == 422
-        assert problem.to_wire().get("params", {}).get("input") == "transcripts[0]", problem.to_wire()
+        # The root input is the `input`, and the path down to the first refused file the location's `field`.
+        assert problem.to_wire().get("params", {}).get("input") == "transcripts", problem.to_wire()
+        assert problem.to_wire().get("location") == {"input": "transcripts", "field": "transcripts[0]"}, problem.to_wire()
         message = exc_info.value.message
         for index in range(3):
             assert (

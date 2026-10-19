@@ -638,7 +638,7 @@ type                = "PipeCondition"
 description         = "Choose the lane a parcel goes down"
 inputs              = { parcel = "Parcel", lane = "Text" }
 output              = "Parcel"
-expression_template = "{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}"
+<expression-line>
 outcomes            = { express = "send_express" }
 default_outcome     = "send_standard"
 
@@ -656,6 +656,13 @@ inputs      = { parcel = "Parcel" }
 output      = "Parcel"
 template    = "Standard: $parcel"
 """
+
+    # Replaced by the condition's field, written as a template or as an expression, each with the branch in it.
+    EXPRESSION_LINE_SLOT: ClassVar[str] = "<expression-line>"
+    EXPRESSION_TEMPLATE_LINE: ClassVar[str] = (
+        "expression_template = \"{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}\""
+    )
+    EXPRESSION_LINE: ClassVar[str] = "expression = \"lane.text | frob_the_lane if lane.text == 'express' else 'quietly_routed'\""
 
     # Replaced by the prompt field each case puts the branch in, `prompt` or `system_prompt`.
     PROMPT_FIELD_SLOT: ClassVar[str] = "<prompt-field>"
@@ -697,76 +704,6 @@ description = "Read the label off a note"
 inputs      = { note = "Text" }
 output      = "ParcelLabel"
 prompt      = "Read the label from $note"
-"""
-
-
-class RunContentMarkerTestData:
-    """Steps that each fail on the run's own data, which carries a marker no log line and no view may hold."""
-
-    # A value no secret pattern matches, so no redaction hides it: only the raise sites' own rule can keep it out.
-    MARKER: ClassVar[str] = "zebra-quartz-ledger-5521"
-
-    # One step per family of raise site: the input shaper, the content factory, a method's function, the composer and a
-    # structure refusing the model's answer, the stand-in model answering the marker for every field.
-    MTHDS: ClassVar[str] = """
-domain = "run_content_marker"
-description = "Steps that each fail on the run's own data"
-
-[concept.Tally]
-description = "A count"
-
-[concept.Tally.structure]
-count = { type = "integer", description = "How many there are", required = true }
-
-[concept.Ticket]
-description = "A ticket and its priority"
-
-[concept.Ticket.structure]
-priority = { choices = ["low", "high"], description = "How urgent it is", required = true }
-
-[pipe.echo_amount]
-type = "PipeCompose"
-description = "Read a number input"
-inputs = { amount = "Number" }
-output = "Text"
-template = "{{ amount }}"
-
-[pipe.echo_tally]
-type = "PipeCompose"
-description = "Read a structured input"
-inputs = { tally = "Tally" }
-output = "Text"
-template = "{{ tally.count }}"
-
-[pipe.echo_date]
-type = "PipeCompose"
-description = "Read a date input"
-inputs = { when = "Date" }
-output = "Text"
-template = "{{ when }}"
-
-[pipe.file_note]
-type = "PipeFunc"
-description = "A function whose own refusal quotes its input"
-inputs = { note = "Text" }
-output = "Text"
-function_name = "tests.integration.pipelex.pipeline.test_run_content_stays_out_of_sinks.run_content_quote_the_note"
-
-[pipe.make_ticket]
-type = "PipeCompose"
-description = "Copy a text into a field holding one of its choices"
-inputs = { level = "Text" }
-output = "Ticket"
-
-[pipe.make_ticket.construct]
-priority = { from = "level" }
-
-[pipe.count_notes]
-type = "PipeLLM"
-description = "Ask a model for a count"
-inputs = { note = "Text" }
-output = "Tally"
-prompt = "Count the items in $note"
 """
 
 
@@ -844,8 +781,18 @@ $photo
 
     # A template reading a private name off a value, which passes the load and which the sandbox refuses at render.
     PRIVATE_READ_TEMPLATE: ClassVar[str] = "Talk about {{ topic['_owner'] }}"
+    # The same name, written by the template inside a string literal that the sandboxed `format` reads it through.
+    FORMAT_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {{ '{0._owner}'.format(topic) }}"
     # A template that fails at render for a reason no security rule has, a method the value lacks.
     MISSING_METHOD_TEMPLATE: ClassVar[str] = "Talk about {{ topic.model_dump_json() }}"
+    # A template looking a name up from the run's data, and a topic naming a private attribute: the sandbox refuses a name
+    # that is the run's input, which no problem may carry.
+    DATA_NAMED_TEMPLATE: ClassVar[str] = "Talk about {{ topic[topic.text] }}"
+    DATA_NAMED_TOPIC: ClassVar[str] = "_quokka_marmalade_4471"
+    # The same lookup, in a template whose condition compares the topic to a string literal holding the name the data
+    # chose as a word: a literal no access reads names nothing the template reached for.
+    DATA_NAMED_BESIDE_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {% if topic.text == 'debug _token' %}debug{% endif %}{{ topic[topic.text] }}"
+    DATA_NAMED_BESIDE_LITERAL_TOPIC: ClassVar[str] = "_token"
     TOPIC: ClassVar[str] = "the quarterly payroll"
     COMPOSE_MTHDS_SLOT: ClassVar[str] = "TEMPLATE_SLOT"
     COMPOSE_MTHDS: ClassVar[str] = """
@@ -859,6 +806,76 @@ description = "Say something about the topic"
 inputs = { topic = "Text" }
 output = "Text"
 template = "TEMPLATE_SLOT"
+"""
+
+
+class RunContentMarkerTestData:
+    """Steps that each fail on the run's own data, which carries a marker no log line and no view may hold."""
+
+    # A value no secret pattern matches, so no redaction hides it: only the raise sites' own rule can keep it out.
+    MARKER: ClassVar[str] = "zebra-quartz-ledger-5521"
+
+    # One step per family of raise site: the input shaper, the content factory, a method's function, the composer and a
+    # structure refusing the model's answer, the stand-in model answering the marker for every field.
+    MTHDS: ClassVar[str] = """
+domain = "run_content_marker"
+description = "Steps that each fail on the run's own data"
+
+[concept.Tally]
+description = "A count"
+
+[concept.Tally.structure]
+count = { type = "integer", description = "How many there are", required = true }
+
+[concept.Ticket]
+description = "A ticket and its priority"
+
+[concept.Ticket.structure]
+priority = { choices = ["low", "high"], description = "How urgent it is", required = true }
+
+[pipe.echo_amount]
+type = "PipeCompose"
+description = "Read a number input"
+inputs = { amount = "Number" }
+output = "Text"
+template = "{{ amount }}"
+
+[pipe.echo_tally]
+type = "PipeCompose"
+description = "Read a structured input"
+inputs = { tally = "Tally" }
+output = "Text"
+template = "{{ tally.count }}"
+
+[pipe.echo_date]
+type = "PipeCompose"
+description = "Read a date input"
+inputs = { when = "Date" }
+output = "Text"
+template = "{{ when }}"
+
+[pipe.file_note]
+type = "PipeFunc"
+description = "A function whose own refusal quotes its input"
+inputs = { note = "Text" }
+output = "Text"
+function_name = "tests.integration.pipelex.pipeline.test_run_content_stays_out_of_sinks.run_content_quote_the_note"
+
+[pipe.make_ticket]
+type = "PipeCompose"
+description = "Copy a text into a field holding one of its choices"
+inputs = { level = "Text" }
+output = "Ticket"
+
+[pipe.make_ticket.construct]
+priority = { from = "level" }
+
+[pipe.count_notes]
+type = "PipeLLM"
+description = "Ask a model for a count"
+inputs = { note = "Text" }
+output = "Tally"
+prompt = "Count the items in $note"
 """
 
 

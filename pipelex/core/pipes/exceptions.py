@@ -97,9 +97,11 @@ class PipeRunError(PipelexError):
         ),
     )
 
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str):
+    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str, field: str | None = None):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
+        # The field of the pipe the failure is located on, as the bundle writes it, when one field is at fault.
+        self.field = field
         super().__init__(message)
 
     @override
@@ -108,7 +110,7 @@ class PipeRunError(PipelexError):
 
     @override
     def problem_location(self) -> ProblemLocation | None:
-        return make_location(pipe=self.pipe_code)
+        return make_location(pipe=self.pipe_code, field=self.field)
 
 
 class PipeOperatorModelChoiceError(PipelexError):
@@ -310,6 +312,10 @@ def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) ->
             return CoreCode.METHOD_SCHEMA_VIOLATION
 
 
+# The name a refusal gives a pipe's own output where its code names an input or an output: the field that declares it.
+PIPE_OUTPUT_NAME = "output"
+
+
 class PipeValidationError(PipelexError, ValueError):
     """A pipe that breaks a rule of the language or of its pipe type, found when the bundle is validated.
 
@@ -406,6 +412,11 @@ class PipeValidationError(PipelexError, ValueError):
         self.explanation = explanation
         super().__init__(message)
         self.with_error_code(pipe_validation_error_code(error_type=error_type))
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The facts every refusal of a pipe holds; its raise site gives the others its code requires with `with_params`.
+        return {"pipe": self.pipe_code, "variables": self.variable_names, "model": self.model_reference}
 
     def desc(self) -> str:
         msg = f"{self.error_type} • domain_code='{self.domain_code}'"

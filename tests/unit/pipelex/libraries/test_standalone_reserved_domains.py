@@ -2,11 +2,15 @@ from pathlib import Path
 
 import pytest
 from mthds.package.exceptions import ManifestError
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
+from pipelex.errors.problem import ProblemView
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 
 class TestStandaloneReservedDomains:
@@ -128,3 +132,27 @@ class TestStandaloneReservedDomains:
             mthds_paths=[dummy_path],
         )
         assert result is None
+
+    def test_two_bundles_declaring_one_reserved_domain_are_each_located_on_their_own_file(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """One item per bundle, each on its own file, never every item on the last bundle of the domain."""
+        mocker.patch("pipelex.libraries.library_manager.find_package_manifest", return_value=None)
+        blueprints = [PipelexBundleBlueprint(domain="native", source=source) for source in ("first.mthds", "second.mthds")]
+        dummy_path = tmp_path / "first.mthds"
+        dummy_path.touch()
+
+        manager = LibraryManager()
+        with pytest.raises(ValidateBundleError) as exc_info, translate_to_validate_bundle_error():
+            manager._check_package_visibility(  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+                blueprints=blueprints,
+                mthds_paths=[dummy_path],
+            )
+
+        items = exc_info.value.to_problem(view=ProblemView.CALLER).errors or []
+        assert [(item.code, item.location.file if item.location else None) for item in items] == [
+            (CoreCode.METHOD_NAME_CONFLICT, "first.mthds"),
+            (CoreCode.METHOD_NAME_CONFLICT, "second.mthds"),
+        ]
+        assert [item.params.as_wire() if item.params else None for item in items] == [
+            {"name": "native", "conflict": "reserved_domain"},
+            {"name": "native", "conflict": "reserved_domain"},
+        ]

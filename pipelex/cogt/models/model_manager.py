@@ -224,6 +224,7 @@ class ModelManager(ModelManagerAbstract):
 
         return ModelDeck(
             inference_models=inference_models,
+            cataloged_handles=self.inference_backend_library.get_cataloged_types_by_handle(),
             # LLM
             llm_default_temperature=model_deck_blueprint.llm.choice_defaults.default_temperature,
             llm_aliases=model_deck_blueprint.llm.aliases,

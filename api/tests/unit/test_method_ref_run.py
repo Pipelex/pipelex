@@ -23,6 +23,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.methods.exceptions import MethodFetchError
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
@@ -231,19 +232,21 @@ class TestMethodRefRun:
         assert STUB_METHOD_ADDRESS in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize(
-        ("code", "expected_status"),
+        ("code", "params", "expected_status"),
         [
-            (CoreCode.METHOD_FETCH_FAILED, 502),
-            (CoreCode.METHOD_NOT_FOUND, 404),
-            (CoreCode.METHOD_PACKAGE_INVALID, 422),
-            (PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, 500),
+            (CoreCode.METHOD_FETCH_FAILED, {}, 502),
+            (CoreCode.METHOD_NOT_FOUND, {}, 404),
+            (CoreCode.METHOD_PACKAGE_INVALID, {"reason": MethodPackageReason.MANIFEST_INVALID}, 422),
+            (PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, {}, 500),
         ],
     )
-    def test_a_fetch_failure_answers_the_status_of_its_code(self, mocker: MockerFixture, code: ErrorCode, expected_status: int):
+    def test_a_fetch_failure_answers_the_status_of_its_code(
+        self, mocker: MockerFixture, code: ErrorCode, params: dict[str, Any], expected_status: int
+    ):
         """A failed fetch answers whatever code its raise site chose, with that code's status from the error registry."""
         fetch_error = MethodFetchError(f"Failed to fetch method '{STUB_METHOD_ADDRESS}': boom").for_method_ref(method_ref=STUB_METHOD_ADDRESS)
         stub_cache = mocker.MagicMock()
-        stub_cache.pinned_package.side_effect = fetch_error.with_error_code(code)
+        stub_cache.pinned_package.side_effect = fetch_error.with_error_code(code).with_params(**params)
         mocker.patch("pipelex_api.method_source.get_method_clone_cache", return_value=stub_cache)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": STUB_METHOD_ADDRESS, "inputs": {}})

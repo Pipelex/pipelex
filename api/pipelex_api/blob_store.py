@@ -81,10 +81,14 @@ MAX_CONCURRENT_BLOB_TRANSFERS = 4
 BLOB_DAMAGED_MESSAGE = "Stored blob bytes do not match their hash"
 
 
-def problem_scheme_of(*, storage_method: str) -> str | None:
+# The kind of storage a `pipelex.storage.*` problem names for a storage plugin's own backend.
+PLUGIN_STORAGE_SCHEME = "plugin"
+
+
+def problem_scheme_of(*, storage_method: str) -> str:
     """The kind of storage a `pipelex.storage.*` problem names for a configured storage method, as the registry spells it.
 
-    `None` for a storage plugin's own method, which the registry's kinds do not list.
+    `plugin` for a storage plugin's own method, whose kind the registry cannot list.
     """
     match storage_method:
         case StorageMethod.LOCAL:
@@ -97,13 +101,13 @@ def problem_scheme_of(*, storage_method: str) -> str | None:
             return "gcs"
         case _:
             # An external storage plugin's method token: the configured method is an open string.
-            return None
+            return PLUGIN_STORAGE_SCHEME
 
 
 class RunnerBlobStore:
     """The blobs and tree listings of one caller's scope, over the deployment's storage provider."""
 
-    def __init__(self, *, scope: str, storage: StorageProviderAbstract, scheme: str | None) -> None:
+    def __init__(self, *, scope: str, storage: StorageProviderAbstract, scheme: str) -> None:
         """Build the blob store of one scope.
 
         Args:

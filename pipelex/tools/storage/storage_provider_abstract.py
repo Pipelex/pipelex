@@ -1,12 +1,16 @@
 import hashlib
 from abc import ABC, abstractmethod
-from typing import NamedTuple
+from typing import ClassVar, Literal, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.tools.storage.exceptions import StorageChecksumMismatchError, StorageFileNotFoundError, StorageInvalidKeyError
 
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
+
+# The kind of storage a provider is, as the `scheme` parameter of the `pipelex.storage.*` codes names it: one Pipelex
+# ships, or `plugin` for a storage plugin's own.
+StorageKind = Literal["local", "s3", "gcs", "memory", "plugin"]
 
 
 class StoredData(NamedTuple):
@@ -26,7 +30,12 @@ class StorageProviderAbstract(ABC):
         - _load_with_metadata(key): Load data with MIME type by key (without scheme)
         - _store(data, key, content_type): Store data and return URI
         - public_url(uri): Return human-readable link for URI
+
+    A provider Pipelex ships names its kind in ``storage_kind``, the ``scheme`` its refusals carry; a plugin's provider
+    keeps the default, ``plugin``.
     """
+
+    storage_kind: ClassVar[StorageKind] = "plugin"
 
     def _strip_scheme(self, uri: str) -> str:
         """Extract key from URI, raising error if invalid.

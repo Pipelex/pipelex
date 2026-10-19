@@ -223,6 +223,8 @@ def categorize_pipe_validation_with_libraries_error(
         expected_inputs=pipe_error.expected_inputs,
         declared_inputs=pipe_error.declared_inputs,
         model_reference=pipe_error.model_reference,
+        # The facts of the error's code its raise site gave, which a caller may read.
+        params=pipe_error.caller_params() or None,
     )
 
 

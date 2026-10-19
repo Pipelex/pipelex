@@ -9,7 +9,7 @@ worker's error family, with a human-readable message and a structured
 
 import math
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit, ModelUnavailableReason
 
 from pipelex.cogt.exceptions import (
     CogtError,
@@ -27,6 +27,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 # Generic failure error class per family — used when the error is not a missing model.
@@ -45,6 +46,16 @@ _NOT_FOUND_CLASSES: dict[InferenceErrorFamily, type[ModelNotFoundError]] = {
     InferenceErrorFamily.EXTRACT: ExtractModelNotFoundError,
     InferenceErrorFamily.SEARCH: SearchModelNotFoundError,
     InferenceErrorFamily.JUDGMENT: JudgmentModelNotFoundError,
+}
+
+
+# The kind of model each family's worker calls, which `model.unavailable` names.
+_FAMILY_MODEL_TYPES: dict[InferenceErrorFamily, ModelType] = {
+    InferenceErrorFamily.LLM: ModelType.LLM,
+    InferenceErrorFamily.IMG_GEN: ModelType.IMG_GEN,
+    InferenceErrorFamily.EXTRACT: ModelType.TEXT_EXTRACTOR,
+    InferenceErrorFamily.SEARCH: ModelType.SEARCH,
+    InferenceErrorFamily.JUDGMENT: ModelType.JUDGMENT,
 }
 
 
@@ -180,14 +191,25 @@ def render_inference_error(
             error_category=classification.category,
             user_action=user_action,
             provider_metadata=metadata,
-        )
+        ).with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.UNKNOWN_AT_PROVIDER)
     # The not-found classes report ``model.unavailable`` alone, which the classification guarantees. A failure
     # class declares every classified code, and its code is chosen here rather than inherited, since the
     # provider's exception it is raised from carries none.
     failure_class = _FAILURE_CLASSES[family]
-    return failure_class(
+    failure = failure_class(
         message,
         error_category=classification.category,
         user_action=user_action,
         provider_metadata=metadata,
     ).with_error_code(classification.error_code)
+    if classification.is_model_not_allowed:
+        # The provider serves the model but does not allow it for this caller.
+        failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
+    match classification.error_code:
+        case CoreCode.MODEL_CONTEXT_EXCEEDED:
+            # The provider's refusal says the inputs are over the model's context window, the bound it names, and
+            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
+        case CoreCode() | PipelexErrorCode():
+            pass
+    return failure

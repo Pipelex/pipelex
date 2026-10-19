@@ -6,7 +6,7 @@ the mthds PackageVisibilityChecker.
 
 from mthds.package.bundle_metadata import BundleMetadata
 from mthds.package.manifest.schema import MethodsManifest
-from mthds.package.visibility import PackageVisibilityChecker, VisibilityError
+from mthds.package.visibility import PackageVisibilityChecker
 
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
@@ -48,26 +48,3 @@ def make_visibility_checker(
     """
     metadatas = [_blueprint_to_metadata(blueprint) for blueprint in blueprints]
     return PackageVisibilityChecker(manifest=manifest, bundle_metadatas=metadatas)
-
-
-def check_visibility_for_blueprints(
-    *,
-    manifest: MethodsManifest | None,
-    blueprints: list[PipelexBundleBlueprint],
-) -> list[VisibilityError]:
-    """Convenience function: check visibility for pipelex blueprints.
-
-    Validates both intra-package cross-domain visibility and cross-package references.
-
-    Args:
-        manifest: The package manifest (None means all-public).
-        blueprints: The pipelex bundle blueprints to check.
-
-    Returns:
-        List of visibility errors.
-    """
-    checker = make_visibility_checker(manifest=manifest, blueprints=blueprints)
-    errors = checker.validate_reserved_domains()
-    errors.extend(checker.validate_all_pipe_references())
-    errors.extend(checker.validate_cross_package_references())
-    return errors

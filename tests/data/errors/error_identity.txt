@@ -56,7 +56,7 @@ CrateNormalizationError | one of runtime.unexpected, method.cycle
 CredentialsError | abstract
 CsvCoercionError | input.invalid
 CsvColumnError | input.invalid
-CsvError | one of input.invalid, request.invalid, runtime.unexpected
+CsvError | one of input.invalid, request.invalid, runtime.unexpected, input.file_unreadable, request.unsupported, method.concept_invalid
 CsvFlatnessError | input.invalid
 CsvReadError | input.file_unreadable
 DateContentError | pipe.function_raised
@@ -228,7 +228,7 @@ MistralModelListingError | provider.response_invalid
 MistralPluginError | abstract
 MistralWorkerConfigurationError | pipelex.config.invalid
 MockUsageOnLiveRunError | request.invalid
-ModelChoiceNotFoundError | one of model.unknown, model.capability_unsupported
+ModelChoiceNotFoundError | one of model.unknown, model.capability_unsupported, model.unavailable
 ModelDeckChoiceUnresolvedError | one of pipelex.config.invalid, model.unavailable
 ModelDeckNotFoundError | pipelex.config.invalid
 ModelDeckPresetValidationError | pipelex.config.invalid
@@ -376,6 +376,7 @@ TracebackMessageError | abstract
 TreeModuleShadowingError | method.name_conflict
 TreePythonError | one of runtime.unexpected, request.unsupported, method.name_conflict
 TreePythonHeldError | runtime.unavailable
+TreePythonSyntaxError | method.syntax
 TypesafeError | pipelex.config.credential_missing
 TypesafeJudgmentResponseError | provider.response_invalid
 TypesafeQuestionUnsupportedError | one of model.capability_unsupported, runtime.unexpected

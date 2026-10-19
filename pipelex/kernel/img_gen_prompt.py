@@ -24,6 +24,7 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.kernel.prompt_assembly import PromptFiles
 from pipelex.kernel.prompt_references import ImageReference
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -56,21 +57,23 @@ async def assemble_img_gen_prompt(
 
     positive_text: str = ""
     if prompt_blueprint:
-        positive_text = await prompt_files.render(
-            template_blueprint=prompt_blueprint,
-            context_provider=context_provider,
-            extra_params=template_params,
-            templating_style=templating_style,
-        )
+        with locating_template_refusal(template_field="prompt"):
+            positive_text = await prompt_files.render(
+                template_blueprint=prompt_blueprint,
+                context_provider=context_provider,
+                extra_params=template_params,
+                templating_style=templating_style,
+            )
 
     negative_text: str | None = None
     if negative_prompt_blueprint:
-        negative_text = await prompt_files.render(
-            template_blueprint=negative_prompt_blueprint,
-            context_provider=context_provider,
-            extra_params=template_params,
-            templating_style=templating_style,
-        )
+        with locating_template_refusal(template_field="negative_prompt"):
+            negative_text = await prompt_files.render(
+                template_blueprint=negative_prompt_blueprint,
+                context_provider=context_provider,
+                extra_params=template_params,
+                templating_style=templating_style,
+            )
 
     return ImgGenPrompt(
         positive_text=positive_text,

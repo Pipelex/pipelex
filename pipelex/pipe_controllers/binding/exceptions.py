@@ -1,4 +1,7 @@
+from typing import Any
+
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
@@ -22,6 +25,10 @@ class BindingPathUnresolvedError(PipelexError):
         self.failed_segment = failed_segment
         self.available_fields = available_fields
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"path": self.path, "segment": self.failed_segment, "available_fields": self.available_fields}
 
 
 class BindingStepRunError(PipelexError):

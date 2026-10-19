@@ -220,7 +220,11 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
             )
         except TimeoutError as exc:
             msg = f"PipeFunc '{request.function_name}' exceeded its {request.timeout_seconds}s timeout"
-            raise PipeFuncExecutionError(msg).with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT) from exc
+            raise (
+                PipeFuncExecutionError(msg)
+                .with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT)
+                .with_params(function=request.function_name, timeout=request.timeout_seconds)
+            ) from exc
 
         # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
         pipe = get_library_manager().get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)

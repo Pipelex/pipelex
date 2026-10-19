@@ -83,7 +83,10 @@ class TestExtractInputFormatCheck:
             "Input 'transcripts[0]' is a Word document (.docx), which model 'azure-document-intelligence' cannot extract: "
             "it reads PDF and images. Give a file in one of those formats, or use an extract model that reads this one."
         )
-        assert exc_info.value.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.INPUT
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"format": "docx", "model": "azure-document-intelligence", "input": "transcripts[0]"}
         assert worker.nb_provider_calls == 0
 
     async def test_a_file_with_no_input_name_is_named_as_the_file_to_extract(self):

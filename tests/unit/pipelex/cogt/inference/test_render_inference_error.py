@@ -28,7 +28,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
-from pipelex.cogt.inference.error_render import render_inference_error
+from pipelex.cogt.inference.error_render import _FAMILY_MODEL_TYPES, render_inference_error  # pyright: ignore[reportPrivateUsage]
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
@@ -126,6 +126,10 @@ class TestRenderInferenceError:
         assert rendered.error_category == InferenceErrorCategory.CONFIGURATION
         assert rendered.model_handle == "fake-handle"
         assert rendered.provider_metadata is metadata
+        # The provider does not know the model the deck resolved, which the problem names with the family's kind of model.
+        caller = rendered.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": "fake-handle", "model_type": _FAMILY_MODEL_TYPES[family], "reason": "unknown_at_provider"}
 
     def test_content_policy_detail_when_violation_present(self) -> None:
         metadata = ProviderErrorMetadata(
@@ -151,6 +155,9 @@ class TestRenderInferenceError:
         assert rendered.user_action is not None
         assert "safety filters" in rendered.user_action.detail
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the rendered failure is built below the worker, whose enrichment names the model and the provider"
+    )
     @pytest.mark.parametrize(
         ("retry_after_seconds", "expected_detail"),
         [

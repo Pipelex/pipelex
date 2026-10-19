@@ -103,7 +103,7 @@ def _register_stub_for_temporal(mocker: MockerFixture, stub: _StubBundleValidato
 class TestValidateDispatch:
     def test_non_direct_validators_invalid_verdict_maps_to_200_invalid_report(self, mocker: MockerFixture) -> None:
         """A non-direct validator's returned failure with items is mapped to a 200 InvalidReport, threading the request."""
-        bad_ref = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")
+        bad_ref = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref", field_path="main_pipe")
         invalid_verdict = BundleValidationFailure(
             problem=make_problem(
                 code=CoreCode.METHOD_INVALID,
@@ -123,7 +123,12 @@ class TestValidateDispatch:
         assert body["is_valid"] is False
         # The verdict's items, as the validator built them, each with its code, its sentence and its parameters.
         assert body["errors"] == [
-            {"code": "method.schema_violation", "detail": error_code_spec(CoreCode.METHOD_SCHEMA_VIOLATION).title, "params": {"finding": "bad ref"}}
+            {
+                "code": "method.schema_violation",
+                "detail": "The declaration at 'main_pipe' breaks a rule of the language (bad ref).",
+                "params": {"field_path": "main_pipe", "finding": "bad ref"},
+                "location": {"field": "main_pipe"},
+            }
         ]
         assert body["message"] == error_code_spec(CoreCode.METHOD_INVALID).detail
         # The dispatch reached the registered non-direct validator, with the request threaded through.

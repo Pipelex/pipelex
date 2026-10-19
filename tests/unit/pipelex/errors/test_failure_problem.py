@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.failure_problem import (
     MAX_LOGGED_FRAMES,
+    failure_diagnostics,
     failure_log_fields,
     failure_problem,
     format_problem_location,
@@ -16,6 +17,7 @@ from pipelex.errors.failure_problem import (
 )
 from pipelex.errors.problem import ProblemView, make_location
 from pipelex.migration.exceptions import FormerReleaseConfigError
+from pipelex.tools.misc.exceptions import JsonTypeError
 
 if TYPE_CHECKING:
     from mthds.protocol.problem.models import ProblemLocation
@@ -81,6 +83,23 @@ class TestFailureProblem:
         failure = FormerReleaseConfigError("a former release left its gateway backend enabled")
 
         assert failure_problem(error=failure) == failure.to_problem(view=ProblemView.OPERATOR)
+
+    def test_a_caught_pipelex_error_s_diagnostics_are_its_operator_view_s(self) -> None:
+        failure = FormerReleaseConfigError("a former release left its gateway backend enabled")
+        failure.__cause__ = KeyError("gateway")
+
+        assert failure_diagnostics(cause=failure) == failure.to_problem(view=ProblemView.OPERATOR).diagnostics
+
+    def test_a_caught_error_s_diagnostics_ask_nothing_of_its_code_s_parameters(self) -> None:
+        """A refusal coded by the command reads the caught error's diagnostics alone, so its code's parameters go unasked.
+
+        The JSON loader's refusal is `request.invalid`, whose `field` it cannot know; the sweep this test runs under
+        fails it if reading the diagnostics built that refusal's problem.
+        """
+        diagnostics = failure_diagnostics(cause=JsonTypeError("the file does not hold a JSON object"))
+
+        assert diagnostics is not None
+        assert diagnostics.error_class == "JsonTypeError"
 
     def test_the_log_fields_name_the_code_and_the_chain_s_classes_and_no_text(self) -> None:
         """No chained exception's text reaches the fields, the foreign ``ValidationError``'s included."""

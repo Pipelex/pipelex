@@ -1,6 +1,7 @@
 import contextlib
 import os
 from pathlib import Path
+from typing import ClassVar
 from uuid import uuid4
 
 import aiofiles
@@ -9,7 +10,7 @@ from typing_extensions import override
 from pipelex.tools.misc.exceptions import FileTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_path
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError, StorageLocalError
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+from pipelex.tools.storage.storage_provider_abstract import StorageKind, StorageProviderAbstract, StoredData
 
 
 class LocalStorageProvider(StorageProviderAbstract):
@@ -17,6 +18,8 @@ class LocalStorageProvider(StorageProviderAbstract):
 
     Files are stored relative to a root path, with keys being relative path strings.
     """
+
+    storage_kind: ClassVar[StorageKind] = "local"
 
     def __init__(self, root_path: Path) -> None:
         """Initialize the local storage provider.
@@ -79,7 +82,7 @@ class LocalStorageProvider(StorageProviderAbstract):
 
         if not file_path.exists():
             msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg)
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
 
         try:
             async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
@@ -87,7 +90,7 @@ class LocalStorageProvider(StorageProviderAbstract):
         except FileNotFoundError as exc:
             # TOCTOU: the file passed exists() above but was removed before the open.
             msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg) from exc
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
         except OSError as exc:
             msg = f"Failed to read file '{key}': {exc}"
             raise StorageLocalError(msg) from exc
@@ -116,7 +119,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             stat_result = file_path.stat()
         except FileNotFoundError as exc:
             msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg) from exc
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
         except OSError as exc:
             msg = f"Failed to read the size of file '{key}': {exc}"
             raise StorageLocalError(msg) from exc

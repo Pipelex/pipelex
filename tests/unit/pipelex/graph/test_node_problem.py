@@ -9,6 +9,9 @@ from pipelex.graph.node_problem import NODE_PROBLEM_FAULT_MESSAGE, make_node_pro
 
 
 class TestNodeProblem:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds the step's failure with a message alone, to check where its problem is located"
+    )
     def test_a_pipelex_error_records_its_problem_located_at_the_node(self) -> None:
         error = StuffFactoryError("Error combining stuffs for concept Report").with_error_code(CoreCode.PIPE_OUTPUT_INVALID)
 
@@ -20,6 +23,7 @@ class TestNodeProblem:
         assert problem.params is not None
         assert problem.params.as_wire()["pipe"] == "analyze"
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the step's failure with a message alone, to check the view its node records")
     def test_the_node_records_the_caller_view(self) -> None:
         """The graph is read by whoever reads the run: no diagnostics, and never the error's own message."""
         error = StuffFactoryError("a deployment's validator said: secret-ish text")
@@ -29,6 +33,9 @@ class TestNodeProblem:
         assert problem.diagnostics is None
         assert "secret-ish text" not in str(problem.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds the step's failure with a message alone, to check where its problem is located"
+    )
     def test_an_entry_pipe_names_itself_as_its_path(self) -> None:
         problem = make_node_problem(error=StuffFactoryError("refused"), pipe_code="flow", pipe_path=[])
 

@@ -93,6 +93,9 @@ class TestCheckLLMSettingWithServedModel:
             assert internal_name not in message
             assert internal_name not in str(caller.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="an external plugin's refusal is raised as the plugin wrote it, which the test builds with a message alone"
+    )
     def test_an_external_plugin_s_refusal_is_raised_as_it_wrote_it(self, mocker: MockerFixture) -> None:
         """Its text may carry what the plugin keeps private, so it rides the operator's diagnostics alone."""
         refusal = LLMCapabilityError("Model 'some-model' is refused by tenant 1234 at internal.example")

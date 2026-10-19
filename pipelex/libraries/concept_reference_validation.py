@@ -149,6 +149,9 @@ def validate_concept_references_in_blueprints(
                             concept_code=owning_concept_code or concept_ref_or_code,
                             declared_concepts=declared_concepts,
                             message=item_message,
+                            # The concept the reference names, which no library declares: the item's `concept`,
+                            # where its concept_code locates the concept that holds the reference.
+                            params={"concept": concept_ref_or_code},
                         )
                     )
 

@@ -83,6 +83,7 @@ class TestAgentCodegenCheckCmd:
         assert error["code"] == "pipelex.codegen.lock_not_found"
         assert error["params"] == {"path": str(tmp_path)}
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the command an error built in the test, without the file its raise site names")
     def test_unreadable_lock_is_no_verdict_exit_2(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         mocker.patch(f"{CMD_MODULE}.run_codegen_check", side_effect=CodegenLockError("codegen.lock is not valid TOML"))
 
@@ -95,6 +96,7 @@ class TestAgentCodegenCheckCmd:
         assert error["diagnostics"]["error_class"] == "CodegenLockError"
         assert "not valid TOML" in error["message"]
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the command an error built in the test, without the file its raise site names")
     def test_unreadable_lock_markdown_follows_the_success_format(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

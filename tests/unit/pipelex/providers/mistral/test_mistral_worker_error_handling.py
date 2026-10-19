@@ -253,6 +253,9 @@ class TestMistralWorkerErrorHandling:
 
     # ---- Problem integration ----
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_llm_problem_transient_is_retryable(self, mocker: MockerFixture) -> None:
         """The problem of a TRANSIENT LLM error invites a retry."""
         worker = _make_mistral_llm_worker(mocker)
@@ -268,6 +271,9 @@ class TestMistralWorkerErrorHandling:
         assert problem.is_retryable is True
         assert _diagnostics_of(problem).error_class == "LLMCompletionError"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_llm_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
         """The problem of a CAPACITY LLM error invites no retry."""
         worker = _make_mistral_llm_worker(mocker)
@@ -282,6 +288,9 @@ class TestMistralWorkerErrorHandling:
         assert find_inference_error_category_in_chain(error) == "capacity"
         assert problem.is_retryable is False
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_extract_problem_includes_category(self, mocker: MockerFixture) -> None:
         """An extract error keeps its category on the chain."""
         worker = _make_mistral_extract_worker(mocker)

@@ -71,10 +71,10 @@ prompt = "Translate these notes into $language: $notes"
 
 class TestBlueprintValidationErrorCategorizer:
     @pytest.mark.parametrize(
-        ("test_name", "mthds_content", "expected_pipe_code", "expected_domain_code"),
+        ("test_name", "mthds_content", "expected_pipe_code", "expected_domain_code", "expected_field_name"),
         [
-            ("pipe_batch", _PIPE_BATCH_COLLISION_MTHDS, "run_batch", "batch_collision"),
-            ("sub_pipe_sequence_step", _SUB_PIPE_COLLISION_MTHDS, "run_seq", "subpipe_collision"),
+            ("pipe_batch", _PIPE_BATCH_COLLISION_MTHDS, "run_batch", "batch_collision", "input_item_name"),
+            ("sub_pipe_sequence_step", _SUB_PIPE_COLLISION_MTHDS, "run_seq", "subpipe_collision", "steps.0.batch_as"),
         ],
     )
     def test_wrapped_batch_collision_keeps_its_error_type(
@@ -83,6 +83,7 @@ class TestBlueprintValidationErrorCategorizer:
         mthds_content: str,
         expected_pipe_code: str,
         expected_domain_code: str,
+        expected_field_name: str,
     ) -> None:
         """A blueprint-stage ``PipeValidationError`` is categorized with its ``error_type``, not dropped.
 
@@ -107,6 +108,8 @@ class TestBlueprintValidationErrorCategorizer:
         assert item.pipe_code == expected_pipe_code
         assert item.domain_code == expected_domain_code
         assert item.source == source
+        # The field it collides on, inside its pipe's table, with no shape tag pydantic routed a step through.
+        assert item.field_name == expected_field_name
         assert item.message, "The categorized item must carry the explanatory message"
         # The recovered message is the PipeValidationError's own clean text, not pydantic's
         # "Value error, " prefixed wrapper.
@@ -127,6 +130,15 @@ class TestBlueprintValidationErrorCategorizer:
         assert typo_error.field_path == "pipe.summarize_notes.promtp"
         assert typo_error.message == "Validation error at 'pipe.summarize_notes.promtp': Extra inputs are not permitted"
         assert any(error.error_type == PipeValidationErrorType.MISSING_INPUT_VARIABLE for error in errors)
+
+    def test_a_misspelled_step_key_is_named_without_the_step_shape(self) -> None:
+        """A sequence step validates through a union tagged by its shape, which is not a field of the bundle either."""
+        mthds_content = _SUB_PIPE_COLLISION_MTHDS.replace('batch_as = "items", ', 'batch_as = "item", reslt = "x", ')
+        with pytest.raises(MthdsParserError) as exc_info:
+            MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source="steps.mthds")
+
+        typo_error = next(error for error in exc_info.value.validation_errors if error.error_type is None)
+        assert typo_error.field_path == "pipe.run_seq.steps.0.reslt"
 
     @pytest.mark.parametrize("misspelled_key", ["prompt-template", "str"])
     def test_a_misspelled_key_is_named_whatever_it_looks_like(self, misspelled_key: str) -> None:

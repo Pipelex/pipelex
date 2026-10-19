@@ -30,8 +30,10 @@ def _raise_model_choice_not_found(
 ) -> NoReturn:
     """Compute fuzzy suggestions and raise ModelChoiceNotFoundError.
 
-    A bare handle the deck serves only as other types names a model that exists, so its refusal is the capability
-    that model lacks, `model.capability_unsupported`, rather than an unknown model.
+    A bare handle a catalog of this deployment declares as this type, which no enabled backend serves, names a model
+    that exists, so its refusal is the deployment's, `model.unavailable` (reason `not_served`); a bare handle the deck
+    serves only as other types names a model that exists too, so its refusal is the capability that model lacks,
+    `model.capability_unsupported`; any other reference is `model.unknown`, with the deck's close matches.
     """
     suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(
         model_deck=model_deck, model_type=model_type, name=name, kind=reference_kind
@@ -48,6 +50,8 @@ def _raise_model_choice_not_found(
     )
     match reference_kind:
         case ModelReferenceKind.HANDLE:
+            if model_deck.is_cataloged_but_unserved(name=name, model_type=model_type):
+                raise not_found.with_error_code(CoreCode.MODEL_UNAVAILABLE)
             if model_deck.is_served_only_as_other_types(name=name, model_type=model_type):
                 raise not_found.with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
             raise not_found

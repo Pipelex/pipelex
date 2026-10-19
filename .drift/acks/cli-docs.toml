@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:f12599081f3831f2ebae7ad28de4e2436c382329d3854286f89152335a63b0b5"
-reviewed_by = "Claude Opus 5.5"
-reviewed_at = "2026-10-18T18:18:07Z"
-rationale = "clean-pass: the merge of the base's review fixes (init's pipelex.config.file_missing, an OSError naming no file as runtime.unexpected, a lone bundle file's tree listed before it is read) into this branch's hosted-run problem reporting; each side had already brought docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md in line with its own changes, and the merged docs carry both."
+digest = "sha256:e697942345f3ef2a23b12d9c8e04b92e534335ce22bdffe43b60b20ac7533b09"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-19T11:06:53Z"
+rationale = "clean-pass: absorbing Runner-speaks-problem, which carries pipelex#1457's agent CLI reading of the runner's problem, keeps this branch's install refusal reasons (package_name_invalid, manifest_missing) in installed_methods.py; docs/tools/cli/agent-cli.md takes #1457's Markdown wording and keeps this branch's method.identifier_invalid item and params facts, and nothing else is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -132,7 +132,7 @@ rationale = "clean-pass: the merge of the base's review fixes (init's pipelex.co
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
 "pipelex/cli/error_handlers.py" = "blob:b0bbfbb058ef764de90c7f1ba09093a7616f43c6"
 "pipelex/cli/exceptions.py" = "blob:5c66f20b0a06c8ae8c20b94f92e2c30b78f5b6c5"
-"pipelex/cli/installed_methods.py" = "blob:1de9b36e7717786fe0454af69011e05ef50610ba"
+"pipelex/cli/installed_methods.py" = "blob:7e7f289d50ca6bc446b6891cbc846dc4a8cee6e2"
 "pipelex/cli/judged_target.py" = "blob:8d3f3b3359992feeeca2bd4acd1d404262cbaf87"
 "pipelex/cli/method_resolver.py" = "blob:54fe2e6036b637c2e298f18bbfd10cfc616ef4a8"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"

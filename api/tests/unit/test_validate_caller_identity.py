@@ -172,7 +172,8 @@ class TestValidationCallerIdentity:
 
         body = assert_problem(response, status=422, code="request.invalid")
         # The refused field, or a key inside it, which the path names from the field down.
-        assert [field.split(".")[0] for field in problem_items_fields(body)] == ["analytics_groups"]
+        # A single refused field is the problem itself, with no list restating it.
+        assert "errors" not in body, body
         assert validator.caller_identities == []
 
     def test_validate_failing_on_two_fields_names_both(self, mocker: MockerFixture) -> None:

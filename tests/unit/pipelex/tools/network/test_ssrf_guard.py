@@ -42,10 +42,10 @@ class TestSsrfGuard:
         mocker.patch("socket.getaddrinfo", side_effect=fake)
         with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips("attacker.example", port=80)
-        # The host is part of a URL the runtime did not choose, a run's input or a caller's callback: no message names it.
-        assert "attacker.example" not in str(exc_info.value)
-        # The refusal states the class of what the name resolved to, for its security event, and its message never names the address.
+        # The refusal states the class of what the name resolved to, for its security event. The host is part of a URL the
+        # runtime did not choose, a run's input or a caller's callback, so no message names it, nor the address.
         assert exc_info.value.security_target_class == SecurityTargetClass.METADATA
+        assert "attacker.example" not in str(exc_info.value)
         assert "169.254.169.254" not in str(exc_info.value)
 
     @pytest.mark.parametrize(
@@ -59,7 +59,8 @@ class TestSsrfGuard:
         ],
     )
     async def test_resolve_blocks_literal_private_host(self, host: str, target_class: SecurityTargetClass) -> None:
-        # A literal private IP never needs resolution — blocked by the cheap rule, and classified for the security event.
+        # A literal private IP never needs resolution — blocked by the cheap rule, classified for the security event, and
+        # never named by the refusal's message.
         with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips(host, port=80)
         assert exc_info.value.security_target_class == target_class

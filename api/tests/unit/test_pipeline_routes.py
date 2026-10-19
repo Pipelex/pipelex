@@ -14,7 +14,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.errors.problem import ProblemView
+from pipelex.errors.problem import MISSING_REQUIRED_PARAMS_MESSAGE, ProblemView
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
@@ -445,17 +445,20 @@ class TestPipelineRoutes:
         log_spy.assert_not_called()
         start_mock.assert_not_awaited()
 
+    @pytest.mark.builds_problems_without_required_params(reason="a refusal stating no class of destination has no `target_class` to give")
     def test_a_callback_refusal_naming_no_class_leaves_the_parameter_out(self, mocker: MockerFixture):
         # A refusal that states no class of destination gives no `target_class`, rather than a `None` for its code to
-        # refuse, so no parameter is dropped and logged.
+        # refuse, so no parameter is dropped and logged; the problem logs instead that it lacks the parameter.
         warn_spy = mocker.patch("pipelex.errors.problem._warn")
         refusal = CallbackUrlRefusedError("callback URL host is not allowed")
         assert "target_class" not in refusal.problem_params()
         problem = refusal.to_problem(view=ProblemView.OPERATOR)
         assert problem.params is not None
         assert "target_class" not in problem.params.as_wire()
-        dropped = [call for call in warn_spy.call_args_list if "parameter" in call.kwargs["message"]]
+        dropped = [call for call in warn_spy.call_args_list if "gives a parameter" in call.kwargs["message"]]
         assert not dropped, dropped
+        lacking = [call.kwargs["fields"]["params"] for call in warn_spy.call_args_list if call.kwargs["message"] == MISSING_REQUIRED_PARAMS_MESSAGE]
+        assert lacking == [["target_class"]], warn_spy.call_args_list
 
     def test_start_rejects_too_many_callbacks(self, mocker: MockerFixture):
         client, _, start_mock = _build_client(mocker)

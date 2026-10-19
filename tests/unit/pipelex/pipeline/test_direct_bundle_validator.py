@@ -66,6 +66,9 @@ class TestDirectBundleValidator:
             methods_dirs=None,
         )
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     async def test_validate_bundle_error_becomes_the_invalid_arm(self, mocker: MockerFixture) -> None:
         """An invalid bundle's ValidateBundleError is converted to the invalid arm, its operator's problem and its items, not propagated."""
         error = ValidateBundleError("bundle is invalid")

@@ -1,16 +1,20 @@
+from typing import ClassVar
+
 from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex.tools.misc.exceptions import FileTypeError
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+from pipelex.tools.storage.storage_provider_abstract import StorageKind, StorageProviderAbstract, StoredData
 
 InMemoryStorageRoot = dict[str, bytes]
 
 
 class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbstract):
     """In-memory storage provider using a dict mapping URIs to bytes."""
+
+    storage_kind: ClassVar[StorageKind] = "memory"
 
     root: InMemoryStorageRoot = {}
 
@@ -29,7 +33,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         """
         if key not in self.root:
             msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg)
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
 
         data = self.root[key]
 
@@ -52,7 +56,7 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         """
         if key not in self.root:
             msg = f"File not found: '{key}'"
-            raise StorageFileNotFoundError(msg)
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
         return len(self.root[key])
 
     @override

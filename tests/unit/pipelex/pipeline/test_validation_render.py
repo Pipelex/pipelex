@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from mthds.protocol.problem.models import FixOp, ProblemItem, SetKeyOp
 from mthds.protocol.problem.models import SuggestedFix as WireSuggestedFix
 from mthds.protocol.problem.registry import CoreCode
@@ -126,6 +127,9 @@ class TestValidationRender:
         assert "✅" not in markdown
         assert "⚠️" not in markdown
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds the validation item in the test, without the multiplicities its raise site names"
+    )
     def test_renders_an_invalid_verdict_from_its_problem_items(self):
         """The invalid-arm renderer presents the verdict's problem items, the `errors` a host answers: each numbered under
         its code's title with its code, where it is, its sentence and its suggested fix, and never a validation item's own

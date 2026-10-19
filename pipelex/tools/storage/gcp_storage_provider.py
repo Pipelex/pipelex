@@ -2,7 +2,7 @@ import asyncio
 import importlib.util
 from datetime import timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 from urllib.parse import quote
 
 from typing_extensions import override
@@ -14,7 +14,7 @@ from pipelex.tools.storage.exceptions import (
     StorageGcpCredentialsError,
     StorageGcpError,
 )
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
+from pipelex.tools.storage.storage_provider_abstract import StorageKind, StorageProviderAbstract, StoredData
 
 # GCS signed URL signing process version (v4 is recommended, v2 is deprecated)
 GCS_SIGNED_URL_VERSION = "v4"
@@ -26,6 +26,8 @@ class GcpStorageProvider(StorageProviderAbstract):
     Files are stored in a GCS bucket with keys being path strings.
     Uses asyncio.to_thread to wrap sync GCS operations.
     """
+
+    storage_kind: ClassVar[StorageKind] = "gcs"
 
     def __init__(
         self,
@@ -114,7 +116,7 @@ class GcpStorageProvider(StorageProviderAbstract):
             return StoredData(data=data, mime_type=content_type)
         except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Object not found in GCS: '{key}'"
-            raise StorageFileNotFoundError(msg) from exc
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
         except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to load object from GCS: '{key}': {exc}"
             raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
@@ -169,7 +171,7 @@ class GcpStorageProvider(StorageProviderAbstract):
             return data[:nb_bytes]
         except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Object not found in GCS: '{key}'"
-            raise StorageFileNotFoundError(msg) from exc
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
         except RequestRangeNotSatisfiable:  # pyright: ignore[reportUnknownVariableType]
             # GCS refuses any range over an empty object: its head is empty.
             return b""
@@ -223,7 +225,7 @@ class GcpStorageProvider(StorageProviderAbstract):
             raise StorageGcpError(msg) from exc
         if blob is None:
             msg = f"Object not found in GCS: '{key}'"
-            raise StorageFileNotFoundError(msg)
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
         size: int = blob.size
         return size
 

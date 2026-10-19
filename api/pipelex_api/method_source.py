@@ -51,8 +51,8 @@ from pipelex.libraries.method_trees import list_package_method_tree
 from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
+from pipelex.methods.package_reason import MethodPackageReason
 
-from pipelex_api.exceptions import MethodPackageReason
 from pipelex_api.method_cache import get_method_clone_cache
 from pipelex_api.method_tree_request import (
     RequestMethod,

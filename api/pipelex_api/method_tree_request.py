@@ -55,7 +55,9 @@ from mthds.protocol.problem.registry import CoreCode, MethodResourceMissingReaso
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD, root_escape_of
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import MethodEntryError
@@ -65,7 +67,7 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
-from pipelex_api.exceptions import CustomCodeOrigin, CustomCodeRequiresSandboxError, MethodPackageReason, RequestMethodError, RunnerRequestError
+from pipelex_api.exceptions import CustomCodeOrigin, CustomCodeRequiresSandboxError, RequestMethodError, RunnerRequestError
 from pipelex_api.limits import (
     MAX_METHOD_DEPENDENCIES,
     MAX_METHOD_REQUEST_TOTAL_BYTES,
@@ -579,8 +581,9 @@ async def read_request_method(*, documents: TreeDocuments, blob_store: RunnerBlo
 
     Each dependency tree's manifest must declare the address it is keyed by.
 
-    Raises (as problem documents): the refusals of `read_request_tree`, and a 422 `request.invalid` naming
-    `dependencies` for dependencies without `files` or a dependency keyed by another address than its manifest's.
+    Raises (as problem documents): the refusals of `read_request_tree`, a 422 `request.invalid` naming `dependencies`
+    for dependencies without `files`, and a 422 `pipelex.request.dependency_key_mismatch` naming the address to key it by
+    for a dependency keyed by another address than its manifest's.
     """
     if documents.files is None:
         if documents.dependencies:
@@ -608,7 +611,11 @@ async def read_request_method(*, documents: TreeDocuments, blob_store: RunnerBlo
         declared = dependency_address_of(tree=dependency_tree, fallback_name=dependency_dir_name(address=address), label=label, root=root)
         if declared != address:
             msg = f"{label} is keyed by an address its {MANIFEST_NAME} does not declare: it declares '{declared}'."
-            raise RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
+            raise (
+                RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
+                .with_error_code(PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH)
+                .with_params(key=address, address=declared)
+            )
         add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label, root=root)
     request_method = RequestMethod(tree=tree, dependencies=dependencies)
     ensure_method_within_limits(request_method=request_method, label=_METHOD_LABEL)

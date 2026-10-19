@@ -124,6 +124,7 @@ class TestGoogleImgGenWorkerRefusal:
         assert _MODEL_ID not in error.message
         caller = error.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.MODEL_CONTENT_REFUSED
+        assert caller.to_wire()["params"] == {"model": _MODEL_HANDLE}
         assert caller.domain == ProblemDomain.INPUT
         assert error_code_spec(CoreCode.MODEL_CONTENT_REFUSED).status == 422
         # The caller reads the code's sentence, never the provider's model id, and the reason rides the operator's view.
@@ -216,6 +217,9 @@ class TestGoogleImgGenWorkerRefusal:
             fields={"model_handle": _MODEL_HANDLE, "finish_reason": "IMAGE_BRAND_NEW"},
         )
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the image worker sends no output limit and Gemini reports none, the max_tokens and output_tokens of model.output_truncated"
+    )
     async def test_an_answer_cut_before_its_image_reads_output_truncated(self, mocker: MockerFixture) -> None:
         """A finish reason of MAX_TOKENS with no image is the cut it states, not an empty answer to rephrase."""
         async with _answering(_finished_without_image("MAX_TOKENS")) as http_client:

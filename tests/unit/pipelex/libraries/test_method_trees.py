@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.models import TreeLimits
-from mthds.protocol.problem.registry import ProblemDomain
+from mthds.method_tree.vocabulary import TreeRefusalCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
 from pipelex.errors.problem import ProblemView
@@ -20,6 +21,7 @@ from pipelex.libraries.method_trees import (
     tree_bundle_of_lone_file,
     tree_python_sources,
 )
+from pipelex.methods.package_reason import MethodPackageReason
 
 _MANIFEST = '[package]\naddress = "github.com/pipelex-tests/nested"\nversion = "1.0.0"\ndescription = "A nested package"\n'
 
@@ -102,6 +104,11 @@ class TestMethodTrees:
             list_library_bundle_files(library_dirs=[tmp_path])
 
         assert exc_info.value.message.endswith(LIMITS_ADVICE)
+        # The caller reads the limit the tree passed, by the reason the listing stopped at it.
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_PACKAGE_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": MethodPackageReason.TOO_MANY_FILES, "limit": 1}
 
     def test_a_bundle_file_named_alone_is_rooted_at_the_manifest_above_it_else_alone(self, tmp_path: Path) -> None:
         """Named alone, a bundle reads the files of the method a METHODS.toml above it roots, and with none only itself."""
@@ -156,8 +163,10 @@ class TestMethodTrees:
         assert [bundle_file.tree_bundle.tree_path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])] == ["top.mthds"]
 
         _touch(directory=tmp_path, tree_path="vendor/tool/tool.mthds")
-        with pytest.raises(MethodTreeLoadError, match="symbolic link"):
+        with pytest.raises(MethodTreeLoadError, match="symbolic link") as exc_info:
             list_library_bundle_files(library_dirs=[tmp_path])
+        # The reason is the standard's refusal code, which the listing refused the tree with.
+        assert exc_info.value.problem_params() == {"reason": TreeRefusalCode.SYMBOLIC_LINK}
 
     def test_this_machine_s_limits_are_read_once_per_listing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         limits_spy = mocker.patch("pipelex.libraries.method_trees.local_tree_limits", return_value=TreeLimits())

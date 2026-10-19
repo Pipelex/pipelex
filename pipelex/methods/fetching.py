@@ -20,6 +20,7 @@ from pipelex.methods.exceptions import MethodFetchError, MethodPackageSymlinkErr
 from pipelex.methods.fetch_limits import MAX_FETCHED_PACKAGE_FILES, MAX_FETCHED_PACKAGE_TOTAL_BYTES
 from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 
 GIT_REV_PARSE_TIMEOUT_SECONDS = 30
@@ -178,17 +179,17 @@ def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> 
         if file_path.is_symlink():
             relative = "/".join(relative_parts)
             msg = f"Method package '{package_address}' contains a symlink ('{relative}') — fetched packages must not contain symlinks."
-            raise MethodPackageSymlinkError(msg)
+            raise MethodPackageSymlinkError(msg).with_params(path=relative)
         if not file_path.is_file():
             continue
         file_count += 1
         total_bytes += file_path.stat().st_size
         if file_count > MAX_FETCHED_PACKAGE_FILES:
             msg = f"Method package '{package_address}' exceeds the fetched-package ceiling of {MAX_FETCHED_PACKAGE_FILES} files."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TOO_MANY_FILES, limit=MAX_FETCHED_PACKAGE_FILES)
         if total_bytes > MAX_FETCHED_PACKAGE_TOTAL_BYTES:
             msg = f"Method package '{package_address}' exceeds the fetched-package ceiling of {MAX_FETCHED_PACKAGE_TOTAL_BYTES} bytes in total."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TREE_TOO_LARGE, limit=MAX_FETCHED_PACKAGE_TOTAL_BYTES)
 
 
 def fetch_method_package(

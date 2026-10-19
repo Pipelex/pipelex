@@ -228,7 +228,7 @@ async def pipeline_run_id_conflict_route() -> None:
     # Pipelex raises this from ``add_new_pipeline`` when a submission reuses a ``pipeline_run_id``
     # that is still registered; its code, `pipelex.run.already_exists`, declares 409.
     msg = "Pipeline some-run-id already exists"
-    raise PipelineManagerAlreadyExistsError(msg)
+    raise PipelineManagerAlreadyExistsError(msg).with_params(pipeline_run_id="some-run-id")
 
 
 @_router.get("/method-package-symlink")
@@ -534,6 +534,9 @@ class TestExceptionHandlers:
         }
 
     @pytest.mark.parametrize("case", list(ProblemTestData.RETRY_CASES))
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a crafted retryable failure checks the Retry-After header, which no parameter decides"
+    )
     def test_retry_after_header_is_guarded(self, case: str):
         """`Retry-After` rides a 429 alone, and only when the delay is a finite, non-negative number, rounded up."""
         _, _, expected_status, expected_header, expected_retry_after = ProblemTestData.RETRY_CASES[case]
@@ -546,6 +549,7 @@ class TestExceptionHandlers:
         assert response.json().get("retry_after") == expected_retry_after
 
     @pytest.mark.parametrize(("code", "expected_status"), ProblemTestData.CODE_STATUSES)
+    @pytest.mark.builds_problems_without_required_params(reason="checks the status each code declares, which no parameter decides")
     def test_the_status_is_the_one_the_code_declares(self, mocker: MockerFixture, code: ErrorCode, expected_status: int):
         """The response's status, the body's `status` member and the record's are the registry's, one value for all three."""
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")
@@ -763,6 +767,7 @@ class TestExceptionHandlers:
             (429, 429, "runtime.unavailable", "Retry-After"),
         ],
     )
+    @pytest.mark.builds_problems_without_required_params(reason="a refusal the framework raises carries none of the facts its code names")
     def test_a_framework_4xx_keeps_its_meaning(self, mocker: MockerFixture, raised_status: int, status: int, code: str, kept_header: str | None):
         # Only a 400 or a 422 is a request the framework could not read: every other 4xx is answered under the code whose
         # status and meaning match it, or keeps its status, never as a malformed request.
@@ -1012,6 +1017,7 @@ class TestExceptionHandlers:
             ("/inference-failure-unattributed", None),
         ],
     )
+    @pytest.mark.builds_problems_without_required_params(reason="an inference failure no backend is attributed to names no provider")
     def test_backend_name_is_only_ever_the_backend_the_error_names(self, mocker: MockerFixture, path: str, expected_backend_name: str | None):
         """The provider the SDK's metadata names, `gateway`, is no backend's name: it is never written under `backend_name`, nor under `sdk`."""
         log_spy = mocker.patch("pipelex_api.exception_handlers.log")

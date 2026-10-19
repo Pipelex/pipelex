@@ -177,6 +177,9 @@ class TestLinkupWorkerErrorHandling:
 
     # ---- Problem tests ----
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_extract_problem_for_auth(self, mocker: MockerFixture) -> None:
         """An authentication error is a CONFIGURATION failure, and its problem invites no retry."""
         worker = _make_linkup_extract_worker(mocker)
@@ -192,6 +195,9 @@ class TestLinkupWorkerErrorHandling:
         assert problem.is_retryable is False
         assert _diagnostics_of(problem).error_class == "ExtractJobFailureError"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_search_problem_for_rate_limit(self, mocker: MockerFixture) -> None:
         """A rate limit error is a TRANSIENT failure, and its problem invites a retry."""
         worker = _make_linkup_search_worker(mocker)
@@ -206,6 +212,9 @@ class TestLinkupWorkerErrorHandling:
         assert find_inference_error_category_in_chain(error) == "transient"
         assert problem.is_retryable is True
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_search_problem_for_no_result(self, mocker: MockerFixture) -> None:
         """A no-result error is a CONTENT failure, and its problem invites no retry."""
         worker = _make_linkup_search_worker(mocker)
@@ -220,6 +229,9 @@ class TestLinkupWorkerErrorHandling:
         assert find_inference_error_category_in_chain(error) == "content"
         assert problem.is_retryable is False
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_extract_problem_for_no_result(self, mocker: MockerFixture) -> None:
         """A no-result error is a CONTENT failure, and its problem invites no retry."""
         worker = _make_linkup_extract_worker(mocker)

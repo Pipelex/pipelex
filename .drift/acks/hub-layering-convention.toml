@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:dd59159853d97c98d62d3fcb2c38c8f0b4a10807033c5ac43a17a13bcaa37e85"
+digest = "sha256:8c80e6112b26f2f0dec72bbf6639cfc7dca269641dc6f097f7770a85a125a3fc"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T05:54:29Z"
-rationale = "real-catch: runtime_hub.py gains get_error_console, the stderr console a CLI prints a failure's report through; docs/contribute/hub-layering.md lists it beside get_console. No import crosses the boundary."
+reviewed_at = "2026-10-19T10:49:47Z"
+rationale = "clean-pass: absorbing Runner-speaks-problem keeps this branch's interpreter_hub.py, get_selectable_own_pipe_refs and get_required_pipe's referring_pipe_code, beside its runtime_hub.py's get_error_console; docs/contribute/hub-layering.md lists both and says what referring_pipe_code is for. No import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
-"pipelex/interpreter_hub.py" = "blob:e1a4b941820aeb8affbb6c70b7f81eb29e4cc191"
+"pipelex/interpreter_hub.py" = "blob:8572e31eafdfa9eb5ecde01326ef51a971f86b2e"
 "pipelex/runtime_hub.py" = "blob:48f34feea22c29a56910f4a2fbb317a1d0a1e492"

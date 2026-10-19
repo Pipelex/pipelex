@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -98,6 +99,11 @@ class StorageS3Error(StorageError):
         ),
     )
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The kind of storage `pipelex.storage.unavailable` names; a configuration code declares no such parameter.
+        return {"scheme": "s3"}
+
 
 class StorageGcpError(StorageError):
     """Raised when a GCP storage operation fails.
@@ -109,6 +115,11 @@ class StorageGcpError(StorageError):
     error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
         default=PipelexErrorCode.STORAGE_UNAVAILABLE, others=(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED,)
     )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The kind of storage `pipelex.storage.unavailable` names; a configuration code declares no such parameter.
+        return {"scheme": "gcs"}
 
 
 class StorageGcpCredentialsError(StorageGcpError):

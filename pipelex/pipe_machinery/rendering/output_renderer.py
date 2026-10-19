@@ -54,7 +54,7 @@ def _collect_possible_outputs(
             concept_provider = get_concept_library()
             # pipe_dependencies() is a set — sort so the user-facing output_option_N numbering is deterministic
             for mapped_pipe_code in sorted(mapped_pipe_codes):
-                mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
+                mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code, referring_pipe_code=the_pipe.code)
                 try:
                     output_dict = mapped_pipe.output.render_stuff_spec(concept_provider=concept_provider, output_format=output_format)
                     content = output_dict.get("content", output_dict)
@@ -105,7 +105,7 @@ def _collect_possible_outputs(
             if not last_pipe_code:
                 return []
 
-            last_pipe = get_required_pipe(pipe_code=last_pipe_code)
+            last_pipe = get_required_pipe(pipe_code=last_pipe_code, referring_pipe_code=the_pipe.code)
 
             # If last pipe also has Anything output, recurse
             if last_pipe.output.concept.code == NativeConceptCode.ANYTHING:

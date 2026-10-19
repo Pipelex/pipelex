@@ -235,6 +235,9 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata.sdk_exception_type == expected_sdk_type
         assert exc_info.value.__cause__ is sdk_exc
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_the_operator_problem_carries_the_provider_facts(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_client_error(429, "Resource has been exhausted", status="RESOURCE_EXHAUSTED")

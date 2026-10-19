@@ -82,6 +82,7 @@ def _make_llm_job(*, user_images: list[PromptImage]) -> LLMJob:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMWorkerPromptImageFormat:
+    @pytest.mark.builds_problems_without_required_params(reason="a prompt image reaches the worker by its position, with no input name")
     @pytest.mark.parametrize(
         "pdf_image",
         [
@@ -98,7 +99,10 @@ class TestLLMWorkerPromptImageFormat:
             await worker.gen_text(llm_job=_make_llm_job(user_images=[png_image, pdf_image]))
 
         assert str(exc_info.value) == ("Prompt image 2 given to model 'gpt-vision-test' is a PDF document (.pdf), not an image.")
-        assert exc_info.value.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.INPUT
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"format": "pdf", "model": "gpt-vision-test"}
         assert worker.nb_provider_calls == 0
 
     @pytest.mark.parametrize(

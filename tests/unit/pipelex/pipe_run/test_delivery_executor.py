@@ -31,6 +31,7 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none, get_library_manager, scoped_current_library
 from pipelex.pipe_run import delivery_executor as delivery_executor_module
@@ -304,7 +305,9 @@ class TestDeliveryExecutor:
         )
 
     async def test_storage_failure_raises(self, mocker: MockerFixture) -> None:
+        """An uncoded failure of the storage is the storage being unavailable, naming the storage's kind."""
         mock_storage = mocker.AsyncMock()
+        mock_storage.storage_kind = "s3"
         mock_storage.store = mocker.AsyncMock(side_effect=Exception("S3 down"))
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
 
@@ -317,7 +320,7 @@ class TestDeliveryExecutor:
         executor = DeliveryExecutor()
         assignment = DeliveryAssignment(storage=StorageTarget())
 
-        with pytest.raises(StorageDeliveryError):
+        with pytest.raises(StorageDeliveryError) as raised:
             await executor.execute(
                 pipe_output=mock_output,
                 storage_scope="test-user",
@@ -325,6 +328,11 @@ class TestDeliveryExecutor:
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
             )
+
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == PipelexErrorCode.STORAGE_UNAVAILABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"scheme": "s3"}
 
     async def test_generate_result_files_raises_without_main_stuff_typed(self, mocker: MockerFixture) -> None:
         """A completed run always resolves its declared output — a typed working memory with neither
@@ -890,6 +898,9 @@ class TestDeliveryExecutor:
         assert "Page 1 contents" in json_text
         assert "https://example.com/img.png" in json_text
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="delivers a run's problem built in the test, without the model and provider of its failure"
+    )
     @pytest.mark.parametrize("problem_view", [ProblemView.OPERATOR, ProblemView.CALLER])
     async def test_webhook_includes_the_problem_in_its_own_view_on_failed_status(self, mocker: MockerFixture, problem_view: ProblemView) -> None:
         """A FAILED delivery sends the run's problem in the webhook's own view, which the receiver can rehydrate.
@@ -1062,6 +1073,9 @@ class TestDeliveryExecutor:
         assert isinstance(vars(record).get("file_count"), int)
         assert vars(record)["file_count"] > 0
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="delivers a run's problem built in the test, without the model and provider of its failure"
+    )
     @pytest.mark.parametrize(
         ("status", "has_problem"),
         [

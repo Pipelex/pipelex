@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
@@ -12,6 +13,7 @@ from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES, HeldFile
 from pipelex.core.method_trees.tree_files import write_call_files
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
@@ -214,3 +216,17 @@ class TestDirectExecutorWorkdir:
         assert response.function_qualname == "greet_it"
         assert (tree_root / "structures.py").is_file()
         assert not list(tree_root.rglob("__pycache__"))
+
+    @pytest.mark.builds_problems_without_required_params(reason="the transported call runs below the PipeFunc step, whose wrapper names the pipe")
+    @pytest.mark.asyncio
+    async def test_a_transported_run_past_its_deadline_names_the_function_and_the_limit(self, tmp_path: Path, mocker: MockerFixture):
+        """The runaway-code guard's refusal is `pipe.function_timed_out`, naming the function and the limit it passed."""
+        mocker.patch.object(DirectPipeFuncExecutor, "run_pipe_func", side_effect=TimeoutError)
+
+        with _greet_request(tmp_path=tmp_path) as request, pytest.raises(PipelexError) as raised:
+            await _run_transported(request=request.model_copy(update={"timeout_seconds": 7}))
+
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_FUNCTION_TIMED_OUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"function": "greet_demo_funcs.greeting.greet_it", "timeout": 7}

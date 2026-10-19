@@ -9,6 +9,7 @@ follow the builder's items one for one.
 
 import json
 
+import pytest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
@@ -20,7 +21,8 @@ from pipelex.core.exceptions import (
 )
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipeline.exceptions import TreePythonSyntaxError, ValidateBundleError
 from pipelex.pipeline.validation_errors import build_validation_error_items, warning_problem_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
 from pipelex.validation_error_types import HintLintErrorType, PipeFactoryErrorType, PipeValidationErrorType, TemplateCheckErrorType
@@ -174,6 +176,7 @@ class TestBuildValidationErrorItems:
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY, ValidationErrorCategory.DRY_RUN]
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_a_verdict_projects_its_dry_run_failures(self) -> None:
         """A ``ValidateBundleError`` carrying dry-run failures lists one ``dry_run`` item per failure, and its problem one item each."""
         exc = ValidateBundleError(
@@ -242,6 +245,9 @@ class TestBuildValidationErrorItems:
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_validation_items_are_total_for_message_only_error(self) -> None:
         """A bare-message ``ValidateBundleError`` still lists a non-empty set of items — the invariant is total.
 
@@ -440,6 +446,9 @@ class TestBuildValidationErrorItems:
         # And the verdict lists it (it would be missing if the list were dropped).
         assert [item.pipe_code for item in exc.validation_error_items()] == ["pipe_inst"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a warning no type classifies names no declaration, so its item carries no field path"
+    )
     def test_warnings_become_problem_items_under_the_code_their_type_names(self) -> None:
         """A valid report's warnings, as a surface speaking problem items carries them: each type names its code, and a
         warning no type classifies takes `method.schema_violation`, as an unclassified item of an invalid verdict does.
@@ -484,3 +493,45 @@ class TestBuildValidationErrorItems:
             },
         ]
         assert "emphasis" in items[0].detail
+
+    def test_a_pipe_refusal_s_own_facts_reach_its_problem_item(self) -> None:
+        """The facts the check that found the fault knows ride the item beside the pipe its locators give."""
+        verdict = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="summarize",
+                    message="The output does not fit.",
+                    field_path="summarize.output",
+                    params={"declared": "testapp.Summary", "expected": ["native.Text", "native.Html"], "pipe_type": "PipeCompose"},
+                ),
+            ],
+        )
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH
+        assert item.params is not None
+        assert item.params.as_wire() == {
+            "pipe": "summarize",
+            "declared": "testapp.Summary",
+            "expected": ["native.Text", "native.Html"],
+            "pipe_type": "PipeCompose",
+        }
+
+    def test_an_unclassified_item_reads_through_the_verdict_s_umbrella_to_the_refusal_it_forwards(self) -> None:
+        """A library that could not load a bundle forwards the parser's refusal under `method.invalid`: the item takes the parser's code and facts."""
+        syntax_refusal = TreePythonSyntaxError("The file does not parse.").with_params(finding="invalid syntax at line 3")
+        umbrella = LibraryLoadingError("The library could not be loaded.")
+        umbrella.__cause__ = syntax_refusal
+        verdict = ValidateBundleError(message="The library could not be loaded.")
+        verdict.__cause__ = umbrella
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_SYNTAX
+        assert item.params is not None
+        assert item.params.as_wire() == {"finding": "invalid syntax at line 3"}

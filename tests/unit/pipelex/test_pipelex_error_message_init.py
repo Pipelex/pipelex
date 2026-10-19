@@ -31,6 +31,7 @@ class TestPipelexErrorMessageInit:
                     offenders.append(f"{error_cls.__module__}.{error_cls.__name__} (lists {shadow_cls.__name__} before PipelexError)")
         assert not offenders, "Exception classes shadow PipelexError.__init__ — `.message` will be unset:\n" + "\n".join(offenders)
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the error with a message alone, to check how its message is set")
     @pytest.mark.parametrize("error_cls", [ConstructFieldBlueprintValueError, RoutingProfileBlueprintValueError])
     def test_message_set_and_problem_succeeds(self, error_cls: type[PipelexError]) -> None:
         """A reordered ``(PipelexError, ValueError)`` mixin sets ``.message``, keeps its

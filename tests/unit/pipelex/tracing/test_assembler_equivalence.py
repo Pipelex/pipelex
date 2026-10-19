@@ -754,6 +754,9 @@ def _scenario_dry_condition_merge(tracer: GraphTracer, context: TraceContext) ->
 class TestAssemblerEquivalence:
     """Equivalence tests comparing GraphTracer teardown with GraphSpecAssembler."""
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     @pytest.mark.parametrize(
         "scenario_fn",
         [

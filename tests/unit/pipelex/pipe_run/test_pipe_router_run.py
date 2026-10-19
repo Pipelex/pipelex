@@ -108,6 +108,9 @@ def _make_pipe_job() -> PipeJob:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRouterRun:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises an inference failure built by hand, below the worker that names its model and provider"
+    )
     async def test_transient_cogt_error_surfaces_on_first_attempt(self) -> None:
         """Direct execution is a single pipeline-level attempt: a transient CogtError is not retried.
 
@@ -147,6 +150,7 @@ class TestPipeRouterRun:
         assert exc_info.value.pipe_stack == ["stub_pipe"]
         assert router.call_count == 1
 
+    @pytest.mark.builds_problems_without_required_params(reason="raises a failure built with a message alone, to check where the router locates it")
     async def test_any_pipelex_error_is_located_with_its_own_problem(self) -> None:
         """A PipelexError that is neither a CogtError nor a PipeRunError is located too, and its problem is its own."""
         stuff_error = StuffFactoryError("Error combining stuffs")

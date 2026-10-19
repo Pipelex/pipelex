@@ -48,6 +48,9 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a model availability failure in the test with no cause, whose code and parameters the failed lookup gives"
+    )
     def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
         """handle_model_availability_error should read the advice for its tip and exit with code 1."""
         mocker.patch("pipelex.cli.error_handlers.get_error_console")
@@ -86,6 +89,9 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_handle_validate_bundle_error_exits_and_reads_its_items(self, mocker: MockerFixture) -> None:
         """handle_validate_bundle_error should read the verdict's items and exit with code 1.
 

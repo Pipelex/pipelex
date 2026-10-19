@@ -247,6 +247,9 @@ class TestGoogleWorkerErrorHandling:
 
     # ---- Problem integration ----
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_problem_includes_category_and_retryable(self, mocker: MockerFixture) -> None:
         """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_google_llm_worker(mocker)
@@ -262,6 +265,9 @@ class TestGoogleWorkerErrorHandling:
         assert problem.is_retryable is True
         assert _diagnostics_of(problem).error_class == "LLMCompletionError"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
         """The problem of a CAPACITY error invites no retry."""
         worker = _make_google_llm_worker(mocker)

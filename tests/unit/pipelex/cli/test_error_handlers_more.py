@@ -170,6 +170,9 @@ class TestErrorHandlersExtended:
         assert "Possible solutions:" not in output
         assert "Enabled Backends:" not in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_handle_validate_bundle_error_prints_a_bracketed_tip_as_written(self, console: Console) -> None:
         """The verdict's advice is plain text: `SDK[openai]` prints as written, neither swallowed as a style tag nor escaped twice."""
         exc = ValidateBundleError(message="validation failed")
@@ -182,6 +185,9 @@ class TestErrorHandlersExtended:
         assert "💡 Tip: use 'gpt-4o → SDK[openai]' in the pipe" in output
         assert "\\[" not in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors and its dry-run failure in the test, without the facts their raise sites give their items' codes"
+    )
     def test_handle_validate_bundle_error_renders_all_sections(self, console: Console) -> None:
         """Blueprint, pipe, and dry-run sections all render with their details."""
         blueprint_error = PipelexBundleBlueprintValidationErrorData(
@@ -237,6 +243,9 @@ class TestErrorHandlersExtended:
         assert "Pipe: third_pipe" in output
         assert "Pipe 'third_pipe' failed its dry run: dry run exploded" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_handle_validate_bundle_error_minimal_renders_fallback_residual(self, console: Console) -> None:
         """A message-only error renders the fallback residual item, so the message is never lost.
 

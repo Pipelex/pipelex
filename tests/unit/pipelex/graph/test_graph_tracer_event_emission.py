@@ -6,6 +6,7 @@ correct trace events as a side effect alongside its existing in-memory accumulat
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -219,6 +220,9 @@ class TestGraphTracerEventEmission:
         # An end event names the pipe it ends, as its start does, and the invocation's path.
         assert (evt.pipe_code, evt.pipe_ref, evt.pipe_type, evt.path) == ("test_pipe", "tests.test_pipe", "PipeLLM", "tests.test_pipe")
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds the step's failure with a message alone, to check where its problem is recorded"
+    )
     def test_pipe_end_error_records_the_same_caller_view_on_the_event_and_the_node(self) -> None:
         """The node's problem reaches the event and the node of the graph alike, in the caller's view, without the error's message."""
         tracer, event_log = self._make_tracer_with_event_log()

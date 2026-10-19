@@ -64,6 +64,8 @@ class InputShapingError(PipelexError):
     The message is the operator's diagnostics, so what the caller needs in order to act rides the problem: the input
     as the ``input`` parameter and ``location.input``, and the facts each factory knows as the parameters its code's
     template declares, such as the counts of ``input.wrong_multiplicity`` or the concepts of ``input.wrong_concept``.
+    The ``field`` of ``input.invalid`` is the dotted path of the field that fails inside the value when the refusal
+    names one, and the input's own name, the root of every such path, when the whole value is at fault.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
@@ -84,7 +86,10 @@ class InputShapingError(PipelexError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        return {"input": self.variable_name, **self.shaping_params}
+        params: dict[str, Any] = {"input": self.variable_name, **self.shaping_params}
+        if params.get("field") is None:
+            params["field"] = self.variable_name
+        return params
 
     @override
     def problem_location(self) -> ProblemLocation | None:

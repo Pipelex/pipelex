@@ -16,6 +16,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.libraries.pipe.pipe_suggestions import declared_pipe_refs
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
@@ -74,7 +75,9 @@ async def dry_run_pipeline(
 
     if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+        # With no entry pipe to start from, the request may select any pipe the bundles declare.
+        candidates = declared_pipe_refs(blueprints=blueprints)
+        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
 
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,

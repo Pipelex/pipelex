@@ -8,6 +8,7 @@ from pipelex.errors.problem import ProblemView
 
 
 class TestBundleResourceExceptions:
+    @pytest.mark.builds_problems_without_required_params(reason="builds each refusal with a message alone, to check its retry verdict")
     @pytest.mark.parametrize(
         ("error_class", "expected_code"),
         [
@@ -28,6 +29,7 @@ class TestBundleResourceExceptions:
             assert problem.retry == RetryVerdict.NO
             assert problem.to_wire()["retry"] == "no"
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the refusal with a message alone, to check what its wrapper reports")
     def test_a_wrapper_raised_from_one_carries_its_code_and_retry(self) -> None:
         try:
             try:
@@ -45,6 +47,7 @@ class TestBundleResourceExceptions:
         assert problem.diagnostics.error_class == "PipelexError"
         assert [cause.error_class for cause in problem.diagnostics.causes or []] == ["BundleResourceNotNamedError"]
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the refusal with a message alone, to check the code its raise site chooses")
     def test_two_paths_naming_one_file_are_an_invalid_request(self) -> None:
         """A raise site that refuses paths that cannot make one tree chooses the request's code, not the path refusal's."""
         problem = BundleResourcePathError("Two files name one file.").with_error_code(CoreCode.REQUEST_INVALID).to_problem(view=ProblemView.CALLER)

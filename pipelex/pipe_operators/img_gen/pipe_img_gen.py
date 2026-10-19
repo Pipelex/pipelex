@@ -151,7 +151,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.IMAGE.concept_ref],
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.IMAGE.concept_ref], pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(

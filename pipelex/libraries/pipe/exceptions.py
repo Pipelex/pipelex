@@ -39,7 +39,9 @@ class EntryPipeNotFoundError(PipeNotFoundError):
     the method itself declares that names no pipe of the method chooses ``method.pipe_unresolved``.
 
     The message names only the caller's own `pipe_code`, and each raise site owes that invariant: a
-    message here may name what the caller typed and nothing from the loaded library.
+    message here may name what the caller typed and nothing from the loaded library. The code's `suggestions` offer
+    only pipes the caller may select: the entry package's own for a bare or domain-qualified code, and for an
+    `alias->…` code the pipes that package exports, never its private ones (`PipeLibrary.get_required_entry_pipe`).
     """
 
     error_code = ErrorCodeSet(

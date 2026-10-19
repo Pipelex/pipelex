@@ -327,6 +327,7 @@ markers = [
   "codex_disabled: tests that should not run in Codex",
   "dry_runnable: tests that can be run in dry-run mode",
   "pipelex_api: tests that require access to the Pipelex API",
+  "builds_problems_without_required_params(reason): the test builds a problem lacking a parameter its code requires on purpose, which the sweep of tests/unit/conftest.py otherwise fails",
 ]
 
 [tool.coverage.run]

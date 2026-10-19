@@ -127,6 +127,9 @@ class TestAgentOutput:
         assert payload["is_valid"] is False
         assert "empty" not in payload
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="hands the command a fetch failure built in the test, which names neither the input nor the host"
+    )
     def test_agent_error_reports_a_pipelex_cause_by_its_own_problem_in_the_operator_view(self, capsys: pytest.CaptureFixture[str]) -> None:
         cause = _url_refusal()
         with pytest.raises(typer.Exit):
@@ -166,6 +169,9 @@ class TestAgentOutput:
         assert parsed["code"] == CoreCode.RUNTIME_UNEXPECTED
         assert "errors" not in parsed
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_agent_error_lists_the_items_of_a_verdict_under_pipelex_wrappers(self, capsys: pytest.CaptureFixture[str]) -> None:
         verdict = ValidateBundleError(message="Pipe 'post_notice' could not be loaded")
         wrapper = PipelexError("the run was refused")
@@ -271,6 +277,9 @@ class TestAgentOutput:
             agent_error(cause.message, cause=cause)
         assert advice.detail not in capsys.readouterr().err
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its problem's items in the test, with only the parameters the Markdown is checked for"
+    )
     def test_render_problem_markdown_states_the_facts_the_faults_and_the_diagnostics(self) -> None:
         location = make_location(pipe="summarize", path=["main", "summarize"], file="contracts.mthds", line=12)
         item = make_problem_item(code=CoreCode.METHOD_CONCEPT_UNRESOLVED, params={"concept": "Missing"}, location=make_location(pipe="summarize"))
@@ -296,6 +305,9 @@ class TestAgentOutput:
         assert "- **bundle_path:** /w/b.mthds" in rendered
         assert "is_valid" not in rendered
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its problem's items in the test, with only the parameters the Markdown is checked for"
+    )
     def test_render_problem_markdown_nests_the_run_s_own_problem(self) -> None:
         """A read of a failed run's results renders the run's own problem under it as the problem itself renders, one heading
         level down: its title, sentence, step, code, location and items.
