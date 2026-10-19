@@ -25,7 +25,7 @@ class TestRunLocatedFailurePanel:
     ) -> None:
         """`pipelex run` on the model example renders the model panel naming the failing step, its next step, and the local-deck tip there only."""
         console = Console(width=400, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=console)
         mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=console)
         bundle_path = tmp_path / "located_failure_model.mthds"
         bundle_path.write_text(LocatedRunFailureTestData.MODEL_MTHDS, encoding="utf-8")

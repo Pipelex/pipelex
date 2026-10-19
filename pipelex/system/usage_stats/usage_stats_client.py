@@ -32,7 +32,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.usage_stats.usage_stats_contract import (
     NOTICE_VERSION,
     TOOL_NAME,
-    UsageStatsErrorDomain,
+    UsageStatsError,
     UsageStatsHost,
     UsageStatsIntegration,
     UsageStatsOffBy,
@@ -228,8 +228,8 @@ class UsageStatsClient:
         self._common: CommonProperties | None = None
         self._held: list[dict[str, Any]] = []
         self._background: _BackgroundSender | None = None
-        #: Who can fix the failure the command reported, when something said so; read for its `command_completed`.
-        self.command_error_domain: UsageStatsErrorDomain | None = None
+        #: The code and the domain of the failure the command reported, when something said so; read for its `command_completed`.
+        self.command_error: UsageStatsError | None = None
         #: Whether the command sent its work to the hosted API, which holds the rest of what it did.
         self.is_command_hosted = False
         #: What an `init` command set, for its `command_completed`.
@@ -241,9 +241,9 @@ class UsageStatsClient:
     def is_enabled(self) -> bool:
         return not self.settings.off_by
 
-    def note_command_error_domain(self, *, error_domain: UsageStatsErrorDomain) -> None:
-        """Record who can fix the failure the command is reporting, as its error output classifies it; the last one wins."""
-        self.command_error_domain = error_domain
+    def note_command_error(self, *, error: UsageStatsError) -> None:
+        """Record the code and the domain of the failure the command is reporting, as its error output gives them; the last one wins."""
+        self.command_error = error
 
     def note_command_hosted(self) -> None:
         """Record that the command sent its work to the hosted API, for its `command_completed`."""
@@ -614,11 +614,11 @@ def record_usage_stats_event(*, event: UsageStatsEvent) -> None:
         client.record(event=event)
 
 
-def note_command_error_domain(*, error_domain: UsageStatsErrorDomain) -> None:
-    """Record, for the running command's `command_completed`, who can fix the failure it is reporting."""
+def note_command_error(*, error: UsageStatsError) -> None:
+    """Record, for the running command's `command_completed`, the code and the domain of the failure it is reporting."""
     client = _PROCESS.client
     if client is not None:
-        client.note_command_error_domain(error_domain=error_domain)
+        client.note_command_error(error=error)
 
 
 def note_command_hosted() -> None:

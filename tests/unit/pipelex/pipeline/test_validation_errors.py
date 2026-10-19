@@ -1,11 +1,10 @@
 """Unit tests for ``build_validation_error_items`` — the shared structured-error builder.
 
-The single builder feeds both the agent CLI's ``validation_errors`` JSON array
-(via ``extract_validation_errors``) and the API's invalid verdict
-(``BundleValidationFailure.validation_errors``, via ``ValidateBundleError.validation_error_items``),
-so the two surfaces can never drift. These tests pin the per-category field
-projection — including the ``source`` / ``field_name`` / ``concept_code`` fields
-that the older CLI-only extractor dropped — and the CLI↔API shape parity.
+The single builder feeds the problem's ``errors`` (via ``ValidateBundleError.problem_items``), which the agent CLI
+prints, and the API's invalid verdict (``BundleValidationFailure.validation_errors``, via
+``ValidateBundleError.validation_error_items``), so the surfaces can never drift. These tests pin the per-category
+field projection, including the ``source`` / ``field_name`` / ``concept_code`` fields, and that the problem's errors
+follow the builder's items one for one.
 """
 
 import json
@@ -13,7 +12,6 @@ import json
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cli.agent_cli.commands.agent_output import extract_validation_errors
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
     PipeFactoryErrorData,
@@ -32,8 +30,8 @@ def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
     """Call the builder with the error's categorized lists only — for the category-projection tests.
 
     The pipe-validation arm uses ``pipe_validation_error_data`` (pipe validation **plus**
-    pipe/concept instantiation errors) — the same combined accessor both real call sites
-    (``ValidateBundleError.validation_error_items`` and the CLI ``extract_validation_errors``) pass.
+    pipe/concept instantiation errors) — the same combined accessor the real call site
+    (``ValidateBundleError.validation_error_items``, which the problem's items and the API verdict both read) passes.
     The dry-run failures and the ``fallback_message`` residual are intentionally omitted here so these
     tests pin the categorized projection in isolation; they have their own dedicated tests below.
     """
@@ -260,11 +258,6 @@ class TestBuildValidationErrorItems:
         assert problem.errors is not None
         assert [item.code for item in problem.errors] == [CoreCode.METHOD_SCHEMA_VIOLATION]
 
-    def test_cli_extractor_is_total_for_message_only_error(self) -> None:
-        """The CLI ``extract_validation_errors`` is also total — a bare-message error yields one item, never an empty array."""
-        cli_dicts = extract_validation_errors(ValidateBundleError(message="empty blueprint"))
-        assert cli_dicts == [{"category": "blueprint_validation", "message": "empty blueprint"}]
-
     def test_empty_collections_collapse_to_none(self) -> None:
         """An empty ``declared_concepts`` / ``variable_names`` becomes ``None`` so it drops from the wire."""
         exc = ValidateBundleError(
@@ -281,32 +274,23 @@ class TestBuildValidationErrorItems:
         factory_item = _build_items(exc)[0]
         assert factory_item.declared_concepts is None
 
-    def test_cli_extractor_matches_builder_dumped_shape(self) -> None:
-        """The CLI ``extract_validation_errors`` dicts equal the dumped builder items — single shape, two surfaces.
+    def test_the_problem_s_errors_follow_the_builder_s_items_one_for_one(self) -> None:
+        """The problem the agent CLI prints lists one fault per item of the API's invalid verdict, at the same pipe.
 
-        Pins that the agent CLI and the API's invalid verdict emit the identical structured
-        items: the CLI adapter is exactly ``model_dump(exclude_none=True)`` over
-        the same builder the API verdict uses.
+        The API's verdict is the ``BundleValidationFailure`` a validator returns, built as the direct validator builds
+        it; its items are dumped to the wire and compared as encoded JSON, so a field that diverges between Python and
+        JSON would show.
         """
         exc = _all_category_error()
-        cli_dicts = extract_validation_errors(exc)
-        builder_dicts = [item.model_dump(mode="json", exclude_none=True) for item in _build_items(exc)]
-        assert cli_dicts == builder_dicts
-
-    def test_cli_extractor_equals_api_verdict_validation_errors(self) -> None:
-        """The CLI array and the API's invalid verdict ``validation_errors`` are identical on the wire.
-
-        The API's verdict is the ``BundleValidationFailure`` a validator returns, built as the direct
-        validator builds it. A plain ``==`` would pass merely because ``StrEnum`` subclasses ``str``; to
-        prove *wire-byte* parity (and catch a future python/json-divergent field that is not a StrEnum),
-        we also compare the encoded JSON, not just the in-memory dicts.
-        """
-        exc = _all_category_error()
-        cli_dicts = extract_validation_errors(exc)
         verdict = BundleValidationFailure(problem=exc.to_problem(view=ProblemView.OPERATOR), validation_errors=exc.validation_error_items())
         verdict_items = verdict.model_dump(mode="json", exclude_none=True)["validation_errors"]
-        assert verdict_items == cli_dicts
-        assert json.dumps(verdict_items, sort_keys=True) == json.dumps(cli_dicts, sort_keys=True)
+        builder_dicts = [item.model_dump(mode="json", exclude_none=True) for item in _build_items(exc)]
+        assert json.dumps(verdict_items, sort_keys=True) == json.dumps(builder_dicts, sort_keys=True)
+
+        problem_items = exc.to_problem(view=ProblemView.OPERATOR).errors
+        assert problem_items is not None
+        assert len(problem_items) == len(builder_dicts)
+        assert [item.location.pipe if item.location else None for item in problem_items] == [item.get("pipe_code") for item in builder_dicts]
 
     def test_enriched_pipe_validation_error_rides_a_suggested_fix(self) -> None:
         """An enriched output-mismatch error data yields an item carrying the planner's suggested_fix."""

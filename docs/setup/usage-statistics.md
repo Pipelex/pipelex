@@ -8,7 +8,7 @@ Pipelex collects **anonymous usage statistics**: counts of commands, runs, pipe 
 
 They are on by default, and you can turn them off at any time, for one command, one project or the whole machine, as [Turning them off](#turning-them-off) explains.
 
-The first time a Pipelex tool runs with statistics on, it prints this notice on stderr, once per machine. A command whose stderr a program reads rather than a person, `pipelex-agent` with JSON errors (`--error-format json`, or `--format json` with no `--error-format`), neither prints nor records it, and still sends its statistics; the next command whose stderr a person reads prints it:
+The first time a Pipelex tool runs with statistics on, it prints this notice on stderr, once per machine. A command whose stderr a program reads rather than a person, `pipelex-agent` with JSON errors (the command's `--error-format json`, the program's `--error-format json` given before the command, or `--format json` with no `--error-format`), neither prints nor records it, and still sends its statistics; the next command whose stderr a person reads prints it:
 
 > Pipelex collects anonymous usage statistics: counts of commands, runs, pipe types, models and tokens, and the country your IP address maps to; the address itself is never stored. It never collects your methods, prompts, inputs, outputs, file names or pipe names. To turn it off, run `pipelex usage-stats disable` or set DO_NOT_TRACK=1. Details: https://docs.pipelex.com/latest/setup/usage-statistics/
 
@@ -24,16 +24,19 @@ Every event is a count, a yes-or-no, or a value from a closed list. No property 
 - the tool and its version (`pipelex`, and the release), and the surface it ran from: the `pipelex` CLI, the `pipelex-agent` CLI, the API server or a Python program;
 - the operating system and processor family, the Python minor version, and whether the process ran in CI or in a container;
 - an anonymous **installation identifier**, a random UUID drawn once per machine and shared by every Pipelex tool on it, never derived from anything about the machine or you.
+- the version of the event contract it follows, `schema`, which is 2 from the release whose events name a failure by its error's code and that code's domain, so that a receiver tells them from an earlier release's events.
 
 The events themselves are:
 
 | Event | Sent | What it counts |
 | --- | --- | --- |
-| `command_completed` | once per command of the `pipelex` and `pipelex-agent` CLIs | the command's path in the command tree (`run bundle`, `validate pipe`, `init` and so on, a shorthand such as `pipelex validate my_pipe` counting as the command it runs; never its arguments or option values), its outcome, its duration, who could fix a failure (`input`, `config`, `runtime` or `other`), and whether it ran on the hosted API; for `init`, also where it set runs to execute and, when it set up backends on this machine, which backend kinds it enabled |
-| `run_completed` | once per run, whatever started it | the outcome, live or dry, the kind of source the method came from (a local bundle, an installed method, a published address), the duration, the bundle's size and nesting depth, which language features it used (batching, parallel branches, conditions, structured outputs, image and document inputs), how many pipes of each type ran, and its inference totals: calls, failures, tokens, images, pages and cost |
-| `model_used` | once per model a run used | the backend kind (`openai`, `anthropic`, `mistral`, and so on, `custom` for a backend Pipelex does not ship), the model's name in the backend tables Pipelex ships (`other` for any other), and that run's calls, failures by category, tokens, images, pages and cost for it |
+| `command_completed` | once per command of the `pipelex` and `pipelex-agent` CLIs | the command's path in the command tree (`run bundle`, `validate pipe`, `init` and so on, a shorthand such as `pipelex validate my_pipe` counting as the command it runs; never its arguments or option values), its outcome, its duration, for a failure the code of its error from the [error registry](../under-the-hood/error-model.md) (`client.argument_invalid`, `method.invalid` and so on) and that code's domain, who must act on it (`input`, `method`, `account`, `operator` or `runtime`), and whether it ran on the hosted API; for `init`, also where it set runs to execute and, when it set up backends on this machine, which backend kinds it enabled |
+| `run_completed` | once per run, whatever started it | the outcome, for a failed run the code of its error and that code's domain, live or dry, the kind of source the method came from (a local bundle, an installed method, a published address), the duration, the bundle's size and nesting depth, which language features it used (batching, parallel branches, conditions, structured outputs, image and document inputs), how many pipes of each type ran, and its inference totals: calls, failures, tokens, images, pages and cost |
+| `model_used` | once per model a run used | the backend kind (`openai`, `anthropic`, `mistral`, and so on, `custom` for a backend Pipelex does not ship), the model's name in the backend tables Pipelex ships (`other` for any other), and that run's calls, its failed calls by the domain of their error's code, tokens, images, pages and cost for it |
 | `method_validated` | once per validation of a method | the verdict, the duration, the number of errors and warnings, and the bundle's size and depth |
 | `code_generated` | once per code generation | what was generated (types, input templates or structure classes), the target language, the outcome, the duration and the bundle's size |
+
+A refusal a server answered, the hosted API's among them, is counted by the code and the domain its answer sent, never by what Pipelex reads from its HTTP status: a command's event then carries none, and a run's, which must name one, the catch-all `runtime.unexpected`.
 
 A run's token totals come from the run's own usage events: when you turn tracing or cost reporting off, the run reports that its usage is unknown and no `model_used` is sent. The statistics never turn tracing on.
 

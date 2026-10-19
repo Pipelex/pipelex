@@ -178,7 +178,7 @@ class TestStdinResolver:
     def test_concept_object_form_is_refused(self, capsys: pytest.CaptureFixture[str]) -> None:
         """The full-object concept a stale runtime dumped is refused, never reduced to a bare code.
 
-        The label is a shape error, not a decode error: the envelope parsed, so a consumer must not
+        The reason is the shape, not a decode error: the envelope parsed, so a consumer must not
         be told to go hunting for trailing commas in JSON that was valid.
         """
         set_agent_cli_error_format(CliOutputFormat.JSON)
@@ -196,10 +196,13 @@ class TestStdinResolver:
         with pytest.raises(typer.Exit) as exc_info:
             resolve_stdin_inputs(data)
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "StdinEnvelopeShapeError"
-        assert "working_memory.root.item.concept" in envelope["message"]
-        assert "trailing commas" not in envelope["hint"]
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.argument_invalid"
+        assert problem["params"] == {"argument": "stdin", "reason": "working_memory.root.item.concept is not a concept ref string"}
+        assert "working_memory.root.item.concept" in problem["message"]
+        # The way out the refusal names: the concept's ref, or a fresh envelope from a current run.
+        assert "Replace the concept object with its ref, or re-pipe the output of a current 'pipelex-agent run --with-memory'." in problem["message"]
+        assert "valid JSON" not in problem["detail"]
 
     def test_stuff_missing_concept_skipped(self) -> None:
         """Stuff entries missing concept or content are silently skipped."""
@@ -380,8 +383,8 @@ class TestStdinResolver:
 
         assert result.pipeline_inputs == {"contract_text": {"concept": "Text", "content": "First line.\nSecond line.\n"}}
 
-    def test_inputs_toml_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Invalid TOML in a .toml inputs file emits a TomlError envelope with input domain."""
+    def test_inputs_toml_syntax_error_problem(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid TOML in a .toml inputs file is the request's problem, request.malformed, in the input domain."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         toml_file = tmp_path / "inputs.toml"
         toml_file.write_text("topic = \n", encoding="utf-8")
@@ -390,10 +393,10 @@ class TestStdinResolver:
             parse_cli_inputs(inputs_arg=str(toml_file))
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "TomlError"
-        assert envelope["error_domain"] == "input"
-        assert "hint" in envelope
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "request.malformed"
+        assert problem["domain"] == "input"
+        assert problem["diagnostics"]["error_class"] == "TomlError"
 
     def test_inputs_toml_time_only_becomes_time_content(self, tmp_path: Path) -> None:
         """A bare TOML time-of-day input maps to a native Time content (no rejection since native.Time exists)."""
@@ -405,8 +408,8 @@ class TestStdinResolver:
         assert parsed.pipeline_inputs is not None
         assert parsed.pipeline_inputs["opening"] == TimeContent(time=datetime.time(9, 0))
 
-    def test_inputs_json_syntax_error_envelope(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Invalid JSON in a .json inputs file emits a JSONDecodeError envelope (not a raw traceback)."""
+    def test_inputs_json_syntax_error_problem(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Invalid JSON in a .json inputs file is an argument refusal naming --inputs (not a raw traceback)."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         json_file = tmp_path / "inputs.json"
         json_file.write_text("{not valid json", encoding="utf-8")
@@ -415,8 +418,48 @@ class TestStdinResolver:
             parse_cli_inputs(inputs_arg=str(json_file))
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "JSONDecodeError"
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.argument_invalid"
+        assert problem["params"] == {"argument": "--inputs", "reason": "the file is not valid JSON"}
+        assert problem["diagnostics"]["error_class"] == "JSONDecodeError"
+
+    def test_an_inputs_file_holding_no_object_names_the_argument(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """A JSON inputs file holding an array is the caller's argument to correct, never the runtime's catch-all."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        json_file = tmp_path / "inputs.json"
+        json_file.write_text("[1, 2]", encoding="utf-8")
+
+        with pytest.raises(typer.Exit):
+            parse_cli_inputs(inputs_arg=str(json_file))
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.argument_invalid"
+        assert problem["params"] == {"argument": "--inputs", "reason": "the file does not hold a JSON object"}
+
+    @pytest.mark.parametrize(
+        ("body", "reason"),
+        [
+            (None, "is a directory"),
+            (b"\xff\xfe{}", "not UTF-8 text"),
+        ],
+    )
+    def test_an_inputs_file_that_cannot_be_read_is_a_file_refusal(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str], body: bytes | None, reason: str
+    ) -> None:
+        """A path that is a directory, or a file that is not text, is `client.file_unreadable` with the system's reason."""
+        set_agent_cli_error_format(CliOutputFormat.JSON)
+        inputs_path = tmp_path / "inputs.json"
+        if body is None:
+            inputs_path.mkdir()
+        else:
+            inputs_path.write_bytes(body)
+
+        with pytest.raises(typer.Exit):
+            parse_cli_inputs(inputs_arg=str(inputs_path))
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "client.file_unreadable"
+        assert problem["params"] == {"path": str(inputs_path), "reason": reason}
 
     # -------------------------------------------------------------------------
     # auto_inputs_dir precedence tests
@@ -491,7 +534,7 @@ class TestStdinResolver:
     def test_ambiguous_auto_dir_raises_when_no_stdin(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """With no stdin and both default files present, auto-detect is the active source and emits the ambiguity envelope."""
+        """With no stdin and both default files present, auto-detect is the active source and reports the ambiguity's problem."""
         set_agent_cli_error_format(CliOutputFormat.JSON)
         (tmp_path / "inputs.json").write_text('{"from_auto": true}')
         (tmp_path / "inputs.toml").write_text("from_auto = true\n")
@@ -504,7 +547,8 @@ class TestStdinResolver:
             parse_cli_inputs(inputs_arg=None, auto_inputs_dir=tmp_path)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "AmbiguousInputsFilesError"
-        assert envelope["error_domain"] == "input"
-        assert "--inputs" in envelope["hint"]
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "request.invalid"
+        assert problem["domain"] == "input"
+        assert problem["diagnostics"]["error_class"] == "AmbiguousInputsFilesError"
+        assert "--inputs" in problem["message"]

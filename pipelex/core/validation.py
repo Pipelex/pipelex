@@ -24,7 +24,9 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from pipelex.base_exceptions import MigrationErrorBlock, PipelexConfigError
 from pipelex.migration.exceptions import MigrationError
 from pipelex.migration.plan import MigrationPlan
-from pipelex.system.configuration.config_loader import pydantic_error_behind
+from pipelex.system.configuration.config_loader import CONFIG_NAME, pydantic_error_behind
+from pipelex.system.configuration.config_surface import PIPELEX_CONFIG_SURFACE_ID, TELEMETRY_CONFIG_SURFACE_ID
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.typing.pydantic_utils import analyze_pydantic_validation_error
 
 MIGRATE_COMMAND = "pipelex migrate"
@@ -45,6 +47,29 @@ class ValidationErrorReport(BaseModel):
     migration: MigrationErrorBlock | None = None
     """What a `pipelex migrate` would find for the surface that refused, when a scan found
     anything at all. `None` means the failure is not staleness — or that no surface was named."""
+
+    setting: str | None = None
+    """The setting the first refusal names, as a dotted path of keys, which the refusal's problem gives its step;
+    `None` when the refusal names none, or carries no pydantic error. A path of names, never a value."""
+
+
+#: The part of the configuration and the file a surface's refusal names, by the surface's id.
+_SURFACE_PARTS: dict[str, tuple[str, str]] = {
+    PIPELEX_CONFIG_SURFACE_ID: ("pipelex", CONFIG_NAME),
+    TELEMETRY_CONFIG_SURFACE_ID: ("telemetry", TELEMETRY_CONFIG_FILE_NAME),
+}
+
+
+def refused_setting(*, validation_error: ValidationError) -> str | None:
+    """The setting the first refusal of `validation_error` names, as a dotted path of keys; `None` when none names one.
+
+    Only the location is read, never the input, so no value from the user's file reaches it.
+    """
+    for error in validation_error.errors(include_url=False, include_input=False, include_context=False):
+        location = [str(part) for part in error["loc"]]
+        if location:
+            return ".".join(location)
+    return None
 
 
 def report_validation_error(
@@ -71,7 +96,8 @@ def report_validation_error(
         The translated message and, when a scan found something, the structured migration block.
     """
     message = analyze_pydantic_validation_error(validation_error).error_msg
-    return _report_after_the_scan(message=message, surface_id=surface_id, config_dirs=config_dirs)
+    report = _report_after_the_scan(message=message, surface_id=surface_id, config_dirs=config_dirs)
+    return report.model_copy(update={"setting": refused_setting(validation_error=validation_error)})
 
 
 def report_config_refusal(
@@ -115,8 +141,9 @@ def report_config_refusal(
     Returns:
         The body and, when a scan found something, the structured migration block.
     """
-    message = analyze_pydantic_validation_error(refusal).error_msg if isinstance(refusal, ValidationError) else str(refusal)
-    return _report_after_the_scan(message=message, surface_id=surface_id, config_dirs=config_dirs)
+    if isinstance(refusal, ValidationError):
+        return report_validation_error(validation_error=refusal, surface_id=surface_id, config_dirs=config_dirs)
+    return _report_after_the_scan(message=str(refusal), surface_id=surface_id, config_dirs=config_dirs)
 
 
 def _report_after_the_scan(*, message: str, surface_id: str | None, config_dirs: list[Path] | None) -> ValidationErrorReport:
@@ -154,7 +181,8 @@ def raise_config_setup_error(*, config_error: Exception, surface_id: str, config
         raise config_error
     report = report_validation_error(validation_error=validation_error, surface_id=surface_id, config_dirs=config_dirs)
     msg = f"Could not setup config because of: {report.message}"
-    raise PipelexConfigError(msg, migration=report.migration) from config_error
+    surface, file = _SURFACE_PARTS.get(surface_id, (surface_id, None))
+    raise PipelexConfigError(msg, migration=report.migration, surface=surface, file=file, setting=report.setting) from config_error
 
 
 def _pending_migration(*, surface_id: str, config_dirs: list[Path] | None) -> MigrationErrorBlock | None:

@@ -119,6 +119,7 @@ class CommandCompletedProperties(UsageStatsProperties):
 
     command: str
     outcome: UsageStatsOutcome
+    error_code: str | None = None
     error_domain: UsageStatsErrorDomain | None = None
     duration_ms: int
     hosted: bool | None = None
@@ -168,6 +169,7 @@ class BundleFeatures(UsageStatsProperties):
 
 class RunCompletedProperties(UsageStatsProperties):
     outcome: UsageStatsOutcome
+    error_code: str | None = None
     error_domain: UsageStatsErrorDomain | None = None
     dry_run: bool
     method_source: UsageStatsMethodSource
@@ -212,12 +214,11 @@ class ModelUsedProperties(UsageStatsProperties):
     model: str
     calls: int
     failures: int
-    failures_transient: int
-    failures_configuration: int
-    failures_content: int
-    failures_capacity: int
-    failures_ambiguous: int
-    failures_unknown: int
+    failures_input: int
+    failures_method: int
+    failures_account: int
+    failures_operator: int
+    failures_runtime: int
     input_tokens: int
     output_tokens: int
     cached_tokens: int

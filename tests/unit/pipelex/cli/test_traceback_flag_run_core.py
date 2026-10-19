@@ -51,7 +51,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
             pipe_stack=["test-pipe"],
         )
 
-        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_error_console", return_value=mock_console)
         mock_runner_cls = mocker.patch("pipelex.cli.commands.run._run_core.PipelexMTHDSProtocol")
 
         mock_runner = mocker.MagicMock()
@@ -96,7 +96,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
     def test_bundle_file_not_found_prints_traceback(self, mocker: MockerFixture) -> None:
         """FileNotFoundError for bundle in _execute_run prints traceback when --traceback is active."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_error_console", return_value=mock_console)
 
         ctx = click.Context(click.Command("run"), obj={"traceback": True})
         with ctx, pytest.raises(typer.Exit):
@@ -125,7 +125,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
     def test_json_decode_error_prints_traceback(self, mocker: MockerFixture) -> None:
         """json.JSONDecodeError for inline inputs prints traceback when --traceback is active."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_error_console", return_value=mock_console)
 
         ctx = click.Context(click.Command("run"), obj={"traceback": True})
         with ctx, pytest.raises(typer.Exit):
@@ -154,7 +154,7 @@ class TestTracebackFlagInExecuteRunInnerExcepts:
     def test_no_traceback_when_flag_absent(self, mocker: MockerFixture) -> None:
         """FileNotFoundError for bundle does NOT print traceback when --traceback is False."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.commands.run._run_core.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.commands.run._run_core.get_error_console", return_value=mock_console)
 
         ctx = click.Context(click.Command("run"), obj={"traceback": False})
         with ctx, pytest.raises(typer.Exit):

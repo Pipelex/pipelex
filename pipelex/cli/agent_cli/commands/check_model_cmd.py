@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_argument_error, agent_error, agent_success, use_agent_cli_error_format
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.cogt.models.model_reference_check import ModelCheckCategory
@@ -62,7 +62,7 @@ def agent_check_model_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Check if a model reference is valid and suggest alternatives if not.
@@ -71,7 +71,7 @@ def agent_check_model_cmd(
     model deck by the rule a validation applies, and on failure provides fuzzy
     suggestions and wrong-sigil hints.
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     try:
         make_pipelex_for_agent_cli(needs_inference=False)
 
@@ -109,9 +109,9 @@ def agent_check_model_cmd(
         # `agent_error` has already reported is caught again below and reported twice.
         raise
     except ModelReferenceParseError as exc:
-        agent_error(f"Invalid model reference: {exc}", error_type="ArgumentError", cause=exc)
+        agent_argument_error(f"Invalid model reference: {exc}", argument=name, reason="not a model reference", cause=exc)
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(f"Failed to check model: {exc}", error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(f"Failed to check model: {exc}", cause=exc)
     finally:
         Pipelex.teardown_if_needed()

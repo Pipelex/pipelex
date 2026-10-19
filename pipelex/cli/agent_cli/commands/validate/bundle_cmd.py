@@ -12,9 +12,10 @@ from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
     agent_error_validate_bundle,
+    agent_file_error,
     agent_success_formatted,
-    run_failure_fields,
-    set_agent_cli_error_format,
+    agent_unreadable_file_error,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.cli.agent_cli.commands.validate._validate_core import (
@@ -106,7 +107,7 @@ def validate_bundle_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Validate a bundle file (.mthds) or a method's folder and output the results.
@@ -126,7 +127,7 @@ def validate_bundle_cmd(
         pipelex-agent validate bundle my_method/ --graph
         pipelex-agent validate bundle draft_pipeline.mthds --allow-signatures
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     # A folder is judged whole, as the MTHDS protocol's validation judges a method: every bundle of its tree.
     try:
@@ -184,18 +185,16 @@ def validate_bundle_cmd(
             except PipelineExecutionError as exc:
                 agent_error(
                     f"Graph generation failed: {exc.message}",
-                    error_type="PipelineExecutionError",
                     cause=exc,
                     exit_code=2,
-                    **run_failure_fields(error=exc),
                 )
             except MthdsParserError as exc:
-                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
+                agent_error(f"Graph generation failed: {exc}", cause=exc, exit_code=2)
             except typer.Exit:
                 raise
             except Exception as exc:  # ruff: ignore[blind-except]
-                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(f"Graph generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+                agent_error(f"Graph generation failed: {exc}", cause=exc, exit_code=2)
 
         # Generate view (GraphSpec JSON) if requested and validation succeeded
         if view and isinstance(graph_target, _GraphTarget):
@@ -212,18 +211,16 @@ def validate_bundle_cmd(
             except PipelineExecutionError as exc:
                 agent_error(
                     f"View generation failed: {exc.message}",
-                    error_type="PipelineExecutionError",
                     cause=exc,
                     exit_code=2,
-                    **run_failure_fields(error=exc),
                 )
             except MthdsParserError as exc:
-                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
+                agent_error(f"View generation failed: {exc}", cause=exc, exit_code=2)
             except typer.Exit:
                 raise
             except Exception as exc:  # ruff: ignore[blind-except]
-                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-                agent_error(f"View generation failed: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=2)
+                # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+                agent_error(f"View generation failed: {exc}", cause=exc, exit_code=2)
 
         agent_success_formatted(result, markdown_renderer=format_validate_markdown, output_format=output_format)
 
@@ -242,16 +239,21 @@ def validate_bundle_cmd(
 
     except PipeNotFoundError as exc:
         # The real class, not the caught base — see the same arm in `validate pipe`.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {judged_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+        agent_file_error(f"Bundle file not found: {judged_path}", path=str(judged_path), reason="not found", cause=exc, exit_code=2)
+
+    except OSError as exc:
+        # A method file this machine would not let the command read: the file, never a fault of the method. An error
+        # naming no file, a connection or a timeout, is the unexpected failure the boundary reports.
+        agent_unreadable_file_error(error=exc, exit_code=2)
 
     except ValidateBundleError as exc:
-        # Invalid verdict: emit the format-aware failure surface. JSON keeps the exact structured
-        # envelope (is_valid:false discriminant + validation_errors[], the shared builder's output,
-        # non-empty on every invalid verdict); markdown renders those items as prose with a fix-aware
-        # footer. Signatures never reach here (they are a runnability fact, gated above).
+        # Invalid verdict: the problem of the method that does not validate, format-aware. Its errors are
+        # the shared builder's items, non-empty on every invalid verdict, beside the is_valid:false
+        # discriminant; markdown renders those items as prose with a fix-aware footer. Signatures never
+        # reach here (they are a runnability fact, gated above).
         agent_error_validate_bundle(exc, bundle_path=judged_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
 
     except PipeOperatorModelAvailabilityError as exc:
@@ -263,14 +265,14 @@ def validate_bundle_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
+        agent_error(exc.message, cause=exc, exit_code=2, **availability_extra)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

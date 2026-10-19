@@ -61,7 +61,7 @@ class TestValidateSuggestedFixIntegration:
         mocker.patch(f"{VALIDATE_CORE_MODULE}.get_telemetry_manager", return_value=mocker.MagicMock())
         mocker.patch(f"{VALIDATE_CORE_MODULE}.tag")
         recorded_console = Console(width=500, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
 
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text(_FIXABLE_SEQUENCE_MTHDS, encoding="utf-8")

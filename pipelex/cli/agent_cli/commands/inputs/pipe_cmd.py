@@ -9,7 +9,13 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import (
+    CliOutputFormat,
+    agent_argument_error,
+    agent_error,
+    agent_file_error,
+    use_agent_cli_error_format,
+)
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
@@ -38,11 +44,15 @@ def inputs_pipe_cmd(
         bool,
         typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
     ] = False,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to json)"),
+    ] = None,
 ) -> None:
     """Generate an example inputs template for a pipe by code.
 
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, JSON to stderr on error with exit code 1.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
 
     Examples:
         pipelex-agent inputs pipe my_pipe
@@ -50,24 +60,22 @@ def inputs_pipe_cmd(
         pipelex-agent inputs pipe my_pipe --format toml
         pipelex-agent inputs pipe my_pipe --explicit
     """
+    use_agent_cli_error_format(error_format=error_format)
     # Helpful error if the user passes a path instead of a pipe code
     target_path = Path(pipe_code)
     if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
-        agent_error(
+        agent_argument_error(
             f"'{pipe_code}' looks like a file path or directory. "
             f"Use 'inputs bundle {pipe_code}' for bundles/directories, or 'inputs pipe <code>' for pipe codes.",
-            error_type="ArgumentError",
+            argument=pipe_code,
+            reason="a path where a pipe code is expected",
         )
 
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
     except ExportedPipeAmbiguousError as exc:
-        agent_error(
-            f"Ambiguous pipe code '{pipe_code}': {exc}",
-            error_type="ArgumentError",
-            cause=exc,
-        )
+        agent_error(f"Ambiguous pipe code '{pipe_code}': {exc}", cause=exc)
     if export_dirs:
         if library_dir is None:
             library_dir = export_dirs
@@ -82,16 +90,15 @@ def inputs_pipe_cmd(
         emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
-        agent_error(f"File not found: {exc}", error_type="FileNotFoundError", cause=exc)
+        agent_file_error(f"File not found: {exc}", path=str(exc.filename or exc), reason="not found", cause=exc)
 
     except ValidateBundleError as exc:
-        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
+        # A failing dry run is the problem's errors, one located item per failing pipe.
+        agent_error(exc.message, cause=exc)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -107,14 +114,14 @@ def inputs_pipe_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, cause=exc, **availability_extra)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

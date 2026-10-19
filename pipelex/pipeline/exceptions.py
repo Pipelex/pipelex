@@ -20,7 +20,7 @@ from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
 from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
-from pipelex.pipeline.validation_errors import build_validation_error_items, problem_item_of, validation_item_code
+from pipelex.pipeline.validation_errors import ValidationItemCode, build_validation_error_items, problem_item_of, validation_item_code
 from pipelex.system.pipe_run_mode import PipeRunMode
 
 
@@ -416,12 +416,27 @@ class ValidateBundleError(PipelexError):
 
     @override
     def problem_items(self) -> list[ProblemItem] | None:
-        """One problem item per validation item, each with its own code: a dry run's the failure's, any other its type's.
+        """One problem item per validation item, each with its own code (:meth:`item_codes`).
+
+        On a withheld verdict (:meth:`withholding_files`), every item is withheld whole, its sentence, its parameters and
+        its locators, whichever channel each came from.
+        """
+        items = [problem_item_of(item=item, code=item_code.code, params=item_code.params) for item, item_code in self._coded_items()]
+        if self._file_withholding is not None:
+            file_withholding = self._file_withholding
+            items = [file_withholding.withheld_item(item=item) for item in items]
+        return items or None
+
+    def item_codes(self) -> list[ValidationItemCode]:
+        """The code of each of :meth:`validation_error_items`, in its order (:meth:`problem_items`'s codes)."""
+        return [item_code for _, item_code in self._coded_items()]
+
+    def _coded_items(self) -> list[tuple[ValidationErrorItem, ValidationItemCode]]:
+        """Each of :meth:`validation_error_items` with its code: a dry run's the failure's, any other its type's.
 
         An item no stage classified takes the code of the refusal this verdict was built from when that refusal is
         the method's, and ``method.schema_violation`` otherwise, or when that code is ``method.invalid``: the verdict's
-        own umbrella, whose sentence says nothing of the item. On a withheld verdict (:meth:`withholding_files`), every
-        item is withheld whole, its sentence, its parameters and its locators, whichever channel each came from.
+        own umbrella, whose sentence says nothing of the item.
         """
         residual_code: ErrorCode = CoreCode.METHOD_SCHEMA_VIOLATION
         # The parameters the refusal's code renders from, as a caller reads them, which an item taking its code keeps.
@@ -434,7 +449,7 @@ class ValidateBundleError(PipelexError):
                 cause_params = cause.to_problem(view=ProblemView.CALLER).params
                 residual_params = cause_params.as_wire() if cause_params is not None else None
         dry_run_failures = iter(self.dry_run_failures)
-        items: list[ProblemItem] = []
+        coded_items: list[tuple[ValidationErrorItem, ValidationItemCode]] = []
         for item in self.validation_error_items():
             item_code: ErrorCode
             item_params: dict[str, Any] | None = None
@@ -447,11 +462,8 @@ class ValidateBundleError(PipelexError):
                 item_params = residual_params
             else:
                 item_code = validation_item_code(item=item, residual_code=residual_code)
-            items.append(problem_item_of(item=item, code=item_code, params=item_params))
-        if self._file_withholding is not None:
-            file_withholding = self._file_withholding
-            items = [file_withholding.withheld_item(item=item) for item in items]
-        return items or None
+            coded_items.append((item, ValidationItemCode(code=item_code, params=item_params)))
+        return coded_items
 
 
 class HostLibraryLoadRefusalError(PipelexError):

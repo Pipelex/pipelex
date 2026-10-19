@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, ClassVar, Self
 
 import tomli
@@ -57,12 +58,14 @@ class TomlError(ToolError):
 
     error_code = ErrorCodeSet(default=PipelexErrorCode.CONFIG_SYNTAX, others=(CoreCode.REQUEST_MALFORMED, CoreCode.METHOD_SYNTAX))
 
-    def __init__(self, message: str, doc: str, pos: int, lineno: int, colno: int):
+    def __init__(self, message: str, doc: str, pos: int, lineno: int, colno: int, *, path: Path | None = None):
         super().__init__(message)
         self.doc = doc
         self.pos = pos
         self.lineno = lineno
         self.colno = colno
+        # The file the document was read from, when it was read from one: a refusal names that file, never a guess.
+        self.path = path
 
     @override
     def problem_params(self) -> dict[str, Any]:

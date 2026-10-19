@@ -122,7 +122,7 @@ class TestHumanFolderEntryCommands:
 
     def test_validate_names_the_folder_whose_tree_is_refused_in_its_invalid_verdict(self, mocker: MockerFixture, tmp_path: Path) -> None:
         recorded_console = Console(width=500, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
         mock_execute = mocker.patch("pipelex.cli.commands.validate.bundle_cmd.execute_validate")
         _write_folder_with_a_refused_tree(directory=tmp_path)
 
@@ -140,7 +140,7 @@ class TestHumanFolderEntryCommands:
     def test_fix_reports_a_folder_whose_tree_is_refused_as_a_fix_that_fails(self, mocker: MockerFixture, tmp_path: Path, diff: bool) -> None:
         recorded_console = Console(width=500, record=True, color_system=None)
         mocker.patch("pipelex.cli.commands.fix._fix_core.get_console", return_value=recorded_console)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
         mock_execute = mocker.patch("pipelex.cli.commands.fix.bundle_cmd.execute_fix")
         _write_folder_with_a_refused_tree(directory=tmp_path)
 

@@ -1,7 +1,6 @@
 """Agent CLI fix bundle command."""
 
 import asyncio
-import sys
 from pathlib import Path
 from typing import Annotated, Any, NoReturn
 
@@ -10,10 +9,13 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
+    agent_argument_error,
     agent_error,
+    agent_error_fix_bundle,
+    agent_file_error,
     agent_success_formatted,
-    get_agent_cli_error_format,
-    set_agent_cli_error_format,
+    agent_unreadable_file_error,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.cli.judged_target import fix_judged_target
@@ -22,7 +24,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult, unfixable_method_result
-from pipelex.pipeline.fixes.fix_render import format_fix_markdown, format_fix_still_invalid_markdown
+from pipelex.pipeline.fixes.fix_render import format_fix_markdown
 from pipelex.pipeline.fixes.planner import KNOWN_FIX_CODES
 
 
@@ -34,9 +36,10 @@ def _normalize_rule_codes(codes: list[str] | None) -> tuple[str, ...] | None:
 
 def _reject_invalid_rule_filters(*, select_codes: tuple[str, ...] | None, ignore_codes: tuple[str, ...] | None) -> None:
     if select_codes is not None and ignore_codes is not None:
-        agent_error(
+        agent_argument_error(
             "--select and --ignore are mutually exclusive",
-            error_type="ArgumentError",
+            argument="--ignore",
+            reason="contradicts --select",
             exit_code=2,
             known_fix_codes=sorted(KNOWN_FIX_CODES),
         )
@@ -50,9 +53,10 @@ def _reject_invalid_rule_filters(*, select_codes: tuple[str, ...] | None, ignore
     if unknown_codes:
         known_codes = ", ".join(sorted(KNOWN_FIX_CODES))
         unknown = ", ".join(unknown_codes)
-        agent_error(
+        agent_argument_error(
             f"Unknown fix rule code(s): {unknown}. Known codes: {known_codes}",
-            error_type="ArgumentError",
+            argument=unknown,
+            reason="unknown fix rule code",
             exit_code=2,
             unknown_fix_codes=unknown_codes,
             known_fix_codes=sorted(KNOWN_FIX_CODES),
@@ -62,7 +66,8 @@ def _reject_invalid_rule_filters(*, select_codes: tuple[str, ...] | None, ignore
 def _result_payload(result: FixBundleResult, *, bundle_path: str) -> dict[str, Any]:
     return {
         "bundle_path": str(Path(bundle_path).resolve()),
-        **result.model_dump(mode="json", exclude_none=True),
+        # The remaining errors' codes are the problem's items' when the fix fails, never a member of the result.
+        **result.model_dump(mode="json", exclude_none=True, exclude={"remaining_error_codes"}),
     }
 
 
@@ -77,19 +82,11 @@ def _failure_message(result: FixBundleResult) -> str:
 
 
 def _emit_still_invalid(*, result: FixBundleResult, bundle_path: str) -> NoReturn:
-    """Emit the still-invalid verdict, format-aware, and exit 1.
+    """Report the still-invalid verdict, format-aware, and exit 1.
 
-    JSON keeps the exact FixBundleError envelope (the result fields + bail_reason via the payload); markdown renders the
-    remaining errors as prose with their 💡 lines (mirroring the human still-invalid panel) instead of a raw JSON dump
-    of the details.
+    The problem is the method's that does not validate, its faults the remaining errors.
     """
-    payload = _result_payload(result, bundle_path=bundle_path)
-    match get_agent_cli_error_format():
-        case CliOutputFormat.JSON:
-            agent_error(_failure_message(result), error_type="FixBundleError", exit_code=1, **payload)
-        case CliOutputFormat.MARKDOWN:
-            print(format_fix_still_invalid_markdown(result, bundle_path=str(payload["bundle_path"])), file=sys.stderr)
-            raise typer.Exit(1)
+    agent_error_fix_bundle(result=result, bundle_path=str(Path(bundle_path).resolve()), message=_failure_message(result))
 
 
 def fix_bundle_cmd(
@@ -126,14 +123,14 @@ def fix_bundle_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Fix a bundle file (.mthds) or a method's folder in place.
 
     A folder is judged whole, every bundle of its method tree, as `validate bundle` judges it.
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
     select_codes = _normalize_rule_codes(select_codes_raw)
     ignore_codes = _normalize_rule_codes(ignore_codes_raw)
@@ -166,15 +163,21 @@ def fix_bundle_cmd(
             if not allow_signatures and result.is_runnable is False:
                 raise typer.Exit(1)
             return
+
+        # Still-invalid verdict: the problem of the method that does not validate, its faults the remaining errors.
         _emit_still_invalid(result=result, bundle_path=bundle_path)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+        agent_file_error(f"Bundle file not found: {bundle_path}", path=bundle_path, reason="not found", cause=exc, exit_code=2)
+
+    except OSError as exc:
+        # A method file the loop could not read; a write it could not make is a `FixWriteFailedError`, never an OSError.
+        # An error naming no file, a connection or a timeout, is the unexpected failure the boundary reports.
+        agent_unreadable_file_error(error=exc, exit_code=2)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             exit_code=2,
             pipe_code=exc.pipe_code,
@@ -191,14 +194,14 @@ def fix_bundle_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, exit_code=2, **availability_extra)
+        agent_error(exc.message, cause=exc, exit_code=2, **availability_extra)
 
     except typer.Exit:
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc, exit_code=2)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc, exit_code=2)
 
     finally:
         Pipelex.teardown_if_needed()

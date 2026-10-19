@@ -21,6 +21,7 @@ Three properties are what the tests below exist to hold:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -311,6 +312,35 @@ class TestTheErrorCarriesBothTheDomainAndTheBlock:
         diagnostics = raised.value.to_problem(view=ProblemView.OPERATOR).diagnostics
         assert diagnostics is not None
         assert diagnostics.migration is None
+
+    @pytest.mark.usefixtures("machine")
+    @pytest.mark.parametrize(
+        ("surface_id", "expected_step"),
+        [
+            (
+                PIPELEX_CONFIG_SURFACE_ID,
+                "Correct the setting 'required_field' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime.",
+            ),
+            (
+                TELEMETRY_CONFIG_SURFACE_ID,
+                "Correct the setting 'required_field' in the file 'telemetry.toml' of the telemetry configuration, then restart the runtime.",
+            ),
+        ],
+    )
+    def test_the_operator_s_step_names_the_setting_the_file_and_the_surface(
+        self, surface_id: str, expected_step: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The code's step renders from the parameters the refusal gives, never falling back on the generic sentence."""
+        refusal = ConfigValidationError("the configuration was refused")
+        refusal.__cause__ = _make_validation_error()
+
+        with pytest.raises(PipelexConfigError) as raised:
+            raise_config_setup_error(config_error=refusal, surface_id=surface_id)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = raised.value.to_problem(view=ProblemView.OPERATOR)
+        assert problem.next_step.detail == expected_step
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
 
     def test_a_refusal_carrying_no_pydantic_error_is_re_raised_as_itself(self) -> None:
         """There is nothing to translate, and its own message is already the whole account."""

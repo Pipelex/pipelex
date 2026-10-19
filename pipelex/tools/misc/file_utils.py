@@ -476,6 +476,42 @@ def ensure_directory_for_file_path(file_path: Path) -> None:
     ensure_directory_exists(file_path.parent)
 
 
+def path_label(*, path: Path) -> str:
+    """The path as a refusal names it to its reader, without the home directory.
+
+    A problem's parameters are read by an agent, printed and logged, and a home directory names the account it belongs
+    to, so a path under the working directory is written relative to it, as a project's files are, and a path under the
+    home directory as ``~/…``. When the working directory holds the home directory, the home directory itself or one
+    above it, a file under the home directory is written ``~/…`` all the same, so the home configuration never reads
+    as a project's. A path under neither is written whole: it names no account.
+
+    Args:
+        path: The file or directory, absolute or relative to the working directory.
+
+    Returns:
+        The label, with forward slashes in a relative or ``~/`` label.
+    """
+    try:
+        working_dir: Path | None = Path.cwd()
+    except FileNotFoundError:
+        # The working directory was removed while the process ran: only the home directory can shorten the path.
+        working_dir = None
+    try:
+        home_dir: Path | None = Path.home()
+    except RuntimeError:
+        home_dir = None
+    joined = path if path.is_absolute() or working_dir is None else working_dir / path
+    # Collapsed lexically before it is compared, so a `..` cannot climb out of the working directory or the home
+    # directory while still reading as under it, nor walk back into the home directory past its name.
+    absolute = Path(os.path.normpath(joined))
+    if working_dir is not None and absolute.is_relative_to(working_dir):
+        if home_dir is None or not home_dir.is_relative_to(working_dir):
+            return absolute.relative_to(working_dir).as_posix()
+    if home_dir is not None and absolute.is_relative_to(home_dir):
+        return f"~/{absolute.relative_to(home_dir).as_posix()}"
+    return str(path)
+
+
 def path_exists(path_str: str | Path) -> bool:
     """Checks if a file or directory exists at the specified path.
 

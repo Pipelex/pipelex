@@ -92,6 +92,6 @@ class TestFixBundleE2E:
         assert result.returncode == 1, f"unfixable bundle must exit 1.\nstdout={result.stdout!r}\nstderr={result.stderr!r}"
         assert result.stdout == ""
         payload = json.loads(result.stderr)
-        assert payload["error_type"] == "FixBundleError"
+        assert payload["code"] == "method.invalid"
         assert payload["is_valid"] is False
-        assert payload["remaining_errors"]
+        assert payload["errors"]
