@@ -564,7 +564,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `auth_refusal_reason` | string | Why the API server refused a caller's own credentials: `missing_bearer_token`, `expired_token`, `invalid_token` or `api_key_mismatch` |
 | `claim_type` | string | The type a token's claim was decoded as, by its Python name, where the claim is refused and its value is not logged: `str`, `int`, `dict` |
 | `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
-| `error.code` | string | The registry code of a failure's problem, which a line about a failure that may quote a run's data gives in place of its text |
+| `error.code` | string | The registry code of a failure's problem, which a line about a failure that may quote a run's data gives in place of its text, and the code of the refusal a [security event](#the-security-event) logs, whose domain rides beside it in `error.domain` |
 | `error.chain` | list of strings | The classes along a failure's cause chain, its own first, which the root of a CLI command gives in place of the chain's texts |
 | `error.frames` | list of strings | The frames a failure went through, from where the root of a CLI command caught it down to where its first exception was raised, each `module:line in function`, with no source line and no local, the innermost forty kept, which that root gives in place of the traceback |
 | `error_domain` | string | Who fixes a failure: `input`, `config`, `runtime`, read from the domain of the failure's code |

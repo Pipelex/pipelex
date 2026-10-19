@@ -30,6 +30,9 @@ from pydantic_core.core_schema import ErrorType
 #: The class of the handled exception, by its name.
 ERROR_TYPE_FIELD = "error.type"
 
+#: The registry code of the failure or the refusal a record is about, which the record gives in place of its text.
+ERROR_CODE_FIELD = "error.code"
+
 #: The handled exception's text.
 ERROR_MESSAGE_FIELD = "error.message"
 
