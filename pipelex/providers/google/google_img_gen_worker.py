@@ -282,11 +282,12 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         cause = _IMAGE_REFUSAL_CAUSES.get(refusal_reason.upper())
         next_step = "Revise the image prompt or its input images."
         msg = f"{what_happened}: {cause}. {next_step}" if cause else f"{what_happened}. {next_step}"
-        raise (
-            ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT, provider_metadata=None)
-            .with_error_code(CoreCode.MODEL_CONTENT_REFUSED)
-            .as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
-        )
+        raise ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONTENT,
+            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step),
+            provider_metadata=None,
+        ).with_error_code(CoreCode.MODEL_CONTENT_REFUSED)
 
     @override
     async def _gen_image_list(

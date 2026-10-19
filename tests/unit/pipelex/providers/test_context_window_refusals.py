@@ -13,9 +13,8 @@ from google.genai import errors as genai_errors
 from mistralai.client import Mistral
 from mistralai.client.errors import MistralError
 from mistralai.client.models import UserMessage
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -37,6 +36,8 @@ from pipelex.cogt.inference.error_classification import (
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from tests.helpers.completion_stop import make_text_llm_job
 
@@ -473,9 +474,9 @@ class TestContextWindowRefusals:
             with pytest.raises(LLMCompletionError) as exc_info:
                 await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.code == CoreCode.MODEL_CONTEXT_EXCEEDED
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.retryable is False
-        assert report.http_status == 422
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_CONTEXT_EXCEEDED
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.retry == RetryVerdict.NO
+        assert error_code_spec(CoreCode.MODEL_CONTEXT_EXCEEDED).status == 422
         assert isinstance(exc_info.value.__cause__, openai.BadRequestError)

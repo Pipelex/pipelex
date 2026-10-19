@@ -7,14 +7,15 @@ import httpx
 import pytest
 from google import genai
 from google.genai import types as genai_types
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenOutputTruncatedError, InferenceErrorCategory
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.cogt.llm import completion_stop
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 
 if TYPE_CHECKING:
@@ -121,11 +122,15 @@ class TestGoogleImgGenWorkerRefusal:
         assert f"'{reason}'" in error.message
         assert f"'{_MODEL_HANDLE}'" in error.message
         assert _MODEL_ID not in error.message
-        report = error.to_error_report()
-        assert report.code == CoreCode.MODEL_CONTENT_REFUSED
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.http_status == 422
-        assert report.caller_facing_message is True
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_CONTENT_REFUSED
+        assert caller.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.MODEL_CONTENT_REFUSED).status == 422
+        # The caller reads the code's sentence, never the provider's model id, and the reason rides the operator's view.
+        assert _MODEL_ID not in str(caller.to_wire())
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == error.message
 
     @pytest.mark.parametrize(
         ("answer", "expected_message"),
@@ -228,11 +233,14 @@ class TestGoogleImgGenWorkerRefusal:
         assert error.user_action is not None
         assert error.user_action.kind is UserActionKind.CHANGE_INPUT
         assert error.user_action.detail == "Simplify the image prompt, or choose another image model."
-        report = error.to_error_report()
-        assert report.code == CoreCode.MODEL_OUTPUT_TRUNCATED
-        assert report.http_status == 422
-        assert report.retryable is False
-        assert report.caller_facing_message is True
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_OUTPUT_TRUNCATED
+        assert error_code_spec(CoreCode.MODEL_OUTPUT_TRUNCATED).status == 422
+        assert caller.retry == RetryVerdict.NO
+        assert _MODEL_ID not in str(caller.to_wire())
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == error.message
 
     @pytest.mark.parametrize("answer", [_GENERATED_IMAGE, _GENERATED_IMAGE_AT_THE_LIMIT], ids=["stopped", "stopped-at-the-limit"])
     async def test_a_generated_image_is_returned(self, mocker: MockerFixture, answer: dict[str, Any]) -> None:

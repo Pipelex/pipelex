@@ -838,13 +838,12 @@ class ImgGenOutputTruncatedError(ImgGenGenerationError):
     holds no image (a Gemini candidate whose finish reason is `MAX_TOKENS`), instead of reading it as an empty answer.
     It is ``model.output_truncated``, and not retryable: the same request stops at the same limit. The worker sends no
     output limit of its own, so the limit is the model's, which the image and the model's thinking share, and the
-    next step is a simpler prompt or another model, never a setting of the pipe's. The message names only the model's
-    deck handle and the provider's stop value, so it is kept verbatim for the caller.
+    advice its `user_action` gives is a simpler prompt or another model, never a setting of the pipe's. The message,
+    for the operator, names only the model's deck handle and the provider's stop value.
     """
 
     error_code = CoreCode.MODEL_OUTPUT_TRUNCATED
     error_category = InferenceErrorCategory.CONTENT
-    _authors_caller_facing_message = True
 
     def __init__(self, *, model_handle: str, stop_reason: str):
         next_step = "Simplify the image prompt, or choose another image model."
