@@ -80,8 +80,10 @@ class TestValidateBundleErrorFormat:
         assert captured.out == ""
         return captured.err
 
-    def test_markdown_renders_prose_and_fix_aware_footer(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
-        """Markdown renders the problem's heading and facts, prose items with the 💡 fix line, the bundle, and a fix-aware footer."""
+    def test_markdown_renders_the_items_and_a_fix_aware_footer(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path
+    ) -> None:
+        """Markdown renders the problem's heading and facts, its items with their fix, the bundle, and a fix-aware footer."""
         bundle_path = tmp_path / "bundle.mthds"
         markdown = self._report_markdown(
             mocker=mocker, capsys=capsys, items=[_fixable_item(source=bundle_path)], bundle_path=bundle_path, library_dirs=[tmp_path / "libs"]
@@ -89,8 +91,12 @@ class TestValidateBundleErrorFormat:
 
         assert markdown.startswith("## The method does not validate")
         assert "- Code: `method.invalid` (domain method, retry no)" in markdown
-        assert "1. **Inadequate Output Multiplicity**" in markdown
-        assert "   - 💡 Suggested fix: Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step" in markdown
+        assert "### Errors\n\n- `method.output_multiplicity_mismatch`: " in markdown
+        assert f"(pipe 'brainstorm', file '{bundle_path}')\n" in markdown
+        assert (
+            "  - Suggested fix (`match-sequence-output`, safe): Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step"
+        ) in markdown
+        assert "## Pipe validation errors" not in markdown
         assert f"- **bundle_path:** {bundle_path}" in markdown
         assert "is_valid" not in markdown
         assert f"💡 1 of these errors can be fixed automatically — run: `pipelex-agent fix bundle {bundle_path} -L {tmp_path / 'libs'}`" in markdown
@@ -108,11 +114,14 @@ class TestValidateBundleErrorFormat:
             library_dirs=None,
         )
 
-        assert "   - 💡 Suggested fix: Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step" in markdown
         assert (
-            "   - 💡 Suggested fix (unsafe, confirm before applying): Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt'"
+            "  - Suggested fix (`match-sequence-output`, safe): Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step"
         ) in markdown
-        assert "💡 Suggested fix: Replace model" not in markdown
+        assert (
+            "  - Suggested fix (`rename-model`, unsafe, confirm before applying): "
+            "Replace model '@best-sonet' of pipe 'write_tide_note' with '@best-gpt'"
+        ) in markdown
+        assert "(`rename-model`, safe)" not in markdown
         assert "💡 1 of these errors can be fixed automatically" in markdown
 
     def test_markdown_no_fix_footer_when_nothing_fixable(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:

@@ -134,10 +134,17 @@ class TestResolveCrateFromMethodDir:
 
         discovery.assert_not_called()
         # The unresolved dependency `/v1/validate` reports, located on the pipe calling it, in the words of the contents
-        # core's refusal, whose marker a hosted run tells it apart by.
+        # core's refusal.
         validation_errors = exc_info.value.validation_error_items()
         assert len(validation_errors) == 1, validation_errors
         item = validation_errors[0]
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
         assert item.source == "host.mthds"
         assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message
+        # A hosted run tells it apart by the problem item's code and parameters, the package it names included.
+        problem_errors = exc_info.value.to_problem(view=ProblemView.CALLER).errors
+        assert problem_errors is not None
+        (problem_item,) = problem_errors
+        assert problem_item.code == "method.dependency_missing"
+        assert problem_item.params is not None
+        assert problem_item.params.as_wire() == {"kind": "package", "name": "github.com/org/pkg", "reason": "not_found"}

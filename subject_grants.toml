@@ -28,14 +28,6 @@ rationale = "Verb-object: iterates the Pipelex part of the exception's cause cha
 param = "exc"
 rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_build_error_source"]
-param = "exc"
-rationale = "Derives from the exc; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::_render_error_markdown"]
-param = "payload"
-rationale = "Renders the payload; single operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_argument_error"]
 param = "message"
 rationale = "Refuses an argument with the command's message; single operand, as agent_error."
@@ -43,10 +35,6 @@ rationale = "Refuses an argument with the command's message; single operand, as 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
 rationale = "Emits an agent error for the message; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_hosted_envelope"]
-param = "message"
-rationale = "Emits a hosted run's legacy error envelope for the message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_validate_bundle"]
 param = "exc"
@@ -4620,14 +4608,6 @@ rationale = "Verb-object: validates bundles from the directory; options stay key
 param = "pipe_error"
 rationale = "Verb-object: backfills the pipe error in place; single operand."
 
-["pipelex/pipeline/validation_render.py::_markdown_category_header"]
-param = "category"
-rationale = "Noun-named derivation: the header text for the category; single operand."
-
-["pipelex/pipeline/validation_render.py::_render_error_item_markdown"]
-param = "item"
-rationale = "Verb-object: renders the error item; index is context."
-
 ["pipelex/pipeline/validation_render.py::count_applicable_fixes"]
 param = "items"
 rationale = "Single-operand count over the error items; scope stays keyword."
@@ -4635,10 +4615,6 @@ rationale = "Single-operand count over the error items; scope stays keyword."
 ["pipelex/pipeline/validation_render.py::format_validate_markdown"]
 param = "result"
 rationale = "Verb-object: formats the validate result; single operand."
-
-["pipelex/pipeline/validation_render.py::format_validation_error_items_markdown"]
-param = "items"
-rationale = "Verb-object: formats the error items; single operand."
 
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"

@@ -16,13 +16,12 @@ from pipelex.pipeline.validation_errors import problem_item_of, validation_item_
 from pipelex.pipeline.validation_render import (
     build_fix_command,
     format_validate_markdown,
-    format_validation_error_items_markdown,
     render_invalid_verdict_markdown,
     suggested_fix_label,
 )
 from pipelex.suggested_fix import FixSafety, SuggestedFix
 from pipelex.suggested_fix import SetKeyOp as PipelexSetKeyOp
-from pipelex.validation_error_types import PipeValidationErrorType, ValidationResidualErrorType
+from pipelex.validation_error_types import PipeValidationErrorType
 
 
 class TestValidationRender:
@@ -169,48 +168,6 @@ class TestValidationRender:
         markdown = render_invalid_verdict_markdown(items=[], message="MTHDS validation found errors")
 
         assert markdown == "# Validation failed\n\nMTHDS validation found errors"
-
-    def test_format_validation_error_items_markdown_groups_categories_and_renders_fix_line(self):
-        """The shared items renderer groups by category, humanizes the error_type title, renders
-        the identity fields + message + `💡 Suggested fix` line, and keeps the dry_run residual plain.
-        """
-        items = [
-            ValidationErrorItem(
-                category=ValidationErrorCategory.PIPE_VALIDATION,
-                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
-                pipe_code="brainstorm",
-                domain_code="story_studio",
-                source="/w/bundle.mthds",
-                message="the sequence 'brainstorm' declares its output as 'StoryIdea', but its last step yields 'StoryIdea[]'.",
-                suggested_fix=SuggestedFix(
-                    fix_code="match-sequence-output",
-                    description="Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step",
-                    safety=FixSafety.SAFE,
-                    ops=[],
-                ),
-            ),
-            ValidationErrorItem(
-                category=ValidationErrorCategory.DRY_RUN,
-                error_type=ValidationResidualErrorType.DRY_RUN_ERROR,
-                message="Dry run failed: boom.",
-            ),
-        ]
-
-        markdown = format_validation_error_items_markdown(items)
-
-        # Category grouping (markdown headings), humanized title, identity fields, message, fix line.
-        assert "## Pipe validation errors" in markdown
-        assert "1. **Inadequate Output Multiplicity**" in markdown
-        assert "   - Pipe: `brainstorm`" in markdown
-        assert "   - Domain: `story_studio`" in markdown
-        assert "   - the sequence 'brainstorm' declares its output as 'StoryIdea'" in markdown
-        assert "   - 💡 Suggested fix: Set output of pipe 'brainstorm' to 'StoryIdea[]' to match its last step" in markdown
-        assert "   - Source: `/w/bundle.mthds`" in markdown
-        # No internal repr / Python-list-repr brackets leak (Phase 1 diseases stay cured downstream).
-        assert "multiplicity=None" not in markdown
-        # The dry_run residual keeps its plain single-message rendering (no numbering, no bullets).
-        assert "## Dry run error" in markdown
-        assert "Dry run failed: boom." in markdown
 
     def test_suggested_fix_label_says_when_a_fix_is_unsafe(self):
         """A safe fix is a plain `Suggested fix`; an unsafe one says it is unsafe and needs confirming."""

@@ -14,6 +14,7 @@ from pipelex.libraries.method_trees import (
     bundle_files_under,
     list_library_bundle_files,
     list_library_dir_trees,
+    list_local_method_tree,
     list_package_method_tree,
     reporting_host_library_tree_faults,
     submitted_tree_files,
@@ -196,6 +197,32 @@ class TestMethodTrees:
         assert str(tmp_path) not in message
         assert str(tmp_path.resolve()) not in message
         assert LIMITS_ADVICE not in message
+
+    def test_a_refused_tree_names_the_rule_and_the_path_a_caller_reads(self, tmp_path: Path) -> None:
+        """`method.package_invalid` declares the rule broken and the tree path at fault, which reach a caller without the message."""
+        _touch(directory=tmp_path, tree_path="method/main.mthds")
+        (tmp_path / "method" / "link.mthds").symlink_to(tmp_path / "method" / "main.mthds")
+
+        with pytest.raises(MethodTreeLoadError) as exc_info:
+            list_local_method_tree(handed_over=tmp_path / "method")
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == "method.package_invalid"
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "symbolic_link", "path": "link.mthds"}
+
+    def test_a_refused_dependency_package_names_its_path_under_its_address(self, tmp_path: Path) -> None:
+        package_root = tmp_path / "installed" / "invoicing"
+        _touch(directory=package_root, tree_path="METHODS.toml", content=_MANIFEST)
+        _touch(directory=package_root, tree_path="invoice.mthds")
+        (package_root / "link.mthds").symlink_to(package_root / "invoice.mthds")
+
+        with pytest.raises(MethodTreeLoadError) as exc_info:
+            list_package_method_tree(root=package_root, package_address="github.com/pipelex-tests/invoicing")
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "symbolic_link", "path": "github.com/pipelex-tests/invoicing/link.mthds"}
 
     def test_a_host_library_tree_that_cannot_be_listed_is_the_host_s_fault(self, tmp_path: Path) -> None:
         """Beside a caller's bundles, a tree of the host's own directories is no input of theirs, and its message never reaches them."""
