@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import (
@@ -24,6 +23,7 @@ from pipelex.tools.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.tools.templating.text_format import TextFormat
 
 if TYPE_CHECKING:
+    from pipelex.base_exceptions import PipelexError
     from pipelex.errors.error_codes import ErrorCode
 
 _TEMPLATING_STYLE = TemplatingStyle(tag_style=TagStyle.NO_TAG, text_format=TextFormat.PLAIN)
