@@ -14,16 +14,18 @@ What this module does, in order:
 
 1. Every limit of this runner on a tree (`MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_TOTAL_KIB`,
    `MAX_METHOD_TREE_FILE_KIB`) is checked on the sizes the entries state, before any blob is read: a 422
-   `MethodTreeTooLarge` naming the limit.
+   `method.package_invalid` whose `reason` names the limit and whose `limit` gives it.
 2. The bytes of every hash entry are read from the runner's blob store, under the caller's scope, at once.
-3. The map is read (`read_file_map`): a refusal of the standard is a 422 `InvalidMethodFiles` whose `tree_refusal`
-   member carries the refusal's code and the paths it names, and hash entries the store does not hold at their stated
-   size are one 422 `MissingBlobs` whose `missing_blobs` member lists every such hash.
+3. The map is read (`read_file_map`): a refusal of the standard is a 422 `method.package_invalid` whose `reason` is the
+   refusal's code and whose `path` is the first path it names, except a key leaving the tree, which is the security
+   refusal `security.input_path_refused`, and an entry of the wrong shape, which is `request.invalid`; hash entries the
+   store does not hold at their stated size are one 422 `request.blobs_missing` whose `missing_blobs` parameter lists
+   every such hash.
 4. The files `resources` sends join the tree (`with_resources`), the same bytes under a path the tree holds or a new
-   file at a tree path; other bytes under a path the tree holds are a 422 `InvalidResourcePath` naming it.
-5. Python is honored only on a sandbox-hosted deployment: a method holding a `.py` file is refused with a 403
-   `CustomCodeRequiresSandbox` before anything is written, and on a sandbox-hosted deployment a tree declaring a Python
-   structure class is refused (`MethodStructuresRefusedError`, a 422).
+   file at a tree path; other bytes under a path the tree holds are a 422 `request.invalid` naming `resources`.
+5. Python is honored only on a sandbox-hosted deployment: a method holding a `.py` file is refused with a 501
+   `pipelex.deployment.custom_code_requires_sandbox` before anything is written, and on a sandbox-hosted deployment a
+   tree declaring a Python structure class is refused (`MethodStructuresRefusedError`, a 422).
 6. Each tree read in full is recorded in the blob store, its files then its listing, so the next request can send it
    by hash, and `POST /v1/blobs/missing` answers its digest with one lookup.
 7. The trees are written out into a temporary directory and held as written (`pipelex.libraries.written_trees`), so
@@ -49,10 +51,10 @@ from mthds.method_tree.vocabulary import TreeRefusalCode
 from mthds.package.exceptions import ManifestError
 from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodResourceMissingReason, RequestMalformedReason
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundle_resources.bundle_resource import root_escape_refusal
+from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD, root_escape_of
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -63,8 +65,7 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import ApiSecurityRefusal, raise_forbidden, raise_validation_error, raise_validation_problem
+from pipelex_api.exceptions import CustomCodeOrigin, CustomCodeRequiresSandboxError, MethodPackageReason, RequestMethodError, RunnerRequestError
 from pipelex_api.limits import (
     MAX_METHOD_DEPENDENCIES,
     MAX_METHOD_REQUEST_TOTAL_BYTES,
@@ -75,6 +76,7 @@ from pipelex_api.limits import (
 
 FILES_FIELD = "files"
 DEPENDENCIES_FIELD = "dependencies"
+BUNDLE_FIELD = "bundle_b64"
 PYTHON_SUFFIX = ".py"
 FILES_LABEL = "The `files` map"
 ARCHIVE_LABEL = "The `bundle_b64` archive"
@@ -86,6 +88,8 @@ REQUEST_METHOD_LABEL = "sent in the request"
 VENDORED_METHODS_PREFIX = ".mthds/methods/"
 # A file the membership rule judges a directory by, which stands in for any file inside a directory being judged.
 _ANY_FILE_NAME = "file"
+# The `finding` of a `method.syntax` refusing a bundle that is not text.
+NOT_UTF8_FINDING = "the bundle is not UTF-8 text"
 
 
 class RequestTree(NamedTuple):
@@ -184,15 +188,16 @@ def tree_documents_of(*, body: bytes) -> TreeDocuments:
     tree. It is decoded as `json.loads` decodes bytes, UTF-8, UTF-16 or UTF-32, as the route's own parser accepted it.
     A member given twice in the body is read as JSON reads it, the last one counting, and a `null` member is absent.
 
-    Raises (as problem documents): a 422 `InvalidJSON` for a body that does not decode or parse, and a 422
-    `InvalidMethodFiles` for `dependencies` that is not an object, or that gives one address twice.
+    Raises (as problem documents): a 422 `request.malformed` for a body that does not decode or parse, and a 422
+    `request.invalid` naming `dependencies` when it is not an object, or gives one address twice.
     """
     try:
         parsed = _parse_keeping_pairs(body.decode(json.detect_encoding(body), "surrogatepass"))
     except (UnicodeDecodeError, ValueError) as exc:
         # The route's parser read these bytes already, so this is a second line of defence: `JSONDecodeError` and
         # an integer longer than Python converts are both a `ValueError`.
-        raise_validation_error(message=f"Request body is not valid JSON: {exc!s}", error_type=ErrorType.INVALID_JSON)
+        msg = f"Request body is not valid JSON: {exc!s}"
+        raise RunnerRequestError(msg).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=RequestMalformedReason.NOT_JSON) from exc
     if not isinstance(parsed, _JsonObject):
         return TreeDocuments(files=None, dependencies=None)
     members = dict(parsed.pairs)
@@ -203,15 +208,12 @@ def tree_documents_of(*, body: bytes) -> TreeDocuments:
         return TreeDocuments(files=files_document, dependencies=None)
     if not isinstance(dependencies_member, _JsonObject):
         msg = "`dependencies` must be a JSON object mapping each dependency's address to its map of file entries."
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+        raise RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
     dependency_documents: dict[str, str] = {}
     for address, dependency_member in dependencies_member.pairs:
         if address in dependency_documents:
-            raise_validation_problem(
-                message=f"`dependencies` gives the address '{wire_name(address)}' twice.",
-                error_type=ErrorType.INVALID_METHOD_FILES,
-                members={"tree_refusal": {"code": TreeRefusalCode.DUPLICATE_KEY, "names": [wire_name(address)]}},
-            )
+            msg = f"`dependencies` gives the address '{wire_name(address)}' twice."
+            raise RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
         dependency_documents[address] = _serialized(dependency_member)
     return TreeDocuments(files=files_document, dependencies=dependency_documents)
 
@@ -278,23 +280,25 @@ def wire_name(name: str) -> str:
 
 
 def ensure_within_tree_limits(*, file_count: int, total_bytes: int, largest_path: str | None, largest_bytes: int, label: str) -> None:
-    """Refuse a tree past one of this runner's limits, naming the limit, with a 422 `MethodTreeTooLarge`."""
+    """Refuse a tree past one of this runner's limits with a 422 `method.package_invalid`, its `reason` naming the limit."""
     if file_count > MAX_METHOD_TREE_FILES:
         msg = f"{label} holds {file_count} files, past this runner's limit of {MAX_METHOD_TREE_FILES} files in a method tree."
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TOO_MANY_FILES, limit=MAX_METHOD_TREE_FILES)
     if largest_path is not None and largest_bytes > MAX_METHOD_TREE_FILE_BYTES:
         msg = (
             f"{label} holds the file '{wire_name(largest_path)}' of {largest_bytes} bytes, past this runner's limit of "
             f"{MAX_METHOD_TREE_FILE_BYTES // 1024} KiB for one file of a method tree."
         )
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise RequestMethodError(msg, file=wire_name(largest_path)).with_params(
+            reason=MethodPackageReason.FILE_TOO_LARGE, path=wire_name(largest_path), limit=MAX_METHOD_TREE_FILE_BYTES
+        )
     if total_bytes > MAX_METHOD_TREE_TOTAL_BYTES:
         msg = f"{label} holds {total_bytes} bytes, past this runner's limit of {MAX_METHOD_TREE_TOTAL_BYTES // 1024} KiB for a method tree."
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TREE_TOO_LARGE, limit=MAX_METHOD_TREE_TOTAL_BYTES)
 
 
 def ensure_tree_within_limits(*, tree: RequestTree, label: str) -> None:
-    """Refuse a tree read in full that passes one of this runner's limits, with a 422 `MethodTreeTooLarge`."""
+    """Refuse a tree read in full that passes one of this runner's limits, with a 422 `method.package_invalid`."""
     largest_path: str | None = None
     largest_bytes = 0
     for tree_path, data in tree.contents.items():
@@ -310,24 +314,24 @@ def ensure_tree_within_limits(*, tree: RequestTree, label: str) -> None:
 
 
 def ensure_trees_within_request_limits(*, dependency_count: int, total_bytes: int, label: str) -> None:
-    """Refuse a method whose trees together pass this runner's limits, with a 422 `MethodTreeTooLarge`.
+    """Refuse a method whose trees together pass this runner's limits, with a 422 `method.package_invalid`.
 
     Each tree is held to the tree limits on its own; these bound what one request carries in all, its method's tree and
     every dependency tree beside it, so the memory and the disk a request takes do not grow with its dependencies.
     """
     if dependency_count > MAX_METHOD_DEPENDENCIES:
         msg = f"{label} carries {dependency_count} dependencies, past this runner's limit of {MAX_METHOD_DEPENDENCIES} dependency trees."
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.TOO_MANY_DEPENDENCIES, limit=MAX_METHOD_DEPENDENCIES)
     if total_bytes > MAX_METHOD_REQUEST_TOTAL_BYTES:
         msg = (
             f"{label} holds {total_bytes} bytes across its tree and its dependency trees, past this runner's limit of "
             f"{MAX_METHOD_REQUEST_TOTAL_BYTES // 1024} KiB for a method and its dependencies."
         )
-        raise_validation_error(message=msg, error_type=ErrorType.METHOD_TREE_TOO_LARGE)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.METHOD_TOO_LARGE, limit=MAX_METHOD_REQUEST_TOTAL_BYTES)
 
 
 def ensure_method_within_limits(*, request_method: "RequestMethod", label: str) -> None:
-    """Refuse a method read in full whose trees together pass this runner's limits, with a 422 `MethodTreeTooLarge`."""
+    """Refuse a method read in full whose trees together pass this runner's limits, with a 422 `method.package_invalid`."""
     trees = [request_method.tree, *request_method.dependencies.values()]
     ensure_trees_within_request_limits(
         dependency_count=len(request_method.dependencies),
@@ -336,20 +340,63 @@ def ensure_method_within_limits(*, request_method: "RequestMethod", label: str) 
     )
 
 
-def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoReturn:
-    """Answer the standard's refusal of a map: the hashes to upload, or the code and the paths it names."""
+def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str, field: str) -> NoReturn:
+    """Answer the standard's refusal of a map with the code it is, its facts as the code's parameters.
+
+    Hashes this runner does not hold are `request.blobs_missing`, listing every one to upload. A key that is not a tree
+    path and tries to leave the tree is the security refusal `security.input_path_refused`, by the runtime's one rule for
+    a caller's path that leaves its root (`root_escape_of`): absolute, naming a drive or a network share, or climbing
+    with a `..` segment, read with either separator, whether the caller sent it as a key of `files` or as a member of
+    `bundle_b64`, as it is under `resources`. An entry of the wrong shape is the request's own, `request.invalid` naming
+    the field the map rides. A file reference that names no file of the tree, or that leaves it, is
+    `method.resource_missing`. Every other refusal is a rule of the method's package the tree breaks,
+    `method.package_invalid`, whose `reason` is the standard's refusal code and whose `path` is the first path it names.
+
+    Args:
+        refusal_error: The standard's refusal.
+        label: How the refusal names the map, such as "The `files` map".
+        field: The request field the map rides, such as `files`.
+    """
     refusal = refusal_error.refusal
+    names = [wire_name(name) for name in refusal.names]
+    first_name = names[0] if names else None
+    msg = f"{label} is not a method tree. {refusal_error.message}"
     match refusal.code:
         case TreeRefusalCode.MISSING_BLOB:
             msg = (
                 f"{label} names, by hash, bytes this runner does not hold at their stated size: {', '.join(refusal.names)}. "
                 "Upload them (POST /v1/blobs/missing, then PUT /v1/blobs/{sha256}) and send the request again."
             )
-            raise_validation_problem(message=msg, error_type=ErrorType.MISSING_BLOBS, members={"missing_blobs": list(refusal.names)})
+            raise (
+                RunnerRequestError(msg, field=field).with_error_code(CoreCode.REQUEST_BLOBS_MISSING).with_params(missing_blobs=list(refusal.names))
+            ) from refusal_error
+        case TreeRefusalCode.INVALID_TREE_PATH:
+            for name in refusal.names:
+                escape = root_escape_of(path=name)
+                if escape is not None:
+                    raise (
+                        RequestMethodError(msg, file=wire_name(name))
+                        .with_error_code(CoreCode.SECURITY_INPUT_PATH_REFUSED)
+                        .with_params(rule=escape.rule)
+                    ) from refusal_error
+            raise RequestMethodError(msg, file=first_name).with_params(reason=refusal.code, path=first_name) from refusal_error
+        case TreeRefusalCode.MALFORMED_ENTRY:
+            raise RunnerRequestError(msg, field=field) from refusal_error
+        case TreeRefusalCode.REFERENCE_NOT_IN_TREE:
+            raise (
+                RequestMethodError(msg, file=first_name)
+                .with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
+                .with_params(file=first_name or "", reason=MethodResourceMissingReason.NOT_IN_TREE)
+            ) from refusal_error
+        case TreeRefusalCode.REFERENCE_LEAVES_TREE:
+            raise (
+                RequestMethodError(msg, file=first_name)
+                .with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
+                .with_params(file=first_name or "", reason=MethodResourceMissingReason.LEAVES_TREE)
+            ) from refusal_error
         case (
             TreeRefusalCode.SYMBOLIC_LINK
             | TreeRefusalCode.SPECIAL_FILE
-            | TreeRefusalCode.INVALID_TREE_PATH
             | TreeRefusalCode.NORMALIZATION_COLLISION
             | TreeRefusalCode.PATH_COLLISION
             | TreeRefusalCode.EMPTY_TREE
@@ -357,68 +404,18 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoRetur
             | TreeRefusalCode.GITIGNORE_NOT_UTF8
             | TreeRefusalCode.DUPLICATE_KEY
             | TreeRefusalCode.EXCLUDED_NAME
-            | TreeRefusalCode.MALFORMED_ENTRY
             | TreeRefusalCode.REFERENCE_INVALID
-            | TreeRefusalCode.REFERENCE_LEAVES_TREE
             | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
-            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
             | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
             | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
             | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
             | TreeRefusalCode.MODULE_NOT_IN_TREE
             | TreeRefusalCode.MODULE_AMBIGUOUS
         ):
-            raise_validation_problem(
-                message=f"{label} is not a method tree. {refusal_error.message}",
-                error_type=ErrorType.INVALID_METHOD_FILES,
-                members={"tree_refusal": {"code": refusal.code, "names": [wire_name(name) for name in refusal.names]}},
-                security_refusal=_tree_path_security_refusal(refusal_error=refusal_error),
-            )
+            raise RequestMethodError(msg, file=first_name).with_params(reason=refusal.code, path=first_name) from refusal_error
 
 
-def _tree_path_security_refusal(*, refusal_error: MethodTreeRefusedError) -> ApiSecurityRefusal | None:
-    """The security refusal a tree refusal is, when a path it names tries to leave the tree, else `None`.
-
-    The standard's reader refuses a key that is not a tree path without saying why, so the runtime's one rule for a
-    caller's path that leaves its root decides (`root_escape_refusal`): a path that is absolute, names a drive or a
-    network share, or climbs with a `..` segment, read with either separator, is a traversal,
-    `security.input_path_refused`, whether the caller sent it as a key of `files` or as a member of `bundle_b64`, which
-    the same reader judges, and as it is under `resources`. Every other path the reader refuses (an empty segment, a
-    backslash, a colon, a path not in NFC) is the shape of how the caller packed the method, a refusal of the request
-    and no security event.
-    """
-    refusal = refusal_error.refusal
-    match refusal.code:
-        case TreeRefusalCode.INVALID_TREE_PATH:
-            if any(root_escape_refusal(path=name) is not None for name in refusal.names):
-                return ApiSecurityRefusal(code=CoreCode.SECURITY_INPUT_PATH_REFUSED, error_type=type(refusal_error).__name__)
-            return None
-        case (
-            TreeRefusalCode.MISSING_BLOB
-            | TreeRefusalCode.SYMBOLIC_LINK
-            | TreeRefusalCode.SPECIAL_FILE
-            | TreeRefusalCode.NORMALIZATION_COLLISION
-            | TreeRefusalCode.PATH_COLLISION
-            | TreeRefusalCode.EMPTY_TREE
-            | TreeRefusalCode.LONE_FILE_EXCLUDED
-            | TreeRefusalCode.GITIGNORE_NOT_UTF8
-            | TreeRefusalCode.DUPLICATE_KEY
-            | TreeRefusalCode.EXCLUDED_NAME
-            | TreeRefusalCode.MALFORMED_ENTRY
-            | TreeRefusalCode.REFERENCE_INVALID
-            | TreeRefusalCode.REFERENCE_LEAVES_TREE
-            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
-            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
-            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
-            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
-            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
-            | TreeRefusalCode.MODULE_NOT_IN_TREE
-            | TreeRefusalCode.MODULE_AMBIGUOUS
-        ):
-            return None
-
-
-async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str) -> BlobStore:
+async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str, field: str) -> BlobStore:
     """The bytes a map's hash entries name that the blob store holds, looked up by size before any is read.
 
     A hash held at another size than one of its entries states is refused, since uploading its bytes again would not
@@ -426,8 +423,8 @@ async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, se
     census bounded, so reading them reads no more than the census allowed. A hash not held is left out, for the reader
     to report among the blobs this runner does not hold.
 
-    Raises (as a problem document): a 422 `BlobMismatch` whose `mismatched_blobs` member lists each hash held at another
-    size, with that size.
+    Raises (as a problem document): a 422 `request.invalid` naming the field the map rides; its message, in the operator's
+    diagnostics, lists each hash held at another size, with that size, which no parameter of the code carries.
     """
     stored = await blob_store.stored_sizes(sha256s=sorted(stated_sizes))
     mismatched = {sha256: size for sha256, size in stored.items() if size is not None and stated_sizes[sha256] != {size}}
@@ -437,24 +434,24 @@ async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, se
             f"{label} states a size for a hash other than the size of the bytes this runner holds under it: {described}. "
             "A hash names one set of bytes, so state the size of those bytes."
         )
-        raise_validation_problem(
-            message=msg,
-            error_type=ErrorType.BLOB_MISMATCH,
-            members={"mismatched_blobs": [{"sha256": sha256, "held_size": size} for sha256, size in mismatched.items()]},
-        )
+        raise RunnerRequestError(msg, field=field)
     return await blob_store.read_held(sizes={sha256: size for sha256, size in stored.items() if size is not None})
 
 
-async def read_request_tree(*, document: str, blob_store: RunnerBlobStore | None, label: str, census: _MapCensus | None = None) -> RequestTree:
+async def read_request_tree(
+    *, document: str, blob_store: RunnerBlobStore | None, label: str, field: str, census: _MapCensus | None = None
+) -> RequestTree:
     """Read one map of file entries a request carried, its hash entries from the runner's blob store.
 
     Args:
         document: The map's JSON text, as the request carried it.
         blob_store: The blob store of the caller's scope, or None for a map that names no bytes by hash.
         label: How a refusal names the map, such as "The `files` map".
+        field: The request field the map rides, such as `files`, which a refusal of the request names.
         census: The map's census when the caller took it already, else taken here.
 
-    Raises (as problem documents): `MethodTreeTooLarge`, `InvalidMethodFiles` and `MissingBlobs`, each a 422.
+    Raises (as problem documents): the refusals of `_refuse_map`, `method.package_invalid` for a tree past a limit, and
+    `request.invalid` for a map the reader cannot take as a source of a tree, each a 422.
     """
     if census is None:
         census = _census(document=document)
@@ -468,13 +465,14 @@ async def read_request_tree(*, document: str, blob_store: RunnerBlobStore | None
             label=label,
         )
         if census.stated_sizes and blob_store is not None:
-            held = await _held_blobs(blob_store=blob_store, stated_sizes=census.stated_sizes, label=label)
+            held = await _held_blobs(blob_store=blob_store, stated_sizes=census.stated_sizes, label=label, field=field)
     try:
         reading = read_file_map(document, blob_store=held)
     except MethodTreeRefusedError as exc:
-        _refuse_map(refusal_error=exc, label=label)
+        _refuse_map(refusal_error=exc, label=label, field=field)
     except TreeSourceError as exc:
-        raise_validation_problem(message=f"{label} is not a method tree. {exc.message}", error_type=ErrorType.INVALID_METHOD_FILES, members={})
+        msg = f"{label} is not a method tree. {exc.message}"
+        raise RunnerRequestError(msg, field=field) from exc
     request_tree = RequestTree(tree=reading.tree, contents=reading.contents)
     ensure_tree_within_limits(tree=request_tree, label=label)
     return request_tree
@@ -486,8 +484,11 @@ def _base64_map_document(*, entries: list[tuple[str, bytes]]) -> str:
     return _serialized(_JsonObject(pairs=pairs))
 
 
-def manifest_of(*, tree: RequestTree, label: str) -> MethodsManifest | None:
+def manifest_of(*, tree: RequestTree, label: str, root: str) -> MethodsManifest | None:
     """The `METHODS.toml` at a tree's root, parsed, or None when the tree holds none there.
+
+    `root` is the path the request names the tree's root by, empty for the method's own tree and `<address>/` or
+    `.mthds/methods/<name>/` for a package it ships, so that a refusal's `path` names the manifest as the request does.
 
     Raises:
         MethodEntryError: The manifest is not UTF-8 text, or not a valid manifest (a 422 in the input domain).
@@ -499,10 +500,18 @@ def manifest_of(*, tree: RequestTree, label: str) -> MethodsManifest | None:
         return parse_methods_toml(manifest_bytes.decode("utf-8"))
     except UnicodeDecodeError as exc:
         msg = f"The {MANIFEST_NAME} of {label} is not UTF-8 text."
-        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
+        raise (
+            MethodEntryError(msg)
+            .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
+            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=f"{root}{MANIFEST_NAME}")
+        ) from exc
     except ManifestError as exc:
         msg = f"The {MANIFEST_NAME} of {label} is not a valid manifest: {exc.message}"
-        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
+        raise (
+            MethodEntryError(msg)
+            .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
+            .with_params(reason=MethodPackageReason.MANIFEST_INVALID, path=f"{root}{MANIFEST_NAME}")
+        ) from exc
 
 
 def is_package_dir_name(name: str) -> bool:
@@ -518,22 +527,21 @@ def is_package_dir_name(name: str) -> bool:
     return not excluded_name_violation(f"{name}/{_ANY_FILE_NAME}")
 
 
-def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str) -> str:
+def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str, root: str) -> str:
     """The address a dependency tree's manifest declares, `address/name`, as a reference names the package.
 
     A manifest declaring no name takes `fallback_name`, the name of the directory the tree is written as, which is the
-    name the engine's discovery gives such a package; it must then be a name a package's directory can take.
+    name the engine's discovery gives such a package; it must then be a name a package's directory can take. `root` is
+    the path the request names the tree's root by (`manifest_of`).
 
-    Raises (as a 422 `InvalidMethodFiles`): a tree with no valid `METHODS.toml` at its root, or one whose manifest
-    declares no name when `fallback_name` cannot name a package's directory.
+    Raises (as a 422 `method.package_invalid`): a tree with no valid `METHODS.toml` at its root (the manifest's own
+    refusal, `MethodEntryError`, when it holds one that cannot be read), or one whose manifest declares no name when
+    `fallback_name` cannot name a package's directory.
     """
-    try:
-        manifest = manifest_of(tree=tree, label=label)
-    except MethodEntryError as exc:
-        raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_METHOD_FILES)
+    manifest = manifest_of(tree=tree, label=label, root=root)
     if manifest is None:
         msg = f"{label} holds no {MANIFEST_NAME} at its root, so no reference could find it as a package."
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.MANIFEST_MISSING, path=f"{root}{MANIFEST_NAME}")
     if manifest.name is not None:
         return f"{manifest.address}/{manifest.name}"
     if not is_package_dir_name(fallback_name):
@@ -541,7 +549,7 @@ def dependency_address_of(*, tree: RequestTree, fallback_name: str, label: str) 
             f"{label} declares no name in its {MANIFEST_NAME}, so it takes the last segment of its address, "
             f"'{wire_name(fallback_name)}', which cannot name a package's directory: declare the package's name in its {MANIFEST_NAME}."
         )
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.PACKAGE_NAME_INVALID, path=f"{root}{MANIFEST_NAME}")
     return f"{manifest.address}/{fallback_name}"
 
 
@@ -550,11 +558,11 @@ def dependency_dir_name(*, address: str) -> str:
     return address.rsplit("/", 1)[-1]
 
 
-def add_dependency(*, dependencies: dict[str, RequestTree], address: str, tree: RequestTree, label: str) -> None:
+def add_dependency(*, dependencies: dict[str, RequestTree], address: str, tree: RequestTree, label: str, root: str) -> None:
     """Add a dependency tree under its address, refusing an address a reference could not tell from one already there.
 
     A reference matches a package by its address without regard to case, so two addresses differing only in case are
-    one identity too.
+    one identity too. `root` is the path the request names the tree's root by, which a refusal names.
     """
     for known in dependencies:
         if known.casefold() == address.casefold():
@@ -562,7 +570,7 @@ def add_dependency(*, dependencies: dict[str, RequestTree], address: str, tree: 
                 f"{label} declares the address '{wire_name(address)}', which another dependency of the request declares too: a reference "
                 "matches a package by its address without regard to case, so it could not tell them apart."
             )
-            raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+            raise RequestMethodError(msg).with_params(reason=MethodPackageReason.DEPENDENCY_ADDRESS_COLLISION, path=root)
     dependencies[address] = tree
 
 
@@ -571,13 +579,13 @@ async def read_request_method(*, documents: TreeDocuments, blob_store: RunnerBlo
 
     Each dependency tree's manifest must declare the address it is keyed by.
 
-    Raises (as problem documents): the refusals of `read_request_tree`, and a 422 `InvalidMethodFiles` for
-    `dependencies` without `files` or a dependency keyed by another address than its manifest's.
+    Raises (as problem documents): the refusals of `read_request_tree`, and a 422 `request.invalid` naming
+    `dependencies` for dependencies without `files` or a dependency keyed by another address than its manifest's.
     """
     if documents.files is None:
         if documents.dependencies:
             msg = "`dependencies` accompany the method's own `files`: send the method's tree in `files`, and its dependencies beside it."
-            raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
+            raise RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
         return None
     dependency_documents = documents.dependencies or {}
     # Every map's census first, so the request's trees together are held to their limits before any blob is read.
@@ -588,18 +596,20 @@ async def read_request_method(*, documents: TreeDocuments, blob_store: RunnerBlo
         total_bytes=sum(census.stated_bytes for census in [files_census, *dependency_censuses.values()] if census is not None),
         label=_METHOD_LABEL,
     )
-    tree = await read_request_tree(document=documents.files, blob_store=blob_store, label=FILES_LABEL, census=files_census)
+    tree = await read_request_tree(document=documents.files, blob_store=blob_store, label=FILES_LABEL, field=FILES_FIELD, census=files_census)
     dependencies: dict[str, RequestTree] = {}
     for address, dependency_document in dependency_documents.items():
         label = f"The dependency '{wire_name(address)}'"
         dependency_tree = await read_request_tree(
-            document=dependency_document, blob_store=blob_store, label=label, census=dependency_censuses[address]
+            document=dependency_document, blob_store=blob_store, label=label, field=DEPENDENCIES_FIELD, census=dependency_censuses[address]
         )
-        declared = dependency_address_of(tree=dependency_tree, fallback_name=dependency_dir_name(address=address), label=label)
+        # The caller names a file of a dependency by the dependency's address, then its path inside it.
+        root = f"{address}/"
+        declared = dependency_address_of(tree=dependency_tree, fallback_name=dependency_dir_name(address=address), label=label, root=root)
         if declared != address:
             msg = f"{label} is keyed by an address its {MANIFEST_NAME} does not declare: it declares '{declared}'."
-            raise_validation_error(message=msg, error_type=ErrorType.INVALID_METHOD_FILES)
-        add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label)
+            raise RunnerRequestError(msg, field=DEPENDENCIES_FIELD)
+        add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label, root=root)
     request_method = RequestMethod(tree=tree, dependencies=dependencies)
     ensure_method_within_limits(request_method=request_method, label=_METHOD_LABEL)
     return request_method
@@ -615,7 +625,8 @@ async def read_archive_method(*, bundle_b64: str) -> RequestMethod:
     included, is refused by the tree's rule.
 
     Raises (as problem documents): the archive's own refusals (`decode_bundle_archive`), the refusals of
-    `read_request_tree`, and a 422 `InvalidMethodFiles` for a shipped package with no manifest, or two declaring one address.
+    `read_request_tree`, and a 422 `method.package_invalid` for a shipped package with no manifest, or two declaring one
+    address.
     """
     archive_entries = decode_bundle_archive(bundle_b64=bundle_b64)
     own_entries: list[tuple[str, bytes]] = []
@@ -630,13 +641,16 @@ async def read_archive_method(*, bundle_b64: str) -> RequestMethod:
                 vendored_entries.setdefault(package_name, []).append((package_path, data))
         else:
             own_entries.append((name, data))
-    tree = await read_request_tree(document=_base64_map_document(entries=own_entries), blob_store=None, label=ARCHIVE_LABEL)
+    tree = await read_request_tree(document=_base64_map_document(entries=own_entries), blob_store=None, label=ARCHIVE_LABEL, field=BUNDLE_FIELD)
     dependencies: dict[str, RequestTree] = {}
     for package_name, package_entries in vendored_entries.items():
         label = f"The package '{VENDORED_METHODS_PREFIX}{package_name}/' of {ARCHIVE_LABEL[0].lower()}{ARCHIVE_LABEL[1:]}"
-        dependency_tree = await read_request_tree(document=_base64_map_document(entries=package_entries), blob_store=None, label=label)
-        address = dependency_address_of(tree=dependency_tree, fallback_name=package_name, label=label)
-        add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label)
+        dependency_tree = await read_request_tree(
+            document=_base64_map_document(entries=package_entries), blob_store=None, label=label, field=BUNDLE_FIELD
+        )
+        root = f"{VENDORED_METHODS_PREFIX}{package_name}/"
+        address = dependency_address_of(tree=dependency_tree, fallback_name=package_name, label=label, root=root)
+        add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=label, root=root)
     request_method = RequestMethod(tree=tree, dependencies=dependencies)
     ensure_method_within_limits(request_method=request_method, label=ARCHIVE_LABEL)
     return request_method
@@ -648,8 +662,8 @@ def with_resources(*, request_method: RequestMethod, resources: Mapping[str, byt
     A file the tree already holds with the same bytes changes nothing; other bytes under a path the tree holds, or a path
     that cannot name a file of a tree, are refused naming the path.
 
-    Raises (as problem documents): a 422 `InvalidResourcePath` for two different files under one path or a path no tree
-    could hold, and a 422 `MethodTreeTooLarge` for a tree the files take past this runner's limits.
+    Raises (as problem documents): a 422 `request.invalid` naming `resources` for two different files under one path or
+    a path no tree could hold, and a 422 `method.package_invalid` for a tree the files take past this runner's limits.
     """
     if not resources:
         return request_method
@@ -664,12 +678,12 @@ def with_resources(*, request_method: RequestMethod, resources: Mapping[str, byt
         if violation is not None or excluded_name_violation(path):
             reason = violation or "the membership rule keeps it out of every method tree"
             msg = f"The file '{wire_name(path)}' sent in `resources` cannot be a file of the method's tree: {reason}."
-            raise_validation_error(message=msg, error_type=ErrorType.INVALID_RESOURCE_PATH)
+            raise RunnerRequestError(msg, field=SUBMITTED_FILES_FIELD)
         contents[path] = data
     collisions = path_collisions(contents)
     if collisions:
         msg = f"The files sent in `resources` collide with the method's files: {', '.join(repr(path) for path in collisions)}."
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_RESOURCE_PATH)
+        raise RunnerRequestError(msg, field=SUBMITTED_FILES_FIELD)
     merged = RequestMethod(tree=RequestTree.make_from_contents(contents=contents), dependencies=request_method.dependencies)
     ensure_tree_within_limits(tree=merged.tree, label=_WITH_RESOURCES_LABEL)
     ensure_method_within_limits(request_method=merged, label=_WITH_RESOURCES_LABEL)
@@ -689,19 +703,20 @@ def _python_sources(*, tree: RequestTree) -> dict[str, str]:
     return sources
 
 
-def ensure_python_allowed(*, request_method: RequestMethod, label: str) -> None:
+def ensure_python_allowed(*, request_method: RequestMethod, label: str, origin: CustomCodeOrigin) -> None:
     """Refuse a method shipping Python where it may not run, before anything of it is written.
 
-    On a deployment that is not sandbox-hosted, any `.py` file is refused (403 `CustomCodeRequiresSandbox`): running it
-    would import it in-process. On a sandbox-hosted deployment, the method's own tree declaring a Python structure class
-    is refused (`MethodStructuresRefusedError`, a 422), naming each file by its tree path; a dependency tree is checked
-    once written, by its address (`written_method`).
+    On a deployment that is not sandbox-hosted, any `.py` file is refused (501
+    `pipelex.deployment.custom_code_requires_sandbox`, whose `origin` says whether the request sent the method or named
+    a package to fetch): running it would import it in-process. On a sandbox-hosted deployment, the method's own tree
+    declaring a Python structure class is refused (`MethodStructuresRefusedError`, a 422), naming each file by its tree
+    path; a dependency tree is checked once written, by its address (`written_method`).
     """
     if not request_method.has_python:
         return
     if not is_pipe_func_sandbox_hosted():
         msg = f"{label} ships custom Python (.py); running it requires a sandbox-hosted deployment."
-        raise_forbidden(message=msg, error_type=ErrorType.CUSTOM_CODE_REQUIRES_SANDBOX)
+        raise CustomCodeRequiresSandboxError(msg, origin=origin)
     ensure_no_structured_content_in_library_sources(sources_by_dir={Path(): _python_sources(tree=request_method.tree)})
 
 
@@ -713,12 +728,12 @@ async def record_request_method(*, request_method: RequestMethod, blob_store: Ru
 
 
 def ensure_method_holds_a_bundle(*, request_method: RequestMethod, label: str) -> None:
-    """Refuse a method whose own tree holds no `.mthds` bundle, with a 422 `InvalidBundle`."""
+    """Refuse a method whose own tree holds no `.mthds` bundle, with a 422 `method.package_invalid`."""
     if not request_method.tree.bundle_paths:
         msg = f"{label} holds no .mthds bundle of its own."
         if request_method.dependencies:
             msg += " The packages it carries are dependencies: the method's own bundles go in its own tree."
-        raise_validation_error(message=msg, error_type=ErrorType.INVALID_BUNDLE)
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.NO_BUNDLE)
 
 
 def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:
@@ -740,11 +755,11 @@ def select_tree_entry(*, tree: RequestTree, method_label: str) -> MethodEntry:
             content = tree.contents[tree_path].decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"The bundle '{tree_path}' of the method {method_label} is not UTF-8 text."
-            raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_SYNTAX) from exc
+            raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_SYNTAX).with_params(finding=NOT_UTF8_FINDING) from exc
         with translate_to_validate_bundle_error():
             blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content, mthds_source=tree_path)
         candidates.append(EntryCandidate.of_blueprint(tree_path=tree_path, blueprint=blueprint))
-    manifest = manifest_of(tree=tree, label=f"the method {method_label}")
+    manifest = manifest_of(tree=tree, label=f"the method {method_label}", root="")
     return select_entry(candidates=candidates, manifest=manifest, method_label=method_label)
 
 

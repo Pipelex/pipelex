@@ -8,17 +8,27 @@ without a lookup per file.
 
 import asyncio
 import json
+import logging
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
+from pipelex.tools.log.log_fields import carried_attributes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 from pytest_mock import MockerFixture
 from typing_extensions import override
 
-from pipelex_api.blob_store import MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_TRANSFERS, RunnerBlobStore
-from pipelex_api.errors import ApiError
+from pipelex_api.blob_store import (
+    BLOB_DAMAGED_MESSAGE,
+    MAX_CONCURRENT_BLOB_LOOKUPS,
+    MAX_CONCURRENT_BLOB_TRANSFERS,
+    RunnerBlobStore,
+    problem_scheme_of,
+)
+from pipelex_api.exceptions import BlobStoreDamagedError, RunnerRequestError
 from pipelex_api.method_tree_request import RequestTree, read_request_tree
+from tests.unit._problems import problem_of
 
 _SCOPE = "single-tenant"
 
@@ -97,61 +107,81 @@ def _hash_map(entries: dict[str, tuple[bytes, int]]) -> str:
     return json.dumps({tree_path: {"sha256": sha256_hex(data), "size": size} for tree_path, (data, size) in entries.items()})
 
 
-def _problem_of(exc_info: pytest.ExceptionInfo[ApiError]) -> dict[str, object]:
-    document: dict[str, object] = exc_info.value.document
-    return document
-
-
 @pytest.mark.asyncio(loop_scope="class")
 class TestRunnerBlobStore:
     async def test_a_blob_held_at_another_size_is_refused_before_any_byte_is_read(self) -> None:
-        """An entry stating a size other than the held bytes' is a `BlobMismatch`, and the census bounds every read."""
+        """An entry stating a size other than the held bytes' is a `request.invalid`, and the census bounds every read."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         large = b"x" * 4096
         await blob_store.store_blob(data=large)
 
-        with pytest.raises(ApiError) as exc_info:
-            await read_request_tree(document=_hash_map({"large.bin": (large, 0)}), blob_store=blob_store, label="The `files` map")
+        with pytest.raises(RunnerRequestError) as exc_info:
+            await read_request_tree(document=_hash_map({"large.bin": (large, 0)}), blob_store=blob_store, label="The `files` map", field="files")
 
-        problem = _problem_of(exc_info)
-        assert exc_info.value.status_code == 422
-        assert problem["error_type"] == "BlobMismatch"
-        assert problem["mismatched_blobs"] == [{"sha256": sha256_hex(large), "held_size": len(large)}]
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 422
+        assert problem["code"] == "request.invalid"
+        assert problem["params"] == {"field": "files"}
+        # The hash and the size held ride the operator's message alone.
+        assert f"{sha256_hex(large)}" in problem["diagnostics"]["message"]
         assert storage.loaded_keys == []
 
     async def test_a_blob_not_held_is_missing_and_a_held_one_is_read_and_checked(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         held = b"held bytes"
         absent = b"absent bytes"
         await blob_store.store_blob(data=held)
 
-        with pytest.raises(ApiError) as exc_info:
+        with pytest.raises(RunnerRequestError) as exc_info:
             await read_request_tree(
-                document=_hash_map({"held.txt": (held, len(held)), "absent.txt": (absent, len(absent))}), blob_store=blob_store, label="The map"
+                document=_hash_map({"held.txt": (held, len(held)), "absent.txt": (absent, len(absent))}),
+                blob_store=blob_store,
+                label="The map",
+                field="files",
             )
-        assert _problem_of(exc_info)["missing_blobs"] == [sha256_hex(absent)]
+        problem = problem_of(exc_info.value)
+        assert problem["code"] == "request.blobs_missing"
+        assert problem["params"] == {"missing_blobs": [sha256_hex(absent)]}
 
-        tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map")
+        tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
 
-    async def test_bytes_that_do_not_hash_to_their_key_are_a_server_fault(self) -> None:
-        """Damaged storage is no caller's doing, and no upload of theirs would change it: a 500 naming the hash."""
+    async def test_bytes_that_do_not_hash_to_their_key_are_a_damaged_stored_file_never_retried(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A damaged object does not heal: a retry reads the same bytes, so the verdict is not to retry.
+
+        No caller's doing, and no upload of theirs would change it: storage holds the object, but not the bytes the runtime
+        stored, `pipelex.storage.damaged`, which the caller reports. Not `pipelex.storage.unavailable`, whose retry verdict would
+        send a client round its retry budget, nor `runtime.misconfigured`, which tells the operator to change a setting
+        none of which is wrong; the operator finds which object to remove in a record of its own, naming the hash.
+        """
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         data = b"the true bytes"
         storage.objects[_blob_key(data)] = b"the damaged!!!"
 
-        with pytest.raises(ApiError) as exc_info:
-            await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map")
+        with caplog.at_level(logging.ERROR), pytest.raises(BlobStoreDamagedError) as exc_info:
+            await read_request_tree(document=_hash_map({"file.txt": (data, len(data))}), blob_store=blob_store, label="The map", field="files")
 
-        assert exc_info.value.status_code == 500
-        assert _problem_of(exc_info)["error_type"] == "BlobStoreCorrupted"
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 500
+        assert problem["code"] == "pipelex.storage.damaged"
+        assert problem["retry"] == "no"
+        assert problem["next_step"]["kind"] == "report"
+        assert problem["params"] == {"scheme": "memory"}
+        (record,) = [record for record in caplog.records if record.getMessage() == BLOB_DAMAGED_MESSAGE]
+        assert record.levelno == logging.ERROR
+        assert carried_attributes(record=record) == {
+            "blob_sha256": sha256_hex(data),
+            "blob_size_bytes": len(data),
+            "read_size_bytes": len(b"the damaged!!!"),
+            "storage_scheme": "memory",
+        }
 
     async def test_lookups_and_reads_run_a_bounded_number_at_a_time(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         blobs = [f"file number {index_blob}".encode() for index_blob in range(3 * MAX_CONCURRENT_BLOB_LOOKUPS)]
         for data in blobs:
             storage.objects[_blob_key(data)] = data
@@ -166,16 +196,18 @@ class TestRunnerBlobStore:
     async def test_a_short_object_is_asked_for_and_its_upload_is_a_server_fault_that_writes_nothing(self) -> None:
         """A blob cut short is damaged storage, which no write repairs: nothing writes over a blob, so its operator must."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         data = b"the whole blob, of which a failed write kept only a part"
         storage.objects[_blob_key(data)] = data[:10]
 
         assert await blob_store.missing_blobs(sizes={sha256_hex(data): len(data)}) == [sha256_hex(data)]
-        with pytest.raises(ApiError) as exc_info:
+        with pytest.raises(BlobStoreDamagedError) as exc_info:
             await blob_store.store_blob(data=data)
 
-        assert exc_info.value.status_code == 500
-        assert _problem_of(exc_info)["error_type"] == "BlobStoreCorrupted"
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 500
+        assert problem["code"] == "pipelex.storage.damaged"
+        assert problem["params"] == {"scheme": "memory"}
         assert storage.objects[_blob_key(data)] == data[:10]
         assert storage.created == []
         assert storage.unconditional_keys == []
@@ -183,7 +215,7 @@ class TestRunnerBlobStore:
     async def test_blobs_and_listings_are_created_only_with_their_checksums(self) -> None:
         """Every write names its SHA-256, the blob's hash or the listing's digest, and none is unconditional."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {"main.mthds": b"domain = 'a'", "notes.txt": b"some notes"}
         request_tree = RequestTree.make_from_contents(contents=contents)
 
@@ -199,7 +231,7 @@ class TestRunnerBlobStore:
     async def test_files_of_the_same_bytes_are_one_blob_written_once(self) -> None:
         """Two empty `__init__.py` files name one blob key, which a tree records with one lookup and one create."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {"main.mthds": b"domain = 'a'", "pkg/__init__.py": b"", "pkg/sub/__init__.py": b""}
         request_tree = RequestTree.make_from_contents(contents=contents)
 
@@ -217,7 +249,7 @@ class TestRunnerBlobStore:
     async def test_a_blob_another_writer_created_meanwhile_is_held(self, mocker: MockerFixture) -> None:
         """The lookup found nothing, then the create found the key taken: the same bytes are held, and that is no error."""
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         data = b"bytes two writers send at once"
 
         async def _absent_then_created(key: str) -> int:
@@ -234,7 +266,7 @@ class TestRunnerBlobStore:
 
     async def test_a_tree_whose_listing_is_held_is_recorded_without_a_lookup_per_file(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {f"file_{index_file}.txt": f"content {index_file}".encode() for index_file in range(5)}
         request_tree = RequestTree.make_from_contents(contents=contents)
         await blob_store.record_tree(tree=request_tree.tree, contents=request_tree.contents)
@@ -247,10 +279,27 @@ class TestRunnerBlobStore:
 
     async def test_a_listing_that_is_not_the_digest_s_holds_no_tree(self) -> None:
         storage = _CountingStorage()
-        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage)
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         contents = {"a.txt": b"a"}
         digest = digest_of_contents(contents)
         other_listing = tree_listing(tree_files_from_contents({"b.txt": b"b"}))
         storage.objects[f"{_SCOPE}/trees/{digest.removeprefix('sha256:')}"] = other_listing
 
         assert await blob_store.tree_hashes(tree_digest=digest) is None
+
+
+class TestProblemScheme:
+    @pytest.mark.parametrize(
+        ("storage_method", "scheme"),
+        [
+            (StorageMethod.LOCAL, "local"),
+            (StorageMethod.IN_MEMORY, "memory"),
+            (StorageMethod.S3, "s3"),
+            (StorageMethod.GCP, "gcs"),
+            ("azure", None),
+        ],
+    )
+    def test_the_problem_names_the_kind_of_storage_as_the_registry_spells_it(self, storage_method: str, scheme: str | None) -> None:
+        assert problem_scheme_of(storage_method=storage_method) == scheme
+        params = problem_of(BlobStoreDamagedError("damaged", scheme=scheme)).get("params")
+        assert params == ({"scheme": scheme} if scheme is not None else None)

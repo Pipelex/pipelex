@@ -1,9 +1,10 @@
 """A caller holding its own token reads only under its own id, on every route that takes a `read_scope`.
 
 With `AUTH_MODE=jwt` the caller reaches the runner directly, so the read scope it sends is its own claim, not a trusted
-host's: a scope lying under another id is refused with a 403 `ReadScopeForbidden` before anything is read, whether the
-route resolves hash entries in that scope's blob store, hands it to a validator or runs under it. On the other modes
-the caller is the host or one tenant, so the same scope is taken as it is.
+host's: a scope lying under another id is refused with a 403 `auth.forbidden`, whose `requirement` is
+`read_scope_under_caller`, before anything is read, whether the route resolves hash entries in that scope's blob store,
+hands it to a validator or runs under it. On the other modes the caller is the host or one tenant, so the same scope is
+taken as it is.
 """
 
 from collections.abc import Awaitable, Callable
@@ -21,6 +22,7 @@ from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 from pipelex_api.security import AUTH_MODE_ENV_VAR, RequestUser
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _CALLER_ID = "user_a"
@@ -81,11 +83,8 @@ class TestReadScopeBinding:
 
         response = _post(client, route=route, read_scope=read_scope)
 
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        problem = response.json()
-        assert problem["error_type"] == "ReadScopeForbidden", response.text
-        assert repr(read_scope) in problem["detail"]
+        problem = assert_problem(response, status=403, code="auth.forbidden")
+        assert problem["params"] == {"requirement": "read_scope_under_caller"}, problem
 
     @pytest.mark.parametrize("route", _ROUTES)
     @pytest.mark.parametrize("read_scope", [_CALLER_ID, f"{_CALLER_ID}/org_x"])

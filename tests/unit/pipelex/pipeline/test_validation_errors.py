@@ -21,9 +21,9 @@ from pipelex.core.exceptions import (
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.pipeline.validation_errors import build_validation_error_items, warning_problem_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
-from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
+from pipelex.validation_error_types import HintLintErrorType, PipeFactoryErrorType, PipeValidationErrorType, TemplateCheckErrorType
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
@@ -439,3 +439,48 @@ class TestBuildValidationErrorItems:
         assert items[0].source == "instantiated.mthds"
         # And the verdict lists it (it would be missing if the list were dropped).
         assert [item.pipe_code for item in exc.validation_error_items()] == ["pipe_inst"]
+
+    def test_warnings_become_problem_items_under_the_code_their_type_names(self) -> None:
+        """A valid report's warnings, as a surface speaking problem items carries them: each type names its code, and a
+        warning no type classifies takes `method.schema_violation`, as an unclassified item of an invalid verdict does.
+        """
+        hint_warning = ValidationErrorItem(
+            category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
+            error_type=HintLintErrorType.HINT_UNKNOWN_KEY,
+            concept_code="Essay",
+            domain_code="docs",
+            hint_key="emphasis",
+            message="Hint key 'emphasis' on concept 'docs.Essay' is not defined by this version of the standard.",
+        )
+        template_warning = ValidationErrorItem(
+            category=ValidationErrorCategory.DRY_RUN,
+            error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
+            pipe_code="print_invoice",
+            template_file="invoice.xlsx",
+            message="The name Totl matches no field.",
+        )
+        unclassified_warning = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="Something to look at.")
+
+        items = warning_problem_items(warnings=[hint_warning, template_warning, unclassified_warning])
+
+        assert [item.model_dump(mode="json", exclude_none=True) for item in items] == [
+            {
+                "code": "method.hint_invalid",
+                "detail": items[0].detail,
+                "params": {"reason": "unknown_key", "hint": "emphasis"},
+                # The declaration the hint is on, which neither parameter names.
+                "location": {"field": "concept.Essay"},
+            },
+            {
+                "code": "pipelex.docgen.template_warning",
+                "detail": "The document template 'invoice.xlsx' may be faulty: The name Totl matches no field.",
+                "params": {"template": "invoice.xlsx", "finding": "The name Totl matches no field."},
+                "location": {"pipe": "print_invoice"},
+            },
+            {
+                "code": "method.schema_violation",
+                "detail": items[2].detail,
+                "params": {"finding": "Something to look at."},
+            },
+        ]
+        assert "emphasis" in items[0].detail

@@ -560,6 +560,9 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `has_blocked_steps` | boolean | Whether a stale configuration file needs a migration step that cannot be applied for the user |
 | `file_count` | integer | The number of result files a delivery stored |
 | `storage_key` | string | The key a delivery stores a result file under, which ends in the file's name |
+| `storage_scheme` | string or `null` | The kind of storage a deployment's storage provider is, as a `pipelex.storage.*` problem names it: `s3`, `local`; `null` for a storage plugin whose kind the registry does not list |
+| `blob_sha256` | string | The SHA-256 a blob is stored under in the API server's blob store, in lowercase hex: its content's hash, never its content |
+| `blob_size_bytes`, `read_size_bytes` | integer | The size the API server's blob store holds a blob at, and the size of the bytes a read of it returned, in bytes |
 | `env_var` | string | The name of an environment variable, never its value |
 | `default_value` | integer | The value a setting falls back to when its environment variable holds none it can use |
 | `auth_mode` | string | The authentication mode the API server's `AUTH_MODE` names |

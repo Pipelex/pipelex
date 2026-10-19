@@ -66,6 +66,7 @@ Pipelex's storage addresses and uploads.
 |---|---|---|---|---|
 | [`pipelex.storage.uri_invalid`](pipelex/storage/uri_invalid.md) | The storage address is malformed | `input` | `no` | `422` |
 | [`pipelex.storage.not_found`](pipelex/storage/not_found.md) | A stored file is gone | `runtime` | `no` | `500` |
+| [`pipelex.storage.damaged`](pipelex/storage/damaged.md) | A stored file is damaged | `runtime` | `no` | `500` |
 | [`pipelex.storage.unavailable`](pipelex/storage/unavailable.md) | Storage is unavailable | `runtime` | `yes` | `503` |
 | [`pipelex.storage.not_configured`](pipelex/storage/not_configured.md) | This deployment serves no storage for that address | `operator` | `no` | `500` |
 | [`pipelex.storage.grant_unusable`](pipelex/storage/grant_unusable.md) | The upload grant is spent or expired | `runtime` | `yes` | `403` |

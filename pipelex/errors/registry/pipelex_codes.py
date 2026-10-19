@@ -37,6 +37,7 @@ class PipelexErrorCode(StrEnum):
     RUN_ALREADY_EXISTS = "pipelex.run.already_exists"
     STORAGE_URI_INVALID = "pipelex.storage.uri_invalid"
     STORAGE_NOT_FOUND = "pipelex.storage.not_found"
+    STORAGE_DAMAGED = "pipelex.storage.damaged"
     STORAGE_UNAVAILABLE = "pipelex.storage.unavailable"
     STORAGE_NOT_CONFIGURED = "pipelex.storage.not_configured"
     STORAGE_GRANT_UNUSABLE = "pipelex.storage.grant_unusable"
@@ -371,6 +372,20 @@ class StorageNotFoundParams(PipelexErrorParams):
     """
 
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_NOT_FOUND
+
+    scheme: Literal["local", "s3", "gcs", "memory"]
+
+
+class StorageDamagedParams(PipelexErrorParams):
+    """The parameters of `pipelex.storage.damaged`.
+
+    A stored file is damaged.
+
+    Attributes:
+        scheme: The kind of storage that holds the damaged file.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_DAMAGED
 
     scheme: Literal["local", "s3", "gcs", "memory"]
 
@@ -975,6 +990,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.RUN_ALREADY_EXISTS: RunAlreadyExistsParams,
     PipelexErrorCode.STORAGE_URI_INVALID: StorageUriInvalidParams,
     PipelexErrorCode.STORAGE_NOT_FOUND: StorageNotFoundParams,
+    PipelexErrorCode.STORAGE_DAMAGED: StorageDamagedParams,
     PipelexErrorCode.STORAGE_UNAVAILABLE: StorageUnavailableParams,
     PipelexErrorCode.STORAGE_NOT_CONFIGURED: StorageNotConfiguredParams,
     PipelexErrorCode.STORAGE_GRANT_UNUSABLE: StorageGrantUnusableParams,
@@ -1271,6 +1287,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         retry="no",
         status=500,
         detail="A file the runtime stored is no longer in its {scheme} storage.",
+        actor_step="report",
+        actor_step_detail="Report this to whoever runs the runtime.",
+        other_step="report",
+        other_step_detail="Report this to whoever runs the runtime.",
+    ),
+    PipelexErrorCode.STORAGE_DAMAGED: PipelexErrorEntry(
+        title="A stored file is damaged",
+        domain="runtime",
+        retry="no",
+        status=500,
+        detail="A file the runtime stored in its {scheme} storage no longer holds the bytes it was stored with.",
         actor_step="report",
         actor_step_detail="Report this to whoever runs the runtime.",
         other_step="report",

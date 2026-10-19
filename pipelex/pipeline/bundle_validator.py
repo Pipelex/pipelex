@@ -45,6 +45,7 @@ from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import caller_refusal
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.security_event import emit_security_event, mark_security_event_emitted
 from pipelex.interpreter_hub import (
     clear_current_library,
     get_current_library,
@@ -585,6 +586,14 @@ class BundleValidator:
                 error_message = f"Skipped dry run for pipe '{pipe.pipe_ref}': unresolved dependency: {exc}"
                 log.verbose("A pipe's dry run was skipped for an unresolved dependency", fields={"pipe_ref": pipe.pipe_ref, **error_fields(exc=exc)})
                 return DryRunOutput(pipe_code=pipe.code, pipe_ref=pipe.pipe_ref, status=DryRunStatus.SKIPPED, error_message=error_message)
+            # A refusal of a security rule is logged once, where it is met: the pipe run logs the one it meets while it
+            # executes (`PipeRun.run`), which this finds marked, and this logs one met before any pipe run, such as while
+            # the mock inputs are built, which nobody else would, so the sweep's error can be marked as logged.
+            emit_security_event(
+                error=exc,
+                pipeline_run_id=dry_run_pipeline_id,
+                extras=caller_identity.extras if caller_identity is not None else None,
+            )
             formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
             error_message = f"Dry run failed for pipe '{pipe.pipe_ref}': {formatted_error}"
             # A failure raised outside any routed pipe run (the mock-input build) is the swept pipe's own.
@@ -649,7 +658,12 @@ class BundleValidator:
             met_texts = {id(output.failure): output.error_message for output in unexpected_failures.values() if output.failure is not None}
             details = "\n".join(f"- {met_texts.get(id(failure)) or failure.message}" for failure in failures)
             msg = f"Dry run failed for {len(failures)} pipe(s):\n{details}"
-            raise DryRunError(msg, failures=failures)
+            dry_run_error = DryRunError(msg, failures=failures)
+            if dry_run_error.security_failure_codes:
+                # Each refusal's security event was logged where the sweep met it (`_run_and_classify`), and this error,
+                # which reports the first under its code, is new: marked, so the boundary it reaches does not log it twice.
+                mark_security_event_emitted(error=dry_run_error)
+            raise dry_run_error
         return results
 
     @classmethod

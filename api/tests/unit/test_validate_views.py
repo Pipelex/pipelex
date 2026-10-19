@@ -90,7 +90,7 @@ class TestValidateInputFormView:
         body = response.json()
         assert body["is_valid"] is False
         assert "input_form" not in body, f"The invalid arm never carries `input_form`, got keys: {sorted(body)}"
-        assert body["validation_errors"]
+        assert body["errors"]
 
     def test_unknown_view_token_is_ignored_not_422(self):
         # Lenient-ignore: a stale view token must never fail the call.

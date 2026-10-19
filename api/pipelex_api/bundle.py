@@ -16,30 +16,30 @@ import binascii
 import zipfile
 from io import BytesIO
 
+from mthds.protocol.problem.registry import CoreCode, RequestMalformedReason
 from pipelex import log
 from pipelex.tools.log.error_fields import error_fields
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_payload_too_large, raise_validation_error
-from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES
+from pipelex_api.exceptions import MethodPackageReason, RequestMethodError, RunnerRequestError
+from pipelex_api.limits import MAX_BUNDLE_FILES, MAX_BUNDLE_TOTAL_BYTES, base64_decoded_size
 
-# Base64 inflates by 4/3; a zip is compressed, so a bundle whose DECOMPRESSED content is within
-# the ceiling encodes to well under this. Bounding the base64 string BEFORE decoding stops a
-# ~100 MiB request-body (the only other bound) from being expanded into ~75 MiB of heap just to
-# be rejected later by the decompressed-size guard. Slack (+4) covers padding.
-_MAX_BUNDLE_B64_CHARS = MAX_BUNDLE_TOTAL_BYTES * 4 // 3 + 4
+# The request field the archive rides, which the refusals of its encoding name.
+_BUNDLE_FIELD = "bundle_b64"
 
 
 def _guard_count(count: int) -> None:
     if count == 0:
-        raise_validation_error(message="Bundle is empty (no files)", error_type=ErrorType.INVALID_BUNDLE)
+        msg = "Bundle is empty (no files)"
+        raise RunnerRequestError(msg, field=_BUNDLE_FIELD)
     if count > MAX_BUNDLE_FILES:
-        raise_payload_too_large(message=f"Bundle exceeds the {MAX_BUNDLE_FILES}-file limit (got {count})")
+        msg = f"Bundle exceeds the {MAX_BUNDLE_FILES}-file limit (got {count})"
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.BUNDLE_TOO_MANY_FILES, limit=MAX_BUNDLE_FILES)
 
 
 def _guard_running_total(total_bytes: int) -> None:
     if total_bytes > MAX_BUNDLE_TOTAL_BYTES:
-        raise_payload_too_large(message=f"Bundle exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB decompressed-size limit")
+        msg = f"Bundle exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB decompressed-size limit"
+        raise RequestMethodError(msg).with_params(reason=MethodPackageReason.BUNDLE_TOO_LARGE, limit=MAX_BUNDLE_TOTAL_BYTES)
 
 
 def decode_bundle_archive(*, bundle_b64: str) -> list[tuple[str, bytes]]:
@@ -50,24 +50,45 @@ def decode_bundle_archive(*, bundle_b64: str) -> list[tuple[str, bytes]]:
     cheap length check on the still-encoded string runs FIRST, so an oversized payload is refused before it is buffered
     into memory as decoded bytes. A name the archive gives twice is returned twice, for the tree's reader to refuse.
 
-    Raises (as problem documents): an oversized archive (413 `PayloadTooLarge`), a value that is not base64 (400
-    `InvalidBase64`), and one that is not a zip archive or holds no file (422 `InvalidBundle`).
+    Raises (as problem documents): an archive past the size limit (413 `request.too_large`, its limit and its size in
+    bytes, the size read off the encoded length), a value that is
+    not base64 or not a zip archive (422 `request.malformed`), an archive holding no file (422 `request.invalid`), and
+    one past the limit on its files or on its decompressed size (422 `method.package_invalid`).
     """
-    if len(bundle_b64) > _MAX_BUNDLE_B64_CHARS:
-        raise_payload_too_large(message=f"bundle_b64 exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB compressed-size limit")
+    # A zip is compressed, so a bundle whose decompressed content is within the ceiling is an archive well under it. Its
+    # size is read off the encoded length, so a ~100 MiB request body, the only other bound, is refused before it is
+    # expanded into ~75 MiB of heap just to be refused later by the decompressed-size guard.
+    archive_bytes = base64_decoded_size(encoded=bundle_b64)
+    if archive_bytes > MAX_BUNDLE_TOTAL_BYTES:
+        msg = f"bundle_b64 exceeds the {MAX_BUNDLE_TOTAL_BYTES // 1024} KiB compressed-size limit"
+        raise (
+            RunnerRequestError(msg, field=_BUNDLE_FIELD)
+            .with_error_code(CoreCode.REQUEST_TOO_LARGE)
+            .with_params(limit=MAX_BUNDLE_TOTAL_BYTES, size=archive_bytes)
+        )
     try:
         raw = base64.b64decode(bundle_b64, validate=True)
     except (binascii.Error, ValueError) as decode_error:
         # DEBUG: the refusal below is a caller's mistake, which the error handler already logs; this keeps the cause.
         log.debug("A bundle's base64 could not be decoded", fields=error_fields(exc=decode_error))
-        raise_bad_request(message="bundle_b64 is not valid base64", error_type=ErrorType.INVALID_BASE64)
+        msg = "bundle_b64 is not valid base64"
+        raise (
+            RunnerRequestError(msg, field=_BUNDLE_FIELD)
+            .with_error_code(CoreCode.REQUEST_MALFORMED)
+            .with_params(reason=RequestMalformedReason.BAD_BASE64)
+        ) from decode_error
 
     try:
         archive = zipfile.ZipFile(BytesIO(raw))
     except zipfile.BadZipFile as zip_error:
         # DEBUG: the refusal below is a caller's mistake, which the error handler already logs; this keeps the cause.
         log.debug("A bundle is not a valid zip archive", fields=error_fields(exc=zip_error))
-        raise_validation_error(message="bundle_b64 is not a valid zip archive", error_type=ErrorType.INVALID_BUNDLE)
+        msg = "bundle_b64 is not a valid zip archive"
+        raise (
+            RunnerRequestError(msg, field=_BUNDLE_FIELD)
+            .with_error_code(CoreCode.REQUEST_MALFORMED)
+            .with_params(reason=RequestMalformedReason.BAD_ZIP)
+        ) from zip_error
 
     entries: list[tuple[str, bytes]] = []
     total_bytes = 0

@@ -18,6 +18,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
@@ -36,11 +37,11 @@ from typing_extensions import override
 from pipelex_api.api_config import ApiConfig, get_api_config, is_callers_override, resolve_orchestration_mode
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle_resources import decode_bundle_resources
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import ApiSecurityRefusal, raise_bad_request, raise_forbidden, raise_validation_error, security_refusal_of
+from pipelex_api.exceptions import CustomCodeOrigin, ReservedObjectKeyError, RunnerAuthError, RunnerRequestError
 from pipelex_api.json_body import decode_json_body
 from pipelex_api.method_source import fetched_method
 from pipelex_api.method_tree_request import (
+    BUNDLE_FIELD,
     REQUEST_METHOD_LABEL,
     RequestMethod,
     ensure_method_holds_a_bundle,
@@ -55,15 +56,18 @@ from pipelex_api.method_tree_request import (
 )
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import (
-    PROBLEM_400_START_REQUIRES_ASYNC,
-    PROBLEM_403_RUN_POLICY,
+    PROBLEM_403_READ_SCOPE,
     PROBLEM_404_METHOD_PACKAGE,
     PROBLEM_409_DUPLICATE_RUN,
     PROBLEM_429,
-    PROBLEM_501_ASYNC_NOT_ENABLED,
+    PROBLEM_500_HELD_BLOBS,
+    PROBLEM_501_RUN_POLICY,
+    PROBLEM_501_START,
 )
 from pipelex_api.problem_view import problem_view_of
+from pipelex_api.request_refusals import WHOLE_BODY_FIELD, callback_url_refusal_in, refused_request_error
 from pipelex_api.routes.pipelex.utils import get_current_iso_timestamp
+from pipelex_api.run_extras_binding import bind_run_extras
 from pipelex_api.schemas.models import (
     PipelexApiExecuteRequest,
     PipelexApiExecuteResponse,
@@ -138,6 +142,10 @@ def _resolve_storage_scope(request: Request, *, requested: str | None) -> str:
     return requested or get_request_user_id(request)
 
 
+# What a request refused for its `read_scope` lacks, as the `requirement` of its `auth.forbidden`.
+READ_SCOPE_UNDER_CALLER_REQUIREMENT = "read_scope_under_caller"
+
+
 def bound_read_scope(request: Request, *, requested: str | None) -> str | None:
     """The read scope a request sent, once this caller may read under it; every route taking a `read_scope` reads it here.
 
@@ -145,9 +153,9 @@ def bound_read_scope(request: Request, *, requested: str | None) -> str | None:
     trusted proxy forwarding the user's identity (the hosted plane, which sends the organization it serves) or a
     single tenant, and with the shared `api_key` it is one tenant: a sent value is taken as it is. With `AUTH_MODE=jwt`
     the caller reaches this runner directly, its token's `user_id` its only identity, so it reads only under that id: a
-    sent scope must be the id or lie under it, else the request is refused with a 403 `ReadScopeForbidden` before
-    anything is read, so no caller reads another's blobs or runs under another's scope. A run's storage scope must lie
-    under its read scope, so it is bound with it.
+    sent scope must be the id or lie under it, else the request is refused with a 403 `auth.forbidden`, whose
+    `requirement` is `read_scope_under_caller`, before anything is read, so no caller reads another's blobs or runs
+    under another's scope. A run's storage scope must lie under its read scope, so it is bound with it.
     """
     if requested is None:
         return None
@@ -157,10 +165,8 @@ def bound_read_scope(request: Request, *, requested: str | None) -> str | None:
         case AuthMode.JWT:
             caller_id = get_request_user_id(request)
             if requested.split("/")[0] != caller_id:
-                raise_forbidden(
-                    message=f"The read_scope {requested!r} does not lie under this caller's own id, the only scope its token may read.",
-                    error_type=ErrorType.READ_SCOPE_FORBIDDEN,
-                )
+                msg = f"The read_scope {requested!r} does not lie under this caller's own id, the only scope its token may read."
+                raise RunnerAuthError(msg).with_error_code(CoreCode.AUTH_FORBIDDEN).with_params(requirement=READ_SCOPE_UNDER_CALLER_REQUIREMENT)
             return requested
 
 
@@ -195,6 +201,10 @@ class _RunScopes(NamedTuple):
     read_scope: str | None
 
 
+# The run request's field naming the scope a run may read, which a refusal of the scopes it resolves to names.
+_READ_SCOPE_FIELD = "read_scope"
+
+
 def _resolve_run_scopes(request: Request, *, extras: PipelineApiExtras) -> _RunScopes:
     """Resolve the run's storage and read scopes, and refuse a pair the run could not work under.
 
@@ -207,18 +217,14 @@ def _resolve_run_scopes(request: Request, *, extras: PipelineApiExtras) -> _RunS
     read_scope = _resolve_read_scope(request, requested=extras.read_scope)
     if read_scope is not None:
         if storage_scope == LOCAL_STORAGE_SCOPE:
-            raise_validation_error(
-                message=f"A run with a read_scope must pass its own storage_scope, not the local sentinel {LOCAL_STORAGE_SCOPE!r}.",
-                error_type=ErrorType.INVALID_READ_SCOPE,
-            )
+            msg = f"A run with a read_scope must pass its own storage_scope, not the local sentinel {LOCAL_STORAGE_SCOPE!r}."
+            raise RunnerRequestError(msg, field=_READ_SCOPE_FIELD)
         try:
             validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
         except ValueError as exc:
             origin = "sent" if extras.read_scope is not None else "defaulted to the caller's id"
-            raise_validation_error(
-                message=f"{exc} The read_scope {read_scope!r} was {origin}, and the storage_scope is {storage_scope!r}.",
-                error_type=ErrorType.INVALID_READ_SCOPE,
-            )
+            msg = f"{exc} The read_scope {read_scope!r} was {origin}, and the storage_scope is {storage_scope!r}."
+            raise RunnerRequestError(msg, field=_READ_SCOPE_FIELD) from exc
     return _RunScopes(storage_scope=storage_scope, read_scope=read_scope)
 
 
@@ -350,7 +356,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         """Execute a method synchronously, dispatching by the resolved `orchestration_mode`.
 
         Symmetric with `start`: the effective `orchestration_mode` is resolved FIRST (config default
-        + optional per-request override, so a forbidden override is refused with a 403 before any
+        + optional per-request override, so a forbidden override is refused with a 422 before any
         library load), then the run is dispatched through the hub's `OrchestratorRegistry` instead
         of the boot-global pipe-run slot. `direct` runs in-process on this agnostic base; a
         `temporal` mode dispatches the whole job to a worker and awaits it. A mode with no registered
@@ -370,7 +376,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         (`PipelineApiExtras.orchestration_mode`).
         """
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
-        # policy forbids is refused (403) here, before any library load / run registration. Mirrors start().
+        # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
         api_config = get_api_config()
         orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
@@ -424,7 +430,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         `/start` is genuinely fire-and-forget, so it is HONEST about its capability: the resolved
         mode's orchestrator is looked up and its `supports_fire_and_forget` checked BEFORE any
         library load. A blocking-only orchestrator (the in-process `direct` base) cannot honor
-        async delivery, so it is refused with a 400 (`START_REQUIRES_ASYNC_ORCHESTRATION`) — use
+        async delivery, so it is refused with a 501 (`runtime.unsupported`) — use
         `/execute` — rather than silently running blocking and acking. A mode with no registered
         orchestrator fails loud with `MissingOrchestratorError` (carrying the install hint), also
         before any library load.
@@ -443,7 +449,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         is an API-layer extra threaded into `RunMetadata.request_id` for log
         correlation, so it reaches the job a worker is handed. `requested_orchestration_mode` is the optional per-request backend override
         (`PipelineApiExtras.orchestration_mode`); it is resolved against the deployment's
-        `api.toml` policy and a forbidden override is refused with a 403.
+        `api.toml` policy and a forbidden override is refused with a 422.
         """
         if extra:
             # Nothing on the wire reaches `extra`: the route parses the extras itself and passes them by name, so a
@@ -451,10 +457,10 @@ class ApiRunner(PipelexMTHDSProtocol):
             msg = f"ApiRunner defines no extension args beyond its named ones; got {sorted(extra)}."
             raise PipelexUnexpectedError(msg)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
-        # policy forbids is refused (403) here. Then look up the orchestrator and check its async
+        # policy forbids is refused (422) here. Then look up the orchestrator and check its async
         # capability: `/start` is fire-and-forget, so a blocking-only orchestrator (direct on the
-        # agnostic base) is refused HONESTLY with a 400 instead of silently running blocking and
-        # acking. Both gates run BEFORE pipeline_run_setup so a doomed request never loads a library.
+        # agnostic base) is refused HONESTLY with a 501 `runtime.unsupported` instead of silently
+        # running blocking and acking. Both gates run BEFORE pipeline_run_setup so a doomed request never loads a library.
         api_config = get_api_config()
         orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
@@ -465,7 +471,7 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"Orchestration mode '{orchestration_mode}' cannot honor fire-and-forget delivery: /start requires an "
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
-            raise_bad_request(msg, error_type=ErrorType.START_REQUIRES_ASYNC_ORCHESTRATION)
+            raise AsyncExecutionNotEnabledError(msg)
         await self._ensure_served_method_requirements_met()
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
@@ -580,7 +586,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         """Validate MTHDS bundles, returning the verdict as a value (the route maps it to a 200).
 
         Mode-aware, mirroring `start`: the effective `orchestration_mode` is resolved FIRST (config
-        default + optional per-request override, so a forbidden override is refused with a 403
+        default + optional per-request override, so a forbidden override is refused with a 422
         before any library load), then dispatched through the hub's `BundleValidatorRegistry`.
         `direct` validates in-process on this agnostic base; a `temporal` mode dispatches the
         whole job to a worker (`pipelex-temporal`). A mode with no registered validator fails
@@ -617,7 +623,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         would fall back to: nothing lists or erases what a validation would leave under that prefix.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
-        # is refused (403) here, before any validator dispatch / library load. Mirrors start().
+        # is refused (422) here, before any validator dispatch / library load. Mirrors start().
         api_config = get_api_config()
         orchestration_mode = resolve_orchestration_mode(requested_orchestration_mode, config=api_config)
         validator = get_bundle_validator_registry().get_optional(mode=orchestration_mode)
@@ -698,20 +704,18 @@ def _decode_body(body: bytes) -> dict[str, Any]:
     Parsing as plain data is not enough on its own: a marker accepted as an ordinary dict comes
     back to life the moment the runtime round-trips the inputs through kajson. So the caller,
     `_parse_request`, refuses a key a kajson decoder treats as a marker at any depth with a 422
-    `ReservedObjectKey` (`_refuse_reserved_object_keys`), once the run's extras are bound for the
-    security event that refusal logs.
+    `pipelex.security.reserved_key` (`_refuse_reserved_object_keys`), once the run's extras are bound
+    for the security event that refusal logs.
 
     The parse is `decode_json_body`'s, so its failures are caller mistakes answered with a 422
-    `InvalidJSON` rather than a sanitized 500: a body nested deeper than `MAX_JSON_NESTING_DEPTH`,
+    `request.malformed` rather than a sanitized 500: a body nested deeper than `MAX_JSON_NESTING_DEPTH`,
     refused before it is parsed whatever the interpreter and its stack, a body that is not UTF-8,
-    and one that is not JSON.
+    and one that is not JSON. A body that parses to anything but an object is a 422 `request.invalid`.
     """
     decoded = decode_json_body(body)
     if not isinstance(decoded, dict):
-        raise_validation_error(
-            message="Request body must be a JSON object",
-            error_type=ErrorType.INVALID_JSON,
-        )
+        msg = "Request body must be a JSON object"
+        raise RunnerRequestError(msg, field=WHOLE_BODY_FIELD)
     return cast("dict[str, Any]", decoded)
 
 
@@ -719,45 +723,18 @@ def _refuse_reserved_object_keys(request_data: dict[str, Any]) -> None:
     """Refuse a body holding an object key a kajson decoder reads as a class marker, at any depth, with a 422.
 
     The refusal is a security rule's, `pipelex.security.reserved_key`, so it logs a security event, which names the
-    kind of thing refused and never the key.
+    kind of thing refused and never the key. The problem's `keys` parameter names the key the caller sent, bounded as
+    the correlation fields are.
     """
     reserved_key = _find_reserved_object_key(request_data)
     if reserved_key is not None:
-        # The key is the caller's, as long as the body allows (any `__kajson…` key matches), and the
-        # detail is logged as a field: echo it bounded, as the correlation fields are.
+        # The key is the caller's, as long as the body allows (any `__kajson…` key matches): echo it bounded.
         shown_key = reserved_key if len(reserved_key) <= _MAX_CORRELATION_FIELD_LEN else f"{reserved_key[:_MAX_CORRELATION_FIELD_LEN]}…"
-        raise_validation_error(
-            message=(
-                f"Request body contains the reserved object key '{shown_key}'. A run request is plain JSON: "
-                f"no object in it may carry a '__class__' or '__module__' key, or a key starting with '{_RESERVED_OBJECT_KEY_PREFIX}'."
-            ),
-            error_type=ErrorType.RESERVED_OBJECT_KEY,
-            security_refusal=ApiSecurityRefusal(code=PipelexErrorCode.SECURITY_RESERVED_KEY, error_type=ErrorType.RESERVED_OBJECT_KEY),
+        msg = (
+            f"Request body contains the reserved object key '{shown_key}'. A run request is plain JSON: "
+            f"no object in it may carry a '__class__' or '__module__' key, or a key starting with '{_RESERVED_OBJECT_KEY_PREFIX}'."
         )
-
-
-# The `error_type` a 422 on one extras field carries. A field absent from this map
-# (`pipeline_run_id`, `orchestration_mode`) answers with the generic `ValidationError`.
-_EXTRAS_FIELD_ERROR_TYPES: dict[str, ErrorType] = {
-    "callback_urls": ErrorType.INVALID_CALLBACK_URLS,
-    "storage_scope": ErrorType.INVALID_STORAGE_SCOPE,
-    "read_scope": ErrorType.INVALID_READ_SCOPE,
-    "analytics_groups": ErrorType.INVALID_ANALYTICS_GROUPS,
-}
-
-
-def _extras_error_type(exc: ValidationError) -> ErrorType:
-    """Classify an extras failure by the field that failed, so a client can branch on `error_type`.
-
-    Every extras failure used to answer `InvalidCallbackUrls`, including a traversal in
-    `storage_scope` on a request that carried no callback at all. A body failing on
-    more than one field gets the generic `ValidationError`: naming one of them would
-    send the caller to fix that field and leave the other one for the next request.
-    """
-    failed_fields = {str(error["loc"][0]) for error in exc.errors() if error["loc"]}
-    if len(failed_fields) != 1:
-        return ErrorType.VALIDATION_ERROR
-    return _EXTRAS_FIELD_ERROR_TYPES.get(failed_fields.pop(), ErrorType.VALIDATION_ERROR)
+        raise ReservedObjectKeyError(msg, keys=[shown_key])
 
 
 def _validate_extras(request_data: dict[str, Any]) -> PipelineApiExtras:
@@ -768,41 +745,16 @@ def _validate_extras(request_data: dict[str, Any]) -> PipelineApiExtras:
     second list to keep in step. Such a list would drop a forgotten key SILENTLY, and for
     `storage_scope` that is worse than an error: the run falls back to the caller's own id
     and writes to the wrong prefix while reporting success.
+
+    A field the model refuses is a 422 `request.invalid` with one item per refused field (`refused_request_error`),
+    except a callback URL the SSRF rules refuse, which is answered as its own security refusal,
+    `security.input_url_refused`, whatever else failed (`callback_url_refusal_in`).
     """
     try:
         return PipelineApiExtras.model_validate(request_data)
     except ValidationError as exc:
-        raise_validation_error(
-            message=str(exc),
-            error_type=_extras_error_type(exc),
-            security_refusal=_security_refusal_in(exc),
-        )
-
-
-def _security_refusal_in(exc: ValidationError) -> ApiSecurityRefusal | None:
-    """The refusal of a security rule an extras validator raised, such as a callback URL aimed at a private address.
-
-    A validator's error rides its entry's context, where pydantic keeps the exception it raised. A body that also fails
-    on another field is still the security rule's refusal, so the first one found is reported whatever else failed.
-    """
-    for error in exc.errors():
-        refusal = security_refusal_of(error=error.get("ctx", {}).get("error"))
-        if refusal is not None:
-            return refusal
-    return None
-
-
-def _validated_run_extras_or_none(request_data: dict[str, Any]) -> dict[str, str] | None:
-    """The body's `analytics_groups` when they pass the runtime's rules on their own, else `None`.
-
-    Read before anything else is refused, so that the security event of a refusal before the extras are validated,
-    such as a reserved object key or a callback URL, still names whose request it was, with values the runtime's
-    own rules accepted.
-    """
-    try:
-        return PipelineApiExtras.model_validate({"analytics_groups": request_data.get("analytics_groups")}).analytics_groups
-    except ValidationError:
-        return None
+        faults = exc.errors()
+        raise (callback_url_refusal_in(faults=faults) or refused_request_error(faults=faults, located_by_request_part=False)) from exc
 
 
 # Per-field bound applied at the request.state binding site so an oversized
@@ -853,8 +805,9 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
     """
     body = await request.body()
     request_data = _decode_body(body)
-    # The run's opaque extras, for the security event a refusal of this request logs before any run carries them.
-    request.state.run_extras = _validated_run_extras_or_none(request_data)
+    # The run's opaque extras, read before anything else is refused, so that the security event a refusal of this request
+    # logs before any run carries them, a reserved object key or a callback URL, still names whose request it was.
+    bind_run_extras(request=request, body=request_data)
     _refuse_reserved_object_keys(request_data)
     # Bind body-derived correlation identifiers onto `request.state` as soon as
     # the raw dict is in hand — before `_validate_extras` or `from_body`, so a
@@ -870,11 +823,11 @@ async def _parse_request(request: Request) -> _ParsedRunRequest:
         run_request = RunRequest.from_body(request_data)
     except ValidationError as exc:
         # A body whose fields fail Pydantic coercion is a caller mistake, not a server fault, so it maps to
-        # a 422 rather than escaping to the generic-500 fallback. A body naming its run source wrongly, or
-        # none, is refused by `from_body` as a `PipelexRequestError` instead, which needs no catch here: it
-        # is a `PipelexError` carrying `request.invalid` or `request.unsupported`, and the global handler
-        # answers it with its code.
-        raise_validation_error(message=str(exc))
+        # a 422 `request.invalid`, one item per refused field, rather than escaping to the generic-500 fallback.
+        # A body naming its run source wrongly, or none, is refused by `from_body` as a `PipelexRequestError`
+        # instead, which needs no catch here: it is a `PipelexError` carrying `request.invalid` or
+        # `request.unsupported`, and the global handler answers it with its code.
+        raise refused_request_error(faults=exc.errors(), located_by_request_part=False) from exc
     return _ParsedRunRequest(run_request=run_request, extras=extras, body=body)
 
 
@@ -898,7 +851,8 @@ async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store
     The files `resources` sends join the tree. Every tree is recorded in the blob store once the Python gate passed.
     """
     if run_request.bundle_b64 is not None and run_request.files is not None:
-        raise_validation_error(message="Provide either bundle_b64 or files, not both", error_type=ErrorType.INVALID_BUNDLE)
+        msg = "Provide either bundle_b64 or files, not both"
+        raise RunnerRequestError(msg, field=BUNDLE_FIELD)
     request_method: RequestMethod | None
     if run_request.bundle_b64 is not None:
         request_method = await read_archive_method(bundle_b64=run_request.bundle_b64)
@@ -911,7 +865,7 @@ async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store
         return None
     request_method = with_resources(request_method=request_method, resources=decode_bundle_resources(resources=run_request.resources))
     ensure_method_holds_a_bundle(request_method=request_method, label="This method")
-    ensure_python_allowed(request_method=request_method, label="This method")
+    ensure_python_allowed(request_method=request_method, label="This method", origin=CustomCodeOrigin.BUNDLE)
     await record_request_method(request_method=request_method, blob_store=blob_store)
     return request_method
 
@@ -933,7 +887,7 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     the runtime's `submitted_files`.
 
     Security gate: a method shipping custom Python (`.py`) is only honored on a sandbox-hosted deployment, refused with
-    a 403 before anything is written (`ensure_python_allowed`).
+    a 501 before anything is written (`ensure_python_allowed`).
     """
     method_provenance: MethodProvenance | None = None
     method_label = REQUEST_METHOD_LABEL
@@ -941,7 +895,7 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
         fetched = await asyncio.to_thread(fetched_method, run_request.method_ref)
         request_method: RequestMethod | None = fetched.request_method
         ensure_method_holds_a_bundle(request_method=fetched.request_method, label=f"Method package {fetched.label}")
-        ensure_python_allowed(request_method=fetched.request_method, label=f"Method package {fetched.label}")
+        ensure_python_allowed(request_method=fetched.request_method, label=f"Method package {fetched.label}", origin=CustomCodeOrigin.PACKAGE)
         method_provenance = fetched.provenance
         method_label = fetched.label
     else:
@@ -976,14 +930,19 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     # `JSONResponse` built from a trimmed dump, so FastAPI never serializes through this model —
     # it is purely what the artifact publishes, and it must match `apply_tokens_usage_wire_shape`.
     response_model=PipelexApiExecuteResponse,
-    # On top of the composite router's shared 401/413/422/500: the policy 403s (a forbidden
-    # per-request `orchestration_mode` override, the custom-code sandbox gate, the structures
-    # refusal on a bundle or a fetched package), the `method_ref` package-not-found 404, and the provider
-    # rate-limit passthrough (429) — `/execute` is the only route that runs inference, so it is
-    # the only one that can be rate-limited upstream. NO 409: unlike `/start`, `/execute` takes
-    # no client-supplied `pipeline_run_id` (the base runner generates one per call), so a caller
-    # cannot collide with an in-flight run.
-    responses={403: PROBLEM_403_RUN_POLICY, 404: PROBLEM_404_METHOD_PACKAGE, 429: PROBLEM_429},
+    # On top of the composite router's shared 401/413/422/500: a `read_scope` outside the caller's own (403), the
+    # `method_ref` package-not-found 404, the provider rate-limit passthrough (429) — `/execute` is the only route that runs inference, so
+    # it is the only one that can be rate-limited upstream — and the custom-code sandbox gate's 501 on a
+    # bundle or a fetched package. NO 409: unlike `/start`, `/execute` takes no client-supplied
+    # `pipeline_run_id` (the base runner generates one per call), so a caller cannot collide with an
+    # in-flight run. Its 500 names, beside the shared one's codes, a damaged blob a `files` map names by hash.
+    responses={
+        403: PROBLEM_403_READ_SCOPE,
+        404: PROBLEM_404_METHOD_PACKAGE,
+        429: PROBLEM_429,
+        500: PROBLEM_500_HELD_BLOBS,
+        501: PROBLEM_501_RUN_POLICY,
+    },
     # Documented body = the protocol's RunRequest plus THIS server's own
     # `orchestration_mode` extension (the route honors a per-request override). The
     # body is read through the raw Request (plain JSON with the reserved-key
@@ -1052,19 +1011,19 @@ async def execute(request: Request) -> JSONResponse:
     # On top of the composite router's shared 401/413/422/500. `/start` is fire-and-forget, so
     # its extra failures are all about the backend's ability to honor that and about the
     # client-supplied run id it (alone) accepts:
-    #   400 — the resolved orchestrator is blocking-only (the in-process `direct` base): refuse
-    #         honestly rather than block-and-ack. Use `/execute`.
-    #   403 — a per-request `orchestration_mode` override the deployment forbids, or the
-    #         custom-code sandbox gate on a bundle or a fetched package.
+    #   403 — a `read_scope` that does not lie under the caller's own id, on a `jwt` deployment.
     #   404 — a `method_ref` whose repository holds no matching package.
     #   409 — the submitted `pipeline_run_id` is still registered for an in-flight run.
-    #   501 — an async-capable deployment whose async execution is not enabled.
+    #   500 — beside the shared one's codes, a damaged blob a `files` map names by hash.
+    #   501 — the resolved orchestrator is blocking-only (the in-process `direct` base), or the
+    #         deployment's async execution is not enabled: refuse honestly rather than block-and-ack,
+    #         use `/execute`; or the custom-code sandbox gate on a bundle or a fetched package.
     responses={
-        400: PROBLEM_400_START_REQUIRES_ASYNC,
-        403: PROBLEM_403_RUN_POLICY,
+        403: PROBLEM_403_READ_SCOPE,
         404: PROBLEM_404_METHOD_PACKAGE,
         409: PROBLEM_409_DUPLICATE_RUN,
-        501: PROBLEM_501_ASYNC_NOT_ENABLED,
+        500: PROBLEM_500_HELD_BLOBS,
+        501: PROBLEM_501_START,
     },
     # Documented body = the protocol's StartRequest plus THIS server's own
     # extensions (callback_urls) — the protocol model no longer advertises
@@ -1096,8 +1055,8 @@ async def start(
     sets `FIRE_AND_FORGET` delivery and checks the resolved orchestrator can honor it. A Temporal
     deployment (`orchestration_mode = "temporal"`) enqueues the run and returns immediately with a
     `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`, the default)
-    the in-process orchestrator is blocking-only, so `/start` is HONEST: it refuses with a `400`
-    (`StartRequiresAsyncOrchestration`) — use `/execute` — rather than silently blocking and acking.
+    the in-process orchestrator is blocking-only, so `/start` is HONEST: it refuses with a `501`
+    (`runtime.unsupported`) — use `/execute` — rather than silently blocking and acking.
     The completion callback (`callback_urls` / storage delivery) fires on the async path.
     """
     run_request, extras, body = parsed

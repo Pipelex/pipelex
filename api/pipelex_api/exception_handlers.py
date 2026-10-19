@@ -1,11 +1,15 @@
 """Global FastAPI exception handlers that translate any failure into RFC 9457.
 
 The single place the API renders a failure into an HTTP response. Every
-handler produces the same `application/problem+json` shape: an `ApiError`
-(raised by the `pipelex_api.errors` 4xx/5xx helpers) carries a pre-built problem
-document; a FastAPI `RequestValidationError` from automatic request
-validation is rendered into one; every `PipelexError` becomes its problem
-document (`PipelexError.to_problem`); each orchestrator plugin's
+handler produces the same `application/problem+json` shape, a problem document
+with a registry code: every `PipelexError` becomes its problem document
+(`PipelexError.to_problem`), the runner's own refusals included, which it raises
+as the classes of `pipelex_api.exceptions`; a FastAPI `RequestValidationError`
+from automatic request validation becomes `request.invalid`, one item per
+refused field; a route nobody serves is `request.not_found`, a method a route
+does not accept `request.method_not_allowed`, and any other refusal the
+framework raises while reading a request `request.malformed`; a client gone
+mid-upload is `request.malformed` too; each orchestrator plugin's
 transport-fault mapper (contributed through the plugin SPI's
 `add_http_error_mapper`, discovered at app construction) gets its own handler
 rendering the problem of the `PipelexError` it maps the fault to; everything
@@ -30,40 +34,53 @@ router wiring), so a misconfigured env var can't crash test collection of
 every module that imports a handler at once.
 """
 
-import math
+import traceback
 from collections.abc import Awaitable, Callable
+from enum import StrEnum, unique
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, cast
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pipelex import log
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import ErrorDomain, PipelexError, iter_traceback_chain
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
-from pipelex.errors.error_codes import error_code_spec, parse_error_code
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.errors.security_event import emit_security_event
 from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.plugins.registrar import HttpErrorMapperFn
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.requests import ClientDisconnect
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import ApiError, log_api_security_event
+from pipelex_api.exceptions import RunnerAuthError, RunnerRequestError
 from pipelex_api.middleware import request_id_of
-from pipelex_api.problem_document import (
-    PROBLEM_JSON_MEDIA_TYPE,
-    build_problem_document_from_api_error,
-    with_request_context,
-)
+from pipelex_api.problem_document import problem_json_response, problem_status
 from pipelex_api.problem_view import problem_view_of
+from pipelex_api.request_refusals import callback_url_refusal_in, refused_request_error
 
 if TYPE_CHECKING:
     from pipelex_api.security import RequestUser
 
 # A Starlette/FastAPI async exception handler: `(request, exc) -> response`.
 _ExceptionHandler = Callable[[Request, Exception], Awaitable[Response]]
+
+# The classes of the exceptions a failure's chain holds, by name, outermost first: what each one was raised from or
+# while handling, as a traceback would print them, without their text.
+ERROR_CHAIN_FIELD = "error.chain"
+
+# Where the deepest exception of the chain was raised, as `file:line in function` from the outermost frame inward,
+# without the source lines or any exception's text. Written on a 5xx alone, the failure an operator debugs.
+ERROR_FRAMES_FIELD = "error.frames"
+
+# The prefix of the fields carrying the problem's operator-only parameters, one field per parameter, such as
+# `error.params.component`. The registry marks a parameter operator-only when it names the runtime's own configuration
+# or one of its components, never a caller's content, so the record carries them whatever view the response took.
+ERROR_PARAMS_FIELD_PREFIX = "error.params."
 
 
 def _user_id_of(request: Request) -> str | None:
@@ -115,11 +132,12 @@ def _pipeline_run_id_of(request: Request) -> str | None:
 
 
 def _run_extras_of(request: Request) -> dict[str, str] | None:
-    """Return the run's extras when `_parse_request` bound them on the request.
+    """Return the labels the request's body named, its `analytics_groups`, when they were bound on the request.
 
-    The opaque labels a host attaches to a run, which the hosted plane fills with the organization. They ride
+    The opaque labels a host attaches to a request, which the hosted plane fills with the organization. They ride
     the security event a refusal answered here logs, so a refusal before any run exists still names whose
-    request it was. `None` for a route that parses no run request, or a body whose extras did not validate.
+    request it was. Bound as soon as a JSON body is parsed (`pipelex_api.run_extras_binding`); `None` for a request
+    with no JSON body, or a body naming no labels or labels that did not validate.
     """
     return getattr(request.state, "run_extras", None)
 
@@ -128,8 +146,7 @@ def _request_fields(request: Request) -> dict[str, Any]:
     """Return the request-scoped attributes every error record carries.
 
     Single source of truth for the `url.path` / `user.id` / `pipe_code` /
-    `pipeline_run_id` set, so the three log paths (`_log_error_report`,
-    `_log_api_authored_error`, `handle_unexpected_error`) cannot drift. The
+    `pipeline_run_id` set, which every record `_log_problem` emits carries. The
     path and the caller take their OpenTelemetry keys, the pipe and the run
     the runtime's own field names, so a query written for the runtime's lines
     finds these too.
@@ -154,36 +171,30 @@ def _request_fields(request: Request) -> dict[str, Any]:
     }
 
 
-# The HTTP status of a problem whose code the registry gives none, which only a client's own failure has.
-_FALLBACK_PROBLEM_STATUS = 500
+@unique
+class RecordLevel(StrEnum):
+    """The level of the record an error response writes, which decides whether it reaches the error-rate alerts.
 
-
-def _retry_after_header(problem: PipelexProblem, *, status: int) -> dict[str, str]:
-    """Return a `Retry-After` header dict when a retry hint applies to this response.
-
-    Emitted only when the response is itself a retry invitation — a 429, such as
-    a provider's rate limit passed through — so a hint never rides a 500/422
-    where `Retry-After` is meaningless. The problem's `retry_after`, which only a
-    code inviting a retry carries and which is always finite, is rounded up to an
-    integer. Empty dict when no hint applies.
+    `ERROR` for a failure whoever runs the server must look at, with the frames its deepest exception was raised through;
+    `WARNING` for a failure the caller caused or can avoid, without frames; `DEBUG` for a request no route serves, which
+    scanners send by the thousand and which nobody has anything to do about.
     """
-    if status != 429:
-        return {}
-    seconds = problem.retry_after
-    if seconds is None or not math.isfinite(seconds):
-        return {}
-    return {"Retry-After": str(max(0, math.ceil(seconds)))}
+
+    DEBUG = "debug"
+    WARNING = "warning"
+    ERROR = "error"
+
+    @property
+    def writes_frames(self) -> bool:
+        """Whether the record names where the deepest exception of the chain was raised, which only an operator's fault needs."""
+        match self:
+            case RecordLevel.ERROR:
+                return True
+            case RecordLevel.WARNING | RecordLevel.DEBUG:
+                return False
 
 
-def _status_of(problem: PipelexProblem) -> int:
-    """The HTTP status of the response a problem is the body of: its code's, from the error registry."""
-    code = parse_error_code(problem.code)
-    if code is None:
-        return _FALLBACK_PROBLEM_STATUS
-    return error_code_spec(code).status or _FALLBACK_PROBLEM_STATUS
-
-
-def _emit_api_error(*, fields: dict[str, Any], as_error: bool) -> None:
+def _emit_api_error(*, fields: dict[str, Any], level: RecordLevel) -> None:
     """Emit one error record: a fixed message, everything about the failure a record attribute.
 
     The message is the same on every error line, whichever handler produced it, so it is the key a
@@ -199,39 +210,94 @@ def _emit_api_error(*, fields: dict[str, Any], as_error: bool) -> None:
     JSON sink's line, an OTLP attribute on the collector's.
 
     `None`-valued fields are dropped, so an identifier this request never bound is
-    absent rather than carried as a null. `as_error` picks the level — `error`
-    (with the traceback) for operator-actionable failures, `warning` for
-    `INPUT`-domain caller mistakes.
+    absent rather than carried as a null. `level` is the record's (`RecordLevel`). No record
+    carries the exception itself, whose traceback would print the text of every
+    exception of its chain, and a foreign exception's text, a pydantic
+    `ValidationError`'s or a method function's, can quote a run's inputs or a
+    model's answer: the record names the chain's classes and where the deepest
+    was raised instead (`_chain_fields`), with the problem's operator-only
+    parameters, which name the runtime's own configuration or component, such as
+    the `component` of a `runtime.misconfigured`. The capped message rides the
+    operator view's diagnostics alone, which only a request the operator
+    authenticated reads in its response.
     """
     attributes = {key: value for key, value in fields.items() if value is not None}
-    if as_error:
-        log.error("A request ended in an error response", fields=attributes, include_exception=True)
-    else:
-        log.warning("A request ended in an error response", fields=attributes)
+    match level:
+        case RecordLevel.ERROR:
+            log.error("A request ended in an error response", fields=attributes)
+        case RecordLevel.WARNING:
+            log.warning("A request ended in an error response", fields=attributes)
+        case RecordLevel.DEBUG:
+            log.debug("A request ended in an error response", fields=attributes)
 
 
-def _emit_at_error_level(status: int) -> bool:
-    """Decide the log disposition from the final HTTP status, not the error domain.
+def _chain_fields(error: BaseException, *, with_frames: bool) -> dict[str, Any]:
+    """The record fields naming a failure's exceptions by class, and with `with_frames` where the deepest was raised.
 
-    A 5xx is a server fault — log at `error` with a traceback. A 4xx is
-    client-facing (a caller mistake or a benign conflict) — log at `warning`
-    without a traceback. Keying off the status the code declares is what keeps
-    a conflict, such as ``pipelex.run.already_exists`` answered with 409, out of
-    the error dashboards, while still covering the 422 caller mistakes and the
-    provider-429 passthrough without a second per-error-type registry.
+    Never an exception's text: the classes and the frames are this server's code, while a message can be anyone's data.
     """
-    return status >= 500
+    chain = list(iter_traceback_chain(error))
+    fields: dict[str, Any] = {ERROR_CHAIN_FIELD: [type(link).__name__ for link in chain]}
+    if with_frames:
+        deepest = chain[-1]
+        frames = traceback.StackSummary.extract(traceback.walk_tb(deepest.__traceback__), lookup_lines=False)
+        fields[ERROR_FRAMES_FIELD] = [f"{frame.filename}:{frame.lineno} in {frame.name}" for frame in frames]
+    return fields
 
 
-def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int) -> None:
+def _operator_param_fields(*, diagnostics: ProblemDiagnostics | None) -> dict[str, Any]:
+    """The record fields carrying a problem's operator-only parameters, one per parameter, under `error.params.`.
+
+    The operator view keeps them in its diagnostics, which a caller's response leaves out, so the record is where the
+    operator reads them whatever view the response took: the `component` of a `runtime.misconfigured`, the `dependency`
+    of a `runtime.unavailable`, the setting or the file of a `pipelex.config.*`. The registry declares a parameter
+    operator-only when it names the runtime's own configuration or one of its components, never a caller's content, so
+    no run data reaches the record through them.
+    """
+    if diagnostics is None or not diagnostics.params:
+        return {}
+    return {f"{ERROR_PARAMS_FIELD_PREFIX}{name}": value for name, value in diagnostics.params.items()}
+
+
+def record_level_of(*, status: int, domain: ProblemDomain) -> RecordLevel:
+    """The level of an error response's record, from its status and from who must act on it, its code's domain.
+
+    A 4xx is the caller's to act on, a mistake or a benign conflict such as ``pipelex.run.already_exists`` answered with
+    409, so it logs at `warning`. A 5xx logs at `error` only when the server has something to fix:
+
+    - a `501` states that this deployment does not offer what the request asks for, custom code without a sandbox,
+      `/v1/start` on a blocking-only orchestrator, a model it serves no backend for. The operator decides whether to
+      offer it, but nothing is broken, and the caller meets the refusal each time it asks again, so it logs at `warning`,
+      or any caller could fill the error-rate alerts by repeating it;
+    - any other 5xx logs at `warning` when its domain is the caller's (`input`, `method`, `account`), a refusal the
+      caller can avoid, such as a webhook receiver of its own that refused a delivery, and at `error` when it is the
+      runtime's or the operator's.
+    """
+    match status:
+        case HTTPStatus.NOT_IMPLEMENTED:
+            return RecordLevel.WARNING
+        case server_status if server_status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+            match domain:
+                case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+                    return RecordLevel.WARNING
+                case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
+                    return RecordLevel.ERROR
+        case _:
+            return RecordLevel.WARNING
+
+
+def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel | None) -> None:
     """Emit the structured error record for a failure answered with a problem, from the operator view.
 
-    Disposition follows the HTTP status (see ``_emit_at_error_level``):
-    a 4xx is client-facing and logs at `warning` without a traceback (caller
-    mistakes, a provider's 429 passed through, and the 409 conflict), a 5xx
-    logs at `error` with the traceback. `error.code` is the problem's code and
-    `error.type` the class of the exception that escaped, else the class the
-    operator view names. `user.id` rides every record when auth bound a caller —
+    Its level is `level` when the caller names one, else follows the HTTP status and the code's domain
+    (``record_level_of``): a 4xx is client-facing and logs at `warning` (caller mistakes, a provider's 429 passed through,
+    and the 409 conflict), a 5xx the server has to fix logs at `error` with the frames its deepest exception was raised
+    through. No record carries an
+    exception's text or its traceback (``_emit_api_error``). `error.code` is the
+    problem's code, `error.type` the class of the exception that escaped, else
+    the class the operator view names, and `error.chain` the classes of the
+    exceptions it was raised from, and each operator-only parameter of the problem
+    rides `error.params.<name>`. `user.id` rides every record when auth bound a caller —
     without it, the storage / pipeline-backend leg of a failure carries only
     `request_id` and `url.path`, and tying the failure to the caller requires
     correlating the request id across unrelated records.
@@ -268,69 +334,35 @@ def _log_problem(problem: PipelexProblem, *, error: BaseException | None, reques
     if diagnostics is not None and diagnostics.provider is not None:
         fields["provider_status_code"] = diagnostics.provider.status
         fields["provider_request_id"] = diagnostics.provider.request_id
-    _emit_api_error(fields=fields, as_error=_emit_at_error_level(status))
+    fields.update(_operator_param_fields(diagnostics=diagnostics))
+    record_level = level or record_level_of(status=status, domain=problem.effective_domain)
+    if error is not None:
+        fields.update(_chain_fields(error, with_frames=record_level.writes_frames))
+    _emit_api_error(fields=fields, level=record_level)
 
 
-def _log_api_authored_error(*, document: dict[str, Any], status: int, request: Request) -> None:
-    """Emit the structured error record for an API-authored error response.
-
-    Shares the disposition rule and the common-key set of `_log_problem`
-    so every error response — a pipelex error's problem
-    *or* an API-authored 4xx/5xx raised by an `pipelex_api.errors` helper — produces
-    one error record a downstream sink can filter uniformly on its message and
-    on `request_id`, `url.path`, `error.type`, `error_domain`, `retryable`
-    and `http.response.status_code`. Without this, an API-owned 500 (a `raise_internal_server_error`
-    site — `/version`'s missing-package case is the canonical example)
-    would land with zero operator output, since `handle_api_error` only
-    serializes the response.
-
-    Where the two helpers differ — by design, matching what each side actually
-    has to log:
-    - API-authored docs add `detail`, which the API wrote itself from what it
-      checked, so it is the cause an operator reads.
-    - API-authored docs omit `error.code`, `error_category`, `backend_name`, `model_handle`,
-      `provider_status_code` and `provider_request_id` — those are inference-domain classifiers pipelex
-      sets only on classifiable failures and the API never authors itself.
-
-    A 4xx logs at `warning` without a traceback; a 5xx logs at `error` with
-    the traceback — same status-keyed disposition rule `_log_problem`
-    uses (see ``_emit_at_error_level``), so a sink dedup'ing by level sees one
-    shape.
-    """
-    fields: dict[str, Any] = {
-        **_request_fields(request),
-        ERROR_TYPE_FIELD: document.get("error_type"),
-        "error_domain": document.get("error_domain"),
-        "retryable": document.get("retryable"),
-        OTelLogAttr.HTTP_RESPONSE_STATUS_CODE: status,
-        "detail": document.get("detail"),
-    }
-    _emit_api_error(fields=fields, as_error=_emit_at_error_level(status))
-
-
-def problem_response(problem: PipelexProblem, *, error: BaseException | None, request: Request) -> JSONResponse:
+def problem_response(
+    problem: PipelexProblem,
+    *,
+    error: BaseException | None,
+    request: Request,
+    headers: dict[str, str] | None = None,
+    status: int | None = None,
+    record_level: RecordLevel | None = None,
+) -> JSONResponse:
     """Render a problem built in the operator's view as the response to `request`, and log the failure.
 
-    The single rendering of every failure a problem describes: a raised `PipelexError`, an
-    orchestrator plugin's mapped transport fault, an unexpected exception, and a fault the
-    `/validate` route receives as a value rather than a raise, for which `error` is `None`. The status is the code's, the
-    record is logged from the operator view, and the body is the view of the request's reader
-    (`pipelex_api.problem_view`), with its `status` member set to the response's.
+    The single rendering of every failure a problem describes: a raised `PipelexError`, the runner's own refusals
+    included, an orchestrator plugin's mapped transport fault, an unexpected exception, and a fault the `/validate` route
+    receives as a value rather than a raise, for which `error` is `None`. The status is the code's, unless `status` names
+    the one a framework refusal keeps; the record is logged from the operator view, at `record_level` when the caller
+    names one, else at the level its status and its code's domain give it (`record_level_of`), and the body is the view
+    of the request's reader (`pipelex_api.problem_view`), rendered by `pipelex_api.problem_document.problem_json_response`,
+    which adds `headers` to the ones its status calls for.
     """
-    status = _status_of(problem)
-    _log_problem(problem, error=error, request=request, status=status)
-    match problem_view_of(request):
-        case ProblemView.OPERATOR:
-            reader_problem = problem
-        case ProblemView.CALLER:
-            reader_problem = caller_view_of(problem=problem)
-    document = reader_problem.model_copy(update={"status": status}).to_wire()
-    return JSONResponse(
-        status_code=status,
-        content=document,
-        media_type=PROBLEM_JSON_MEDIA_TYPE,
-        headers=_retry_after_header(problem, status=status),
-    )
+    answered_status = status or problem_status(problem)
+    _log_problem(problem, error=error, request=request, status=answered_status, level=record_level)
+    return problem_json_response(problem, view=problem_view_of(request), headers=headers, status=answered_status)
 
 
 def operator_problem_of(error: PipelexError, *, request: Request) -> PipelexProblem:
@@ -357,7 +389,18 @@ async def handle_pipelex_error(request: Request, exc: Exception) -> Response:
     # the log context's, which `RequestIdMiddleware` binds for the whole request. No run id: the one a body names
     # is the caller's claim, and no run the runtime assigned one to exists yet.
     emit_security_event(error=error, extras=_run_extras_of(request))
-    return problem_response(operator_problem_of(error, request=request), error=error, request=request)
+    return problem_response(operator_problem_of(error, request=request), error=error, request=request, headers=_challenge_headers(error))
+
+
+def _challenge_headers(error: PipelexError) -> dict[str, str] | None:
+    """The `WWW-Authenticate` challenge of an authentication refusal that names one, the scheme the deployment reads.
+
+    A refusal behind a trusted proxy names none: that deployment reads no credential of the request, so a challenge
+    would ask for one it never reads.
+    """
+    if isinstance(error, RunnerAuthError) and error.challenge is not None:
+        return {"WWW-Authenticate": error.challenge}
+    return None
 
 
 def _make_orchestrator_error_handler(mapper: HttpErrorMapperFn) -> "_ExceptionHandler":
@@ -384,8 +427,9 @@ def _make_orchestrator_error_handler(mapper: HttpErrorMapperFn) -> "_ExceptionHa
 async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     """Catch-all for any failure matched by no more-specific handler.
 
-    Covers anything that is not an `ApiError`, a `RequestValidationError`, a
-    `PipelexError`, or an orchestrator plugin's mapped transport exception — so on
+    Covers anything that is not a `RequestValidationError`, a `ClientDisconnect`, a
+    Starlette `HTTPException`, a `PipelexError`, or an orchestrator plugin's mapped
+    transport exception — so on
     the orchestrator-agnostic base (which installs no mapper), an *unmapped* bare
     transport/runtime error collapses here to a 500.
 
@@ -394,147 +438,266 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     `PipelexUnexpectedError` (`make_unexpected_failure`) and answered as its
     problem, `runtime.unexpected`, through the same rendering as every other
     failure: the caller reads the code's own sentences and never the exception's
-    text, and the operator reads its class in `diagnostics`, never its text either,
-    which can carry anything of a run's data. A
-    traceback reaches no response — it goes to the operator log, correlated by
-    request id.
+    text, and a request the operator authenticated reads its class in
+    `diagnostics`, never its text either, which can carry anything of a run's
+    data. Neither a traceback nor the exception's text reaches the response or
+    the log: the operator's record names the chain's classes and the frames it
+    was raised through, correlated by request id.
 
     This handler also covers a failure *inside* another handler: Starlette's
     `ServerErrorMiddleware` wraps the others, so such a failure still lands here
-    rather than a bodyless default.
+    rather than a bodyless default. That middleware raises the exception again
+    once this handler answered it, for the server to log with its traceback;
+    `AnsweredErrorBarrier` stops it there, so its text reaches no log either.
     """
     unexpected_failure = make_unexpected_failure(error=exc)
-    return problem_response(operator_problem_of(unexpected_failure, request=request), error=exc, request=request)
-
-
-async def handle_api_error(request: Request, exc: Exception) -> Response:
-    """Render an API-authored `ApiError` as an RFC 7807 problem response.
-
-    `ApiError` is raised by the `raise_*` helpers in `pipelex_api.errors` for the API's
-    own 4xx/5xx — request validation, auth, payload limits, misconfiguration.
-    The helper builds the problem document at raise time, where it holds no
-    `Request`, so this handler stamps the two request-scoped members (`instance`
-    and `request_id`) onto a copy of it, read from the same place as the
-    request-validation path reads them. A `PipelexError`'s problem carries
-    `request_id` alone, since the problem document leaves the RFC's `instance`
-    out: the request id already names the occurrence. It then
-    serializes that document, re-attaches any `WWW-Authenticate` challenge header,
-    and emits the structured error record so an API-owned 500 from any
-    route is observable (a `raise_internal_server_error` site like `version.py`'s
-    missing-package case is the canonical example — it has no preceding
-    `log.error` at the call site). An `ApiError` answering a security rule's refusal,
-    a reserved object key, a callback URL or a path leaving the method, also logs its
-    security event here, with the run's extras the body carried and no run id.
-    `exc` is typed `Exception` to match Starlette's handler contract; FastAPI only
-    routes an `ApiError` here, so the cast is sound.
-    """
-    api_error = cast("ApiError", exc)
-    document = with_request_context(
-        api_error.document,
-        instance=request.url.path,
-        request_id=request_id_of(request),
-    )
-    _log_api_authored_error(document=document, status=api_error.status_code, request=request)
-    log_api_security_event(api_error=api_error, extras=_run_extras_of(request))
-    return JSONResponse(
-        status_code=api_error.status_code,
-        content=document,
-        media_type=PROBLEM_JSON_MEDIA_TYPE,
-        headers=api_error.headers,
-    )
-
-
-def _summarize_request_validation_error(exc: RequestValidationError) -> str:
-    """Render FastAPI's per-field validation failures as one human-readable string.
-
-    `RequestValidationError.errors()` is a list of per-field dicts; RFC 7807's
-    `detail` is a single human-readable string, so each entry is rendered as
-    `<location>: <message>` and the lot joined. Only `loc` and `msg` are read —
-    both are plain strings / ints — so nothing unserializable from a crafted
-    request body can reach the response.
-    """
-    parts: list[str] = []
-    for error in exc.errors():
-        location = ".".join(str(item) for item in error.get("loc", ()))
-        message = error.get("msg") or "Invalid input"
-        parts.append(f"{location}: {message}" if location else message)
-    return "; ".join(parts) or "Request validation failed"
-
-
-# The `error_type` a FastAPI-validated body failing on exactly one of these fields carries,
-# so a client branches on the same value whichever route refused the field. `/execute` and
-# `/start` read their extras by hand and classify them the same way in `pipelex_api.routes.pipelex.pipeline`.
-_BODY_FIELD_ERROR_TYPES: dict[str, ErrorType] = {
-    "analytics_groups": ErrorType.INVALID_ANALYTICS_GROUPS,
-}
-
-
-def _request_validation_error_type(exc: RequestValidationError) -> ErrorType:
-    """Classify a request validation failure by the body field that failed.
-
-    Only a failure confined to one classified body field gets that field's type; anything
-    else — several fields, a query parameter, a model-level validator — keeps the generic
-    `ValidationError`, because naming one field would hide the others.
-    """
-    failed_fields: set[str] = set()
-    for error in exc.errors():
-        location = tuple(error.get("loc", ()))
-        if len(location) < 2 or location[0] != "body":
-            return ErrorType.VALIDATION_ERROR
-        failed_fields.add(str(location[1]))
-    if len(failed_fields) != 1:
-        return ErrorType.VALIDATION_ERROR
-    return _BODY_FIELD_ERROR_TYPES.get(failed_fields.pop(), ErrorType.VALIDATION_ERROR)
+    response = problem_response(operator_problem_of(unexpected_failure, request=request), error=exc, request=request)
+    # Marked once its record is written, so `AnsweredErrorBarrier` tells the exception Starlette raises again after this
+    # answer from one nothing recorded.
+    request.state.answered_error = exc
+    return response
 
 
 async def handle_request_validation_error(request: Request, exc: Exception) -> Response:
-    """Translate FastAPI's automatic request validation failure into RFC 7807.
+    """Answer FastAPI's automatic request validation failure as `request.invalid`, one item per refused field.
 
-    FastAPI raises `RequestValidationError` when a request body, query, or path
-    parameter fails the endpoint's declared Pydantic model — an extra field
-    under `extra="forbid"`, a `min_length` / `max_length` breach, a missing or
-    mistyped field, a `field_validator` raising `ValueError`, malformed JSON. Its
-    built-in handler would answer with a bare `{"detail": [...]}` /
-    `application/json` body; registering this handler overrides that so an
-    endpoint's caller-input rejection is the same `application/problem+json`
-    shape as an explicit `raise_validation_error` — one error contract across
-    every endpoint. `exc` is typed `Exception` to match Starlette's handler
-    contract; FastAPI only routes a `RequestValidationError` here, so the cast
-    is sound.
+    FastAPI raises `RequestValidationError` when a request body, query, or path parameter fails the endpoint's declared
+    model: an extra field under `extra="forbid"`, a length breach, a missing or mistyped field, a `field_validator`
+    raising `ValueError`. Its built-in handler would answer a bare `{"detail": [...]}` in `application/json`; this
+    handler answers the runner's own refusal instead (`pipelex_api.request_refusals`), `request.invalid` with one item
+    per refused field, or `request.malformed` for a body that is not JSON, through the same rendering every pipelex error
+    takes. A callback URL the SSRF rules refuse is found among the faults and answered as its own security refusal,
+    whichever route's model ran the check. `exc` is typed `Exception` to match Starlette's handler contract; FastAPI only
+    routes a `RequestValidationError` here, so the cast is sound.
     """
     validation_error = cast("RequestValidationError", exc)
-    document = build_problem_document_from_api_error(
-        _request_validation_error_type(validation_error),
-        _summarize_request_validation_error(validation_error),
-        422,
-        instance=request.url.path,
-        request_id=request_id_of(request),
-        error_domain=ErrorDomain.INPUT,
+    faults = validation_error.errors()
+    # A callback URL refusal is the error the model's validator raised, answered as itself; any other fault is answered by
+    # a refusal standing in for FastAPI's exception, chained from it so the record's `error.chain` still names it.
+    refusal = callback_url_refusal_in(faults=faults) or _standing_in_for(
+        refused_request_error(faults=faults, located_by_request_part=True), original=validation_error
     )
-    # Same error record as an explicit `raise_validation_error`,
-    # so FastAPI's automatic-validation 422s aren't silent in operator logs.
-    _log_api_authored_error(document=document, status=422, request=request)
-    return JSONResponse(status_code=422, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)
+    return await handle_pipelex_error(request, refusal)
 
 
-async def handle_client_disconnect(request: Request, exc: Exception) -> Response:  # noqa: ARG001 — Starlette's handler contract
-    """Answer a client that left before its request body arrived in full with a 400, logged as a caller's failure.
+def _standing_in_for(refusal: PipelexError, *, original: Exception) -> PipelexError:
+    """`refusal`, chained from the framework exception it answers in its place, as `raise refusal from original` would chain it.
 
-    Starlette raises `ClientDisconnect` from a body read when the client goes away mid-upload: from the
-    nesting check of a `JsonBodyRoute`, and from the run routes, which read their raw body themselves.
-    Nobody is left to read the answer, so what matters is the record it leaves: a 400 `BadRequest` at
-    `warning`, as FastAPI's own body read answered it, never a 500 server fault logged with a traceback.
+    A handler answering a framework exception through one of the runner's refusals builds that refusal itself, so nothing
+    raises it from the exception it stands in for. Chained, the record's `error.chain` names the framework exception
+    after the refusal, and the operator view's `diagnostics.causes` name its class, never its text.
     """
-    document = build_problem_document_from_api_error(
-        ErrorType.BAD_REQUEST,
-        "The client disconnected before the request body was received in full.",
-        400,
-        instance=request.url.path,
-        request_id=request_id_of(request),
-        error_domain=ErrorDomain.INPUT,
+    refusal.__cause__ = original
+    refusal.__suppress_context__ = True
+    return refusal
+
+
+# The reason a body the client stopped sending is malformed, which none of the reasons `request.malformed` lists names.
+_BODY_INCOMPLETE_REASON = "body_incomplete"
+
+
+async def handle_client_disconnect(request: Request, exc: Exception) -> Response:
+    """Answer a client that left before its request body arrived in full as `request.malformed`, logged as a caller's failure.
+
+    Starlette raises `ClientDisconnect` from a body read when the client goes away mid-upload: from the nesting check of a
+    `JsonBodyRoute`, and from the run routes, which read their raw body themselves. Nobody is left to read the answer, so
+    what matters is the record it leaves: a 422 at `warning`, a caller's failure, never a 500 server fault logged with a
+    traceback. The body that arrived is cut short, so it is malformed; no reason the code lists fits a truncated body,
+    and its reason takes any string beside them, so the runner names this one itself.
+    """
+    message = "The client disconnected before the request body was received in full"
+    refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_INCOMPLETE_REASON)
+    return await handle_pipelex_error(request, _standing_in_for(refusal, original=exc))
+
+
+# The reason a body the framework refused to read is malformed, for a refusal no check of the runner's own made first.
+_BODY_UNREADABLE_REASON = "unreadable"
+
+# The reason a body the framework refused as too large is malformed: the framework names no limit and no size, which the
+# runner's `request.too_large` must state, so the refusal is the reading's, and keeps its 413.
+_BODY_TOO_LARGE_REASON = "too_large"
+
+# The component a rate limit in front of a route is, which the operator reads on the record of the 429 it answered.
+_RATE_LIMITER_DEPENDENCY = "rate_limiter"
+
+# The one header a framework refusal of each status keeps, the one its answer needs: the methods a route accepts on a
+# 405, the challenge a credential refusal names on a 401, and the delay a rate limit asks for on a 429. Any other header
+# it was raised with is dropped. Compared in lower case, as HTTP header names are.
+_KEPT_FRAMEWORK_HEADER_BY_STATUS: dict[int, str] = {401: "www-authenticate", 405: "allow", 429: "retry-after"}
+
+
+def framework_refusal(*, status: int, challenge: str | None) -> tuple[PipelexError, int | None]:
+    """The runner's refusal answering a 4xx the framework raised, and the status it keeps when its code declares another.
+
+    Each refusal carries a code whose required parameters it can fill: the framework says nothing about a refusal but its
+    status and a header, so a code whose parameters it cannot know gives way to one whose parameters it can.
+
+    - a 400, or a 422 raised as an `HTTPException`, is a request the framework could not read, `request.malformed` with
+      the reason `unreadable`, keeping its status;
+    - a 401 is `auth.missing_credential`, with the challenge the raise named;
+    - a 403 is `auth.invalid_credential`, keeping its 403: `auth.forbidden` would need the `requirement` the identity
+      lacks, which the framework does not say;
+    - a 404 and a 405 are a request no route serves, `request.not_found` and `request.method_not_allowed`;
+    - a 413 is `request.malformed` with the reason `too_large`, keeping its 413: `request.too_large` states a limit and a
+      size, which the framework does not say;
+    - a 429 is `runtime.unavailable`, whose verdict invites a retry after the `Retry-After` the raise named, keeping its
+      429, with the rate limiter as the dependency the operator reads: `account.rate_limited` would need the limit and
+      the window, which the framework does not say;
+    - any other 4xx, a 415 among them, is `request.malformed` with the reason `unreadable`, keeping its status: a form
+      of request the framework would not read.
+    """
+    refusal: PipelexError
+    kept_status: int | None = None
+    match status:
+        case 400 | 422:
+            message = f"The framework refused to read the request with HTTP {status}"
+            refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_UNREADABLE_REASON)
+            kept_status = status
+        case 401:
+            message = "The framework refused the request for want of a credential"
+            refusal = RunnerAuthError(message, challenge=challenge).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
+        case 403:
+            message = "The framework refused the request: its credential does not permit this operation"
+            refusal = RunnerAuthError(message).with_error_code(CoreCode.AUTH_INVALID_CREDENTIAL)
+            kept_status = status
+        case 404:
+            refusal = RunnerRequestError("No route serves this path").with_error_code(CoreCode.REQUEST_NOT_FOUND)
+        case 405:
+            refusal = RunnerRequestError("This route does not accept the request's method").with_error_code(CoreCode.REQUEST_METHOD_NOT_ALLOWED)
+        case 413:
+            message = "The framework refused the request as too large"
+            refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_TOO_LARGE_REASON)
+            kept_status = status
+        case 429:
+            message = "A rate limit refused the request"
+            refusal = RunnerRequestError(message).with_error_code(CoreCode.RUNTIME_UNAVAILABLE).with_params(dependency=_RATE_LIMITER_DEPENDENCY)
+            kept_status = status
+        case _:
+            message = f"The framework refused the request with HTTP {status}, a status no registry code declares"
+            refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_MALFORMED).with_params(reason=_BODY_UNREADABLE_REASON)
+            kept_status = status
+    return refusal, kept_status
+
+
+# The statuses of the refusals Starlette's routing raises before any route runs, for a path nobody serves or a method its
+# route does not accept, which scanners probing for `/wp-admin` or `/.env` send by the thousand.
+_ROUTING_STATUSES = frozenset({HTTPStatus.NOT_FOUND, HTTPStatus.METHOD_NOT_ALLOWED})
+
+
+async def handle_http_exception(request: Request, exc: Exception) -> Response:
+    """Answer the refusals Starlette and FastAPI raise as `HTTPException`s as problems, never a client's 4xx as a 500.
+
+    Starlette raises an `HTTPException` when routing fails before any route runs: a 404 for a path nobody serves, and a
+    405 for a method the path's route does not accept, with the `Allow` header listing the methods it does. The framework
+    raises one while it reads a request, too: FastAPI's 400 for a typed body its parse fails on with anything but a
+    `JSONDecodeError`, and Starlette's 400 for a form it cannot parse, which `JsonBodyRoute` mostly answers first
+    (`pipelex_api.json_body`). And a dependency the framework runs may raise one: FastAPI's security classes answer a
+    missing credential with a 401 or a 403, a rate limiter with a 429. No route of the runner raises one itself (its
+    refusals are the classes of `pipelex_api.exceptions`).
+
+    Each 4xx keeps its meaning (`framework_refusal`): it is answered under a code whose meaning matches its own and whose
+    parameters the runner can fill, keeping its status where that code declares another, and the one header it was
+    raised with that its answer needs rides along, the `Allow` of a 405, the `WWW-Authenticate` challenge of a 401 or the
+    `Retry-After` of a 429. A routing 404 or 405 writes its record at `DEBUG`, as Starlette's own answer wrote none: no one
+    has anything to do about a path nobody serves, and a scanner probing for them would otherwise fill the warnings. A 5xx
+    is the framework's own failure, `runtime.unexpected`. The refusal is chained from the `HTTPException`, so the record's
+    `error.chain` names it. `exc` is typed `Exception` to match Starlette's handler contract; Starlette only routes an
+    `HTTPException` here, so the cast is sound.
+    """
+    http_exception = cast("StarletteHTTPException", exc)
+    status = http_exception.status_code
+    if not 400 <= status < 500:
+        return await handle_unexpected_error(request, http_exception)
+    kept_header = _KEPT_FRAMEWORK_HEADER_BY_STATUS.get(status)
+    kept_headers = {key: value for key, value in (http_exception.headers or {}).items() if key.lower() == kept_header}
+    challenge = next(iter(kept_headers.values()), None) if kept_header == "www-authenticate" else None
+    refusal, kept_status = framework_refusal(status=status, challenge=challenge)
+    refusal = _standing_in_for(refusal, original=http_exception)
+    record_level = RecordLevel.DEBUG if status in _ROUTING_STATUSES else None
+    return problem_response(
+        operator_problem_of(refusal, request=request),
+        error=refusal,
+        request=request,
+        headers=kept_headers,
+        status=kept_status,
+        record_level=record_level,
     )
-    _log_api_authored_error(document=document, status=400, request=request)
-    return JSONResponse(status_code=400, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)
+
+
+# The message of the record `AnsweredErrorBarrier` writes for a failure no handler recorded, once a response had started.
+UNRECORDED_FAILURE_MESSAGE = "A request failed after its response had started"
+
+
+class AnsweredErrorBarrier:
+    """Pure-ASGI layer around the app that keeps an exception it answered from reaching the server that runs it.
+
+    Starlette's `ServerErrorMiddleware` runs the catch-all handler (`handle_unexpected_error`) and then raises the
+    exception again, so that the server can log it: uvicorn writes it with its traceback through its own logger,
+    outside the runner's records, and a traceback prints the text of every exception of its chain, which a foreign
+    exception can fill with a run's inputs or a model's answer. This layer sits outside that middleware and stops the
+    exception there. When no response has started, which only a failure of the handler itself leaves, the failure is
+    answered and logged here as the handler would have. Once one has, nothing can be answered any more: the exception
+    the handler answered, which it marks once its record is written, is dropped, and any other, the handler's own
+    failure while a response was streaming or sending, is dropped after a record of its own,
+    `UNRECORDED_FAILURE_MESSAGE`, which names the request's path, the status already sent and the chain by class, never
+    an exception's text. A failure of the barrier's own answer, the catch-all building it or the server sending it, such
+    as to a client already gone, is recorded and dropped the same way. So no exception, and no text of one, leaves the
+    app, and none leaves it unrecorded.
+
+    `pipelex_api.main` puts it directly around the FastAPI app, inside `RequestIdMiddleware`, so the request's log
+    context is still bound while it answers.
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        sent_status: int | None = None
+
+        async def tracking_send(message: Message) -> None:
+            nonlocal sent_status
+            if message["type"] == "http.response.start":
+                sent_status = message["status"]
+            await send(message)
+
+        try:
+            await self.app(scope, receive, tracking_send)
+        except Exception as exc:  # ruff: ignore[BLE001]
+            # The absolute root of an API endpoint handler, outside Starlette's own catch-all, which raises whatever
+            # reached it again.
+            request = Request(scope)
+            if sent_status is not None:
+                if getattr(request.state, "answered_error", None) is not exc:
+                    _log_unrecorded_failure(exc, request=request, sent_status=sent_status)
+                return
+            try:
+                response = await handle_unexpected_error(request, exc)
+                await response(scope, receive, tracking_send)
+            except Exception as answer_failure:  # ruff: ignore[BLE001]
+                # The absolute root still: the barrier's own answer failed, the catch-all building it or the server
+                # sending it, such as to a client already gone, and nothing is left to answer it.
+                _log_unrecorded_failure(answer_failure, request=request, sent_status=sent_status)
+
+
+def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_status: int | None) -> None:
+    """Record a failure no handler recorded, which ended a request after its response had started.
+
+    The response's status and part of it are already sent, so the failure is answered by no problem: the record names the
+    request's path, the status sent, the class that escaped and the classes of its chain, and never an exception's text.
+    `sent_status` is `None` only when the barrier's own answer failed before its status was sent, which leaves the
+    server to answer for it, and the record then names no status.
+    """
+    fields: dict[str, Any] = {
+        "url.path": request.url.path,
+        ERROR_TYPE_FIELD: type(error).__name__,
+        **_chain_fields(error, with_frames=False),
+    }
+    if sent_status is not None:
+        fields[OTelLogAttr.HTTP_RESPONSE_STATUS_CODE] = sent_status
+    log.error(UNRECORDED_FAILURE_MESSAGE, fields=fields)
 
 
 def register_exception_handlers(
@@ -544,11 +707,11 @@ def register_exception_handlers(
 ) -> None:
     """Register the app-level exception handlers on `app`.
 
-    Resolution is most-specific-first: an API-authored `ApiError` →
-    `handle_api_error`; a FastAPI `RequestValidationError` (automatic
+    Resolution is most-specific-first: a FastAPI `RequestValidationError` (automatic
     request-body / parameter validation) → `handle_request_validation_error`; a
     Starlette `ClientDisconnect` (the client left mid-upload) →
-    `handle_client_disconnect`; a
+    `handle_client_disconnect`; a Starlette `HTTPException` (a path no route
+    serves, a method a route does not accept) → `handle_http_exception`; a
     `PipelexError` (including an orchestrator plugin's `PipelexError`-derived
     workflow failure) → `handle_pipelex_error`; a bare orchestrator-SDK transport
     error → that plugin's mapper-backed handler (see `http_error_mappers`);
@@ -575,9 +738,9 @@ def register_exception_handlers(
     picked per request, by the identity its authentication established
     (`pipelex_api.problem_view`).
     """
-    app.add_exception_handler(ApiError, handle_api_error)
     app.add_exception_handler(RequestValidationError, handle_request_validation_error)
     app.add_exception_handler(ClientDisconnect, handle_client_disconnect)
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
     app.add_exception_handler(PipelexError, handle_pipelex_error)
     for exc_type, mapper in (http_error_mappers or {}).items():
         app.add_exception_handler(exc_type, _make_orchestrator_error_handler(mapper))

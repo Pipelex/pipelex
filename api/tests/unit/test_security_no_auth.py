@@ -12,6 +12,7 @@ from pytest_mock import MockerFixture
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.security import ForwardedIdentityHeader, RequestUser, get_request_user, no_auth
 from tests.unit._constants import RoutePath
+from tests.unit._problems import assert_problem
 
 USER_ID = "11111111-1111-4111-1111-111111111111"
 
@@ -81,8 +82,9 @@ class TestNoAuthForwardedHeaders:
         client = _build_client()
         headers: dict[str, str] = {} if user_id is None else {ForwardedIdentityHeader.USER_ID: user_id}
         response = client.get(RoutePath.WHOAMI, headers=headers)
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.missing_credential")
+        # This deployment reads no bearer token, so its 401 asks for none.
+        assert "WWW-Authenticate" not in response.headers
 
     def test_the_reserved_single_tenant_id_is_not_special_on_the_wire(self, mocker: MockerFixture):
         """`single-tenant` forwarded by a proxy is an ordinary path-safe id here.
@@ -119,7 +121,8 @@ class TestNoAuthForwardedHeaders:
         `user_id` is the owner segment of every storage key, so a value
         containing `/`, `\`, control chars, or being `.`/`..` could enable
         traversal. The proxy intended to authenticate someone but forwarded a
-        malformed value — we reject the request (400) rather than silently
+        malformed value — we refuse the request (422 `request.invalid` naming the
+        header, which no credential of the caller's could fix) rather than silently
         downgrade to a shared owner and scope the caller's outputs into someone
         else's namespace.
         """
@@ -128,9 +131,8 @@ class TestNoAuthForwardedHeaders:
         headers: dict[str, str] = {ForwardedIdentityHeader.USER_ID: unsafe_user_id}
         with caplog.at_level(logging.WARNING):
             response = client.get(RoutePath.WHOAMI, headers=headers)
-        assert response.status_code == 400
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "BadRequest"
+        assert_problem(response, status=422, code="request.invalid", field=ForwardedIdentityHeader.USER_ID)
+        assert "WWW-Authenticate" not in response.headers
         # The refused header names no caller, so it is never logged as `user.id`, nor logged at all: anyone reaching
         # the server could otherwise have any text recorded as a user.
         (record,) = [

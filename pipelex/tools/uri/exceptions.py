@@ -24,22 +24,13 @@ class UriReadRefusalReason(StrEnum):
                 return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
 
     @property
-    def security_target_class(self) -> SecurityTargetClass:
+    def target_class(self) -> SecurityTargetClass:
         """The class of destination the refusal names in its security event: another tenant's key, or a scheme the run does not read."""
         match self:
             case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
                 return SecurityTargetClass.FOREIGN_STORAGE_KEY
             case UriReadRefusalReason.LOCAL_PATH:
                 return SecurityTargetClass.SCHEME
-
-    @property
-    def target_class(self) -> str:
-        """The kind of target the refused URL points at, as the refusal's sentence names it."""
-        match self:
-            case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
-                return "foreign storage"
-            case UriReadRefusalReason.LOCAL_PATH:
-                return "local"
 
 
 class UriReadRefusedError(SecurityError):
@@ -66,8 +57,11 @@ class UriReadRefusedError(SecurityError):
         super().__init__(message)
         self.reason = reason
         # The reason is the class of destination refused, so the security event names it without the raise site saying so.
-        self.with_security_target_class(reason.security_target_class)
+        self.with_security_target_class(reason.target_class)
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        return {"reason": self.reason.desc, "target_class": self.reason.target_class}
+        # The problem's `target_class` is a value the registry lists, which the code's sentence reads as a word ("points
+        # at a private target"): `scheme` for a local path, and `private` for another tenant's key, which the registry
+        # lists no value for. The security event names the finer class the refusal states, `foreign_storage_key`.
+        return {"reason": self.reason.desc, "target_class": self.reason.target_class.listed_target_class}

@@ -15,6 +15,7 @@ from pytest_mock import MockerFixture
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.security import RequestUser, get_request_user, verify_api_key, verify_jwt
 from tests.unit._constants import RoutePath
+from tests.unit._problems import assert_problem
 
 JWT_SECRET = "test-jwt-secret-do-not-use-in-prod"
 API_KEY = "test-api-key-static"
@@ -73,9 +74,10 @@ class TestSecurityVerifiers:
         client = _build_jwt_client()
         token = jwt.encode({"sub": "google#abc"}, JWT_SECRET, algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidToken"
+        body = assert_problem(response, status=500, code="pipelex.deployment.token_claims_invalid")
+        # The issuer, not the bearer, fixes a claim: the operator's to know, so the claim and the reason ride the diagnostics.
+        assert "WWW-Authenticate" not in response.headers
+        assert "diagnostics" not in body
 
     def test_jwt_missing_user_id_claim_rejected(self, mocker: MockerFixture):
         """No `user_id` claim means no caller identifier — reject."""
@@ -83,10 +85,10 @@ class TestSecurityVerifiers:
         client = _build_jwt_client()
         token = jwt.encode({"iat": 0}, JWT_SECRET, algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
+        body = assert_problem(response, status=500, code="pipelex.deployment.token_claims_invalid")
+        # The issuer, not the bearer, fixes a claim: the operator's to know, so the claim and the reason ride the diagnostics.
+        assert "WWW-Authenticate" not in response.headers
+        assert "diagnostics" not in body
 
     @pytest.mark.parametrize(
         "unsafe_user_id",
@@ -114,10 +116,10 @@ class TestSecurityVerifiers:
         client = _build_jwt_client()
         token = jwt.encode({"user_id": unsafe_user_id}, JWT_SECRET, algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
+        body = assert_problem(response, status=500, code="pipelex.deployment.token_claims_invalid")
+        # The issuer, not the bearer, fixes a claim: the operator's to know, so the claim and the reason ride the diagnostics.
+        assert "WWW-Authenticate" not in response.headers
+        assert "diagnostics" not in body
 
     @pytest.mark.parametrize(
         ("refused_claim", "expected_claim_type"),
@@ -143,7 +145,7 @@ class TestSecurityVerifiers:
         with caplog.at_level(logging.WARNING):
             response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
 
-        assert response.status_code == 401
+        assert response.status_code == 500
         (record,) = [record for record in caplog.records if record.getMessage() == "A verified token's user id claim is not a path-safe segment"]
         carried = carried_attributes(record=record)
         assert carried.get("claim_type") == expected_claim_type
@@ -183,38 +185,32 @@ class TestSecurityVerifiers:
         client = _build_jwt_client()
         token = jwt.encode({"user_id": SINGLE_TENANT_USER_ID}, JWT_SECRET, algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
+        body = assert_problem(response, status=500, code="pipelex.deployment.token_claims_invalid")
+        # The issuer, not the bearer, fixes a claim: the operator's to know, so the claim and the reason ride the diagnostics.
+        assert "WWW-Authenticate" not in response.headers
+        assert "diagnostics" not in body
 
     def test_jwt_invalid_token_rejected(self, mocker: MockerFixture):
         mocker.patch("pipelex_api.security.get_optional_env", return_value=JWT_SECRET)
         client = _build_jwt_client()
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": "Bearer not.a.real.token"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.invalid_credential")
         assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
 
     def test_jwt_wrong_secret_rejected(self, mocker: MockerFixture):
         mocker.patch("pipelex_api.security.get_optional_env", return_value=JWT_SECRET)
         client = _build_jwt_client()
         token = jwt.encode({"user_id": USER_ID_UUID}, "different-secret", algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.invalid_credential")
         assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
 
     def test_jwt_missing_secret_returns_500(self, mocker: MockerFixture):
         mocker.patch("pipelex_api.security.get_optional_env", return_value=None)
         client = _build_jwt_client()
         token = jwt.encode({"user_id": USER_ID_UUID}, "anything", algorithm="HS256")
         response = client.get(RoutePath.WHOAMI, headers={"Authorization": f"Bearer {token}"})
-        assert response.status_code == 500
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ServerMisconfigured"
+        assert_problem(response, status=500, code="runtime.misconfigured")
 
     def test_api_key_happy_path(self, mocker: MockerFixture):
         mocker.patch("pipelex_api.security.get_optional_env", return_value=API_KEY)
@@ -227,18 +223,14 @@ class TestSecurityVerifiers:
         mocker.patch("pipelex_api.security.get_optional_env", return_value=API_KEY)
         client = _build_api_key_client()
         response = client.get(RoutePath.PING, headers={"Authorization": "Bearer wrong-key"})
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.invalid_credential")
         assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "InvalidToken"
 
     def test_api_key_missing_env_returns_500(self, mocker: MockerFixture):
         mocker.patch("pipelex_api.security.get_optional_env", return_value=None)
         client = _build_api_key_client()
         response = client.get(RoutePath.PING, headers={"Authorization": "Bearer anything"})
-        assert response.status_code == 500
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ServerMisconfigured"
+        assert_problem(response, status=500, code="runtime.misconfigured")
 
     @pytest.mark.parametrize(
         "authorization",
@@ -255,17 +247,15 @@ class TestSecurityVerifiers:
         `HTTPBearer(auto_error=False)` means none of these branches go through
         FastAPI's default `HTTPException` handler (which would emit
         `application/json` `{"detail": "Not authenticated"}`). Instead
-        `verify_api_key` sees `credentials is None` and calls
-        `raise_unauthenticated(...)` — same problem document as every other 401.
+        `verify_api_key` sees `credentials is None` and raises the runner's own
+        `auth.missing_credential` refusal — the problem document every 401 is.
         """
         mocker.patch("pipelex_api.security.get_optional_env", return_value=API_KEY)
         client = _build_api_key_client()
         headers: dict[str, str] = {} if authorization is None else {"Authorization": authorization}
         response = client.get(RoutePath.PING, headers=headers)
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.missing_credential")
         assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "Unauthenticated"
 
     @pytest.mark.parametrize(
         "authorization",
@@ -282,7 +272,5 @@ class TestSecurityVerifiers:
         client = _build_jwt_client()
         headers: dict[str, str] = {} if authorization is None else {"Authorization": authorization}
         response = client.get(RoutePath.WHOAMI, headers=headers)
-        assert response.status_code == 401
-        assert response.headers["content-type"] == "application/problem+json"
+        assert_problem(response, status=401, code="auth.missing_credential")
         assert response.headers["WWW-Authenticate"] == "Bearer"
-        assert response.json()["error_type"] == "Unauthenticated"

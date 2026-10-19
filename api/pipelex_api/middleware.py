@@ -1,19 +1,21 @@
 """ASGI middleware shared across the FastAPI app."""
 
-import re
 import secrets
 import time
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
+from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
+from pipelex.errors.problem import ProblemView
+from pipelex.system.job_metadata import is_valid_request_id
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from pipelex_api.error_types import ErrorType
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.limits import MAX_REQUEST_BODY_BYTES, MAX_REQUEST_BODY_MIB
-from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE, build_problem_document_from_api_error
+from pipelex_api.problem_document import problem_json_response
 
 
 def request_id_of(request: Request) -> str | None:
@@ -27,25 +29,23 @@ def request_id_of(request: Request) -> str | None:
     return getattr(request.state, "request_id", None)
 
 
-def _too_large_response(*, request: Request) -> JSONResponse:
-    """Build the 413 RFC 7807 problem response for an over-limit request body.
+def _too_large_response(*, request: Request, size: int) -> JSONResponse:
+    """Build the 413 `request.too_large` problem response for an over-limit request body.
 
-    The body-size check runs in middleware, before routing, so it cannot go
-    through the `pipelex_api.errors` helpers — a middleware must `return` a response,
-    not raise. It builds the same problem document directly, reading the request
-    context off the `Request` it was handed. `RequestIdMiddleware` runs outermost,
-    so the id is already on `request.state` by the time this is reached; that
-    middleware's `send` wrapper also stamps the `X-Request-ID` header onto this
-    response.
+    The body-size check runs in middleware, before routing, so no exception handler answers it: a middleware must
+    `return` a response, not raise. It renders the same problem a `RunnerRequestError` carrying `request.too_large` would,
+    in the caller's view, since no authentication has run yet to mark the request as the operator's.
+    `RequestIdMiddleware` runs outermost, so the id is already on `request.state` by the time this is reached; that
+    middleware's `send` wrapper also stamps the `X-Request-ID` header onto this response.
+
+    Args:
+        request: The refused request.
+        size: The bytes the request reached: the length it declared, or the bytes read before the read was cut.
     """
-    document = build_problem_document_from_api_error(
-        ErrorType.PAYLOAD_TOO_LARGE,
-        f"Request body exceeds {MAX_REQUEST_BODY_MIB} MiB limit",
-        413,
-        instance=request.url.path,
-        request_id=request_id_of(request),
-    )
-    return JSONResponse(status_code=413, content=document, media_type=PROBLEM_JSON_MEDIA_TYPE)
+    message = f"Request body exceeds the {MAX_REQUEST_BODY_MIB} MiB limit"
+    refusal = RunnerRequestError(message).with_error_code(CoreCode.REQUEST_TOO_LARGE).with_params(limit=MAX_REQUEST_BODY_BYTES, size=size)
+    problem = refusal.to_problem(view=ProblemView.OPERATOR, request_id=request_id_of(request))
+    return problem_json_response(problem, view=ProblemView.CALLER)
 
 
 async def request_body_size_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -69,7 +69,7 @@ async def request_body_size_middleware(request: Request, call_next: Callable[[Re
         except ValueError:
             declared = -1
         if declared > MAX_REQUEST_BODY_BYTES:
-            return _too_large_response(request=request)
+            return _too_large_response(request=request, size=declared)
 
     original_receive = request.receive
     bytes_seen = 0
@@ -98,7 +98,7 @@ async def request_body_size_middleware(request: Request, call_next: Callable[[Re
 
     response = await call_next(request)
     if too_large:
-        return _too_large_response(request=request)
+        return _too_large_response(request=request, size=bytes_seen)
     return response
 
 
@@ -112,13 +112,6 @@ _CROCKFORD_BASE32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
 _ULID_LENGTH = 26
 _ULID_RANDOM_BITS = 80
 _ULID_TIMESTAMP_MASK = (1 << 48) - 1
-
-# An inbound X-Request-ID is reflected into response headers, logs, and error
-# bodies, so a client-supplied value is never trusted verbatim: it must be a
-# bounded run of injection-safe characters or it is discarded. ULIDs and UUIDs
-# both satisfy this.
-_REQUEST_ID_MAX_LENGTH = 128
-_REQUEST_ID_CHARSET = re.compile(r"\A[A-Za-z0-9_-]+\Z")
 
 
 def generate_request_id() -> str:
@@ -137,21 +130,20 @@ def generate_request_id() -> str:
     return "".join(digits)
 
 
-def _is_valid_request_id(candidate: str) -> bool:
-    """Return whether a client-supplied request id is safe to reflect back verbatim."""
-    return 0 < len(candidate) <= _REQUEST_ID_MAX_LENGTH and _REQUEST_ID_CHARSET.match(candidate) is not None
-
-
 def _resolve_request_id(scope: Scope) -> str:
     """Return the request id for this request.
 
     Reuses a valid inbound `X-Request-ID` header; otherwise — absent,
-    malformed, or over-long — mints a fresh ULID.
+    malformed, or over-long — mints a fresh ULID. An inbound id is reflected
+    into response headers, logs and error bodies, so it is never trusted
+    verbatim: it must pass the runtime's one request id rule
+    (`pipelex.system.job_metadata.is_valid_request_id`), the one a run applies
+    to the id it is handed, or it is discarded. ULIDs and UUIDs both pass.
     """
     for name, value in scope.get("headers", []):
         if name == b"x-request-id":
             candidate: str = value.decode("latin-1").strip()
-            if _is_valid_request_id(candidate):
+            if is_valid_request_id(value=candidate):
                 return candidate
             break
     return generate_request_id()

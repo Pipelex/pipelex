@@ -14,22 +14,26 @@ from typing import Annotated, Any
 import jwt
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from mthds.protocol.problem.registry import CoreCode
 from pipelex import log
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.environment import get_optional_env
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pydantic import BaseModel, Field
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_bad_request, raise_internal_server_error, raise_unauthenticated
-from pipelex_api.exceptions import InvalidAuthModeError
+from pipelex_api.exceptions import InvalidAuthModeError, RunnerAuthError, RunnerMisconfiguredError, RunnerRequestError
 from pipelex_api.problem_view import mark_operator_request
 
 AUTH_MODE_ENV_VAR = "AUTH_MODE"
 
 # JWT Configuration (only used when AUTH_MODE=jwt)
 JWT_ALGORITHM = "HS256"
+
+# The `WWW-Authenticate` challenge of a 401 where the deployment reads a bearer credential, a token or the API key
+# (RFC 9110, section 15.5.2). A deployment behind a trusted proxy reads none, so its refusals carry no challenge.
+BEARER_CHALLENGE = "Bearer"
 
 # A caller's `user_id` is the first path segment of every `pipelex-storage://`
 # URI and S3 key (`<user_id>/...`). The runner treats it as an OPAQUE id and
@@ -82,9 +86,9 @@ def is_safe_user_id(value: str) -> bool:
 # does NOT raise FastAPI's default `HTTPException` (which would emit
 # `application/json` `{"detail": "Not authenticated"}` — the old, pre-RFC-7807
 # shape) before our verifiers run. With `auto_error=False`, `HTTPBearer`
-# returns `None` in that case, and the verifiers below raise
-# `raise_unauthenticated(...)` so the response is the same RFC 7807
-# `application/problem+json` document as every other 401 on the surface.
+# returns `None` in that case, and the verifiers below raise a
+# `RunnerAuthError` carrying `auth.missing_credential`, so the response is the
+# same `application/problem+json` document as every other 401 on the surface.
 security = HTTPBearer(auto_error=False)
 
 
@@ -97,8 +101,8 @@ class AuthMode(StrEnum):
 class AuthRefusalReason(StrEnum):
     """Why the server refused a caller's own credentials, as the `auth_refusal_reason` field of the line that says so.
 
-    These are the caller's mistakes, answered with a 401 the exception handler records at WARNING with its `error.type`
-    and `detail`, so the line naming the reason is diagnosis and logs at DEBUG. A token that verifies but whose
+    These are the caller's mistakes, answered with a 401 the exception handler records at WARNING with its `error.code`
+    and `error.type`, so the line naming the reason is diagnosis and logs at DEBUG. A token that verifies but whose
     `user_id` claim is unusable is no caller's mistake: whoever minted it holds the server's secret, so it is the
     deployment's issuer that is misconfigured, and that line stays a WARNING the operator can act on.
     """
@@ -175,17 +179,19 @@ async def verify_jwt(
     if credentials is None:
         # Missing, empty, or non-Bearer `Authorization` header. `HTTPBearer`
         # is configured with `auto_error=False` so this branch (rather than
-        # FastAPI's default `HTTPException`) shapes the response — same RFC
-        # 7807 `application/problem+json` as every other 401.
+        # FastAPI's default `HTTPException`) shapes the response — the same
+        # `application/problem+json` as every other 401.
         log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN})
-        raise_unauthenticated("Missing or malformed Authorization header")
+        msg = "Missing or malformed Authorization header"
+        raise RunnerAuthError(msg, challenge=BEARER_CHALLENGE).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
 
     jwt_secret = get_optional_env("JWT_SECRET_KEY")
     if not jwt_secret:
         log.error(
             "An environment variable the authentication mode requires is not set", fields={"env_var": "JWT_SECRET_KEY", "auth_mode": AuthMode.JWT}
         )
-        raise_internal_server_error("Server configuration error: JWT_SECRET_KEY not configured", error_type=ErrorType.SERVER_MISCONFIGURED)
+        msg = "Server configuration error: JWT_SECRET_KEY not configured"
+        raise RunnerMisconfiguredError(msg, component="JWT_SECRET_KEY")
 
     token = credentials.credentials
 
@@ -204,7 +210,10 @@ async def verify_jwt(
         user_id = payload.get("user_id")
         if not user_id:
             log.warning("A verified token has no user id claim", fields={USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION})
-            raise_unauthenticated("Invalid token: missing user_id claim", error_type=ErrorType.INVALID_TOKEN)
+            msg = "Invalid token: missing user_id claim"
+            raise (
+                RunnerAuthError(msg).with_error_code(PipelexErrorCode.DEPLOYMENT_TOKEN_CLAIMS_INVALID).with_params(claim="user_id", reason="missing")
+            )
         if not isinstance(user_id, str) or not is_safe_user_id(user_id):
             # The claim is refused, so it is not `user.id`, which names an authenticated caller and is always a string:
             # the line carries the type the claim was decoded as, and never its value.
@@ -212,7 +221,8 @@ async def verify_jwt(
                 "A verified token's user id claim is not a path-safe segment",
                 fields={"claim_type": type(user_id).__name__, USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION},
             )
-            raise_unauthenticated("Invalid token: user_id claim must be a single path-safe segment", error_type=ErrorType.INVALID_TOKEN)
+            msg = "Invalid token: user_id claim must be a single path-safe segment"
+            raise RunnerAuthError(msg).with_error_code(PipelexErrorCode.DEPLOYMENT_TOKEN_CLAIMS_INVALID).with_params(claim="user_id", reason="unsafe")
         if user_id == SINGLE_TENANT_USER_ID:
             # Path-safe, but reserved for the no-user-model deployment. An
             # authenticated token must not claim it, or that caller's runs would
@@ -220,23 +230,25 @@ async def verify_jwt(
             # users — beside whatever a no-auth deployment of the same image
             # wrote there.
             log.warning("A verified token's user id claim is the reserved single-tenant id", fields={USER_ACTION_FIELD: TOKEN_ISSUER_USER_ACTION})
-            raise_unauthenticated(
-                f"Invalid token: user_id claim must not be the reserved {SINGLE_TENANT_USER_ID!r} value",
-                error_type=ErrorType.INVALID_TOKEN,
+            msg = f"Invalid token: user_id claim must not be the reserved {SINGLE_TENANT_USER_ID!r} value"
+            raise (
+                RunnerAuthError(msg).with_error_code(PipelexErrorCode.DEPLOYMENT_TOKEN_CLAIMS_INVALID).with_params(claim="user_id", reason="reserved")
             )
         _set_request_user(request, user_id=user_id)
 
         return payload
 
-    except jwt.ExpiredSignatureError:
+    except jwt.ExpiredSignatureError as exc:
         log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.EXPIRED_TOKEN})
-        raise_unauthenticated("Token expired", error_type=ErrorType.TOKEN_EXPIRED)
+        msg = "Token expired"
+        raise RunnerAuthError(msg, challenge=BEARER_CHALLENGE).with_error_code(CoreCode.AUTH_CREDENTIAL_EXPIRED) from exc
     except jwt.InvalidTokenError as exc:
         log.debug(
             CREDENTIALS_REFUSED_MESSAGE,
             fields={"auth_mode": AuthMode.JWT, "auth_refusal_reason": AuthRefusalReason.INVALID_TOKEN, **error_fields(exc=exc)},
         )
-        raise_unauthenticated("Invalid token", error_type=ErrorType.INVALID_TOKEN)
+        msg = "Invalid token"
+        raise RunnerAuthError(msg, challenge=BEARER_CHALLENGE) from exc
 
 
 async def verify_api_key(request: Request, credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(security)]) -> str:
@@ -250,17 +262,20 @@ async def verify_api_key(request: Request, credentials: Annotated[HTTPAuthorizat
         # matching branch in `verify_jwt` for why this lives here and not
         # in `HTTPBearer`'s default `auto_error=True` behavior.
         log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.MISSING_BEARER_TOKEN})
-        raise_unauthenticated("Missing or malformed Authorization header")
+        msg = "Missing or malformed Authorization header"
+        raise RunnerAuthError(msg, challenge=BEARER_CHALLENGE).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
 
     api_key = get_optional_env("API_KEY")
 
     if not api_key:
         log.error("An environment variable the authentication mode requires is not set", fields={"env_var": "API_KEY", "auth_mode": AuthMode.API_KEY})
-        raise_internal_server_error("Server configuration error: API_KEY not configured", error_type=ErrorType.SERVER_MISCONFIGURED)
+        msg = "Server configuration error: API_KEY not configured"
+        raise RunnerMisconfiguredError(msg, component="API_KEY")
 
     if credentials.credentials != api_key:
         log.debug(CREDENTIALS_REFUSED_MESSAGE, fields={"auth_mode": AuthMode.API_KEY, "auth_refusal_reason": AuthRefusalReason.API_KEY_MISMATCH})
-        raise_unauthenticated("Invalid authentication token", error_type=ErrorType.INVALID_TOKEN)
+        msg = "Invalid authentication token"
+        raise RunnerAuthError(msg, challenge=BEARER_CHALLENGE)
 
     mark_operator_request(request)
     return credentials.credentials
@@ -304,13 +319,17 @@ async def no_auth(request: Request) -> None:
                 USER_ACTION_FIELD: "Make sure the proxy in front of the server authenticates every request and forwards X-User-Id",
             },
         )
-        raise_unauthenticated("Identity required: no X-User-Id was forwarded", error_type=ErrorType.INVALID_TOKEN)
+        # No challenge: this deployment reads no credential of the request, so a `WWW-Authenticate: Bearer` would ask
+        # for a token it never reads.
+        msg = "Identity required: no X-User-Id was forwarded"
+        raise RunnerAuthError(msg).with_error_code(CoreCode.AUTH_MISSING_CREDENTIAL)
     if not is_safe_user_id(user_id):
-        # A non-empty but path-unsafe id: the proxy intended to authenticate
-        # someone and sent a malformed value. Fail closed.
+        # A non-empty but path-unsafe id: the proxy intended to authenticate someone and sent a malformed value, so the
+        # request is refused, naming the header, rather than any credential failing. Fail closed.
         # No value: the header is refused, so it names no caller, and it is whatever text anyone reaching the server sent.
         log.warning("A forwarded user id is not a path-safe segment and the request was refused")
-        raise_bad_request("Forwarded X-User-Id must be a single path-safe segment", error_type=ErrorType.BAD_REQUEST)
+        msg = "Forwarded X-User-Id must be a single path-safe segment"
+        raise RunnerRequestError(msg, field=ForwardedIdentityHeader.USER_ID)
 
     _set_request_user(request, user_id=user_id)
     mark_operator_request(request)
