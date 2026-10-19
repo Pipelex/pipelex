@@ -26,7 +26,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from pipelex_api.api_config import get_api_config, resolve_boot_orchestrator
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import AnsweredErrorBarrier, register_exception_handlers
 from pipelex_api.middleware import RequestIdMiddleware, request_body_size_middleware
 from pipelex_api.openapi_schema import PipelexFastAPI
 from pipelex_api.routes import router as api_router
@@ -215,5 +215,8 @@ register_exception_handlers(fastapi_app, http_error_mappers=HTTP_ERROR_MAPPERS)
 # ServerErrorMiddleware, which `add_middleware` could only ever nest inside.
 # This is what makes it genuinely outermost: the request-id contextvars are
 # bound, and `X-Request-ID` is echoed, on every response — the catch-all 500
-# included. `app` is the ASGI entrypoint (uvicorn loads `pipelex_api.main:app`).
-app = RequestIdMiddleware(fastapi_app)
+# included. Between the two, AnsweredErrorBarrier stops the exception
+# ServerErrorMiddleware raises again after the catch-all answered it, which the
+# server would otherwise log with its traceback, the exception's text included.
+# `app` is the ASGI entrypoint (uvicorn loads `pipelex_api.main:app`).
+app = RequestIdMiddleware(AnsweredErrorBarrier(fastapi_app))

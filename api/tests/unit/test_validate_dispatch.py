@@ -23,6 +23,7 @@ from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemDiagnostics, ProblemView, make_problem
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.pipeline.validation_errors import problem_item_of
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError
 from pipelex.system.caller_identity import CallerIdentity
@@ -33,6 +34,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -101,9 +103,14 @@ def _register_stub_for_temporal(mocker: MockerFixture, stub: _StubBundleValidato
 class TestValidateDispatch:
     def test_non_direct_validators_invalid_verdict_maps_to_200_invalid_report(self, mocker: MockerFixture) -> None:
         """A non-direct validator's returned failure with items is mapped to a 200 InvalidReport, threading the request."""
+        bad_ref = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")
         invalid_verdict = BundleValidationFailure(
-            problem=make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR),
-            validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
+            problem=make_problem(
+                code=CoreCode.METHOD_INVALID,
+                view=ProblemView.OPERATOR,
+                errors=[problem_item_of(item=bad_ref, code=CoreCode.METHOD_SCHEMA_VIOLATION)],
+            ),
+            validation_errors=[bad_ref],
         )
         stub = _StubBundleValidator(verdict=invalid_verdict)
         _register_stub_for_temporal(mocker, stub)
@@ -114,7 +121,10 @@ class TestValidateDispatch:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"] == [{"category": ValidationErrorCategory.BLUEPRINT_VALIDATION, "message": "bad ref"}]
+        # The verdict's items, as the validator built them, each with its code, its sentence and its parameters.
+        assert body["errors"] == [
+            {"code": "method.schema_violation", "detail": error_code_spec(CoreCode.METHOD_SCHEMA_VIOLATION).title, "params": {"finding": "bad ref"}}
+        ]
         assert body["message"] == error_code_spec(CoreCode.METHOD_INVALID).detail
         # The dispatch reached the registered non-direct validator, with the request threaded through.
         assert len(stub.calls) == 1
@@ -184,7 +194,7 @@ class TestValidateDispatch:
         assert exc_info.value.resolve_error_code() == PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def test_forbidden_orchestration_mode_override_is_a_403(self) -> None:
-        """The route threads orchestration_mode into the same override policy /start uses: a forbidden override is a 403."""
+        """The route threads orchestration_mode into the same override policy /start uses: a forbidden override is a 422."""
         client = _build_client()
         # Packaged default is `direct` with override OFF; forcing a different backend is refused before dispatch.
         response = client.post(
@@ -192,6 +202,5 @@ class TestValidateDispatch:
             json={"mthds_contents": [VALID_MTHDS], "orchestration_mode": "temporal"},
         )
 
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert response.json()["error_type"] == "OrchestrationModeOverrideForbidden"
+        problem = assert_problem(response, status=422, code="pipelex.deployment.orchestration_override_forbidden")
+        assert problem["params"] == {"requested_mode": "temporal"}

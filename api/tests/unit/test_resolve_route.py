@@ -4,8 +4,8 @@ Pins `conformance/specs/pipelex-codegen.md#route-envelopes`, in the `conformance
 that verify it: the request takes the method's tree as the protocol's `files` map XOR a `method_ref`,
 read exactly as `/v1/validate` and the run routes read it; a produced verdict is a 200 discriminated on
 `is_valid` with the crate on the valid arm; request-shape errors are 422 problem+json; an address-form
-`method_ref` resolves the fetched package's tree, while the registry form keeps its honest 501 until the
-method registry exists.
+`method_ref` resolves the fetched package's tree, while the registry form is refused as a 422
+`request.unsupported` until the method registry exists.
 """
 
 import base64
@@ -26,6 +26,7 @@ from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, SIBLING_MTHDS, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 RESOLVE_PATH = "/v1/resolve"
 
@@ -40,15 +41,6 @@ def _build_client() -> TestClient:
 
 def _hash_entry(data: bytes) -> dict[str, Any]:
     return {"sha256": sha256_hex(data), "size": len(data)}
-
-
-def _assert_problem(response: Any, *, status: int, error_type: str) -> dict[str, Any]:
-    assert response.status_code == status, response.text
-    assert response.headers["content-type"] == "application/problem+json"
-    problem: dict[str, Any] = response.json()
-    assert problem["error_type"] == error_type, response.text
-    assert "is_valid" not in problem
-    return problem
 
 
 class TestResolveRoute:
@@ -95,10 +87,11 @@ class TestResolveRoute:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"], "an invalid verdict must carry a non-empty validation_errors[]"
-        assert body["validation_errors"][0]["message"]
-        # The bundle's tree path threads through to the diagnostics.
-        assert body["validation_errors"][0]["source"] == "methods/broken.mthds"
+        assert body["errors"], "an invalid verdict must carry a non-empty errors[]"
+        assert body["errors"][0]["code"]
+        assert body["errors"][0]["detail"]
+        # The bundle's tree path threads through to the items' location.
+        assert body["errors"][0]["location"]["file"] == "methods/broken.mthds"
         # No crate exists on the invalid arm; the runnability facts are /validate vocabulary, absent here.
         assert "crate" not in body
         assert "is_runnable" not in body
@@ -116,59 +109,65 @@ class TestResolveRoute:
         assert "smoke.echo" in crate["pipes"]
         assert crate["source_map"]["smoke.echo"] == "documents.mthds"
 
-    def test_registry_form_method_ref_keeps_the_501(self):
+    def test_registry_form_method_ref_is_an_unsupported_request(self):
         # The registry form (any non-address reference) stays reserved for the packaging
-        # program's closing phase — an honest 501, never a silent empty verdict.
+        # program's closing phase — an honest refusal of the form, never a silent empty verdict.
         client = _build_client()
         response = client.post(RESOLVE_PATH, json={"method_ref": "acme/invoice-tools"})
-        _assert_problem(response, status=501, error_type="MethodRefNotSupported")
+        problem = assert_problem(response, status=422, code="request.unsupported")
+        assert problem["params"] == {"field": "method_ref", "reason": "registry_form_method_ref"}
 
     @pytest.mark.parametrize(
-        "payload",
+        ("payload", "field"),
         [
-            pytest.param({}, id="neither"),
-            pytest.param({"files": {"main.mthds": VALID_MTHDS}, "method_ref": "acme/x"}, id="both"),
-            pytest.param({"method_ref": "acme/x", "dependencies": {}}, id="dependencies-without-files"),
+            pytest.param({}, "files", id="neither"),
+            pytest.param({"files": {"main.mthds": VALID_MTHDS}, "method_ref": "acme/x"}, "method_ref", id="both"),
+            pytest.param({"method_ref": "acme/x", "dependencies": {}}, "dependencies", id="dependencies-without-files"),
         ],
     )
-    def test_a_malformed_method_selector_is_a_request_shape_422(self, payload: dict[str, Any]):
-        _assert_problem(_build_client().post(RESOLVE_PATH, json=payload), status=422, error_type="ValidationError")
+    def test_a_malformed_method_selector_is_a_request_shape_422(self, payload: dict[str, Any], field: str):
+        # The model's rule names the field to change, never the body as a whole: the first selector when none is sent,
+        # the second when both are, and the `dependencies` sent without the tree they belong to.
+        assert_problem(_build_client().post(RESOLVE_PATH, json=payload), status=422, code="request.invalid", field=field)
 
     @pytest.mark.parametrize(
-        ("files", "refusal_code"),
+        ("files", "code", "reason"),
         [
-            pytest.param([{"content": VALID_MTHDS, "source": "main.mthds"}], None, id="the-retired-list-shape"),
-            pytest.param({}, "empty_tree", id="empty-map"),
-            pytest.param({"../main.mthds": VALID_MTHDS}, "invalid_tree_path", id="path-leaving-the-tree"),
-            pytest.param({".mthds/main.mthds": VALID_MTHDS}, "excluded_name", id="excluded-name"),
+            pytest.param([{"content": VALID_MTHDS, "source": "main.mthds"}], "request.invalid", None, id="the-retired-list-shape"),
+            pytest.param({}, "method.package_invalid", "empty_tree", id="empty-map"),
+            pytest.param({"../main.mthds": VALID_MTHDS}, "security.input_path_refused", None, id="path-leaving-the-tree"),
+            pytest.param({".mthds/main.mthds": VALID_MTHDS}, "method.package_invalid", "excluded_name", id="excluded-name"),
         ],
     )
-    def test_a_files_member_that_is_no_method_tree_is_refused_as_validate_refuses_it(self, files: Any, refusal_code: str | None):
+    def test_a_files_member_that_is_no_method_tree_is_refused_as_validate_refuses_it(self, files: Any, code: str, reason: str | None):
         client = _build_client()
-        problem = _assert_problem(client.post(RESOLVE_PATH, json={"files": files}), status=422, error_type="InvalidMethodFiles")
-        validate_problem = _assert_problem(client.post("/v1/validate", json={"files": files}), status=422, error_type="InvalidMethodFiles")
-        if refusal_code is not None:
-            assert problem["tree_refusal"]["code"] == refusal_code
-        assert problem.get("tree_refusal") == validate_problem.get("tree_refusal")
+        response = client.post(RESOLVE_PATH, json={"files": files})
+        validate_response = client.post("/v1/validate", json={"files": files})
+        problem = assert_problem(response, status=422, code=code)
+        validate_problem = assert_problem(validate_response, status=422, code=code)
+        if reason is not None:
+            assert problem["params"]["reason"] == reason, problem
+        assert problem.get("params") == validate_problem.get("params")
 
     def test_a_hash_the_runner_does_not_hold_is_a_422_naming_it(self):
         notes = b"notes the runner never received"
         response = _build_client().post(RESOLVE_PATH, json={"files": {"main.mthds": VALID_MTHDS, "notes.txt": _hash_entry(notes)}})
-        problem = _assert_problem(response, status=422, error_type="MissingBlobs")
-        assert problem["missing_blobs"] == [sha256_hex(notes)]
+        problem = assert_problem(response, status=422, code="request.blobs_missing")
+        assert problem["params"] == {"missing_blobs": [sha256_hex(notes)]}
 
     def test_a_file_past_the_tree_limit_is_refused(self):
         response = _build_client().post(RESOLVE_PATH, json={"files": {"main.mthds": VALID_MTHDS, "big.txt": "a" * (MAX_METHOD_TREE_FILE_BYTES + 1)}})
-        problem = _assert_problem(response, status=422, error_type="MethodTreeTooLarge")
-        assert "'big.txt'" in problem["detail"]
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "file_too_large", "path": "big.txt", "limit": MAX_METHOD_TREE_FILE_BYTES}
 
     def test_python_in_a_tree_is_refused_where_it_could_not_run(self):
         response = _build_client().post(RESOLVE_PATH, json={"files": {"main.mthds": VALID_MTHDS, "helpers/tool.py": "VALUE = 1\n"}})
-        _assert_problem(response, status=403, error_type="CustomCodeRequiresSandbox")
+        assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
 
     def test_a_tree_without_a_bundle_is_refused(self):
         response = _build_client().post(RESOLVE_PATH, json={"files": {"notes.txt": "no bundle here"}})
-        _assert_problem(response, status=422, error_type="InvalidBundle")
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "no_bundle"}
 
     def test_resolve_tears_down_its_library(self, mocker: MockerFixture):
         # The engine core leaves the library loaded + current on success (so /codegen can read live

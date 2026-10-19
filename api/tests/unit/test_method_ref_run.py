@@ -30,6 +30,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import STUB_METHOD_ADDRESS, STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 _TREE_NS = "pipelex_api.method_tree_request"
@@ -262,9 +263,8 @@ class TestMethodRefRun:
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
         client, _ = _build_client(mocker)
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {}})
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "CustomCodeRequiresSandbox"
+        problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
+        assert problem["params"] == {"origin": "package"}
 
     def test_python_package_is_written_whole_when_sandbox_hosted(self, mocker: MockerFixture, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY})

@@ -29,6 +29,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.security import RequestUser
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 if TYPE_CHECKING:
     from pipelex.system.job_metadata import RunMetadata
@@ -125,8 +126,7 @@ class TestReadScopeRefusals:
 
         response = client.post(route, json=_run_body(read_scope=bad_scope))
 
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == "InvalidReadScope"
+        assert_problem(response, status=422, code="request.invalid", field="read_scope")
         assert orchestrator.run_metadatas == []
 
     def test_storage_scope_outside_the_read_scope_is_a_422(self, mocker: MockerFixture, route: str) -> None:
@@ -134,10 +134,7 @@ class TestReadScopeRefusals:
 
         response = client.post(route, json=_run_body(storage_scope="org_other/mt_1/run_7", read_scope="org_acme"))
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "InvalidReadScope"
-        assert "was sent" in body["detail"]
+        assert_problem(response, status=422, code="request.invalid", field="read_scope")
         assert orchestrator.run_metadatas == []
 
     def test_host_storage_scope_without_a_read_scope_fails_closed(self, mocker: MockerFixture, route: str) -> None:
@@ -147,10 +144,7 @@ class TestReadScopeRefusals:
 
         response = client.post(route, json=_run_body(storage_scope="org_acme/mt_1/run_7"))
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "InvalidReadScope"
-        assert "defaulted to the caller's id" in body["detail"]
+        assert_problem(response, status=422, code="request.invalid", field="read_scope")
         assert orchestrator.run_metadatas == []
 
     def test_local_storage_sentinel_beside_a_read_scope_is_a_422(self, mocker: MockerFixture, route: str) -> None:
@@ -158,6 +152,5 @@ class TestReadScopeRefusals:
 
         response = client.post(route, json=_run_body(storage_scope=LOCAL_STORAGE_SCOPE, read_scope=LOCAL_STORAGE_SCOPE))
 
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == "InvalidReadScope"
+        assert_problem(response, status=422, code="request.invalid", field="read_scope")
         assert orchestrator.run_metadatas == []

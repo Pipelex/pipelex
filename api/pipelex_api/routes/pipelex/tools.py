@@ -6,7 +6,7 @@ import pipelex_tools
 from fastapi import APIRouter
 from pydantic import BaseModel, Field, field_validator
 
-from pipelex_api.errors import raise_validation_error
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.limits import MAX_MTHDS_FILE_BYTES
 
@@ -102,10 +102,11 @@ async def format_mthds(request_data: FormatRequest) -> FormatResponse:
     """Format one .mthds file with the canonical MTHDS formatter.
 
     Syntax errors return 200 with diagnostics and unchanged content. Malformed
-    formatter options are caller input errors and return RFC 7807 422.
+    formatter options are caller input errors and return a 422 `request.invalid`
+    naming `options`.
     """
     try:
         result = pipelex_tools.format_mthds(request_data.content, options=request_data.options)
     except ValueError as exc:
-        raise_validation_error(str(exc))
+        raise RunnerRequestError(str(exc), field="options") from exc
     return FormatResponse.model_validate(result)

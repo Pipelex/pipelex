@@ -3,29 +3,40 @@
 Up to Python 3.13 `json.loads` raised `RecursionError` on a deeply nested body at a fixed count; from 3.14
 it raises only when the thread's stack runs out, so the same body was refused on one host and parsed on
 another. The server now bounds the depth itself, before parsing. These tests pin the scan (exact on valid
-JSON, blind to brackets inside strings, linear at the body cap), the 422 `InvalidJSON` a body past the
+JSON, blind to brackets inside strings, linear at the body cap), the 422 `request.malformed` a body past the
 limit gets on a route with a typed body, and the invariant that every such route of the app is checked.
 The run routes, which parse their raw body, are covered in `test_pipeline_routes.py`.
 """
 
 import json
 import random
+import sys
 from collections.abc import Callable
 from typing import cast
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Response
+from fastapi.datastructures import Default, DefaultPlaceholder
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
+from pydantic import BaseModel
 from pytest_mock import MockerFixture
+from starlette.types import Message, Scope
 
-from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
-from pipelex_api.json_body import JsonBodyRoute, decode_json_body, json_nesting_exceeds
+from pipelex_api.exceptions import RunnerRequestError
+from pipelex_api.json_body import (
+    INTEGER_TOO_LONG_REASON,
+    TOO_DEEPLY_NESTED_REASON,
+    JsonBodyRoute,
+    decode_json_body,
+    holds_content_type_strictly,
+    json_nesting_exceeds,
+)
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH, MAX_REQUEST_BODY_BYTES
-from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem, problem_of
 
 # Deep enough to exhaust the parser's recursion budget on Python 3.13 and earlier.
 RECURSION_DEEP = 100_000
@@ -185,12 +196,9 @@ class TestJsonBodyNesting:
             headers={"content-type": "application/json"},
         )
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        problem = response.json()
-        assert problem["error_type"] == "InvalidJSON"
-        assert problem["error_domain"] == "input"
-        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in problem["detail"]
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["domain"] == "input"
+        assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
 
     def test_typed_route_accepts_a_body_at_the_limit(self):
         response = _client().post(
@@ -211,9 +219,39 @@ class TestJsonBodyNesting:
             headers={"content-type": "application/json"},
         )
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        assert response.json()["error_type"] == "InvalidJSON"
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
+
+    @pytest.mark.parametrize("route", ["/v1/format", "/v1/validate"])
+    def test_typed_route_refuses_a_body_that_is_not_utf8_as_the_caller_s(self, route: str):
+        # FastAPI's own parse turned the decode error into a bare 400 the handlers could only read as a fault of the
+        # server, a 500; the route now parses first and names the reason.
+        response = _client().post(route, content=b"\xff{}", headers={"content-type": "application/json"})
+
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": "not_utf8"}
+
+    @pytest.mark.parametrize("route", ["/v1/format", "/v1/validate"])
+    def test_typed_route_refuses_an_integer_past_the_digit_limit_as_the_caller_s(self, route: str):
+        # `json.loads` refuses an integer literal longer than `sys.get_int_max_str_digits()` with a plain `ValueError`.
+        too_long = "1" * (sys.get_int_max_str_digits() + 1)
+        response = _client().post(route, content=f'{{"content": "", "padding": {too_long}}}'.encode(), headers={"content-type": "application/json"})
+
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": INTEGER_TOO_LONG_REASON}
+
+    def test_typed_route_reads_a_body_that_is_not_json_as_fastapi_does(self):
+        # A body whose content type is not JSON is handed to the model as raw bytes, which it refuses field by field:
+        # the route parses only what FastAPI would.
+        response = _client().post("/v1/format", content=b"\xff{}", headers={"content-type": "text/plain"})
+
+        assert_problem(response, status=422, code="request.invalid")
+
+    def test_typed_route_reads_a_utf16_body_as_fastapi_does(self):
+        body = json.dumps({"content": VALID_MTHDS}).encode("utf-16")
+        response = _client().post("/v1/lint", content=body, headers={"content-type": "application/json"})
+
+        assert response.status_code == 200, response.text
 
     def test_every_route_with_a_json_body_is_bounded(self):
         # Imported here, as in `test_openapi_contract.py`, so a bad env var fails this test rather than the collection.
@@ -230,9 +268,95 @@ class TestJsonBodyNesting:
         mocker.patch("pipelex_api.json_body.json_nesting_exceeds", return_value=False)
         mocker.patch("pipelex_api.json_body.json.loads", side_effect=RecursionError("maximum recursion depth exceeded"))
 
-        with pytest.raises(ApiError) as raised:
+        with pytest.raises(RunnerRequestError) as raised:
             decode_json_body(b'{"inputs": []}')
 
-        assert raised.value.status_code == 422
-        assert raised.value.document["error_type"] == "InvalidJSON"
-        assert "not valid JSON" in raised.value.document["detail"]
+        # The patch replaces `json.loads` module-wide, and rendering the problem parses JSON too.
+        mocker.stopall()
+        problem = problem_of(raised.value)
+        assert problem["status"] == 422
+        assert problem["code"] == "request.malformed"
+        assert problem["params"] == {"reason": "not_json"}
+        assert isinstance(raised.value.__cause__, RecursionError)
+
+
+class _TypedBody(BaseModel):
+    content: str
+
+
+async def _typed_endpoint(body: _TypedBody) -> dict[str, str]:
+    return {"content": body.content}
+
+
+def _typed_route() -> JsonBodyRoute:
+    return JsonBodyRoute("/typed", _typed_endpoint, methods=["POST"])
+
+
+def _request_declaring_no_content_type(body: bytes) -> Request:
+    """A request to the typed route whose body declares no content type."""
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": body, "more_body": False}
+
+    scope: Scope = {"type": "http", "method": "POST", "path": "/typed", "raw_path": b"/typed", "query_string": b"", "headers": []}
+    return Request(scope, receive)
+
+
+class TestStrictContentType:
+    """A body that declares no content type is parsed as JSON exactly where FastAPI's own parse would parse it.
+
+    FastAPI 0.132.0 added a route's `strict_content_type`, which the dependency floor (`fastapi>=0.118.0`) does not
+    require, so a release without it must still build and serve the routes, parsing such a body as JSON as it does.
+    """
+
+    @pytest.mark.parametrize(
+        ("setting", "is_strict"),
+        [(Default(True), True), (Default(False), False), (True, True), (False, False)],
+    )
+    def test_reads_the_route_s_setting(self, mocker: MockerFixture, setting: bool | DefaultPlaceholder, is_strict: bool):
+        route = _typed_route()
+        mocker.patch.object(route, "strict_content_type", setting)
+        assert holds_content_type_strictly(route) is is_strict
+
+    def test_a_route_of_a_fastapi_without_the_setting_does_not_hold_to_its_content_type(self):
+        route = _typed_route()
+        del route.strict_content_type  # A route as a FastAPI release older than 0.132.0 builds it.
+        assert holds_content_type_strictly(route) is False
+
+    @pytest.mark.asyncio
+    async def test_a_fastapi_without_the_setting_parses_a_body_declaring_no_content_type(self, mocker: MockerFixture):
+        # Its own parse reads such a body as JSON, so the route parses it first, and refuses one that is not UTF-8 as
+        # the caller's malformed request, never as the bare 400 FastAPI would raise.
+        route = _typed_route()
+        del route.strict_content_type
+        framework_handler = mocker.AsyncMock(return_value=Response())
+        # FastAPI's own handler, which a release without the setting builds without reading it.
+        mocker.patch.object(APIRoute, "get_route_handler", return_value=framework_handler)
+        handler = route.get_route_handler()
+
+        with pytest.raises(RunnerRequestError) as raised:
+            await handler(_request_declaring_no_content_type(b"\xff{}"))
+
+        assert problem_of(raised.value)["params"] == {"reason": "not_utf8"}
+        framework_handler.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(("setting", "parses"), [(Default(True), False), (True, False), (Default(False), True), (False, True)])
+    async def test_a_fastapi_with_the_setting_parses_as_the_setting_says(
+        self, mocker: MockerFixture, setting: bool | DefaultPlaceholder, parses: bool
+    ):
+        route = _typed_route()
+        mocker.patch.object(route, "strict_content_type", setting)
+        framework_handler = mocker.AsyncMock(return_value=Response())
+        mocker.patch.object(APIRoute, "get_route_handler", return_value=framework_handler)
+        handler = route.get_route_handler()
+        request = _request_declaring_no_content_type(b"\xff{}")
+
+        if parses:
+            with pytest.raises(RunnerRequestError):
+                await handler(request)
+            framework_handler.assert_not_awaited()
+        else:
+            # A strict route leaves the body to FastAPI, which reads it as raw bytes the model refuses field by field.
+            await handler(request)
+            framework_handler.assert_awaited_once()

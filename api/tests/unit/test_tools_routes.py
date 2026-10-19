@@ -7,6 +7,7 @@ from pipelex_api.openapi_schema import PipelexFastAPI
 from pipelex_api.problem_document import PROBLEM_JSON_MEDIA_TYPE
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 SCHEMA_INVALID_MTHDS = """\
 domain = "broken"
@@ -61,11 +62,7 @@ class TestLintRoute:
     def test_oversized_content_returns_rfc7807_422(self):
         response = _build_client().post("/v1/lint", json={"content": "a" * (MAX_MTHDS_FILE_BYTES + 1)})
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        body = response.json()
-        assert body["error_type"] == "ValidationError"
-        assert "MTHDS file exceeds" in body["detail"]
+        assert_problem(response, status=422, code="request.invalid", field="content")
 
 
 class TestFormatRoute:
@@ -98,11 +95,7 @@ class TestFormatRoute:
     def test_malformed_options_return_rfc7807_422(self):
         response = _build_client().post("/v1/format", json={"content": "a = 1\n", "options": {"column_width": "wide"}})
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == PROBLEM_JSON_MEDIA_TYPE
-        body = response.json()
-        assert body["error_type"] == "ValidationError"
-        assert "column_width" in body["detail"]
+        assert_problem(response, status=422, code="request.invalid", field="options")
 
 
 class TestToolsRouteSchema:

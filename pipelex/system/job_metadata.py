@@ -13,28 +13,41 @@ from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.trace_context import TraceContext
 from pipelex.tools.log.log_context import LogContext, bind_log_context
 
+# The one rule of an inbound request id, which the API server's middleware applies to an `X-Request-ID` header and a run
+# applies to the id its host passes: a request id is echoed in a response header and written into log lines, plain and
+# key=value alike, so it holds letters, digits, `_` and `-` alone, the characters of a ULID or a UUID. A space, a quote, an
+# `=` or a `;` could forge a field in a key=value line or a parameter of a header, and a control character a whole line.
 REQUEST_ID_MAX_LENGTH = 128
-REQUEST_ID_PATTERN = re.compile(r"[\x20-\x7E]+")
+REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9_-]+")
+
+
+def is_valid_request_id(*, value: str) -> bool:
+    """Whether `value` is a usable inbound request id: at most `REQUEST_ID_MAX_LENGTH` of the characters the rule allows.
+
+    The rule is matched whole (`fullmatch`, which a final newline cannot slip past as it can a `$` anchor).
+    """
+    return len(value) <= REQUEST_ID_MAX_LENGTH and REQUEST_ID_PATTERN.fullmatch(value) is not None
 
 
 def validate_request_id(*, value: str) -> str:
     """Return `value` if it is a usable inbound request id, else raise `RunParameterError`.
 
-    The one statement of the constraint, which `RunMetadata` applies at construction and a
-    host entry point applies before it builds a run, so both refuse exactly the same values.
+    The one statement of the constraint (`is_valid_request_id`), which `RunMetadata` applies at construction, a host
+    entry point applies before it builds a run, and the API server's middleware applies to an inbound header, so all of
+    them refuse exactly the same values.
 
     Raises:
-        RunParameterError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a
-            character outside printable ASCII.
+        RunParameterError: the value is empty, longer than `REQUEST_ID_MAX_LENGTH`, or holds a character other than an
+            ASCII letter or digit, `_` or `-`.
     """
     if len(value) > REQUEST_ID_MAX_LENGTH:
         msg = f"Invalid request_id: it has {len(value)} characters, and at most {REQUEST_ID_MAX_LENGTH} are allowed."
         raise RunParameterError(msg)
-    # `fullmatch`, not `match` with a trailing `$`, which would admit one final newline.
-    if not REQUEST_ID_PATTERN.fullmatch(value):
+    if not is_valid_request_id(value=value):
+        # The value is not quoted: it is the text the rule refuses to write into a log line.
         msg = (
-            f"Invalid request_id {value!r}: expected one or more printable ASCII characters. "
-            "The value is quoted into log lines and error reports, so a control character in it would forge one."
+            "Invalid request_id: expected one or more ASCII letters, digits, '_' or '-'. "
+            "The value is echoed in headers and written into log lines, where any other character could forge a field."
         )
         raise RunParameterError(msg)
     return value
@@ -168,10 +181,10 @@ class RunMetadata(BaseModel):
     # from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
     # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
     # both can appear together when the API surfaces a provider failure.
-    # Constrained at the wire-format boundary by `validate_request_id` (printable
-    # ASCII only, max 128 chars) so an unsanitized upstream value cannot inject
-    # newlines or control characters into the log lines or the problem
-    # documents that quote it.
+    # Constrained at the wire-format boundary by `validate_request_id` (ASCII
+    # letters, digits, `_` and `-`, max 128 chars) so an unsanitized upstream
+    # value cannot inject a line, a field or a header parameter into the log
+    # lines, the headers or the problem documents that carry it.
     request_id: str | None = None
 
     # The opaque labels the host attaches to this run. Never read by name;

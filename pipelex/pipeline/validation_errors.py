@@ -9,6 +9,9 @@ structured-error surface:
   agent CLI prints, and
 - the agent CLI's Markdown, which renders the items themselves as prose.
 
+A valid report's advisory ``warnings`` are the same items, and :func:`warning_problem_items` turns them into problem
+items for a surface that speaks problem items, such as the runner's ``/validate``.
+
 All of them reach it through ``ValidateBundleError.validation_error_items``, so the CLI
 and API structured shapes cannot drift. It takes the error-data lists directly
 rather than a ``ValidateBundleError`` instance — that keeps the dependency one-directional
@@ -18,11 +21,12 @@ is no import cycle.
 
 from typing import Any
 
-from mthds.protocol.problem.models import ProblemItem
+from mthds.protocol.problem.models import ProblemItem, ProblemLocation
 from mthds.protocol.problem.registry import (
     CoreCode,
     MethodDependencyMissingKind,
     MethodDependencyMissingReason,
+    MethodHintInvalidReason,
     MethodIdentifierInvalidIdentifierKind,
 )
 from pydantic import BaseModel, ConfigDict
@@ -38,8 +42,15 @@ from pipelex.core.pipes.exceptions import pipe_validation_error_code
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import make_location, make_problem_item
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
-from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType, ValidationResidualErrorType
+from pipelex.validation_error_types import (
+    HintLintErrorType,
+    PipeFactoryErrorType,
+    PipeValidationErrorType,
+    TemplateCheckErrorType,
+    ValidationResidualErrorType,
+)
 
 
 def build_validation_error_items(
@@ -209,8 +220,48 @@ def validation_item_code(*, item: ValidationErrorItem, residual_code: ErrorCode)
                 return CoreCode.METHOD_CONCEPT_UNRESOLVED
             case PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR:
                 return CoreCode.METHOD_SCHEMA_VIOLATION
-    # The dry-run residual, whose items take their failure's own code, and the advisory types, which only ride warnings.
+    if isinstance(error_type, HintLintErrorType):
+        return CoreCode.METHOD_HINT_INVALID
+    if isinstance(error_type, TemplateCheckErrorType):
+        return PipelexErrorCode.DOCGEN_TEMPLATE_WARNING
+    # The dry-run residual, whose items take their failure's own code.
     return residual_code
+
+
+def _hint_reason(*, error_type: HintLintErrorType) -> MethodHintInvalidReason:
+    """The `reason` of `method.hint_invalid` a hint lint finding of this type gives."""
+    match error_type:
+        case HintLintErrorType.HINT_UNKNOWN_KEY:
+            return MethodHintInvalidReason.UNKNOWN_KEY
+        case HintLintErrorType.HINT_UNKNOWN_INTENT:
+            return MethodHintInvalidReason.UNKNOWN_INTENT
+        case HintLintErrorType.HINT_INAPPLICABLE_INTENT:
+            return MethodHintInvalidReason.INAPPLICABLE_INTENT
+
+
+def _hint_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
+    """The hint a hint lint item is about and why it is not understood, when the item is one."""
+    if not isinstance(item.error_type, HintLintErrorType):
+        return {}
+    return {"reason": _hint_reason(error_type=item.error_type), "hint": item.hint_key}
+
+
+def warning_problem_items(*, warnings: list[ValidationErrorItem]) -> list[ProblemItem]:
+    """A valid report's advisory warnings as problem items, each with its type's code.
+
+    A warning's type names its code (:func:`validation_item_code`): an advisory pipe lint its own, a hint lint
+    `method.hint_invalid`, a template check's finding `pipelex.docgen.template_warning`. A warning no type classifies
+    takes `method.schema_violation`, as an unclassified item of an invalid verdict does.
+
+    Args:
+        warnings: The report's warnings.
+
+    Returns:
+        One problem item per warning, in order.
+    """
+    return [
+        problem_item_of(item=warning, code=validation_item_code(item=warning, residual_code=CoreCode.METHOD_SCHEMA_VIOLATION)) for warning in warnings
+    ]
 
 
 # The identifier an item of these types is about, and where the item holds it: an input name among its variable names, a pipe
@@ -260,6 +311,8 @@ def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     facts: dict[str, Any] = {
         **_identifier_facts(item=item),
         **_dependency_facts(item=item),
+        **_hint_facts(item=item),
+        "template": item.template_file,
         "pipe": item.pipe_code,
         "concept": item.missing_concept_code or item.concept_code,
         "variables": item.variable_names,
@@ -297,16 +350,39 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
     spec = error_code_spec(code)
     facts = {**_item_facts(item=item), **(params or {})}
     item_params = {name: value for name, value in facts.items() if name in spec.param_names}
-    line = item.line if item.line is not None and item.line >= 1 else None
-    column = item.column if item.column is not None and item.column >= 1 else None
-    location = make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
     return make_problem_item(
         code=code,
         params=item_params,
-        location=location,
+        location=_item_location(item=item),
         suggestions=item.suggestions,
         suggested_fix=_problem_fix(item=item),
     )
+
+
+def _item_location(*, item: ValidationErrorItem) -> ProblemLocation | None:
+    """Where in the method a validation item is: the declaration a hint lint is on, else the pipe, field and file it names."""
+    if isinstance(item.error_type, HintLintErrorType):
+        return _hint_location(item=item)
+    line = item.line if item.line is not None and item.line >= 1 else None
+    column = item.column if item.column is not None and item.column >= 1 else None
+    return make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
+
+
+def _hint_location(*, item: ValidationErrorItem) -> ProblemLocation | None:
+    """The declaration a hint lint finding is on, which neither of `method.hint_invalid`'s parameters names.
+
+    A hint sits on one of three sites (`pipelex.pipeline.hint_warnings`): an input of a pipe, located at the pipe and the
+    input; a concept, located at its bundle-root path, `concept.<Concept>`; a field of a concept's structure, at the
+    field's, `concept.<Concept>.structure.<field>`. The domain is not part of the path, as no item's is: a bundle-root
+    path is read in the bundle that declares the concept.
+    """
+    if item.pipe_code is not None:
+        input_name = item.variable_names[0] if item.variable_names else None
+        return make_location(pipe=item.pipe_code, input_name=input_name)
+    if item.concept_code is not None:
+        concept_path = f"concept.{item.concept_code}"
+        return make_location(field=f"{concept_path}.structure.{item.field_name}" if item.field_name else concept_path)
+    return None
 
 
 def _problem_fix(*, item: ValidationErrorItem) -> dict[str, Any] | None:

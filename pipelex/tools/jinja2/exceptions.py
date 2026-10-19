@@ -63,8 +63,8 @@ class Jinja2TemplateSecurityError(SecurityError):
 
     A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
     `UnsafeSchemaError`, so that a host catching that family never absorbs it into a domain answer and never retries
-    it. A type of its own, apart from `Jinja2TemplateRenderError`, so that the classification of render-time template
-    failures tells a refusal from the rest.
+    it. A type of its own, apart from `Jinja2TemplateRenderError`, so that a refusal reads apart from a template that
+    fails for any other reason.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_TEMPLATE_REFUSED, others=(CoreCode.RUNTIME_UNEXPECTED,))

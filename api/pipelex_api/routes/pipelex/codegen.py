@@ -14,8 +14,10 @@ from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
+from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
+from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
     GeneratedArtifact,
@@ -77,7 +79,7 @@ class CodegenRequest(MethodTreeRequest):
             case CodegenRouteKind.TYPES:
                 if self.pipe_ref is not None:
                     msg = "pipe_ref is not accepted for kind='types' (a concept-set-wide projection)"
-                    raise ValueError(msg)
+                    raise RequestFieldConflictError(msg, field="pipe_ref")
         return self
 
 
@@ -112,9 +114,10 @@ CodegenResponse = Annotated[Union[CodegenValidReport, CrateInvalidReport], Field
 @router.post(
     "/codegen",
     response_model=CodegenResponse,
-    # On top of the composite router's shared 401/413/422/500: the Python policy's 403s and the
-    # `method_ref` fetch outcomes, shared with `/resolve`.
-    responses={403: PROBLEM_403_METHOD_PYTHON_POLICY, 404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_METHOD_REF},
+    # On top of the composite router's shared 401/413/422/500: the refusals of the method's tree shared with `/resolve`,
+    # a `read_scope` outside the caller's own, the `method_ref` package-not-found 404, a damaged blob a hash entry
+    # names, and the Python policy's 501.
+    responses={403: PROBLEM_403_READ_SCOPE, 404: PROBLEM_404_METHOD_PACKAGE, 500: PROBLEM_500_HELD_BLOBS, 501: PROBLEM_501_RUN_POLICY},
     # NOT tagged `x-mthds-protocol` — a Pipelex API extension, like `/resolve`. The MTHDS standard
     # specifies the crate this reads (the Library Crate Format); it specifies no type projection, so
     # every `target` here — `ts-zod` and `python-pydantic` no less than `python-structures` — is ours.
@@ -132,12 +135,12 @@ async def codegen_mthds(request: Request, request_data: CodegenRequest) -> JSONR
 
     - **Valid verdict (200, `is_valid: true`):** the artifacts + lock on the valid arm.
     - **Invalid verdict (200, `is_valid: false`):** the library could not be parsed, loaded, or
-      validated — `validation_errors[]` from pipelex's one shared builder; no artifacts exist.
+      validated — `errors[]`, one problem item per error; no artifacts exist.
     - **No verdict (non-2xx):** an unknown projection `kind`/`target`, a `pipe_ref` on a
       concept-set-wide kind, or a malformed method selector is a request-shape 422 problem+json; the
-      method's tree is refused as `/resolve` refuses it (422 `InvalidMethodFiles` or `MissingBlobs`,
-      the Python policy's 403s, the `method_ref` fetch outcomes, 501 for a registry-form
-      `method_ref`); auth is 401/403; server fault is 5xx.
+      method's tree is refused as `/resolve` refuses it (a 422 `method.package_invalid` or
+      `request.blobs_missing`, the Python policy's refusals, the `method_ref` fetch outcomes, a 422
+      `request.unsupported` for a registry-form `method_ref`); auth is 401/403; server fault is 5xx.
     """
     with CodeGenerationReport(
         artifact=UsageStatsCodegenArtifact.TYPES, target=usage_stats_codegen_target(target=request_data.target)
@@ -174,5 +177,5 @@ async def _generate_codegen_response(*, request: Request, request_data: CodegenR
     outcome = await project_resolved_method(request=request, request_data=request_data, project=_projection_response)
     if isinstance(outcome, ValidateBundleError):
         generation_report.declare_failed()
-        return invalid_crate_report_response(outcome)
+        return invalid_crate_report_response(outcome, view=problem_view_of(request))
     return outcome

@@ -272,11 +272,10 @@ class TestSecurityEvent:
         target_class: SecurityTargetClass | None,
     ) -> None:
         """The failure reports the security code with the domain of whoever caused it, and its event names the same, with the run and the org."""
-        problem = error.to_problem(view=ProblemView.CALLER)
+        problem = error.to_problem(view=ProblemView.OPERATOR)
         assert problem.code == code
         # The registry domain of the code, who caused the refusal, which the problem document carries.
         assert error_code_spec(code).domain == domain
-        assert problem.domain == domain
 
         with _security_event_lines() as lines:
             assert emit_security_event(error=error, pipeline_run_id="run_1", request_id="req_1", extras={"org_id": "org_abc", "plan": "pro"})

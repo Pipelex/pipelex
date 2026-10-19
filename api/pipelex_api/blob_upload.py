@@ -5,8 +5,9 @@ must say that the upload is allowed, as a presigned URL does on an object store.
 names: its URL is its own `PUT /v1/blobs/{sha256}` with a query naming the blob store's scope, an expiry and an
 HMAC-SHA256 signature over the scope, the hash and the expiry. The upload route checks the signature and the expiry,
 writes under the scope the signature binds and nowhere else, and answers a missing, forged or expired signature with a
-403 `BlobUploadNotAuthorized`. The upload route therefore needs no bearer token: only a caller who passed the
-deployment's authentication on `POST /v1/blobs/missing` holds a target, for one hash, in its own scope, for a while.
+403 `auth.forbidden` whose `requirement` is a signed upload target. The upload route therefore needs no bearer token:
+only a caller who passed the deployment's authentication on `POST /v1/blobs/missing` holds a target, for one hash, in
+its own scope, for a while.
 
 The key is `BLOB_UPLOAD_SIGNING_KEY` when the deployment sets it, which it must when several instances serve one
 deployment, since a target named by one instance is checked by whichever instance receives the upload; otherwise each
@@ -28,8 +29,7 @@ from urllib.parse import urlencode, urlsplit
 from fastapi import Request
 from pipelex.system.environment import get_optional_env
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_internal_server_error
+from pipelex_api.exceptions import RunnerMisconfiguredError
 from pipelex_api.limits import BLOB_UPLOAD_URL_TTL_SECONDS
 
 PUBLIC_BASE_URL_ENV = "PUBLIC_BASE_URL"
@@ -62,8 +62,8 @@ def signed_upload_query(*, scope: str, sha256: str) -> str:
 def _public_base_url() -> str | None:
     """`PUBLIC_BASE_URL` without its trailing slash, or None when unset.
 
-    Raises (as a problem document): a 500 `ServerMisconfigured` for a value that is not an absolute http or https URL
-    without a query or a fragment.
+    Raises (as a problem document): a 500 `runtime.misconfigured` naming `PUBLIC_BASE_URL`, for a value that is not an
+    absolute http or https URL without a query or a fragment.
     """
     configured = get_optional_env(PUBLIC_BASE_URL_ENV)
     if not configured:
@@ -71,7 +71,7 @@ def _public_base_url() -> str | None:
     parts = urlsplit(configured)
     if parts.scheme not in {"http", "https"} or not parts.netloc or parts.query or parts.fragment:
         msg = f"Server configuration error: {PUBLIC_BASE_URL_ENV} must be an absolute http or https URL, such as https://runner.example.com."
-        raise_internal_server_error(message=msg, error_type=ErrorType.SERVER_MISCONFIGURED)
+        raise RunnerMisconfiguredError(msg, component=PUBLIC_BASE_URL_ENV)
     return configured.rstrip("/")
 
 

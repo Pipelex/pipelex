@@ -51,7 +51,7 @@ PIPELEX_ENV=dev
 # ── Methods sent as trees, and the blob store (`files`, `/v1/blobs/*`) ─────
 # See pipe-run.md → "Sending a method as a tree" and "Sending files by hash".
 # Each tree of a request is bounded on its own; over any limit is a 422
-# MethodTreeTooLarge. All read at startup.
+# method.package_invalid naming the limit. All read at startup.
 # MAX_METHOD_TREE_FILES=1000          # files in one tree
 # MAX_METHOD_TREE_FILE_KIB=32768      # bytes per file, and per uploaded blob (default 32 MiB)
 # MAX_METHOD_TREE_TOTAL_KIB=65536     # bytes across one tree (default 64 MiB)
@@ -156,7 +156,7 @@ The base is **orchestrator-agnostic**. WHICH backend a top-level run dispatches 
 | Key | Meaning | Base default |
 | --- | --- | --- |
 | `orchestration_mode` | Which **backend** (orchestrator) a top-level run dispatches to. An **open string token**: `direct` (in-process), `temporal`, and any plugin-provided token are accepted; an unregistered token fails loud at dispatch with the plugin's install hint. | `direct` |
-| `allow_request_orchestration_mode_override` | Whether a caller may set `orchestration_mode` per request on `POST /v1/execute`, `POST /v1/start`, and `POST /v1/validate`. When `false`, a requested token that differs from the deployment default is refused with a `403`. | `false` |
+| `allow_request_orchestration_mode_override` | Whether a caller may set `orchestration_mode` per request on `POST /v1/execute`, `POST /v1/start`, and `POST /v1/validate`. When `false`, a requested token that differs from the deployment default is refused with a `422` `pipelex.deployment.orchestration_override_forbidden`. | `false` |
 
 The packaged default (`orchestration_mode = "direct"`, override off) is what the generic image ships.
 
@@ -165,7 +165,7 @@ The packaged default (`orchestration_mode = "direct"`, override off) is what the
 **`orchestration_mode` is one of two orthogonal axes.** It names only the **backend**. The other axis — *delivery*, i.e. whether the caller waits — is **endpoint-intrinsic**, never configured and never requestable:
 
 - `POST /v1/execute` and `POST /v1/validate` are **synchronous** (`BLOCKING` delivery): they return the full output / the verdict.
-- `POST /v1/start` is **fire-and-forget** (`FIRE_AND_FORGET` delivery): it returns immediately with a `workflow_id`. It works only on a backend that is genuinely async-capable. A Temporal deployment (`orchestration_mode = "temporal"`) enqueues on `/start` and returns a `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`) the in-process orchestrator is blocking-only, so `/start` is **HONEST**: it refuses with a `400` (`StartRequiresAsyncOrchestration`) — use `/execute` — rather than silently running blocking and acking.
+- `POST /v1/start` is **fire-and-forget** (`FIRE_AND_FORGET` delivery): it returns immediately with a `workflow_id`. It works only on a backend that is genuinely async-capable. A Temporal deployment (`orchestration_mode = "temporal"`) enqueues on `/start` and returns a `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`) the in-process orchestrator is blocking-only, so `/start` is **HONEST**: it refuses with a `501` `runtime.unsupported` — use `/execute` — rather than silently running blocking and acking.
 
 So a deployment sets **one** `orchestration_mode` and each endpoint applies its own delivery — there is no fire-and-forget token to configure or request.
 

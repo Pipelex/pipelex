@@ -675,6 +675,39 @@
       "what_to_do": "Report the problem to whoever runs the runtime, with the run's `pipeline_run_id` when it has one."
     },
     {
+      "code": "pipelex.storage.damaged",
+      "title": "A stored file is damaged",
+      "domain": "runtime",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 500,
+      "detail": "A file the runtime stored in its {scheme} storage no longer holds the bytes it was stored with.",
+      "steps": {
+        "actor": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "scheme": {
+          "type": "enum",
+          "values": [
+            "local",
+            "s3",
+            "gcs",
+            "memory"
+          ],
+          "description": "The kind of storage that holds the damaged file."
+        }
+      },
+      "meaning": "Storage still holds an object under the file's key, but its bytes are not the ones the runtime stored: they do not hash to the key the file is stored under, or they are not the size storage holds them at. A retry reads the same damaged object, and no upload writes over it, so it stays until whoever runs the runtime removes it.",
+      "what_to_do": "Report the problem to whoever runs the runtime, with the `request_id`. Once they have removed the damaged object, upload the file again."
+    },
+    {
       "code": "pipelex.storage.unavailable",
       "title": "Storage is unavailable",
       "domain": "runtime",

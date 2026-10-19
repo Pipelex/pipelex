@@ -45,6 +45,7 @@ from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -330,9 +331,8 @@ class TestExecuteDispatch:
             },
         )
 
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert response.json()["error_type"] == "OrchestrationModeOverrideForbidden"
+        problem = assert_problem(response, status=422, code="pipelex.deployment.orchestration_override_forbidden")
+        assert problem["params"] == {"requested_mode": "temporal"}
 
     def test_inbound_request_id_reaches_the_dispatched_job(self, mocker: MockerFixture) -> None:
         """On a `temporal` deployment, the inbound `X-Request-ID` rides the job the orchestrator is handed.

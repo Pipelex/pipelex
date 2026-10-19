@@ -8,14 +8,12 @@
 # - validator: a builtin raised in a helper only pydantic validators call, which pydantic wraps;
 # - private: a private class caught in the module that defines it, which no reader sees;
 # - carrier: a class a library or protocol expects by type (the import system's ImportError, httpx's transport
-#   errors, the standard's method tree refusal its callers translate, the runner's own ApiError) that the scan
-#   cannot recognise by its name alone;
+#   errors, the standard's method tree refusal its callers translate) that the scan cannot recognise by its name alone;
 # - tooling: developer or release code outside the exempt directories, which only the development CLI calls;
 # - caught: a builtin raised in a module that must import nothing of Pipelex, which its every caller catches by type.
 #
 # A new raise belongs here only when it is one of these; otherwise raise a coded PipelexError subclass.
-api/pipelex_api/errors.py | _raise_api_error | ApiError | carrier
-api/pipelex_api/openapi_schema.py | name_shared_fix_schemas | ValueError | invariant
+api/pipelex_api/openapi_schema.py | _apply_schema_renames | ValueError | invariant
 api/pipelex_api/schemas/models.py | _ensure_mthds_file_within_bytes_limit | ValueError | validator
 pipelex/base_exceptions.py | PipelexError.__init_subclass__ | TypeError | invariant
 pipelex/base_exceptions.py | PipelexError.with_error_code | ValueError | invariant

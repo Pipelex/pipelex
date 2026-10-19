@@ -32,6 +32,7 @@ from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import RequestIdMiddleware
 from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.security import ForwardedIdentityHeader, no_auth, verify_api_key, verify_jwt
+from tests.unit._problems import assert_problem
 from tests.unit.test_data import ProblemTestData, rate_limited_failure
 
 _GATEWAY_CONFIG_MESSAGE = "the gateway config is missing"
@@ -230,11 +231,8 @@ class TestProblemViews:
 
         response = client.get("/config-error", headers={"Authorization": "Bearer not-the-configured-key"})
 
-        assert response.status_code == 401
-        body = response.json()
-        assert body["error_type"] == "InvalidToken"
+        body = assert_problem(response, status=401, code="auth.invalid_credential")
         assert "diagnostics" not in body
-        assert "code" not in body
 
     @pytest.mark.parametrize("identity", list(_IDENTITIES))
     def test_an_unknown_code_reaches_a_caller_without_the_operator_step(self, mocker: MockerFixture, identity: _Identity) -> None:

@@ -9,7 +9,7 @@ calls by its address loads only when the request shipped it, in `dependencies` o
 `.mthds/methods/`, and one nothing shipped is the invalid verdict, never a lookup among the methods installed on this
 server or a fetch. They speak the same verdict vocabulary as
 `POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with the invalid arm carrying the
-structured `validation_errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
+structured `errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
 the envelopes cannot drift.
 
 The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s runnability facts
@@ -29,8 +29,8 @@ from typing import Literal, NamedTuple, NoReturn, TypeVar
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
@@ -42,14 +42,16 @@ from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_not_implemented
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.method_tree_request import RequestMethod, WrittenMethod, manifest_of, written_method
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.schemas.models import MethodTreeRequest
 
 #: What a route makes of a resolved method, in the worker thread that holds it loaded.
 ProjectionT = TypeVar("ProjectionT")
+
+# The `reason` of the `request.unsupported` refusing a registry-form `method_ref`, which no registry here resolves.
+REGISTRY_FORM_METHOD_REF_REASON = "registry_form_method_ref"
 
 
 class GeneratedArtifact(BaseModel):
@@ -60,36 +62,36 @@ class GeneratedArtifact(BaseModel):
 
 
 class CrateInvalidReport(BaseModel):
-    """The 200 **invalid** arm shared by `/resolve` and `/codegen` — the crate-verdict vocabulary.
+    """The 200 **invalid** arm shared by `/resolve`, `/codegen` and `/pipe-io` — the crate-verdict vocabulary.
 
     Same discipline as `/validate`'s `InvalidReport`: an invalid library is the *successful
     product* of a diagnostic call (the request was well-formed; the library was not), so it rides
-    a 200 discriminated on `is_valid`, carrying the same structured `ValidationErrorItem`s the
-    local CLI and `/validate` emit for the identical failure.
+    a 200 discriminated on `is_valid`, carrying the same problem items in `errors` that `/validate`
+    emits for the identical failure.
     """
 
     is_valid: Literal[False] = False
     """Discriminant of the invalid arm (mirrors the valid arms' `Literal[True]`)."""
 
-    validation_errors: list[ValidationErrorItem] = Field(
-        default_factory=empty_list_factory_of(ValidationErrorItem),
-        description="Per-error diagnostics, built by pipelex's one shared builder — non-empty on every invalid verdict.",
+    errors: list[ProblemItem] = Field(
+        default_factory=empty_list_factory_of(ProblemItem),
+        description=(
+            "One problem item per error, each with its own code, its parameters and its location — non-empty on every "
+            "invalid verdict. The items of the verdict's problem, as a refusal's `errors` carry them."
+        ),
     )
     message: str = Field(default="MTHDS library could not be resolved", description="Human-readable summary of the verdict.")
 
 
-def invalid_crate_report_response(validate_error: ValidateBundleError) -> JSONResponse:
+def invalid_crate_report_response(validate_error: ValidateBundleError, *, view: ProblemView) -> JSONResponse:
     """Render a produced "could not resolve" verdict as a 200 `CrateInvalidReport`.
 
-    The items are the error's own (`ValidateBundleError.validation_error_items`) and the message is
-    its problem's `detail`, the sentence its code renders, which reads the same in every view.
-    `exclude_none` drops each item's unset locators so the wire items match the agent CLI's
-    byte-for-byte — the "one error item, two surfaces" guarantee `/validate` already keeps.
+    The items are those of the error's problem in the view of the request's reader (`ValidateBundleError.problem_items`,
+    one per item of pipelex's one shared builder), and the message is its `detail`, the sentence its code renders, which
+    reads the same in every view. `exclude_none` drops each item's unset members, as the standard writes a problem item.
     """
-    invalid_report = CrateInvalidReport(
-        validation_errors=validate_error.validation_error_items(),
-        message=validate_error.to_problem(view=ProblemView.CALLER).detail,
-    )
+    problem = validate_error.to_problem(view=view)
+    invalid_report = CrateInvalidReport(errors=list(problem.errors or []), message=problem.detail)
     return JSONResponse(content=invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True))
 
 
@@ -114,7 +116,7 @@ class ResolvedMethod(NamedTuple):
         Raises:
             MethodEntryError: The manifest is not UTF-8 text, or not a valid manifest (a 422 in the input domain).
         """
-        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}")
+        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}", root="")
         return manifest.main_pipe if manifest is not None else None
 
 
@@ -163,16 +165,20 @@ async def project_resolved_method(
     verdict instead, the `ValidateBundleError` carrying the structured validation items, with `project` never called and
     nothing left loaded.
 
-    Raises (as problem documents): 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`;
-    the address-form fetch and location failures (`MethodRefError` subclasses); and whatever `project` raises, such as
-    a selection refusal.
+    Raises (as problem documents): a 422 `request.unsupported` for a registry-form `method_ref`; the refusals of
+    `select_request_method`; the address-form fetch and location failures (`MethodRefError` subclasses); and whatever
+    `project` raises, such as a selection refusal.
     """
     if request_data.method_ref is not None and not looks_like_method_ref(request_data.method_ref):
-        raise_not_implemented(
+        msg = (
             "Registry-form method_ref resolution is not available on this server: no method registry is wired. "
             "Use an address-form reference (a `github.com/...` address, e.g. `github.com/Pipelex/methods/documents@v0.1.0`) "
-            "or send the method's tree in `files`.",
-            error_type=ErrorType.METHOD_REF_NOT_SUPPORTED,
+            "or send the method's tree in `files`."
+        )
+        raise (
+            RunnerRequestError(msg, field="method_ref")
+            .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+            .with_params(reason=REGISTRY_FORM_METHOD_REF_REASON)
         )
     selected = await select_request_method(
         request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
@@ -237,7 +243,7 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     failed selection — an unknown ref, an ambiguous one, a chain that finds no entry pipe or several —
     is an input-domain 422 rather than an invalid-crate verdict, since nothing about the *closure* is
     wrong in any of them. It is raised as the engine's own entry-lookup error class (see
-    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the `error_type` the run routes
+    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the code the run routes
     answer for the same `pipe_code`. A chain finding no entry pipe or several has no run-route twin to
     match: this route refuses both the way the pipe-selector design classifies them.
 

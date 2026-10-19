@@ -26,7 +26,7 @@ same path, the files a step reads, such as a `PipeDocGen` template, included.
 
 The security gate (packaging invariant 7 — execution locus decides) is the request tree's
 (`pipelex_api.method_tree_request.ensure_python_allowed`): on a deployment that is not sandbox-hosted, a package
-carrying any `.py` is refused with a 403 `CustomCodeRequiresSandbox`; on a sandbox-hosted one, PipeFunc `.py` is
+carrying any `.py` is refused with a 501 `pipelex.deployment.custom_code_requires_sandbox`; on a sandbox-hosted one, PipeFunc `.py` is
 acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError`, a 422
 `pipelex.deployment.python_structures_refused`).
 
@@ -52,6 +52,7 @@ from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage, MethodProvenance
 from pipelex.methods.method_ref import parse_method_ref
 
+from pipelex_api.exceptions import MethodPackageReason
 from pipelex_api.method_cache import get_method_clone_cache
 from pipelex_api.method_tree_request import (
     RequestMethod,
@@ -143,9 +144,7 @@ def _package_tree_entries(*, package: FetchedMethodPackage) -> list[_GitTreeEntr
         except UnicodeDecodeError as exc:
             msg = f"Method package '{package.full_address}' holds a file whose name is not UTF-8 text, which no method tree can hold."
             raise (
-                MethodFetchError(msg)
-                .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
-                .with_params(reason="a file's name is not UTF-8 text, which no method tree can hold")
+                MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason=MethodPackageReason.FILE_NAME_NOT_UTF8)
             ) from exc
         if not path.startswith(prefix):
             continue
@@ -245,8 +244,9 @@ def _read_package_method(*, package: FetchedMethodPackage) -> RequestMethod:
                     continue
                 vendored_label = f"The package '.mthds/methods/{vendored_dir.name}/' of method package '{package.full_address}'"
                 dependency_tree = _read_listed_tree(root=vendored_dir, package_address=vendored_label, label=vendored_label)
-                address = dependency_address_of(tree=dependency_tree, fallback_name=vendored_dir.name, label=vendored_label)
-                add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=vendored_label)
+                root = f".mthds/methods/{vendored_dir.name}/"
+                address = dependency_address_of(tree=dependency_tree, fallback_name=vendored_dir.name, label=vendored_label, root=root)
+                add_dependency(dependencies=dependencies, address=address, tree=dependency_tree, label=vendored_label, root=root)
         request_method = RequestMethod(tree=tree, dependencies=dependencies)
         ensure_method_within_limits(request_method=request_method, label=label)
         return request_method
@@ -259,8 +259,7 @@ def _fetched_package(method_ref: str) -> Generator[FetchedMethodPackage, None, N
     """Parse the reference and fetch its package through the SHA-keyed clone cache, its clone pinned in the block.
 
     Every failure mode is a distinct pipelex `MethodRefError` subclass, rendered by the
-    global handler as RFC 7807 `problem+json` with the class name as `error_type` and the
-    status the API maps for it (`pipelex_api.exception_handlers._ERROR_TYPE_STATUS_OVERRIDES`).
+    global handler as the `problem+json` document of its code, with the status its code declares.
     """
     ref = parse_method_ref(method_ref)
     with get_method_clone_cache().pinned_package(ref=ref) as package:
@@ -288,7 +287,7 @@ def fetched_method(method_ref: str) -> FetchedMethod:
         MethodRefError subclasses: parse, fetch, location and bounds failures, each rendered as `problem+json` by the
             global handler.
         MethodTreeLoadError: The standard refused the package's tree (a 422 naming the package by its address).
-        ApiError: A tree past this runner's limits, or a shipped package without a manifest (422s).
+        RequestMethodError: A tree past this runner's limits, or a shipped package without a manifest (422s).
     """
     with _fetched_package(method_ref) as package:
         request_method = _read_package_method(package=package)

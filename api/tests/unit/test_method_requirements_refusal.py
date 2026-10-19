@@ -246,10 +246,9 @@ class TestMethodRequirementsRefusal:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        (item,) = body["validation_errors"]
-        assert item["source"] == "requirements.txt"
-        assert item["line"] == 1
-        assert "pandas 2.2.3 is there" in item["message"]
+        (item,) = body["errors"]
+        assert item["code"] == "method.dependency_missing"
+        assert item["location"] == {"file": "requirements.txt", "line": 1}
         assert validator.calls == 0
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

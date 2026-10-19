@@ -172,7 +172,7 @@ class TestProtocolConformance:
         callback_url = f"http://127.0.0.1:{server.server_port}/completion"
 
         # --- relax both SSRF layers for the loopback receiver (test-only) --------
-        mocker.patch("pipelex_api.schemas.models._is_disallowed_host", return_value=False)
+        mocker.patch("pipelex_api.schemas.models.is_disallowed_host", return_value=False)
         mocker.patch("pipelex.pipe_run.delivery_executor.SsrfGuardedTransport", httpx.AsyncHTTPTransport)
 
         # The signing secret is pinned HERE rather than relying on the ambient

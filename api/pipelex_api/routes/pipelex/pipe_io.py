@@ -11,7 +11,8 @@ from pipelex.pipeline.validate_bundle import build_pending_signatures
 from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.openapi_responses import PROBLEM_403_METHOD_PYTHON_POLICY, PROBLEM_404_METHOD_PACKAGE, PROBLEM_501_METHOD_REF
+from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
+from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.crate_ops import (
     CrateInvalidReport,
     RequestedPipe,
@@ -114,9 +115,10 @@ PipeIOResponse = Annotated[Union[PipeIOValidReport, CrateInvalidReport], Field(d
 @router.post(
     "/pipe-io",
     response_model=PipeIOResponse,
-    # On top of the composite router's shared 401/413/422/500: the Python policy's 403s and the
-    # `method_ref` fetch outcomes it shares with `/resolve` and `/codegen`.
-    responses={403: PROBLEM_403_METHOD_PYTHON_POLICY, 404: PROBLEM_404_METHOD_PACKAGE, 501: PROBLEM_501_METHOD_REF},
+    # On top of the composite router's shared 401/413/422/500: the refusals of the method's tree it shares with
+    # `/resolve` and `/codegen`, a `read_scope` outside the caller's own, the `method_ref` package-not-found 404, a
+    # damaged blob a hash entry names, and the Python policy's 501.
+    responses={403: PROBLEM_403_READ_SCOPE, 404: PROBLEM_404_METHOD_PACKAGE, 500: PROBLEM_500_HELD_BLOBS, 501: PROBLEM_501_RUN_POLICY},
     # NOT tagged `x-mthds-protocol`: it carries the standard's artifacts under their neutral names,
     # but the route is a Pipelex API extension, and the flag marks the standard's five operations alone.
 )
@@ -136,15 +138,16 @@ async def pipe_io(request: Request, request_data: PipeIORequest) -> JSONResponse
     - **Invalid verdict (200, `is_valid: false`):** the closure could not be parsed, loaded, or
       statically validated — the crate verdict, carrying no artifact, no selection and no files.
     - **No verdict (non-2xx):** a malformed body and neither or both method selectors are
-      request-shape 422s (`ValidationError`); a `files` map that is not a method tree is a 422
-      `InvalidMethodFiles`, and hash entries this runner does not hold one 422 `MissingBlobs`, as on
-      `/validate`; custom Python on a deployment that is not sandbox-hosted, or a Python structure
-      class, is a 403; a selection refusal is an input 422 named for its failure,
-      `EntryPipeNotFoundError` for an unknown `pipe_ref` or a single-pipe request whose chain finds no
-      entry pipe, `EntryPipeAmbiguousError` for an ambiguous one or a chain that finds several; the
-      `method_ref` fetch outcomes are those of `/resolve` (404, 422, 501);
-      an artifact that cannot be derived (`PipeIOContractError`) is a 500. All RFC 7807
-      `application/problem+json` via the global handlers.
+      request-shape 422s (`request.invalid`); a `files` map that is not a method tree is a 422
+      `method.package_invalid`, and hash entries this runner does not hold a 422
+      `request.blobs_missing`, as on `/validate`; custom Python on a deployment that is not
+      sandbox-hosted is a 501 `pipelex.deployment.custom_code_requires_sandbox`, and a Python
+      structure class a 422 `pipelex.deployment.python_structures_refused`; a selection refusal is an
+      input 422 named for its failure, `request.pipe_not_found` for an unknown `pipe_ref` or a
+      single-pipe request whose chain finds no entry pipe, `request.pipe_ambiguous` for an ambiguous
+      one or a chain that finds several; the `method_ref` fetch outcomes are those of `/resolve` (404,
+      422); an artifact that cannot be derived (`PipeIOContractError`) is a 500. All
+      `application/problem+json` documents with a registry `code`, via the global handlers.
     """
     outcome = await project_resolved_method(
         request=request,
@@ -152,7 +155,7 @@ async def pipe_io(request: Request, request_data: PipeIORequest) -> JSONResponse
         project=lambda resolution: _pipe_io_response(resolution=resolution, request_data=request_data),
     )
     if isinstance(outcome, ValidateBundleError):
-        return invalid_crate_report_response(outcome)
+        return invalid_crate_report_response(outcome, view=problem_view_of(request))
     return outcome
 
 

@@ -14,7 +14,7 @@ class BundleResourcePathError(PipelexError):
     The path is the caller's own, so the message is theirs to read, and the same request is refused again. A path that
     leaves the bundle, absolute, naming a drive or climbing with `..`, is ``security.input_path_refused``; a path of
     the wrong shape, and paths that each could name a file but that cannot make one tree together, choose
-    ``request.invalid`` (``pipelex.core.bundle_resources.bundle_resource.path_refusal_code``).
+    ``request.invalid`` (``pipelex.core.bundle_resources.bundle_resource.path_refusal_error``).
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_PATH_REFUSED, others=(CoreCode.REQUEST_INVALID,))
