@@ -489,6 +489,10 @@ Exception
     ├── PipelexUnexpectedError     → runtime.unexpected
     ├── PipelexConfigError         → one of pipelex.config.invalid, .syntax, .file_missing
     ├── PipelexSetupError          → inherits its cause's code, else runtime.misconfigured
+    ├── SecurityError              base_exceptions.py — abstract; the policy refusals never absorbed into a domain answer
+    │   ├── UriReadRefusedError / SsrfBlockedError   ← security.input_url_refused, or the code the site that knows the URL's author chooses
+    │   ├── UnsafeSchemaError                         → security.schema_refused
+    │   └── Jinja2TemplateSecurityError               ← the template sandbox's refusal at render time, security.template_refused
     ├── CogtError                  cogt/exceptions.py — abstract; error_category, provider_metadata
     │   ├── LLMCompletionError      ← a set the worker's classification picks from
     │   ├── ImgGenGenerationError   ← a set the worker's classification picks from
@@ -496,6 +500,8 @@ Exception
     ├── PipelineExecutionError      pipeline/exceptions.py — reports its located root fault and its code
     └── ... (one exceptions.py per package) ...
 ```
+
+`SecurityError` is the abstract base class of the policy refusals that are never absorbed into a domain answer: `UriReadRefusedError` (a read outside the run's scope), `SsrfBlockedError` (an outbound request the SSRF guard blocks), `UnsafeSchemaError` (a schema carrying Python code-generation extensions) and `Jinja2TemplateSecurityError` (a template the sandbox refuses at render time). The handlers that turn a refusal of the caller's input into a verdict, the bundle-validation cascade and the library load, let a `SecurityError` through as it is, and a host that treats this family alike, a durable-execution plugin marking it non-retryable for instance, names that base class. Not every refusal belongs to it: the template sandbox's render-budget refusal, `Jinja2TemplateBudgetError`, is a `ToolError` coded `pipe.template_budget_exceeded`, and `TemplateUrlRefusedError`, coded `security.method_path_refused`, derives from `PipelexError` directly, so each is handled by its code like any other refusal.
 
 ### Factory-time vs Runtime
 
