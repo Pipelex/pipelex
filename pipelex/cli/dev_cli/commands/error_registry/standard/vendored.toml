@@ -14,10 +14,10 @@
 
 [source]
 repository = "https://github.com/mthds-ai/mthds"
-# The standard's branch that introduces the error registry, before its release.
-ref = "feature/Core-error-registry"
-commit = "d5dadecf63eac58734d0021d36974a4462def15a"
-standard_version = "7.1.0"
+# The standard's release the files were copied from.
+ref = "v8.0.0"
+commit = "dacacdf5e57fe35ebd86a6b7716250070df008d9"
+standard_version = "8.0.0"
 
 [files."mthds-error-registry.schema.json"]
 path = "docs/spec/openapi/mthds-error-registry.schema.json"
@@ -25,4 +25,4 @@ sha256 = "2923af37db081788fdfaf43d8d0e24a39e68be3ebd43f75ef64a04f87480e723"
 
 [files."mthds-error-registry.json"]
 path = "docs/spec/openapi/mthds-error-registry.json"
-sha256 = "4992e6bd8a30eb97016bb68620487b589f639ec08a860bfb8ce6b5b952169eb8"
+sha256 = "f64fc9f779cc96fa722b9a9c082c12155e3b8fd4e428048754e8241691eea440"
