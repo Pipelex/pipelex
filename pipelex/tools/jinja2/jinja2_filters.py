@@ -60,11 +60,14 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | st
     if text_format:
         # A template can name its own format — `{{ x | format("markdown") }}` — and Jinja2 hands the
         # argument over as a raw string, so both that and a `TextFormat` member normalise here. An
-        # unknown name is a template error, reported as one rather than as a bare `ValueError`.
+        # unknown name is a template error, reported as one rather than as a bare `ValueError`. The
+        # message lists the formats the filter knows, never the name it was handed, which a template
+        # can take from the run's data (`{{ x | format(chosen) }}`).
         try:
             named_text_format = TextFormat(text_format)
         except ValueError as exc:
-            msg = f"Invalid text format: '{text_format}'"
+            known_formats = ", ".join(f"'{known_format}'" for known_format in TextFormat)
+            msg = f"Invalid text format: the format filter takes one of {known_formats}"
             raise Jinja2ContextError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID) from exc
     else:
         named_text_format = None
@@ -116,9 +119,8 @@ async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
         Jinja2ContextError: If value is undefined.
     """
     if isinstance(value, Undefined):
+        # The tag name is not written: a template can take it from the run's data (`{{ x | tag(label) }}`).
         msg = "Cannot use tag filter on undefined value"
-        if tag_name:
-            msg = f"Cannot use tag filter on undefined value with tag_name '{tag_name}'"
         raise Jinja2ContextError(msg)
 
     # Protocol-based rendering, licensed by the value's type (see renderable_dispatch.py)

@@ -1,3 +1,4 @@
+from jinja2.exceptions import SecurityError as JinjaSecurityError
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import SecurityError
@@ -54,9 +55,10 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
 class Jinja2TemplateSecurityError(SecurityError):
     """A template reached for something the sandbox policy refuses (`jinja2_sandbox.py`).
 
-    That is an undeclared private name, or a call that is not a method of a plain value. Its message names the
-    attribute or the callable and the type it was reached on, and never quotes the template source, since the same
-    render serves Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
+    That is an undeclared private name, or a call that is not a method of a plain value. Its message names the type
+    the refused name was reached on, and the attribute or the callable only when the parsed template spells it, since
+    a name reached by a value is the run's data; it never quotes the template source, since the same render serves
+    Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
     Pipelex's own, our template tripping our sandbox is our bug, `runtime.unexpected`.
 
     A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
@@ -109,3 +111,20 @@ class Jinja2DetectVariablesError(ToolError):
     """A template whose variables cannot be read because it does not parse; its callers report the method's syntax."""
 
     error_code = CoreCode.METHOD_SYNTAX
+
+
+class SandboxRefusalError(JinjaSecurityError):
+    """A refusal of the template sandbox (`jinja2_sandbox.py`), worded with the names it quotes and without them.
+
+    It is Jinja2's ``SecurityError``, the carrier Jinja2 expects a refusal by, raised at the point of access. Its message
+    names what the template reached for: an attribute it read, the name it stored a callable under in a namespace, the
+    method or function it called. A template reaching ``obj[key]``, ``obj | attr(key)`` or ``namespace({key: value})``
+    takes that name from the run's data, so the refusal also carries the names its message quotes, ``named``, and its
+    wording without them, ``anonymous_message``: the render reporting it keeps the message only when the template's own
+    source spells every name it quotes (`pipelex.tools.jinja2.jinja2_rendering`).
+    """
+
+    def __init__(self, message: str, *, named: tuple[str, ...], anonymous_message: str):
+        super().__init__(message)
+        self.named = named
+        self.anonymous_message = anonymous_message

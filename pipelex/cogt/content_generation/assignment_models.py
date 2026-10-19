@@ -154,10 +154,16 @@ class ExtractAssignment(BaseModel):
 
 
 class RenderPageViewsAssignment(BaseModel):
+    """Serializable unit for rendering a document's pages as images.
+
+    ``input_name`` is the input the document came from, as a caller writes it, which a failed fetch of its URL names.
+    """
+
     job_metadata: JobMetadata
     cogt_run_params: CogtRunParams
     document_uri: str
     page_views_dpi: int
+    input_name: str | None = None
 
     def referenced_uris(self) -> list[UriReference]:
         """The URL the leaf reads for this assignment: the document whose pages it renders."""

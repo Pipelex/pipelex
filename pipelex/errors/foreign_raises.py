@@ -45,8 +45,9 @@ VALIDATOR_DECORATOR_NAMES: frozenset[str] = frozenset(
 )
 """Pydantic's decorators, inside which a builtin raise is wrapped by pydantic into its own error."""
 
-VALIDATOR_EXCEPTION_NAMES: frozenset[str] = frozenset({"ValueError", "TypeError", "AssertionError", "PydanticCustomError"})
-"""The exceptions pydantic turns into a validation error when a validator raises them."""
+VALIDATOR_EXCEPTION_NAMES: frozenset[str] = frozenset({"ValueError", "TypeError", "AssertionError", "PydanticCustomError", "InputFreeValueError"})
+"""The exceptions pydantic turns into a validation error when a validator raises them, ``InputFreeValueError`` being the
+``ValueError`` whose message holds nothing of the value refused."""
 
 DATA_MODEL_DUNDER_NAMES: frozenset[str] = frozenset(
     {
@@ -80,12 +81,14 @@ FRAMEWORK_CARRIER_NAMES: frozenset[str] = frozenset(
         "StopIteration",
         "StopAsyncIteration",
         "GeneratorExit",
-        # Temporal's failure carrier, Jinja's template refusals inside the render budget and the sandbox,
+        # Temporal's failure carrier, Jinja's template refusals inside the render budget and the sandbox (the sandbox's
+        # own `SandboxRefusalError` being Jinja's `SecurityError` worded twice),
         # httpcore's refused connection inside the SSRF guard's transport, google-auth's refresh refusal,
         # kajson's decoder refusal inside the payload decoder, and the print protocol's end of stream.
         "ApplicationError",
         "TemplateError",
         "JinjaSecurityError",
+        "SandboxRefusalError",
         "ConnectError",
         "RefreshError",
         "KajsonDecoderError",

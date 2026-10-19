@@ -5,6 +5,7 @@ from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 
 class NumberContent(StuffContent):
@@ -17,8 +18,8 @@ class NumberContent(StuffContent):
     def check_finite(cls, value: float) -> int | float:
         # NaN and the infinities are not JSON numbers: serialization would turn them into null.
         if isinstance(value, float) and not math.isfinite(value):
-            msg = f"number must be finite, got {value}"
-            raise ValueError(msg)
+            msg = "number must be finite, never NaN or an infinity"
+            raise InputFreeValueError(msg)
         return value
 
     @property

@@ -622,6 +622,16 @@ class TestDetectJinja2Variables:
                 template_source=template_source,
             )
 
+    def test_a_syntax_error_names_its_line_and_never_the_token(self):
+        """Jinja2's message quotes the token it stopped at, the template's own text: the error names the fault and the line."""
+        with pytest.raises(Jinja2DetectVariablesError) as exc_info:
+            detect_jinja2_required_variables(
+                template_category=TemplateCategory.LLM_PROMPT,
+                template_source="Hello\n{{ note confidential_token }}",
+            )
+
+        assert str(exc_info.value) == "Jinja2 detect variables — syntax error at line 2 (TemplateSyntaxError), template_category: llm_prompt"
+
     def test_set_with_variable(self):
         """Test that set statements don't add their target to required variables."""
         template_source = """

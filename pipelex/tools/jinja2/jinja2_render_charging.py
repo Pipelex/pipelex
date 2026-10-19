@@ -39,11 +39,13 @@ from pipelex.tools.jinja2.jinja2_render_budget import (
     EAGER_TYPES,
     ESCAPE_FACTOR,
     STEP_UNITS,
+    DescribedOperation,
     RenderBudget,
     charged_if_lazy,
     charged_iterable,
     check_int_result,
     compare_weight,
+    describe_operation,
     is_data_object,
     produced_size,
     refuse_int_result,
@@ -147,19 +149,22 @@ def _inputs_units(*, values: tuple[Any, ...], keywords: dict[str, Any], step: in
     return units
 
 
-def _charge_result(*, budget: RenderBudget, result: Any, operation: str | Callable[[], str], produces_int: bool) -> Any:
+def _charge_result(*, budget: RenderBudget, result: Any, operation: str | Callable[[], str | DescribedOperation], produces_int: bool) -> Any:
     if produces_int and type(result) is int:
-        check_int_result(value=result, operation=operation() if callable(operation) else operation)
+        # Only an operator or a filter produces an integer it checks, and neither quotes a name a value supplied.
+        check_int_result(value=result, operation=describe_operation(operation=operation).anonymous_text)
     budget.charge(units=produced_size(result), operation=operation)
     return result
 
 
-async def _charge_awaited(*, budget: RenderBudget, pending: Awaitable[Any], operation: str | Callable[[], str], produces_int: bool) -> Any:
+async def _charge_awaited(
+    *, budget: RenderBudget, pending: Awaitable[Any], operation: str | Callable[[], str | DescribedOperation], produces_int: bool
+) -> Any:
     result = await pending
     return _charge_result(budget=budget, result=result, operation=operation, produces_int=produces_int)
 
 
-def _finish(*, budget: RenderBudget, result: Any, operation: str | Callable[[], str], produces_int: bool = False) -> Any:
+def _finish(*, budget: RenderBudget, result: Any, operation: str | Callable[[], str | DescribedOperation], produces_int: bool = False) -> Any:
     """Charge an operation's result, once awaited when the operation is async."""
     if type(result) not in EAGER_TYPES and inspect.isawaitable(result):
         return _charge_awaited(budget=budget, pending=result, operation=operation, produces_int=produces_int)
@@ -265,8 +270,12 @@ def _call_inputs_units(*, obj: Any, plain_method: tuple[Any, OperationCost] | No
     return _inputs_units(values=args, keywords=kwargs, step=CALL_UNITS)
 
 
-def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: dict[str, Any], operation: Callable[[], str]) -> Any:
-    """Make a call the sandbox has allowed, charging it to the render's budget."""
+def charged_call(*, context: Context, obj: Any, args: tuple[Any, ...], kwargs: dict[str, Any], operation: Callable[[], DescribedOperation]) -> Any:
+    """Make a call the sandbox has allowed, charging it to the render's budget.
+
+    `operation` describes the call with the callable's name and without it, since a template reading the callable by
+    `obj[key]` or `obj | attr(key)` names it by a value of the run's data; it runs only when the budget refuses.
+    """
     budget = render_budget_of(context)
     plain_method = _plain_method_cost(obj=obj)
     bound_value: Any = plain_method[0] if plain_method is not None else None

@@ -438,10 +438,11 @@ async def handle_unexpected_error(request: Request, exc: Exception) -> Response:
     `PipelexUnexpectedError` (`make_unexpected_failure`) and answered as its
     problem, `runtime.unexpected`, through the same rendering as every other
     failure: the caller reads the code's own sentences and never the exception's
-    text, and a request the operator authenticated reads its class and message in
-    `diagnostics`. Neither a traceback nor the exception's text reaches the
-    response or the log: the operator's record names the chain's classes and the
-    frames it was raised through, correlated by request id.
+    text, and a request the operator authenticated reads its class in
+    `diagnostics`, never its text either, which can carry anything of a run's
+    data. Neither a traceback nor the exception's text reaches the response or
+    the log: the operator's record names the chain's classes and the frames it
+    was raised through, correlated by request id.
 
     This handler also covers a failure *inside* another handler: Starlette's
     `ServerErrorMiddleware` wraps the others, so such a failure still lands here
