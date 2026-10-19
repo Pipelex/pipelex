@@ -25,6 +25,7 @@ from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import RunMetadata
 from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError, TraceEventModeError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
@@ -122,9 +123,11 @@ def read_run_trace_events(*, pipeline_run_id: str) -> RunTraceEvents:
                 event_log.close()
     except (OSError, json.JSONDecodeError, ValidationError, PipelexConfigError, MissingDependencyError, EventLogError) as read_error:
         log.warning("The trace events of a run could not be read for its tracing assembly", fields=error_fields(exc=read_error))
+        # A ValidationError is written by its reasons, never the traced values it quotes, which are the run's data.
+        read_failure = describe_exception_without_input(exc=read_error)
         return RunTraceEvents(
             events=None,
-            read_error=f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_error}",
+            read_error=f"Tracing assembly failed to read events for pipeline_run_id={pipeline_run_id}: {read_failure}",
         )
     return RunTraceEvents(events=events, read_error=None)
 
@@ -231,7 +234,11 @@ def _assemble_tracing_events(
             log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
         except (ValidationError, TraceEventModeError) as assembly_error:
             log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=assembly_error))
-            result.graph_assembly_error = f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {assembly_error}"
+            # The error travels on the run's output: a ValidationError is written by its reasons, never the traced values it
+            # quotes, which are the run's data.
+            result.graph_assembly_error = (
+                f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {describe_exception_without_input(exc=assembly_error)}"
+            )
 
     return result
 

@@ -86,7 +86,9 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
         except Exception as exc:
             # Case (2), unbounded code: the function is arbitrary user code whose exception surface cannot be
             # enumerated. Whatever it raised is its failure, a coded Pipelex error a helper raised inside it included.
-            msg = f"{type(exc).__name__}: {exc}"
+            # The message names the exception's class alone: its text is the function's own, which can quote the
+            # run's inputs, and `pipe.function_raised` declares no parameter to carry it.
+            msg = f"The function raised {type(exc).__name__}"
             raise PipeFuncRaisedError(msg).with_params(function=function_name) from exc
         # Outside the function's failure: the kernel's coercion refusing what the function returned is the step's
         # output failing, `FuncOutputTypeError` with `pipe.output_invalid`, whatever shape it refused.

@@ -106,8 +106,11 @@ class TestRunFaultViews:
         assert operator.diagnostics is not None
         assert operator.diagnostics.message.startswith("Error combining stuffs for concept Review")
 
-    async def test_a_deployment_validators_text_is_the_operators_alone(self) -> None:
-        """A deployment's structure class refusing the combine: its validator's text reaches the operator, never the caller."""
+    async def test_a_deployment_validators_text_reaches_neither_view(self) -> None:
+        """A deployment's structure class refusing the combine: its validator's text, which may quote the run's data, stays out.
+
+        The caller reads the code's sentence, and the operator the refusal's location and its type, never the text.
+        """
         # The process-global registry, which the run's own library is seeded from, as a deployment's Python module would.
         registry = KajsonManager.get_class_registry()
         registry.register_class(RunFaultViewsValidatedReview)
@@ -133,7 +136,9 @@ class TestRunFaultViews:
         assert caller.location is not None
         assert caller.location.pipe == "analyze"
         assert operator.diagnostics is not None
-        assert validator_text in operator.diagnostics.message
+        assert validator_text not in operator.diagnostics.message
+        assert "DR-7" not in operator.diagnostics.message
+        assert "value_error" in operator.diagnostics.message
 
     async def test_missing_required_input_is_the_callers_fault(self) -> None:
         """A run missing a required input: the input domain, a sentence and a next step naming the input."""

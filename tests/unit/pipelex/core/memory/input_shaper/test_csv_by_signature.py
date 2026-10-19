@@ -5,15 +5,18 @@ non-tabular values, singular declarations, and record dicts with sibling keys al
 to the normal shaping arms.
 """
 
+import json
 from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.memory.exceptions import MultiplicityCountMismatchError, StructureValidationError, WrongScalarKindError
 from pipelex.core.memory.input_shaper import InputShaper
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.tools.tabular.exceptions import CsvError
 from tests.unit.pipelex.core.memory.input_shaper.data import ShaperPerson, build_input_specs
@@ -105,3 +108,41 @@ class TestInputShaperCsvBySignature:
             InputShaper.shape(
                 {"people": "https://example.com/people.csv"}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None
             )
+
+    @pytest.mark.parametrize(
+        ("topic", "url", "expected_location"),
+        [
+            ("a scheme Pipelex reads", "s3://bucket/people.csv", "a remote or non-local url, in the scheme 's3'"),
+            ("a scheme Pipelex reads, written in capitals", "HTTPS://example.com/people.csv", "a remote or non-local url, in the scheme 'https'"),
+            ("a scheme that is the caller's own text", "confidential-patient-diagnosis://records/people.csv", "a remote or non-local url"),
+        ],
+    )
+    def test_a_remote_table_names_its_scheme_only_when_pipelex_reads_it(self, topic: str, url: str, expected_location: str):
+        """A url's scheme is the caller's text: the refusal names one Pipelex reads, never one the caller made up."""
+        input_specs = build_input_specs([("people", "shaper_test.ShaperPerson", True)])
+
+        with pytest.raises(CsvError) as exc_info:
+            InputShaper.shape({"people": {"url": url}}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        assert str(exc_info.value) == (
+            "CSV input supports local file paths only in v1, but stuff 'people' for concept 'shaper_test.ShaperPerson' points at "
+            f"{expected_location}. Download the file locally and reference it by path."
+        ), topic
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert "confidential" not in json.dumps(operator.to_wire()), topic
+
+    def test_a_table_that_does_not_fit_names_the_input_never_the_file(self, tmp_path: Path):
+        """The codec knows the file alone: the input it was given as completes the problem's sentence, and the path stays out."""
+        csv_path = tmp_path / "confidential-patient-diagnosis.csv"
+        csv_path.write_text("name,confidential-column\nAda,x\n", encoding="utf-8")
+        input_specs = build_input_specs([("people", "shaper_test.ShaperPerson", True)])
+
+        with pytest.raises(CsvError) as exc_info:
+            InputShaper.shape({"people": str(csv_path)}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"input": "people"}
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert "confidential" not in json.dumps(operator.to_wire())

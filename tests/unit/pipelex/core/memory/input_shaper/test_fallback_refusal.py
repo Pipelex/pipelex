@@ -66,7 +66,10 @@ class TestInputShaperFallbackRefusal:
         with pytest.raises(StructureValidationError, match=r"Input 'payload' could not be built as 'native\.Dynamic'") as exc_info:
             InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
-        assert "a number (3)" in str(exc_info.value)
+        # The value is described by its kind, never quoted: it is the run's input.
+        refusal = str(exc_info.value).split("Expected shape")[0]
+        assert "you provided a number," in refusal
+        assert "3" not in refusal
         assert isinstance(exc_info.value.__cause__, StuffFactoryError)
 
     @pytest.mark.parametrize(
@@ -179,10 +182,10 @@ class TestInputShaperFallbackRefusal:
     @pytest.mark.parametrize(
         ("concept_ref", "multiplicity", "provided_value", "provided_description"),
         [
-            ("native.Rating", None, 2, "a number (2)"),
+            ("native.Rating", None, 2, "a number"),
             ("native.Rating", True, [1, 2], "a list of 2 item(s)"),
-            ("native.Rating", None, True, "a boolean (true)"),
-            ("native.Choice", None, 3, "a number (3)"),
+            ("native.Rating", None, True, "a boolean"),
+            ("native.Choice", None, 3, "a number"),
         ],
     )
     def test_a_scalar_at_a_verdict_input_is_told_to_send_the_envelope(

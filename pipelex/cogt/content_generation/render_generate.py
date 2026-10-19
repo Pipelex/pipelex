@@ -12,6 +12,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.misc.image_utils import ImageFormat
 
 
@@ -32,10 +33,11 @@ async def render_page_views_and_store(
     # Deferred import: avoid pulling the pdf rendering SDK at module-load time
     from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # ruff: ignore[import-outside-top-level]
 
-    page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(
-        pdf_uri=render_assignment.document_uri,
-        dpi=render_assignment.page_views_dpi,
-    )
+    with fetching_for_input(input_name=render_assignment.input_name):
+        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(
+            pdf_uri=render_assignment.document_uri,
+            dpi=render_assignment.page_views_dpi,
+        )
     image_contents: list[ImageContent] = []
     for page_view_image in page_view_images:
         raw_details = GeneratedImageRawDetails.make_from_pil_image(

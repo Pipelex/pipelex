@@ -1,7 +1,7 @@
 import datetime
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 import shortuuid
 from mthds.protocol.pipeline_inputs import StuffContentOrData
@@ -20,13 +20,20 @@ from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
 from pipelex.tools.tabular.exceptions import CsvError
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input, validation_error_locations
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_read_scope import authorize_uri_read
 from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# The schemes of the remote locations Pipelex itself reads, which a refusal of a table given at one names. Any other
+# scheme is the caller's own text, as free as a url's host or path, since `urlsplit` takes whatever precedes the first
+# colon when letters, digits, `+`, `-` and `.` make it up: such a refusal names none.
+_NAMED_REMOTE_SCHEMES: frozenset[str] = frozenset({"http", "https", "s3", "gs", PIPELEX_STORAGE_SCHEME.removesuffix("://")})
 
 
 class StuffBlueprint(BaseModel):
@@ -141,7 +148,11 @@ class StuffFactory:
         try:
             the_stuff_content = the_subclass.model_validate(obj=stuff_contents)
         except ValidationError as exc:
-            msg = f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: {format_pydantic_validation_error(exc=exc)}"
+            # The branches' outputs are the run's data: the refusal names the fields and reasons, never the values.
+            msg = (
+                f"Error combining stuffs for concept {concept.code}, stuff named `{name}`: "
+                f"{format_validation_error_without_input(validation_error=exc, validated_type=the_subclass)}"
+            )
             raise StuffFactoryError(msg).with_error_code(CoreCode.PIPE_OUTPUT_INVALID) from exc
         return cls.make_stuff(
             concept=concept,
@@ -149,6 +160,29 @@ class StuffFactory:
             name=name,
             code=code,
         )
+
+    @classmethod
+    def _make_content_refusal(
+        cls, *, name: str | None, concept_ref: str, content_class: type[StuffContent], validation_error: ValidationError, what: str
+    ) -> StuffFactoryError:
+        """The refusal of an input's content that its concept's class does not validate, ``input.invalid``.
+
+        The content is the run's data: the message names each refused field as far as the class's schema names it, and
+        its reason, never the value, and the first refused field is the problem's ``field``.
+        """
+        reasons = format_validation_error_without_input(validation_error=validation_error, validated_type=content_class)
+        msg = (
+            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a dict that should represent a StuffContentOrData "
+            f"but {what} does not fit the concept '{concept_ref}': {reasons}"
+        )
+        locations = validation_error_locations(validation_error=validation_error, validated_type=content_class)
+        refused_field = next((location for location in locations if location is not None), None)
+        params: dict[str, str] = {}
+        if name is not None:
+            params["input"] = name
+        if refused_field is not None:
+            params["field"] = refused_field
+        return StuffFactoryError(msg).with_params(**params)
 
     @classmethod
     def _try_make_csv_list_stuff(
@@ -235,23 +269,13 @@ class StuffFactory:
         # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
         # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
         if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
-            # Strip query/fragment/userinfo before echoing the url: the message reaches the operator's
-            # diagnostics and every log line, so a signed/token-bearing url (e.g. an S3 presigned link)
-            # must not leak its credentials into it. Keep scheme/host/path to identify it.
-            safe_netloc = url_parts.hostname or ""
-            try:
-                safe_port = url_parts.port
-            except ValueError:
-                # A malformed/out-of-range port makes the `.port` property raise; don't let that
-                # ValueError escape (it would bypass this redaction and surface the raw url in a
-                # traceback). Drop the port from the sanitized display instead.
-                safe_port = None
-            if safe_port is not None:
-                safe_netloc = f"{safe_netloc}:{safe_port}"
-            safe_url = urlunsplit((url_parts.scheme, safe_netloc, url_parts.path, "", ""))
+            # The url is the input's value, which no message carries: it can be a signed link whose query holds a
+            # credential, and its host and path are the caller's data. The input's name identifies it, and so does its
+            # scheme when it is one Pipelex reads: any other scheme is the caller's own text too.
+            in_scheme = f", in the scheme '{url_parts.scheme}'" if url_parts.scheme in _NAMED_REMOTE_SCHEMES else ""
             msg = (
                 f"CSV input supports local file paths only in v1, but stuff '{name}' for concept "
-                f"'{concept.concept_ref}' points at a remote/non-local url: {safe_url!r}. "
+                f"'{concept.concept_ref}' points at a remote or non-local url{in_scheme}. "
                 "Download the file locally and reference it by path."
             )
             raise CsvError(msg)
@@ -268,7 +292,13 @@ class StuffFactory:
             read_scope=read_scope,
             position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
         )
-        return list_content_from_csv(Path(resolved.path), row_model=row_model)
+        try:
+            return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
+        except CsvError as exc:
+            # The codec names the file by the input it was given as, and the code's sentences name it as well.
+            if name is not None and "input" in error_code_spec(exc.resolve_error_code()).param_names:
+                exc.with_params(input=name)
+            raise
 
     @classmethod
     def _resolve_entry_concept(
@@ -362,11 +392,12 @@ class StuffFactory:
                     raise StuffFactoryError(msg)
 
                 # Check all items are of the same type
-                for item in list_content.items:
+                for item_index, item in enumerate(list_content.items):
                     if not isinstance(item, type(first_item)):
+                        # The item is the run's data: the message names its position and its type, never its value.
                         msg = (
                             f"Trying to create a Stuff '{name}' from a ListContent of '{type(first_item).__name__}' "
-                            f"but the items are not of the same type. Especially, items {item} is of type {type(item).__name__}. "
+                            f"but the items are not of the same type: the item at index {item_index} is of type {type(item).__name__}. "
                             "Every items of the list should be an identical type."
                         )
                         raise StuffFactoryError(msg)
@@ -431,10 +462,11 @@ class StuffFactory:
 
                 # Case 1.2: list[str] → ListContent[TextContent] with Text concept
                 if isinstance(first_item, str):
-                    for item in stuff_content_or_data:
+                    for item_index, item in enumerate(stuff_content_or_data):
                         if not isinstance(item, str):
                             msg = (
-                                f"Trying to create a Stuff '{name}' from a list of strings but the item {item} is not a string. "
+                                f"Trying to create a Stuff '{name}' from a list of strings but the item at index {item_index}, "
+                                f"of type {type(item).__name__}, is not a string. "
                                 "Every items of the list should be a identical type. If its a string, everything should be a string."
                             )
                             raise StuffFactoryError(msg)
@@ -453,11 +485,11 @@ class StuffFactory:
                     content_class_name = type(first_item).__name__
 
                     # Check all items are of the same type
-                    for item in stuff_content_or_data:
+                    for item_index, item in enumerate(stuff_content_or_data):
                         if not isinstance(item, type(first_item)):
                             msg = (
                                 f"Trying to create a Stuff '{name}' from a list of '{type(first_item).__name__}' "
-                                f"but the items are not of the same type. Especially, items {item} is of type {type(item).__name__}. "
+                                f"but the items are not of the same type: the item at index {item_index} is of type {type(item).__name__}. "
                                 "Every items of the list should be a identical type. If its a string, everything should be a string."
                             )
                             raise StuffFactoryError(msg)
@@ -643,11 +675,17 @@ class StuffFactory:
                 )
                 raise StuffFactoryError(msg).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
 
+            try:
+                dict_content = the_class.model_validate(obj=content)
+            except ValidationError as exc:
+                raise cls._make_content_refusal(
+                    name=name, concept_ref=concept.concept_ref, content_class=the_class, validation_error=exc, what="its content"
+                ) from exc
             return cls.make_stuff(
                 name=name,
                 code=code,
                 concept=concept,
-                content=the_class.model_validate(obj=content),
+                content=dict_content,
             )
 
         # Case 2.2/2.2b/2.4/2.5/2.6: content is a list
@@ -673,11 +711,12 @@ class StuffFactory:
 
             # Case 2.2/2.2b: list[str]
             if isinstance(first_item, str):
-                for item in list_content_2:
+                for item_index, item in enumerate(list_content_2):
                     if not isinstance(item, str):
                         msg = (
-                            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a list of strings but the item {item} "
-                            "is not a string. Every items of the list should be a identical type. If its a string, everything should be a string."
+                            f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a list of strings but the item at index "
+                            f"{item_index}, of type {type(item).__name__}, is not a string. "
+                            "Every items of the list should be a identical type. If its a string, everything should be a string."
                         )
                         raise StuffFactoryError(msg)
 
@@ -714,22 +753,32 @@ class StuffFactory:
 
             # Case 2.6: list[dict]
             if isinstance(first_item, dict):
-                for item_dict in list_content_2:
+                for item_index, item_dict in enumerate(list_content_2):
                     if not isinstance(item_dict, dict):
                         msg = (
                             f"Trying to create a Stuff '{name}' in the inputs of your pipe, from a list of dicts but "
-                            f"the item {item_dict} is not a dict. Every items of the list should be a identical type. "
-                            "If its a dict, everything should be a dict."
+                            f"the item at index {item_index}, of type {type(item_dict).__name__}, is not a dict. "
+                            "Every items of the list should be a identical type. If its a dict, everything should be a dict."
                         )
                         raise StuffFactoryError(msg)
 
-                # Create StuffContent objects from dicts
+                # Create StuffContent objects from dicts, with the class the factory validates each one into
+                item_class = get_class_registry().get_class(name=concept.structure_class_name) or TextContent
                 stuff_items: list[StuffContent] = []
-                for item_dict in list_content_2:
-                    stuff_content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
-                        concept=concept,
-                        value=item_dict,
-                    )
+                for item_index, item_dict in enumerate(list_content_2):
+                    try:
+                        stuff_content = StuffContentFactory.make_stuff_content_from_concept_with_fallback(
+                            concept=concept,
+                            value=item_dict,
+                        )
+                    except ValidationError as exc:
+                        raise cls._make_content_refusal(
+                            name=name,
+                            concept_ref=concept.concept_ref,
+                            content_class=item_class,
+                            validation_error=exc,
+                            what=f"the item at index {item_index} of its content",
+                        ) from exc
                     stuff_items.append(stuff_content)
 
                 return cls.make_stuff(

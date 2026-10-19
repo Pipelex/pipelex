@@ -32,9 +32,9 @@ class PipeFuncRaisedError(PipelexError):
 
     Raised by the in-process executor from whatever the function's own code raised, so that the step tells a failure
     of its function from a failure of the seam that runs it: it is ``pipe.function_raised`` whatever the function
-    raised, a coded Pipelex error included, which rides as its cause. Its message gives the type and the text of the
-    function's exception, which can carry whatever the process holds, so it reaches the operator alone, as every
-    message does, and no parameter of its code repeats it.
+    raised, a coded Pipelex error included, which rides as its cause. Its message names the class of the function's
+    exception and never its text, which is the function's own and can quote the run's inputs or whatever the process
+    holds: a message reaches the operator's diagnostics and the logs, and the code declares no parameter for it.
     """
 
     error_code = CoreCode.PIPE_FUNCTION_RAISED

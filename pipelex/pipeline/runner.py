@@ -40,7 +40,7 @@ from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     import asyncio
@@ -406,7 +406,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 output_name=pipe_job.output_name,
             ) from exc
         except ValidationError as exc:
-            formatted_error = format_pydantic_validation_error(exc)
+            # The run's inputs are the caller's data: the message names why they failed, never their values. Each site
+            # that validates an input into a known class refuses it there, located by that class's schema; a refusal
+            # that reaches this arm came from a model this frame does not know, and a location read without its schema
+            # could quote a key of the data, so it is named by its model and its reasons alone.
+            formatted_error = format_validation_error_without_input(validation_error=exc)
             model_name = exc.title
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg).with_error_code(CoreCode.INPUT_INVALID) from exc

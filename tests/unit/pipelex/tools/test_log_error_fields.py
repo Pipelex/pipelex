@@ -17,6 +17,7 @@ from pipelex.tools.log.json_log_sink import EXCEPTION_KEY, LOGGER_KEY, MESSAGE_K
 from pipelex.tools.log.log import Log
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -46,6 +47,7 @@ class _Diagnosis(BaseModel):
     severity: int = 0
     code: str = "none"
     reviewed: bool = False
+    ward: str = "A1"
 
     @field_validator("diagnosis")
     @classmethod
@@ -62,6 +64,15 @@ class _Diagnosis(BaseModel):
             error_type = "unknown_code"
             message_template = "The code {code} is not known"
             raise PydanticCustomError(error_type, message_template, {"code": value})
+        return value
+
+    @field_validator("ward")
+    @classmethod
+    def _ward_is_a_letter_and_a_floor(cls, value: str) -> str:
+        if len(value) != 2:
+            # A refusal that names the form it expected and never the value.
+            msg = "A ward is named by its letter and its floor"
+            raise InputFreeValueError(msg)
         return value
 
     @field_validator("severity", mode="before")
@@ -134,22 +145,50 @@ class TestLogErrorFields:
         assert error_fields(exc=exc, text=text) == {ERROR_TYPE_FIELD: expected[0], ERROR_MESSAGE_FIELD: expected[1]}, topic
 
     def test_a_validation_error_is_written_as_its_locations_and_reasons_never_its_input(self) -> None:
-        """A pydantic error's own text quotes every value it refused, which is payload: a run's input or a model's response."""
+        """A pydantic error's own text quotes every value it refused, which is payload: a run's input or a model's response.
+
+        A dict's key is the input's too, so the location names it by the placeholder.
+        """
         secret_looking = "sk-live-4f9a8b7c6d5e4f3a2b1c"
         with pytest.raises(ValidationError) as caught:
-            _Settings.model_validate({"retries": secret_looking, "limits": {"burst": secret_looking}})
+            _Settings.model_validate({"retries": secret_looking, "limits": {_PAYLOAD: secret_looking}})
         assert secret_looking in str(caught.value)
 
-        fields = error_fields(exc=caught.value)
+        fields = error_fields(exc=caught.value, validated_type=_Settings)
 
         assert fields == {
             ERROR_TYPE_FIELD: "ValidationError",
             ERROR_MESSAGE_FIELD: (
                 "retries: Input should be a valid integer, unable to parse string as an integer; "
-                "limits.burst: Input should be a valid integer, unable to parse string as an integer"
+                "limits.<key>: Input should be a valid integer, unable to parse string as an integer"
             ),
         }
         assert secret_looking not in fields[ERROR_MESSAGE_FIELD]
+        assert _PAYLOAD not in fields[ERROR_MESSAGE_FIELD]
+
+    @pytest.mark.parametrize(
+        ("topic", "validated_type"),
+        [("no model given", None), ("a model the error did not come from", _Diagnosis)],
+    )
+    def test_a_validation_error_whose_model_is_not_known_is_written_as_its_reasons_alone(
+        self, topic: str, validated_type: type[BaseModel] | None
+    ) -> None:
+        """Without the schema, nothing tells a field's name from a key of the input's own, so no location is written."""
+        with pytest.raises(ValidationError) as caught:
+            _Settings.model_validate({"retries": 3, "limits": {_PAYLOAD: "many"}})
+
+        message = error_fields(exc=caught.value, validated_type=validated_type)[ERROR_MESSAGE_FIELD]
+
+        assert message == "Input should be a valid integer, unable to parse string as an integer", topic
+
+    def test_an_authored_document_s_refusal_keeps_its_locations(self) -> None:
+        """A line about a method author's own document, or a value Pipelex built, writes the locations pydantic gives."""
+        with pytest.raises(ValidationError) as caught:
+            _Settings.model_validate({"retries": 3, "limits": {"max_calls": "many"}})
+
+        message = error_fields(exc=caught.value, is_authored_input=True)[ERROR_MESSAGE_FIELD]
+
+        assert message == "limits.max_calls: Input should be a valid integer, unable to parse string as an integer"
 
     def test_a_validation_error_at_the_root_names_its_reason_alone(self) -> None:
         with pytest.raises(ValidationError) as caught:
@@ -171,7 +210,7 @@ class TestLogErrorFields:
             _Diagnosis.model_validate(document)
         assert _PAYLOAD in str(caught.value), topic
 
-        message = error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD]
+        message = error_fields(exc=caught.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD]
 
         assert message == expected, topic
         assert _PAYLOAD not in message, topic
@@ -183,20 +222,32 @@ class TestLogErrorFields:
 
         assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "assertion_error"
 
-    def test_a_date_content_rejection_is_written_without_the_value_it_quotes(self) -> None:
-        """`DateContent`'s validator names the string it could not read as a date, which can be a run's input."""
+    def test_a_date_content_rejection_keeps_its_sentence_which_names_no_value(self) -> None:
+        """`DateContent`'s validator raises an `InputFreeValueError`, whose sentence names the form it expected alone."""
         with pytest.raises(ValidationError) as caught:
             DateContent.model_validate({"date": _PAYLOAD})
-        assert _PAYLOAD in caught.value.errors()[0]["msg"]
+        assert _PAYLOAD not in caught.value.errors()[0]["msg"]
 
-        assert error_fields(exc=caught.value) == {ERROR_TYPE_FIELD: "ValidationError", ERROR_MESSAGE_FIELD: "date: value_error"}
+        assert error_fields(exc=caught.value, validated_type=DateContent) == {
+            ERROR_TYPE_FIELD: "ValidationError",
+            ERROR_MESSAGE_FIELD: "date: Value error, The value is not an extended ISO 8601 calendar date (e.g. '2026-07-07').",
+        }
+
+    def test_an_input_free_value_error_keeps_its_sentence_beside_a_custom_one(self) -> None:
+        """A validator raising `InputFreeValueError` declares its sentence holds nothing of the value, so it is kept."""
+        with pytest.raises(ValidationError) as caught:
+            _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "ward": _PAYLOAD})
+
+        assert error_fields(exc=caught.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD] == (
+            "diagnosis: value_error; ward: Value error, A ward is named by its letter and its floor"
+        )
 
     def test_pydantic_own_reasons_are_kept_beside_a_custom_one(self) -> None:
         """Only the validator's message goes: the reasons pydantic wrote itself, which quote no input, stay readable."""
         with pytest.raises(ValidationError) as mixed:
             _Diagnosis.model_validate({"diagnosis": _PAYLOAD, "reviewed": "not a boolean"})
 
-        assert error_fields(exc=mixed.value)[ERROR_MESSAGE_FIELD] == (
+        assert error_fields(exc=mixed.value, validated_type=_Diagnosis)[ERROR_MESSAGE_FIELD] == (
             "diagnosis: value_error; reviewed: Input should be a valid boolean, unable to interpret input"
         )
 
@@ -205,8 +256,15 @@ class TestLogErrorFields:
         [
             ("an unknown tag of a discriminated union", _Shipment, {"item": {"kind": _PAYLOAD}}, _PAYLOAD, "item: union_tag_invalid"),
             ("a value that is no UUID", _Record, {"record_id": _PAYLOAD}, "found `o`", "record_id: uuid_parsing"),
-            ("a key a nested model forbids", _StrictSettings, {"limits": {_PAYLOAD: 1}}, None, "limits: Extra inputs are not permitted"),
-            ("a key the root model forbids", _StrictSettings, {_PAYLOAD: 1}, None, "Extra inputs are not permitted"),
+            ("a key a nested model forbids", _StrictSettings, {"limits": {_PAYLOAD: 1}}, None, "limits.<key>: Extra inputs are not permitted"),
+            ("a key the root model forbids", _StrictSettings, {_PAYLOAD: 1}, None, "<key>: Extra inputs are not permitted"),
+            (
+                "a key of a dict",
+                _Settings,
+                {"retries": 1, "limits": {_PAYLOAD: "many"}},
+                None,
+                "limits.<key>: Input should be a valid integer, unable to parse string as an integer",
+            ),
         ],
     )
     def test_a_message_or_a_location_drawn_from_the_input_never_reaches_the_line(
@@ -227,7 +285,7 @@ class TestLogErrorFields:
         else:
             assert _PAYLOAD in [str(part) for part in error["loc"]], topic
 
-        fields = error_fields(exc=caught.value)
+        fields = error_fields(exc=caught.value, validated_type=model)
         fresh, buffer = json_buffer
         fresh.warning("A document was refused", fields=fields)
 
@@ -241,7 +299,7 @@ class TestLogErrorFields:
         with pytest.raises(ValidationError) as caught:
             _Bounded.model_validate({"code": _PAYLOAD})
 
-        assert error_fields(exc=caught.value)[ERROR_MESSAGE_FIELD] == "code: String should have at most 8 characters"
+        assert error_fields(exc=caught.value, validated_type=_Bounded)[ERROR_MESSAGE_FIELD] == "code: String should have at most 8 characters"
 
     def test_a_text_given_for_a_validation_error_is_carried_as_given(self) -> None:
         with pytest.raises(ValidationError) as caught:

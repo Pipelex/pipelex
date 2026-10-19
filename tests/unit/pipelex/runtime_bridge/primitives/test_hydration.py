@@ -598,6 +598,27 @@ class TestHydrateWorkingMemory:
         with pytest.raises(PipeJobError, match="invalid_stuff"):
             hydrate_working_memory(raw)
 
+    def test_hydrate_locates_a_refused_content_by_its_class_and_never_quotes_it(self) -> None:
+        """The content is the run's data: its refusal names the field its class declares, never the value or a key of it."""
+        raw = {
+            "root": {
+                "invalid_stuff": {
+                    "stuff_code": "test",
+                    "stuff_name": "invalid_stuff",
+                    "concept": "native.Text",
+                    "content": {"text": {"jane.doe@acme.example": "secret-value"}},
+                },
+            },
+            "aliases": {},
+        }
+
+        with pytest.raises(PipeJobError) as exc_info:
+            hydrate_working_memory(raw)
+
+        assert "Failed to hydrate stuff 'invalid_stuff': text: Input should be a valid string" in str(exc_info.value)
+        assert "jane.doe@acme.example" not in str(exc_info.value)
+        assert "secret-value" not in str(exc_info.value)
+
     def test_hydrate_round_trips_absence_ledger(self) -> None:
         """The absence ledger survives the dump_for_transport → hydrate round-trip: a recorded
         absence must not degrade to a hard miss after cross-process transit.

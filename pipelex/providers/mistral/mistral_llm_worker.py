@@ -36,6 +36,11 @@ if TYPE_CHECKING:
     from mistralai.client.types import OptionalNullable
 
 
+# The Mistral SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (MistralError, httpx.TransportError)
+
+
 class MistralLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
@@ -156,7 +161,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
             )
-        except (MistralError, httpx.TransportError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
@@ -285,7 +290,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_mistral_metadata(underlying_exc)
+                metadata = extract_mistral_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
@@ -294,21 +299,13 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-            raise LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
-                ),
-            ).with_error_code(CoreCode.RUNTIME_UNEXPECTED) from instructor_exc
+            raise self._make_structured_generation_failure(api_name="Mistral", schema=schema, instructor_exc=instructor_exc) from instructor_exc
         except IncompleteOutputException as incomplete_exc:
             # instructor found the answer's first choice finished on `length`
             raise self._incomplete_output_error(
                 llm_job=llm_job, last_completion=incomplete_exc.last_completion, max_tokens=max_tokens
             ) from incomplete_exc
-        except (MistralError, httpx.TransportError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
