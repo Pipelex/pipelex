@@ -12,8 +12,9 @@ class BundleResourcePathError(PipelexError):
     the same file, or a key the tree of the submitted files cannot hold, such as one colliding with another once
     case-folded, or naming a file already submitted, from a library directory or with the request, with other bytes.
     The path is the caller's own, so the message is theirs to read, and the same request is refused again. A path that
-    cannot name a file inside the bundle is ``security.input_path_refused``; paths that each could but that cannot
-    make one tree together choose ``request.invalid``.
+    leaves the bundle, absolute, naming a drive or climbing with `..`, is ``security.input_path_refused``; a path of
+    the wrong shape, and paths that each could name a file but that cannot make one tree together, choose
+    ``request.invalid`` (``pipelex.core.bundle_resources.bundle_resource.path_refusal_code``).
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_PATH_REFUSED, others=(CoreCode.REQUEST_INVALID,))

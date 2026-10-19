@@ -52,6 +52,7 @@ from mthds.package.manifest.schema import MethodsManifest
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
+from pipelex.core.bundle_resources.bundle_resource import root_escape_refusal
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -63,7 +64,7 @@ from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
 from pipelex_api.bundle_resources import refuse_two_files_under_one_path
 from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_forbidden, raise_validation_error, raise_validation_problem
+from pipelex_api.errors import ApiSecurityRefusal, raise_forbidden, raise_validation_error, raise_validation_problem
 from pipelex_api.limits import (
     MAX_METHOD_DEPENDENCIES,
     MAX_METHOD_REQUEST_TOTAL_BYTES,
@@ -371,7 +372,50 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str) -> NoRetur
                 message=f"{label} is not a method tree. {refusal_error.message}",
                 error_type=ErrorType.INVALID_METHOD_FILES,
                 members={"tree_refusal": {"code": refusal.code, "names": [wire_name(name) for name in refusal.names]}},
+                security_refusal=_tree_path_security_refusal(refusal_error=refusal_error),
             )
+
+
+def _tree_path_security_refusal(*, refusal_error: MethodTreeRefusedError) -> ApiSecurityRefusal | None:
+    """The security refusal a tree refusal is, when a path it names tries to leave the tree, else `None`.
+
+    The standard's reader refuses a key that is not a tree path without saying why, so the runtime's one rule for a
+    caller's path that leaves its root decides (`root_escape_refusal`): a path that is absolute, names a drive or a
+    network share, or climbs with a `..` segment, read with either separator, is a traversal,
+    `security.input_path_refused`, whether the caller sent it as a key of `files` or as a member of `bundle_b64`, which
+    the same reader judges, and as it is under `resources`. Every other path the reader refuses (an empty segment, a
+    backslash, a colon, a path not in NFC) is the shape of how the caller packed the method, a refusal of the request
+    and no security event.
+    """
+    refusal = refusal_error.refusal
+    match refusal.code:
+        case TreeRefusalCode.INVALID_TREE_PATH:
+            if any(root_escape_refusal(path=name) is not None for name in refusal.names):
+                return ApiSecurityRefusal(code=CoreCode.SECURITY_INPUT_PATH_REFUSED, error_type=type(refusal_error).__name__)
+            return None
+        case (
+            TreeRefusalCode.MISSING_BLOB
+            | TreeRefusalCode.SYMBOLIC_LINK
+            | TreeRefusalCode.SPECIAL_FILE
+            | TreeRefusalCode.NORMALIZATION_COLLISION
+            | TreeRefusalCode.PATH_COLLISION
+            | TreeRefusalCode.EMPTY_TREE
+            | TreeRefusalCode.LONE_FILE_EXCLUDED
+            | TreeRefusalCode.GITIGNORE_NOT_UTF8
+            | TreeRefusalCode.DUPLICATE_KEY
+            | TreeRefusalCode.EXCLUDED_NAME
+            | TreeRefusalCode.MALFORMED_ENTRY
+            | TreeRefusalCode.REFERENCE_INVALID
+            | TreeRefusalCode.REFERENCE_LEAVES_TREE
+            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
+            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
+            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
+            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
+            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
+            | TreeRefusalCode.MODULE_NOT_IN_TREE
+            | TreeRefusalCode.MODULE_AMBIGUOUS
+        ):
+            return None
 
 
 async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str) -> BlobStore:

@@ -1,9 +1,9 @@
 contract = "logging-docs"
-digest = "sha256:d9ec388a1a3a14e1cf3fa4316211776c0a55a6a33d646202bd93c5aa3e5265b0"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-10T12:37:22Z"
-rationale = "real-catch: The contract now lists docs/under-the-hood/log-sink-plugins.md as a review target, since its table of built-in sinks and its explanation of why console is the default both describe what the console renders, which console_fields.py decides; no trigger file changed since the last ack. Reviewed that page against console_fields.py, console_log_sink.py and console_prefix.py: the console row named an emoji formatter that no longer exists, the handler now taking the stdlib's plain logging.Formatter, and the default's rationale promised emoji and clickable paths, while the path column is off unless is_show_path turns it on. Both passages now state what the console renders: the fields after the message coloured by name per FIELD_STYLES, the advice line from advice_segments, the dimmed package name before another library's line, and the layouts. The rest of the page, the sink contract, what a sink reads off a record and the reserved keys, states nothing console_fields.py or error_fields.py decides. logging.md was reviewed at the previous ack against the same trigger blobs; its console sections were re-read and still hold."
+digest = "sha256:7566ad3cf074b3d3fc2c2f19b04d9f3734cd7d169d61fc7f4cc56d77d476a08e"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-19T09:36:03Z"
+rationale = "real-catch: error_fields.py now names error.code beside error.type, the one constant both the CLI root's failure line (failure_problem) and the security event read after dev's #1449 merged into this branch. logging.md's field table described error.code only as a failure's problem's code on a CLI failure line; it now also names the security event, which carries the refused request's code there with its domain in error.domain. The Exceptions section and the security event section still hold, and log-sink-plugins.md states nothing error_fields.py decides."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
-"pipelex/tools/log/error_fields.py" = "blob:515b7649ddd22dceb192faa21713732ec61cd6e0"
+"pipelex/tools/log/error_fields.py" = "blob:72e5039bbc5b3c39fbd1a52de2f1e9283668be8c"

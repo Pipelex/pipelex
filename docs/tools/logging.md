@@ -422,6 +422,12 @@ for (operation, model_handle), group in groups.items():
 
 A test runs a small method live, with stand-in workers answering every model call on two models, and computes the cost and the latency of each operation and model from the `json` output alone.
 
+## The security event
+
+A refusal a security rule makes, an address the SSRF guard blocks, a stored file outside the run's read scope, a path escaping its root, a template the sandbox refuses, fails the run under a `security.` code and logs one **security event** beside it. The event is a record of its own kind, on its own logger, `pipelex.errors.security_event`, at **WARNING**, with the fixed message `A security rule refused a request` and the field `event.name` set to `pipelex.security.refusal`, so a host routes it by its logger or by that field without reading any text: to an alert on a hosted deployment, to the client's own sinks on-premises. Its fields name the refusal's code and domain, the kind and class of target refused, the run, the request and each of the run's extras as `run.extras.<key>`, and never the URL, the path, the template or any input value; it carries no traceback. A refusal is logged once however many boundaries it crosses. The [error model](../under-the-hood/error-model.md#security-refusals-and-the-security-event) lists every field and value, and where the event is logged.
+
+The event follows its logger's level like any other record, so a host that raises `pipelex` above `WARNING` with `package_log_levels` drops it too; one that quiets the runtime and still wants its security events sets `pipelex-errors-security_event = "WARNING"` beside that key.
+
 ## Log-call conventions
 
 Pipelex's own log calls, in `pipelex/` and in the API server's `api/pipelex_api/`, follow these conventions, so that a line written today can be grouped, counted and filtered in a log store tomorrow. The [log-call guard](../contribute/log-calls.md), `make check-log-calls`, holds every call to the ones that can be read off the source: the fixed message at INFO and above, the absence of markup, the mechanical rules of [wording a message](#wording-a-message), and no handled exception spliced into the text; the rest is for review. Code of your own that logs through `log` is welcome to follow them too.
@@ -558,7 +564,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `auth_refusal_reason` | string | Why the API server refused a caller's own credentials: `missing_bearer_token`, `expired_token`, `invalid_token` or `api_key_mismatch` |
 | `claim_type` | string | The type a token's claim was decoded as, by its Python name, where the claim is refused and its value is not logged: `str`, `int`, `dict` |
 | `error.type`, `error.message` | string | A handled exception's class name and its text, as [Exceptions](#exceptions) describes |
-| `error.code` | string | The registry code of a failure's problem, which a line about a failure that may quote a run's data gives in place of its text |
+| `error.code` | string | The registry code of a failure's problem, which a line about a failure that may quote a run's data gives in place of its text, and the code of the refusal a [security event](#the-security-event) logs, whose domain rides beside it in `error.domain` |
 | `error.chain` | list of strings | The classes along a failure's cause chain, its own first, which the root of a CLI command gives in place of the chain's texts |
 | `error.frames` | list of strings | The frames a failure went through, from where the root of a CLI command caught it down to where its first exception was raised, each `module:line in function`, with no source line and no local, the innermost forty kept, which that root gives in place of the traceback |
 | `error_domain` | string | Who fixes a failure: `input`, `config`, `runtime`, read from the domain of the failure's code |

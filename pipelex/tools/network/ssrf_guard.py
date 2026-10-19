@@ -26,7 +26,7 @@ import httpx
 from typing_extensions import override
 
 from pipelex.tools.network.exceptions import SsrfBlockedError
-from pipelex.tools.network.host_rules import is_disallowed_host, is_disallowed_ip
+from pipelex.tools.network.host_rules import classify_disallowed_host, is_disallowed_host, is_disallowed_ip
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -58,7 +58,7 @@ async def resolve_to_allowed_ips(
     """
     if is_disallowed_host(host):
         msg = f"Refusing to connect to {host!r}: destination is a disallowed (private/loopback/metadata) address."
-        raise SsrfBlockedError(msg)
+        raise SsrfBlockedError(msg).with_security_target_class(classify_disallowed_host(host))
     loop = asyncio.get_running_loop()
     getaddrinfo_coro = loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     try:
@@ -79,9 +79,11 @@ async def resolve_to_allowed_ips(
     if not resolved_ips:
         msg = f"Refusing to connect to {host!r}: name resolved to no addresses."
         raise SsrfBlockedError(msg)
-    if any(is_disallowed_ip(resolved_ip) for resolved_ip in resolved_ips):
+    disallowed_ips = [resolved_ip for resolved_ip in resolved_ips if is_disallowed_ip(resolved_ip)]
+    if disallowed_ips:
         msg = f"Refusing to connect to {host!r}: it resolved to a disallowed (private/loopback/metadata) address."
-        raise SsrfBlockedError(msg)
+        # The first disallowed address classifies the refusal for its security event, which never names the address.
+        raise SsrfBlockedError(msg).with_security_target_class(classify_disallowed_host(disallowed_ips[0]))
     return resolved_ips
 
 
