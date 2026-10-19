@@ -5,7 +5,7 @@ import typer
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexError
-from pipelex.cli.agent_cli.commands.agent_output import agent_error_markdown, run_failure_fields
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, set_agent_cli_error_format, start_agent_cli_error_format
 from pipelex.errors.problem import ProblemView, problem_metadata
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -91,9 +91,13 @@ async def _refused_run(*, template: str, topic: str) -> PipelineExecutionError:
 
 
 def _agent_markdown(*, error: PipelineExecutionError, capsys: pytest.CaptureFixture[str]) -> str:
-    """What `pipelex-agent run --error-format markdown` prints for the failed run."""
-    with pytest.raises(typer.Exit):
-        agent_error_markdown(error.message, error_type="PipelineExecutionError", cause=error, **run_failure_fields(error=error))
+    """What `pipelex-agent run --error-format markdown` prints for the failed run, as its run commands report it."""
+    set_agent_cli_error_format(CliOutputFormat.MARKDOWN)
+    try:
+        with pytest.raises(typer.Exit):
+            agent_error(error.message, cause=error)
+    finally:
+        start_agent_cli_error_format()
     return capsys.readouterr().err
 
 
@@ -149,7 +153,7 @@ class TestTemplateRefusalNames:
         )
         assert caller.location is not None
         assert caller.location.as_wire() == {"pipe": "say", "path": ["say"], "field": "template"}
-        assert "# Error: PipelineExecutionError" in markdown
+        assert markdown.startswith(f"## {operator.title}\n")
 
     async def test_a_name_another_string_literal_holds_is_still_the_run_s_data(self) -> None:
         """A word a string literal holds, outside any format string, is not what the template reached for.
