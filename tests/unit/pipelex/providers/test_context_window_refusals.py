@@ -450,6 +450,9 @@ class TestContextWindowRefusals:
         assert rendered.user_action is not None
         assert "context window" not in rendered.user_action.detail
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a provider's context-window refusal carries neither the prompt's size nor the window's, the counts of model.context_exceeded"
+    )
     @pytest.mark.asyncio
     async def test_the_worker_reports_the_prompt_over_the_window_as_the_callers_input(self, mocker: MockerFixture) -> None:
         """End to end through a worker: the run report reads `model.context_exceeded`, the caller's to fix, answered 422."""
@@ -476,6 +479,8 @@ class TestContextWindowRefusals:
 
         caller = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.MODEL_CONTEXT_EXCEEDED
+        # The refusal names the bound the prompt passed and the model, never the counts the provider words alone.
+        assert caller.to_wire()["params"] == {"model": "gpt-4o", "limit": "context_window"}
         assert caller.domain == ProblemDomain.INPUT
         assert caller.retry == RetryVerdict.NO
         assert error_code_spec(CoreCode.MODEL_CONTEXT_EXCEEDED).status == 422

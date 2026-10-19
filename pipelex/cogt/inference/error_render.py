@@ -9,7 +9,7 @@ worker's error family, with a human-readable message and a structured
 
 import math
 
-from mthds.protocol.problem.registry import CoreCode, ModelUnavailableReason
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit, ModelUnavailableReason
 
 from pipelex.cogt.exceptions import (
     CogtError,
@@ -205,4 +205,11 @@ def render_inference_error(
     if classification.is_model_not_allowed:
         # The provider serves the model but does not allow it for this caller.
         failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
+    match classification.error_code:
+        case CoreCode.MODEL_CONTEXT_EXCEEDED:
+            # The provider's refusal says the inputs are over the model's context window, the bound it names, and
+            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
+        case CoreCode() | PipelexErrorCode():
+            pass
     return failure
