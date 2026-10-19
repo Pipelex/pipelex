@@ -700,6 +700,98 @@ prompt      = "Read the label from $note"
 """
 
 
+class SecurityRefusalTestData:
+    """Runs a security rule refuses, mid-run, before the run and at a template's render, and what none of their events may quote."""
+
+    READ_SCOPE: ClassVar[str] = "org_abc"
+    STORAGE_SCOPE: ClassVar[str] = "org_abc/mt_1/run_1"
+    EXTRAS: ClassVar[dict[str, str]] = {"org_id": "org_abc"}
+
+    # Another tenant's storage key, which a construct turns into an image URL the next step shows a model.
+    FOREIGN_KEY: ClassVar[str] = "pipelex-storage://org_other/mt_y/run_9/assets/payroll.png"
+    FORGED_IMAGE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_forged_image"
+description = "Forge an image URL from plain text, then show the image to a model"
+main_pipe = "describe_forged_photo"
+
+[concept.Photo]
+description = "A photo with a caption"
+
+[concept.Photo.structure]
+caption = { type = "text", description = "The caption" }
+picture = { type = "concept", concept_ref = "native.Image", description = "The picture" }
+
+[pipe.describe_forged_photo]
+type = "PipeSequence"
+description = "Forge a photo from a text, then describe it"
+inputs = { where = "Text" }
+output = "Text"
+steps = [
+  { pipe = "forge_photo", result = "photo" },
+  { pipe = "describe_photo", result = "description" },
+]
+
+[pipe.forge_photo]
+type = "PipeCompose"
+description = "Build a photo whose URL is the text it was given"
+inputs = { where = "Text" }
+output = "Photo"
+
+[pipe.forge_photo.construct]
+caption = "forged"
+
+[pipe.forge_photo.construct.picture]
+url = { template = "{{ where }}" }
+
+[pipe.describe_photo]
+type = "PipeLLM"
+description = "Describe the photo"
+inputs = { photo = "Photo" }
+output = "Text"
+prompt = \"\"\"
+Describe this image.
+$photo.picture
+\"\"\"
+"""
+
+    # A path on the server's disk passed as an image input, which the input seam refuses before the run exists.
+    LOCAL_PATH: ClassVar[str] = "/etc/passwd"
+    DESCRIBE_IMAGE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_input"
+description = "Describe an image input"
+main_pipe = "describe_image"
+
+[pipe.describe_image]
+type = "PipeLLM"
+description = "Describe an image"
+inputs = { photo = "Image" }
+output = "Text"
+prompt = \"\"\"
+Describe this image.
+$photo
+\"\"\"
+"""
+
+    # A template reading a private name off a value, which passes the load and which the sandbox refuses at render.
+    PRIVATE_READ_TEMPLATE: ClassVar[str] = "Talk about {{ topic['_owner'] }}"
+    # A template that fails at render for a reason no security rule has, a method the value lacks.
+    MISSING_METHOD_TEMPLATE: ClassVar[str] = "Talk about {{ topic.model_dump_json() }}"
+    TOPIC: ClassVar[str] = "the quarterly payroll"
+    COMPOSE_MTHDS_SLOT: ClassVar[str] = "TEMPLATE_SLOT"
+    COMPOSE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_template"
+description = "Compose a line about a topic"
+main_pipe = "say"
+
+[pipe.say]
+type = "PipeCompose"
+description = "Say something about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "TEMPLATE_SLOT"
+"""
+
+
 class ResolveBundleTestData:
     """Bundles the host-facing resolve cores are pinned with."""
 

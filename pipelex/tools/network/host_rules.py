@@ -7,13 +7,38 @@ rule here means the API server and the worker classify the same address the same
 way.
 """
 
-from ipaddress import ip_address
+from ipaddress import IPv4Address, IPv6Address, ip_address
+
+from pipelex.errors.security_target import SecurityTargetClass
+
+# The cloud metadata-server aliases: ``metadata`` / ``metadata.google.internal`` are GCP's.
+_METADATA_HOSTNAMES: frozenset[str] = frozenset({"metadata.google.internal", "metadata"})
+
+# The loopback alias.
+_LOOPBACK_HOSTNAMES: frozenset[str] = frozenset({"localhost"})
 
 # Hostnames that never resolve to a public destination but aren't literal IPs, so
-# the IP-privateness check below can't catch them. ``metadata`` /
-# ``metadata.google.internal`` are the GCP metadata-server aliases; ``localhost``
-# is the loopback alias.
-_DISALLOWED_HOSTNAMES: frozenset[str] = frozenset({"localhost", "metadata.google.internal", "metadata"})
+# the IP-privateness check below can't catch them.
+_DISALLOWED_HOSTNAMES: frozenset[str] = _METADATA_HOSTNAMES | _LOOPBACK_HOSTNAMES
+
+# The well-known cloud metadata and credential endpoints by address, each in its canonical spelling. Every one is
+# already refused as an address that is not publicly routable; this set only names its class for the security event.
+_METADATA_IPS: frozenset[str] = frozenset(
+    {
+        # The instance metadata service AWS, GCP, Azure and Oracle Cloud Infrastructure all serve, and AWS's IPv6 one.
+        "169.254.169.254",
+        "fd00:ec2::254",
+        # AWS ECS: the task metadata endpoint and the container credentials endpoint.
+        "169.254.170.2",
+        # AWS EKS Pod Identity: the credentials agent, and its IPv6 address.
+        "169.254.170.23",
+        "fd00:ec2::23",
+        # Alibaba Cloud's instance metadata service.
+        "100.100.100.200",
+        # Oracle Cloud's legacy metadata service.
+        "192.0.0.192",
+    }
+)
 
 
 def is_disallowed_ip(host: str) -> bool:
@@ -64,3 +89,40 @@ def is_disallowed_host(host: str) -> bool:
     if normalized_host in _DISALLOWED_HOSTNAMES:
         return True
     return is_disallowed_ip(normalized_host)
+
+
+def classify_disallowed_host(host: str) -> SecurityTargetClass | None:
+    """The class of destination a disallowed host is, for the security event its refusal emits.
+
+    A cloud metadata endpoint, by alias or by address, is ``metadata``; ``localhost`` and a loopback address are
+    ``loopback``; any other link-local address is ``link_local``; and every other address that is not publicly
+    routable (private ranges, carrier-grade NAT, multicast, reserved, the unspecified address) is ``private``.
+    The host is normalized as :func:`is_disallowed_host` normalizes it, and an IPv4-mapped IPv6 address
+    (``::ffff:169.254.169.254``) is classified as the IPv4 address it carries, which is where a dual-stack socket
+    connects it: ``ipaddress`` reads the mapped form's loopback and link-local properties differently across Python
+    versions, and never as the metadata address it spells.
+
+    Args:
+        host: A host :func:`is_disallowed_host` refuses, a literal IP or a hostname.
+
+    Returns:
+        The host's class, or ``None`` for a host that is neither a known internal name nor a literal disallowed
+        IP, an empty one among them, which the refusal names no class for.
+    """
+    normalized_host = host.rstrip(".").lower()
+    if normalized_host in _METADATA_HOSTNAMES:
+        return SecurityTargetClass.METADATA
+    if normalized_host in _LOOPBACK_HOSTNAMES:
+        return SecurityTargetClass.LOOPBACK
+    if not is_disallowed_ip(normalized_host):
+        return None
+    addr: IPv4Address | IPv6Address = ip_address(normalized_host)
+    if isinstance(addr, IPv6Address) and addr.ipv4_mapped is not None:
+        addr = addr.ipv4_mapped
+    if str(addr) in _METADATA_IPS:
+        return SecurityTargetClass.METADATA
+    if addr.is_loopback:
+        return SecurityTargetClass.LOOPBACK
+    if addr.is_link_local:
+        return SecurityTargetClass.LINK_LOCAL
+    return SecurityTargetClass.PRIVATE

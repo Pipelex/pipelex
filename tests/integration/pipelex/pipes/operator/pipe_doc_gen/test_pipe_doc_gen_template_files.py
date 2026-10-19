@@ -5,6 +5,7 @@ from mthds.method_tree.models import MethodTree
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
@@ -48,7 +49,6 @@ class TestPipeDocGenTemplateFiles:
         ("template_file", "expected_code", "expected"),
         [
             ("invoice.docx", CoreCode.METHOD_RESOURCE_MISSING, "resolves to 'invoice.docx', which is not a file of the tree."),
-            ("../outside.docx", CoreCode.SECURITY_METHOD_PATH_REFUSED, "climbs above the root of its method tree"),
             ("ignored.docx", CoreCode.METHOD_RESOURCE_MISSING, "which is not a file of the tree: it is kept out by a .gitignore pattern"),
             (
                 ".templates/invoice.docx",
@@ -56,15 +56,14 @@ class TestPipeDocGenTemplateFiles:
                 "which is not a file of the tree: it is kept out by a path segment starting with a dot",
             ),
         ],
-        ids=["missing_file", "outside_the_tree", "gitignored", "hidden"],
+        ids=["missing_file", "gitignored", "hidden"],
     )
     async def test_a_template_file_is_a_file_of_the_bundle_s_method_tree(
         self, tmp_path: Path, template_file: str, expected_code: CoreCode, expected: str
     ) -> None:
-        """A template file must be a file of the method's tree: one outside it, or one its membership rule keeps out, is never read."""
+        """A template file must be a file of the method's tree: one its membership rule keeps out is never read."""
         method_dir = tmp_path / "method"
         method_dir.mkdir()
-        (tmp_path / "outside.docx").write_bytes(b"docx")
         (method_dir / "ignored.docx").write_bytes(b"docx")
         (method_dir / ".gitignore").write_text("ignored.docx\n", encoding="utf-8")
         (method_dir / ".templates").mkdir()
@@ -76,6 +75,21 @@ class TestPipeDocGenTemplateFiles:
 
         assert only_problem_item(exc_info.value).code == expected_code
         assert expected in refusal_messages(exc_info.value)
+
+    @pytest.mark.usefixtures("stub_engines")
+    async def test_a_template_file_outside_the_tree_is_the_method_s_security_refusal_not_a_verdict(self, tmp_path: Path) -> None:
+        """A template file that climbs out of the method's tree is refused under its security code, never absorbed into a verdict."""
+        method_dir = tmp_path / "method"
+        method_dir.mkdir()
+        (tmp_path / "outside.docx").write_bytes(b"docx")
+        bundle_path = write_bundle(directory=method_dir, step_fields='format = "docx"\ntemplate_file = "../outside.docx"')
+
+        with pytest.raises(PipelexError) as exc_info:
+            await validate_bundle(mthds_file_path=bundle_path)
+
+        assert not isinstance(exc_info.value, ValidateBundleError)
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_METHOD_PATH_REFUSED
+        assert "climbs above the root of its method tree" in exc_info.value.message
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_climbs_through_dot_dot_to_another_folder_of_its_tree(self, tmp_path: Path) -> None:
