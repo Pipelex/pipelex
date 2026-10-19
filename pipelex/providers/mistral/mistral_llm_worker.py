@@ -265,9 +265,10 @@ class MistralLLMWorker(LLMWorkerAbstract):
         reasoning_effort = self._resolve_reasoning_effort(inference_model=self.inference_model, job_params=job_params)
         self._log_reasoning_sent(api_name="Mistral", settings={"reasoning_effort": None if reasoning_effort is UNSET else reasoning_effort})
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+        from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
+        max_tokens = job_params.max_tokens or self.default_max_tokens
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
@@ -275,7 +276,7 @@ class MistralLLMWorker(LLMWorkerAbstract):
                 messages=messages,
                 model=self.inference_model.model_id,
                 temperature=job_params.temperature if self.inference_model.accepts_temperature else UNSET,
-                max_tokens=job_params.max_tokens or self.default_max_tokens,
+                max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
                 # instructor's retry is confined to schema re-ask: this validation-only AsyncRetrying
                 # re-asks on a malformed/invalid output but never retries a transport error, which ends the
@@ -299,6 +300,11 @@ class MistralLLMWorker(LLMWorkerAbstract):
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
             raise self._make_structured_generation_failure(api_name="Mistral", schema=schema, instructor_exc=instructor_exc) from instructor_exc
+        except IncompleteOutputException as incomplete_exc:
+            # instructor found the answer's first choice finished on `length`
+            raise self._incomplete_output_error(
+                llm_job=llm_job, last_completion=incomplete_exc.last_completion, max_tokens=max_tokens
+            ) from incomplete_exc
         except _SDK_ERRORS as sdk_exc:
             metadata = extract_mistral_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
