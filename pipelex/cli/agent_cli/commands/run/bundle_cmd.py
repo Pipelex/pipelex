@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
 
 import typer
-from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexConfigError, iter_cause_chain
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli, report_agent_init_failure
@@ -28,6 +27,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
     BASE_URL_OPTION_HELP,
     HOSTED_OPTION_HELP,
     RUNNER_OPTION_HELP,
+    agent_error_method_refusal,
     refuse_local_only_flags,
     resolve_agent_run_execution,
     run_hosted_for_agent,
@@ -135,6 +135,12 @@ def run_bundle_cmd(
     if mock_inputs and not dry_run:
         agent_argument_error("--mock-inputs requires --dry-run", argument="--mock-inputs", reason="requires --dry-run")
 
+    # Where the run executes is settled before the method is read: a refusal of the method found while reading it is the
+    # one a runner would answer for it, and a run on a runner reports it as the runner would, in the caller's view.
+    execution = resolve_agent_run_execution(runner=runner, hosted=hosted, base_url=base_url)
+    if execution.is_hosted:
+        refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
+
     pipe_code: str | None = pipe
     bundle_path: str | None = None
     auto_inputs_dir: Path | None = None
@@ -153,10 +159,10 @@ def run_bundle_cmd(
         try:
             folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
         except ValidateBundleError as exc:
-            agent_error(exc.message, cause=exc)
+            agent_error_method_refusal(error=exc, message=exc.message, execution=execution)
         except MethodEntryError as exc:
             # No pipe to start at is the run's refusal and no verdict: its problem carries its own code.
-            agent_error(exc.message, cause=exc)
+            agent_error_method_refusal(error=exc, message=exc.message, execution=execution)
         except PipelexConfigError as exc:
             # Listing the tree reads its limits from the configuration, before the boot would.
             report_agent_init_failure(error=exc)
@@ -207,7 +213,7 @@ def run_bundle_cmd(
                     agent_file_error(f"Bundle file not found: {missing}", path=missing, reason="not found", cause=read_error)
                 if read_error is not None:
                     agent_unreadable_file_error(error=read_error)
-                agent_error(exc.message, cause=exc)
+                agent_error_method_refusal(error=exc, message=exc.message, execution=execution)
             except PipelexConfigError as exc:
                 # Listing the tree reads its limits from the configuration, before the boot would.
                 report_agent_init_failure(error=exc)
@@ -229,23 +235,20 @@ def run_bundle_cmd(
                     bundle_blueprint = MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_path)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
-                    agent_error(
-                        f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
-                        code=CoreCode.REQUEST_PIPE_UNSPECIFIED,
-                        params={"candidates": sorted(bundle_blueprint.pipe or {})},
-                    )
+                    # No pipe to start at, as a folder with no main_pipe has none: the same refusal, `request.pipe_unspecified`.
+                    no_entry_msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe."
+                    no_entry = MethodEntryError(no_entry_msg).with_params(candidates=sorted(bundle_blueprint.pipe or {}))
+                    agent_error_method_refusal(error=no_entry, message=no_entry_msg, execution=execution)
                 pipe_code = main_pipe_code
                 hosted_pipe_code = main_pipe_code
         except ValidateBundleError as exc:
-            agent_error(f"Failed to parse bundle '{bundle_path}': {exc.message}", cause=exc)
+            agent_error_method_refusal(error=exc, message=f"Failed to parse bundle '{bundle_path}': {exc.message}", execution=execution)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback, then auto-detected
     parsed_inputs = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_dir=auto_inputs_dir)
     pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
-    execution = resolve_agent_run_execution(runner=runner, hosted=hosted, base_url=base_url)
     if execution.is_hosted:
-        refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
         # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
         try:
             bundle_files = collect_mthds_files(

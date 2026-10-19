@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:e697942345f3ef2a23b12d9c8e04b92e534335ce22bdffe43b60b20ac7533b09"
+digest = "sha256:e2503f6e69a587a26fd9c9c8e856e158b359b2cbbc5285f680e1c427ea5486f4"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-19T11:06:53Z"
-rationale = "clean-pass: absorbing Runner-speaks-problem, which carries pipelex#1457's agent CLI reading of the runner's problem, keeps this branch's install refusal reasons (package_name_invalid, manifest_missing) in installed_methods.py; docs/tools/cli/agent-cli.md takes #1457's Markdown wording and keeps this branch's method.identifier_invalid item and params facts, and nothing else is stale."
+reviewed_at = "2026-10-19T11:41:17Z"
+rationale = "clean-pass: merging #1458's head (Runner-problem-params, 9578055b3) into this branch, whose own _run_hosted.py and bundle_cmd.py changes are the triggers, keeps both edits to docs/tools/cli/agent-cli.md, #1458's validate-bundle verdict paragraph and this branch's run-on-a-runner paragraph, which touch different passages; pipelex/cli/agent_cli/CLAUDE.md, which #1458 did not change, still describes the hosted caller-view refusals as this branch wrote them, and nothing else under docs/tools/cli/ is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -38,9 +38,9 @@ rationale = "clean-pass: absorbing Runner-speaks-problem, which carries pipelex#
 "pipelex/cli/agent_cli/commands/run/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/agent_cli/commands/run/_output_helpers.py" = "blob:40ed1700e0d5e86d7696eadd7f9887baeb8059f6"
 "pipelex/cli/agent_cli/commands/run/_run_core.py" = "blob:d71aee873856cfa72eb0ff18eb82c79e348f124a"
-"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:cd2b8dda59e076f1023d3b20d7c239b3674c3f2e"
+"pipelex/cli/agent_cli/commands/run/_run_hosted.py" = "blob:8d2e819c44d5669756e931b9f3fc83741d54a1df"
 "pipelex/cli/agent_cli/commands/run/app.py" = "blob:7546d9b31ea2dc22b1ddae538edfbc8e7f7d08df"
-"pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:e8976dd91908262d8d7d5bf2d2e4e11c978a3f3b"
+"pipelex/cli/agent_cli/commands/run/bundle_cmd.py" = "blob:fd02137f1286cb4293cdc5dc2b03c31d5c87454b"
 "pipelex/cli/agent_cli/commands/run/method_cmd.py" = "blob:0df77aa1e35c22ceffdcefd7f4c12f28fda366c7"
 "pipelex/cli/agent_cli/commands/run/pipe_cmd.py" = "blob:1a5a2f86ac80fb86cb53376202bad05ffd19e9f6"
 "pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:db0176d7de1e074fd6eefd787c10e71b891eeb32"
