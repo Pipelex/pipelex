@@ -33,6 +33,7 @@ from pipelex.errors.problem import (
     runtime_version,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.suggested_fix import SuggestedFix
 from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_span_context_for_logs
 from pipelex.validation_error_types import ValidationErrorType
@@ -279,6 +280,9 @@ class PipelexError(Exception):
 
     # The code the raise site chose with :meth:`with_error_code`, from the codes the class declares.
     _chosen_error_code: ErrorCode | None = None
+    # The class of destination a security refusal refused, stated by the raise site with
+    # :meth:`with_security_target_class`; the security event carries it and nothing else about the target.
+    _security_target_class: SecurityTargetClass | None = None
     # The parameters the raise site gave with :meth:`with_params`.
     _given_params: dict[str, Any] | None = None
     # The items the raise site gave with :meth:`with_items`, one per fault of a refusal of several.
@@ -323,6 +327,28 @@ class PipelexError(Exception):
             raise ValueError(msg)
         self._chosen_error_code = error_code
         return self
+
+    def with_security_target_class(self, target_class: SecurityTargetClass | None) -> Self:
+        """State, where a security refusal is decided, which class of destination it refused.
+
+        The security event (:mod:`pipelex.errors.security_event`) names that class, a loopback or a private address,
+        a cloud metadata endpoint, a scheme the runtime does not read, and never the destination itself. Only the
+        raise site knows it: the SSRF guard has the address in hand, the read scope the reason. ``None`` leaves the
+        class unknown, for a site that refused something it cannot classify, such as a name that resolved to nothing.
+
+        Args:
+            target_class: The class of destination refused, or ``None`` when the site cannot tell.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_security_target_class(target_class)``.
+        """
+        self._security_target_class = target_class
+        return self
+
+    @property
+    def security_target_class(self) -> SecurityTargetClass | None:
+        """The class of destination this security refusal refused, ``None`` when nobody stated it."""
+        return self._security_target_class
 
     def with_params(self, **params: Any) -> Self:
         """Give, where this error is raised, the parameters its code's sentences are rendered from.

@@ -33,10 +33,7 @@ from pipelex.errors.problem import (
     make_problem,
     runtime_version,
 )
-from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
-
-#: The registry code of the failure's problem, which a line about a failure gives in place of its text.
-ERROR_CODE_FIELD = "error.code"
+from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD
 
 #: The classes along the failure's cause chain, the failure's own first, which a line gives in place of their texts.
 ERROR_CHAIN_FIELD = "error.chain"

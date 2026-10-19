@@ -1,4 +1,5 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.bundle_resources.bundle_resource import (
     canonical_resource_path,
@@ -25,24 +26,30 @@ class TestCanonicalResourcePath:
         assert canonical_resource_path_or_none(path=path) == expected
 
     @pytest.mark.parametrize(
-        ("path", "reason"),
+        ("path", "reason", "code"),
         [
-            ("", "empty"),
-            ("   ", "empty"),
-            (".", "names no file"),
-            ("/etc/invoice.docx", "absolute"),
-            ("../invoice.docx", "'..' segment"),
-            ("templates/../../invoice.docx", "'..' segment"),
-            ("templates\\invoice.docx", "backslash"),
-            ("C:invoice.docx", "colon"),
-            ("invoice\x00.docx", "NUL"),
+            ("", "empty", CoreCode.REQUEST_INVALID),
+            ("   ", "empty", CoreCode.REQUEST_INVALID),
+            (".", "names no file", CoreCode.REQUEST_INVALID),
+            ("/etc/invoice.docx", "absolute", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("\\etc\\invoice.docx", "absolute", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("../invoice.docx", "'..' segment", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("templates/../../invoice.docx", "'..' segment", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("..\\secrets\\key.pem", "'..' segment", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("C:/Windows/invoice.docx", "drive", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("C:invoice.docx", "drive", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("\\\\server\\share\\invoice.docx", "network share", CoreCode.SECURITY_INPUT_PATH_REFUSED),
+            ("templates\\invoice.docx", "backslash", CoreCode.REQUEST_INVALID),
+            ("invoice:v2.docx", "colon", CoreCode.REQUEST_INVALID),
+            ("invoice\x00.docx", "NUL", CoreCode.REQUEST_INVALID),
         ],
     )
-    def test_a_path_that_cannot_name_a_file_inside_the_bundle_is_refused(self, path: str, reason: str) -> None:
-        """The message says why, and the lenient form answers None."""
+    def test_a_path_that_cannot_name_a_file_inside_the_bundle_is_refused(self, path: str, reason: str, code: CoreCode) -> None:
+        """The message says why, the lenient form answers None, and only a path leaving the bundle is a security refusal."""
         with pytest.raises(BundleResourcePathError) as exc_info:
             canonical_resource_path(path=path)
         assert reason in exc_info.value.message
+        assert exc_info.value.resolve_error_code() == code
         assert canonical_resource_path_or_none(path=path) is None
 
 

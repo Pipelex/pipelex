@@ -8,6 +8,10 @@ rationale = "Converts its one operand, a registry domain: ErrorDomain.from_probl
 param = "error_code"
 rationale = "Chained at every raise site on its one operand, the chosen code: raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING)."
 
+["pipelex/base_exceptions.py::PipelexError.with_security_target_class"]
+param = "target_class"
+rationale = "Chained at every raise site on its one operand, the class of destination refused: raise SsrfBlockedError(msg).with_security_target_class(target_class)."
+
 ["pipelex/base_exceptions.py::error_domain_is_input"]
 param = "error_domain"
 rationale = "Predicate on the error domain; single operand."
@@ -6355,6 +6359,10 @@ rationale = "Parses/reads the path; single operand."
 ["pipelex/tools/misc/toml_utils.py::save_toml_to_path"]
 param = "data"
 rationale = "Transforms the data; single operand."
+
+["pipelex/tools/network/host_rules.py::classify_disallowed_host"]
+param = "host"
+rationale = "Reads as classify(host): its one operand is the host the SSRF guard refused, as is_disallowed_host takes it."
 
 ["pipelex/tools/network/host_rules.py::is_disallowed_host"]
 param = "host"
