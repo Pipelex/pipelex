@@ -1,10 +1,10 @@
 contract = "logging-docs"
-digest = "sha256:f07cb29a7da0c4d4f3b462d3cc7879db0de8a1991455e000de153d036e487b4f"
+digest = "sha256:e9d1efdae09623788998bf78a017bf4ab34e85bf61e88c64ff02b29f6f613494"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-17T06:50:19Z"
-rationale = "real-catch: the contract now triggers on pydantic_utils.py, where error_fields writes a ValidationError: its locations, reasons and the new is_authored_input option live there. logging.md now names the TypeAdapter form of validated_type and is_authored_input, the secondary-failure lines logged by class and code, and the instructor records no sink writes; log-sink-plugins.md said a redaction failure was the one case a sink misses an accepted record, and now names the instructor filter as the other."
+reviewed_at = "2026-10-19T10:03:38Z"
+rationale = "real-catch: the merge of dev's #1452 into this branch left error_fields.py with two ERROR_CODE_FIELD constants, #1452's for a pipe's failure line and this branch's for a CLI root's failure line and the security event; one remains. logging.md's field table row for error.code was merged in the merge commit to name all three carriers, and its Exceptions section, which #1452 rewrote for a pipe's failure and a secondary failure, still holds against error_fields.py and pydantic_utils.py; log-sink-plugins.md states nothing these modules decide."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
-"pipelex/tools/log/error_fields.py" = "blob:e58e2a88ebc48c08fdfe1c7d173c9a719346cac0"
+"pipelex/tools/log/error_fields.py" = "blob:76a1e4c88aa57427a11e7550c1144644494d56f3"
 "pipelex/tools/typing/pydantic_utils.py" = "blob:6c469e95f53135d426c00e7b4cfc8711004f518b"
