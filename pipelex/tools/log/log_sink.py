@@ -90,6 +90,21 @@ class ProcessorFilter(logging.Filter):
         return UNSCRUBBED_MARK not in record.__dict__
 
 
+#: The loggers of libraries whose records quote a run's data by design, by their top-level package name: `instructor`
+#: logs each attempt's validation error, which quotes the model's answer, and the requests it sends, with the prompt.
+#: Pipelex reports what such a library does through its own lines and errors, so no sink writes their records, at any
+#: level a configuration gives the logger.
+PAYLOAD_LOGGER_PACKAGES: frozenset[str] = frozenset({"instructor"})
+
+
+class PayloadLoggerFilter(logging.Filter):
+    """Drops a record of a library that writes a run's data into its log lines (``PAYLOAD_LOGGER_PACKAGES``)."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        return record.name.split(".", 1)[0] not in PAYLOAD_LOGGER_PACKAGES
+
+
 def _report_processor_failure(*, processor: LogRecordProcessor, exc: Exception) -> None:
     """Write the stdlib's logging-error banner with the processor and the exception type, when the stdlib would have reported at all."""
     if not logging.raiseExceptions or not sys.stderr:
@@ -119,9 +134,13 @@ class LogSink(ABC):
 
     @property
     def handler(self) -> logging.Handler:
-        """The sink's handler, built on first read with the processors wired in front of it."""
+        """The sink's handler, built on first read with the processors wired in front of it.
+
+        A record of a library that quotes a run's data in its lines is dropped first (``PayloadLoggerFilter``).
+        """
         if self._handler is None:
             handler = self.make_handler()
+            handler.addFilter(PayloadLoggerFilter())
             handler.addFilter(ProcessorFilter(processors=self.processors))
             self._handler = handler
         return self._handler

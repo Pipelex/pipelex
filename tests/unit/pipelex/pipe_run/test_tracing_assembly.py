@@ -290,6 +290,28 @@ class TestTracingAssembly:
         assert result.graph_assembly_error is not None
         assert result.tokens_usages == [usage_event.tokens_usage]
 
+    @pytest.mark.parametrize("failing_step", ["read", "assembly"])
+    def test_an_assembly_error_never_quotes_a_traced_value(self, mocker: MockerFixture, failing_step: str) -> None:
+        """The assembly's errors travel on the run's output: a refusal is written by its reasons, never the value it quotes."""
+        self._enable_tracing(mocker)
+        traced_value = "jane.doe@acme.example"
+        with pytest.raises(ValidationError) as caught:
+            UsageReportEvent.model_validate({"sequence": traced_value})
+        event_log = mocker.MagicMock()
+        mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
+        match failing_step:
+            case "read":
+                event_log.read_events = mocker.MagicMock(side_effect=caught.value)
+            case _:
+                event_log.read_events = mocker.MagicMock(return_value=[_make_usage_event("plr-quote", "plr-quote:node_0")])
+                mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", side_effect=caught.value)
+
+        result = assemble_tracing(pipeline_run_id="plr-quote", assemble_graph=True, assemble_usage=False)
+
+        assert result.graph_assembly_error is not None
+        assert "Input should be a valid integer" in result.graph_assembly_error
+        assert traced_value not in result.graph_assembly_error
+
     def test_unexpected_keyerror_propagates(self, mocker: MockerFixture) -> None:
         """Programming bugs (KeyError) propagate — proves tightening from a blanket except Exception."""
         self._enable_tracing(mocker)

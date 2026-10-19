@@ -225,12 +225,14 @@ class TestLocatedRunFailure:
 
         assert error.pipe_code == "flow"
         assert error.pipe_stack == ["flow"]
-        assert error.message == "Pipe 'flow' failed: KeyError: 'boom from a pipe'"
+        # Named by its class alone: a foreign exception's text can carry a key of the run's data.
+        assert error.message == "Pipe 'flow' failed: KeyError"
         operator = error.to_problem(view=ProblemView.OPERATOR)
         assert operator.code == CoreCode.RUNTIME_UNEXPECTED
         assert operator.diagnostics is not None
         assert operator.diagnostics.error_class == "PipelexUnexpectedError"
-        assert "boom from a pipe" in operator.diagnostics.message
+        assert operator.diagnostics.message == "KeyError"
+        assert "boom from a pipe" not in str(operator.to_wire())
         caller = error.to_problem(view=ProblemView.CALLER)
         assert caller.code == CoreCode.RUNTIME_UNEXPECTED
         assert "boom from a pipe" not in str(caller.to_wire())

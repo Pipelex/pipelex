@@ -76,6 +76,12 @@ class ShaperRecord(StructuredContent):
     b: int | None = Field(default=None, description="Another optional number")
 
 
+class ShaperLedger(StructuredContent):
+    """A structure holding a dict, whose keys are the caller's own text."""
+
+    scores: dict[str, int] = Field(description="A score by name")
+
+
 class ShaperWeird(StructuredContent):
     """A pathological structure whose fields are literally `concept` and `content` (collision-rule test)."""
 
@@ -101,6 +107,7 @@ CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
     ("ShaperPerson", "ShaperPerson", None),
     ("ShaperRecord", "ShaperRecord", None),
     ("ShaperWeird", "ShaperWeird", None),
+    ("ShaperLedger", "ShaperLedger", None),
 ]
 
 CONCEPT_REFS: list[str] = [f"{SHAPER_TEST_DOMAIN}.{concept_code}" for concept_code, _, _ in CONCEPT_DEFS]

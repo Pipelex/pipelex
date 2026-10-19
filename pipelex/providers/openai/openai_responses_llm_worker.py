@@ -46,6 +46,11 @@ if TYPE_CHECKING:
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
+# The OpenAI SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (openai.APIStatusError, openai.APIConnectionError)
+
+
 class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
     def __init__(
         self,
@@ -164,7 +169,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
@@ -189,7 +194,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
         )
 
         if not response.output_text:
-            msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
+            # The response is the model's answer, the run's data: the message names the model and the status alone.
+            msg = f"OpenAI Responses message content is empty (status: {response.status})\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
@@ -258,7 +264,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth/not-found errors aren't flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_openai_metadata(underlying_exc)
+                metadata = extract_openai_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
                 classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
@@ -267,14 +273,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            msg = (
-                f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {instructor_exc}"
-            )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN).with_error_code(
-                CoreCode.RUNTIME_UNEXPECTED
+            raise self._make_structured_generation_failure(
+                api_name="OpenAI Responses", schema=schema, instructor_exc=instructor_exc
             ) from instructor_exc
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(

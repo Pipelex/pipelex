@@ -21,7 +21,7 @@ from pipelex import log
 from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.exceptions import EventLogSchemaMismatchError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
@@ -192,7 +192,10 @@ class NdjsonEventLog(EventLogProtocol):
                             continue
                         refused_count += 1
                         if first_refusal is None:
-                            first_refusal = f"{ndjson_path}:{line_number} — {format_pydantic_validation_error(validation_error)}"
+                            first_refusal = (
+                                f"{ndjson_path}:{line_number} — "
+                                f"{format_validation_error_without_input(validation_error=validation_error, validated_type=_any_trace_event_adapter)}"
+                            )
                         continue
 
                     events.append(event)

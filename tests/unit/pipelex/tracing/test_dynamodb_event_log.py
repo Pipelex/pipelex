@@ -204,6 +204,21 @@ class TestDynamoDBEventLog:
 
         assert event_log.read_events(_RUN_ID) == events
 
+    def test_a_refusal_locates_the_field_and_never_quotes_the_traced_value(self, mocker: MockerFixture) -> None:
+        """The refusal travels into the run's assembly errors: it names the refused field, never the traced value it held."""
+        event_log, mock_table = self._make_event_log_with_table(mocker)
+        payload = json.loads(_decision_events(mode=PipeRunMode.LIVE)[0].model_dump_json())
+        payload["sequence"] = "traced-value-from-the-run"
+        mock_table.query.return_value = {
+            "Items": [{"PK": f"PIPELINE_RUN#{_RUN_ID}", "SK": "EVENT#wf_flow#primary#0000000000", "payload": json.dumps(payload)}]
+        }
+
+        with pytest.raises(EventLogSchemaMismatchError) as refusal:
+            event_log.read_events(_RUN_ID)
+
+        assert f"{payload['event_kind']}.sequence: Input should be a valid integer" in str(refusal.value)
+        assert "traced-value-from-the-run" not in str(refusal.value)
+
     def test_an_event_stored_without_a_mode_is_refused(self, mocker: MockerFixture) -> None:
         """A payload written before every event stated its mode is in a shape this version refuses, never read as live."""
         event_log, mock_table = self._make_event_log_with_table(mocker)

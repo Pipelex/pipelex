@@ -32,7 +32,8 @@ class WorkingMemoryFactory(BaseModel):
     @classmethod
     def make_from_single_stuff(cls, stuff: Stuff) -> WorkingMemory:
         if not stuff.stuff_name:
-            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff}"
+            # A stuff's own text carries its content, the run's data: the message names it by its header, its code and concept.
+            msg = f"Cannot make_from_single_stuff because stuff has no name: {stuff.header}"
             raise WorkingMemoryFactoryError(msg)
         stuff_dict: StuffDict = {stuff.stuff_name: stuff}
         return WorkingMemory(root=stuff_dict, aliases={MAIN_STUFF_NAME: stuff.stuff_name})
@@ -51,7 +52,8 @@ class WorkingMemoryFactory(BaseModel):
             if not name:
                 if is_ignore_unnamed:
                     continue
-                msg = f"Stuff {stuff} has no name"
+                # A stuff's own text carries its content, the run's data: the message names it by its header, its code and concept.
+                msg = f"Stuff {stuff.header} has no name"
                 raise WorkingMemoryFactoryError(msg)
             stuff_dict[name] = stuff
         aliases: dict[str, str] = {}
@@ -172,13 +174,14 @@ class WorkingMemoryFactory(BaseModel):
                     needed_inputs_for_factory.append(text_typed_named_stuff_spec)
 
             except ValidationError as exc:
-                # Fallback to TextContent when the typed stuff spec fails pydantic validation
+                # Fallback to TextContent when the typed stuff spec fails pydantic validation. The spec is the method's
+                # own document, no run's data, so its refusal is located as pydantic gives it.
                 log.warning(
                     "An input whose concept's structure class could not be used was mocked as text",
                     fields={
                         "stuff_name": named_stuff_spec.variable_name,
                         "concept_ref": named_stuff_spec.concept.concept_ref,
-                        **error_fields(exc=exc),
+                        **error_fields(exc=exc, is_authored_input=True),
                     },
                 )
                 text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
@@ -281,13 +284,14 @@ class WorkingMemoryFactory(BaseModel):
                 working_memory.add_new_stuff(name=typed_named_stuff_spec.variable_name, stuff=mock_stuff)
             except (FactoryException, ValidationError) as exc:
                 # Mock build (polyfactory) or content validation (pydantic) failed for this dynamic
-                # class — fall back to text content. Unexpected errors propagate.
+                # class — fall back to text content. Unexpected errors propagate. The refused value is a mock Pipelex
+                # built, no run's data, so its refusal is located as pydantic gives it.
                 log.warning(
                     "A text stand-in was used for a mock input its structure could not build",
                     fields={
                         "stuff_name": typed_named_stuff_spec.variable_name,
                         "concept_ref": typed_named_stuff_spec.concept.concept_ref,
-                        **error_fields(exc=exc),
+                        **error_fields(exc=exc, is_authored_input=True),
                     },
                 )
                 # Create fallback text content

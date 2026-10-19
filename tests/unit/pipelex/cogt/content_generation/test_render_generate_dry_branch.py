@@ -13,10 +13,11 @@ from pipelex.cogt.content_generation.render_generate import render_page_views_an
 from pipelex.config import get_config
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
 
 
 class TestRenderGenerateDryBranch:
-    def _assignment(self, *, run_mode: PipeRunMode) -> RenderPageViewsAssignment:
+    def _assignment(self, *, run_mode: PipeRunMode, input_name: str | None = None) -> RenderPageViewsAssignment:
         return RenderPageViewsAssignment(
             job_metadata=JobMetadata(
                 run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_render_dry")
@@ -24,6 +25,7 @@ class TestRenderGenerateDryBranch:
             cogt_run_params=CogtRunParams(run_mode=run_mode),
             document_uri="file:///tmp/doc.pdf",
             page_views_dpi=72,
+            input_name=input_name,
         )
 
     @pytest.mark.asyncio
@@ -62,3 +64,19 @@ class TestRenderGenerateDryBranch:
 
         assert len(page_views) == 2
         assert factory.make_image_content.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_a_failed_fetch_names_the_input_the_document_came_from(self, mocker: MockerFixture) -> None:
+        """The document's URL could not be fetched: the failure names the input, which the assignment carries, never the URL."""
+        mocker.patch(
+            "pipelex.tools.pdf.pypdfium2_renderer.pypdfium2_renderer.render_pdf_pages_from_uri",
+            new=mocker.AsyncMock(side_effect=RemoteFileFetchError("Could not fetch a remote file", host="files.example.com")),
+        )
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await render_page_views_and_store(
+                render_assignment=self._assignment(run_mode=PipeRunMode.LIVE, input_name="contracts[1]"),
+                generated_content_factory=mocker.MagicMock(),
+            )
+
+        assert exc_info.value.input_name == "contracts[1]"

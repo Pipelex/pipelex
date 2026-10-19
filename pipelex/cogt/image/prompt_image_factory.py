@@ -16,7 +16,13 @@ from pipelex.tools.misc.base64_utils import (
 class PromptImageFactory:
     @classmethod
     def make_prompt_image(
-        cls, *, uri: str | None = None, base64_data: str | None = None, raw_bytes: bytes | None = None, mime_type: str | None = None
+        cls,
+        *,
+        uri: str | None = None,
+        base64_data: str | None = None,
+        raw_bytes: bytes | None = None,
+        mime_type: str | None = None,
+        input_name: str | None = None,
     ) -> PromptImage:
         """Create a PromptImage from the provided input.
 
@@ -26,6 +32,8 @@ class PromptImageFactory:
             raw_bytes: Raw binary image data
             mime_type: The image's MIME type when it is known (only used with a uri other than a data URL,
                 whose bytes carry their own type)
+            input_name: The input the image came from, as a caller writes it, which a failed fetch of its URL names
+                (only used with a uri other than a data URL, which nothing fetches)
 
         Returns:
             A PromptImage instance (PromptImageUri, PromptImageBase64, or PromptImageBinary)
@@ -44,6 +52,6 @@ class PromptImageFactory:
             if extracted is not None:
                 extracted_base64_data, _mime_type = extracted
                 return PromptImageBase64(base64_data=extracted_base64_data)
-            return PromptImageUri(uri=uri, mime_type=mime_type)
+            return PromptImageUri(uri=uri, mime_type=mime_type, input_name=input_name)
         msg = "PromptImageFactory requires one of: uri, base64_data, or raw_bytes"
         raise PromptImageFactoryError(msg)

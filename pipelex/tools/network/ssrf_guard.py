@@ -56,8 +56,10 @@ async def resolve_to_allowed_ips(
     covering DNS too — stock httpcore resolves inside the same deadline, but here
     resolution happens in a separate step.
     """
+    # No message names the host: it is part of a URL the runtime did not choose, a run's input or a callback the caller
+    # gave, and a message reaches the operator's diagnostics and the logs. The refusal's code says what was refused.
     if is_disallowed_host(host):
-        msg = f"Refusing to connect to {host!r}: destination is a disallowed (private/loopback/metadata) address."
+        msg = "Refusing to connect: the destination is a disallowed (private/loopback/metadata) address."
         raise SsrfBlockedError(msg).with_security_target_class(classify_disallowed_host(host))
     loop = asyncio.get_running_loop()
     getaddrinfo_coro = loop.getaddrinfo(host, port, type=socket.SOCK_STREAM)
@@ -67,21 +69,21 @@ async def resolve_to_allowed_ips(
         else:
             addr_infos = await asyncio.wait_for(getaddrinfo_coro, timeout=timeout)
     except socket.gaierror as exc:
-        msg = f"Could not resolve host {host!r}."
+        msg = "Could not resolve the destination host."
         raise httpcore.ConnectError(msg) from exc
     except TimeoutError as exc:
-        msg = f"Timed out resolving host {host!r}."
+        msg = "Timed out resolving the destination host."
         raise httpcore.ConnectTimeout(msg) from exc
     resolved_ips = [str(addr_info[4][0]) for addr_info in addr_infos]
     # Fail closed: if resolution yielded no address to vet, refuse rather than
     # fall through. getaddrinfo raises on failure today, but the guard's contract
     # is "return vetted IPs or raise" — never return an unvetted destination.
     if not resolved_ips:
-        msg = f"Refusing to connect to {host!r}: name resolved to no addresses."
+        msg = "Refusing to connect: the destination host resolved to no addresses."
         raise SsrfBlockedError(msg)
     disallowed_ips = [resolved_ip for resolved_ip in resolved_ips if is_disallowed_ip(resolved_ip)]
     if disallowed_ips:
-        msg = f"Refusing to connect to {host!r}: it resolved to a disallowed (private/loopback/metadata) address."
+        msg = "Refusing to connect: the destination host resolved to a disallowed (private/loopback/metadata) address."
         # The first disallowed address classifies the refusal for its security event, which never names the address.
         raise SsrfBlockedError(msg).with_security_target_class(classify_disallowed_host(disallowed_ips[0]))
     return resolved_ips

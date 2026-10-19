@@ -228,6 +228,7 @@ class ContentGenerator(ContentGeneratorProtocol):
             cogt_run_params=cogt_run_params,
             document_uri=extract_input.document_uri,
             page_views_dpi=page_views_dpi,
+            input_name=extract_input.input_name,
         )
         return await render_page_views_and_store(
             render_assignment=render_assignment,

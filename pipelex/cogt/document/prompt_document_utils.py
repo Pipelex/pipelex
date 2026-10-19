@@ -15,7 +15,7 @@ from pipelex.cogt.document.prompt_document import (
     PromptDocumentUri,
 )
 from pipelex.runtime_hub import get_storage_provider
-from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
+from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx, fetching_for_input
 from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64, detect_file_type_from_bytes
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl
@@ -62,7 +62,8 @@ async def prepare_prompt_document(
                     if is_http_url_enabled:
                         prepared = PreparedFileHttpUrl(url=prompt_document.resolved.url)
                     else:
-                        raw_bytes = await fetch_file_from_url_httpx(url=prompt_document.resolved.url)
+                        with fetching_for_input(input_name=prompt_document.input_name):
+                            raw_bytes = await fetch_file_from_url_httpx(url=prompt_document.resolved.url)
                         prepared = PreparedFileBase64(
                             base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                             file_type=detect_file_type_from_bytes(raw_bytes),
@@ -140,7 +141,8 @@ async def prepare_prompt_document_as_base64(prompt_document: PromptDocument) -> 
         case PromptDocumentUri():
             match prompt_document.resolved:
                 case ResolvedHttpUrl():
-                    raw_bytes = await fetch_file_from_url_httpx(url=prompt_document.resolved.url)
+                    with fetching_for_input(input_name=prompt_document.input_name):
+                        raw_bytes = await fetch_file_from_url_httpx(url=prompt_document.resolved.url)
                     return PreparedFileBase64(
                         base64_data=base64.b64encode(raw_bytes).decode("ascii"),
                         file_type=detect_file_type_from_bytes(raw_bytes),
