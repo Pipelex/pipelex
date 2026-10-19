@@ -15,6 +15,7 @@
 #
 # A new raise belongs here only when it is one of these; otherwise raise a coded PipelexError subclass.
 api/pipelex_api/errors.py | _raise_api_error | ApiError | carrier
+api/pipelex_api/openapi_schema.py | name_shared_fix_schemas | ValueError | invariant
 api/pipelex_api/schemas/models.py | _ensure_mthds_file_within_bytes_limit | ValueError | validator
 pipelex/base_exceptions.py | PipelexError.__init_subclass__ | TypeError | invariant
 pipelex/base_exceptions.py | PipelexError.with_error_code | ValueError | invariant

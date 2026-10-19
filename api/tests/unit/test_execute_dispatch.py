@@ -390,7 +390,7 @@ class TestExecuteDispatch:
         # The packaged default is `direct`; the empty registry holds no orchestrator for it.
         assert exc_info.value.mode == "direct"
         # The deployment's own default has no orchestrator: the operator installs its plugin.
-        assert exc_info.value.to_error_report().code == "pipelex.plugin.not_found"
+        assert exc_info.value.resolve_error_code() == "pipelex.plugin.not_found"
 
     @pytest.mark.asyncio
     async def test_missing_orchestrator_for_the_callers_override_is_unsupported(self, mocker: MockerFixture) -> None:
@@ -406,4 +406,4 @@ class TestExecuteDispatch:
                 requested_orchestration_mode="temporal",
             )
         assert exc_info.value.mode == "temporal"
-        assert exc_info.value.to_error_report().code == "runtime.unsupported"
+        assert exc_info.value.resolve_error_code() == "runtime.unsupported"

@@ -2,11 +2,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.graph.graphspec import ErrorSpec, GraphSpec, NodeKind, NodeStatus
+from pipelex.errors.problem import ProblemView, make_location, make_problem
+from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeStatus
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -75,7 +77,7 @@ class _Writer:
             pipe_ref=f"filings.{pipe_code}",
             pipe_type=pipe_type,
             ended_at=base["timestamp"],
-            error=ErrorSpec(error_type="WorkerLostError", message="An internal error occurred."),
+            error=make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, location=make_location(pipe=pipe_code, path=[pipe_code])),
         )
 
     def usage(self, *, node_id: str, path: str) -> UsageReportEvent:

@@ -2,8 +2,8 @@
 
 Three failure modes used to collapse to a bare message-only residual (no ``error_type``,
 no locator). They now carry a category + ``error_type`` + identity locators, built by the
-one shared builder and projected onto ``ErrorReport.validation_errors`` (the same items the
-agent CLI emits and the hosted ``InvalidReport`` carries):
+one shared builder and listed by ``ValidateBundleError.validation_error_items()`` (the items the
+agent CLI emits, each of which the invalid verdict's problem lists under its ``errors``):
 
 - pipe-owned unresolved concept reference (a pipe input/output) → ``pipe_validation`` /
   ``unresolved_concept`` (with the referencing pipe, the missing concept, and the field).
@@ -23,8 +23,10 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -206,12 +208,15 @@ template = "A note about $topic"
 
 
 async def _validation_errors_for(mthds_contents: str) -> list[ValidationErrorItem]:
-    """Validate one invalid bundle and return its structured validation_errors[]."""
+    """Validate one invalid bundle and return its structured validation items, one per item of its problem's `errors`."""
     with pytest.raises(ValidateBundleError) as exc_info:
         await validate_bundle(mthds_contents=[mthds_contents])
-    report = exc_info.value.to_error_report()
-    items = report.validation_errors
-    assert items, "Every invalid verdict must carry a non-empty validation_errors[]"
+    items = exc_info.value.validation_error_items()
+    assert items, "Every invalid verdict must carry a non-empty list of validation items"
+    problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.METHOD_INVALID
+    assert problem.errors is not None
+    assert len(problem.errors) == len(items)
     return items
 
 
@@ -345,7 +350,7 @@ class TestValidateBundleStructuredErrors:
         """Every item that carries a `pipe_code` must carry `domain_code` too — the
         presentation chain identifies pipes by full ref (`domain_code.pipe_code`), so a
         bare-code item degrades node decorations and click-to-navigate downstream. Pins
-        the report-wide invariant on an extraneous-input bundle (surfaced here by the
+        the verdict-wide invariant on an extraneous-input bundle (surfaced here by the
         blueprint categorizer; the operator-raised `PipeValidationError` sites that used
         to omit `domain_code` are fixed at their raise sites and pinned by the pipe-sorter
         unit test).
@@ -357,7 +362,7 @@ class TestValidateBundleStructuredErrors:
         item = extraneous_items[0]
         assert item.pipe_code == "greet_person"
         assert item.domain_code == "structured_extraneous_input"
-        # The invariant holds across the whole report, not just the pinned channel.
+        # The invariant holds across the whole verdict, not just the pinned channel.
         for reported in items:
             if reported.pipe_code is not None:
                 assert reported.domain_code is not None, f"item {reported.error_type} carries pipe_code without domain_code"
@@ -388,7 +393,7 @@ class TestValidateBundleStructuredErrors:
         bundle_path.write_text(mthds_contents)
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
-        items = exc_info.value.to_error_report().validation_errors
+        items = exc_info.value.validation_error_items()
         assert items, "Every invalid verdict must carry a non-empty validation_errors[]"
         extraneous_items = [item for item in items if item.error_type == PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE]
         assert extraneous_items, f"Expected an extraneous_input_variable item, got {[(i.category, i.error_type) for i in items]}"

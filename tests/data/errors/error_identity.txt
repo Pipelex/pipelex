@@ -92,7 +92,7 @@ DuplicateSecretsProviderError | pipelex.plugin.conflict
 DuplicateServiceErrorCodeError | pipelex.plugin.conflict
 DuplicateStorageProviderError | pipelex.plugin.conflict
 EmptyMethodTreeError | method.invalid
-EntryPipeAmbiguousError | one of request.pipe_ambiguous, method.pipe_unresolved
+EntryPipeAmbiguousError | one of request.pipe_ambiguous, request.pipe_unspecified, method.ref_ambiguous
 EntryPipeNotFoundError | one of request.pipe_not_found, request.pipe_unspecified, method.pipe_unresolved
 EnvVarNotFoundError | pipelex.config.variable_missing
 ErrorRegistryError | runtime.unexpected
@@ -197,7 +197,7 @@ MarkdownFormattingBudgetError | input.too_large
 MarkdownParserDependencyError | pipelex.config.dependency_missing
 MethodDependencyFetchError | method.dependency_missing
 MethodDependencyNotShippedError | method.dependency_missing
-MethodEntryError | one of request.pipe_unspecified, request.pipe_ambiguous, request.pipe_not_found, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
+MethodEntryError | one of request.pipe_unspecified, method.ref_ambiguous, request.pipe_ambiguous, request.pipe_not_found, method.pipe_unresolved, method.package_invalid, method.syntax, method.invalid
 MethodFetchDisabledError | method.dependency_missing
 MethodFetchError | one of method.fetch_failed, pipelex.config.dependency_missing, method.not_found, method.package_invalid
 MethodFileUnavailableError | one of runtime.unexpected, method.resource_missing

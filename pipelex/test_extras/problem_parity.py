@@ -1,14 +1,14 @@
-"""Single source of truth for the local / Temporal ``ErrorReport`` parity contract.
+"""Single source of truth for the local / Temporal problem parity contract.
 
 This module is **shipped in the open-core wheel on purpose**. The parity contract spans two
-repos: open core asserts that a failing pipe surfaces a fully classified ``ErrorReport`` on the
+repos: open core asserts that a failing pipe surfaces a fully classified problem on the
 local execution path, and our Temporal plugin asserts the *same*
-classification survives the activity -> workflow -> submitter boundary. Both arms import the
+problem survives the activity -> workflow -> submitter boundary. Both arms import the
 fixtures below, so the classification a failing pipe surfaces cannot silently diverge between the
 two execution paths — there is one definition, not two hand-synced copies.
 
 Shipping it from core also gives third-party orchestrator-plugin authors a ready-made fixture to
-prove their own backend preserves the ``ErrorReport`` across its boundary.
+prove their own backend preserves the problem across its boundary.
 
 The only genuinely per-repo bit — the ``.mthds`` bundle each repo ships to drive the failing pipe
 — is deliberately NOT here. Each arm subclasses these classes and adds its own ``BUNDLE_FILE``.
@@ -16,16 +16,18 @@ The only genuinely per-repo bit — the ``.mthds`` bundle each repo ships to dri
 
 from typing import ClassVar
 
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, StepKind
+
 from pipelex.cogt.exceptions import InferenceErrorCategory, JudgmentJobFailureError, LLMCompletionError, SearchJobFailureError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 
 
-class ErrorReportParityTestData:
-    """Constants + factory driving both arms of the local / Temporal ``ErrorReport`` parity test.
+class ProblemParityTestData:
+    """Constants + factory driving both arms of the local / Temporal problem parity test.
 
     A single deliberately-failing ``PipeLLM`` call is the source of truth for both arms: each runs
     the ``native_text_sequence`` pipe with the LLM call mocked to raise ``make_failing_llm_error()``,
-    then asserts the resulting ``ErrorReport`` against the same ``EXPECTED_*`` classification.
+    then asserts the resulting problem against the same ``EXPECTED_*`` classification.
     """
 
     PIPE_CODE: ClassVar[str] = "native_text_sequence"
@@ -39,9 +41,14 @@ class ErrorReportParityTestData:
     FAILURE_CATEGORY: ClassVar[InferenceErrorCategory] = InferenceErrorCategory.CONFIGURATION
     FAILURE_USER_ACTION_DETAIL: ClassVar[str] = "Verify the API key configured for this provider."
 
-    # The classification both arms must surface on the recovered ErrorReport.
+    # The classification both arms must surface on the recovered problem: the code the category names, its domain, its
+    # verdict and its step, and the model and the provider on the operator's diagnostics.
+    EXPECTED_CODE: ClassVar[CoreCode] = CoreCode.RUNTIME_MISCONFIGURED
+    EXPECTED_DOMAIN: ClassVar[ProblemDomain] = ProblemDomain.OPERATOR
     EXPECTED_RETRYABLE: ClassVar[bool] = False
-    EXPECTED_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
+    EXPECTED_OPERATOR_STEP_KIND: ClassVar[StepKind] = StepKind.FIX_CONFIGURATION
+    # The advice the failure carries, which a local CLI prints as its tip and no problem carries.
+    FAILURE_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
 
     @classmethod
     def make_failing_llm_error(cls) -> LLMCompletionError:
@@ -53,7 +60,7 @@ class ErrorReportParityTestData:
         error = LLMCompletionError(
             cls.FAILURE_MESSAGE,
             error_category=cls.FAILURE_CATEGORY,
-            user_action=UserAction(kind=cls.EXPECTED_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
+            user_action=UserAction(kind=cls.FAILURE_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
         )
         # model_handle / backend_name are declared on CogtError; a real worker fills them
         # at its public-method chokepoint. This test mocks above the worker, so set them
@@ -63,10 +70,10 @@ class ErrorReportParityTestData:
         return error
 
 
-class SearchErrorReportParityTestData:
-    """Constants + factory driving both arms of the local / Temporal ``ErrorReport`` parity test for web search.
+class SearchProblemParityTestData:
+    """Constants + factory driving both arms of the local / Temporal problem parity test for web search.
 
-    The search counterpart of :class:`ErrorReportParityTestData`. A single deliberately-failing
+    The search counterpart of :class:`ProblemParityTestData`. A single deliberately-failing
     ``PipeSearch`` leaf is the source of truth for both arms: the local arm runs the ``native_search``
     pipe through the direct ``ContentGenerator`` with ``make_search_sourced_answer`` mocked to fail; the
     Temporal arm runs the same pipe through ``WfPipeRouter`` with the activity-side ``search_gen_sourced_answer``
@@ -83,9 +90,14 @@ class SearchErrorReportParityTestData:
     FAILURE_CATEGORY: ClassVar[InferenceErrorCategory] = InferenceErrorCategory.CONFIGURATION
     FAILURE_USER_ACTION_DETAIL: ClassVar[str] = "Verify the API key configured for this search provider."
 
-    # The classification both arms must surface on the recovered ErrorReport.
+    # The classification both arms must surface on the recovered problem: the code the category names, its domain, its
+    # verdict and its step, and the model and the provider on the operator's diagnostics.
+    EXPECTED_CODE: ClassVar[CoreCode] = CoreCode.RUNTIME_MISCONFIGURED
+    EXPECTED_DOMAIN: ClassVar[ProblemDomain] = ProblemDomain.OPERATOR
     EXPECTED_RETRYABLE: ClassVar[bool] = False
-    EXPECTED_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
+    EXPECTED_OPERATOR_STEP_KIND: ClassVar[StepKind] = StepKind.FIX_CONFIGURATION
+    # The advice the failure carries, which a local CLI prints as its tip and no problem carries.
+    FAILURE_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
 
     @classmethod
     def make_failing_search_error(cls) -> SearchJobFailureError:
@@ -97,7 +109,7 @@ class SearchErrorReportParityTestData:
         error = SearchJobFailureError(
             cls.FAILURE_MESSAGE,
             error_category=cls.FAILURE_CATEGORY,
-            user_action=UserAction(kind=cls.EXPECTED_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
+            user_action=UserAction(kind=cls.FAILURE_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
         )
         # model_handle / backend_name are declared on CogtError; a real search worker fills them at its
         # public-method chokepoint. This test mocks above the worker, so set them directly.
@@ -106,10 +118,10 @@ class SearchErrorReportParityTestData:
         return error
 
 
-class JudgeErrorReportParityTestData:
-    """Constants + factory driving both arms of the local / Temporal ``ErrorReport`` parity test for judgment.
+class JudgeProblemParityTestData:
+    """Constants + factory driving both arms of the local / Temporal problem parity test for judgment.
 
-    The judgment counterpart of :class:`SearchErrorReportParityTestData`. A single deliberately-failing
+    The judgment counterpart of :class:`SearchProblemParityTestData`. A single deliberately-failing
     ``PipeJudge`` leaf is the source of truth for both arms: the local arm runs the ``native_judge`` pipe
     through the direct ``ContentGenerator`` with ``make_judgment_answers`` mocked to fail; a distributed
     arm runs the same pipe with its activity-side leaf mocked to fail. Both assert the same ``EXPECTED_*``
@@ -126,9 +138,14 @@ class JudgeErrorReportParityTestData:
     FAILURE_CATEGORY: ClassVar[InferenceErrorCategory] = InferenceErrorCategory.CONFIGURATION
     FAILURE_USER_ACTION_DETAIL: ClassVar[str] = "Verify the API key configured for this judgment provider."
 
-    # The classification both arms must surface on the recovered ErrorReport.
+    # The classification both arms must surface on the recovered problem: the code the category names, its domain, its
+    # verdict and its step, and the model and the provider on the operator's diagnostics.
+    EXPECTED_CODE: ClassVar[CoreCode] = CoreCode.RUNTIME_MISCONFIGURED
+    EXPECTED_DOMAIN: ClassVar[ProblemDomain] = ProblemDomain.OPERATOR
     EXPECTED_RETRYABLE: ClassVar[bool] = False
-    EXPECTED_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
+    EXPECTED_OPERATOR_STEP_KIND: ClassVar[StepKind] = StepKind.FIX_CONFIGURATION
+    # The advice the failure carries, which a local CLI prints as its tip and no problem carries.
+    FAILURE_USER_ACTION_KIND: ClassVar[UserActionKind] = UserActionKind.CHECK_CREDENTIALS
 
     @classmethod
     def make_failing_judgment_error(cls) -> JudgmentJobFailureError:
@@ -140,7 +157,7 @@ class JudgeErrorReportParityTestData:
         error = JudgmentJobFailureError(
             cls.FAILURE_MESSAGE,
             error_category=cls.FAILURE_CATEGORY,
-            user_action=UserAction(kind=cls.EXPECTED_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
+            user_action=UserAction(kind=cls.FAILURE_USER_ACTION_KIND, detail=cls.FAILURE_USER_ACTION_DETAIL),
         )
         # model_handle / backend_name are declared on CogtError; a real judgment worker fills them at its
         # public-method chokepoint. This test mocks above the worker, so set them directly.

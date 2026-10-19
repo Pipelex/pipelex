@@ -30,8 +30,8 @@ from typing import Literal, NamedTuple, NoReturn, TypeVar
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.base_exceptions import ValidationErrorItem
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeNotFoundError
@@ -78,15 +78,17 @@ class CrateInvalidReport(BaseModel):
     message: str = Field(default="MTHDS library could not be resolved", description="Human-readable summary of the verdict.")
 
 
-def invalid_crate_report_response(error_report: ErrorReport) -> JSONResponse:
+def invalid_crate_report_response(validate_error: ValidateBundleError) -> JSONResponse:
     """Render a produced "could not resolve" verdict as a 200 `CrateInvalidReport`.
 
+    The items are the error's own (`ValidateBundleError.validation_error_items`) and the message is
+    its problem's `detail`, the sentence its code renders, which reads the same in every view.
     `exclude_none` drops each item's unset locators so the wire items match the agent CLI's
     byte-for-byte — the "one error item, two surfaces" guarantee `/validate` already keeps.
     """
     invalid_report = CrateInvalidReport(
-        validation_errors=error_report.validation_errors or [],
-        message=error_report.message,
+        validation_errors=validate_error.validation_error_items(),
+        message=validate_error.to_problem(view=ProblemView.CALLER).detail,
     )
     return JSONResponse(content=invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True))
 
@@ -116,13 +118,13 @@ class ResolvedMethod(NamedTuple):
         return manifest.main_pipe if manifest is not None else None
 
 
-def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ErrorReport:
+def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ValidateBundleError:
     """The crate of a method written out, or the invalid verdict when it does not resolve."""
     try:
         return resolve_crate_from_method_dir(method_dir=written.method_dir, methods_dirs=written.methods_dirs)
     except ValidateBundleError as validate_error:
         # The produced negative verdict: the core already tore its library down.
-        return validate_error.to_error_report()
+        return validate_error
 
 
 def _project_written_method(
@@ -130,7 +132,7 @@ def _project_written_method(
     request_method: RequestMethod,
     method_label: str,
     project: Callable[[ResolvedMethod], ProjectionT],
-) -> ProjectionT | ErrorReport:
+) -> ProjectionT | ValidateBundleError:
     """Write the method out, resolve it, hand it to `project` while it is loaded, and release everything: blocking work.
 
     Runs whole in one worker thread, so the library the core binds as current in this thread's context is the one
@@ -138,7 +140,7 @@ def _project_written_method(
     """
     with written_method(request_method=request_method) as written:
         resolution = _resolve_written_method(written=written)
-        if isinstance(resolution, ErrorReport):
+        if isinstance(resolution, ValidateBundleError):
             return resolution
         try:
             return project(ResolvedMethod(crate=resolution, request_method=request_method, method_label=method_label))
@@ -151,14 +153,14 @@ async def project_resolved_method(
     request: Request,
     request_data: MethodTreeRequest,
     project: Callable[[ResolvedMethod], ProjectionT],
-) -> ProjectionT | ErrorReport:
+) -> ProjectionT | ValidateBundleError:
     """Resolve the method the request names into its normalized crate, and return what `project` makes of it.
 
     The method is read as `/validate` reads it (`select_request_method`), then written out as a run writes it and loaded
     alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread.
     `project` runs in that thread with the freshly opened library loaded and current, so it can read live pipes, and the
     written tree held; both are released when it returns or raises. A method that does not resolve returns its invalid
-    verdict instead, an `ErrorReport` carrying the structured `validation_errors`, with `project` never called and
+    verdict instead, the `ValidateBundleError` carrying the structured validation items, with `project` never called and
     nothing left loaded.
 
     Raises (as problem documents): 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`;
@@ -221,8 +223,11 @@ class PipeSelectionMiss(NamedTuple):
     """Where the selector that missed came from, which picks the refusal's code; `None` when there was no selector
     at all, because the request named no pipe and the closure declares no single `main_pipe`."""
 
-    user_action: UserAction | None = None
-    """The fix to name instead of the error class's own, when the class's is wrong for this miss."""
+    selector: str | None = None
+    """The selector that missed, the request's `pipe_ref` or a declared `main_pipe`; `None` when there was none."""
+
+    candidates: list[str] | None = None
+    """The qualified refs of the `main_pipe`s the closure declares, when it declares several."""
 
 
 def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifest_main_pipe: str | None) -> RequestedPipe:
@@ -253,57 +258,52 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
     A selection refusal must not share `ValidationError` with a malformed request, or a client has no
     field to tell the two apart. So it is raised as `EntryPipeNotFoundError` or
     `EntryPipeAmbiguousError`, the classes the engine's entry lookup raises and the run routes answer
-    with for an unknown or ambiguous `pipe_code`. The global `PipelexError` handler then renders it —
-    the class name as `error_type`, the INPUT domain as a 422, the class's `user_action` — exactly as
-    it renders the run routes' refusal. Both classes declare their messages caller-facing, which every
-    message built here honours: it names the caller's selector, the manifest's `main_pipe`, or the
-    qualified refs of the closure the caller submitted, and nothing from a host library.
+    with for an unknown or ambiguous `pipe_code`. The global `PipelexError` handler then renders its
+    problem exactly as it renders the run routes' refusal: the code's status and sentences, filled
+    with the parameters given here, the selector that missed and the candidates. The message built
+    here rides the operator's diagnostics alone.
 
     The no-entry-pipe miss is a not-found and the several-`main_pipe`s miss an ambiguity, the way the
-    pipe-selector design classifies them. Neither is a typo in a pipe code, so each carries its own
-    `user_action`, which replaces the class's code-typo advice for that one error.
+    pipe-selector design classifies them.
 
     The code says who must act, which is where the selector came from. A selector the request named that
     misses is the caller's (`request.pipe_not_found`, `request.pipe_ambiguous`), and so is a request naming no
-    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified` when it
-    declares none, `request.pipe_ambiguous` when it declares several). A `main_pipe` the method itself
-    declares, in the fetched package's manifest or in the closure, that names no pipe of the closure is the
-    method's (`method.pipe_unresolved`), whose author fixes the declaration.
+    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified`, naming as its
+    `candidates` the `main_pipe`s the closure declares when it declares several, since there is then no selector
+    for `request.pipe_ambiguous` to name). A `main_pipe` the method itself declares, in the fetched package's
+    manifest or in the closure, is the method's, whose author fixes the declaration: one that names no pipe of
+    the closure is `method.pipe_unresolved`, naming it as the `missing` pipe, and one that matches pipes in
+    several domains is `method.ref_ambiguous`, naming it as the `ref` with its `candidates`, so the refusal
+    never says a pipe that exists twice does not exist.
     """
     match miss.kind:
         case PipeSelectionMissKind.NOT_FOUND:
             match miss.origin:
                 case SelectorOrigin.REQUEST:
-                    raise (
-                        EntryPipeNotFoundError(miss.message)
-                        .with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND)
-                        .as_caller_fault(user_action=miss.user_action)
-                    )
+                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND).with_params(pipe=miss.selector))
                 case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
-                    raise (
-                        EntryPipeNotFoundError(miss.message)
-                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
-                        .as_caller_fault(user_action=miss.user_action)
-                    )
+                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED).with_params(missing=miss.selector))
                 case None:
-                    raise (
-                        EntryPipeNotFoundError(miss.message)
-                        .with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
-                        .as_caller_fault(user_action=miss.user_action)
-                    )
+                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED))
         case PipeSelectionMissKind.AMBIGUOUS:
             match miss.origin:
-                case SelectorOrigin.REQUEST | None:
+                case SelectorOrigin.REQUEST:
                     raise (
                         EntryPipeAmbiguousError(miss.message)
                         .with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
-                        .as_caller_fault(user_action=miss.user_action)
+                        .with_params(pipe=miss.selector, candidates=miss.candidates)
+                    )
+                case None:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED)
+                        .with_params(candidates=miss.candidates)
                     )
                 case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
                     raise (
                         EntryPipeAmbiguousError(miss.message)
-                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
-                        .as_caller_fault(user_action=miss.user_action)
+                        .with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
+                        .with_params(ref=miss.selector, candidates=miss.candidates)
                     )
 
 
@@ -336,10 +336,6 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
             kind=PipeSelectionMissKind.NOT_FOUND,
             message="No `pipe_ref` was given and the closure declares no `main_pipe` — name the pipe explicitly.",
             origin=None,
-            user_action=UserAction(
-                kind=UserActionKind.CHANGE_INPUT,
-                detail="Send a `pipe_ref` naming the pipe to select, since the closure declares no `main_pipe` to default to.",
-            ),
         )
     if len(candidates) > 1:
         joined = ", ".join(sorted(candidates))
@@ -347,10 +343,7 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"No `pipe_ref` was given and the closure declares several `main_pipe`s ({joined}) — name the pipe explicitly.",
             origin=None,
-            user_action=UserAction(
-                kind=UserActionKind.CHANGE_INPUT,
-                detail="Send a `pipe_ref` naming one of the declared `main_pipe`s.",
-            ),
+            candidates=sorted(candidates),
         )
     return _select_entry_pipe(candidates[0], origin=SelectorOrigin.CLOSURE)
 
@@ -386,9 +379,14 @@ def _select_entry_pipe(selector: str, *, origin: SelectorOrigin) -> RequestedPip
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"{described} matches pipes in several domains of {scope}, so it selects none: {exc}",
             origin=origin,
+            selector=selector,
+            # The qualified refs the entry lookup found, which the refusal names to the caller.
+            candidates=exc.given_params.get("candidates"),
         )
     except PipeNotFoundError as exc:
-        return PipeSelectionMiss(kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}", origin=origin)
+        return PipeSelectionMiss(
+            kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}", origin=origin, selector=selector
+        )
     return RequestedPipe(ref=the_pipe.pipe_ref, pipe=the_pipe)
 
 

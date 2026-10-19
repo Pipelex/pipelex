@@ -3,14 +3,17 @@ from pathlib import Path
 import pytest
 from mthds.package.dependency_resolver import ResolvedDependency
 from mthds.package.manifest.schema import MethodsManifest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.core.pipes.exceptions import PipeLoadRefusalError
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import refusal_messages
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _PACKAGE_ADDRESS = "github.com/acme/invoicing"
@@ -57,12 +60,15 @@ class TestPipeDocGenDependencyTemplateFile:
 
         refusal = exc_info.value
         assert refusal.source == f"{_PACKAGE_ADDRESS}/invoice/invoice.mthds"
-        report = str(refusal.to_error_report().model_dump())
+        report = refusal_messages(refusal)
         assert (
             "The file reference 'invoice.html' in 'invoice/invoice.mthds' resolves to 'invoice/invoice.html', which is not a file of the tree."
             in report
         )
         assert str(tmp_path) not in report
+        caller = refusal.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_RESOURCE_MISSING
+        assert str(tmp_path) not in str(caller.to_wire())
 
     def test_a_dependency_s_step_reads_no_file_its_package_keeps_out(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A file the package's own .gitignore keeps out of its tree is invisible to its steps, though it lies beside the bundle."""
@@ -70,4 +76,4 @@ class TestPipeDocGenDependencyTemplateFile:
         with pytest.raises(PipeLoadRefusalError) as exc_info:
             self._load_dependency(mocker=mocker, package_root=tmp_path, template=_TEMPLATE)
 
-        assert "it is kept out by a .gitignore pattern" in str(exc_info.value.to_error_report().model_dump())
+        assert "it is kept out by a .gitignore pattern" in refusal_messages(exc_info.value)

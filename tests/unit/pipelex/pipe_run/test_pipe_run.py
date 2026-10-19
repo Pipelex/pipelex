@@ -3,14 +3,31 @@ from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
+from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import PipelexProblem
 from pipelex.pipe_run import pipe_run as pipe_run_module
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+
+_WEBHOOK_URL = "https://hooks.example.test/runs"
+
+
+class _UnbuildableProblemError(PipelexError):
+    """A run's error whose problem cannot be built: its parameters raise, as a faulty override in a plugin's error could."""
+
+    error_code = CoreCode.INPUT_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        msg = "the parameters could not be read"
+        raise RuntimeError(msg)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -212,10 +229,10 @@ class TestPipeRun:
         assert call_kwargs["status"] == "FAILED"
         assert call_kwargs["pipe_output"] is None
 
-    async def test_run_failure_bare_exception_synthesizes_report(self, mocker: MockerFixture) -> None:
-        """A bare (non-Pipelex) exception still delivers a structured error report.
+    async def test_run_failure_bare_exception_synthesizes_problem(self, mocker: MockerFixture) -> None:
+        """A bare (non-Pipelex) exception still delivers a problem, a fault of ours.
 
-        Direct mode must match Temporal mode, where ``recover_error_report`` is total:
+        Direct mode must match Temporal mode, where the recovered problem is total:
         the FAILED webhook always carries an ``error`` object so receivers can
         rehydrate a failed run uniformly, whichever mode produced it.
         """
@@ -237,16 +254,63 @@ class TestPipeRun:
         )
 
         pipe_run = PipeRun(pipe_router=mock_router)
-        assignment = DeliveryAssignment(storage=StorageTarget())
+        assignment = DeliveryAssignment(storage=StorageTarget(), webhooks=[WebhookTarget(url=_WEBHOOK_URL)])
 
         with pytest.raises(RuntimeError, match="router blew up"):
             await pipe_run.run(pipe_job=mock_job, delivery_assignment=assignment)
 
         mock_executor_instance.execute.assert_called_once()
-        error_report = mock_executor_instance.execute.call_args.kwargs["error_report"]
-        assert error_report is not None
-        assert error_report.error_type == "PipelexUnexpectedError"
-        assert "router blew up" in error_report.message
+        problem = mock_executor_instance.execute.call_args.kwargs["problem"]
+        assert isinstance(problem, PipelexProblem)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.pipeline_run_id == "plr-bare"
+        # The problem is the operator's, which each webhook projects to its own view.
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "PipelexUnexpectedError"
+        assert problem.diagnostics.message == "RuntimeError: router blew up"
+
+    @pytest.mark.parametrize(
+        "assignment",
+        [
+            pytest.param(None, id="no_delivery"),
+            pytest.param(DeliveryAssignment(storage=StorageTarget()), id="no_webhook"),
+            pytest.param(DeliveryAssignment(webhooks=[WebhookTarget(url=_WEBHOOK_URL)]), id="webhook"),
+        ],
+    )
+    async def test_a_problem_that_cannot_be_built_never_replaces_the_run_s_error(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture, assignment: DeliveryAssignment | None
+    ) -> None:
+        """The run fails with its own error; the problem is built only for a webhook, and one that raises is a fault of ours."""
+        run_error = _UnbuildableProblemError("the pipe refused its input")
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=run_error)
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor_instance = mock_executor.return_value
+        mock_executor_instance.execute = mocker.AsyncMock()
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-unbuildable", storage_scope="test/scope", read_scope=None)
+        )
+
+        with pytest.raises(_UnbuildableProblemError) as raised, caplog.at_level(logging.ERROR, logger=pipe_run_module.__name__):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment)
+
+        assert raised.value is run_error
+        fault_records = [record for record in caplog.records if record.getMessage() == pipe_run_module.WEBHOOK_PROBLEM_FAULT_MESSAGE]
+        if assignment is None:
+            mock_executor_instance.execute.assert_not_called()
+            assert fault_records == []
+            return
+        problem = mock_executor_instance.execute.call_args.kwargs["problem"]
+        if not assignment.webhooks:
+            assert problem is None
+            assert fault_records == []
+            return
+        assert isinstance(problem, PipelexProblem)
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.pipeline_run_id == "plr-unbuildable"
+        (fault_record,) = fault_records
+        assert vars(fault_record)["failed_error_type"] == "_UnbuildableProblemError"
 
     async def test_run_failure_delivers_before_raising(self, mocker: MockerFixture) -> None:
         """Delivery runs BEFORE the error is re-raised."""

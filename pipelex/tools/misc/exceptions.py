@@ -1,7 +1,8 @@
-from typing import ClassVar, Self
+from typing import Any, ClassVar, Self
 
 import tomli
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -63,6 +64,11 @@ class TomlError(ToolError):
         self.lineno = lineno
         self.colno = colno
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The parser's own words, which name a position in the document and never its text.
+        return {"reason": self.message, "finding": self.message, "line": self.lineno, "column": self.colno}
+
     @classmethod
     def from_tomli_error(cls, exc: tomli.TOMLDecodeError) -> Self:
         return cls(message=exc.msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno)
@@ -72,9 +78,10 @@ class RemoteFileFetchError(ToolError):
     """A remote file an input or a pipe referenced could not be fetched.
 
     Raised where the fetch happens — inside the operator that consumes the resource, the
-    one honest test that a URL serves what it claims to. The URL is caller-supplied, so the
-    message is caller-facing: it names the URL and what the server or the network said (an
-    HTTP status, a refused connection, a timeout), and never a resolved address.
+    one honest test that a URL serves what it claims to. The message names the URL and what
+    the server or the network said (an HTTP status, a refused connection, a timeout), and never
+    a resolved address; it reaches the operator's diagnostics, the caller reading the sentence
+    its code renders.
 
     A server that answered but would not serve the file is ``input.file_unreadable`` (the
     default); a timeout or a refused connection, which a retry may get past, is
@@ -86,7 +93,6 @@ class RemoteFileFetchError(ToolError):
         default=CoreCode.INPUT_FILE_UNREADABLE,
         others=(CoreCode.INPUT_URL_UNREACHABLE, CoreCode.PROVIDER_RESPONSE_INVALID),
     )
-    _authors_caller_facing_message = True
     user_action = UserAction(
         kind=UserActionKind.CHANGE_INPUT,
         detail="Check that the URL serves the file to a plain HTTP client, or upload the file and reference it instead.",

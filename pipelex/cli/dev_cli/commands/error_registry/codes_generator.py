@@ -208,55 +208,90 @@ def _params_class(*, registry: ErrorRegistryDocument, entry: RegistryEntry, impo
     return lines
 
 
-def _entries_lines(*, registry: ErrorRegistryDocument) -> list[str]:
-    """The lines declaring ``PipelexErrorEntry`` and ``PIPELEX_ERROR_ENTRIES``, every code's title and verdict.
+def _string_argument_lines(*, name: str, text: str, indent: str) -> list[str]:
+    """A keyword argument holding a string, on one line when it fits, else as an implicit concatenation of word runs.
 
-    The runtime reads a code's title, domain, retry verdict, status and step kinds from this table rather
-    than from the snapshot, so that classifying an error never reads a file: an error is built anywhere,
-    inside a Temporal workflow's sandbox included.
+    ``ruff format`` keeps a parenthesized concatenation whose joined form does not fit on one line, and joins one
+    that does, so the text is split only when its one-line form runs past the line length, which keeps the
+    generated module as the formatter leaves it.
+    """
+    one_line = f"{indent}{name}={json.dumps(text)},"
+    if len(one_line) <= _LINE_LENGTH:
+        return [one_line]
+    part_indent = f"{indent}    "
+    room = _LINE_LENGTH - len(part_indent) - 2
+    parts: list[str] = []
+    current = ""
+    for word in text.split(" "):
+        candidate = f"{current} {word}" if current else word
+        if current and len(json.dumps(candidate + " ")) > room:
+            parts.append(current + " ")
+            current = word
+        else:
+            current = candidate
+    parts.append(current)
+    return [f"{indent}{name}=(", *(f"{part_indent}{json.dumps(part)}" for part in parts), f"{indent}),"]
+
+
+def _entries_lines(*, registry: ErrorRegistryDocument) -> list[str]:
+    """The lines declaring ``PipelexErrorEntry`` and ``PIPELEX_ERROR_ENTRIES``, every code's title, verdict and templates.
+
+    The runtime reads a code's title, domain, retry verdict, status, step kinds and templates from this table
+    rather than from the snapshot, so that classifying an error and rendering its problem never reads a file: an
+    error is built anywhere, inside a Temporal workflow's sandbox included.
     """
     lines = [
         "",
         "",
         "class PipelexErrorEntry(NamedTuple):",
-        '    """What the registry declares about a Pipelex code that classifying an error needs.',
+        '    """What the registry declares about a Pipelex code that classifying an error and rendering its problem need.',
         "",
         "    Attributes:",
         "        title: The code's short title, the same for every occurrence.",
         "        domain: Who must act, from the MTHDS protocol's closed list of domains.",
         "        retry: Whether repeating the operation can succeed: ``no``, ``yes`` or ``outcome_unknown``.",
         "        status: The HTTP status of an answer the code is the body of, ``None`` for a code raised otherwise.",
+        "        detail: The template of the sentence that states one occurrence, naming parameters as ``{name}``.",
         "        actor_step: The kind of the step aimed at the domain's actor.",
+        "        actor_step_detail: The template of the sentence of the step aimed at the domain's actor.",
         "        other_step: The kind of the step aimed at any other reader.",
+        "        other_step_detail: The template of the sentence of the step aimed at any other reader.",
         '    """',
         "",
         "    title: str",
         "    domain: str",
         "    retry: str",
         "    status: int | None",
+        "    detail: str",
         "    actor_step: str",
+        "    actor_step_detail: str",
         "    other_step: str",
+        "    other_step_detail: str",
         "",
         "",
         "PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {",
     ]
+    argument_indent = "        "
     for entry in registry.codes:
         member_name = code_member_name(registry=registry, code=entry.code)
         title = _docstring_text(text=entry.title, where=f"{entry.code}: title")
+        lines.append(f"    PipelexErrorCode.{member_name}: PipelexErrorEntry(")
+        lines.extend(_string_argument_lines(name="title", text=title, indent=argument_indent))
         lines.extend(
             [
-                f"    PipelexErrorCode.{member_name}: PipelexErrorEntry(",
-                f"        title={json.dumps(title)},",
-                f"        domain={json.dumps(str(entry.domain))},",
-                f"        retry={json.dumps(str(entry.retry))},",
-                f"        status={entry.status},",
-                f"        actor_step={json.dumps(str(entry.steps.actor.kind))},",
-                f"        other_step={json.dumps(str(entry.steps.other.kind))},",
-                "    ),",
+                f"{argument_indent}domain={json.dumps(str(entry.domain))},",
+                f"{argument_indent}retry={json.dumps(str(entry.retry))},",
+                f"{argument_indent}status={entry.status},",
             ]
         )
+        lines.extend(_string_argument_lines(name="detail", text=entry.detail, indent=argument_indent))
+        lines.append(f"{argument_indent}actor_step={json.dumps(str(entry.steps.actor.kind))},")
+        lines.extend(_string_argument_lines(name="actor_step_detail", text=entry.steps.actor.detail, indent=argument_indent))
+        lines.append(f"{argument_indent}other_step={json.dumps(str(entry.steps.other.kind))},")
+        lines.extend(_string_argument_lines(name="other_step_detail", text=entry.steps.other.detail, indent=argument_indent))
+        lines.append("    ),")
     lines.append("}")
-    lines.append('"""The title and verdict of every Pipelex code."""')
+    lines.append('"""The title, verdict and templates of every Pipelex code."""')
     return lines
 
 

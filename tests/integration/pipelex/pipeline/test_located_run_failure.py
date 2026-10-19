@@ -3,13 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, StepKind
 from typing_extensions import override
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorReport, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.config import get_config
 from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -45,27 +46,28 @@ class _DirectOrchestratorPipeRun(PipeRunProtocol):
         raise AssertionError(msg)
 
 
-class _RecoveredReportError(PipelexError):
-    """Carries a report recovered across a transport boundary, as a distributed submitter does."""
+class _RecoveredProblemError(PipelexError):
+    """Carries a problem recovered across a transport boundary, as a distributed submitter does."""
 
-    def __init__(self, message: str, *, error_report: ErrorReport):
+    def __init__(self, message: str, *, recovered_problem: PipelexProblem):
         super().__init__(message)
-        self.error_report = error_report
+        self.carried_problem = recovered_problem
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        return self.error_report
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
-class _RecoveredReportPipeRun(PipeRunProtocol):
-    """Fail the way a distributed orchestrator does: its bridge sentence around a recovered report."""
+class _RecoveredProblemPipeRun(PipeRunProtocol):
+    """Fail the way a distributed orchestrator does: its bridge sentence around a recovered problem."""
 
-    def __init__(self, *, recovered_report: ErrorReport):
-        self._recovered_report = recovered_report
+    def __init__(self, *, recovered_problem: PipelexProblem):
+        self._recovered_problem = recovered_problem
 
     @override
     async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
-        recovered = _RecoveredReportError(self._recovered_report.message, error_report=self._recovered_report)
+        recovered_message = self._recovered_problem.diagnostics.message if self._recovered_problem.diagnostics else self._recovered_problem.detail
+        recovered = _RecoveredProblemError(recovered_message, recovered_problem=self._recovered_problem)
         msg = f"Pipe execution failed in temporal blocking delivery for pipe '{pipe_job.pipe.code}': {recovered}"
         raise PipelexBridgeDispatchError(msg) from recovered
 
@@ -88,7 +90,7 @@ class TestLocatedRunFailure:
         return exc_info.value
 
     async def test_unserved_model_is_reported_at_the_failing_step(self) -> None:
-        """The model example: the failing step, its path and the model error's own identity and sentence."""
+        """The model example: the failing step, its path and the model error's own identity, code and sentence."""
         runner = PipelexMTHDSProtocol()
         with pytest.raises(PipelineExecutionError) as exc_info:
             await runner.execute(pipe_code="two_steps", mthds_contents=[LocatedRunFailureTestData.MODEL_MTHDS], inputs={"topic": "cats"})
@@ -97,33 +99,31 @@ class TestLocatedRunFailure:
         assert error.pipe_code == "summarize"
         assert error.pipe_stack == ["two_steps", "summarize"]
 
-        report = error.to_error_report()
-        assert report.error_type == "ModelNotFoundError"
-        assert report.code == CoreCode.MODEL_UNKNOWN
-        assert report.title == error_code_spec(CoreCode.MODEL_UNKNOWN).title
-        assert report.type_uri == error_code_spec(CoreCode.MODEL_UNKNOWN).type_uri
         unserved_handle = LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
-        assert report.message == f"Pipe 'summarize' failed (two_steps → summarize): Model handle '{unserved_handle}' was not found in the model deck."
-        # The local-deck remedy is the local CLI's to give: the message reaches hosted readers too.
-        assert ".pipelex/inference" not in report.message
-        assert "pipelex init" not in report.message
-        assert report.model == LocatedRunFailureTestData.UNSERVED_MODEL_HANDLE
-        # The model lookup advises changing the model the step names, so no fallback is needed.
-        assert report.user_action == UserAction(
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_UNKNOWN
+        assert caller.title == error_code_spec(CoreCode.MODEL_UNKNOWN).title
+        assert caller.type == error_code_spec(CoreCode.MODEL_UNKNOWN).type_uri
+        assert caller.location is not None
+        assert (caller.location.pipe, caller.location.path) == ("summarize", ["two_steps", "summarize"])
+        assert caller.detail == f"The method names the llm model '{unserved_handle}', which no catalog knows."
+        assert caller.diagnostics is None
+
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "ModelNotFoundError"
+        assert operator.diagnostics.message == f"Model handle '{unserved_handle}' was not found in the model deck."
+        assert operator.diagnostics.model == unserved_handle
+        assert error.message == f"Pipe 'summarize' failed (two_steps → summarize): Model handle '{unserved_handle}' was not found in the model deck."
+        # The local-deck remedy is the local CLI's to give: neither reader's text names it.
+        for text in (error.message, str(caller.to_wire()), str(operator.to_wire())):
+            assert ".pipelex/inference" not in text
+            assert "pipelex init" not in text
+        # The model lookup advises changing the model the step names, a local tip that rides no problem.
+        assert error.advised_action() == UserAction(
             kind=UserActionKind.CHANGE_MODEL,
             detail=f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
         )
-
-        # The step names the model in an inline setting, and no entry of the deck names it: the
-        # caller's own fault, whose message STRICT disclosure keeps.
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == report.message
-        assert strict_payload["error_domain"] == "input"
-        assert strict_payload["error_type"] == "ModelNotFoundError"
-        assert strict_payload["user_action"] == {
-            "kind": "change_model",
-            "detail": f"Change the model '{unserved_handle}' to an LLM the model deck serves.",
-        }
 
     async def test_parallel_combine_failure_is_reported_at_the_nested_parallel(self) -> None:
         """The multiplicity example: the parallel nested in the sequence, with the combine's own identity and message."""
@@ -132,20 +132,46 @@ class TestLocatedRunFailure:
         assert error.pipe_code == "analyze"
         assert error.pipe_stack == ["flow", "analyze"]
 
-        report = error.to_error_report()
-        assert report.error_type == "StuffFactoryError"
         # The combine's refusal restated with its multiplicity remedy, a StuffFactoryError raised from the
         # combine's own, is the root fault: of two faults of the same class, the outer one.
-        assert report.message.startswith(
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "StuffFactoryError"
+        assert operator.diagnostics.message.startswith("PipeParallel 'analyze' cannot combine its branch results into its output 'Report'.")
+        assert error.message.startswith(
             "Pipe 'analyze' failed (flow → analyze): PipeParallel 'analyze' cannot combine its branch results into its output 'Report'."
         )
-        assert "Branch 'gen_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'Report' holds a single item." in report.message
-        # The multiplicity next step, since a mismatched combine is the caller's to fix.
-        assert report.user_action is not None
-        assert report.user_action.detail.startswith("Branch 'gen_ideas' gives result 'ideas' as a list")
+        assert "Branch 'gen_ideas' gives result 'ideas' as a list, 'Idea[]', but field 'ideas' of 'Report' holds a single item." in error.message
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_OUTPUT_MULTIPLICITY
+        assert caller.detail == ("Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.")
+        # A mismatched combine is the caller's to fix: the caller's step is the code's, the branch to change the operator's message.
+        assert caller.next_step.kind == StepKind.CHANGE_METHOD
+        assert "Branch 'gen_ideas'" not in str(caller.to_wire())
 
-    async def test_caller_facing_root_keeps_its_message_under_strict(self) -> None:
-        """A caller-facing root fault keeps its own message, located, under STRICT."""
+    async def test_every_branch_whose_multiplicity_differs_is_an_item(self) -> None:
+        """Two branches give a list to a single field: the problem names the first, and one item names each."""
+        runner = PipelexMTHDSProtocol(pipe_run_mode=PipeRunMode.DRY, execution_config=_dry_mock_config())
+        with pytest.raises(PipelineExecutionError) as exc_info:
+            await runner.execute(pipe_code="flow", mthds_contents=[LocatedRunFailureTestData.PARALLEL_TWO_MULTIPLICITIES_MTHDS])
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_OUTPUT_MULTIPLICITY
+        assert caller.detail == "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'."
+        assert caller.errors is not None
+        assert [(item.code, item.detail) for item in caller.errors] == [
+            (
+                CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.",
+            ),
+            (
+                CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                "Pipe 'analyze' produced an output of the multiplicity 'list', but its output 'summary' is declared 'single'.",
+            ),
+        ]
+
+    async def test_a_method_fault_at_the_root_reads_its_code_s_sentence_located(self) -> None:
+        """A root fault of the caller's own method reads its code's sentence, located at the failing pipe."""
         runner = PipelexMTHDSProtocol()
         with pytest.raises(PipelineExecutionError) as exc_info:
             await runner.execute(pipe_code="force_flow", mthds_contents=[LocatedRunFailureTestData.FORCE_MTHDS], inputs={})
@@ -153,17 +179,20 @@ class TestLocatedRunFailure:
 
         assert error.pipe_code == "force_echo"
         assert error.pipe_stack == ["force_flow", "force_echo"]
+        assert error.message.startswith("Pipe 'force_echo' failed (force_flow → force_echo): ")
+        assert "clause" in error.message
 
-        report = error.to_error_report()
-        assert report.error_type == "OptionalValueAbsentError"
-        assert report.caller_facing_message is True
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == report.message
-        assert strict_payload["message"].startswith("Pipe 'force_echo' failed (force_flow → force_echo): ")
-        assert "clause" in strict_payload["message"]
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_FORCED_INPUT_ABSENT
+        assert caller.detail == "Pipe 'force_echo' forces 'clause' with '!', and it was absent in this run."
+        assert caller.location is not None
+        assert (caller.location.pipe, caller.location.path) == ("force_echo", ["force_flow", "force_echo"])
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "OptionalValueAbsentError"
 
     async def test_in_process_orchestrator_adds_nothing(self) -> None:
-        """Through the in-process bridge, the report and the location are the direct run's; the bridge's sentence is in neither."""
+        """Through the in-process bridge, the problem and the location are the direct run's; the bridge's sentence is in neither."""
         direct_error = await self._run_parallel_failure()
         bridged_error = await self._run_parallel_failure(pipe_run=_DirectOrchestratorPipeRun())
 
@@ -171,21 +200,23 @@ class TestLocatedRunFailure:
         assert bridged_error.pipe_code == direct_error.pipe_code
         assert bridged_error.pipe_stack == direct_error.pipe_stack
         assert bridged_error.message == direct_error.message
-        assert bridged_error.to_error_report() == direct_error.to_error_report()
-        assert "DIRECT mode" not in bridged_error.to_error_report().message
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert bridged_error.to_problem(view=view) == direct_error.to_problem(view=view)
+        assert "DIRECT mode" not in str(bridged_error.to_problem(view=ProblemView.OPERATOR).to_wire())
 
-    async def test_recovered_report_adds_nothing(self) -> None:
-        """A report recovered across a transport boundary, as the hosted run stores it, reads as the direct run's."""
+    async def test_recovered_problem_adds_nothing(self) -> None:
+        """A problem recovered across a transport boundary, as the hosted run stores it, reads as the direct run's."""
         direct_error = await self._run_parallel_failure()
         location = find_failure_location(error=direct_error)
         assert isinstance(location, PipeRouterError)
-        # What a distributed worker's run root stores: the located router error's report.
-        recovered_report = location.to_error_report()
+        # What a distributed worker's run root stores: the located router error's problem, in the operator's view.
+        recovered_problem = location.to_problem(view=ProblemView.OPERATOR)
 
-        bridged_error = await self._run_parallel_failure(pipe_run=_RecoveredReportPipeRun(recovered_report=recovered_report))
+        bridged_error = await self._run_parallel_failure(pipe_run=_RecoveredProblemPipeRun(recovered_problem=recovered_problem))
 
-        assert bridged_error.to_error_report() == direct_error.to_error_report()
-        assert "temporal blocking delivery" not in bridged_error.to_error_report().message
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert bridged_error.to_problem(view=view) == direct_error.to_problem(view=view)
+        assert "temporal blocking delivery" not in str(bridged_error.to_problem(view=ProblemView.OPERATOR).to_wire())
         assert "temporal blocking delivery" not in bridged_error.message
 
     async def test_foreign_exception_is_located_as_unexpected_error(self) -> None:
@@ -194,8 +225,13 @@ class TestLocatedRunFailure:
 
         assert error.pipe_code == "flow"
         assert error.pipe_stack == ["flow"]
-        report = error.to_error_report()
-        assert report.error_type == "PipelexUnexpectedError"
-        assert report.message == "Pipe 'flow' failed: KeyError: 'boom from a pipe'"
-        assert report.caller_facing_message is False
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
+        assert error.message == "Pipe 'flow' failed: KeyError: 'boom from a pipe'"
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.code == CoreCode.RUNTIME_UNEXPECTED
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "PipelexUnexpectedError"
+        assert "boom from a pipe" in operator.diagnostics.message
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.RUNTIME_UNEXPECTED
+        assert "boom from a pipe" not in str(caller.to_wire())
+        assert "KeyError" not in str(caller.to_wire())

@@ -3,6 +3,9 @@
 import logging
 from datetime import UTC, datetime, timedelta
 
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, GraphSpecMode, IOSpec, NodeKind, NodeStatus
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -257,11 +260,15 @@ class TestGraphTracer:
             started_at=started_at,
         )
 
+        problem = make_problem(
+            code=CoreCode.RUNTIME_UNEXPECTED,
+            view=ProblemView.CALLER,
+            location=make_location(pipe="failing_pipe", path=["failing_pipe"]),
+        )
         tracer.on_pipe_end_error(
             node_id=node_id,
             ended_at=started_at + timedelta(milliseconds=50),
-            error_type="ValueError",
-            error_message="Something went wrong",
+            problem=problem,
             error_stack="Traceback...",
         )
 
@@ -270,10 +277,8 @@ class TestGraphTracer:
         assert graph_spec is not None
         node = graph_spec.nodes[0]
         assert node.status == NodeStatus.FAILED
-        assert node.error is not None
-        assert node.error.error_type == "ValueError"
-        assert node.error.message == "Something went wrong"
-        assert node.error.stack == "Traceback..."
+        assert node.error == problem
+        assert node.error_stack == "Traceback..."
 
     def test_skipped_tracking(self) -> None:
         """A lifted (skipped) pipe ends its node in the SKIPPED state with the skip reason."""

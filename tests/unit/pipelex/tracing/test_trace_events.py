@@ -1,17 +1,20 @@
 """Serialization round-trip tests for trace event models."""
 
+import json
 from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import TypeAdapter, ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location, make_problem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
-from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import MAX_STACK_LENGTH, EdgeKind, IOSpec, NodeKind
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -72,12 +75,11 @@ class _Shared:
         )
 
     @staticmethod
-    def make_error_spec() -> ErrorSpec:
-        return ErrorSpec(
-            error_type="LLMError",
-            message="Model returned an error",
-            stack="Traceback (most recent call last):\n  File ...",
-            caller_facing=True,
+    def make_error_problem() -> PipelexProblem:
+        return make_problem(
+            code=CoreCode.PROVIDER_UNAVAILABLE,
+            view=ProblemView.CALLER,
+            location=make_location(pipe="gen_summary", path=["records", "gen_summary"]),
         )
 
     @staticmethod
@@ -143,7 +145,8 @@ class TestTraceEvents:
                 "pipe_ref": "records.gen_summary",
                 "pipe_type": "PipeLLM",
                 "ended_at": _Shared.TIMESTAMP,
-                "error": _Shared.make_error_spec(),
+                "error": _Shared.make_error_problem(),
+                "error_stack": "Traceback (most recent call last):\n  File ...",
             },
         ),
         (
@@ -374,12 +377,13 @@ class TestTraceEvents:
         assert restored_io.multiplicity is True
         assert restored_io.extra == {"custom_field": "custom_value"}
 
-    def test_error_spec_survives_round_trip_within_event(self) -> None:
-        """ErrorSpec fields are preserved through event serialization."""
-        error = ErrorSpec(
-            error_type="ValidationError",
-            message="Field 'name' is required",
-            stack="long stack trace here...",
+    def test_problem_survives_round_trip_within_event(self) -> None:
+        """The problem and the stack are preserved through event serialization, with no member written as null."""
+        error = make_problem(
+            code=CoreCode.INPUT_MISSING,
+            view=ProblemView.CALLER,
+            params={"input": "name"},
+            location=make_location(pipe="test_pipe", path=["test_pipe"]),
         )
         event = PipeEndErrorEvent(
             pipe_code="test_pipe",
@@ -389,14 +393,39 @@ class TestTraceEvents:
             node_id=_Shared.NODE_ID,
             ended_at=_Shared.TIMESTAMP,
             error=error,
+            error_stack="long stack trace here...",
         )
 
         json_str = event.model_dump_json()
         restored = PipeEndErrorEvent.model_validate_json(json_str)
 
-        assert restored.error.error_type == "ValidationError"
-        assert restored.error.message == "Field 'name' is required"
-        assert restored.error.stack == "long stack trace here..."
+        assert restored.error == error
+        assert restored.error.code == CoreCode.INPUT_MISSING
+        assert restored.error.detail == "The request does not give the input 'name', which the method requires."
+        assert restored.error.location is not None
+        assert restored.error.location.as_wire() == {"pipe": "test_pipe", "path": ["test_pipe"]}
+        assert restored.error_stack == "long stack trace here..."
+        # The event writes its problem as the wire does, with no member written as null.
+        assert json.loads(json_str)["error"] == error.to_wire()
+
+    def test_a_failed_pipe_event_caps_its_stack_as_the_graph_does(self) -> None:
+        """An unbounded stack trace never reaches a trace subscriber: the event caps it at the node's limit."""
+        error = make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER)
+        long_stack = "Traceback (most recent call last):\n" + "  frame\n" * MAX_STACK_LENGTH
+        event = PipeEndErrorEvent(
+            pipe_code="test_pipe",
+            pipe_ref=None,
+            pipe_type="PipeFunc",
+            **_Shared.make_base_fields(),
+            node_id=_Shared.NODE_ID,
+            ended_at=_Shared.TIMESTAMP,
+            error=error,
+            error_stack=long_stack,
+        )
+
+        assert event.error_stack is not None
+        assert len(event.error_stack) == MAX_STACK_LENGTH
+        assert event.error_stack == long_stack[: MAX_STACK_LENGTH - 3] + "..."
 
     def test_usage_report_with_llm_tokens_round_trip(self) -> None:
         """UsageReportEvent with LLMTokensUsage survives round-trip via AnyTokensUsage discriminator."""

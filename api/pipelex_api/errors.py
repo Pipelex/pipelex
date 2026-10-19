@@ -2,7 +2,7 @@
 
 These cover failures the API detects at its own boundary — request validation,
 auth, payload-size limits, server misconfiguration — as opposed to pipelex
-domain errors, which carry an `ErrorReport` and are translated by the global
+domain errors, which answer their own problem document through the global
 `PipelexError` handler in `pipelex_api.exception_handlers`.
 
 Each helper builds an RFC 7807 problem document (`build_problem_document_from_api_error`)
@@ -29,7 +29,7 @@ class ApiError(Exception):
 
     Raised by the `raise_*` helpers below; rendered by `handle_api_error` in
     `pipelex_api.exception_handlers` as `application/problem+json`. Distinct from a pipelex
-    `PipelexError`: there is no `ErrorReport` behind it — the failure is the
+    `PipelexError`: there is no problem of a pipelex error behind it — the failure is the
     API's own request validation, auth, or configuration check. The problem
     document is built at raise time, less the request context: `instance` and
     `request_id` are stamped by the handler, which is the frame that holds the
@@ -137,7 +137,7 @@ def raise_internal_server_error(message: str, error_type: ErrorType) -> NoReturn
 
     For the API's own configuration / invariant failures — a missing secret, a
     storage backend that cannot presign, absent package metadata. NOT for
-    pipelex domain errors, which carry an `ErrorReport` and are handled by the
+    pipelex domain errors, which answer their own problem through the
     global `PipelexError` handler. Classified `CONFIG` domain: an operator, not
     the caller, fixes it.
     """

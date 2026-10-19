@@ -10,10 +10,14 @@ from collections.abc import Callable
 
 import pytest
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
@@ -69,8 +73,7 @@ class TestResolveCrateFromContents:
         with pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_contents(mthds_contents=[INVALID_MTHDS], mthds_sources=["broken.mthds"])
 
-        error_report = exc_info.value.to_error_report()
-        assert error_report.validation_errors, "the shared builder must produce structured validation-error items"
+        assert exc_info.value.validation_error_items(), "the shared builder must produce structured validation-error items"
 
         assert teardown_spy.call_count == teardown_calls_before + 1
         opened_library_id, _ = open_library_spy.spy_return
@@ -92,10 +95,15 @@ class TestResolveCrateFromContents:
             side_effect=AssertionError("in-memory resolve must not discover installed methods or fetch by address"),
         )
 
-        with pytest.raises(ValidateBundleError, match=ADDRESS_DEPENDENCY_REFUSAL_MARKER) as exc_info:
+        with pytest.raises(PipeLibraryError) as exc_info:
             resolve_crate_from_contents(mthds_contents=[ADDRESS_DEPENDENCY_MTHDS], mthds_sources=["host.mthds"])
 
         discovery.assert_not_called()
-        # The verdict's items carry the marker a hosted run tells this refusal apart by, on a server answering it.
-        validation_errors = exc_info.value.to_error_report().validation_errors or []
-        assert any(ADDRESS_DEPENDENCY_REFUSAL_MARKER in item.message for item in validation_errors)
+        # The request is what pipe-io cannot serve, not the method, so the refusal is no verdict: its problem carries the
+        # code and the reason a hosted run tells this refusal apart by.
+        assert not isinstance(exc_info.value, ValidateBundleError)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.REQUEST_UNSUPPORTED
+        assert problem.to_wire().get("params") == {"field": "files", "reason": ADDRESS_DEPENDENCY_UNSUPPORTED_REASON}
+        # The operator's message quotes the dependency after the marker the tree resolution's verdict items carry too.
+        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in exc_info.value.message

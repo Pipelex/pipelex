@@ -127,6 +127,14 @@ class InputKind(StrEnum):
                 return False
 
 
+def _first_refused_field(*, validation_error: ValidationError) -> str | None:
+    """The dotted path, inside the value, of the first field a structure's validation refused; ``None`` when it names none."""
+    errors = validation_error.errors(include_url=False, include_input=False)
+    if not errors or not errors[0]["loc"]:
+        return None
+    return ".".join(str(segment) for segment in errors[0]["loc"])
+
+
 class InputShaper:
     """Turn a caller's provided inputs into a ``WorkingMemory``, interpreted against the signature."""
 
@@ -426,6 +434,7 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 provided_description=cls._describe_value(value),
+                provided_count=len(cast("list[Any]", value)),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         return cls._build_item_content(
@@ -814,6 +823,7 @@ class InputShaper:
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 reason=str(exc),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
+                field=_first_refused_field(validation_error=exc) if isinstance(exc, ValidationError) else None,
             ) from exc
 
     @classmethod
@@ -990,6 +1000,7 @@ class InputShaper:
                 variable_name=variable_name,
                 declared_concept_ref=stuff_spec.concept.concept_ref,
                 provided_description=f"a list of {len(list_content.items)} item(s)",
+                provided_count=len(list_content.items),
                 expected_shape=cls._render_expected_shape(concept_provider=concept_provider, stuff_spec=stuff_spec),
             )
         if fixed_count is not None and len(list_content.items) != fixed_count:

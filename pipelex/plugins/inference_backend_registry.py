@@ -46,9 +46,8 @@ class CheckLLMRequestFn(Protocol):
 
     A refusal is an ``LLMCapabilityError``, and a validation verdict shows it to whoever wrote the setting.
     A built-in backend's refusal is shown with the model named by its deck handle, since this library writes
-    those messages. An external plugin's refusal is shown as written only when the plugin raises it as
-    caller-facing copy (``as_caller_fault()``), vouching that it names nothing the plugin keeps private;
-    any other is named by its title alone.
+    those messages. An external plugin's refusal is shown by the sentence its code renders, since its own
+    message may name what the plugin keeps private; that message rides the operator's diagnostics alone.
     """
 
     def __call__(self, *, inference_model: "InferenceModelSpec", job_params: "LLMJobParams", is_structured: bool) -> None: ...

@@ -1,6 +1,9 @@
 """Errors raised while loading pipeline-inputs files for the run CLI surfaces."""
 
+from typing import Any
+
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
@@ -18,8 +21,10 @@ class AmbiguousInputsFilesError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass --inputs explicitly to choose which inputs file to use",
     )
-    # The message describes a fault in the caller's own bundle directory — caller-facing copy.
-    _authors_caller_facing_message = True
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"field": "inputs"}
 
 
 class AutoDetectedInputsFileError(PipelexError):
@@ -35,5 +40,7 @@ class AutoDetectedInputsFileError(PipelexError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Replace it with the file itself, or name the inputs file with --inputs <path>",
     )
-    # The message describes a fault in the caller's own bundle directory — caller-facing copy.
-    _authors_caller_facing_message = True
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"field": "inputs"}

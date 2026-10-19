@@ -1,8 +1,12 @@
 """A PipeJudge step is refused when its method loads, before a run spends anything, for each thing it cannot do."""
 
+from typing import TYPE_CHECKING
+
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_model_deck
@@ -13,24 +17,49 @@ from tests.integration.pipelex.pipes.operator.pipe_judge.test_data import (
     PipeJudgeSeveralQuestionsTestData,
 )
 
+if TYPE_CHECKING:
+    from mthds.protocol.problem.models import ProblemItem
+
 _MODEL = f'model = "{PipeJudgeLoadTestData.JUDGMENT_MODEL}"'
 _STRUCTURE = PipeJudgeSeveralQuestionsTestData.STRUCTURE
 _QUESTIONS = PipeJudgeSeveralQuestionsTestData.QUESTIONS
 
 
-async def _refusal_report(bundle: str) -> str:
+async def _refusal(bundle: str) -> ValidateBundleError:
     with pytest.raises(ValidateBundleError) as exc_info:
         await validate_bundle(mthds_contents=[bundle])
-    return str(exc_info.value.to_error_report().model_dump())
+    return exc_info.value
+
+
+async def _refusal_report(bundle: str) -> str:
+    """The invalid verdict a caller reads, as text: its items, as `/validate` and the CLI list them, and its problem."""
+    refusal = await _refusal(bundle)
+    items = [item.model_dump(mode="json", exclude_none=True) for item in refusal.validation_error_items()]
+    return f"{items}{refusal.to_problem(view=ProblemView.CALLER).to_wire()}"
+
+
+def _only_problem_item(refusal: ValidateBundleError) -> "ProblemItem":
+    """The one item of an invalid verdict, as the caller's problem lists it."""
+    problem = refusal.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.METHOD_INVALID
+    assert problem.errors is not None
+    (item,) = problem.errors
+    return item
 
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeJudgeLoadRefusals:
     @pytest.mark.usefixtures("no_judgment_default")
     async def test_a_step_with_no_model_and_no_default_is_refused(self) -> None:
-        report = await _refusal_report(PipeJudgeLoadTestData.bundle())
-        assert "PipeJudge 'judge_it' has no judgment model" in report
-        assert "`choice_default` under `[judgment]`" in report
+        """The caller reads the code's sentence, naming the kind of model; the deck's setting to fill is the operator's to read."""
+        refusal = await _refusal(PipeJudgeLoadTestData.bundle())
+
+        item = _only_problem_item(refusal)
+        assert item.code == CoreCode.MODEL_UNSPECIFIED
+        assert item.detail == "The step names no judgment model, and the deployment names no default for that kind."
+        (validation_item,) = refusal.validation_error_items()
+        assert validation_item.message == item.detail
+        assert "`choice_default` under `[judgment]`" in str(refusal.__cause__)
 
     async def test_an_unknown_model_is_refused_on_its_field(self) -> None:
         report = await _refusal_report(PipeJudgeLoadTestData.bundle(step_fields='model = "jev-9.99.9"'))
@@ -62,10 +91,17 @@ class TestPipeJudgeLoadRefusals:
         ],
     )
     async def test_a_file_the_prompt_presents_is_refused_for_a_text_only_model(self, inputs: str, file_kind: str) -> None:
-        report = await _refusal_report(PipeJudgeLoadTestData.bundle(inputs=inputs, prompt="Inspect this: $photo", step_fields=_MODEL))
-        assert f"does not read {file_kind}" in report
-        assert "presents 'photo' in its prompt" in report
-        assert PipeJudgeLoadTestData.JUDGMENT_MODEL in report
+        """The caller reads the code's sentence, naming the model and the kind of file it does not read."""
+        refusal = await _refusal(PipeJudgeLoadTestData.bundle(inputs=inputs, prompt="Inspect this: $photo", step_fields=_MODEL))
+
+        item = _only_problem_item(refusal)
+        assert item.code == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
+        expected_detail = f"The model '{PipeJudgeLoadTestData.JUDGMENT_MODEL}' does not support {file_kind[:-1]} inputs, which the step needs."
+        assert item.detail == expected_detail
+        (validation_item,) = refusal.validation_error_items()
+        assert validation_item.message == expected_detail
+        # The refusal's own message, naming the input the prompt presents, is the operator's diagnostics.
+        assert "presents 'photo' in its prompt" in str(refusal.__cause__)
 
     @pytest.mark.usefixtures("judgment_model_reading_files")
     @pytest.mark.parametrize(

@@ -4,7 +4,8 @@ Jinja2 compiles a filter or a test inside a branch to a lookup that only fails w
 only parsed at load, so such a template passes the load and fails the run. The failure used to escape as a raw
 `TemplateRuntimeError`, or as a `Jinja2TemplateRenderError` that is not the caller's fault, and a hosted run answered
 500 "An internal error occurred.". It is now `method.template_invalid`: a located refusal naming the pipe, the
-template's field and the filter Jinja2 refused, kept under STRICT disclosure, which never quotes the template's text.
+template's field and the filter Jinja2 refused for the operator, and the code's sentence for the caller, which never quotes
+the template's text.
 """
 
 from __future__ import annotations
@@ -13,10 +14,11 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, StepKind
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode
 from pipelex.config import get_config
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -41,23 +43,22 @@ async def _failed_run(*, pipe_code: str, bundle: str, inputs: dict[str, Any], pi
     return exc_info.value
 
 
-def _assert_is_the_refusal(*, error: PipelineExecutionError, detail: str, next_step: str) -> None:
-    report = error.to_error_report()
-    assert report.code == CoreCode.METHOD_TEMPLATE_INVALID
-    assert report.message == detail
-    assert report.user_action is not None
-    assert report.user_action.detail == next_step
-
-    strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-    assert strict_payload["message"] == detail
-    assert strict_payload["message"] != INTERNAL_ERROR_PLACEHOLDER
-    assert strict_payload["user_action"] == {"kind": "change_input", "detail": next_step}
-    document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-    assert document["status"] == 422
-    assert document["detail"] == detail
+def _assert_is_the_refusal(*, error: PipelineExecutionError, message: str, detail: str, pipe_code: str) -> None:
+    """The caller reads the code's sentence, located on the pipe; the refusal's own message is the operator's diagnostics."""
+    caller = error.to_problem(view=ProblemView.CALLER)
+    assert caller.code == CoreCode.METHOD_TEMPLATE_INVALID, caller.to_wire()
+    assert caller.detail == detail, caller.to_wire()
+    assert caller.location is not None
+    assert caller.location.pipe == pipe_code
+    assert caller.next_step.kind == StepKind.CHANGE_METHOD
+    assert error_code_spec(CoreCode.METHOD_TEMPLATE_INVALID).status == 422
+    operator = error.to_problem(view=ProblemView.OPERATOR)
+    assert operator.diagnostics is not None
+    assert operator.diagnostics.message == message
     # Neither the template's text nor the branch it would have rendered reaches the caller.
-    assert RenderTimeTemplateTestData.TEMPLATE_TEXT not in json.dumps(document)
-    assert "{%" not in json.dumps(document)
+    caller_wire = json.dumps(caller.to_wire())
+    assert RenderTimeTemplateTestData.TEMPLATE_TEXT not in caller_wire
+    assert "{%" not in caller_wire
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -73,8 +74,9 @@ class TestRenderTimeTemplateRefusals:
 
         _assert_is_the_refusal(
             error=error,
-            detail=f"Pipe 'route_parcel' failed: PipeCondition 'route_parcel': its expression cannot render: {_UNKNOWN_FILTER_FAULT}",
-            next_step=f"Fix the expression of PipeCondition 'route_parcel': {_UNKNOWN_FILTER_FAULT}",
+            message=f"PipeCondition 'route_parcel': its expression cannot render: {_UNKNOWN_FILTER_FAULT}",
+            detail=f"The template 'expression' of pipe 'route_parcel' is invalid ({_UNKNOWN_FILTER_FAULT}).",
+            pipe_code="route_parcel",
         )
 
     @pytest.mark.parametrize("prompt_field", ["prompt", "system_prompt"])
@@ -89,12 +91,13 @@ class TestRenderTimeTemplateRefusals:
 
         _assert_is_the_refusal(
             error=error,
-            detail=f"Pipe 'summarize' failed: PipeLLM 'summarize': its {prompt_field} cannot render: {_UNKNOWN_FILTER_FAULT}",
-            next_step=f"Fix the {prompt_field} of PipeLLM 'summarize': {_UNKNOWN_FILTER_FAULT}",
+            message=f"PipeLLM 'summarize': its {prompt_field} cannot render: {_UNKNOWN_FILTER_FAULT}",
+            detail=f"The template '{prompt_field}' of pipe 'summarize' is invalid ({_UNKNOWN_FILTER_FAULT}).",
+            pipe_code="summarize",
         )
 
     async def test_a_broken_deployment_structure_prompt_is_ours_and_withheld(self, mocker: MockerFixture) -> None:
-        """The structure prompt is the deployment's template, rendered in the step: `runtime.unexpected`, a 500 whose message STRICT withholds."""
+        """The structure prompt is the deployment's template, rendered in the step: `runtime.unexpected`, a 500 whose message is the operator's."""
         mocker.patch.dict(
             get_config().inference.llm.generic_templates,
             {"output_structure_prompt": RenderTimeTemplateTestData.BROKEN_STRUCTURE_PROMPT},
@@ -107,11 +110,13 @@ class TestRenderTimeTemplateRefusals:
             pipe_run_mode=PipeRunMode.DRY,
         )
 
-        report = error.to_error_report()
-        assert report.code == CoreCode.RUNTIME_UNEXPECTED
-        assert report.error_type == "Jinja2TemplateInvalidError"
-        assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == INTERNAL_ERROR_PLACEHOLDER
-        document = report.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert document["status"] == 500
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.RUNTIME_UNEXPECTED
+        assert caller.diagnostics is None
+        assert error_code_spec(CoreCode.RUNTIME_UNEXPECTED).status == 500
         # Neither the deployment's template nor what Jinja2 refused in it reaches the caller.
-        assert RenderTimeTemplateTestData.UNKNOWN_STRUCTURE_FILTER not in json.dumps(document)
+        assert RenderTimeTemplateTestData.UNKNOWN_STRUCTURE_FILTER not in json.dumps(caller.to_wire())
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        diagnosed_classes = {operator.diagnostics.error_class, *(cause.error_class for cause in operator.diagnostics.causes or [])}
+        assert "Jinja2TemplateInvalidError" in diagnosed_classes

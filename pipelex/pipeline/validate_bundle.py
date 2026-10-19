@@ -120,10 +120,8 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
     if missing:
         missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
         msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
-        # The bundle-scoped wording stays the raise site's own — more precise here than the class's
-        # library-lookup message — and is safe under ``_authors_caller_facing_message``: it names only
-        # the caller's own selector codes (derived from ``wanted``), nothing from the loaded library.
-        raise EntryPipeNotFoundError(msg)
+        # The bundle-scoped wording stays the raise site's own, more precise here than the class's library-lookup message.
+        raise EntryPipeNotFoundError(msg).with_params(pipe=", ".join(sorted(missing)))
     return selected
 
 
@@ -182,7 +180,7 @@ async def validate_bundle(
     if provided_params == 0:
         # Programmer error: a caller (the HTTP request layer, a builder op) must wire exactly one
         # input. It is not a content verdict the end user can fix → PipelexUnexpectedError (→ 500,
-        # redacted under STRICT), matching the mthds_sources-mismatch guard below — never a
+        # runtime.unexpected), matching the mthds_sources-mismatch guard below — never a
         # ValidateBundleError, which would 200/422 a host-wiring bug as if the bundle were invalid.
         msg = "One of mthds_contents, mthds_file_path or method_dir must be provided to validate_bundle"
         raise PipelexUnexpectedError(msg)
@@ -206,9 +204,9 @@ async def validate_bundle(
         # threads each bundle's source onto the in-memory load path so its diagnostics carry a
         # real ``source``). It is never supplied by the end caller, so a missing-alongside /
         # length-mismatch is a host wiring bug, not bad user input: raise an internal error
-        # (→ 500, redacted under STRICT) rather than ``ValidateBundleError`` (→ caller-facing
-        # 422). Contrast the empty-``mthds_contents`` guard above, which can legitimately
-        # reflect an end user submitting no bundles and so stays a caller-facing input error.
+        # (→ 500, runtime.unexpected) rather than ``ValidateBundleError`` (→ 422). Contrast the
+        # empty-``mthds_contents`` guard above, which can legitimately reflect an end user
+        # submitting no bundles and so stays the caller's input error.
         msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 

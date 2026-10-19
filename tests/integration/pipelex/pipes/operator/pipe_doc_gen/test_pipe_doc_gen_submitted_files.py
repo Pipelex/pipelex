@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorCategory
@@ -14,6 +15,7 @@ from pipelex.core.bundle_resources.exceptions import BundleResourceNotNamedError
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
 from pipelex.core.method_trees.tree_bundle import TreeBundleRef
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -26,6 +28,10 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     RecordingMethodFileStore,
     StubEngines,
     WorkerLikePipeRun,
+    caller_text,
+    diagnosed_error_classes,
+    only_problem_item,
+    refusal_messages,
     write_bundle,
 )
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
@@ -95,7 +101,9 @@ class TestPipeDocGenSubmittedFiles:
                 submitted_files=_docx_files(),
             )
 
-        assert "invoice.totl" in str(exc_info.value.to_error_report().model_dump())
+        item = only_problem_item(exc_info.value)
+        assert item.code == PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
+        assert "invoice.totl" in item.detail
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_not_supplied_is_refused_saying_so(self) -> None:
@@ -103,8 +111,12 @@ class TestPipeDocGenSubmittedFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=_DOCX_TEMPLATE_STEP)])
 
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert "names the template file 'templates/invoice.docx', which was not supplied with its bundle" in report
+        item = only_problem_item(exc_info.value)
+        assert item.code == CoreCode.METHOD_RESOURCE_MISSING
+        assert item.location is not None
+        assert item.location.pipe == "print_invoice"
+        assert "'templates/invoice.docx'" in item.detail
+        assert "names the template file 'templates/invoice.docx', which was not supplied with its bundle" in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("template_file", ["../invoice.docx", "templates/../invoice.docx"], ids=["leaves_the_bundle", "dot_dot_inside"])
@@ -124,7 +136,7 @@ class TestPipeDocGenSubmittedFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await _load_from_content(load=load, content=content, submitted_files=submitted_files)
 
-        items = exc_info.value.to_error_report().validation_errors
+        items = exc_info.value.validation_error_items()
         assert items is not None
         (item,) = items
         assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
@@ -160,7 +172,7 @@ class TestPipeDocGenSubmittedFiles:
                 inputs=PipeDocGenTestData.INVOICE_INPUTS,
             )
 
-        (item,) = exc_info.value.to_error_report().validation_errors or []
+        (item,) = exc_info.value.validation_error_items() or []
         assert item.category == ValidationErrorCategory.BLUEPRINT_VALIDATION
         assert item.field_path == "pipe.print_invoice"
         assert "it leaves the bundle through a '..' segment" in item.message
@@ -197,7 +209,7 @@ class TestPipeDocGenSubmittedFiles:
                 mthds_contents=[content for content, _ in entries],
                 inputs=PipeDocGenTestData.INVOICE_INPUTS,
             )
-        (item,) = exc_info.value.to_error_report().validation_errors or []
+        (item,) = exc_info.value.validation_error_items() or []
         assert (item.category, item.domain_code, item.pipe_code) == (
             ValidationErrorCategory.BLUEPRINT_VALIDATION,
             PipeDocGenTestData.OTHER_DOMAIN,
@@ -223,7 +235,7 @@ class TestPipeDocGenSubmittedFiles:
                 submitted_files={"invoice.html": b"<h1>{{ invoice.numbr }}</h1>"},
             )
 
-        assert "numbr" in str(exc_info.value.to_error_report().model_dump())
+        assert "numbr" in caller_text(exc_info.value)
 
     async def test_a_run_prints_with_the_submitted_html_template(self, stub_engines: StubEngines) -> None:
         await PipelexMTHDSProtocol(submitted_files={"invoice.html": b"<h1>{{ invoice.number }}</h1>"}).execute(
@@ -339,8 +351,7 @@ class TestPipeDocGenSubmittedFiles:
             )
 
         assert remote_worker.received_crates
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert MethodFileUnavailableError.__name__ in report
+        assert MethodFileUnavailableError.__name__ in diagnosed_error_classes(exc_info.value)
         assert stub_engines.check_requests == []
 
     @pytest.mark.parametrize(
@@ -361,7 +372,7 @@ class TestPipeDocGenSubmittedFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[bundle_path.read_text(encoding="utf-8")], mthds_sources=[str(bundle_path)])
 
-        assert "which was not supplied with its bundle" in str(exc_info.value.to_error_report().model_dump())
+        assert "which was not supplied with its bundle" in refusal_messages(exc_info.value)
         assert stub_engines.check_requests == []
 
     @pytest.mark.parametrize("pipe_run_mode", [pytest.param(PipeRunMode.LIVE, id="live"), pytest.param(PipeRunMode.DRY, id="dry")])
@@ -403,7 +414,7 @@ class TestPipeDocGenSubmittedFiles:
             await PipelexMTHDSProtocol().execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
 
         for exc_info in (validate_exc_info, run_exc_info):
-            assert "which was not supplied with its bundle" in str(exc_info.value.to_error_report().model_dump())
+            assert "which was not supplied with its bundle" in refusal_messages(exc_info.value)
         assert stub_engines.check_requests == []
         assert stub_engines.engine.jobs == []
 

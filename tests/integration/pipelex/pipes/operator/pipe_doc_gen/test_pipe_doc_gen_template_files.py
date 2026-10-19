@@ -2,16 +2,26 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.doc_gen.input_shape import InputShapeKind
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, StubEngines, write_bundle
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
+    METHOD_MANIFEST,
+    StubEngines,
+    caller_text,
+    only_problem_item,
+    refusal_messages,
+    write_bundle,
+)
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _DOCX_TEMPLATE_STEP = 'format = "docx"\ntemplate_file = "invoice.docx"'
@@ -35,16 +45,22 @@ async def _validate_with_html_template_file(*, directory: Path, load: str, templ
 class TestPipeDocGenTemplateFiles:
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize(
-        ("template_file", "expected"),
+        ("template_file", "expected_code", "expected"),
         [
-            ("invoice.docx", "resolves to 'invoice.docx', which is not a file of the tree."),
-            ("../outside.docx", "climbs above the root of its method tree"),
-            ("ignored.docx", "which is not a file of the tree: it is kept out by a .gitignore pattern"),
-            (".templates/invoice.docx", "which is not a file of the tree: it is kept out by a path segment starting with a dot"),
+            ("invoice.docx", CoreCode.METHOD_RESOURCE_MISSING, "resolves to 'invoice.docx', which is not a file of the tree."),
+            ("../outside.docx", CoreCode.SECURITY_METHOD_PATH_REFUSED, "climbs above the root of its method tree"),
+            ("ignored.docx", CoreCode.METHOD_RESOURCE_MISSING, "which is not a file of the tree: it is kept out by a .gitignore pattern"),
+            (
+                ".templates/invoice.docx",
+                CoreCode.METHOD_RESOURCE_MISSING,
+                "which is not a file of the tree: it is kept out by a path segment starting with a dot",
+            ),
         ],
         ids=["missing_file", "outside_the_tree", "gitignored", "hidden"],
     )
-    async def test_a_template_file_is_a_file_of_the_bundle_s_method_tree(self, tmp_path: Path, template_file: str, expected: str) -> None:
+    async def test_a_template_file_is_a_file_of_the_bundle_s_method_tree(
+        self, tmp_path: Path, template_file: str, expected_code: CoreCode, expected: str
+    ) -> None:
         """A template file must be a file of the method's tree: one outside it, or one its membership rule keeps out, is never read."""
         method_dir = tmp_path / "method"
         method_dir.mkdir()
@@ -58,7 +74,8 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        assert expected in str(exc_info.value.to_error_report().model_dump())
+        assert only_problem_item(exc_info.value).code == expected_code
+        assert expected in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_climbs_through_dot_dot_to_another_folder_of_its_tree(self, tmp_path: Path) -> None:
@@ -89,10 +106,12 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        report = str(exc_info.value.to_error_report().model_dump())
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.domain == ProblemDomain.METHOD
+        assert only_problem_item(exc_info.value).code == CoreCode.METHOD_RESOURCE_MISSING
+        report = refusal_messages(exc_info.value)
         assert "names the template file 'invoice.docx'" in report
         assert "Run the method's folder instead, or add a METHODS.toml to it." in report
-        assert exc_info.value.to_error_report().error_domain == "input"
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_symbolic_link_in_the_method_refuses_its_tree(self, tmp_path: Path) -> None:
@@ -106,7 +125,7 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        assert "holds a symbolic link, 'linked.docx'" in str(exc_info.value.to_error_report().model_dump())
+        assert "holds a symbolic link, 'linked.docx'" in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_a_template_file_named_by_an_absolute_path_is_refused_without_repeating_it(self, tmp_path: Path) -> None:
@@ -118,9 +137,10 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        report = str(exc_info.value.to_error_report().model_dump())
+        report = refusal_messages(exc_info.value)
         assert "a path relative to the bundle's file, in its method, and this one cannot be: it is absolute" in report
         assert str(absolute_template) not in report
+        assert str(absolute_template) not in caller_text(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])
@@ -129,7 +149,7 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await _validate_with_html_template_file(directory=tmp_path, load=load, template_bytes="<p>Facture émise</p>".encode("latin-1"))
 
-        assert "could not read the template file 'invoice.html' as UTF-8 text" in str(exc_info.value.to_error_report().model_dump())
+        assert "could not read the template file 'invoice.html' as UTF-8 text" in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     async def test_an_html_template_file_changed_after_its_tree_was_listed_is_refused_not_read_from_disk(
@@ -149,7 +169,7 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        assert "could not read the template file 'invoice.html' as its method tree listed it" in str(exc_info.value.to_error_report().model_dump())
+        assert "could not read the template file 'invoice.html' as its method tree listed it" in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("load", ["from_its_directory", "from_content"])
@@ -172,7 +192,9 @@ class TestPipeDocGenTemplateFiles:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        assert "invoice.totl" in str(exc_info.value.to_error_report().model_dump())
+        item = only_problem_item(exc_info.value)
+        assert item.code == PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
+        assert "invoice.totl" in item.detail
         (request,) = stub_engines.check_requests
         assert request.template == b"docx bytes"
         assert request.template_name == "invoice.docx"

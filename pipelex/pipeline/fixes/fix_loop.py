@@ -108,7 +108,7 @@ def _fix_fingerprint(fix: SuggestedFix) -> str:
 
 
 def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
-    """Project the error's categorized lists into wire items — same channels as ``to_error_report``."""
+    """Project the error's categorized lists into wire items — the same channels as its problem's items."""
     return exc.validation_error_items()
 
 

@@ -30,6 +30,7 @@ from pipelex_sdk.errors import (
 from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.base_exceptions import ErrorDomain
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
@@ -167,10 +168,10 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
         case HostedRunError():
             message = error.message
             next_step = error.user_action.detail if error.user_action is not None else "Check the run request: the method, the pipe and the inputs"
-            # Who acts and whether a retry can succeed are the error's code's, read off its report.
-            hosted_report = error.to_error_report()
-            error_domain = hosted_report.error_domain
-            retryable = hosted_report.retryable
+            # Who acts and whether a retry can succeed are the error's code's.
+            hosted_code_spec = error_code_spec(error.resolve_error_code())
+            error_domain = ErrorDomain.from_problem_domain(hosted_code_spec.domain)
+            retryable = hosted_code_spec.invites_retry
             if isinstance(error, (HostedRunPollingError, HostedRunInterruptedError)):
                 pipeline_run_id = error.pipeline_run_id
             if isinstance(error, HostedMethodInvalidError):

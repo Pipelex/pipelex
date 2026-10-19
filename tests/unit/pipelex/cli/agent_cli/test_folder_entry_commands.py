@@ -16,7 +16,7 @@ from pipelex.cli.agent_cli.commands.inputs.bundle_cmd import inputs_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
 
@@ -36,8 +36,8 @@ _VALID_RESULT: dict[str, Any] = {"success": True, "is_valid": True, "is_runnable
 
 
 def _run_refusal(*, directory: Path) -> str:
-    """The message `run bundle` refuses the folder with."""
-    with pytest.raises(ValidateBundleError) as exc_info:
+    """The message `run bundle` refuses the folder with: no single pipe to start at is the run's own refusal, no verdict."""
+    with pytest.raises(MethodEntryError) as exc_info:
         resolve_method_folder_run(directory=directory, pipe_override=None)
     return exc_info.value.message
 

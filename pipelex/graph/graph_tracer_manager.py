@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 from pipelex import log
+from pipelex.errors.problem import PipelexProblem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
@@ -421,10 +422,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
-        error_type: str,
-        error_message: str,
+        problem: PipelexProblem,
         error_stack: str | None = None,
-        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution.
 
@@ -432,11 +431,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             lookup_key: The tracer lookup key.
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the pipe failed.
-            error_type: The exception type name.
-            error_message: The error message.
+            problem: The problem that ended the node, in the caller's view, located at the node's pipe.
             error_stack: Optional stack trace.
-            caller_facing: Whether the message was written for the caller, as the error report of the error the
-                pipe raised says in its `caller_facing_message`.
         """
         if node_id is None:
             return
@@ -448,10 +444,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         tracer.on_pipe_end_error(
             node_id=node_id,
             ended_at=ended_at,
-            error_type=error_type,
-            error_message=error_message,
+            problem=problem,
             error_stack=error_stack,
-            caller_facing=caller_facing,
         )
 
     def register_controller_output(

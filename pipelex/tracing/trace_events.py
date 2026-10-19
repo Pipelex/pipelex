@@ -11,11 +11,12 @@ from enum import StrEnum
 from functools import cached_property
 from typing import Annotated, Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 from typing_extensions import override
 
+from pipelex.errors.problem import PipelexProblem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
-from pipelex.graph.graphspec import EdgeKind, ErrorSpec, IOSpec, NodeKind
+from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, cap_error_stack
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_key
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -168,8 +169,9 @@ class PipeEndSuccessEvent(TraceEvent):
 class PipeEndErrorEvent(TraceEvent):
     """Emitted when a pipe fails.
 
-    Its `error` gives the progress contract's `failure`: `message`, and `caller_facing`, true when that message was
-    written for the caller.
+    Its `error` is the problem that ended the pipe, in the caller's view, located at the pipe; `error_stack` is the
+    stack trace of the error, when the graph's data inclusion asks for it, capped as the graph's node caps it, since
+    the event reaches every trace subscriber before any node is built from it.
     """
 
     event_kind: Literal[TraceEventKind.PIPE_END_ERROR] = TraceEventKind.PIPE_END_ERROR
@@ -178,7 +180,13 @@ class PipeEndErrorEvent(TraceEvent):
     pipe_ref: str | None
     pipe_type: str
     ended_at: datetime
-    error: ErrorSpec
+    error: PipelexProblem
+    error_stack: str | None = None
+
+    @field_validator("error_stack", mode="after")
+    @classmethod
+    def cap_stack(cls, value: str | None) -> str | None:
+        return cap_error_stack(stack=value)
 
 
 class PipeEndSkippedEvent(TraceEvent):
@@ -298,7 +306,7 @@ class ConditionResolvedEvent(TraceEvent):
     """The PipeCondition's own node."""
     rendered_value: str
     """The value the condition's expression rendered. It may quote text of the method, or of a library the method
-    depends on, so it is kept for whoever reads the trace and never reaches a caller-facing summary."""
+    depends on, so it is kept for whoever reads the trace and never reaches a problem's parameters."""
     selected_outcome: str | None
     """The key of the outcome map the rendered value matched, or None when it matched none and the condition took its
     default outcome: `"default"` can itself be a key of an outcome map, so it cannot stand for the default."""

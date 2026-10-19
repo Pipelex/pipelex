@@ -235,9 +235,9 @@ class StuffFactory:
         # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
         # through as a ResolvedLocalPath but keeps `://` in its path, so reject those too.
         if not isinstance(resolved, ResolvedLocalPath) or "://" in resolved.path:
-            # Strip query/fragment/userinfo before echoing the url: CsvError is caller-facing and
-            # survives STRICT disclosure, so a signed/token-bearing url (e.g. an S3 presigned link)
-            # must not leak its credentials into the message. Keep scheme/host/path to identify it.
+            # Strip query/fragment/userinfo before echoing the url: the message reaches the operator's
+            # diagnostics and every log line, so a signed/token-bearing url (e.g. an S3 presigned link)
+            # must not leak its credentials into it. Keep scheme/host/path to identify it.
             safe_netloc = url_parts.hostname or ""
             try:
                 safe_port = url_parts.port

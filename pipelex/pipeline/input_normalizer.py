@@ -571,7 +571,8 @@ def _identify_file_input(
         f"Input '{input_name}' expects an image, but the file is {describe_file_format(format_key=format_key, mime_type=mime_type_to_describe)}. "
         "Give an image file such as PNG, JPEG or WebP."
     )
-    raise PipelineInputNotAnImageError(msg)
+    # No model reads the input yet, so the code's sentence, which names one, falls back to its title.
+    raise PipelineInputNotAnImageError(msg).with_params(input=input_name, format=format_key)
 
 
 async def _load_local_head(local_path: Path) -> bytes:

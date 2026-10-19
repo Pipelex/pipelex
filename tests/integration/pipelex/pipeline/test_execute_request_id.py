@@ -6,6 +6,7 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_pipe_run
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -71,5 +72,5 @@ class TestExecuteRequestId:
             )
 
         assert type(exc_info.value) is RunParameterError
-        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_INVALID
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_INVALID
         assert pipe_run.pipe_jobs == []

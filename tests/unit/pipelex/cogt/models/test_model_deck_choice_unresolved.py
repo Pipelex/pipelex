@@ -1,18 +1,20 @@
 """Whose fault an unresolved model choice is: the method's when its step named the model, the deployment's when the deck did.
 
-The deck's lookups refuse a reference they do not resolve as ``ModelChoiceNotFoundError``, ``model.unknown`` and
-caller-facing, which is right for a model the method named. A default or an override the deck names itself reaches the
-same lookups when a step names no model, and a miss there is the deck's: ``ModelDeckChoiceUnresolvedError``, which a
-caller cannot fix by changing their input, reports ``model.unavailable`` for a bare handle no backend serves and
-``pipelex.config.invalid`` for a preset, alias or waterfall the deck does not define, and is never caller-facing.
+The deck's lookups refuse a reference they do not resolve as ``ModelChoiceNotFoundError``, ``model.unknown`` in the
+method's domain, which is right for a model the method named. A default or an override the deck names itself reaches
+the same lookups when a step names no model, and a miss there is the deck's: ``ModelDeckChoiceUnresolvedError``, which
+a caller cannot fix by changing their method, reports ``model.unavailable`` for a bare handle no backend serves and
+``pipelex.config.invalid`` for a preset, alias or waterfall the deck does not define, both in the operator's domain,
+and names the deck's setting to its operator alone.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_engine import resolve_doc_gen_setting
@@ -26,6 +28,7 @@ from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.img_gen_ops import resolve_img_gen_setting
@@ -155,9 +158,28 @@ class TestModelDeckChoiceUnresolved:
         assert expected_deck_setting in unresolved.message
         assert unresolved.resolve_error_code() == expected_code
         assert isinstance(unresolved.__cause__, ModelChoiceNotFoundError)
-        report = unresolved.to_error_report()
-        assert report.caller_facing_message is False
-        assert report.error_domain != "input"
+        caller = unresolved.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.OPERATOR
+        # The deck's setting is the deployment's configuration: its operator reads it, its caller does not.
+        assert expected_deck_setting not in str(caller.to_wire())
+        operator = unresolved.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert expected_deck_setting in operator.diagnostics.message
+
+    def test_a_stale_handle_s_sentence_renders_with_its_reason(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """`model.unavailable` declares why the model is not served, and a stale handle of the deck is served by no backend."""
+        _use_deck(mocker, model_deck=_make_deck())
+
+        with pytest.raises(ModelDeckChoiceUnresolvedError) as exc_info:
+            resolve_llm_setting_for_text()
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+
+        assert caller.code == CoreCode.MODEL_UNAVAILABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": "stale-text-model", "model_type": "llm", "reason": "not_served"}
+        assert caller.detail == "The llm model 'stale-text-model' exists, but this deployment does not serve it (reason: not_served)."
+        assert not any(record.getMessage() == "A problem's sentence could not be rendered from its template" for record in caplog.records)
 
     @pytest.mark.parametrize(
         ("_topic", "resolve", "expected_choice"),
@@ -176,7 +198,7 @@ class TestModelDeckChoiceUnresolved:
         resolve: Callable[[], Any],
         expected_choice: str,
     ) -> None:
-        """The method named the model, so the miss is the method's own: `model.unknown`, caller-facing, input domain."""
+        """The method named the model, so the miss is the method's own: `model.unknown`, in the method's domain."""
         _use_deck(mocker, model_deck=_make_deck())
 
         with pytest.raises(ModelChoiceNotFoundError) as exc_info:
@@ -186,9 +208,9 @@ class TestModelDeckChoiceUnresolved:
         assert not isinstance(not_found, ModelDeckChoiceUnresolvedError)
         assert not_found.model_choice == expected_choice
         assert not_found.resolve_error_code() == CoreCode.MODEL_UNKNOWN
-        report = not_found.to_error_report()
-        assert report.caller_facing_message is True
-        assert report.error_domain == "input"
+        caller = not_found.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_UNKNOWN
+        assert caller.domain == ProblemDomain.METHOD
 
     @pytest.mark.parametrize(
         ("_topic", "llm_choice_overrides", "expected_deck_setting", "expected_code"),
@@ -221,7 +243,9 @@ class TestModelDeckChoiceUnresolved:
         unresolved = exc_info.value
         assert unresolved.deck_setting == expected_deck_setting
         assert unresolved.resolve_error_code() == expected_code
-        assert unresolved.to_error_report().caller_facing_message is False
+        caller = unresolved.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert expected_deck_setting not in str(caller.to_wire())
 
     @pytest.mark.parametrize(
         ("_topic", "resolve"),
@@ -242,4 +266,4 @@ class TestModelDeckChoiceUnresolved:
         not_found = exc_info.value
         assert "served by the model deck, but not as an LLM" in not_found.message
         assert not_found.resolve_error_code() == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
-        assert not_found.to_error_report().caller_facing_message is True
+        assert not_found.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.METHOD

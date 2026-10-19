@@ -13,6 +13,8 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
@@ -60,6 +62,7 @@ from pipelex_api.openapi_responses import (
     PROBLEM_429,
     PROBLEM_501_ASYNC_NOT_ENABLED,
 )
+from pipelex_api.problem_view import problem_view_of
 from pipelex_api.routes.pipelex.utils import get_current_iso_timestamp
 from pipelex_api.schemas.models import (
     PipelexApiExecuteRequest,
@@ -77,7 +80,6 @@ if TYPE_CHECKING:
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
-    from pipelex.base_exceptions import ErrorReport
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.methods.fetching import MethodProvenance
     from pipelex.pipe_run.pipe_job import PipeJob
@@ -407,6 +409,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         callback_urls: list[str] | None = None,
         request_id: str | None = None,
         requested_orchestration_mode: str | None = None,
+        callback_problem_view: ProblemView = ProblemView.CALLER,
     ) -> PipelexRunResultStart:
         """Start a method execution asynchronously without waiting for completion.
 
@@ -431,6 +434,9 @@ class ApiRunner(PipelexMTHDSProtocol):
         we accept it, and `StartAck.pipeline_run_id` echoes it back as authoritative).
         `callback_urls` is THIS server's extension (completion webhooks) — the wire
         layer validates it (`PipelineApiExtras`) and passes it here by name.
+        `callback_problem_view` is the view of a failed run's problem those webhooks carry: the
+        view of the request's own reader (`pipelex_api.problem_view`), since a completion webhook
+        is the same answer as the synchronous response, delivered later.
         `extra` is the protocol's generic extension slot; this runner's wire
         extras are parsed by the route layer, so nothing reaches it — a
         non-empty value is an in-process misuse and is rejected. `request_id`
@@ -517,6 +523,7 @@ class ApiRunner(PipelexMTHDSProtocol):
                 WebhookTarget(
                     url=url,
                     headers={"X-Completion-Signature": _completion_signature(resolved_pipeline_run_id)},
+                    problem_view=callback_problem_view,
                 )
                 for url in callback_urls
             ]
@@ -569,7 +576,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         requested_orchestration_mode: str | None,
         graph_pipe_code: str | None,
         method_dir: Path | None = None,
-    ) -> PipelexValidationReport | ErrorReport:
+    ) -> PipelexValidationReport | BundleValidationFailure:
         """Validate MTHDS bundles, returning the verdict as a value (the route maps it to a 200).
 
         Mode-aware, mirroring `start`: the effective `orchestration_mode` is resolved FIRST (config
@@ -580,8 +587,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         loud with `MissingBundleValidatorError` (carrying the install hint). Validation is inherently
         blocking, so there is no delivery axis here — the registry holds one validator per mode.
 
-        Returns the verdict, not a raise: the valid `PipelexValidationReport`, or the structured
-        `ErrorReport` an invalid bundle produces (carrying `validation_errors`). A genuine
+        Returns the verdict, not a raise: the valid `PipelexValidationReport`, or the
+        `BundleValidationFailure` an invalid bundle produces (carrying `validation_errors`). A genuine
         no-verdict infra fault propagates to the global problem+json handler (5xx). The route
         discriminates on `isinstance(verdict, PipelexValidationReport)`.
 
@@ -624,7 +631,10 @@ class ApiRunner(PipelexMTHDSProtocol):
             with translate_to_validate_bundle_error():
                 await self._ensure_served_method_requirements_met()
         except ValidateBundleError as invalid_method:
-            return invalid_method.to_error_report()
+            return BundleValidationFailure(
+                problem=invalid_method.to_problem(view=ProblemView.OPERATOR),
+                validation_errors=invalid_method.validation_error_items(),
+            )
         verdict = await validator.validate_bundles(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,
@@ -645,8 +655,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
         # PipelexValidationReport. Recover the precise type here — the single narrowing point — so
-        # the route's `isinstance(verdict, PipelexValidationReport)` yields ErrorReport on the else arm.
-        return cast("PipelexValidationReport | ErrorReport", verdict)
+        # the route's `isinstance(verdict, BundleValidationFailure)` yields the report on the else arm.
+        return cast("PipelexValidationReport | BundleValidationFailure", verdict)
 
 
 # The object keys a kajson decoder reads as class markers: `__class__` and `__module__` name a class to
@@ -1004,8 +1014,8 @@ async def execute(request: Request) -> JSONResponse:
     # client-supplied run id it (alone) accepts:
     #   400 — the resolved orchestrator is blocking-only (the in-process `direct` base): refuse
     #         honestly rather than block-and-ack. Use `/execute`.
-    #   403 — a per-request `orchestration_mode` override the deployment forbids, the
-    #         custom-code sandbox gate, or the structures refusal on a bundle or a fetched package.
+    #   403 — a per-request `orchestration_mode` override the deployment forbids, or the
+    #         custom-code sandbox gate on a bundle or a fetched package.
     #   404 — a `method_ref` whose repository holds no matching package.
     #   409 — the submitted `pipeline_run_id` is still registered for an in-flight run.
     #   501 — an async-capable deployment whose async execution is not enabled.
@@ -1083,6 +1093,7 @@ async def start(
             callback_urls=extras.callback_urls,
             request_id=request_id_of(request),
             requested_orchestration_mode=extras.orchestration_mode,
+            callback_problem_view=problem_view_of(request),
         )
     # The ack plus this server's provenance extension: `(address, tag, commit_sha)` for a
     # `method_ref` run, null otherwise — the caller (and, on hosted, the platform's Run row)

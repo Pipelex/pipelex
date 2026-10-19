@@ -1,18 +1,18 @@
-"""Documentation-only models and shared `responses=` declarations for the API's RFC 7807 errors.
+"""Documentation-only models and shared `responses=` declarations for the API's problem documents.
 
 Every failure this server emits is an `application/problem+json` document built
-by the global handlers in `pipelex_api.exception_handlers` — from a pipelex
-`ErrorReport` (`build_problem_document`) or from an API-authored `ApiError`
-(`build_problem_document_from_api_error`). Neither path validates through a
-Pydantic model: they build plain dicts. The models here exist **only** so the
+by the global handlers in `pipelex_api.exception_handlers` — the problem of a
+pipelex error (`PipelexError.to_problem`, in the view of the request's reader)
+or the document of an API-authored `ApiError`
+(`build_problem_document_from_api_error`). The models here exist **only** so the
 committed OpenAPI artifact can publish that shape with a real schema instead of
 an untyped `additionalProperties: true` blob — nothing in the request path
 imports them, and adding a field here does not change a single response byte.
-Keep them in step with `docs/error-responses.md`, which is the prose contract.
+Keep them in step with `docs/api-server/error-responses.md`, which is the prose contract.
 
-`ProblemDocument.validation_errors` reuses pipelex's own `ValidationErrorItem`,
-so the item shape published on the error wire is the same one `/validate`'s 200
-invalid arm publishes — including `suggested_fix`, which rides along for free.
+The members of a pipelex error's problem reuse the problem's own models (its next
+step, parameters, location, items and diagnostics), so the shapes published here
+are the ones the problem is validated with.
 
 The response dicts below are attached two ways:
 
@@ -33,20 +33,20 @@ re-keys every 4xx/5xx response onto `application/problem+json` (via
 
 from typing import Any
 
-from pipelex.base_exceptions import ValidationErrorItem
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
+from mthds.protocol.problem.models import NextStep, ProblemItem, ProblemLocation, ProblemParams
+from pipelex.errors.problem import ProblemDiagnostics
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProblemDocument(BaseModel):
-    """An RFC 7807 `application/problem+json` error body — the shape of every failure response.
+    """An RFC 9457 `application/problem+json` error body — the shape of every failure response.
 
-    Standard RFC 7807 members (`type`, `title`, `status`, `detail`, `instance`)
-    plus the extension members pipelex's classification adds. Only `type`,
-    `title`, `status`, `detail`, and `error_type` are always present, and `code`
-    on every error the runtime raises: the rest ride along when the originating
-    error populates them, so a consumer must treat them as optional.
-    `extra="allow"` mirrors RFC 7807's open-ended extension-member rule.
+    A pipelex error answers its problem document: the RFC's members (`type`, `title`, `status`, `detail`), the MTHDS
+    core's (`code`, `domain`, `retry`, `next_step`, always present, and `retry_after`, `params`, `location`, `errors`,
+    `pipeline_run_id` when they hold a value) and Pipelex's (`request_id`, and `diagnostics` in the operator view
+    alone). An API-authored error carries no `code` yet, and is classified by `error_type`, `error_domain` and
+    `retryable` instead, with its request path as `instance`. No member is ever written as `null`: a member with no
+    value is absent. `extra="allow"` mirrors RFC 9457's open-ended extension-member rule.
     """
 
     model_config = ConfigDict(extra="allow")
@@ -62,46 +62,58 @@ class ProblemDocument(BaseModel):
     title: str = Field(
         ..., description="Short, human-readable summary: the title of the error's `code`, or of its `error_type` when it carries none."
     )
-    status: int = Field(..., description="HTTP status code, repeated in the body per RFC 7807.")
-    detail: str = Field(..., description="Human-readable explanation of this specific failure. Redacted under `ERROR_DISCLOSURE=strict`.")
-    instance: str | None = Field(default=None, description="Path of the request that failed.")
-    request_id: str | None = Field(default=None, description="Correlation id, echoed in the `X-Request-ID` response header.")
+    status: int = Field(..., description="HTTP status code, repeated in the body per RFC 9457: the status its `code` declares.")
+    detail: str = Field(
+        ...,
+        description=(
+            "Human-readable explanation of this specific failure, rendered from its code's template and parameters. "
+            "Never parsed: a program branches on `code`."
+        ),
+    )
     code: str | None = Field(
         default=None,
         description=(
             "Registry code of the error, what a client branches on: a core code of the MTHDS standard (e.g. `request.invalid`) "
-            "or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises, under every "
-            "`ERROR_DISCLOSURE` mode; absent on an API-authored error."
+            "or a Pipelex code (e.g. `pipelex.config.invalid`). Present on every error the runtime raises; absent on an "
+            "API-authored error."
         ),
     )
-    error_type: str = Field(..., description="Stable class name of the originating error (e.g. `ValidateBundleError`, `Unauthenticated`).")
+    domain: str | None = Field(default=None, description="Who must act, the code's domain: `input`, `method`, `account`, `operator` or `runtime`.")
+    retry: str | None = Field(
+        default=None, description="Whether repeating the request can succeed, the code's verdict: `yes`, `no` or `outcome_unknown`."
+    )
+    retry_after: float | None = Field(default=None, description="Seconds to wait before a retry, when known, on a code whose verdict is `yes`.")
+    next_step: NextStep | None = Field(
+        default=None,
+        description="What the reader should do next: a kind and a sentence, aimed at the caller, or at the operator in the operator view.",
+    )
+    params: ProblemParams | None = Field(default=None, description="The code's typed parameters, the ones its templates are rendered with.")
+    location: ProblemLocation | None = Field(
+        default=None, description="Where the failure happened: the failing pipe and its path from the entry pipe, an input, a field, a file."
+    )
+    errors: list[ProblemItem] | None = Field(
+        default=None,
+        description=(
+            "One item per fault, for a refusal with several, such as a method that does not validate. "
+            "On `/validate`, `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead."
+        ),
+    )
+    pipeline_run_id: str | None = Field(default=None, description="The run the failure belongs to.")
+    request_id: str | None = Field(default=None, description="Correlation id, echoed in the `X-Request-ID` response header.")
+    diagnostics: ProblemDiagnostics | None = Field(
+        default=None,
+        description=(
+            "What only the operator reads: the error's class and message, its causes, the provider's answer, the model. "
+            "Present only when the request was authenticated as the operator's (`AUTH_MODE=api_key`, or a trusted proxy)."
+        ),
+    )
+    instance: str | None = Field(default=None, description="Path of the request that failed, on an API-authored error.")
+    error_type: str | None = Field(default=None, description="Stable name of an API-authored error (e.g. `Unauthenticated`).")
     error_domain: str | None = Field(
         default=None,
-        description="`input` (caller can fix it → 422), `config` or `runtime` (deployment must fix it → 500). Absent for domain-less errors.",
+        description="On an API-authored error: `input` (caller can fix it → 4xx) or `config` (deployment must fix it → 5xx).",
     )
-    retryable: bool | None = Field(
-        default=None,
-        description=(
-            "Whether retrying the same request can plausibly succeed. Always present: on an error carrying a `code`, it is that code's retry verdict."
-        ),
-    )
-    error_category: str | None = Field(default=None, description="Finer classification, when the originating error provides one (inference errors).")
-    user_action: UserAction | None = Field(default=None, description="Structured suggestion of what the caller should do next, when available.")
-    model: str | None = Field(default=None, description="Inference model that failed. Stripped under `ERROR_DISCLOSURE=strict`.")
-    provider: str | None = Field(default=None, description="Inference provider that failed. Stripped under `ERROR_DISCLOSURE=strict`.")
-    provider_metadata: ProviderErrorMetadata | None = Field(
-        default=None,
-        description="Upstream provider error metadata. Stripped (bar a curated slice) under `ERROR_DISCLOSURE=strict`.",
-    )
-    validation_errors: list[ValidationErrorItem] | None = Field(
-        default=None,
-        description=(
-            "Structured per-error diagnostics, carried by a `ValidateBundleError`. Each item may carry a `suggested_fix`. "
-            "Retained under `ERROR_DISCLOSURE=strict` — it describes the caller's own bundle, not server internals. "
-            "On `/validate`, `/resolve`, `/codegen` and `/pipe-io` an invalid bundle is a **200** verdict instead, so the "
-            "items ride the response body there rather than a problem document."
-        ),
-    )
+    retryable: bool | None = Field(default=None, description="On an API-authored error: whether retrying the same request can plausibly succeed.")
 
 
 def _problem(description: str, *, headers: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -137,20 +149,17 @@ PROBLEM_403_RUN_POLICY: dict[str, Any] = _problem(
     "`orchestration_mode` this deployment does not allow overriding per request "
     "(`allow_request_orchestration_mode_override = false`); `CustomCodeRequiresSandbox` — the method (a bundle, or a "
     "fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted; or "
-    "`MethodStructuresRefusedError` — the method's Python declares structure classes (`StructuredContent` "
-    "subclasses), whether it arrived as a bundle (`files` or `bundle_b64`) or as a fetched `method_ref` package: "
-    "a sandbox-hosted deployment imports no caller Python into its own process, so it refuses them before "
-    "loading anything (express the types as MTHDS concepts instead); or `ReadScopeForbidden` — on a `jwt` deployment, "
-    "the request sent a `read_scope` that does not lie under the caller's own `user_id`.",
+    "`ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the caller's "
+    "own `user_id`. The refusal of a method whose Python declares structure classes, "
+    "`pipelex.deployment.python_structures_refused`, is a 422 instead, since the method's author changes it.",
 )
 
 PROBLEM_403_METHOD_PYTHON_POLICY: dict[str, Any] = _problem(
     "The run routes' Python policy, applied to the method's tree: `CustomCodeRequiresSandbox` — the method (sent in "
-    "`files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted; or "
-    "`MethodStructuresRefusedError` — the method's Python declares structure classes (`StructuredContent` subclasses), "
-    "which a sandbox-hosted deployment never imports into its own process (express the types as MTHDS concepts instead). "
+    "`files`, or a fetched `method_ref` package) ships custom Python and this deployment is not sandbox-hosted. "
     "Also `ReadScopeForbidden` — on a `jwt` deployment, the request sent a `read_scope` that does not lie under the "
-    "caller's own `user_id`.",
+    "caller's own `user_id`. The refusal of a method whose Python declares structure classes, "
+    "`pipelex.deployment.python_structures_refused`, is a 422 instead, since the method's author changes it.",
 )
 
 PROBLEM_403_READ_SCOPE: dict[str, Any] = _problem(
@@ -159,7 +168,7 @@ PROBLEM_403_READ_SCOPE: dict[str, Any] = _problem(
 )
 
 PROBLEM_409_DUPLICATE_RUN: dict[str, Any] = _problem(
-    "`PipelineManagerAlreadyExistsError` — the submitted `pipeline_run_id` is still registered for an in-flight run. "
+    "`pipelex.run.already_exists` — the submitted `pipeline_run_id` is still registered for an in-flight run. "
     "Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates.",
 )
 
@@ -168,9 +177,9 @@ PROBLEM_413: dict[str, Any] = _problem(
 )
 
 PROBLEM_422: dict[str, Any] = _problem(
-    "The request could not be processed: a malformed body, a field failing validation, or an `input`-domain pipelex "
-    "error (a `.mthds` bundle the caller must fix). Note that on the diagnostic routes an *invalid bundle* is a **200** "
-    "verdict, not a 422 — see each route's response contract.",
+    "The request could not be processed: a malformed body, a field failing validation, or a pipelex error whose code "
+    "the caller fixes (a `.mthds` bundle that does not validate, a missing input). Note that on the diagnostic routes "
+    "an *invalid bundle* is a **200** verdict, not a 422 — see each route's response contract.",
 )
 
 PROBLEM_429: dict[str, Any] = _problem(
@@ -184,18 +193,16 @@ PROBLEM_429: dict[str, Any] = _problem(
 )
 
 PROBLEM_500: dict[str, Any] = _problem(
-    "A `config`-domain or `runtime`-domain failure the caller cannot fix (a missing env var, a bad TOML override, a "
-    "backend fault), or an unclassified error sanitized by the catch-all handler. Report the `request_id`.",
+    "A failure the caller cannot fix (a missing env var, a bad TOML override, a backend fault), or an unexpected "
+    "error answered as `runtime.unexpected`. Report the `request_id`.",
 )
 
 PROBLEM_501_ASYNC_NOT_ENABLED: dict[str, Any] = _problem(
-    "`AsyncExecutionNotEnabledError` — this deployment does not provide async pipeline execution. Permanent under the "
-    "current deployment; do not retry.",
+    "`runtime.unsupported` — this deployment does not provide async pipeline execution. Permanent under the current deployment; do not retry.",
 )
 
 PROBLEM_404_METHOD_PACKAGE: dict[str, Any] = _problem(
-    "`MethodPackageNotFoundError` — the `method_ref` repository was fetched, but no package in it matches the "
-    "requested address by manifest identity. The message lists the packages the repository does contain.",
+    "`method.not_found` — the `method_ref` repository was fetched, but no package in it matches the requested address by manifest identity.",
 )
 
 PROBLEM_403_BLOB_UPLOAD: dict[str, Any] = _problem(

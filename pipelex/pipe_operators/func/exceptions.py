@@ -33,7 +33,8 @@ class PipeFuncRaisedError(PipelexError):
     Raised by the in-process executor from whatever the function's own code raised, so that the step tells a failure
     of its function from a failure of the seam that runs it: it is ``pipe.function_raised`` whatever the function
     raised, a coded Pipelex error included, which rides as its cause. Its message gives the type and the text of the
-    function's exception, which can carry whatever the process holds, so it is not caller-facing.
+    function's exception, which can carry whatever the process holds, so it reaches the operator alone, as every
+    message does, and no parameter of its code repeats it.
     """
 
     error_code = CoreCode.PIPE_FUNCTION_RAISED
@@ -45,8 +46,7 @@ class PipeFuncFunctionError(PipelexError):
     Raised when the module the import path names is not found, when the function is not a top-level `def` or
     `async def` of that module carrying the `@pipe_func()` marker, or, once the module is imported, when the function
     does not follow the calling convention. The message names the step and the function, and describes the
-    caller's own method, so it is kept under STRICT disclosure.
+    caller's own method.
     """
 
     error_code = CoreCode.METHOD_FUNCTION_INVALID
-    _authors_caller_facing_message = True

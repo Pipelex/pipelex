@@ -1,7 +1,7 @@
-"""Per-repo bundle paths for the local / Temporal ``ErrorReport`` parity pair.
+"""Per-repo bundle paths for the local / Temporal problem parity pair.
 
 The parity-invariant fixtures (the injected failure + its expected classification) and the error
-factories are the single shared source of truth in ``pipelex.test_extras.error_report_parity`` —
+factories are the single shared source of truth in ``pipelex.test_extras.problem_parity`` —
 shipped in the open-core wheel so this repo's local arm and our Temporal plugin's distributed
 arm import the *same* data and cannot silently diverge. Only the ``.mthds`` bundle each repo
 ships is genuinely per-repo, so that is all these subclasses add.
@@ -9,24 +9,24 @@ ships is genuinely per-repo, so that is all these subclasses add.
 
 from typing import ClassVar
 
-from pipelex.test_extras.error_report_parity import ErrorReportParityTestData as SharedErrorReportParityTestData
-from pipelex.test_extras.error_report_parity import JudgeErrorReportParityTestData as SharedJudgeErrorReportParityTestData
-from pipelex.test_extras.error_report_parity import SearchErrorReportParityTestData as SharedSearchErrorReportParityTestData
+from pipelex.test_extras.problem_parity import JudgeProblemParityTestData as SharedJudgeProblemParityTestData
+from pipelex.test_extras.problem_parity import ProblemParityTestData as SharedProblemParityTestData
+from pipelex.test_extras.problem_parity import SearchProblemParityTestData as SharedSearchProblemParityTestData
 
 
-class ErrorReportParityTestData(SharedErrorReportParityTestData):
+class ProblemParityTestData(SharedProblemParityTestData):
     """Local-arm view of the parity fixtures, pointing at this repo's ``native_text_sequence`` bundle."""
 
     BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_text_sequence.mthds"
 
 
-class SearchErrorReportParityTestData(SharedSearchErrorReportParityTestData):
+class SearchProblemParityTestData(SharedSearchProblemParityTestData):
     """Local-arm view of the search parity fixtures, pointing at this repo's ``native_search`` bundle."""
 
     BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_search.mthds"
 
 
-class JudgeErrorReportParityTestData(SharedJudgeErrorReportParityTestData):
+class JudgeProblemParityTestData(SharedJudgeProblemParityTestData):
     """Local-arm view of the judgment parity fixtures, pointing at this repo's ``native_judge`` bundle."""
 
     BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/error_handling/bundles/native_judge.mthds"

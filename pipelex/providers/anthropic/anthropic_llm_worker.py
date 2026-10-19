@@ -306,7 +306,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 )
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @classmethod
     def _build_thinking_params_for_budget(
@@ -323,7 +323,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                     f"Model '{inference_model.desc}' uses adaptive thinking which does not support reasoning_budget. "
                     f"Use reasoning_effort instead (e.g. reasoning_effort='high')"
                 )
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="a reasoning budget")
             case ThinkingMode.MANUAL:
                 safe_budget = fit_thinking_budget(
                     budget=budget,
@@ -340,7 +340,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 )
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @override
     async def _gen_text(

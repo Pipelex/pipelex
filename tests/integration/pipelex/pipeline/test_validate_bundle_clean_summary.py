@@ -49,7 +49,7 @@ def _assert_clean_summary(exc: ValidateBundleError) -> None:
     assert "Could not load blueprints because of" not in exc.message
     assert "Could not load concepts because of" not in exc.message
     # The summary is derived from the structured items: a single item projects its message verbatim.
-    items = list(exc.to_error_report().validation_errors or [])
+    items = list(exc.validation_error_items() or [])
     assert items, "an invalid verdict must carry structured items"
     assert exc.message == items[0].message
 

@@ -34,10 +34,14 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from tests.helpers.recovered_problem import make_recovered_url_refusal
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -269,11 +273,11 @@ class TestAgentOutput:
         assert "no traceback" in parsed["error_source"][0]
 
     # -------------------------------------------------------------------------
-    # to_error_report() integration tests
+    # to_problem() integration tests
     # -------------------------------------------------------------------------
 
     def test_agent_error_uses_report_hint_from_cogt_error(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should use user_action from to_error_report() as the hint field."""
+        """agent_error should use the next step from to_problem() as the hint field."""
         cause = CogtError(
             "inference failed",
             user_action=UserAction(kind=UserActionKind.CHECK_CREDENTIALS, detail="Check your API key and try again"),
@@ -307,6 +311,44 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error_code"] == CoreCode.INPUT_URL_UNREACHABLE
 
+    def test_agent_error_classifies_a_recovered_problem_by_its_own_code(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A cause reporting a problem it recovered gives its code, domain and verdict together with its step, never its class's."""
+        cause = make_recovered_url_refusal()
+        problem = cause.to_problem(view=ProblemView.OPERATOR)
+        with pytest.raises(typer.Exit):
+            agent_error("the run failed on the worker", error_type="RecoveredProblemError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_code"] == CoreCode.INPUT_URL_UNREACHABLE
+        assert parsed["error_domain"] == "input"
+        assert parsed["retryable"] is True
+        assert parsed["hint"] == problem.next_step.detail
+
+    def test_agent_error_lists_no_item_of_a_verdict_behind_a_foreign_exception(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """A foreign exception raised from a handled verdict is a new failure: its envelope lists none of the verdict's items."""
+        stale_verdict = ValidateBundleError(message="validation failed", pipelex_bundle_blueprint_validation_errors=[])
+        foreign_fault = RuntimeError("the cache could not be written")
+        foreign_fault.__cause__ = stale_verdict
+        stand_in = make_unexpected_failure(error=foreign_fault)
+
+        with pytest.raises(typer.Exit):
+            agent_error("unexpected failure", error_type="PipelexUnexpectedError", cause=stand_in)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error_code"] == CoreCode.RUNTIME_UNEXPECTED
+        assert "validation_errors" not in parsed
+
+    def test_agent_error_lists_the_items_of_a_verdict_under_pipelex_wrappers(self, capsys: pytest.CaptureFixture[str]) -> None:
+        verdict = ValidateBundleError(message="Pipe 'post_notice' could not be loaded")
+        wrapper = PipelexError("the run was refused")
+        wrapper.__cause__ = verdict
+
+        with pytest.raises(typer.Exit):
+            agent_error("the run was refused", error_type="PipelexError", cause=wrapper)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert [item["message"] for item in parsed["validation_errors"]] == ["Pipe 'post_notice' could not be loaded"]
+
     def test_agent_error_has_no_error_code_without_a_coded_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
         """A builtin cause carries no registry code, so the envelope names none rather than inventing one."""
         with pytest.raises(typer.Exit):
@@ -316,7 +358,7 @@ class TestAgentOutput:
         assert "error_code" not in parsed
 
     def test_agent_error_uses_report_error_category(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include error_category from to_error_report()."""
+        """agent_error should include error_category from to_problem()."""
         cause = CogtError("bad config", error_category=InferenceErrorCategory.CONFIGURATION)
         with pytest.raises(typer.Exit):
             agent_error("bad config", error_type="CogtError", cause=cause)
@@ -343,6 +385,17 @@ class TestAgentOutput:
         parsed = json.loads(capsys.readouterr().err)
         # hint should come from AGENT_ERROR_HINTS since PipelexError has no user_action
         assert parsed["hint"] == AGENT_ERROR_HINTS["PipeExecutionError"]
+
+    def test_agent_error_falls_back_to_the_code_s_next_step(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """With no advice on the chain and no table entry, the hint is the code's next step as the operator reads it."""
+        cause = MissingOrchestratorError(mode="temporal")
+        with pytest.raises(typer.Exit):
+            agent_error(cause.message, error_type="MissingOrchestratorError", cause=cause)
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["hint"] == (
+            "Install a plugin that provides 'temporal' for the setting 'orchestration_mode', or choose a value an installed plugin provides."
+        )
 
     def test_agent_error_report_hint_overrides_lookup(self, capsys: pytest.CaptureFixture[str]) -> None:
         """When cause has user_action, it should override the lookup dict hint."""
@@ -371,7 +424,7 @@ class TestAgentOutput:
         assert parsed["hint"] == "custom override"
 
     def test_agent_error_includes_model_and_provider_from_report(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include model and provider from to_error_report()."""
+        """agent_error should include model and provider from to_problem()."""
         cause = InferenceBackendCredentialsError(
             credentials_error_type=InferenceBackendCredentialsErrorType.VAR_NOT_FOUND,
             backend_name="openai",
@@ -432,7 +485,7 @@ class TestAgentOutput:
         assert parsed["error_category"] == "configuration"
 
     def test_agent_error_uses_report_error_domain(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """agent_error should include error_domain from to_error_report() for a PipelexError cause."""
+        """agent_error should include error_domain from to_problem() for a PipelexError cause."""
         cause = PipelexConfigError("bad config")
         with pytest.raises(typer.Exit):
             agent_error("bad config", error_type="PipelexConfigError", cause=cause)

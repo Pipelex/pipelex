@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
     from pipelex.cogt.inference.error_classification import UserActionKind
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, find_inference_error_category_in_chain
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.pypdfium2.pypdfium2_worker import Pypdfium2Worker
 from tests.unit.pipelex.providers.pypdfium2.test_data import Pypdfium2ErrorHandlingTestData
 
@@ -36,6 +37,12 @@ def _make_extract_job(mocker: MockerFixture) -> Any:
     job.job_params.max_nb_images = 0  # No images, simplifies the test
     job.job_report.extract_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -82,8 +89,8 @@ class TestPypdfium2WorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is expected_user_action_kind
 
-    async def test_error_report_for_file_not_found(self, mocker: MockerFixture) -> None:
-        """to_error_report() for FileNotFoundError has CONTENT category."""
+    async def test_problem_for_file_not_found(self, mocker: MockerFixture) -> None:
+        """A FileNotFoundError is a CONTENT failure, and its problem invites no retry."""
         worker = _make_pypdfium2_worker(mocker)
         sdk_exc = FileNotFoundError("No such file: /tmp/missing.pdf")
 
@@ -102,12 +109,13 @@ class TestPypdfium2WorkerErrorHandling:
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "content"
-        assert report.retryable is False
-        assert report.error_type == "ExtractJobFailureError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "content"
+        assert problem.is_retryable is False
+        assert _diagnostics_of(problem).error_class == "ExtractJobFailureError"
 
-    async def test_error_report_for_os_error_is_the_runtime_s(self, mocker: MockerFixture) -> None:
+    async def test_problem_for_os_error_is_the_runtime_s(self, mocker: MockerFixture) -> None:
         """A local disk failure is this machine's, not the input's and not one a retry is known to clear: runtime.unexpected."""
         worker = _make_pypdfium2_worker(mocker)
         sdk_exc = OSError("Disk read error")
@@ -127,7 +135,8 @@ class TestPypdfium2WorkerErrorHandling:
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "unknown"
-        assert report.code == CoreCode.RUNTIME_UNEXPECTED
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "unknown"
+        assert problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert problem.is_retryable is False

@@ -222,7 +222,8 @@ def ensure_no_structured_content_python(*, package_dir: Path, package_address: s
         f"Method package '{package_address}' declares Python structure classes ({details}), which would be imported "
         f"into the runner's own process. Refused: {STRUCTURES_REFUSAL_RULE}. {STRUCTURES_REFUSAL_REMEDY}"
     )
-    raise MethodStructuresRefusedError(msg)
+    # A package's files are named by the package's address, as the caller names the package.
+    raise MethodStructuresRefusedError(msg).with_params(files=[f"{package_address}/{violation.relative_path}" for violation in violations])
 
 
 def ensure_no_structured_content_in_library_sources(*, sources_by_dir: Mapping[Path, Mapping[str, str]]) -> None:
@@ -253,4 +254,4 @@ def ensure_no_structured_content_in_library_sources(*, sources_by_dir: Mapping[P
         f"This method declares Python structure classes ({details}), which would be imported into the runner's "
         f"own process. Refused: {STRUCTURES_REFUSAL_RULE}. {STRUCTURES_REFUSAL_REMEDY}"
     )
-    raise MethodStructuresRefusedError(msg)
+    raise MethodStructuresRefusedError(msg).with_params(files=[violation.relative_path for violation in violations])

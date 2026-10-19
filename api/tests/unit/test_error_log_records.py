@@ -39,6 +39,16 @@ async def pipelex_failure_route() -> None:
     raise PipelexConfigError(msg)
 
 
+# The text of an exception that is not a Pipelex error, which may name anything on the host: the operator's alone.
+_FOREIGN_FAILURE_TEXT = "the cache index at /srv/pipelex/private/index.db is corrupt"
+
+
+@_router.get("/foreign-failure")
+async def foreign_failure_route() -> None:
+    # A bug of ours, raised by no Pipelex error: the catch-all handler answers it as `runtime.unexpected`.
+    raise RuntimeError(_FOREIGN_FAILURE_TEXT)
+
+
 @_router.get("/caller-mistake")
 async def caller_mistake_route(detail: str) -> None:
     # A caller-input 422 whose `detail` is exactly what the caller sent — the `warning`-level
@@ -46,12 +56,16 @@ async def caller_mistake_route(detail: str) -> None:
     raise_validation_error(detail, ErrorType.VALIDATION_ERROR)
 
 
-def _build_client() -> TestClient:
-    """Wire a throwaway app with the production handlers and the request-id middleware."""
+def _build_client(*, raise_server_exceptions: bool = True) -> TestClient:
+    """Wire a throwaway app with the production handlers and the request-id middleware.
+
+    `raise_server_exceptions` must be `False` for a route whose exception reaches the catch-all handler, which
+    Starlette's `ServerErrorMiddleware` runs and then re-raises.
+    """
     app = FastAPI()
     register_exception_handlers(app)
     app.include_router(_router)
-    return TestClient(RequestIdMiddleware(app))
+    return TestClient(RequestIdMiddleware(app), raise_server_exceptions=raise_server_exceptions)
 
 
 # The message every error line carries, whichever handler produced it: the key the error stream is selected by.
@@ -104,6 +118,25 @@ class TestErrorLogRecords:
         assert getattr(record, "request_id", None) == response.headers[REQUEST_ID_HEADER]
         assert getattr(record, "url.path", None) == "/pipelex-failure"
         assert getattr(record, "error.type", None) == "PipelexConfigError"
+
+    def test_an_unexpected_failure_keeps_its_class_and_text_for_the_operator_alone(self, caplog: pytest.LogCaptureFixture):
+        # The catch-all answers the caller the code's sentences, and the operator's record keeps what escaped: its class
+        # as `error.type`, and its text with its traceback under `exception`, never in a field a caller-supplied value
+        # could share.
+        with caplog.at_level(logging.WARNING):
+            response = _build_client(raise_server_exceptions=False).get("/foreign-failure")
+        assert response.status_code == 500
+        assert response.json()["code"] == "runtime.unexpected"
+        assert _FOREIGN_FAILURE_TEXT not in response.text
+        assert "RuntimeError" not in response.text
+        record = _api_error_record(caplog)
+        assert record.levelno == logging.ERROR
+        assert getattr(record, "error.code", None) == "runtime.unexpected"
+        assert getattr(record, "error.type", None) == "RuntimeError"
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], RuntimeError)
+        payload = _rendered_json(record)
+        assert f"RuntimeError: {_FOREIGN_FAILURE_TEXT}" in payload["exception"]
 
     def test_a_caller_mistake_records_a_warning_carrying_the_same_identifiers(self, caplog: pytest.LogCaptureFixture):
         # A 4xx is a caller mistake, so it lands at `warning` — but it carries the same message and

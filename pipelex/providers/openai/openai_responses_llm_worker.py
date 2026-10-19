@@ -120,22 +120,22 @@ class OpenAIResponsesLLMWorker(LLMWorkerAbstract):
                     return Reasoning(effort=openai_effort)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     msg = f"Model '{inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="a reasoning budget")
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         return None
 

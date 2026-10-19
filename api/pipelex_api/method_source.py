@@ -27,7 +27,8 @@ same path, the files a step reads, such as a `PipeDocGen` template, included.
 The security gate (packaging invariant 7 — execution locus decides) is the request tree's
 (`pipelex_api.method_tree_request.ensure_python_allowed`): on a deployment that is not sandbox-hosted, a package
 carrying any `.py` is refused with a 403 `CustomCodeRequiresSandbox`; on a sandbox-hosted one, PipeFunc `.py` is
-acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError` → 403).
+acceptable but a package declaring `StructuredContent` subclasses is refused (`MethodStructuresRefusedError`, a 422
+`pipelex.deployment.python_structures_refused`).
 
 Everything a run needs is read OUT of the cached clone before this module returns — the tree's bytes into memory —
 while the clone is pinned against eviction (`MethodCloneCache.pinned_package`), so cache eviction never races a read or
@@ -109,10 +110,10 @@ def _run_git(*, clone_dir: Path, args: list[str], stdin: bytes | None, package_a
         raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.CalledProcessError as exc:
         msg = f"Could not read method package '{package_address}' from its commit: {exc.stderr.decode('utf-8', errors='replace').strip()}"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package_address) from exc
     except subprocess.TimeoutExpired as exc:
         msg = f"Timed out reading method package '{package_address}' from its commit"
-        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED) from exc
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package_address) from exc
     return result.stdout
 
 
@@ -141,7 +142,11 @@ def _package_tree_entries(*, package: FetchedMethodPackage) -> list[_GitTreeEntr
             path = raw_path.decode("utf-8")
         except UnicodeDecodeError as exc:
             msg = f"Method package '{package.full_address}' holds a file whose name is not UTF-8 text, which no method tree can hold."
-            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID) from exc
+            raise (
+                MethodFetchError(msg)
+                .with_error_code(CoreCode.METHOD_PACKAGE_INVALID)
+                .with_params(reason="a file's name is not UTF-8 text, which no method tree can hold")
+            ) from exc
         if not path.startswith(prefix):
             continue
         entries.append(_GitTreeEntry(mode=mode, object_sha=object_sha, path=path.removeprefix(prefix)))
@@ -170,7 +175,7 @@ def _read_git_objects(*, package: FetchedMethodPackage, object_shas: list[str]) 
         header = output[cursor:line_end].decode("ascii").split(" ")
         if len(header) != 3 or header[0] != object_sha:
             msg = f"Could not read the object {object_sha} of method package '{package.full_address}' from its commit."
-            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED)
+            raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_FETCH_FAILED).for_method_ref(method_ref=package.full_address)
         size = int(header[2])
         start = line_end + 1
         contents[object_sha] = output[start : start + size]
