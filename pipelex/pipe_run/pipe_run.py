@@ -9,6 +9,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
+from pipelex.errors.security_event import emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
@@ -112,7 +113,14 @@ class PipeRun(PipeRunProtocol):
         # The run's identifiers ride the payload; here is where a direct-mode run binds them onto every
         # record it emits, the delivery's included. The binding is released when the run returns.
         with pipe_job.job_metadata.log_context():
-            return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            try:
+                return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            except PipelexError as exc:
+                # This run owns the security events of the refusals raised while it executes, in this process; the runner
+                # that dispatched it logs none. A refusal its pipes raised was logged already; one its tail raised, such as a
+                # webhook the SSRF guard refuses at fire time after the run completed, is logged here.
+                emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+                raise
 
     async def _run_bound(
         self,
@@ -166,6 +174,8 @@ class PipeRun(PipeRunProtocol):
                     ERROR_TYPE_FIELD: type(exc).__name__,
                 },
             )
+            # A security refusal also logs its security event, once, naming the run and never what it refused.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:

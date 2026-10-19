@@ -7,6 +7,7 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.network.ssrf_guard import SsrfGuardedBackend, SsrfGuardedTransport, resolve_to_allowed_ips
 
@@ -43,13 +44,26 @@ class TestSsrfGuard:
             await resolve_to_allowed_ips("attacker.example", port=80)
         # The host is part of a URL the runtime did not choose, a run's input or a caller's callback: no message names it.
         assert "attacker.example" not in str(exc_info.value)
+        # The refusal states the class of what the name resolved to, for its security event, and its message never names the address.
+        assert exc_info.value.security_target_class == SecurityTargetClass.METADATA
         assert "169.254.169.254" not in str(exc_info.value)
 
-    async def test_resolve_blocks_literal_private_host(self) -> None:
-        # A literal private IP never needs resolution — blocked by the cheap rule.
+    @pytest.mark.parametrize(
+        ("host", "target_class"),
+        [
+            ("10.0.0.5", SecurityTargetClass.PRIVATE),
+            ("127.0.0.1", SecurityTargetClass.LOOPBACK),
+            ("localhost", SecurityTargetClass.LOOPBACK),
+            ("metadata.google.internal", SecurityTargetClass.METADATA),
+            ("169.254.7.7", SecurityTargetClass.LINK_LOCAL),
+        ],
+    )
+    async def test_resolve_blocks_literal_private_host(self, host: str, target_class: SecurityTargetClass) -> None:
+        # A literal private IP never needs resolution — blocked by the cheap rule, and classified for the security event.
         with pytest.raises(SsrfBlockedError) as exc_info:
-            await resolve_to_allowed_ips("10.0.0.5", port=80)
-        assert "10.0.0.5" not in str(exc_info.value)
+            await resolve_to_allowed_ips(host, port=80)
+        assert exc_info.value.security_target_class == target_class
+        assert host not in str(exc_info.value)
 
     async def test_resolve_blocks_mixed_public_and_private(self, mocker: MockerFixture) -> None:
         # A host resolving to both a public and a private IP is itself a rebinding
@@ -58,8 +72,10 @@ class TestSsrfGuard:
             return _addrinfo("93.184.216.34", 80) + _addrinfo("127.0.0.1", 80)
 
         mocker.patch("socket.getaddrinfo", side_effect=fake)
-        with pytest.raises(SsrfBlockedError):
+        with pytest.raises(SsrfBlockedError) as exc_info:
             await resolve_to_allowed_ips("rebind.example", port=80)
+        # The disallowed address among the answers classifies the refusal, not the public one beside it.
+        assert exc_info.value.security_target_class == SecurityTargetClass.LOOPBACK
 
     async def test_resolution_failure_maps_to_connect_error(self, mocker: MockerFixture) -> None:
         # A genuine DNS failure is not a security event — surface httpx's usual connect error.

@@ -8,22 +8,29 @@ the finally-block library-restore matrix are pinned by the integration suite
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
+from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event, mark_security_event_emitted
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.job_metadata import RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture, MockType
 
+    from pipelex.base_exceptions import PipelexError
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
@@ -46,6 +53,22 @@ class _RaisingPipeRun(PipeRunProtocol):
         raise self._exc
 
 
+class _RebuiltFailurePipeRun(PipeRunProtocol):
+    """A pipe run that hands the job to another process and raises the failure it rebuilt from that process's report.
+
+    The other process logged the security event of a refusal where it raised it, so the rebuilt failure is marked as
+    reported, as an orchestrator marks every error it rebuilds.
+    """
+
+    def __init__(self, exc: PipelexError):
+        self._exc = exc
+
+    @override
+    async def run(self, pipe_job: PipeJob, *, delivery_assignment: DeliveryAssignment | None = None) -> PipeOutput:
+        mark_security_event_emitted(error=self._exc)
+        raise self._exc
+
+
 class _ExecuteEnv(NamedTuple):
     setup_mock: MockType
     telemetry_manager: MockType
@@ -55,6 +78,7 @@ class _ExecuteEnv(NamedTuple):
 
 _RUN_ID = "run-id-123"
 _LIB_ID = "lib-id-456"
+SECURITY_EVENT_LOGGER = "pipelex.errors.security_event"
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -126,6 +150,52 @@ class TestRunnerExecuteErrorPaths:
             },
             run_metadata=env.pipe_job.job_metadata.run_metadata,
         )
+
+    async def test_a_refusal_raised_in_this_process_that_the_pipe_run_left_unreported_is_logged_by_the_runner(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A pipe run that hands the job to another process can be refused here first, before it dispatches.
+
+        Such as an input URL the SSRF guard refuses while the pipe run uploads the inputs in this process. The refusal
+        never left this process and nobody logged it, so the runner logs it, once, naming the run, and the API handler
+        above it finds it reported.
+        """
+        env = self._patch_env(mocker)
+        env.pipe_job.job_metadata.run_metadata = RunMetadata(
+            user_id="pytest", pipeline_run_id=_RUN_ID, storage_scope="test/scope", read_scope=None, extras={"org_id": "org_abc"}
+        )
+        refusal = SsrfBlockedError("Refusing to connect to '10.0.0.5'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        runner = PipelexMTHDSProtocol(execution_config=env.execution_config, pipe_run=_RaisingPipeRun(refusal))
+
+        with caplog.at_level(logging.WARNING, logger=SECURITY_EVENT_LOGGER), pytest.raises(PipelineExecutionError) as exc_info:
+            await runner.execute(pipe_code="echo_pipe")
+
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_INPUT_URL_REFUSED
+        (event,) = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
+        assert event["error.code"] == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert event["error.type"] == "SsrfBlockedError"
+        assert event["pipeline_run_id"] == _RUN_ID
+        assert event["run.extras.org_id"] == "org_abc"
+        assert not emit_security_event(error=exc_info.value)
+
+    async def test_a_failure_rebuilt_from_another_process_s_report_is_not_logged_again(
+        self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A refusal raised in another process was logged there: the failure rebuilt from its report carries the mark.
+
+        The stand-in pipe run marks the failure it raises, as an orchestrator marks every error it rebuilds from a
+        worker's report, so neither the runner nor the API handler above it logs the refusal a second time.
+        """
+        env = self._patch_env(mocker)
+        rebuilt = SsrfBlockedError("Refusing to connect to '10.0.0.5'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        runner = PipelexMTHDSProtocol(execution_config=env.execution_config, pipe_run=_RebuiltFailurePipeRun(rebuilt))
+
+        with caplog.at_level(logging.WARNING, logger=SECURITY_EVENT_LOGGER), pytest.raises(PipelineExecutionError) as exc_info:
+            await runner.execute(pipe_code="echo_pipe")
+
+        assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert [record for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE] == []
+        assert not emit_security_event(error=exc_info.value)
 
     async def test_pipelex_error_during_setup_propagates_unwrapped(self, mocker: MockerFixture) -> None:
         """When pipeline_run_setup itself raises (pipe_job is None), the SAME exception

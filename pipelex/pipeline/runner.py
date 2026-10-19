@@ -17,6 +17,7 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
+from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -372,9 +373,18 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:
             # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
-            # it is not a run failure, and it propagates untouched.
+            # it is not a run failure, and it propagates untouched. A security refusal raised there, in this
+            # process, logs its security event here.
             if pipe_job is None:
+                emit_security_event(error=exc, request_id=request_id, extras=self.extras)
                 raise
+            # A refusal raised during the run is logged in the process that raised it, by whoever saw it first: `PipeRun`
+            # logged one its run raised in this process, and a remote orchestrator's worker one raised there, whose
+            # failure reaches this process rebuilt from its report and marked by the orchestrator that rebuilt it. Either
+            # way it is reported, and this logs nothing. What is left is a refusal raised in this process that the pipe
+            # run did not log, such as an input URL the SSRF guard refused while a remote pipe run uploaded the inputs
+            # before it dispatched: it is logged here, naming the run, and the handler above logs it no more.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
