@@ -613,6 +613,17 @@ class PipelexError(Exception):
             span_id=trace.format_span_id(span_context.span_id) if span_context is not None else None,
         )
 
+    def operator_diagnostics(self) -> ProblemDiagnostics | None:
+        """The diagnostics the operator's view of this error's problem carries (:meth:`to_problem`), without building it.
+
+        A command refusing something under a code of its own reads the error it caught for these alone, so the
+        parameters the caught error's code requires, which no reader of that refusal is shown, are never asked of it.
+        """
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            return recovered_problem_in_view(problem=recovered, view=ProblemView.OPERATOR).diagnostics
+        return self._diagnostics(facts=self.chain_facts())
+
     def to_problem(
         self,
         *,
