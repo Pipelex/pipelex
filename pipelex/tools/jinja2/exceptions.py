@@ -55,9 +55,10 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
 class Jinja2TemplateSecurityError(SecurityError):
     """A template reached for something the sandbox policy refuses (`jinja2_sandbox.py`).
 
-    That is an undeclared private name, or a call that is not a method of a plain value. Its message names the
-    attribute or the callable and the type it was reached on, and never quotes the template source, since the same
-    render serves Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
+    That is an undeclared private name, or a call that is not a method of a plain value. Its message names the type
+    the refused name was reached on, and the attribute or the callable only when the parsed template spells it, since
+    a name reached by a value is the run's data; it never quotes the template source, since the same render serves
+    Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
     Pipelex's own, our template tripping our sandbox is our bug, `runtime.unexpected`.
 
     A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
