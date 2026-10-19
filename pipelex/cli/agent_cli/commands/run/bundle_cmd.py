@@ -39,7 +39,7 @@ from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError, ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError, PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 if TYPE_CHECKING:
@@ -142,6 +142,9 @@ def run_bundle_cmd(
             folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
         except ValidateBundleError as exc:
             agent_error(exc.message, error_type="ValidateBundleError", cause=exc)
+        except MethodEntryError as exc:
+            # No pipe to start at is the run's refusal and no verdict: its envelope carries its own code.
+            agent_error(exc.message, error_type="MethodEntryError", cause=exc)
         except PipelexConfigError as exc:
             # Listing the tree reads its limits from the configuration, before the boot would.
             report_agent_init_failure(error=exc)

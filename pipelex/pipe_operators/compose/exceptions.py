@@ -18,12 +18,11 @@ class PipeComposeFactoryError(PipeComposeError):
     Raised only while the pipe is built from its blueprint, about that blueprint, so it is the method's to fix and
     bundle validation reports it as an item located on the pipe: a template that does not parse is
     ``method.template_invalid``, its code over the parser's own, and a template mode with no template
-    ``method.schema_violation``. Its messages name only the author's own pipe, concepts and template text, so they
-    are caller-facing copy kept under STRICT disclosure.
+    ``method.schema_violation``. Its messages name only the author's own pipe, concepts and template text; like every
+    message, they reach the operator's diagnostics alone, the caller reading the sentences the code renders.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.METHOD_TEMPLATE_INVALID, others=(CoreCode.METHOD_SCHEMA_VIOLATION,))
-    _authors_caller_facing_message = True
 
 
 class ConstructFieldBlueprintTypeError(PipeComposeError, TypeError):
@@ -41,9 +40,9 @@ class ConstructFieldBlueprintValueError(PipeComposeError, ValueError):
 class PipeComposeTemplateError(PipeComposeError, ValueError):
     """A template of a ``PipeCompose``, its own or a ``construct`` field's, does not parse when its variables are read.
 
-    Its message carries the parser's diagnosis, which can quote the template, so it is not caller-facing: the
-    template may be a host library's. It stays a ``ValueError`` for the pydantic validators that read a pipe's
-    required variables.
+    Its message carries the parser's diagnosis, which can quote the template, so it reaches the operator alone, as
+    every message does, and no parameter repeats it: the template may be a host library's. It stays a ``ValueError``
+    for the pydantic validators that read a pipe's required variables.
     """
 
     error_code = CoreCode.METHOD_TEMPLATE_INVALID

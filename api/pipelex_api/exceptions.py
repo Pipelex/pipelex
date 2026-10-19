@@ -7,7 +7,7 @@ beside the code that raises them, as every error class does: the same gate refus
 ``exceptions.py`` or ``<topic>_exceptions.py`` module.
 
 The API-authored refusals (``pipelex_api.errors.ApiError``, built from ``pipelex_api.error_types.ErrorType``) are a
-separate family with no ``ErrorReport`` behind them.
+separate family with no pipelex error behind them.
 """
 
 from mthds.protocol.problem.registry import CoreCode
@@ -23,12 +23,6 @@ class ApiBootConfigError(PipelexError):
 
 class InvalidAuthModeError(PipelexError):
     """Raised at startup when `AUTH_MODE` holds a value that is not an `AuthMode` member."""
-
-    error_code = PipelexErrorCode.CONFIG_INVALID
-
-
-class InvalidErrorDisclosureError(PipelexError):
-    """Raised at startup when `ERROR_DISCLOSURE` holds an unrecognized value."""
 
     error_code = PipelexErrorCode.CONFIG_INVALID
 

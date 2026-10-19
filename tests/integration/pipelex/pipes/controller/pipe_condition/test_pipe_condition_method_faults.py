@@ -2,9 +2,9 @@
 
 A bundle's load refuses an outcome naming no pipe, an expression that does not parse and a chosen pipe's
 undeclared input before any condition runs, so a run of a loaded bundle does not reach these raise sites:
-the tests call the condition's run arms directly. Each refusal is classified as the caller's fault, keeps
-its message under STRICT disclosure with a next step, and quotes no text of the condition, which may be a
-host library's.
+the tests call the condition's run arms directly. Each refusal is classified as the method's fault, the
+caller reads its code's sentence and next step, rendered from the parameters the raise site gives, and
+neither quotes text of the condition, which may be a host library's.
 """
 
 from datetime import UTC, datetime
@@ -12,12 +12,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, RetryVerdict
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.exceptions import PipeRunError
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import NodeKind
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -47,8 +49,16 @@ def _make_condition(*, pipe_code: str, expression_template: str, outcomes: dict[
     return PipeFactory[PipeCondition].make_from_blueprint(domain_code="test_integration", pipe_code=pipe_code, blueprint=blueprint)
 
 
-def _strict_problem_document(error: PipeRunError) -> dict[str, Any]:
-    return error.to_error_report().to_problem_document(disclosure_mode=DisclosureMode.STRICT)
+def _caller_problem_document(error: PipeRunError) -> dict[str, Any]:
+    """The caller's problem document: a method fault, never retried, with the caller's own message on the operator's side."""
+    problem = error.to_problem(view=ProblemView.CALLER)
+    assert problem.domain == ProblemDomain.METHOD
+    assert problem.retry == RetryVerdict.NO
+    assert error_code_spec(CoreCode(problem.code)).status == 422
+    operator = error.to_problem(view=ProblemView.OPERATOR)
+    assert operator.diagnostics is not None
+    assert operator.diagnostics.message == error.message
+    return problem.to_wire()
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -71,18 +81,16 @@ class TestPipeConditionMethodFaults:
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.LIVE),
             )
 
-        document = _strict_problem_document(exc_info.value)
-        assert document["status"] == 422
-        assert document["error_domain"] == "input"
-        assert document["detail"] == (
+        assert exc_info.value.message == (
             "PipeCondition 'length_gate' chose pipe 'test_integration2.capitalize_long_text', whose required inputs are missing: input_text."
         )
-        assert document["user_action"] == {
-            "kind": "change_input",
-            "detail": (
-                "Provide the missing required inputs of 'test_integration2.capitalize_long_text', which PipeCondition 'length_gate' chose: "
-                "input_text."
-            ),
+        document = _caller_problem_document(exc_info.value)
+        assert document["code"] == CoreCode.PIPE_INPUT_UNRESOLVED
+        assert document["detail"] == "Pipe 'length_gate' could not read 'input_text', which an earlier step should have produced."
+        assert document["location"] == {"pipe": "length_gate"}
+        assert document["next_step"] == {
+            "kind": "change_method",
+            "detail": "Make an earlier step produce 'input_text' for pipe 'length_gate', then run the method again.",
         }
 
     @pytest.mark.parametrize(
@@ -178,18 +186,16 @@ class TestPipeConditionMethodFaults:
 
         # The refusal is the root fault a run and a dry-run verdict report, not the parser error that quotes the expression.
         assert find_root_fault(error=exc_info.value) is exc_info.value
-        document = _strict_problem_document(exc_info.value)
-        assert document["status"] == 422
-        assert document["error_domain"] == "input"
-        assert (
-            document["detail"] == "Dry run failed for pipe 'parse_gate' (PipeCondition): its expression does not parse at line 2 of that expression."
+        assert exc_info.value.message == (
+            "Dry run failed for pipe 'parse_gate' (PipeCondition): its expression does not parse at line 2 of that expression."
         )
-        assert "frobnicate_the_parcel" not in document["detail"]
-        assert "input_text" not in document["detail"]
-        assert document["user_action"] == {
-            "kind": "change_input",
-            "detail": "Fix the expression of PipeCondition 'parse_gate' so that it parses as a Jinja2 expression.",
-        }
+        document = _caller_problem_document(exc_info.value)
+        assert document["code"] == CoreCode.METHOD_TEMPLATE_INVALID
+        assert document["detail"] == "The template 'expression' of pipe 'parse_gate' is invalid (does not parse at line 2 of that expression)."
+        assert document["location"] == {"pipe": "parse_gate"}
+        for text in (str(document), exc_info.value.message):
+            assert "frobnicate_the_parcel" not in text
+            assert "input_text" not in text
 
     async def test_outcomes_naming_no_pipe_are_the_callers_fault(
         self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
@@ -210,18 +216,14 @@ class TestPipeConditionMethodFaults:
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
             )
 
-        document = _strict_problem_document(exc_info.value)
-        assert document["status"] == 422
-        assert document["error_domain"] == "input"
-        assert document["detail"] == (
+        assert exc_info.value.message == (
             "Dry run failed for PipeCondition 'route_gate': its outcomes name pipes that do not exist: "
             "test_integration.send_by_barge, test_integration.send_rush."
         )
-        assert "rush_lane" not in document["detail"]
-        assert document["user_action"] == {
-            "kind": "change_input",
-            "detail": (
-                "Declare the pipes test_integration.send_by_barge, test_integration.send_rush, "
-                "or change the outcomes of PipeCondition 'route_gate' to name existing pipes."
-            ),
-        }
+        document = _caller_problem_document(exc_info.value)
+        assert document["code"] == CoreCode.METHOD_PIPE_UNRESOLVED
+        assert document["params"] == {"pipe": "route_gate", "missing": "test_integration.send_by_barge, test_integration.send_rush"}
+        assert document["location"] == {"pipe": "route_gate"}
+        assert document["next_step"]["kind"] == "change_method"
+        for text in (str(document), exc_info.value.message):
+            assert "rush_lane" not in text

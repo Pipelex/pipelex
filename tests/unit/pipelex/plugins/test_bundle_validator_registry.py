@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import Path
 
-    from pipelex.base_exceptions import ErrorReport
+    from pipelex.errors.bundle_validation_failure import BundleValidationFailure
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.caller_identity import CallerIdentity
     from pipelex.system.configuration.configs import PipelexConfig
@@ -46,7 +46,7 @@ class _FakeBundleValidator:
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
         read_scope: str | None,
-    ) -> PipelexValidationReport | ErrorReport:
+    ) -> PipelexValidationReport | BundleValidationFailure:
         raise NotImplementedError
 
 

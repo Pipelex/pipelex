@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
@@ -22,7 +23,6 @@ class PipeJudgeInputCapabilityError(PipeJudgeError):
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
-    _authors_caller_facing_message = True
 
     def __init__(self, *, pipe_code: str, variable_path: str, file_kind: str, model_name: str, model_inputs: list[str]):
         self.pipe_code = pipe_code
@@ -36,6 +36,10 @@ class PipeJudgeInputCapabilityError(PipeJudgeError):
             f"{file_kind}s, or turn the {file_kind} into text with a step before this one."
         )
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipe": self.pipe_code, "model": self.model_name, "capability": f"{self.file_kind} inputs"}
 
 
 def _with_article(*, noun: str) -> str:

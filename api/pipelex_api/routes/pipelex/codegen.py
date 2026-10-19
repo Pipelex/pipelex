@@ -3,11 +3,11 @@ from typing import Annotated, Literal, Self, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pipelex.base_exceptions import ErrorReport
 from pipelex.codegen.emission import build_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
 from pipelex.codegen.lock import CODEGEN_LOCK_FILENAME
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.usage_stats_reporting import CodeGenerationReport, usage_stats_codegen_target
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsCodegenArtifact
 from pipelex.tools.misc.package_utils import get_package_version
@@ -172,7 +172,7 @@ async def _generate_codegen_response(*, request: Request, request_data: CodegenR
         return JSONResponse(content=report.model_dump(mode="json", by_alias=True))
 
     outcome = await project_resolved_method(request=request, request_data=request_data, project=_projection_response)
-    if isinstance(outcome, ErrorReport):
+    if isinstance(outcome, ValidateBundleError):
         generation_report.declare_failed()
         return invalid_crate_report_response(outcome)
     return outcome

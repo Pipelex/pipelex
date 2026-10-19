@@ -2,9 +2,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.base_exceptions import DisclosureMode
+from pipelex.base_exceptions import PipelexError, iter_cause_chain
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_worker_abstract import DocGenWorkerAbstract
 from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError
@@ -17,6 +18,7 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.method_trees.method_file_store import MethodFileStoreProtocol
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_current_library, get_library_manager, set_current_library
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -35,6 +37,8 @@ from pipelex.runtime_hub import get_secrets_provider
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 if TYPE_CHECKING:
+    from mthds.protocol.problem.models import ProblemItem
+
     from pipelex.libraries.library_crate import LibraryCrate
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 
@@ -159,25 +163,66 @@ def make_models_manager(*, plugin_model_declarations: PluginModelDeclarations, b
 
 
 async def engine_unavailable_report(*, step_fields: str) -> str:
-    """The error report, as text, of validating the test bundle with a PipeDocGen step no engine of this runtime prints.
+    """The operator's problem, as text, of validating the test bundle with a PipeDocGen step no engine of this runtime prints.
 
     The bundle is not at fault: the runtime lacks the engine, which is the operator's to install or enable, so validation
-    gives no verdict and the load's `DocGenEngineMissingError` propagates as `pipelex.docgen.engine_unavailable`, its
-    message kept for the caller under STRICT disclosure.
+    gives no verdict and the load's `DocGenEngineMissingError` propagates as `pipelex.docgen.engine_unavailable`. Its
+    message, which names the remedy, rides the operator's diagnostics; the caller reads the code's sentence over the format.
     """
     with pytest.raises(DocGenEngineMissingError) as exc_info:
         await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
-    report = exc_info.value.to_error_report()
-    assert report.code == PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
-    assert report.to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == report.message
-    return str(report.model_dump())
+    caller_problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+    assert caller_problem.code == PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
+    assert caller_problem.diagnostics is None
+    operator_problem = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+    assert operator_problem.diagnostics is not None
+    assert operator_problem.diagnostics.message == exc_info.value.message
+    return str(operator_problem.to_wire())
 
 
-async def refusal_report(*, step_fields: str) -> str:
-    """The error report, as text, of validating the test bundle with the given PipeDocGen step, which must be refused."""
+def verdict_items_text(error: ValidateBundleError) -> str:
+    """An invalid verdict's items, as text: what `/validate` and the CLI show a caller."""
+    return str([item.model_dump(mode="json", exclude_none=True) for item in error.validation_error_items()])
+
+
+def caller_text(error: PipelexError) -> str:
+    """What a caller reads of a refusal, as text: an invalid verdict's items, and the caller's problem, in its code's sentences."""
+    problem_text = str(error.to_problem(view=ProblemView.CALLER).to_wire())
+    if isinstance(error, ValidateBundleError):
+        return verdict_items_text(error) + problem_text
+    return problem_text
+
+
+def refusal_messages(error: BaseException) -> str:
+    """The messages along a refusal's cause chain, as text: what each raise site found, which only the operator reads.
+
+    No problem a caller reads quotes them: a verdict's items read the sentences of their codes. They reach the operator
+    as the diagnostics of the problem and in the run's log.
+    """
+    return "\n".join(str(node) for node in iter_cause_chain(error))
+
+
+def diagnosed_error_classes(error: PipelexError) -> list[str]:
+    """The classes the operator's diagnostics name: the error's own, then those along its cause chain."""
+    diagnostics = error.to_problem(view=ProblemView.OPERATOR).diagnostics
+    assert diagnostics is not None
+    return [diagnostics.error_class, *(cause.error_class for cause in diagnostics.causes or [])]
+
+
+def only_problem_item(error: ValidateBundleError) -> "ProblemItem":
+    """The one item of an invalid verdict, as the caller's problem lists it."""
+    problem = error.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.METHOD_INVALID
+    assert problem.errors is not None
+    (item,) = problem.errors
+    return item
+
+
+async def refusal_report(*, step_fields: str) -> ValidateBundleError:
+    """The invalid verdict of validating the test bundle with the given PipeDocGen step, which must be refused."""
     with pytest.raises(ValidateBundleError) as exc_info:
         await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
-    return str(exc_info.value.to_error_report().model_dump())
+    return exc_info.value
 
 
 class RecordingMethodFileStore(MethodFileStoreProtocol):

@@ -5,6 +5,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
@@ -35,11 +36,11 @@ class TestPipeImgGenModelChoiceCode:
         refusal = _refusal_of(model=_llm_only_handle())
 
         assert refusal.field_name == "model"
-        assert refusal.to_error_report().code == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
+        assert refusal.to_problem(view=ProblemView.CALLER).code == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
 
     def test_a_model_no_deck_defines_reads_unknown(self, load_empty_library: Callable[[], str]) -> None:
         load_empty_library()
 
         refusal = _refusal_of(model="no-such-painter-anywhere")
 
-        assert refusal.to_error_report().code == CoreCode.MODEL_UNKNOWN
+        assert refusal.to_problem(view=ProblemView.CALLER).code == CoreCode.MODEL_UNKNOWN

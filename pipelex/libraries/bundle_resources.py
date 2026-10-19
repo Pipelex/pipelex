@@ -45,4 +45,4 @@ def check_submitted_files(*, blueprints: Iterable[PipelexBundleBlueprint], submi
             f"The bundle was submitted with files none of its steps names: {listed}. Submit only the files a step reads, "
             "each keyed by the path the step names, such as a PipeDocGen step's 'template_file', relative to the bundle."
         )
-        raise BundleResourceNotNamedError(msg)
+        raise BundleResourceNotNamedError(msg).with_params(field="resources")

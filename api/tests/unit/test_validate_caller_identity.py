@@ -20,7 +20,9 @@ import pytest
 from fastapi import FastAPI, Request, Response
 from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
-from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
@@ -69,12 +71,10 @@ class _RecordingBundleValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
-    ) -> ErrorReport:
+    ) -> BundleValidationFailure:
         self.caller_identities.append(caller_identity)
-        return ErrorReport.make_for_code(
-            code=CoreCode.METHOD_INVALID,
-            error_type="ValidateBundleError",
-            message="bundle is invalid",
+        return BundleValidationFailure(
+            problem=make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR),
             validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
         )
 

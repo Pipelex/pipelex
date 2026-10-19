@@ -14,6 +14,8 @@ Pins the two-sided contract around explicit ``pipeline_run_id`` reuse:
 
 import pytest
 
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.exceptions import PipelineManagerAlreadyExistsError
 from pipelex.pipeline.pipeline_manager import PipelineManager
 
@@ -48,5 +50,12 @@ class TestPipelineManagerRemoval:
         """
         manager = PipelineManager()
         manager.add_new_pipeline(pipe_code="some_pipe", pipeline_run_id="run-1")
-        with pytest.raises(PipelineManagerAlreadyExistsError):
+        with pytest.raises(PipelineManagerAlreadyExistsError) as raised:
             manager.add_new_pipeline(pipe_code="some_pipe", pipeline_run_id="run-1")
+
+        # The run id its code declares names the run that holds it, in the sentence the caller reads.
+        problem = raised.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == PipelexErrorCode.RUN_ALREADY_EXISTS
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"pipeline_run_id": "run-1"}
+        assert problem.detail == "A run with the id 'run-1' already exists."

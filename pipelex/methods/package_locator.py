@@ -190,11 +190,13 @@ def locate_package_in_clone(*, clone_root: Path, requested_address: str) -> Pack
         if scan.skipped_manifests:
             details = "; ".join(scan.skipped_manifests)
             msg = f"{msg} Manifests skipped: {details}"
-        raise MethodPackageNotFoundError(msg)
+        raise MethodPackageNotFoundError(msg).with_params(method_ref=requested_address)
 
     matched = ", ".join(sorted(f"{candidate.full_address} ({candidate.package_dir.name}/)" for candidate in matches))
     msg = (
         f"Ambiguous method address '{requested_address}': it matches more than one package in the fetched repository: {matched}. "
         f"Use the package's full address (address + '/' + name) to disambiguate."
     )
-    raise MethodPackageAmbiguityError(msg)
+    raise MethodPackageAmbiguityError(msg).with_params(
+        method_ref=requested_address, candidates=sorted(candidate.full_address for candidate in matches)
+    )

@@ -1,5 +1,8 @@
+from typing import Any
+
 from pydantic import BaseModel, Field
 
+from pipelex.errors.error_codes import ErrorCode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
 
@@ -164,12 +167,16 @@ class DryRunFailureErrorData(BaseModel):
 
     The dry-run sweep records one per failing pipe, located at the innermost pipe that failed: a
     failure that makes an enclosing controller fail for the same cause is kept once, at the pipe
-    where it happened. ``message`` is built from that pipe's own failure under the disclosure rule
-    for an item built from a raised error: the failure's own message when it is caller-facing, its
-    title otherwise, because the verdict that carries it is caller-facing as a whole.
+    where it happened. ``code`` is the failure's own code, which decides whether the failure is the
+    method's (an invalid verdict) or a fault no verdict may carry. ``message`` names the pipe and gives
+    the sentence the code renders for a caller, never the failure's own message, because the verdict
+    that carries it is read by the caller, and ``params`` holds the parameters that sentence was rendered
+    from, so that the verdict's item renders it again whole.
     """
 
+    code: ErrorCode = Field(description="The code of the pipe's failure")
     pipe_code: str | None = Field(default=None, description="Bare code of the pipe whose dry run failed")
     domain_code: str | None = Field(default=None, description="Domain of the pipe whose dry run failed")
     source: str | None = Field(default=None, description="Source file of the pipe, when the library knows it")
-    message: str = Field(description="The pipe's own failure, as the disclosure rule allows it")
+    message: str = Field(description="The pipe's failure, in the sentence its code renders for a caller")
+    params: dict[str, Any] | None = Field(default=None, description="The parameters the code's sentences are rendered from, those a caller may read")

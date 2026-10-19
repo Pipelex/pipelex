@@ -84,7 +84,7 @@ class PipeConditionBlueprint(PipeBlueprint):
         # a conditional only when it renders, so a wrong name there compiles and is left to the run, as it must be:
         # refusing it here would refuse an expression whose run never reaches it.
         # The message quotes neither the expression nor the parser's diagnosis, which names the token it stopped at:
-        # the verdict is kept verbatim under STRICT disclosure, and the condition may be a host library's.
+        # the verdict's item shows it to the caller, and the condition may be a host library's.
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
             # Both fields or neither: the validator of the pair refuses that and says why, where a refusal of the
             # parse of one of them, which runs first, would hide it.

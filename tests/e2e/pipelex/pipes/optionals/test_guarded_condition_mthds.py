@@ -64,7 +64,7 @@ class TestGuardedConditionExpression:
         # The load-time guard lint (OPTIONAL_INPUT_UNGUARDED) is raised inside a pydantic validator, and
         # the run refuses the bundle with the verdict validating it gives: its item names the lint, so
         # the missing-function error (the wrong reason this control used to pass for) cannot pass it.
-        items = exc_info.value.to_error_report().validation_errors or []
+        items = exc_info.value.validation_error_items() or []
         unguarded_items = [item for item in items if item.error_type == PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED]
         assert unguarded_items, f"expected an optional_input_unguarded item, got {items!r}"
         assert "'flag'" in unguarded_items[0].message

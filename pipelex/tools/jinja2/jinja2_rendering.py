@@ -161,7 +161,7 @@ def _make_invalid_template_error(*, template_error: TemplateError, template_owne
 
     Its message gives Jinja2's own finding (`TemplateError.message`, which names the filter, test or template the
     template reached for), never the template source nor the line Jinja2 would quote with it, so on a method's
-    template it reaches the caller under every disclosure mode.
+    template it can be the ``finding`` parameter its problem shows the caller.
     """
     if isinstance(template_error, TemplateNotFound):
         # A template without a loader (every method template) has nothing to include or extend.
@@ -171,8 +171,8 @@ def _make_invalid_template_error(*, template_error: TemplateError, template_owne
     msg = f"Jinja2 render — the template cannot render as written: {fault}"
     invalid_error = _coded_by_owner(error=Jinja2TemplateInvalidError(msg, fault=fault, template_owner=template_owner), template_owner=template_owner)
     if template_owner.is_method:
-        # The message names the construct Jinja2 refused and never the source, so the method's author reads it.
-        invalid_error.as_caller_fault()
+        # The fault names the construct Jinja2 refused and never the source, so the method's author reads it as the finding.
+        invalid_error.with_params(finding=fault)
     return invalid_error
 
 

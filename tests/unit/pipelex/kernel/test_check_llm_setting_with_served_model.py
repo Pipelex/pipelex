@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError, ModelWaterfallError
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMSetting
@@ -13,6 +13,7 @@ from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.kernel.llm_ops import check_llm_setting_with_served_model
 from pipelex.plugins.inference_backend_registry import LLMRequestCheck
 from pipelex.system.exceptions import MissingDependencyError
@@ -78,32 +79,31 @@ class TestCheckLLMSettingWithServedModel:
         with pytest.raises(LLMSettingRefusedError, match=r"does not support reasoning \(thinking_mode=none\)"):
             check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=True)
 
-    def test_a_refusal_names_the_model_by_its_handle_and_is_shown_under_strict_disclosure(self, mocker: MockerFixture) -> None:
+    def test_a_refusal_names_the_model_by_its_handle(self, mocker: MockerFixture) -> None:
         """A worker names the model with its SDK, backend and provider id, which only its operator may see."""
         _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=None)
         with pytest.raises(LLMSettingRefusedError) as exc_info:
             check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
         message = str(exc_info.value)
         assert message.startswith("Model 'some-model' does not support reasoning")
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_CAPABILITY_UNSUPPORTED
+        assert "'some-model'" in caller.detail
         for internal_name in ("some_sdk", "some_backend", "some-model-id"):
             assert internal_name not in message
-        assert exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == message
+            assert internal_name not in str(caller.to_wire())
 
     def test_an_external_plugin_s_refusal_is_raised_as_it_wrote_it(self, mocker: MockerFixture) -> None:
-        """Its text may carry what the plugin keeps private, so it stays internal under strict disclosure."""
+        """Its text may carry what the plugin keeps private, so it rides the operator's diagnostics alone."""
         refusal = LLMCapabilityError("Model 'some-model' is refused by tenant 1234 at internal.example")
         _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=mocker.MagicMock(side_effect=refusal), is_builtin=False)
         with pytest.raises(LLMCapabilityError) as exc_info:
             check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
         assert exc_info.value is refusal
-        assert "tenant 1234" not in exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"]
-
-    def test_an_external_plugin_s_refusal_it_vouches_for_is_shown_under_strict_disclosure(self, mocker: MockerFixture) -> None:
-        refusal = LLMCapabilityError("Model 'some-model' takes no reasoning").as_caller_fault()
-        _serve(mocker, served=_make_model(thinking_mode=ThinkingMode.NONE), check=mocker.MagicMock(side_effect=refusal), is_builtin=False)
-        with pytest.raises(LLMCapabilityError) as exc_info:
-            check_llm_setting_with_served_model(llm_setting=_SETTING, is_structured=False)
-        assert exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"] == "Model 'some-model' takes no reasoning"
+        assert "tenant 1234" not in str(exc_info.value.to_problem(view=ProblemView.CALLER).to_wire())
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert "tenant 1234" in operator.diagnostics.message
 
     @pytest.mark.parametrize(
         "served",

@@ -1,9 +1,11 @@
 """The read scope's check: a scoped run reads only its own storage prefix, and never the local disk."""
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain
 from pipelex.errors.security_target import SecurityTargetClass
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.uri_read_scope import UriReference, authorize_uri_read, authorize_uri_reads
 
@@ -99,15 +101,18 @@ class TestAuthorizeUriRead:
         assert "secret.png" not in message
         assert READ_SCOPE not in message
 
-    def test_the_refusal_is_a_caller_facing_input_error_answered_as_a_422(self) -> None:
+    def test_the_refusal_is_an_input_error_answered_as_a_422_quoting_no_uri(self) -> None:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri="/etc/passwd", read_scope=READ_SCOPE, position="the input 'photo'")
-        error_report = exc_info.value.to_error_report()
-        assert error_report.error_domain == ErrorDomain.INPUT
-        assert error_report.http_status == 422
-        strict = error_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert "the input 'photo'" in strict["message"]
-        assert "/etc/passwd" not in strict["message"]
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert caller.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.SECURITY_INPUT_URL_REFUSED).status == 422
+        assert "/etc/passwd" not in str(caller.to_wire())
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert "the input 'photo'" in operator.diagnostics.message
+        assert "/etc/passwd" not in operator.diagnostics.message
 
     def test_the_list_form_refuses_the_first_reference_the_scope_does_not_allow(self) -> None:
         uri_references = [

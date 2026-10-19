@@ -9,8 +9,7 @@ if TYPE_CHECKING:
 # registrar menu or the plugin contract.
 #
 # v2 added the optional ``add_http_error_mapper`` capability (a framework-agnostic
-# transport-fault → ``ErrorReport`` mapping a host runtime renders into its own
-# HTTP error response).
+# mapping of a transport fault a host runtime renders into its own HTTP error response).
 #
 # v3 added ``add_storage_provider`` and ``add_secrets_provider`` — two config-selected,
 # process-global provider registries (``runtime.storage.method`` / ``runtime.secrets.method`` pick
@@ -86,7 +85,14 @@ if TYPE_CHECKING:
 # ``PipeFuncPackageOfferFactoryFn`` receives a ``PipeFuncPackageOfferRequest``, the pipe_func config and the requirements
 # of the one method being judged, where it received the config alone, and may answer a ``PipeFuncPackageRefusal``
 # beside an offer or ``None``. A factory written against v7 would read the request as the config it expected.
-PLUGIN_API_VERSION: int = 8
+#
+# v9 changed what crosses the plugin contract for a failure, now that every failure is a problem document seen through
+# the view of its reader. An HTTP-error mapper (``add_http_error_mapper``) returns the ``PipelexError`` a transport
+# exception stands for, whose problem the host builds in the view of whoever asked, where it returned a report; and a
+# bundle validator's ``validate_bundles`` returns a ``BundleValidationFailure`` as its invalid arm, the refusal's
+# problem in the operator's view with its validation items, where it returned a report. A plugin written against v8
+# would hand back a type that is gone; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 9
 
 
 @runtime_checkable

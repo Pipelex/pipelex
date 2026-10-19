@@ -17,7 +17,6 @@ class MockUsageOnLiveRunError(PipelexError, ValueError):
     """
 
     error_code = CoreCode.REQUEST_INVALID
-    _authors_caller_facing_message = True
 
 
 class UnsafeSchemaError(SecurityError):
@@ -48,9 +47,6 @@ class DryRunObjectFidelityError(PipelexError):
     # The method's output concept enforces an invariant the schema round-trip drops; its author fixes it by
     # declaring `examples` / `mock_format` on the offending fields, not a server-side fault.
     error_code = CoreCode.METHOD_MOCK_UNSATISFIABLE
-    # The message is pure caller-facing guidance (names the caller's own output concept class and the
-    # field-level remedy) with no internal paths or secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
 
     @classmethod
     def for_object_class(cls, object_class_name: str) -> "DryRunObjectFidelityError":
@@ -80,9 +76,6 @@ class OutputStructureSchemaError(PipelexError):
     # The method's output concept uses a type pydantic cannot describe as JSON Schema; its author fixes it by
     # changing the field or teaching the type `__get_pydantic_json_schema__`.
     error_code = CoreCode.METHOD_CONCEPT_INVALID
-    # The message names the caller's own output concept class and the remedy, with no internal paths or
-    # secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
 
     @classmethod
     def for_object_class(cls, *, object_class_name: str, reason: str) -> "OutputStructureSchemaError":
@@ -112,9 +105,6 @@ class DryRunMockBuildError(PipelexError):
     # The method's output concept has field constraints the mock factory cannot satisfy; its author fixes it
     # by declaring `examples` / `mock_format` on those fields, not a server fault.
     error_code = CoreCode.METHOD_MOCK_UNSATISFIABLE
-    # The message is pure caller-facing guidance (names the caller's own output concept class and the
-    # field-level remedy) with no internal paths or secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
 
     @classmethod
     def for_object_class(cls, object_class_name: str) -> "DryRunMockBuildError":

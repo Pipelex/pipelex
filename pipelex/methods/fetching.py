@@ -232,12 +232,15 @@ def fetch_method_package(
             clone_default_branch(clone_url=effective_clone_url, destination=dest_dir)
     except VCSFetchError as exc:
         msg = f"Failed to fetch method '{ref.ref_str}': {_without_host_directory(text=exc.message, directory=dest_dir)}"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).for_method_ref(method_ref=ref.ref_str) from exc
 
-    if ref.tag:
-        ensure_cloned_at_tag(clone_dir=dest_dir, ref=ref)
-
-    commit_sha = resolve_head_commit_sha(clone_dir=dest_dir)
+    try:
+        if ref.tag:
+            ensure_cloned_at_tag(clone_dir=dest_dir, ref=ref)
+        commit_sha = resolve_head_commit_sha(clone_dir=dest_dir)
+    except MethodFetchError as fetch_error:
+        # The steps after the clone know the clone, not the reference the caller sent, which the sentences name.
+        raise fetch_error.for_method_ref(method_ref=ref.ref_str)  # ruff: ignore[raise-without-from-inside-except]
     located = locate_package_in_clone(clone_root=dest_dir, requested_address=ref.address)
     ensure_package_within_bounds(package_dir=located.package_dir, package_address=located.full_address)
     if refuse_structures:

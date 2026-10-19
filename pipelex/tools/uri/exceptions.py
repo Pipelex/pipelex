@@ -1,6 +1,8 @@
 from enum import StrEnum
+from typing import Any
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
@@ -22,13 +24,22 @@ class UriReadRefusalReason(StrEnum):
                 return "it names a file on the server's own disk, or a URL in a scheme this runtime does not read, and a hosted run reads neither"
 
     @property
-    def target_class(self) -> SecurityTargetClass:
+    def security_target_class(self) -> SecurityTargetClass:
         """The class of destination the refusal names in its security event: another tenant's key, or a scheme the run does not read."""
         match self:
             case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
                 return SecurityTargetClass.FOREIGN_STORAGE_KEY
             case UriReadRefusalReason.LOCAL_PATH:
                 return SecurityTargetClass.SCHEME
+
+    @property
+    def target_class(self) -> str:
+        """The kind of target the refused URL points at, as the refusal's sentence names it."""
+        match self:
+            case UriReadRefusalReason.FOREIGN_STORAGE_KEY:
+                return "foreign storage"
+            case UriReadRefusalReason.LOCAL_PATH:
+                return "local"
 
 
 class UriReadRefusedError(SecurityError):
@@ -43,18 +54,20 @@ class UriReadRefusedError(SecurityError):
     A :class:`SecurityError`, so that a domain-level ``except`` around a read cannot swallow it.
     The default is ``security.input_url_refused``, answered as a 422: an input asked for the read
     and the caller fixes it by passing the file as an input or an upload. A raise or catch site that
-    knows the method named the URL chooses ``security.method_url_refused``. The message is
-    caller-facing and keeps its text under STRICT disclosure: it names where the URL sat (an
-    image of a pipe's prompt, an input) and why it was refused, and quotes neither the URL nor the
-    read scope. The refusal happens before any IO, so it says nothing about whether the file
+    knows the method named the URL chooses ``security.method_url_refused``. The message names
+    where the URL sat (an image of a pipe's prompt, an input) and why it was refused, and quotes
+    neither the URL nor the read scope. The refusal happens before any IO, so it says nothing about whether the file
     exists.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_URL_REFUSED, others=(CoreCode.SECURITY_METHOD_URL_REFUSED,))
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, reason: UriReadRefusalReason):
         super().__init__(message)
         self.reason = reason
         # The reason is the class of destination refused, so the security event names it without the raise site saying so.
-        self.with_security_target_class(reason.target_class)
+        self.with_security_target_class(reason.security_target_class)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": self.reason.desc, "target_class": self.reason.target_class}

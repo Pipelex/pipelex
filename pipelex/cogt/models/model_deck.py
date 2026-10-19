@@ -2,7 +2,7 @@ from collections.abc import Callable, Container, Mapping
 from functools import partial
 from typing import NoReturn, Self, TypeVar
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ModelUnavailableReason
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from pipelex import log
@@ -65,7 +65,7 @@ def resolve_deck_choice(*, deck_setting: str, resolve: Callable[[], DeckSettingT
     """Resolve a model choice the deck names itself, a default or an override, so that a miss is the deck's fault.
 
     The deck's lookups refuse a reference they do not resolve as ``ModelChoiceNotFoundError``, which reads as the
-    method's: ``model.unknown`` and caller-facing. A step that names no model reaches the same lookups with the deck's
+    method's: ``model.unknown``. A step that names no model reaches the same lookups with the deck's
     own choice, and the caller can change nothing about that, so the miss is raised again as a
     ``ModelDeckChoiceUnresolvedError`` naming the deck's setting.
 
@@ -1094,7 +1094,9 @@ class ModelDeck(ConfigModel):
                     f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
                     f"or enable a backend that supports '{ideal_model_handle}'. "
                 )
-                raise ModelNotFoundError(message=msg, model_handle=waterfall_name)
+                raise ModelNotFoundError(message=msg, model_handle=waterfall_name).with_params(
+                    model=waterfall_name, model_type=model_type, reason=ModelUnavailableReason.FALLBACK_DISABLED
+                )
             try:
                 inference_model = self._get_optional_inference_model(
                     model_handle=fallback,
@@ -1384,17 +1386,19 @@ class ModelDeck(ConfigModel):
                 # as. A reference the deck itself names but cannot serve (a preset or an alias target on
                 # a backend that is not enabled) stays the deployment's fault, `model.unavailable`, and stays
                 # redacted, with no next step.
-                raise (
-                    ModelNotFoundError(message=msg, model_handle=model_handle)
-                    .with_error_code(CoreCode.MODEL_UNKNOWN)
-                    .as_caller_fault(
-                        user_action=UserAction(
-                            kind=UserActionKind.CHANGE_MODEL,
-                            detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
-                        )
-                    )
+                # The advice is the local CLI's tip; a problem's reader gets the code's own next step.
+                change_model = UserAction(
+                    kind=UserActionKind.CHANGE_MODEL,
+                    detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
                 )
-            raise ModelNotFoundError(message=msg, model_handle=model_handle)
+                raise (
+                    ModelNotFoundError(message=msg, model_handle=model_handle, user_action=change_model)
+                    .with_error_code(CoreCode.MODEL_UNKNOWN)
+                    .with_params(model=model_handle, model_type=model_type)
+                )
+            raise ModelNotFoundError(message=msg, model_handle=model_handle).with_params(
+                model=model_handle, model_type=model_type, reason=ModelUnavailableReason.NOT_SERVED
+            )
         if self.inference_models.get(model_type=model_type, handle=model_handle) is None:
             log.verbose(f"Model reference '{model_handle}' resolves to model '{inference_model.name}'")
         return inference_model

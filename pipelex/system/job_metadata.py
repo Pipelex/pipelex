@@ -164,14 +164,14 @@ class RunMetadata(BaseModel):
     # The API-inbound ``X-Request-ID`` (set by the dispatcher when an external
     # HTTP request enters Pipelex). Rides here so it crosses the Temporal
     # serialization boundary — every activity / workflow can correlate logs and
-    # the resulting ``ErrorReport`` back to the originating request. Distinct
+    # the resulting problem back to the originating request. Distinct
     # from :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata.request_id`,
     # which is the *provider*-side request id (OpenAI ``x-request-id`` etc.) —
     # both can appear together when the API surfaces a provider failure.
     # Constrained at the wire-format boundary by `validate_request_id` (printable
     # ASCII only, max 128 chars) so an unsanitized upstream value cannot inject
-    # newlines or control characters into the log lines or ``ErrorReport``
-    # envelopes that quote it.
+    # newlines or control characters into the log lines or the problem
+    # documents that quote it.
     request_id: str | None = None
 
     # The opaque labels the host attaches to this run. Never read by name;

@@ -20,9 +20,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.core.method_trees.exceptions import MethodFileUnavailableError
@@ -36,6 +37,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import STUB_METHOD_ADDRESS
 
@@ -90,9 +92,10 @@ def _b64(data: bytes) -> str:
     return base64.b64encode(data).decode("ascii")
 
 
-def _build_client() -> TestClient:
+def _build_client(*, as_operator: bool = False) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
     return TestClient(app)
 
@@ -195,6 +198,7 @@ def _contents_body(*, route: str, resources: dict[str, str], mthds: str = _INVOI
 
 
 def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
+    """An API-authored refusal: its `error_type`, and the `detail` the API wrote from what it checked."""
     assert response.status_code == status, response.text
     assert response.headers["content-type"].startswith("application/problem+json")
     problem = response.json()
@@ -202,6 +206,31 @@ def _assert_problem(response: Any, *, status: int, error_type: str) -> str:
     assert "is_valid" not in problem
     detail: str = problem["detail"]
     return detail
+
+
+def _assert_coded_problem(response: Any, *, code: CoreCode, params: dict[str, Any]) -> dict[str, Any]:
+    """A runtime refusal: a 422 problem under its code, with the parameters its sentences are rendered from."""
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"].startswith("application/problem+json")
+    problem: dict[str, Any] = response.json()
+    assert problem["code"] == code, response.text
+    assert problem["status"] == 422
+    assert problem["domain"] == "input"
+    # A deterministic refusal of what the caller sent: the same request fails again.
+    assert problem["retry"] == "no"
+    assert problem.get("params") == params
+    assert "is_valid" not in problem
+    return problem
+
+
+def _assert_the_verdict_names_the_missing_file(*, verdict: dict[str, Any], file: str, reason: str) -> None:
+    """An invalid verdict whose one item is a file of the step missing from the method's tree, in the code's sentence."""
+    assert verdict["is_valid"] is False
+    (item,) = verdict["validation_errors"]
+    assert item["category"] == "pipe_validation"
+    assert item["pipe_code"] == "print_invoice"
+    # A verdict is the caller's: its item reads `method.resource_missing`'s sentence, never the runtime's own message.
+    assert item["message"] == f"The file reference '{file}' resolves to no file of the method's tree (reason: {reason})."
 
 
 class TestBundleResourcesRoutes:
@@ -226,21 +255,19 @@ class TestBundleResourcesRoutes:
         response = _build_client().post("/v1/validate", json={"mthds_contents": [_INVOICE_MTHDS]})
 
         assert response.status_code == 200, response.text
-        body = response.json()
-        assert body["is_valid"] is False
-        assert "which was not supplied with its bundle" in str(body["validation_errors"])
+        _assert_the_verdict_names_the_missing_file(verdict=response.json(), file=_TEMPLATE_PATH, reason="not_in_tree")
 
     @pytest.mark.parametrize("route", ["/v1/validate", "/v1/execute"])
     def test_a_file_no_step_names_is_refused_on_every_route_that_loads_contents(self, mocker: MockerFixture, route: str) -> None:
         _stub_the_document_engine(mocker)
         body = _contents_body(route=route, resources={_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES), "templates/logo.png": _b64(b"png")})
 
-        response = _build_client().post(route, json=body)
-        detail = _assert_problem(response, status=422, error_type="BundleResourceNotNamedError")
+        response = _build_client(as_operator=True).post(route, json=body)
+        problem = _assert_coded_problem(response, code=CoreCode.REQUEST_INVALID, params={"field": "resources"})
 
-        assert "'templates/logo.png'" in detail
-        # A deterministic refusal of what the caller sent, as InvalidResourcePath is: the same request fails again.
-        assert response.json()["retryable"] is False
+        # The operator's diagnostics name the file no step reads.
+        assert problem["diagnostics"]["error_class"] == "BundleResourceNotNamedError"
+        assert "'templates/logo.png'" in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize(
         ("path", "reason"),
@@ -297,13 +324,15 @@ class TestBundleResourcesRoutes:
         body.pop("mthds_contents", None)
         body.pop("files", None)
         body["method_ref"] = f"{STUB_METHOD_ADDRESS}@v0.1.0"
-        # The run route refuses it in its request model, as the runtime's `request.invalid`; the crate
+
+        response = _build_client().post(route, json=body)
+
+        # The run route refuses it in its request model, as the runtime's `request.invalid` naming the field; the crate
         # routes refuse it themselves, with the API-authored `ValidationError`.
-        expected_error_type = "PipelexRequestError" if route == "/v1/execute" else "ValidationError"
-
-        detail = _assert_problem(_build_client().post(route, json=body), status=422, error_type=expected_error_type)
-
-        assert "method_ref" in detail
+        if route == "/v1/execute":
+            _assert_coded_problem(response, code=CoreCode.REQUEST_INVALID, params={"field": "resources"})
+        else:
+            assert "method_ref" in _assert_problem(response, status=422, error_type="ValidationError")
 
     def test_a_source_label_naming_a_file_on_the_runner_never_reads_beside_it(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A caller's absolute source naming a real bundle file, with the template file beside it, reaches nothing on the runner's disk."""
@@ -317,9 +346,7 @@ class TestBundleResourcesRoutes:
         response = _build_client().post("/v1/validate", json=body)
 
         assert response.status_code == 200, response.text
-        verdict = response.json()
-        assert verdict["is_valid"] is False
-        assert "which was not supplied with its bundle" in str(verdict["validation_errors"])
+        _assert_the_verdict_names_the_missing_file(verdict=response.json(), file=_TEMPLATE_PATH, reason="not_in_tree")
         assert read_templates == []
 
     @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
@@ -342,8 +369,8 @@ class TestBundleResourcesRoutes:
     def test_resources_with_no_bundle_to_read_them_are_refused(self) -> None:
         response = _build_client().post("/v1/execute", json={"pipe_code": "print_invoice", "resources": {_TEMPLATE_PATH: _b64(_TEMPLATE_BYTES)}})
 
-        assert "resources accompany the bundle" in _assert_problem(response, status=422, error_type="PipelexRequestError")
-        assert response.json()["code"] == "request.invalid"
+        problem = _assert_coded_problem(response, code=CoreCode.REQUEST_INVALID, params={"field": "resources"})
+        assert problem["detail"] == "The request's field 'resources' does not match the route's schema."
 
     def test_a_run_handed_to_a_remote_orchestrator_names_the_tree_of_its_files_by_digest(self, mocker: MockerFixture) -> None:
         """`/start` on a Temporal-like orchestrator: the job's crate and run metadata name the tree, and the job carries none of its files."""
@@ -477,9 +504,10 @@ class TestBundleResourcesRoutes:
 
         assert response.status_code == 200, response.text
         verdict = response.json()
-        assert verdict["is_valid"] is sends_the_logo, response.text
-        if not sends_the_logo:
-            assert "logo.png" in json.dumps(verdict["validation_errors"])
+        if sends_the_logo:
+            assert verdict["is_valid"] is True, response.text
+        else:
+            _assert_the_verdict_names_the_missing_file(verdict=verdict, file="logo.png", reason="not_in_tree")
 
     def test_two_bundles_of_a_method_each_read_the_file_beside_them(self, mocker: MockerFixture) -> None:
         """A step names its file from its bundle's own tree path, so two bundles shipping a template each under one relative path both run."""

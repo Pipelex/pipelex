@@ -5,9 +5,8 @@ so call sites reference symbols, not literals — easier to grep, rename, and
 document. The `pipelex_api.errors` helpers stamp one of these onto the RFC 7807
 problem document as the `error_type` extension member.
 
-Pipelex domain errors carry their own open-ended `error_type` (the exception
-class name, from the `ErrorReport`) and are NOT enumerated here — they are
-deliberately not a fixed set.
+Pipelex domain errors answer their problem document, whose identity is its
+registry `code`, and are NOT enumerated here.
 """
 
 from enum import StrEnum

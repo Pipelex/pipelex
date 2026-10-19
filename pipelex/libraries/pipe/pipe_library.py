@@ -120,8 +120,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                     return matches[0]
                 if len(matches) > 1:
                     domains = [match.domain_code for match in matches]
+                    # The aliased keys the matches are loaded under, the spellings that name each one unambiguously.
+                    candidates = sorted(f"{alias}->{match.pipe_ref}" for match in matches)
                     msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
-                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS).with_params(ref=pipe_code, candidates=candidates)
             return None
 
         return None
@@ -158,7 +160,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             # asserting the opposite — and handed a `user_action` naming candidates that never existed.
             raise
         except PipeLibraryError as exc:
-            raise EntryPipeAmbiguousError(str(exc)) from exc
+            # The candidates the lookup found, which the refusal's code names to the caller and a selection reads back.
+            raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code, candidates=exc.given_params.get("candidates")) from exc
         if pipe is not None:
             return pipe
 
@@ -173,7 +176,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if len(matches) > 1:
             candidates = sorted(match.pipe_ref for match in matches)
             msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly, as 'domain.pipe_code'."
-            raise EntryPipeAmbiguousError(msg)
+            raise EntryPipeAmbiguousError(msg).with_params(pipe=pipe_code, candidates=candidates)
         return None
 
     @override
@@ -184,7 +187,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            raise EntryPipeNotFoundError(msg)
+            raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code)
         return the_pipe
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:

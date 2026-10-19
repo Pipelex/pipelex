@@ -13,10 +13,12 @@ from collections.abc import Callable, Generator, Mapping, Sequence
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pipelex.base_exceptions import DisclosureMode, ErrorReport
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
@@ -35,6 +37,7 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import STUB_METHOD_ADDRESS
 
@@ -115,7 +118,7 @@ class _UnreachableValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
-    ) -> ErrorReport:
+    ) -> BundleValidationFailure:
         self.calls += 1
         msg = "A method refused for its requirements must not reach the validator."
         raise AssertionError(msg)
@@ -148,15 +151,18 @@ def sandbox_hosted_mode_fixture(mocker: MockerFixture) -> Generator[None, None, 
         pipe_func_config.execution_mode = previous
 
 
-def _build_client(mocker: MockerFixture, *, orchestrator: _RecordingOrchestrator, validator: _UnreachableValidator) -> TestClient:
+def _build_client(
+    mocker: MockerFixture, *, orchestrator: _RecordingOrchestrator, validator: _UnreachableValidator, as_operator: bool = False
+) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     mocker.patch(
         f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=False)
     )
     mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"temporal": orchestrator}))
     mocker.patch(f"{_PIPELINE_NS}.get_bundle_validator_registry", return_value=BundleValidatorRegistry({"temporal": validator}))
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
-    register_exception_handlers(app, disclosure_mode=DisclosureMode.STRICT)
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
+    register_exception_handlers(app)
     return TestClient(app)
 
 
@@ -164,7 +170,7 @@ class TestMethodRequirementsRefusal:
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_run_whose_requirements_the_sandbox_does_not_meet_is_refused_before_dispatch(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
         files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": "pandas>=2\npandas>=3\npolars\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
@@ -172,27 +178,31 @@ class TestMethodRequirementsRefusal:
         assert response.status_code == 422, response.text
         assert response.headers["content-type"].startswith("application/problem+json")
         body = response.json()
-        assert body["error_type"] == "MethodRequirementsNotMetError"
-        # Caller-facing under STRICT disclosure: it names each package and the sandbox, and no directory of the runner.
-        assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in body["detail"]
-        assert body["detail"].startswith(f"The method needs Python packages that {_SANDBOX_ENVIRONMENT} does not have")
-        assert "rooted at" not in body["detail"]
+        assert body["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert body["domain"] == "method"
+        assert body["diagnostics"]["error_class"] == "MethodRequirementsNotMetError"
+        # The refusal names each package and the sandbox, and no directory of the runner.
+        message = body["diagnostics"]["message"]
+        assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in message
+        assert message.startswith(f"The method needs Python packages that {_SANDBOX_ENVIRONMENT} does not have")
+        assert "rooted at" not in message
         assert orchestrator.dispatches == []
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_run_whose_requirements_the_deployment_refuses_carries_its_reason_before_dispatch(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
         files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": f"{_UNRESOLVABLE_REQUIREMENT}\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "MethodRequirementsNotMetError"
-        # Caller-facing under STRICT disclosure: the deployment's own reason, and no directory of the runner.
+        assert body["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert body["diagnostics"]["error_class"] == "MethodRequirementsNotMetError"
+        # The deployment's own reason, and no directory of the runner.
         assert (
-            body["detail"]
+            body["diagnostics"]["message"]
             == f"The method needs Python packages that the Daytona sandbox cannot offer, as its requirements.txt declares: {_REFUSAL_REASON}"
         )
         assert orchestrator.dispatches == []
@@ -211,15 +221,16 @@ class TestMethodRequirementsRefusal:
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_refused_requirements_line_refuses_the_run(self, mocker: MockerFixture) -> None:
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
         files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": "-r base.txt\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "MethodRequirementsFileError"
-        assert "line 1 '-r base.txt'" in body["detail"]
+        assert body["code"] == CoreCode.METHOD_PACKAGE_INVALID
+        assert body["diagnostics"]["error_class"] == "MethodRequirementsFileError"
+        assert "line 1 '-r base.txt'" in body["diagnostics"]["message"]
         assert orchestrator.dispatches == []
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
@@ -283,8 +294,12 @@ class TestMethodRequirementsRefusal:
 
         assert response.status_code == 500, response.text
         body = response.json()
-        assert body["error_type"] == "HostLibraryRequirementsError"
-        assert body["error_domain"] == "config"
+        # The deployment's own configuration: the caller reads the operator domain and is told to report it.
+        assert body["code"] == PipelexErrorCode.CONFIG_INVALID
+        assert body["domain"] == "operator"
+        assert body["next_step"]["kind"] == "report"
+        # Withheld from the caller: nothing of the host's paths, interpreter or packages reaches its view.
+        assert "diagnostics" not in body
         for host_detail in (str(tmp_path), sys.executable, _ABSENT_PACKAGE):
             assert host_detail not in response.text, host_detail
         assert orchestrator.dispatches == []

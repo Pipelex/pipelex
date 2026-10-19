@@ -3,7 +3,8 @@ from typing import Annotated, Literal, Self, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorItem
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from pipelex.pipeline.input_form import PipeInputFormDescriptor, PipeOutputFormDescriptor
@@ -15,9 +16,10 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from pipelex_api.bundle_resources import decode_bundle_resources
-from pipelex_api.exception_handlers import problem_response_from_error_report
+from pipelex_api.exception_handlers import problem_response
 from pipelex_api.json_body import JsonBodyRoute
 from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method
+from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import PROBLEM_403_RUN_POLICY, PROBLEM_404_METHOD_PACKAGE
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.routes.pipelex.pipeline import ApiRunner, bound_read_scope, get_request_user_id
@@ -299,7 +301,7 @@ ValidationResponse = Annotated[Union[ValidReport, InvalidReport], Field(discrimi
     response_model=ValidationResponse,
     # On top of the composite router's shared 401/413/422/500: the policy 403s (the
     # `orchestration_mode` override gate it shares with `/start`, plus — for a `method_ref` —
-    # the custom-code sandbox gate and the structures refusal) and the `method_ref`
+    # the custom-code sandbox gate) and the `method_ref`
     # package-not-found 404. Note what is deliberately NOT here: an *invalid bundle* is a
     # produced verdict on a 200, never a 4xx — and a selector-resolution failure is a non-2xx
     # problem+json, never an `is_valid: false` verdict.
@@ -337,20 +339,21 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     - **Invalid verdict (200, `is_valid: false`):** the `InvalidReport` arm — `validation_errors[]`
       (the structured per-error diagnostics, built by pipelex's one shared builder, incl. one
       located `dry_run` item per pipe whose dry run failed) + `message`, with the structural artifacts absent. The runner
-      returns this as a value (`ErrorReport` with `validation_errors`) regardless of backend — the
+      returns this as a value (a `BundleValidationFailure` with `validation_errors`) regardless of backend — the
       in-process arm from the bundle's `ValidateBundleError`, the dispatched arm recovered from the
       worker — so the route maps it to a 200 by matching validation diagnostics, never by catching an
-      exception. Returned `ErrorReport`s without validation diagnostics are backend/config/runtime
-      faults and keep the global RFC 7807 problem response path.
+      exception. A returned failure without validation diagnostics is a backend, configuration or runtime
+      fault, and its problem is answered as every raised failure's is.
     - **No verdict (non-2xx):** a malformed request body, an `mthds_sources` length mismatch, or
       both/neither of `mthds_contents` / `method_ref` is a request-shape **422**; a forbidden
       `orchestration_mode` override is a **403**; a host-wiring programmer error or a genuine
       orchestrator fault is a **5xx**; auth is **401/403**. A `method_ref` **resolution failure**
-      is also a no-verdict condition — never an `is_valid: false`: a malformed reference or a
-      failed fetch is a **422**, no matching package in the repository a **404**, and the
-      custom-Python policy (the sandbox gate, the structures refusal) a **403**, each with the
-      originating error class as `error_type`. All are RFC 7807 `application/problem+json`
-      rendered by the global handler in `pipelex_api.exception_handlers` — routes never shape them.
+      is also a no-verdict condition — never an `is_valid: false`: each answers the status its
+      code declares, such as a **422** for a malformed reference, a **502** for a failed fetch, a
+      **404** for no matching package in the repository and a **422** for the method's Python
+      structure classes, and the custom-code sandbox gate a **403**. All are
+      `application/problem+json` rendered by the global handlers in
+      `pipelex_api.exception_handlers` — routes never shape them.
     """
     # Opt-in presentation formats (D-D): resolved once, threaded into both 200 arms. Empty by
     # default → no `rendered_*` field, response byte-identical to the no-`render` request.
@@ -367,9 +370,9 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     # included, which reads no blob store of its own (`bound_read_scope`).
     read_scope = bound_read_scope(request, requested=request_data.read_scope)
     # Verdict-as-value: the runner resolves the orchestration mode and dispatches through the bundle
-    # validator registry, returning either a validation verdict or a classified fault report.
-    # Only `ErrorReport`s with validation diagnostics are invalid-bundle verdicts (→ 200
-    # InvalidReport); backend/config/runtime reports keep the global problem+json mapping.
+    # validator registry, returning either a validation verdict or a failure carrying its problem.
+    # Only failures with validation diagnostics are invalid-bundle verdicts (→ 200 InvalidReport);
+    # a backend, configuration or runtime fault is answered as its problem, like a raised one.
     validated_method: RequestMethod | None = None
     if request_data.mthds_contents is not None:
         verdict = await ApiRunner(
@@ -418,10 +421,10 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
                 graph_pipe_code=tree_default_pipe_ref,
                 method_dir=written.method_dir,
             )
-    if not isinstance(verdict, PipelexValidationReport):
+    if isinstance(verdict, BundleValidationFailure):
         if verdict.validation_errors:
             return _invalid_report_response(verdict, requested_formats=requested_formats)
-        return problem_response_from_error_report(verdict, request=request)
+        return problem_response(verdict.problem.model_copy(update={"request_id": request_id_of(request)}), error=None, request=request)
     report = verdict
     # The echo of a tree is its bundles' text, decoded strictly now that the valid verdict says they loaded.
     validated_contents = request_data.mthds_contents if validated_method is None else list(validated_method.tree.bundle_texts.values())
@@ -459,20 +462,20 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     return JSONResponse(content=content)
 
 
-def _invalid_report_response(error_report: ErrorReport, *, requested_formats: set[RenderFormat]) -> JSONResponse:
+def _invalid_report_response(failure: BundleValidationFailure, *, requested_formats: set[RenderFormat]) -> JSONResponse:
     """Render a produced "invalid" verdict as a 200 `InvalidReport` (D-A / D-C / D-D).
 
     The `validation_errors[]` come straight from pipelex's one shared builder via
-    `ValidateBundleError.to_error_report()`, so the hosted invalid arm carries the same typed
+    `ValidateBundleError.validation_error_items()`, so the hosted invalid arm carries the same typed
     items the agent CLI emits (including one located `dry_run` item per pipe whose dry run failed —
     the structured-info invariant, which the parse-level `blueprint_validation` residual makes total,
     guarantees this list is non-empty on every invalid verdict that reaches the wire,
     since the empty-`mthds_contents` edge case is a request-shape 422 via `min_length=1`).
-    `message` is the caller-facing summary the error report already carries.
+    `message` is the failure's problem's `detail`, the sentence its code renders, which reads the same in every view.
     """
     invalid_report = InvalidReport(
-        validation_errors=error_report.validation_errors or [],
-        message=error_report.message,
+        validation_errors=failure.validation_errors,
+        message=failure.problem.detail,
     )
     # `exclude_none` drops each item's unset locators, so the wire items match the agent CLI's
     # `extract_validation_errors` byte-for-byte (it dumps items the same way) — the "one error item,

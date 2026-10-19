@@ -34,7 +34,7 @@ _PACKAGE_ROOT: Path = Path(pipelex.__file__).resolve().parent
 _REPO_ROOT: Path = _PACKAGE_ROOT.parent
 _SOURCE_ROOTS: tuple[Path, ...] = (_PACKAGE_ROOT, _REPO_ROOT / "api" / "pipelex_api")
 
-# What a code decides, which a class no longer declares: ``ErrorReport`` reads all four from the code.
+# What a code decides, which a class no longer declares: the problem reads all four from the code.
 _ATTRIBUTES_THE_CODE_DECIDES: tuple[str, ...] = ("error_domain", "retryable", "_declared_title", "_declared_type_uri")
 
 

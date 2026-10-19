@@ -20,6 +20,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError, Jinja2TemplateSecurityError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
@@ -271,7 +272,9 @@ class TestTemplateSandbox:
                 templating_context=_make_context(),
             )
         assert type(exc_info.value) is Jinja2TemplateSecurityError
-        assert exc_info.value.to_error_report().error_type == "Jinja2TemplateSecurityError"
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "Jinja2TemplateSecurityError"
 
     def test_sync_render_reads_metadata(self) -> None:
         rendered = render_jinja2_sync(

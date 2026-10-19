@@ -1,10 +1,13 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.models import ProblemLocation
+from mthds.protocol.problem.registry import CoreCode, InputWrongMultiplicityExpected
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.problem import make_location
 from pipelex.tools.misc.exceptions import ContextProviderError
 
 
@@ -53,21 +56,39 @@ class InputShapingError(PipelexError):
 
     Every subclass describes a fault in the *caller's own* provided inputs — the input name,
     the declared concept, what was provided, and the expected shape rendered from the pipe's
-    signature. Each subclass carries an ``input.`` code (the caller can fix it), and ``_authors_caller_facing_message``
-    (the copy names only the caller's inputs and method, so it survives STRICT disclosure).
+    signature. Each subclass carries an ``input.`` code (the caller can fix it).
 
     Each subclass sets a per-instance ``user_action`` (advice tailored to the specific failure)
     rather than a class-level one, because the actionable fix differs per failure mode.
+
+    The message is the operator's diagnostics, so what the caller needs in order to act rides the problem: the input
+    as the ``input`` parameter and ``location.input``, and the facts each factory knows as the parameters its code's
+    template declares, such as the counts of ``input.wrong_multiplicity`` or the concepts of ``input.wrong_concept``.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message = True
 
-    def __init__(self, message: str, *, variable_name: str, user_action: UserAction | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        variable_name: str,
+        user_action: UserAction | None = None,
+        shaping_params: dict[str, Any] | None = None,
+    ):
         self.variable_name = variable_name
+        self.shaping_params = dict(shaping_params or {})
         if user_action is not None:
             self.user_action = user_action
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.variable_name, **self.shaping_params}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.variable_name)
 
 
 class WrongScalarKindError(InputShapingError):
@@ -109,6 +130,7 @@ class ListWhereSingularError(InputShapingError):
         variable_name: str,
         declared_concept_ref: str,
         provided_description: str,
+        provided_count: int,
         expected_shape: str,
     ) -> "ListWhereSingularError":
         message = (
@@ -119,7 +141,8 @@ class ListWhereSingularError(InputShapingError):
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Provide a single value for input '{variable_name}', or declare it as a list ('{declared_concept_ref}[]') in the method.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action)
+        shaping_params = {"expected": InputWrongMultiplicityExpected.SINGLE, "provided_count": provided_count}
+        return cls(message, variable_name=variable_name, user_action=user_action, shaping_params=shaping_params)
 
 
 class MultiplicityCountMismatchError(InputShapingError):
@@ -145,7 +168,8 @@ class MultiplicityCountMismatchError(InputShapingError):
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Provide exactly {expected_count} items for input '{variable_name}'.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action)
+        shaping_params = {"expected": InputWrongMultiplicityExpected.COUNT, "expected_count": expected_count, "provided_count": provided_count}
+        return cls(message, variable_name=variable_name, user_action=user_action, shaping_params=shaping_params)
 
 
 class StructureValidationError(InputShapingError):
@@ -172,13 +196,19 @@ class StructureValidationError(InputShapingError):
         declared_concept_ref: str,
         reason: str,
         expected_shape: str,
+        field: str | None = None,
     ) -> "StructureValidationError":
+        """The refusal for a value of the right kind that does not build into the declared concept.
+
+        ``field`` is the dotted path, inside the value, of the first field the build refused, when the build names one,
+        which the caller reads as the problem's ``field`` parameter.
+        """
         message = f"Input '{variable_name}' could not be built as '{declared_concept_ref}': {reason}\nExpected shape:\n{expected_shape}"
         user_action = UserAction(
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Fix input '{variable_name}' so it matches the expected shape for '{declared_concept_ref}'.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action)
+        return cls(message, variable_name=variable_name, user_action=user_action, shaping_params={"field": field})
 
     @classmethod
     def make_for_unreadable_bare_value(
@@ -292,7 +322,10 @@ class StructureValidationError(InputShapingError):
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Send input '{variable_name}' in the expected shape, which names its concept and spells out its content.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action).with_error_code(CoreCode.INPUT_WRONG_CONCEPT)
+        shaping_params = {"expected": declared_concept_ref, "provided": built_concept_ref}
+        return cls(message, variable_name=variable_name, user_action=user_action, shaping_params=shaping_params).with_error_code(
+            CoreCode.INPUT_WRONG_CONCEPT
+        )
 
 
 class ExplicitConceptIncompatibleError(InputShapingError):
@@ -321,7 +354,8 @@ class ExplicitConceptIncompatibleError(InputShapingError):
             kind=UserActionKind.CHANGE_INPUT,
             detail=f"Provide a '{declared_concept_ref}' (or a concept that refines it) for input '{variable_name}'.",
         )
-        return cls(message, variable_name=variable_name, user_action=user_action)
+        shaping_params = {"expected": declared_concept_ref, "provided": provided_concept_ref}
+        return cls(message, variable_name=variable_name, user_action=user_action, shaping_params=shaping_params)
 
 
 class UnknownInputNameError(InputShapingError):

@@ -229,7 +229,11 @@ async def read_template_file(*, render_assignment: RenderDocumentAssignment) -> 
         template_source = data.decode("utf-8")
     except UnicodeDecodeError as exc:
         msg = f"The template file '{template_file.name}' of '{composition.filename}' is not UTF-8 text."
-        raise DocGenRenderError(msg).with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INVALID) from exc
+        raise (
+            DocGenRenderError(msg)
+            .with_error_code(PipelexErrorCode.DOCGEN_TEMPLATE_INVALID)
+            .with_params(template=template_file.name, reason="unreadable", finding="the file is not UTF-8 text")
+        ) from exc
     html = await get_template_file_stage().render_html_template_file(template_file=template_file, template_source=template_source)
     return TemplateFileForPrint(html=html, template=None)
 

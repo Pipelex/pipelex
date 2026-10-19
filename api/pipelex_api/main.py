@@ -26,7 +26,6 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from pipelex_api.api_config import get_api_config, resolve_boot_orchestrator
-from pipelex_api.disclosure import resolve_disclosure_mode
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.middleware import RequestIdMiddleware, request_body_size_middleware
 from pipelex_api.openapi_schema import PipelexFastAPI
@@ -52,7 +51,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     # can never be set inconsistently.
     #
     # Loading `api.toml` here also fails the app fast on a malformed config / baked override
-    # (the same posture as ERROR_DISCLOSURE), now even before the singleton exists. The loader
+    # (the same posture as AUTH_MODE), now even before the singleton exists. The loader
     # only needs `runtime_manager.environment` (from PIPELEX_ENV), which resolves without a
     # live singleton. get_api_config() is @cache'd, so the warm here is reused everywhere.
     boot_orchestrator = resolve_boot_orchestrator(get_api_config())
@@ -79,29 +78,19 @@ def _resolve_cors_origins() -> tuple[list[str], bool]:
     return origins, True
 
 
-# Resolve and validate ERROR_DISCLOSURE once, at module/startup: an unrecognized
-# value raises here and the production app fails to boot rather than silently
-# defaulting. Passed into `register_exception_handlers` below; the resolved
-# mode drives how much of an error report reaches a client. Kept module-level
-# so the production fail-fast lives on this single import path — only this
-# module triggers it, not `pipelex_api.exception_handlers` (which lets tests register
-# the handlers without inheriting the env-validation crash).
-ERROR_DISCLOSURE_MODE = resolve_disclosure_mode()
-
-
 def _resolve_http_error_mappers() -> dict[type[Exception], HttpErrorMapperFn]:
     """Resolve the orchestrator plugins' HTTP-error mappers for this deployment.
 
     Runs the pure, repeatable `build_registrar` against the loaded config (the same
     standalone pattern `pipelex plugins list` uses) and reads back the
-    `{exc_type: to_error_report}` map each installed orchestrator plugin contributed
+    `{exc_type: to_pipelex_error}` map each installed orchestrator plugin contributed
     via `PluginRegistrar.add_http_error_mapper`. The base installs no orchestrator
     plugin, so this is an empty map and no transport-error handler is registered; a
     flavor (e.g. the Temporal one) contributes its plugin's mapper here, and only at
     this point — at app construction, where the plugin (and therefore its SDK) is by
     definition installed — is the plugin's exc-type provider thunk run. Resolved once
     at module import so a duplicate/broken plugin fails the app fast, mirroring the
-    `ERROR_DISCLOSURE` fail-fast above.
+    `AUTH_MODE` fail-fast below.
 
     Safe at import because the map is a pure function of *installed* plugins (entry
     points + `config.runtime.plugins.disabled`) — never of the `boot_orchestrator` that
@@ -195,7 +184,7 @@ fastapi_app.include_router(blob_upload_router, prefix="/v1")
 
 # Register all other routes WITH authentication, the dependency selected by the AUTH_MODE env var. An
 # unrecognized AUTH_MODE raises `InvalidAuthModeError` here and the app fails to boot, the same fail-fast
-# posture as ERROR_DISCLOSURE above: a mistyped mode must never serve these routes unauthenticated.
+# posture as a broken plugin above: a mistyped mode must never serve these routes unauthenticated.
 # The API mounts at `/v1` — the SDKs compose `{MTHDS_BASE_URL}/v1/{endpoint}` (master D10); no `/api/v1`
 # mount and no alias remain.
 auth_dependency = get_auth_dependency()
@@ -219,7 +208,7 @@ async def root() -> ServiceIdentity:
     return ServiceIdentity(message="Pipelex API")
 
 
-register_exception_handlers(fastapi_app, disclosure_mode=ERROR_DISCLOSURE_MODE, http_error_mappers=HTTP_ERROR_MAPPERS)
+register_exception_handlers(fastapi_app, http_error_mappers=HTTP_ERROR_MAPPERS)
 
 
 # RequestIdMiddleware wraps the *entire* FastAPI app — including Starlette's

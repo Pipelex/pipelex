@@ -11,6 +11,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import scoped_pipe_func_executor
 from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
@@ -146,10 +147,16 @@ class TestPipeFuncFailureCode:
 
         failure = await _failure_of(pipe_func=_make_pipe_func(), executor=DirectPipeFuncExecutor(), function=function)
 
-        assert failure.to_error_report().code == CoreCode.PIPE_FUNCTION_RAISED
+        caller = failure.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.PIPE_FUNCTION_RAISED
         assert isinstance(failure.__cause__, PipeFuncRaisedError)
         assert type(failure.__cause__.__cause__).__name__ == raised_type
         assert f"Error: {raised_type}: " in failure.message
+        # What the function raised can carry whatever the process holds, so its text is the operator's alone.
+        assert raised_type not in str(caller.to_wire())
+        operator = failure.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == failure.message
 
     @pytest.mark.parametrize(
         ("executor", "expected_code"),
@@ -173,7 +180,7 @@ class TestPipeFuncFailureCode:
 
         failure = await _failure_of(pipe_func=_make_pipe_func(), executor=executor, function=_raises_a_plain_error)
 
-        assert failure.to_error_report().code == expected_code
+        assert failure.to_problem(view=ProblemView.CALLER).code == expected_code
 
     @pytest.mark.parametrize(
         "function",
@@ -190,5 +197,5 @@ class TestPipeFuncFailureCode:
 
         failure = await _failure_of(pipe_func=_make_pipe_func(), executor=DirectPipeFuncExecutor(), function=function)
 
-        assert failure.to_error_report().code == CoreCode.PIPE_OUTPUT_INVALID
+        assert failure.to_problem(view=ProblemView.CALLER).code == CoreCode.PIPE_OUTPUT_INVALID
         assert isinstance(failure.__cause__, FuncOutputTypeError)

@@ -2,10 +2,9 @@ from typing import TYPE_CHECKING, Annotated, Any, Literal, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pipelex.base_exceptions import ErrorReport
 from pipelex.interpreter_hub import get_own_pipes, get_pipe_library
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
-from pipelex.pipeline.exceptions import MethodEntryError
+from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from pipelex.pipeline.input_form import InputForm, OutputForm
 from pipelex.pipeline.pipe_io_contracts import PipeIOContracts
 from pipelex.pipeline.validate_bundle import build_pending_signatures
@@ -152,7 +151,7 @@ async def pipe_io(request: Request, request_data: PipeIORequest) -> JSONResponse
         request_data=request_data,
         project=lambda resolution: _pipe_io_response(resolution=resolution, request_data=request_data),
     )
-    if isinstance(outcome, ErrorReport):
+    if isinstance(outcome, ValidateBundleError):
         return invalid_crate_report_response(outcome)
     return outcome
 

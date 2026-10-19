@@ -122,7 +122,8 @@ def _check_path(*, path: TemplateFieldPath, inputs: InputStuffSpecs, pipe_code: 
         f"PipeDocGen '{pipe_code}': the {label} reads '{path.written}'{reached}, but {holder} has no field '{missing_field}'. "
         f"Its fields are: {_describe_fields(model_class)}."
     )
-    raise PipeDocGenFactoryError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
+    facts = {"pipe": pipe_code, "path": path.written, "segment": missing_field, "available_fields": list(model_class.model_fields)}
+    raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
 
 def check_template_field_paths(

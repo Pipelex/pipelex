@@ -7,11 +7,19 @@ a configuration error naming the variables, rather than letting an unset key rea
 """
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType, InferenceErrorCategory, ModelManagerError
+from pipelex.cogt.exceptions import (
+    InferenceBackendCredentialsError,
+    InferenceBackendCredentialsErrorType,
+    InferenceErrorCategory,
+    ModelManagerError,
+    find_inference_error_category_in_chain,
+)
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.errors.problem import ProblemView
 
 
 def _manager_with(*backends: InferenceBackend) -> ModelManager:
@@ -39,19 +47,24 @@ class TestModelManagerCredentialsGuard:
         assert "needs_inference=False" in error.message
         assert "endpoint (AZURE_API_BASE), api_key (AZURE_API_KEY)" in error.message
 
-    def test_its_report_is_a_configuration_error_whose_next_step_is_a_boot_with_inference(self) -> None:
+    def test_it_is_a_configuration_error_whose_advice_is_a_boot_with_inference(self) -> None:
         """Setting the variable alone would not help a process that booted without inference."""
         manager = _manager_with(InferenceBackend(name="anthropic", unresolved_credentials={"api_key": ["ANTHROPIC_API_KEY"]}))
 
         with pytest.raises(InferenceBackendCredentialsError) as exc_info:
             manager.get_required_inference_backend("anthropic")
 
-        report = exc_info.value.to_error_report()
-        assert report.error_type == "InferenceBackendCredentialsError"
-        assert report.error_category is InferenceErrorCategory.CONFIGURATION
-        assert report.user_action is not None
-        assert report.user_action.kind is UserActionKind.CHECK_CREDENTIALS
-        assert "needs_inference=True" in report.user_action.detail
+        error = exc_info.value
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.code == CoreCode.RUNTIME_MISCONFIGURED
+        assert operator.domain == ProblemDomain.OPERATOR
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "InferenceBackendCredentialsError"
+        assert find_inference_error_category_in_chain(error) == InferenceErrorCategory.CONFIGURATION
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind is UserActionKind.CHECK_CREDENTIALS
+        assert "needs_inference=True" in advice.detail
 
     def test_the_class_keeps_its_own_next_step_elsewhere(self) -> None:
         """The guard's advice is its instance's own: the boot's missing-key error still says to set the variable."""

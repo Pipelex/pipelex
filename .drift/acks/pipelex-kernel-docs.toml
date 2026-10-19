@@ -1,8 +1,8 @@
 contract = "pipelex-kernel-docs"
-digest = "sha256:4d57f0b48f71d64483bf0b6eaae5fdb46e569781477e23f31625ba2e4a49f4aa"
+digest = "sha256:16fabe1ce1d3ef30ab6c155bf87f87acc09b63d9b5443256570c3b38a49af871"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-16T21:33:18Z"
-rationale = "real-catch: the kernel split call_function into invoke_function and coerce_function_output, and the coercion refuses a list holding anything but stuff contents; docs/under-the-hood/pipelex-kernel.md now names the two halves, says the in-process executor calls them apart so only the call is the function's failure, and that a list holding anything else fails as FuncOutputTypeError with pipe.output_invalid."
+reviewed_at = "2026-10-17T00:39:22Z"
+rationale = "clean-pass: the served-model check now gives its refusal the model handle and the capability as params; pipelex-kernel.md stays accurate and now names both params."
 
 [trigger_files]
 "pipelex/kernel/__init__.py" = "blob:c4f1b0fe2ccc17db9110733f71b612f4ac1ba4ce"
@@ -18,7 +18,7 @@ rationale = "real-catch: the kernel split call_function into invoke_function and
 "pipelex/kernel/img_gen_results.py" = "blob:46b4ca11c70d906ae6d58ce66461f9b3414f1bfa"
 "pipelex/kernel/judgment_ops.py" = "blob:6bf523ecd35390e76a8150755a71295d24977698"
 "pipelex/kernel/judgment_results.py" = "blob:4dbbcb204309265999de59a179f4420a0f83be93"
-"pipelex/kernel/llm_ops.py" = "blob:ce23b49ee5050ac38af7ba518fc6a632216f78fb"
+"pipelex/kernel/llm_ops.py" = "blob:730c080684a1f3c1bb90d599105b1789eb6ee10a"
 "pipelex/kernel/llm_prompt_content.py" = "blob:f996cead6e7789494f01f69c128ae71d6dcf8466"
 "pipelex/kernel/llm_results.py" = "blob:6e3b8a2878b5bb284ece5fac10262fb59ac2029d"
 "pipelex/kernel/memory_ops.py" = "blob:7fbbfaaec99f9712d8e215520cb02e26aad3fb40"

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, StepKind
 
 from pipelex.cogt.exceptions import (
     INFERENCE_FAILURE_CODES,
@@ -30,6 +30,7 @@ from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, U
 from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -159,11 +160,11 @@ class TestRenderInferenceError:
             pytest.param(0.0, "Transient provider error — wait a moment, then run it again.", id="retry_after_zero"),
         ],
     )
-    def test_failed_run_report_says_to_wait_then_run_again(self, retry_after_seconds: float | None, expected_detail: str) -> None:
-        """The advice a failed run's report carries for a transient inference error.
+    def test_failed_run_advice_says_to_wait_then_run_again(self, retry_after_seconds: float | None, expected_detail: str) -> None:
+        """The advice a failed run carries for a transient inference error.
 
-        The report is read once the run has failed and every automatic retry is spent, so the
-        advice says what the reader can do, and never that the system will retry.
+        The advice is read once the run has failed and every automatic retry is spent, so it
+        says what the reader can do, and never that the system will retry.
         """
         metadata = ProviderErrorMetadata(
             provider=ProviderName.OPENAI,
@@ -201,10 +202,17 @@ class TestRenderInferenceError:
         )
         failed_run.__cause__ = located
 
-        report_payload = failed_run.to_error_report().to_dict()
-
-        assert report_payload["user_action"] == {"kind": "wait_and_retry", "detail": expected_detail}
-        assert "automatically" not in report_payload["user_action"]["detail"]
+        advice = failed_run.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.WAIT_AND_RETRY
+        assert advice.detail == expected_detail
+        assert "automatically" not in advice.detail
+        caller = failed_run.to_problem(view=ProblemView.CALLER)
+        # The caller's problem invites the wait the provider asked for, as a member, never as advice.
+        assert caller.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert caller.is_retryable is True
+        assert caller.next_step.kind == StepKind.WAIT
+        assert caller.retry_after == retry_after_seconds
 
     @pytest.mark.parametrize("error_code", INFERENCE_FAILURE_CODES, ids=str)
     @pytest.mark.parametrize(

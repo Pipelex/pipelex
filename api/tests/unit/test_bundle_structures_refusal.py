@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -107,7 +107,7 @@ def _build_client(mocker: MockerFixture, *, orchestrator: _RecordingOrchestrator
     mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"direct": orchestrator}))
     app = FastAPI()
     app.include_router(api_router, prefix="/v1")
-    register_exception_handlers(app, disclosure_mode=DisclosureMode.STRICT)
+    register_exception_handlers(app)
     return TestClient(app)
 
 
@@ -122,14 +122,16 @@ class TestBundleStructuresRefusal:
         files = {"main.mthds": VALID_MTHDS, "structures/invoice.py": _structures_py(sentinel=sentinel)}
         response = client.post(path, json={"files": files, "inputs": {"text": "hello"}})
 
-        assert response.status_code == 403, response.text
+        # The method's own structure classes are its author's to change: the code's 422, in the caller's view.
+        assert response.status_code == 422, response.text
         assert response.headers["content-type"].startswith("application/problem+json")
         body = response.json()
-        assert body["error_type"] == "MethodStructuresRefusedError"
-        # Caller-facing even under STRICT disclosure: it names the file and the class, and gives the route.
-        assert "structures/invoice.py" in body["detail"]
-        assert "Invoice" in body["detail"]
-        assert "MTHDS concepts" in body["detail"]
+        assert body["code"] == PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED
+        assert body["domain"] == "method"
+        assert body["next_step"]["kind"] == "change_method"
+        # The caller reads which file declares a structure class, from the code's parameters.
+        assert body.get("params") == {"files": ["structures/invoice.py"]}
+        assert "diagnostics" not in body
         assert not sentinel.exists(), "the structure module was imported"
         assert orchestrator.dispatches == []
 

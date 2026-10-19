@@ -3,8 +3,8 @@ from typing import Annotated, Any, Literal, Union
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pipelex.base_exceptions import ErrorReport
 from pipelex.codegen.crate_encoding import encode_crate_json
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pydantic import BaseModel, Field
 
 from pipelex_api.json_body import JsonBodyRoute
@@ -68,7 +68,7 @@ async def resolve_mthds(request: Request, request_data: MethodTreeRequest) -> JS
       5xx. All RFC 7807 `application/problem+json` via the global handlers.
     """
     outcome = await project_resolved_method(request=request, request_data=request_data, project=_crate_response)
-    if isinstance(outcome, ErrorReport):
+    if isinstance(outcome, ValidateBundleError):
         return invalid_crate_report_response(outcome)
     return outcome
 

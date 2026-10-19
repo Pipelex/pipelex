@@ -80,7 +80,7 @@ def get_api_config() -> ApiConfig:
     The config is immutable for the life of the process (``PIPELEX_ENV`` is fixed
     at boot), so it is loaded once and cached. ``pipelex_api.main`` warms this at startup
     so a malformed ``api.toml`` / baked override fails the app fast — the same
-    fail-fast posture as ``ERROR_DISCLOSURE``. Tests that need a different mode
+    fail-fast posture as ``AUTH_MODE``. Tests that need a different mode
     patch this getter (or call :func:`resolve_orchestration_mode` with a hand-built
     config) rather than mutating the cache.
     """

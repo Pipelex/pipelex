@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from rich.console import Console
 
 from pipelex.base_exceptions import MigrationErrorBlock
@@ -158,6 +159,7 @@ class TestErrorHandlersExtended:
             pipe_validation_errors=[pipe_error],
             dry_run_failures=[
                 DryRunFailureErrorData(
+                    code=CoreCode.PIPE_OUTPUT_INVALID,
                     pipe_code="third_pipe",
                     domain_code="demo",
                     source="bundle.mthds",

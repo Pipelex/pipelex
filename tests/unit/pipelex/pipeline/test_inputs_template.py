@@ -11,6 +11,7 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.inputs_template import build_inputs_for_pipe
 
@@ -81,7 +82,7 @@ class TestBuildInputsForPipe:
         with pytest.raises(MethodEntryError, match="Bundle does not declare a main_pipe") as exc_info:
             asyncio.run(build_inputs_for_pipe(mthds_contents=["mthds content"]))
 
-        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
     def test_mthds_contents_explicit_pipe_code_skips_scan(self, ops_mocks: dict[str, Any]) -> None:
         """An explicit pipe code selects the pipe verbatim, and the result names the pipe it resolved to, qualified."""
@@ -117,7 +118,7 @@ class TestBuildInputsForPipe:
             asyncio.run(build_inputs_for_pipe(bundle_path=bundle_path))
 
         assert str(bundle_path) in str(exc_info.value)
-        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
     def test_bundle_path_explicit_pipe_code_wins(self, ops_mocks: dict[str, Any], tmp_path: Path) -> None:
         """With a bundle path, an explicit pipe code overrides the bundle's main_pipe, and the result names it qualified."""
@@ -155,7 +156,7 @@ class TestBuildInputsForPipe:
         with pytest.raises(MethodEntryError, match="No pipe code specified") as exc_info:
             asyncio.run(build_inputs_for_pipe())
 
-        assert exc_info.value.to_error_report().code == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_PIPE_UNSPECIFIED
 
         ops_mocks["get_required_entry_pipe"].assert_not_called()
 

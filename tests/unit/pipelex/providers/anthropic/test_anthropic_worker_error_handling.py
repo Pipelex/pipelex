@@ -11,8 +11,9 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError, find_inference_error_category_in_chain
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.unit.pipelex.providers.anthropic.test_data import AnthropicErrorHandlingTestData
 
@@ -271,10 +272,10 @@ class TestAnthropicWorkerErrorHandling:
         assert exc_info.value.model_handle == "claude-sonnet-4"
         assert exc_info.value.__cause__ is sdk_exc
 
-    # ---- to_error_report() integration ----
+    # ---- Problem integration ----
 
-    async def test_error_report_includes_category(self, mocker: MockerFixture) -> None:
-        """to_error_report() includes error_category and retryable from the exception."""
+    async def test_problem_includes_category(self, mocker: MockerFixture) -> None:
+        """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_worker(mocker)
         sdk_exc = _make_anthropic_rate_limit_error("Rate limit exceeded")
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -282,6 +283,7 @@ class TestAnthropicWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True

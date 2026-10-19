@@ -173,15 +173,25 @@ class TestOpenApiErrorContract:
         rate_limited = openapi_schema["paths"]["/v1/execute"]["post"]["responses"]["429"]
         assert "Retry-After" in rate_limited["headers"]
 
-    def test_problem_document_carries_the_structured_validation_errors(self, openapi_schema: dict[str, Any]):
-        """A problem document publishes `validation_errors[]` of the SAME `ValidationErrorItem`
-        the 200 invalid arms publish — so `suggested_fix` reaches every surface that carries the
-        items, and the two can never drift into separate schemas.
+    def test_problem_document_items_carry_the_standard_s_suggested_fix(self, openapi_schema: dict[str, Any]):
+        """A problem document publishes `errors[]` of the standard's `ProblemItem`, whose fix is the standard's
+        `ProblemSuggestedFix` (naming its file `file`), while a 200 invalid arm's `ValidationErrorItem` keeps Pipelex's
+        `SuggestedFix` (naming it `source`): each under its own name, never a module-qualified one.
         """
         schemas = openapi_schema["components"]["schemas"]
-        validation_errors = schemas["ProblemDocument"]["properties"]["validation_errors"]
-        item_refs = [option["items"]["$ref"] for option in validation_errors["anyOf"] if option.get("type") == "array"]
-        assert item_refs == ["#/components/schemas/ValidationErrorItem"]
+        assert "validation_errors" not in schemas["ProblemDocument"]["properties"]
+        errors = schemas["ProblemDocument"]["properties"]["errors"]
+        item_refs = [option["items"]["$ref"] for option in errors["anyOf"] if option.get("type") == "array"]
+        assert item_refs == ["#/components/schemas/ProblemItem"]
+
+        def _fix_refs(item_schema: str) -> list[str]:
+            return [option["$ref"] for option in schemas[item_schema]["properties"]["suggested_fix"]["anyOf"] if "$ref" in option]
+
+        assert _fix_refs("ProblemItem") == ["#/components/schemas/ProblemSuggestedFix"]
+        assert _fix_refs("ValidationErrorItem") == ["#/components/schemas/SuggestedFix"]
+        assert "file" in schemas["ProblemSuggestedFix"]["properties"]
+        assert "source" in schemas["SuggestedFix"]["properties"]
+        assert not [name for name in schemas if "__" in name]
 
     def test_suggested_fix_surface_is_published(self, openapi_schema: dict[str, Any]):
         """The codegen fix planner's output is part of the published contract: a `ValidationErrorItem`

@@ -18,7 +18,6 @@ class BundleResourcePathError(PipelexError):
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_PATH_REFUSED, others=(CoreCode.REQUEST_INVALID,))
-    _authors_caller_facing_message = True
 
 
 class BundleResourceNotNamedError(PipelexError):
@@ -30,4 +29,3 @@ class BundleResourceNotNamedError(PipelexError):
     """
 
     error_code = CoreCode.REQUEST_INVALID
-    _authors_caller_facing_message = True

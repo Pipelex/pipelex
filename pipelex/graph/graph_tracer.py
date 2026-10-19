@@ -6,12 +6,12 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.errors.problem import PipelexProblem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol, invocation_path_of_start
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
-    ErrorSpec,
     GraphSpec,
     IOSpec,
     NodeIOSpec,
@@ -103,7 +103,8 @@ class _MutableNodeData:
         self.skip_reason: str | None = None
         self.output_preview: str | None = None
         self.metrics: dict[str, float] = {}
-        self.error: ErrorSpec | None = None
+        self.error: PipelexProblem | None = None
+        self.error_stack: str | None = None
         self.input_specs: list[IOSpec] = input_specs or []
         self.output_specs: list[IOSpec] = []
         self.execution_data: dict[str, Any] = {}
@@ -138,6 +139,7 @@ class _MutableNodeData:
             timing=timing,
             node_io=node_io,
             error=self.error,
+            error_stack=self.error_stack,
             metrics=self.metrics,
             execution_data=self.execution_data,
         )
@@ -1110,10 +1112,8 @@ class GraphTracer(GraphTracerProtocol):
         node_id: str,
         *,
         ended_at: datetime,
-        error_type: str,
-        error_message: str,
+        problem: PipelexProblem,
         error_stack: str | None = None,
-        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution."""
         if not self._is_active:
@@ -1125,13 +1125,8 @@ class GraphTracer(GraphTracerProtocol):
 
         node_data.ended_at = ended_at
         node_data.status = NodeStatus.FAILED
-        error = ErrorSpec(
-            error_type=error_type,
-            message=error_message,
-            stack=error_stack,
-            caller_facing=caller_facing,
-        )
-        node_data.error = error
+        node_data.error = problem
+        node_data.error_stack = error_stack
 
         # Emit PipeEndErrorEvent
         if self._event_log is not None:
@@ -1151,7 +1146,8 @@ class GraphTracer(GraphTracerProtocol):
                     pipe_ref=node_data.pipe_ref,
                     pipe_type=node_data.pipe_type,
                     ended_at=ended_at,
-                    error=error,
+                    error=problem,
+                    error_stack=error_stack,
                 )
             )
 

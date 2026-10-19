@@ -7,7 +7,6 @@ from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.annotation_shapes import list_item_annotation, strip_optional
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
@@ -25,6 +24,7 @@ from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.errors.problem import make_problem_item
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
@@ -567,37 +567,50 @@ class PipeParallel(PipeController):
             # the combined fields' validation errors.
             # The output concept as the author writes it in this bundle, in the next step as in the restatement below.
             output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
-            method_next_step = (
-                f"Change the method so that each branch of PipeParallel '{self.code}' produces what the field of "
-                f"'{output_concept_ref}' it feeds expects, a list only where that field is a list, "
-                "and so that every required field is fed by a branch."
-            )
             # When the refusal is a branch whose multiplicity differs from its field's, say which one to change;
-            # any other refusal leaves as it came, flagged as the caller's fault: an output that does not fit its concept.
+            # any other refusal leaves as it came, coded as an output that does not fit its concept.
             next_steps = self._multiplicity_next_steps(structure_class=structure_class, output_stuffs=output_stuffs)
             if not next_steps:
-                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).as_caller_fault(
-                    user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=method_next_step)
+                # The combine's own message can quote a structure class's validator, which a deployment may have
+                # written: it stays the operator's, and the caller reads the code's sentence over the refused fields.
+                # A refusal of the whole structure, such as a model validator's, names no field: the caller reads the
+                # fields the branches fed, which the refusal is about together.
+                refused_field_names = _refused_field_names(exc=exc)
+                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).with_params(
+                    output_concept=output_concept_ref,
+                    fields=sorted(refused_field_names if refused_field_names is not None else output_stuff_contents),
                 )
                 raise
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
             message_parts = [lead, *next_steps.values()]
-            next_step_parts = list(next_steps.values())
             # Keep what the combine said about every other field it refused, so a second fault is not hidden
-            # behind the multiplicity one, and keep the general next step for it.
+            # behind the multiplicity one.
             refused_fields = _refused_field_names(exc=exc)
             if refused_fields is None or refused_fields - next_steps.keys():
                 message_parts.append(f"The combine also reported: {exc.message}")
-                next_step_parts.append(method_next_step)
             # A StuffFactoryError raised from the combine's own: a run failure is reported as its root fault, and
             # of two faults of the same class on the chain the outer one, which restates the inner with a remedy,
             # is that root (see `pipe_run.located_failure.find_root_fault`), so every surface reports this one.
-            # It is the caller's fault like the refusal it restates, with the multiplicity change as its next step.
-            raise (
+            # It is the method's fault like the refusal it restates: its sentence names the first branch to change, and
+            # when several branches differ from their fields, its items name each one, so no branch to change is hidden.
+            multiplicity_params = {result_name: self._multiplicity_params(result_stuff=output_stuffs[result_name]) for result_name in next_steps}
+            first_result_name = next(iter(next_steps))
+            multiplicity_refusal = (
                 StuffFactoryError(" ".join(message_parts))
                 .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
-                .as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=" ".join(next_step_parts)))
-            ) from exc
+                .with_params(output=first_result_name, **multiplicity_params[first_result_name])
+            )
+            if len(next_steps) > 1:
+                multiplicity_refusal.with_items(
+                    items=[
+                        make_problem_item(
+                            code=CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                            params={"pipe": self.code, "output": result_name, **branch_params},
+                        )
+                        for result_name, branch_params in multiplicity_params.items()
+                    ]
+                )
+            raise multiplicity_refusal from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
@@ -666,6 +679,13 @@ class PipeParallel(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
+
+    @staticmethod
+    def _multiplicity_params(*, result_stuff: "Stuff") -> dict[str, str]:
+        """The multiplicity a branch result produced, and the one its field declares, which differs from it."""
+        if result_stuff.is_list:
+            return {"declared": "single", "produced": "list"}
+        return {"declared": "list", "produced": "single"}
 
     def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> dict[str, str]:
         """Say, for each branch whose result and field differ only in multiplicity, which one to change.

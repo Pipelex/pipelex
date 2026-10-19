@@ -13,11 +13,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, EdgeSpec, GraphSpec, IOSpec, NodeKind, NodeSpec
@@ -61,8 +63,8 @@ def _normalize_node(node: NodeSpec) -> dict[str, Any]:
         "pipe_code": node.pipe_code,
         "pipe_type": node.pipe_type,
         "status": node.status,
-        "error_type": node.error.error_type if node.error else None,
-        "error_message": node.error.message if node.error else None,
+        "error": node.error.to_wire() if node.error else None,
+        "error_stack": node.error_stack,
         "metrics": node.metrics,
         # Concept and multiplicity ride along so both builders are held to carry each io item's typing.
         "inputs": sorted(
@@ -407,8 +409,12 @@ def _scenario_partial_failure(tracer: GraphTracer, context: TraceContext) -> Non
     tracer.on_pipe_end_error(
         node_id=child_id,
         ended_at=started_at + timedelta(seconds=2),
-        error_type="LLMError",
-        error_message="Model returned an error",
+        problem=make_problem(
+            code=CoreCode.PROVIDER_UNAVAILABLE,
+            view=ProblemView.CALLER,
+            location=make_location(pipe="gen_text", path=["parent_pipe", "gen_text"]),
+        ),
+        error_stack="Traceback (most recent call last):\n  File ...",
     )
     # Parent has no end event → will be marked CANCELED
 

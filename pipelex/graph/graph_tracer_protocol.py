@@ -3,6 +3,7 @@ from typing import Any, Protocol
 
 from typing_extensions import override
 
+from pipelex.errors.problem import PipelexProblem
 from pipelex.graph.condition_output_merge import ConditionOutputMerge
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.data_inclusion_config import DataInclusionConfig
@@ -160,21 +161,16 @@ class GraphTracerProtocol(Protocol):
         node_id: str,
         *,
         ended_at: datetime,
-        error_type: str,
-        error_message: str,
+        problem: PipelexProblem,
         error_stack: str | None = None,
-        caller_facing: bool = False,
     ) -> None:
         """Record failed completion of a pipe execution.
 
         Args:
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the pipe failed.
-            error_type: The exception type name.
-            error_message: The error message.
+            problem: The problem that ended the node, in the caller's view, located at the node's pipe.
             error_stack: Optional stack trace.
-            caller_facing: Whether the message was written for the caller, as an error report's
-                `caller_facing_message` says.
         """
         ...
 
@@ -460,10 +456,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         node_id: str,
         *,
         ended_at: datetime,
-        error_type: str,
-        error_message: str,
+        problem: PipelexProblem,
         error_stack: str | None = None,
-        caller_facing: bool = False,
     ) -> None:
         pass
 

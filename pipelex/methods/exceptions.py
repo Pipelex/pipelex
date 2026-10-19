@@ -1,6 +1,7 @@
-from typing import ClassVar
+from typing import Any, ClassVar, Self
 
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
@@ -10,18 +11,21 @@ from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 class MethodRefError(PipelexError):
     """Base class for errors while resolving a method reference (`<address>[@<tag>]`).
 
-    Every subclass describes the caller's own reference or the package it points at,
-    so the messages are caller-facing by design.
+    Every subclass describes the caller's own reference or the package it points at.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message: ClassVar[bool] = True
 
 
 class MethodRefParseError(MethodRefError):
     """The method reference does not match the `<address>[@<tag>]` grammar, or names an address this runtime does not fetch."""
 
     error_code = ErrorCodeSet(default=CoreCode.REQUEST_INVALID, others=(CoreCode.REQUEST_UNSUPPORTED,))
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The reference is the request's `method_ref`; an address it does not fetch is one off GitHub.
+        return {"field": "method_ref", "reason": "address_not_on_github"}
 
 
 class MethodFetchError(MethodRefError):
@@ -37,6 +41,17 @@ class MethodFetchError(MethodRefError):
         default=CoreCode.METHOD_FETCH_FAILED,
         others=(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING, CoreCode.METHOD_NOT_FOUND, CoreCode.METHOD_PACKAGE_INVALID),
     )
+
+    method_ref: str | None = None
+
+    def for_method_ref(self, *, method_ref: str) -> Self:
+        """Name the method reference whose fetch failed, which the codes' sentences name; returns this error."""
+        self.method_ref = method_ref
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"method_ref": self.method_ref}
 
 
 class MethodPackageNotFoundError(MethodRefError):

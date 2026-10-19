@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
@@ -21,11 +22,17 @@ _RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"state", "pipeline_r
 
 
 class WebhookTarget(BaseModel):
-    """A webhook endpoint to notify on delivery."""
+    """A webhook endpoint to notify on delivery.
+
+    ``problem_view`` is the view the failed run's problem reaches the webhook in, the view of whoever asked for it: the
+    host that builds the target picks it from the identity its boundary authenticated, and a target built with none
+    receives the caller's view, which carries no diagnostics.
+    """
 
     url: str
     headers: dict[str, str] = Field(default_factory=dict)
     payload: dict[str, Any] = Field(default_factory=dict)
+    problem_view: ProblemView = Field(default=ProblemView.CALLER, strict=False)
 
     @field_validator("payload", mode="after")
     @classmethod

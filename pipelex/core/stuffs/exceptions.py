@@ -50,9 +50,6 @@ class DateContentError(StuffError):
     """
 
     error_code = CoreCode.PIPE_FUNCTION_RAISED
-    # The message describes the caller's own data (a date-only Date has no time to convert) and carries
-    # no server internals, so it must survive STRICT disclosure — like OptionalValueAbsentError.
-    _authors_caller_facing_message = True
 
 
 class StuffContentValidationError(StuffError):

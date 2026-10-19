@@ -202,7 +202,7 @@ class TestTemplatePrivateNameLint:
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_CONSTRUCT_MTHDS])
-        items = exc_info.value.to_error_report().validation_errors or []
+        items = exc_info.value.validation_error_items() or []
         assert [(item.category, item.error_type) for item in items] == [
             (ValidationErrorCategory.PIPE_VALIDATION, PipeValidationErrorType.TEMPLATE_PRIVATE_NAME)
         ]
@@ -214,6 +214,6 @@ class TestTemplatePrivateNameLint:
         load_empty_library()
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[_CONSTRUCT_FROM_DUNDER_MTHDS])
-        items = exc_info.value.to_error_report().validation_errors or []
+        items = exc_info.value.validation_error_items() or []
         assert len(items) == 1
         assert "reads '__class__', a name starting with an underscore" in (items[0].message or "")

@@ -92,7 +92,6 @@ class MethodTreeLoadError(LibraryLoadingError):
     """
 
     error_code = CoreCode.METHOD_PACKAGE_INVALID
-    _authors_caller_facing_message = True
 
 
 class EmptyMethodTreeError(MethodTreeLoadError):
@@ -129,7 +128,6 @@ class MethodRequirementsError(LibraryLoadingError):
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
-    _authors_caller_facing_message = True
 
     def __init__(self, message: str, *, items: list[PipelexBundleBlueprintValidationErrorData]):
         super().__init__(message, blueprint_validation_errors=items)
