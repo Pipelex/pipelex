@@ -9,6 +9,8 @@ worker's error family, with a human-readable message and a structured
 
 import math
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cogt.exceptions import (
     CogtError,
     ExtractJobFailureError,
@@ -25,6 +27,7 @@ from pipelex.cogt.exceptions import (
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
 from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 # Generic failure error class per family — used when the error is not a missing model.
 _FAILURE_CLASSES: dict[InferenceErrorFamily, type[CogtError]] = {
@@ -69,7 +72,34 @@ def _render_model_not_allowed_detail(*, model_handle: str) -> str:
     )
 
 
-def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, model_handle: str) -> str:
+def _render_context_exceeded_detail(*, family: InferenceErrorFamily) -> str:
+    """Produce the advice for inputs over what the model can read, worded for what the family's model reads.
+
+    The code, ``model.context_exceeded``, says the inputs exceed what the model can read, whatever the model. A language
+    model's window holds the output a request reserves with ``max_tokens`` as well as the prompt, and its providers
+    refuse both overflows alike, Anthropic's "input length and `max_tokens` exceed context limit" and OpenAI's
+    "maximum context length" counting the completion beside the messages, so its advice names both. The
+    ``max_tokens`` may be the deck's default rather than one the pipe set, and a pipe's own setting overrides it. An
+    image model reads a prompt and its input images, and an extraction model a document, neither of which has a
+    ``max_tokens`` to lower.
+    """
+    match family:
+        case InferenceErrorFamily.LLM:
+            return (
+                "The prompt plus the output requested with max_tokens exceed the model's context window — shorten the input "
+                "or lower max_tokens, or choose a model with a larger context window."
+            )
+        case InferenceErrorFamily.IMG_GEN:
+            return "The prompt or its input images exceed what the image model can read — shorten the prompt or send fewer images."
+        case InferenceErrorFamily.EXTRACT:
+            return "The document exceeds what the extraction model can read — send a shorter document, or split it."
+        case InferenceErrorFamily.SEARCH:
+            return "The query built from the inputs exceeds what the search model can read — shorten the inputs."
+        case InferenceErrorFamily.JUDGMENT:
+            return "The material to judge exceeds what the judgment model can read — shorten it."
+
+
+def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, family: InferenceErrorFamily, model_handle: str) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
     if classification.service_error_code is not None:
         # Branches ahead of the action kind rather than inside it: the service's own code names the
@@ -99,6 +129,13 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.CHECK_CREDENTIALS:
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
+            # Worded from the code the classification picked, not from the metadata's wording, so a 5xx, or a parse
+            # failure quoting the model's own text, never reads as the context window
+            match classification.error_code:
+                case CoreCode.MODEL_CONTEXT_EXCEEDED:
+                    return _render_context_exceeded_detail(family=family)
+                case CoreCode() | PipelexErrorCode():
+                    pass
             if metadata.is_content_policy_violation:
                 return "Content was rejected by the provider's safety filters — revise the prompt."
             return "The provider rejected the request — review the prompt, parameters, and inputs."
@@ -133,7 +170,7 @@ def render_inference_error(
     message = _format_message(metadata, model_desc=model_desc)
     user_action = UserAction(
         kind=classification.user_action_kind,
-        detail=_render_detail(metadata, classification=classification, model_handle=model_handle),
+        detail=_render_detail(metadata, classification=classification, family=family, model_handle=model_handle),
     )
     if classification.is_model_not_found:
         not_found_class = _NOT_FOUND_CLASSES[family]

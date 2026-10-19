@@ -1,7 +1,7 @@
 import asyncio
 import base64
 from collections.abc import Coroutine
-from typing import Any, ClassVar
+from typing import Any, ClassVar, NamedTuple
 
 from google.genai import types as genai_types
 from google.genai.client import Client as GoogleGenAiClient
@@ -19,6 +19,15 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.tools.log.error_fields import error_fields
+
+
+class GeminiStopSignal(NamedTuple):
+    """How a Gemini answer says it stopped: at most one of the two reasons is set, and neither when it gives none."""
+
+    # The first candidate's finish reason, as its value, when the answer holds a candidate
+    finish_reason: str | None
+    # The prompt feedback's block reason, as its value, when the answer holds no candidate: the prompt was blocked
+    block_reason: str | None
 
 
 class GoogleFactory:
@@ -107,6 +116,27 @@ class GoogleFactory:
             parts.extend(document_parts)
 
         return genai_types.Content(parts=parts, role="user")
+
+    @classmethod
+    def read_stop_signal(cls, *, response: genai_types.GenerateContentResponse) -> GeminiStopSignal:
+        """Read how a Gemini answer stopped, for the text and image workers alike.
+
+        An answer holding a candidate says it in the first candidate's finish reason. An answer holding none was
+        blocked before the model wrote anything, and says why in its prompt feedback's block reason, which is read
+        only then: the two vocabularies share some words with different meanings.
+
+        Args:
+            response: The Gemini answer.
+
+        Returns:
+            The finish reason or the block reason the answer gives, each as its value, neither when it gives none.
+        """
+        if response.candidates:
+            finish_reason = response.candidates[0].finish_reason
+            return GeminiStopSignal(finish_reason=finish_reason.value if finish_reason else None, block_reason=None)
+        if response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
+            return GeminiStopSignal(finish_reason=None, block_reason=block_reason.value)
+        return GeminiStopSignal(finish_reason=None, block_reason=None)
 
     @classmethod
     def extract_text_from_response(cls, response: genai_types.GenerateContentResponse, *, model_desc: str) -> str:
