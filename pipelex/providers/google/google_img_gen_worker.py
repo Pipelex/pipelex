@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import Mapping
+from types import MappingProxyType
 from typing import Any
 
 import httpx
@@ -9,7 +11,7 @@ from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenOutputTruncatedError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ImgGenGeminiMapping
@@ -18,10 +20,41 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_google_metadata
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
+from pipelex.cogt.llm.completion_stop import classify_image_finish_reason
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.providers.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.log.error_fields import error_fields
+
+# What a reason Gemini gives for refusing an image says, in the words its error gives: the finish reasons that
+# `classify_image_finish_reason` reads as a refusal, and the prompt feedback's block reasons, which share their words
+# and their meanings. A recitation or an unsupported language is no safety filter's doing, so only the safety reasons
+# name one. A reason not listed, such as `OTHER`, is named by its value alone.
+_IMAGE_REFUSAL_CAUSES: Mapping[str, str] = MappingProxyType(
+    {
+        "SAFETY": "a safety filter flagged the content",
+        "IMAGE_SAFETY": "a safety filter flagged the content",
+        "PROHIBITED_CONTENT": "Gemini judged the content prohibited",
+        "IMAGE_PROHIBITED_CONTENT": "Gemini judged the content prohibited",
+        "BLOCKLIST": "the content holds a term from Gemini's blocklist",
+        "SPII": "the content may hold sensitive personal information",
+        "RECITATION": "the output may reproduce an existing source too closely",
+        "IMAGE_RECITATION": "the output may reproduce an existing source too closely",
+        "LANGUAGE": "the prompt's language is not one the model supports",
+        "JAILBREAK": "Gemini took the prompt for a jailbreak attempt",
+        "MODEL_ARMOR": "Model Armor blocked the prompt",
+    }
+)
+
+
+def _holds_image(*, response: genai_types.GenerateContentResponse) -> bool:
+    """Whether the answer's first candidate holds image data, the part the worker returns as the image."""
+    if not response.candidates:
+        return False
+    content = response.candidates[0].content
+    if not content or not content.parts:
+        return False
+    return any(part.inline_data is not None and part.inline_data.data is not None for part in content.parts)
 
 
 class GoogleImgGenWorker(ImgGenWorkerAbstract):
@@ -142,6 +175,10 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                     img_gen_tokens_usage.nb_tokens_by_category.get(token_category, 0) + nb_tokens
                 )
 
+        # Read before the image, so a prompt or an image a filter blocked, or an answer cut before its image, is
+        # reported for what stopped it, not as an empty answer
+        self._check_stop(response=response)
+
         # Extract image from response
         if not response.candidates:
             msg = f"No candidates returned from model: {self.inference_model.desc}"
@@ -202,6 +239,55 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
             ),
             provider_metadata=None,
         ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
+
+    def _check_stop(self, *, response: genai_types.GenerateContentResponse) -> None:
+        """Raise when Gemini says it refused the image, or cut its answer before the image, before the worker looks for one.
+
+        Gemini answers a blocked image request with a success all the same: a candidate whose finish reason names the
+        filter that stopped it (`IMAGE_SAFETY`, `IMAGE_PROHIBITED_CONTENT`, `SAFETY` and their kin), and no image, or,
+        for a prompt blocked before the model wrote anything, no candidate at all and a block reason in the prompt
+        feedback, which is a refusal whatever its value, as the text workers read it. The finish reason reads from
+        Gemini's vocabulary (see `pipelex.cogt.llm.completion_stop`), so an image refused on policy grounds is
+        `model.content_refused`, the caller's input to revise, rather than an empty answer. The message names the
+        reason Gemini gave and what it says, so a recitation or an unsupported language is never called a safety
+        filter's block. A finish reason saying the model's output token limit cut the answer (`MAX_TOKENS`) is
+        `model.output_truncated` when the candidate holds no image, the cause the answer states rather than an empty
+        answer, while an image the model finished before the limit is whole, and returned. Any other finish reason
+        leaves the answer to the checks that read what it holds.
+
+        Raises:
+            ImgGenGenerationError: With `model.content_refused`, when a finish reason or a block reason says the request
+                was refused.
+            ImgGenOutputTruncatedError: When the finish reason says the output token limit cut the answer, which holds
+                no image.
+        """
+        model_handle = self.inference_model.name
+        stop_signal = GoogleFactory.read_stop_signal(response=response)
+        refusal_reason: str
+        what_happened: str
+        if stop_signal.finish_reason is not None:
+            stop_outcome = classify_image_finish_reason(finish_reason=stop_signal.finish_reason, model_handle=model_handle)
+            if stop_outcome.is_truncated and not _holds_image(response=response):
+                raise ImgGenOutputTruncatedError(model_handle=model_handle, stop_reason=stop_signal.finish_reason)
+            if not stop_outcome.is_refused:
+                return
+            refusal_reason = stop_signal.finish_reason
+            what_happened = f"The model '{model_handle}' stopped before it generated the image (finish reason '{refusal_reason}')"
+        elif stop_signal.block_reason is not None:
+            # A prompt blocked before the model answered is a refusal whatever its reason, which the error names
+            refusal_reason = stop_signal.block_reason
+            what_happened = f"Gemini blocked the prompt before the model '{model_handle}' generated the image (block reason '{refusal_reason}')"
+        else:
+            return
+        cause = _IMAGE_REFUSAL_CAUSES.get(refusal_reason.upper())
+        next_step = "Revise the image prompt or its input images."
+        msg = f"{what_happened}: {cause}. {next_step}" if cause else f"{what_happened}. {next_step}"
+        raise ImgGenGenerationError(
+            msg,
+            error_category=InferenceErrorCategory.CONTENT,
+            user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step),
+            provider_metadata=None,
+        ).with_error_code(CoreCode.MODEL_CONTENT_REFUSED)
 
     @override
     async def _gen_image_list(

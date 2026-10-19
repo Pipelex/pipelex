@@ -15,7 +15,7 @@ from jinja2.exceptions import (
 )
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.exceptions import (
     Jinja2ContextError,
@@ -36,7 +36,7 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
-_TemplateError = TypeVar("_TemplateError", bound=ToolError)
+_TemplateError = TypeVar("_TemplateError", bound=PipelexError)
 
 
 def _coded_by_owner(*, error: _TemplateError, template_owner: TemplateOwner) -> _TemplateError:
@@ -365,7 +365,9 @@ _RENDER_FAILURES: tuple[type[BaseException], ...] = (
 )
 
 
-def _make_render_failure(*, render_error: BaseException, template_source: str, template_owner: TemplateOwner) -> ToolError:
+def _make_render_failure(
+    *, render_error: BaseException, template_source: str, template_owner: TemplateOwner
+) -> ToolError | Jinja2TemplateSecurityError:
     """Translate what a render raised into the error the render reports, coded by the template's owner.
 
     The order of the arms matters: a refusal of the sandbox, an undefined value and a filter refusing its argument are

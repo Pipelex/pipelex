@@ -167,6 +167,29 @@ class ProviderErrorMetadata(BaseModel):
         return self.body is not None and _is_content_policy_violation(_stringify_for_scan(self.body))
 
     @property
+    def is_context_window_exceeded(self) -> bool:
+        """Whether the provider refused the request because its inputs are over what the model can read.
+
+        For a language model, that is its context window, which holds the prompt and the output the request reserves
+        with ``max_tokens`` together, so a refusal the ``max_tokens`` sent caused reads the same. Reads the structured
+        error code first, ``provider_error_code`` and the code an error body carries
+        (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
+        prefers), then the wording each provider gives such a refusal, in its rendered message or in the in-process
+        ``body``, as the content-policy check reads them: a raw ``httpx`` error, such as Azure REST's, renders only
+        its status and URL, and keeps the provider's words in the body alone. The classifier reads it on a 400 and on
+        any other 4xx, which a gateway may answer such a refusal with, and the Render step words its next step from
+        the code the classifier picks, so a phrase in a 5xx, or quoted in a failure that reached no status, says
+        nothing.
+        """
+        if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        if error_code_from_body_code_first(self.body) in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        if _names_the_context_window(text=self.message):
+            return True
+        return self.body is not None and _names_the_context_window(text=_stringify_for_scan(self.body))
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -230,6 +253,35 @@ _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
     "safety system",
     "safety filter",
     "blocked by safety",
+)
+
+# The error code a provider gives a refusal of a prompt over the model's context window: OpenAI's, which Azure OpenAI
+# and the OpenAI-compatible gateways relay.
+_CONTEXT_WINDOW_ERROR_CODES: frozenset[str] = frozenset({"context_length_exceeded"})
+
+# How each provider words that refusal in the message its SDK renders, every one a 400. Each phrase names the
+# context window or the prompt's length, so a 400 about a malformed request matches none of them. A language model's
+# window also holds the output the request reserves with `max_tokens`, so two of them also match a 400 the
+# `max_tokens` sent caused, which the deck's default may be: Anthropic's "exceed context limit" and OpenAI's "maximum
+# context length", which counts the completion beside the messages. The Render step's advice for the language-model
+# family therefore names both the input and `max_tokens`.
+_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
+    # OpenAI's code, which its SDK renders into the message with the error body
+    "context_length_exceeded",
+    # OpenAI's earlier wording, also Mistral's and that of OpenAI-compatible servers such as vLLM, for the messages
+    # alone or for the messages and the completion together
+    "maximum context length",
+    # OpenAI's current wording
+    "exceeds the context window",
+    # Anthropic's, directly or through Bedrock
+    "prompt is too long",
+    # Anthropic's when the prompt and the max_tokens requested together pass the window
+    "exceed context limit",
+    # Bedrock's ValidationException, in full: a 400 about one field's length, such as a tool description's, may say
+    # "input is too long" of that field alone
+    "input is too long for requested model",
+    # Gemini's INVALID_ARGUMENT
+    "exceeds the maximum number of tokens allowed",
 )
 
 _GOOGLE_QUOTA_PATTERNS: tuple[str, ...] = (
@@ -328,6 +380,12 @@ def _is_content_policy_violation(error_message: str) -> bool:
     """Check if an error message indicates a content policy or safety filter violation."""
     lower_message = error_message.lower()
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
+
+
+def _names_the_context_window(*, text: str) -> bool:
+    """Check if an error's text words a refusal of inputs over the model's context window, as some provider words it."""
+    lower_text = text.lower()
+    return any(pattern in lower_text for pattern in _CONTEXT_WINDOW_PATTERNS)
 
 
 def _stringify_for_scan(body: Any) -> str:

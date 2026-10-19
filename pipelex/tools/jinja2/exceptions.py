@@ -1,6 +1,7 @@
 from jinja2.exceptions import SecurityError as JinjaSecurityError
 from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.template_owner import TemplateOwner
@@ -51,13 +52,18 @@ class Jinja2TemplateInvalidError(Jinja2TemplateRenderError):
         self.template_owner = template_owner
 
 
-class Jinja2TemplateSecurityError(ToolError):
+class Jinja2TemplateSecurityError(SecurityError):
     """A template reached for something the sandbox policy refuses (`jinja2_sandbox.py`).
 
     That is an undeclared private name, or a call that is not a method of a plain value. Its message names the
     attribute or the callable and the type it was reached on, and never quotes the template source, since the same
     render serves Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
     Pipelex's own, our template tripping our sandbox is our bug, `runtime.unexpected`.
+
+    A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
+    `UnsafeSchemaError`, so that a host catching that family never absorbs it into a domain answer and never retries
+    it. A type of its own, apart from `Jinja2TemplateRenderError`, so that the classification of render-time template
+    failures tells a refusal from the rest.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_TEMPLATE_REFUSED, others=(CoreCode.RUNTIME_UNEXPECTED,))
