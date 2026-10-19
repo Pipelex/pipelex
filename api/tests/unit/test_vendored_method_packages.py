@@ -17,11 +17,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
-from pipelex.base_exceptions import DisclosureMode
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
-from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
@@ -29,9 +29,10 @@ from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeR
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
-from pipelex_api.errors import ApiError
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exceptions import RequestMethodError
 from pipelex_api.method_source import fetched_method
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import (
     STUB_METHOD_ADDRESS,
@@ -43,6 +44,7 @@ from tests.unit._constants import (
     VENDORED_PROBE_MARKER,
     VENDORED_PROBE_MTHDS,
 )
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
@@ -104,8 +106,9 @@ def _build_client(
     *,
     tmp_path: Path,
     orchestrator: _RecordingOrchestrator | None = None,
-    disclosure_mode: DisclosureMode = DisclosureMode.STRICT,
+    as_operator: bool = False,
 ) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     mocker.patch("pipelex.cli.installed_methods.GLOBAL_METHODS_DIR", tmp_path / "global-methods")
     mocker.patch("pipelex.cli.installed_methods.PROJECT_METHODS_DIR", tmp_path / "project-methods")
     mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=False)
@@ -116,8 +119,8 @@ def _build_client(
     if orchestrator is not None:
         mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({"direct": orchestrator}))
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
-    register_exception_handlers(app, disclosure_mode=disclosure_mode)
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
+    register_exception_handlers(app)
     return TestClient(app)
 
 
@@ -203,18 +206,20 @@ class TestVendoredMethodPackages:
     @pytest.mark.parametrize("broken", list(_UNPARSABLE_PROBE_BUNDLES))
     def test_a_shipped_bundle_that_does_not_parse_is_the_verdict(self, mocker: MockerFixture, tmp_path: Path, broken: str):
         """The package is the caller's own content, so its parse failure is the verdict, located by address, never by host path."""
-        client = _build_client(mocker, tmp_path=tmp_path, disclosure_mode=DisclosureMode.STRICT)
+        client = _build_client(mocker, tmp_path=tmp_path)
         files = {**VENDORED_PROBE_FILES, ".mthds/methods/probe/probe.mthds": _UNPARSABLE_PROBE_BUNDLES[broken]}
 
         response = _execute_vendored(client, files=files)
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "ValidateBundleError"
-        items = body["validation_errors"]
+        assert body["code"] == CoreCode.METHOD_INVALID
+        assert body["domain"] == "method"
+        items = body["errors"]
         assert items, body
-        assert {item["source"] for item in items} == {f"{VENDORED_PROBE_ADDRESS}/probe.mthds"}
-        assert VENDORED_PROBE_ADDRESS in body["detail"]
+        # Each fault is located in the package by its address, the way the caller's tree names it.
+        assert {item["location"]["file"] for item in items} == {f"{VENDORED_PROBE_ADDRESS}/probe.mthds"}
+        assert "diagnostics" not in body
         dump = json.dumps(body)
         assert "pipelex-methods-" not in dump
         for temporary_root in (tempfile.gettempdir(), str(Path(tempfile.gettempdir()).resolve())):
@@ -224,17 +229,20 @@ class TestVendoredMethodPackages:
     def test_a_shipped_structure_class_is_refused_unimported(self, mocker: MockerFixture, tmp_path: Path):
         sentinel = tmp_path / "structures-module-ran"
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator)
+        client = _build_client(mocker, tmp_path=tmp_path, orchestrator=orchestrator, as_operator=True)
         files = {**VENDORED_PROBE_FILES, ".mthds/methods/probe/structures.py": _structures_py(sentinel=sentinel)}
 
         response = client.post("/v1/start", json={**_tree_body(files), "inputs": {"text": "hello"}})
 
-        assert response.status_code == 403, response.text
+        assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "MethodStructuresRefusedError"
+        assert body["code"] == PipelexErrorCode.DEPLOYMENT_PYTHON_STRUCTURES_REFUSED
+        # The caller reads the file by the name its tree gives a shipped package's file: the address, then the path inside.
+        assert body.get("params") == {"files": [f"{VENDORED_PROBE_ADDRESS}/structures.py"]}
         # Named as the fetched package's refusal is: by the package's address, and the file by its path inside it.
-        assert f"Method package '{VENDORED_PROBE_ADDRESS}'" in body["detail"]
-        assert "structures.py defines Invoice" in body["detail"]
+        assert body["diagnostics"]["error_class"] == "MethodStructuresRefusedError"
+        assert f"Method package '{VENDORED_PROBE_ADDRESS}'" in body["diagnostics"]["message"]
+        assert "structures.py defines Invoice" in body["diagnostics"]["message"]
         assert not sentinel.exists(), "the structure module was imported"
         assert orchestrator.dispatches == []
 
@@ -262,12 +270,8 @@ class TestVendoredMethodPackages:
 
         response = client.post("/v1/execute", json={"method_ref": _METHOD_REF, "inputs": {"text": "hello"}})
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "InvalidMethodFiles"
-        assert f"method package '{STUB_METHOD_ADDRESS}'" in body["detail"]
-        assert VENDORED_PROBE_ADDRESS in body["detail"]
-        assert "'.mthds/methods/b/'" in body["detail"]
+        body = assert_problem(response, status=422, code="method.package_invalid")
+        assert body["params"] == {"reason": "dependency_address_collision", "path": ".mthds/methods/b/"}
 
     def test_a_method_ref_package_keeps_its_shipped_files_apart(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, **_package_vendoring_files()})
@@ -301,14 +305,12 @@ class TestVendoredMethodPackages:
         install_method_package(files={"smoke.mthds": UNRESOLVED_PACKAGE_MTHDS, ".mthds/methods/unfinished/draft.mthds": UNRESOLVED_PACKAGE_MTHDS})
         client = _build_client(mocker, tmp_path=tmp_path)
 
-        with pytest.raises(ApiError, match="unfinished"):
+        with pytest.raises(RequestMethodError, match="unfinished"):
             fetched_method(_METHOD_REF)
         response = client.post("/v1/pipe-io", json={"method_ref": _METHOD_REF})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert "unfinished" in problem["detail"]
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "manifest_missing", "path": ".mthds/methods/unfinished/METHODS.toml"}, problem
 
     @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
     def test_a_crate_route_resolves_the_dependency_a_method_ref_ships(
@@ -345,13 +347,14 @@ class TestVendoredMethodPackages:
         verdict = response.json()
         assert verdict["is_valid"] is sends_the_dependency, response.text
         if not sends_the_dependency:
-            assert [(item["error_type"], item["missing_pipe_code"]) for item in verdict["validation_errors"]] == [
-                ("unresolved_package_dependency", UNRESOLVED_PACKAGE_REFERENCE)
-            ]
+            package_address = UNRESOLVED_PACKAGE_REFERENCE.split("->", maxsplit=1)[0]
+            assert [(item["code"], item["params"]) for item in verdict["errors"]] == [
+                ("method.dependency_missing", {"kind": "package", "name": package_address, "reason": "not_found"})
+            ], verdict
 
     @pytest.mark.parametrize("route", ["/v1/pipe-io", "/v1/resolve", "/v1/codegen"])
     def test_a_crate_route_never_looks_up_or_fetches_a_dependency_nothing_shipped(self, mocker: MockerFixture, tmp_path: Path, route: str):
-        """Even with fetch-on-miss on, a crate route resolves statically, refusing the call in the words a hosted run matches."""
+        """Even with fetch-on-miss on, a crate route resolves statically, its verdict naming the missing package by its code."""
         client = _build_client(mocker, tmp_path=tmp_path)
         mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
         lookup = mocker.patch(
@@ -369,11 +372,10 @@ class TestVendoredMethodPackages:
         verdict = response.json()
         assert verdict["is_valid"] is False, response.text
         lookup.assert_not_called()
-        [item] = verdict["validation_errors"]
-        assert item["error_type"] == "unresolved_package_dependency"
-        assert item["source"] == "bundle.mthds"
-        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} '{VENDORED_PROBE_ADDRESS}'" in item["message"]
-        assert ADDRESS_DEPENDENCY_REFUSAL_MARKER in verdict["message"]
+        [item] = verdict["errors"]
+        assert item["code"] == "method.dependency_missing"
+        assert item["params"] == {"kind": "package", "name": VENDORED_PROBE_ADDRESS, "reason": "not_found"}
+        assert item["location"]["file"] == "bundle.mthds"
 
     def test_validate_by_method_ref_resolves_the_dependency_it_ships(
         self, mocker: MockerFixture, tmp_path: Path, install_method_package: Callable[..., Path]
@@ -400,9 +402,10 @@ class TestVendoredMethodPackages:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert [(item["error_type"], item["missing_pipe_code"]) for item in body["validation_errors"]] == [
-            ("unresolved_package_dependency", UNRESOLVED_PACKAGE_REFERENCE)
-        ]
+        package_address = UNRESOLVED_PACKAGE_REFERENCE.split("->", maxsplit=1)[0]
+        assert [(item["code"], item["params"]) for item in body["errors"]] == [
+            ("method.dependency_missing", {"kind": "package", "name": package_address, "reason": "not_found"})
+        ], body
 
 
 def _package_vendoring_files() -> dict[str, str]:

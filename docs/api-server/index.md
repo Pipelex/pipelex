@@ -100,7 +100,7 @@ The `AUTH_MODE` environment variable selects how the API authenticates its calle
 
 By default (`AUTH_MODE=none`), the API requires no authentication. This is the default for self-hosted deployments and for running behind an API Gateway that handles auth.
 
-If you sit this API behind a trusted reverse proxy that authenticates users and forwards the caller identity via the `X-User-Id` header, set `TRUST_FORWARDED_IDENTITY_HEADERS=true` to honor it. The runner is a generic execution engine — it does not own user metadata (email, OAuth subject, auth method), so a single opaque caller id is the entire trusted surface. The value must be a single path-safe segment (`is_safe_user_id`). **Default is off** — without this flag the API ignores `X-User-Id` entirely and the deployment is treated as single-tenant. With it on, a request arriving *without* the header is rejected with `401`: turning the flag on asserts that a proxy authenticates every caller, so a missing id means that proxy is absent, misconfigured or bypassed. Only enable it when your proxy strips any inbound copy of the header before adding its own; otherwise, any external client can spoof user identity by sending it directly.
+If you sit this API behind a trusted reverse proxy that authenticates users and forwards the caller identity via the `X-User-Id` header, set `TRUST_FORWARDED_IDENTITY_HEADERS=true` to honor it. The runner is a generic execution engine — it does not own user metadata (email, OAuth subject, auth method), so a single opaque caller id is the entire trusted surface. The value must be a single path-safe segment (`is_safe_user_id`), and one that is not is refused with a `422` `request.invalid` naming the header. **Default is off** — without this flag the API ignores `X-User-Id` entirely and the deployment is treated as single-tenant. With it on, a request arriving *without* the header is rejected with `401` `auth.missing_credential`, with no `WWW-Authenticate` challenge since the runner reads no bearer token in this mode: turning the flag on asserts that a proxy authenticates every caller, so a missing id means that proxy is absent, misconfigured or bypassed. Only enable it when your proxy strips any inbound copy of the header before adding its own; otherwise, any external client can spoof user identity by sending it directly.
 
 ### API Key Authentication
 
@@ -136,7 +136,7 @@ docker run --name pipelex-api -p 8081:8081 \
 
 ## API Endpoints
 
-Every failure is an RFC 7807 `application/problem+json` problem document — see **[Error Responses →](error-responses.md)**, and the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml) for the statuses each route can produce.
+Every failure is an RFC 9457 `application/problem+json` problem document — see **[Error Responses →](error-responses.md)**, and the [committed OpenAPI artifact](openapi/pipelex-api.openapi.yaml) for the statuses each route can produce.
 
 ### Health & Version
 

@@ -20,7 +20,7 @@ The body names the method as the [crate routes](codegen.md#selecting-the-method)
 - `all_pipes` (boolean, default `false`): describe every pipe the closure loads instead of the selected one.
 - `include_files` (boolean, default `false`): echo the text of the method's own `.mthds` bundles on the valid arm.
 - `resources` (object, optional): files the method's steps read, such as a `PipeDocGen` step's `template_file`, keyed by the path from the tree's root, each in standard base64, joining the tree as on [`/v1/validate`](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `files` only. A step whose template file the tree does not hold makes the method invalid.
-- `read_scope` (string, optional): **Pipelex-API extension.** The scope the request reads the method under, as on `/v1/validate`: a hash entry of `files` resolves in that scope's blob store, and only a request carrying it records the tree it read there; [a `jwt` caller may send only a scope under its own id](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups), else a `403 ReadScopeForbidden`.
+- `read_scope` (string, optional): **Pipelex-API extension.** The scope the request reads the method under, as on `/v1/validate`: a hash entry of `files` resolves in that scope's blob store, and only a request carrying it records the tree it read there; [a `jwt` caller may send only a scope under its own id](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups), else a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller`.
 
 There is no `views` field, because the valid arm always carries all three artifacts. The hosted API also accepts a catalog `method_id`, which the platform resolves into the method's `files` before forwarding, so this server never declares it.
 
@@ -36,20 +36,23 @@ There is no `views` field, because the valid arm always carries all three artifa
 }
 ```
 
-The tree's refusals produce no verdict, as on `/v1/validate`: an `InvalidMethodFiles`, `MissingBlobs`, `MethodTreeTooLarge` or `InvalidBundle` `422`, and the custom-Python policy's `403`s (see [No verdict](#no-verdict)).
+The tree's refusals produce no verdict, as on `/v1/validate`: a `422` `method.package_invalid` naming the rule or the limit as its `reason`, `security.input_path_refused`, `request.invalid` or `request.blobs_missing`, and the custom-Python policy's refusals (see [No verdict](#no-verdict)).
 
 ## Pipe selection
 
-The selection chain takes the request's `pipe_ref`; else the `main_pipe` of the `METHODS.toml` at the tree's root, whether the tree was fetched by `method_ref` or sent in `files`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. A root `METHODS.toml` the route cannot read as a manifest, being no UTF-8 text or no valid manifest, is a `422 MethodEntryError` when the request names no pipe. A request naming its pipe in `pipe_ref` never reads the manifest to select it, so there a manifest the route cannot read refuses nothing and only leaves `default_pipe_ref` a stated `null`. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
+The selection chain takes the request's `pipe_ref`; else the `main_pipe` of the `METHODS.toml` at the tree's root, whether the tree was fetched by `method_ref` or sent in `files`; else the closure's own `main_pipe` declaration, when exactly one domain declares one. A root `METHODS.toml` the route cannot read as a manifest, being no UTF-8 text or no valid manifest, is a `422` problem coded `method.package_invalid` when the request names no pipe. A request naming its pipe in `pipe_ref` never reads the manifest to select it, so there a manifest the route cannot read refuses nothing and only leaves `default_pipe_ref` a stated `null`. The chain stops at the first link that is present, so a manifest `main_pipe` the closure does not declare, or declares in several domains, is a failed selection rather than a fall-through to the closure's declarations.
 
-The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with an input `422` `problem+json`. Its `error_type` is the pipelex entry-lookup class that names the failure, never the `ValidationError` of a malformed request, so a client tells a selection refusal from a request-shape one by that field:
+The closure is resolved first, so an invalid closure answers its invalid verdict whatever `pipe_ref` names. For a valid closure these selections are refused with a `422` problem whose `code` names the failure, never the `request.invalid` of a malformed request, so a client tells a selection refusal from a request-shape one by that member:
 
-- `EntryPipeNotFoundError` for a `pipe_ref` that names no pipe of the closure, for a manifest `main_pipe` the closure does not declare, and, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`;
-- `EntryPipeAmbiguousError` for a bare code that matches pipes in several domains, whether the request or the manifest spelled it, and, without `all_pipes`, for a request with no `pipe_ref` whose closure declares several `main_pipe`s.
+- `request.pipe_not_found` for a `pipe_ref` that names no pipe of the closure, with the selection as its `pipe` parameter;
+- `request.pipe_ambiguous` for a bare code that matches pipes in several domains, with the selection as its `pipe` parameter and the qualified refs to choose from as its `candidates`;
+- `request.pipe_unspecified`, without `all_pipes`, for a request with no `pipe_ref` whose closure declares no `main_pipe`, or several, whose qualified refs are then its `candidates`;
+- `method.pipe_unresolved` for a manifest `main_pipe` the closure does not declare, the method's own declaration to fix, with the declared selection as its `missing` parameter;
+- `method.ref_ambiguous` for a manifest `main_pipe` that matches pipes in several domains of the closure, the method's own declaration to fix, with the declared selection as its `ref` parameter and the qualified refs it matches as its `candidates`.
 
-The `detail` says which case it is and, for an ambiguity, names the qualified refs to choose from; the candidates are in the `detail` alone, with no structured list, as on the run routes. The problem's `type` and `title` are the class's. Its `user_action` is the class's too, advising a check of the pipe code, except for a request with no `pipe_ref` whose closure declares no `main_pipe` or several, where it asks for a `pipe_ref` instead.
+The problem's `type`, `title`, sentences and step are the code's: a request's selection asks the caller to select a pipe the method declares, and a manifest's asks the method's author to correct the declaration.
 
-An unknown or ambiguous `pipe_ref` answers the `error_type` the run routes answer for the same `pipe_code`. A closure declaring no `main_pipe`, or several, has no run-route twin: this route refuses both as the pipe-selector design classifies them, while a run over such a closure today fails with a `500` or runs the first declaration.
+An unknown or ambiguous `pipe_ref` answers the code the run routes answer for the same `pipe_code`. A closure declaring no `main_pipe`, or several, has no run-route twin: this route refuses both as the pipe-selector design classifies them, while a run over such a closure today fails with a `500` or runs the first declaration.
 
 A bare `pipe_ref` that matches one pipe (`echo` where `smoke.echo` is meant) is still resolved today, and the valid arm reports the qualified ref.
 
@@ -84,14 +87,14 @@ A bare `pipe_ref` that matches one pipe (`echo` where `smoke.echo` is meant) is 
 
 ## Response (invalid verdict)
 
-An invalid closure is the `200` crate verdict `/v1/resolve` gives: `is_valid: false`, the structured `validation_errors[]` and a `message`. A call into a package nothing shipped is one, its `unresolved_package_dependency` item naming the package as `address-based dependency '<address>'`. It carries no artifacts, no `pipe_ref` or `default_pipe_ref`, no runnability facts and no `files`, whatever the request asked for.
+An invalid closure is the `200` crate verdict `/v1/resolve` gives: `is_valid: false`, the structured `errors[]` and a `message`. A call into a package nothing shipped is one, its `method.dependency_missing` item naming the package's address as its `name`. It carries no artifacts, no `pipe_ref` or `default_pipe_ref`, no runnability facts and no `files`, whatever the request asked for.
 
 ## No verdict
 
-Every non-2xx is RFC 7807 `application/problem+json` (see [Error Responses](error-responses.md)):
+Every non-2xx is RFC 9457 `application/problem+json` (see [Error Responses](error-responses.md)):
 
-- **`422`** for a malformed body or neither or both method selectors, `ValidationError`; for a tree the runner cannot read, `InvalidMethodFiles`, `MissingBlobs`, `MethodTreeTooLarge` or `InvalidBundle`, as on [`/v1/resolve`](codegen.md#selecting-the-method); for an unreadable root manifest on a request naming no pipe, `MethodEntryError`; and for the selection refusals above, `EntryPipeNotFoundError` or `EntryPipeAmbiguousError`.
-- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `MethodPackageNotFoundError` when no package in the fetched repository matches the address, `422` for a reference that does not parse or a fetch the server cannot accept, and `501` `MethodRefNotSupported` for a registry-form reference.
-- **`403`** for the custom-Python policy of `/v1/validate` and the run routes, whose tree the route loads: `CustomCodeRequiresSandbox` for a tree holding a `.py` file on a deployment that is not sandbox-hosted, where loading the library would import each `.py` declaring a structure class and run its module-level code in the server's process, and `MethodStructuresRefusedError` for one whose Python declares a structure class.
-- **`401` / `403`** for authentication, and **`413`** for a body over the size limit.
+- **`422`** for a malformed body or neither or both method selectors, `request.invalid` naming the field; for a tree the runner cannot read, `method.package_invalid`, `security.input_path_refused` or `request.blobs_missing`, as on [`/v1/resolve`](codegen.md#selecting-the-method); for an unreadable root manifest on a request naming no pipe, `method.package_invalid`; and for the selection refusals above, by their codes.
+- **The `method_ref` fetch outcomes**, exactly as on `/v1/resolve`: `404` `method.not_found` when no package in the fetched repository matches the address, `422` for a reference that does not parse (`request.invalid`) or a package the server cannot accept (`method.ambiguous`, `method.package_invalid`), `502` `method.fetch_failed` when the fetch itself failed, and `422` `request.unsupported` for a registry-form reference.
+- **The custom-Python policy of `/v1/validate` and the run routes**, whose tree the route loads: a `501` `pipelex.deployment.custom_code_requires_sandbox` for a tree holding a `.py` file on a deployment that is not sandbox-hosted, where loading the library would import each `.py` declaring a structure class and run its module-level code in the server's process, and a `422` `pipelex.deployment.python_structures_refused` for one whose Python declares a structure class.
+- **`401` / `403`** for authentication, a `403` `auth.forbidden` naming `read_scope_under_caller` among them, and **`413`** `request.too_large` for a body over the size limit.
 - **`500`** when an artifact cannot be derived: a pipe whose input or output JSON Schema cannot be rendered raises `PipeIOContractError`, which answers `500` as it does on `/v1/validate` — a fault of the tool, not a verdict about the method.

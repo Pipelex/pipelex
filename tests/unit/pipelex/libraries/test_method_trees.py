@@ -2,21 +2,26 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.models import TreeLimits
+from mthds.method_tree.vocabulary import TreeRefusalCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import HostLibraryTreeError, MethodTreeLoadError
 from pipelex.libraries.method_trees import (
     LIMITS_ADVICE,
     bundle_files_under,
     list_library_bundle_files,
     list_library_dir_trees,
+    list_local_method_tree,
     list_package_method_tree,
     reporting_host_library_tree_faults,
     submitted_tree_files,
     tree_bundle_of_lone_file,
     tree_python_sources,
 )
+from pipelex.methods.package_reason import MethodPackageReason
 
 _MANIFEST = '[package]\naddress = "github.com/pipelex-tests/nested"\nversion = "1.0.0"\ndescription = "A nested package"\n'
 
@@ -99,6 +104,11 @@ class TestMethodTrees:
             list_library_bundle_files(library_dirs=[tmp_path])
 
         assert exc_info.value.message.endswith(LIMITS_ADVICE)
+        # The caller reads the limit the tree passed, by the reason the listing stopped at it.
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_PACKAGE_INVALID
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": MethodPackageReason.TOO_MANY_FILES, "limit": 1}
 
     def test_a_bundle_file_named_alone_is_rooted_at_the_manifest_above_it_else_alone(self, tmp_path: Path) -> None:
         """Named alone, a bundle reads the files of the method a METHODS.toml above it roots, and with none only itself."""
@@ -153,8 +163,10 @@ class TestMethodTrees:
         assert [bundle_file.tree_bundle.tree_path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])] == ["top.mthds"]
 
         _touch(directory=tmp_path, tree_path="vendor/tool/tool.mthds")
-        with pytest.raises(MethodTreeLoadError, match="symbolic link"):
+        with pytest.raises(MethodTreeLoadError, match="symbolic link") as exc_info:
             list_library_bundle_files(library_dirs=[tmp_path])
+        # The reason is the standard's refusal code, which the listing refused the tree with.
+        assert exc_info.value.problem_params() == {"reason": TreeRefusalCode.SYMBOLIC_LINK}
 
     def test_this_machine_s_limits_are_read_once_per_listing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         limits_spy = mocker.patch("pipelex.libraries.method_trees.local_tree_limits", return_value=TreeLimits())
@@ -186,6 +198,32 @@ class TestMethodTrees:
         assert str(tmp_path.resolve()) not in message
         assert LIMITS_ADVICE not in message
 
+    def test_a_refused_tree_names_the_rule_and_the_path_a_caller_reads(self, tmp_path: Path) -> None:
+        """`method.package_invalid` declares the rule broken and the tree path at fault, which reach a caller without the message."""
+        _touch(directory=tmp_path, tree_path="method/main.mthds")
+        (tmp_path / "method" / "link.mthds").symlink_to(tmp_path / "method" / "main.mthds")
+
+        with pytest.raises(MethodTreeLoadError) as exc_info:
+            list_local_method_tree(handed_over=tmp_path / "method")
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == "method.package_invalid"
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "symbolic_link", "path": "link.mthds"}
+
+    def test_a_refused_dependency_package_names_its_path_under_its_address(self, tmp_path: Path) -> None:
+        package_root = tmp_path / "installed" / "invoicing"
+        _touch(directory=package_root, tree_path="METHODS.toml", content=_MANIFEST)
+        _touch(directory=package_root, tree_path="invoice.mthds")
+        (package_root / "link.mthds").symlink_to(package_root / "invoice.mthds")
+
+        with pytest.raises(MethodTreeLoadError) as exc_info:
+            list_package_method_tree(root=package_root, package_address="github.com/pipelex-tests/invoicing")
+
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "symbolic_link", "path": "github.com/pipelex-tests/invoicing/link.mthds"}
+
     def test_a_host_library_tree_that_cannot_be_listed_is_the_host_s_fault(self, tmp_path: Path) -> None:
         """Beside a caller's bundles, a tree of the host's own directories is no input of theirs, and its message never reaches them."""
         _touch(directory=tmp_path, tree_path="lib/a.mthds")
@@ -194,9 +232,10 @@ class TestMethodTrees:
         with pytest.raises(HostLibraryTreeError) as exc_info, reporting_host_library_tree_faults():
             list_library_bundle_files(library_dirs=[tmp_path / "lib"])
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.caller_facing_message is False
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == PipelexErrorCode.CONFIG_INVALID
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert exc_info.value.message not in str(caller.to_wire())
         assert isinstance(exc_info.value.__cause__, MethodTreeLoadError)
 
     def test_every_bundle_file_under_a_directory_is_found_whatever_the_membership_rule(self, tmp_path: Path) -> None:

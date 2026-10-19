@@ -125,8 +125,10 @@ make up-migration-schemas     - Regenerate the migration fingerprint and default
 make umig                     - Shorthand -> up-migration-schemas
 make up-migration-schemas-force - Same, over a head golden recording material the models lost
 make umigf                    - Shorthand -> up-migration-schemas-force
-make generate-error-pages     - Generate one docs page per PipelexError subclass under docs/errors/
-make gep                      - Shorthand -> generate-error-pages
+make generate-error-registry  - Write the error registry's snapshot, typed codes and docs/errors/ pages from its source
+make ger                      - Shorthand -> generate-error-registry
+make check-error-registry     - Check the error registry against the MTHDS standard, and its derived files
+make cer                      - Shorthand -> check-error-registry
 make generate-error-identity  - Regenerate the committed PipelexError wire-identity snapshot
 make gei                      - Shorthand -> generate-error-identity
 make regenerate-test-models   - Regenerate test model fixtures from backend configs
@@ -197,7 +199,7 @@ make docs-serve-versioned     - Serve versioned docs locally with mike
 make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
-make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
+make docs-deploy-specific-version-pre-release - Deploy docs for the current version with 'pre-release' alias (CI only)
 make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
@@ -239,11 +241,11 @@ export HELP
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version-pre-release docs-delete \
 	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
 	generate-corpus-vocabulary generate-corpus-vocabulary-quiet \
 	check-ledger cl check-migration-schemas cmig up-migration-schemas up-migration-schemas-force umig umigf \
-	generate-error-pages generate-error-pages-quiet gep \
+	generate-error-registry generate-error-registry-quiet ger check-error-registry cer \
 	generate-error-identity generate-error-identity-quiet gei \
 	up \
 	test-count check-test-badge \
@@ -510,15 +512,22 @@ umig: up-migration-schemas
 umigf: up-migration-schemas-force
 	@echo "> done: umigf = up-migration-schemas-force"
 
-generate-error-pages: env
-	$(call PRINT_TITLE,"Generating per-class error documentation pages")
-	$(VENV_PIPELEX_DEV) generate-error-pages
+generate-error-registry: env
+	$(call PRINT_TITLE,"Writing every file derived from the error registry")
+	$(VENV_PIPELEX_DEV) generate-error-registry
 
-generate-error-pages-quiet: env
-	$(VENV_PIPELEX_DEV) generate-error-pages --quiet
+generate-error-registry-quiet: env
+	$(VENV_PIPELEX_DEV) generate-error-registry --quiet
 
-gep: generate-error-pages
-	@echo "> done: gep = generate-error-pages"
+ger: generate-error-registry
+	@echo "> done: ger = generate-error-registry"
+
+check-error-registry: env
+	$(call PRINT_TITLE,"Checking the error registry and its derived files")
+	$(VENV_PIPELEX_DEV) check-error-registry
+
+cer: check-error-registry
+	@echo "> done: cer = check-error-registry"
 
 generate-error-identity: env
 	$(call PRINT_TITLE,"Regenerating the PipelexError wire-identity snapshot")
@@ -1163,16 +1172,16 @@ Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
-docs: env generate-error-pages-quiet
+docs: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
 	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 -f "$(CURDIR)/mkdocs.yml" --watch "$(CURDIR)/docs" -s
 
-docs-check: env generate-error-pages-quiet
+docs-check: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
 docs-serve-versioned: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-serve-versioned: env generate-error-pages-quiet
+docs-serve-versioned: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Serving versioned documentation with mike")
 	$(VENV_MIKE) serve
 
@@ -1182,19 +1191,19 @@ docs-list: env
 	$(VENV_MIKE) list
 
 docs-deploy: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy: env generate-error-pages-quiet
+docs-deploy: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
 docs-deploy-stable: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-stable: env generate-error-pages-quiet
+docs-deploy-stable: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 	$(MAKE) docs-deploy-root
 
 docs-deploy-specific-version-pre-release: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
-docs-deploy-specific-version-pre-release: env generate-error-pages-quiet
+docs-deploy-specific-version-pre-release: env generate-error-registry-quiet
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root
@@ -1205,10 +1214,14 @@ docs-deploy-specific-version-pre-release: env generate-error-pages-quiet
 # Mike does NOT rewrite sitemap URLs for aliases — latest/sitemap.xml contains
 # versioned URLs like /0.20.9/page/, identical to the version directory. The sed
 # rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
+# `pipelex-dev write-error-type-redirects` writes errors/<code>/index.html at the root for every
+# error code latest/ documents, so that a problem's type URI, https://$(SITE_DOMAIN)/errors/<code>,
+# reaches the code's page under /latest/ (docs/contribute/error-registry.md). While latest/ documents
+# no code it writes no stub at all, so errors/ is staged only when the checkout holds it.
 # WARNING: Do NOT insert comments inside the shell continuation chain below.
 # Lines starting with # after a \ continuation become shell comments that silently
 # truncate the command.
-docs-deploy-root:
+docs-deploy-root: env
 ifeq ($(SITE_DOMAIN),)
 	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
 endif
@@ -1223,10 +1236,12 @@ endif
 	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
 	if [ -f "$$TMPDIR/latest/llms.txt" ]; then cp "$$TMPDIR/latest/llms.txt" "$$TMPDIR/llms.txt"; fi && \
 	if [ -f "$$TMPDIR/latest/llms-full.txt" ]; then cp "$$TMPDIR/latest/llms-full.txt" "$$TMPDIR/llms-full.txt"; fi && \
+	$(VENV_PIPELEX_DEV) write-error-type-redirects --site-root "$$TMPDIR" --quiet && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
 	(git add -A llms.txt llms-full.txt 2>/dev/null || true) && \
-	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt)") && \
+	if [ -d errors ]; then git add -A errors; fi && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt, error type redirects)") && \
 	git push origin gh-pages
 
 docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)

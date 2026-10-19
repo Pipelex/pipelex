@@ -1,6 +1,11 @@
 from typing import Any, cast
 
 import pytest
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.answers import read_answer
+from mthds.protocol.problem.client_problems import make_client_problem
+from mthds.protocol.problem.registry import CoreCode
+from mthds.runners.api.exceptions import ApiResponseError
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError
@@ -17,13 +22,15 @@ from pipelex.pipeline.usage_stats_reporting import (
 from pipelex.system.usage_stats.usage_stats_contract import (
     UsageStatsCodegenArtifact,
     UsageStatsCodegenTarget,
+    UsageStatsErrorDomain,
     UsageStatsEventName,
     UsageStatsOutcome,
     UsageStatsProvider,
 )
 from pipelex.system.usage_stats.usage_stats_events import UsageStatsEvent
-from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, usage_stats_error_domain
+from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, sent_usage_stats_error, usage_stats_error, usage_stats_failure_domain
 from pipelex.tracing.trace_events import TraceEvent
+from tests.helpers.recovered_problem import make_recovered_url_refusal
 from tests.helpers.usage_stats_run_events import envelope_of, llm_usage_event, pipe_start_event
 from tests.helpers.usage_stats_schema import assert_envelope_is_valid
 
@@ -102,6 +109,19 @@ def _generate_raising(*, error: BaseException) -> None:
         raise error
 
 
+def _answered_refusal(*, status: int, body: str) -> ApiResponseError:
+    """A refusal a server answered with `body`, with the problem the MTHDS client reads from it, inferred from the status if the body names none."""
+    reading = read_answer(status=status, body=body, headers={}, creates_run=False)
+    return ApiResponseError(
+        f"API POST /v1/start failed ({status})",
+        problem=reading.problem,
+        api_url="https://runner.test",
+        status=status,
+        status_text="",
+        response_body=body,
+    )
+
+
 class TestUsageStatsReporting:
     def test_run_with_usage_reports_one_model_used_per_model(self, mocker: MockerFixture) -> None:
         """Pipe counts and tokens come from the run's events, failures and backends from its tally, one `model_used` per model."""
@@ -110,16 +130,14 @@ class TestUsageStatsReporting:
             tally.note_call(
                 model_handle=_SHIPPED_ANTHROPIC_MODEL,
                 backend_name="anthropic",
-                failed=False,
-                failure_category=None,
+                failure_domain=None,
                 images_generated=0,
                 pages_extracted=0,
             )
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
-            failed=True,
-            failure_category="capacity",
+            failure_domain=UsageStatsErrorDomain.RUNTIME,
             images_generated=0,
             pages_extracted=0,
         )
@@ -145,13 +163,14 @@ class TestUsageStatsReporting:
         assert (run["input_tokens"], run["output_tokens"], run["cached_tokens"]) == (300, 60, 20)
         assert run["cost_usd"] > 0
         model = _properties(usage_event=model_event)
-        assert (model["provider"], model["model"], model["calls"], model["failures"], model["failures_capacity"]) == (
+        assert (model["provider"], model["model"], model["calls"], model["failures"], model["failures_runtime"]) == (
             "anthropic",
             _SHIPPED_ANTHROPIC_MODEL,
             3,
             1,
             1,
         )
+        assert (model["failures_input"], model["failures_method"], model["failures_account"], model["failures_operator"]) == (0, 0, 0, 0)
         assert (model["input_tokens"], model["output_tokens"], model["cached_tokens"]) == (300, 60, 20)
         assert model["cost_usd"] == run["cost_usd"]
 
@@ -164,8 +183,7 @@ class TestUsageStatsReporting:
             tally.note_call(
                 model_handle=_SHIPPED_ANTHROPIC_MODEL,
                 backend_name=backend_name,
-                failed=failed,
-                failure_category="capacity" if failed else None,
+                failure_domain=UsageStatsErrorDomain.RUNTIME if failed else None,
                 images_generated=0,
                 pages_extracted=0,
             )
@@ -194,16 +212,14 @@ class TestUsageStatsReporting:
         tally.note_call(
             model_handle=_SHIPPED_ANTHROPIC_MODEL,
             backend_name="anthropic",
-            failed=False,
-            failure_category=None,
+            failure_domain=None,
             images_generated=0,
             pages_extracted=0,
         )
         tally.note_call(
             model_handle="my-own-gpu-model",
             backend_name="my_gpu_box",
-            failed=False,
-            failure_category=None,
+            failure_domain=None,
             images_generated=0,
             pages_extracted=0,
         )
@@ -245,10 +261,70 @@ class TestUsageStatsReporting:
         assert run["outcome"] == outcome
         assert run["input_tokens"] == 7
         if outcome.is_failed:
-            assert run["error_domain"] == usage_stats_error_domain(error=error)
+            assert (run["error_code"], run["error_domain"]) == ("runtime.unexpected", "runtime")
         else:
+            assert "error_code" not in run
             assert "error_domain" not in run
         assert "secret" not in str(envelope)
+
+    def test_a_recovered_problem_is_counted_by_its_own_code(self) -> None:
+        """A failure reporting a problem recovered from a worker is counted by that problem's code and domain, not by its carrier's class."""
+        assert usage_stats_error(error=make_recovered_url_refusal()) == ("input.url_unreachable", UsageStatsErrorDomain.INPUT)
+
+    def test_a_request_error_is_counted_by_the_problem_it_carries(self) -> None:
+        """An MTHDS client's request error is no Pipelex error, and carries its problem: it is counted by that, not as the catch-all."""
+        unreachable = PipelineRequestError(
+            "the runner could not be reached",
+            problem=make_client_problem(CoreCode.CLIENT_UNREACHABLE, params={"base_url": "https://runner.test"}),
+        )
+
+        assert usage_stats_error(error=unreachable) == ("client.unreachable", UsageStatsErrorDomain.RUNTIME)
+
+    @pytest.mark.parametrize(
+        ("body", "expected", "expected_sent"),
+        [
+            # A gateway's page: the client infers `runtime.unavailable` from the 503, which no statistic reports.
+            ("<html>502 Bad Gateway</html>", ("runtime.unexpected", UsageStatsErrorDomain.RUNTIME), None),
+            # A problem document naming its code and its domain is counted by them, on every path.
+            (
+                '{"detail": "The input is invalid", "code": "input.invalid", "domain": "input"}',
+                ("input.invalid", UsageStatsErrorDomain.INPUT),
+                ("input.invalid", UsageStatsErrorDomain.INPUT),
+            ),
+        ],
+    )
+    def test_an_answered_refusal_is_counted_by_what_its_body_sent_alone(
+        self, body: str, expected: tuple[str, UsageStatsErrorDomain], expected_sent: tuple[str, UsageStatsErrorDomain] | None
+    ) -> None:
+        """One rule for a refusal a server answered: its body's code and domain, never the problem the client inferred from the status."""
+        refusal = _answered_refusal(status=503, body=body)
+
+        assert usage_stats_error(error=refusal) == expected
+        assert sent_usage_stats_error(error=refusal) == expected_sent
+        assert usage_stats_failure_domain(error=refusal) == expected[1]
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            make_recovered_url_refusal(),
+            PipelexError("a fault of ours"),
+            PipelineRequestError("refused", problem=make_client_problem(CoreCode.CLIENT_NOT_CONFIGURED, params={"setting": "base_url"})),
+            RuntimeError("no Pipelex error at all"),
+        ],
+    )
+    def test_a_failed_call_s_domain_is_read_off_its_code_alone(self, mocker: MockerFixture, error: Exception) -> None:
+        """The cheap reading a failed inference call takes agrees with the problem's, and builds no problem to get it."""
+        expected_domain = usage_stats_error(error=error).domain
+        to_problem_spy = mocker.patch.object(PipelexError, "to_problem")
+
+        assert usage_stats_failure_domain(error=error) == expected_domain
+        to_problem_spy.assert_not_called()
+
+    def test_a_failed_run_carries_its_error_s_code_and_domain(self, mocker: MockerFixture) -> None:
+        """A failed run's `run_completed` names its error's code and that code's domain, which the gate accepts."""
+        run_event = build_run_usage_events(facts=_facts(mocker=mocker, outcome=UsageStatsOutcome.FAILED, error=make_recovered_url_refusal()))[0]
+        run = _properties(usage_event=run_event)
+        assert (run["error_code"], run["error_domain"]) == ("input.url_unreachable", "input")
 
     @pytest.mark.parametrize(
         ("backend_name", "model_handle", "provider", "model"),

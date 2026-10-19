@@ -1,4 +1,10 @@
+from typing import Any
+
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
+
 from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ErrorCodeSet
 
 
 class BindingPathUnresolvedError(PipelexError):
@@ -12,11 +18,17 @@ class BindingPathUnresolvedError(PipelexError):
     concepts, is refused the same way, the message naming each outcome and the concept it stores.
     """
 
+    error_code = CoreCode.METHOD_FIELD_PATH_UNRESOLVED
+
     def __init__(self, message: str, *, path: str, failed_segment: str, available_fields: list[str]):
         self.path = path
         self.failed_segment = failed_segment
         self.available_fields = available_fields
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"path": self.path, "segment": self.failed_segment, "available_fields": self.available_fields}
 
 
 class BindingStepRunError(PipelexError):
@@ -27,4 +39,9 @@ class BindingStepRunError(PipelexError):
     multiplicity, such as a list held by a root derived as a single value. A binding whose root a pipe that
     did not resolve at validation stored is derived when it runs, and a result that contradicts the sequence's
     output, or the input of the step reading it, is reported this way too.
+
+    Its code is ``pipe.binding_failed``; a raise site finding a root that holds a list where a single value was
+    derived, or the reverse, chooses ``pipe.output_multiplicity``.
     """
+
+    error_code = ErrorCodeSet(default=CoreCode.PIPE_BINDING_FAILED, others=(CoreCode.PIPE_OUTPUT_MULTIPLICITY,))

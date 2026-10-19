@@ -1,21 +1,24 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import ErrorDomain, PipelexConfigError, PipelexError, PipelexSetupError
+from pipelex.base_exceptions import PipelexConfigError, PipelexError, PipelexSetupError
 from pipelex.cogt.exceptions import (
     CogtError,
-    ImageContentError,
     ImgGenParameterError,
     ImgGenPromptError,
     InferenceBackendLibraryError,
     InferenceErrorCategory,
     LLMPromptParameterError,
-    LLMPromptSpecError,
     PromptDocumentFactoryError,
     PromptImageFactoryError,
     PromptImageFormatError,
     SdkTypeError,
+    find_inference_error_category_in_chain,
 )
 from pipelex.core.stuffs.exceptions import DateContentError
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import (
@@ -30,6 +33,9 @@ from pipelex.system.exceptions import EnvVarNotFoundError
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.tabular.exceptions import CsvError
 
+# A message naming a path on the host, which no caller may read whatever the class.
+_HOST_MESSAGE = "boom at /srv/pipelex/internal/library.mthds"
+
 _PIPELINE_EXEC_ERROR = PipelineExecutionError(
     message="boom",
     run_mode=PipeRunMode.LIVE,
@@ -40,34 +46,37 @@ _PIPELINE_EXEC_ERROR = PipelineExecutionError(
 
 
 class TestClassLevelMetadata:
-    """Key exceptions self-describe error_domain / user_action / error_category at the class level."""
+    """Key exceptions self-describe their code, their advice and their error_category at the class level."""
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check the code it decides")
     @pytest.mark.parametrize(
-        ("_topic", "exc", "expected_domain"),
+        ("_topic", "exc", "expected_code", "expected_domain"),
         [
-            ("pipeline_execution", _PIPELINE_EXEC_ERROR, ErrorDomain.RUNTIME),
-            ("pipe_execution", PipeExecutionError("boom"), ErrorDomain.RUNTIME),
-            ("validate_bundle", ValidateBundleError("boom"), ErrorDomain.INPUT),
-            ("pipeline_input_content", PipelineInputContentError("boom"), ErrorDomain.INPUT),
+            # The run's wrapper takes its cause's code, and with no cause its fallback.
+            ("pipeline_execution", _PIPELINE_EXEC_ERROR, CoreCode.RUNTIME_UNEXPECTED, ProblemDomain.RUNTIME),
+            ("pipe_execution", PipeExecutionError("boom"), CoreCode.RUNTIME_UNEXPECTED, ProblemDomain.RUNTIME),
+            ("validate_bundle", ValidateBundleError("boom"), CoreCode.METHOD_INVALID, ProblemDomain.METHOD),
+            ("pipeline_input_content", PipelineInputContentError("boom"), PipelexErrorCode.STORAGE_URI_INVALID, ProblemDomain.INPUT),
             # The entry-shaped lookups report a pipe_code the caller supplied, so a typo is theirs
-            # to fix — 422, never the 500 an undomained error renders as.
-            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), ErrorDomain.INPUT),
-            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), ErrorDomain.INPUT),
-            ("interpreter", MthdsParserError("boom"), ErrorDomain.INPUT),
-            ("setup", PipelexSetupError("boom"), ErrorDomain.CONFIG),
-            ("config", PipelexConfigError("boom"), ErrorDomain.CONFIG),
-            ("env_var_not_found", EnvVarNotFoundError("boom"), ErrorDomain.CONFIG),
+            # to fix — 422, never the 500 a runtime fault renders as.
+            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), CoreCode.REQUEST_PIPE_NOT_FOUND, ProblemDomain.INPUT),
+            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), CoreCode.REQUEST_PIPE_AMBIGUOUS, ProblemDomain.INPUT),
+            ("interpreter", MthdsParserError("boom"), CoreCode.METHOD_INVALID, ProblemDomain.METHOD),
+            ("setup", PipelexSetupError("boom"), CoreCode.RUNTIME_MISCONFIGURED, ProblemDomain.OPERATOR),
+            ("config", PipelexConfigError("boom"), PipelexErrorCode.CONFIG_INVALID, ProblemDomain.OPERATOR),
+            ("env_var_not_found", EnvVarNotFoundError("boom"), PipelexErrorCode.CONFIG_VARIABLE_MISSING, ProblemDomain.OPERATOR),
         ],
     )
-    def test_error_domain(self, _topic: str, exc: PipelexError, expected_domain: ErrorDomain) -> None:
-        """The targeted exceptions carry their expected error_domain in to_error_report()."""
-        report = exc.to_error_report()
-        assert report.error_domain == expected_domain
+    def test_error_code(self, _topic: str, exc: PipelexError, expected_code: ErrorCode, expected_domain: ProblemDomain) -> None:
+        """The targeted exceptions' problem carries their class's code, and the domain it decides."""
+        problem = exc.to_problem(view=ProblemView.CALLER)
+        assert problem.code == expected_code
+        assert problem.domain == expected_domain
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check the advice it carries")
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_detail"),
         [
-            ("pipeline_execution", _PIPELINE_EXEC_ERROR, "The run of 'some_pipe' failed: the message gives the cause."),
             (
                 "validate_bundle",
                 ValidateBundleError("boom"),
@@ -85,96 +94,78 @@ class TestClassLevelMetadata:
             ),
         ],
     )
-    def test_user_action(self, _topic: str, exc: PipelexError, expected_detail: str) -> None:
-        """The targeted exceptions carry their expected user_action detail in to_error_report()."""
-        report = exc.to_error_report()
-        assert report.user_action is not None
-        assert report.user_action.detail == expected_detail
+    def test_advised_action(self, _topic: str, exc: PipelexError, expected_detail: str) -> None:
+        """The targeted exceptions carry their advice, the local CLI's tip, which no problem carries."""
+        advice = exc.advised_action()
+        assert advice is not None
+        assert advice.detail == expected_detail
+        assert expected_detail not in str(exc.to_problem(view=ProblemView.OPERATOR).to_wire())
+
+    def test_a_run_wrapper_with_no_cause_advises_nothing(self) -> None:
+        """No fallback advice is invented: the problem's next step, from the code, is what the reader follows."""
+        assert _PIPELINE_EXEC_ERROR.advised_action() is None
+        assert _PIPELINE_EXEC_ERROR.to_problem(view=ProblemView.CALLER).next_step.detail == "Report this to whoever runs the runtime."
 
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_category"),
         [
-            ("prompt_spec", LLMPromptSpecError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_parameter", LLMPromptParameterError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_factory", PromptImageFactoryError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_image_format", PromptImageFormatError("x"), InferenceErrorCategory.CONTENT),
             ("prompt_document_factory", PromptDocumentFactoryError("x"), InferenceErrorCategory.CONTENT),
             ("imggen_prompt", ImgGenPromptError("x"), InferenceErrorCategory.CONTENT),
             ("imggen_parameter", ImgGenParameterError("x"), InferenceErrorCategory.CONTENT),
-            ("image_content", ImageContentError("x"), InferenceErrorCategory.CONTENT),
             ("sdk_type", SdkTypeError("x"), InferenceErrorCategory.CONFIGURATION),
             ("backend_library", InferenceBackendLibraryError("x"), InferenceErrorCategory.CONFIGURATION),
         ],
     )
     def test_error_category(self, _topic: str, exc: CogtError, expected_category: InferenceErrorCategory) -> None:
-        """The previously-uncategorized CogtError subclasses now report a class-level error_category."""
-        report = exc.to_error_report()
+        """The previously-uncategorized CogtError subclasses carry a class-level error_category, which the chain walk finds."""
         assert exc.error_category is expected_category
-        assert report.error_category == expected_category
+        assert find_inference_error_category_in_chain(exc) is expected_category
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check where the message goes")
     @pytest.mark.parametrize(
-        ("_topic", "exc", "expected_caller_facing"),
+        ("_topic", "exc"),
         [
-            ("interpreter", MthdsParserError("boom"), True),
-            ("validate_bundle", ValidateBundleError("boom"), True),
-            # Regression pin: this class declared the *report field* name (``caller_facing_message``)
-            # instead of the class-level flag (``_authors_caller_facing_message``), so its
-            # caller-facing message was silently redacted under STRICT disclosure.
-            ("pipeline_input_url_missing", PipelineInputUrlMissingError("boom"), True),
-            # Security pin, and the reason the family is split: this class's message names the
-            # resolved local path and the OSError subclass that rejected it. Flagging it
-            # caller-facing would let STRICT disclosure answer "does this server-side path exist,
-            # and may the runner read it?" for any authenticated caller.
-            ("pipeline_input_content", PipelineInputContentError("boom"), False),
-            # The entry-lookup messages name the caller's own pipe_code and the qualified pipe_refs
-            # of bundles they loaded themselves — nothing server-side — and the candidate list is
-            # the only thing that makes an ambiguity actionable, so redacting it would gut the error.
-            ("entry_pipe_not_found", EntryPipeNotFoundError("boom"), True),
-            ("entry_pipe_ambiguous", EntryPipeAmbiguousError("boom"), True),
-            # The in-body doors stay redacted: their refs come from a bundle, not from the caller.
-            ("pipe_not_found", PipeNotFoundError("boom"), False),
-            ("pipe_library", PipeLibraryError("boom"), False),
-            ("csv", CsvError("boom"), True),
-            ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"]), True),
-            ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"]), True),
-            ("date_content", DateContentError("boom"), True),
-            ("config", PipelexConfigError("boom"), False),
-            ("pipe_execution", PipeExecutionError("boom"), False),
-            ("cogt", CogtError("boom"), False),
+            ("interpreter", MthdsParserError(_HOST_MESSAGE)),
+            # A `ValidateBundleError` is left out: its items are the verdict about the caller's own bundle, which the caller
+            # reads, a message with no categorized data riding as its residual item.
+            ("pipeline_input_url_missing", PipelineInputUrlMissingError(_HOST_MESSAGE)),
+            # Security pin: this class's message names the resolved local path and the OSError subclass that
+            # rejected it, which would answer "does this server-side path exist, and may the runner read it?".
+            ("pipeline_input_content", PipelineInputContentError(_HOST_MESSAGE)),
+            ("entry_pipe_not_found", EntryPipeNotFoundError(_HOST_MESSAGE)),
+            ("entry_pipe_ambiguous", EntryPipeAmbiguousError(_HOST_MESSAGE)),
+            ("pipe_not_found", PipeNotFoundError(_HOST_MESSAGE)),
+            ("pipe_library", PipeLibraryError(_HOST_MESSAGE)),
+            ("csv", CsvError(_HOST_MESSAGE)),
+            ("date_content", DateContentError(_HOST_MESSAGE)),
+            ("config", PipelexConfigError(_HOST_MESSAGE)),
+            ("pipe_execution", PipeExecutionError(_HOST_MESSAGE)),
+            ("cogt", CogtError(_HOST_MESSAGE)),
         ],
     )
-    def test_caller_facing_message(self, _topic: str, exc: PipelexError, expected_caller_facing: bool) -> None:
-        """Only classes whose message describes the caller's own input carry caller_facing_message in to_error_report().
+    def test_a_message_reaches_the_operator_alone(self, _topic: str, exc: PipelexError) -> None:
+        """Whatever the class, its message rides the operator's diagnostics and never the caller's view.
 
-        ``MthdsParserError`` / ``ValidateBundleError`` author caller-facing
-        copy (.mthds syntax, bundle validation); every other class defaults to
-        False so STRICT disclosure redacts its message.
+        The caller reads the sentences its code renders, so no class has to vouch that its message is safe to show.
         """
-        report = exc.to_error_report()
-        assert report.caller_facing_message is expected_caller_facing
+        caller = exc.to_problem(view=ProblemView.CALLER)
+        operator = exc.to_problem(view=ProblemView.OPERATOR)
+        assert _HOST_MESSAGE not in str(caller.to_wire())
+        assert "/srv/pipelex" not in str(caller.to_wire())
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == _HOST_MESSAGE
 
-    def test_caller_facing_message_inherits_for_interpreter_subclass(self) -> None:
-        """A subclass of ``MthdsParserError`` stays caller-facing.
-
-        Pins the deliberate inheritance contract on ``_authors_caller_facing_message``
-        (plain attribute access — see ``base_exceptions.py``): a future refactor
-        swapping the flag to ``cls.__dict__`` lookup (the path used by
-        ``_declared_title`` / ``_declared_type_uri``) would silently downgrade
-        STRICT disclosure for every subclass and let internal messages leak under
-        STRICT — or, more likely, silently redact authored caller-facing copy.
-        """
-
-        class _SubInterpreterError(MthdsParserError):
-            pass
-
-        report = _SubInterpreterError("boom").to_error_report()
-        assert report.caller_facing_message is True
-
-    def test_caller_facing_message_inherits_for_validate_bundle_subclass(self) -> None:
-        """A subclass of ``ValidateBundleError`` stays caller-facing — same contract as the interpreter case."""
-
-        class _SubValidateBundleError(ValidateBundleError):
-            pass
-
-        report = _SubValidateBundleError("boom").to_error_report()
-        assert report.caller_facing_message is True
+    @pytest.mark.parametrize(
+        ("_topic", "exc"),
+        [
+            ("unknown_storage_method", UnknownStorageMethodError(method="bogus", registered_methods=["local", "s3"])),
+            ("unknown_secrets_method", UnknownSecretsMethodError(method="bogus", registered_methods=["env"])),
+        ],
+    )
+    def test_a_plugin_choice_refusal_names_its_value_to_the_operator(self, _topic: str, exc: PipelexError) -> None:
+        operator = exc.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert "bogus" in operator.diagnostics.message

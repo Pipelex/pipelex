@@ -72,7 +72,7 @@ class TestCollectPossibleOutputsSequence:
         result = _collect_possible_outputs(sequence_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert result == [{"concept_ref": "test.Final", "content": {"text": "final output"}}]
-        get_pipe_mock.assert_called_once_with(pipe_code="final_step")
+        get_pipe_mock.assert_called_once_with(pipe_code="final_step", referring_pipe_code=sequence_pipe.code)
         final_pipe.output.render_stuff_spec.assert_called_once_with(
             concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
         )
@@ -108,7 +108,7 @@ class TestCollectPossibleOutputsSequence:
         }
         pipes_by_code = {"mid_sequence": mid_pipe, "leaf_step": leaf_pipe}
 
-        def fake_get_required_pipe(pipe_code: str) -> Any:
+        def fake_get_required_pipe(pipe_code: str, referring_pipe_code: object) -> Any:  # ruff: ignore[unused-function-argument]
             return pipes_by_code[pipe_code]
 
         get_pipe_mock = mocker.patch(GET_REQUIRED_PIPE_TARGET, side_effect=fake_get_required_pipe)
@@ -117,8 +117,8 @@ class TestCollectPossibleOutputsSequence:
 
         assert result == [{"concept_ref": "test.Leaf", "content": {"text": "leaf output"}}]
         assert get_pipe_mock.call_count == 2
-        get_pipe_mock.assert_any_call(pipe_code="mid_sequence")
-        get_pipe_mock.assert_any_call(pipe_code="leaf_step")
+        get_pipe_mock.assert_any_call(pipe_code="mid_sequence", referring_pipe_code=outer_pipe.code)
+        get_pipe_mock.assert_any_call(pipe_code="leaf_step", referring_pipe_code=mid_pipe.code)
         leaf_pipe.output.render_stuff_spec.assert_called_once_with(
             concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
         )

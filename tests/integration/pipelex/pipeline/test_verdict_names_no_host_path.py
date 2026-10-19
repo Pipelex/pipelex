@@ -1,17 +1,18 @@
-"""Pin: a verdict a STRICT caller reads names no path on the host.
+"""Pin: a verdict a caller reads names no path on the host.
 
-Every validation item is caller-facing, and STRICT disclosure keeps the items and the verdict's message
-verbatim, so neither may carry a path on the host, in an item's ``source`` or in any message. Two origins
-used to put one there:
+Every validation item is the caller's, and so is the caller's view of the verdict's problem, so neither may
+carry a path on the host, in an item's ``source`` or in any message or detail. Two origins used to put one
+there:
 
 - **An address-based dependency.** A package the bundle depends on by address is installed on the host,
   and its bundles were named by their install path. They are named by the package's address and the
   bundle's path inside the package instead, on every surface: the ``source`` of an item located inside the
   dependency, and the files a duplicate declaration inside it names.
-- **The host's own library directories.** When submitted content is validated, the library directories
-  loaded beside it are the host's: an item located in one of their files carries no ``source``, and a message
-  naming one of their files names ``<host library file>`` instead. A run loads a host's directories
-  untranslated, so their refusal is no verdict at all, and STRICT redacts it.
+- **The host's own library directories.** When submitted content is validated or run, the library
+  directories loaded beside it are the host's. A method of theirs that refuses to load is the deployment's
+  fault, a ``HostLibraryLoadRefusalError`` and no verdict at all, whose message is the operator's alone. A verdict on the
+  caller's own content keeps their files out too: an item located in one of them carries no ``source``,
+  and a message naming one of them names ``<host library file>`` instead.
 
 A bundle validated from a file keeps the full paths of its library directories: there they are the caller's, as
 they are for a runtime told its library directories are the caller's own (``library_dirs_are_callers``).
@@ -22,12 +23,15 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.config import get_config
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import HostLibraryTreeError
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -147,6 +151,28 @@ prompt      = "Write a short notice for the harbour board from these tide times:
 """
 
 
+# The caller's bundle whose sequence calls a pipe by a code that is a slip from the host's `pin_board_notice`.
+_MISTYPED_STEP_CALLER_BUNDLE = """
+domain      = "harbour_notices"
+description = "Post notices on the harbour board"
+main_pipe   = "post_board_notice"
+
+[pipe.post_board_notice]
+type        = "PipeSequence"
+description = "Write the notice, then post it"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+steps       = [{ pipe = "pin_board_notic", result = "notice" }]
+
+[pipe.write_board_notice]
+type        = "PipeLLM"
+description = "Write the notice for the harbour board"
+inputs      = { tide_times = "Text" }
+output      = "Text"
+prompt      = "Write a short notice for the harbour board from these tide times: $tide_times"
+"""
+
+
 # A host library bundle whose PipeFunc's tree holds a module named like a standard-library module: the
 # refusal names the module, the tree file and the bundle, never the tree's directory on the host.
 _HOST_PIPE_FUNC_BUNDLE = """
@@ -199,14 +225,28 @@ def _host_path_markers(tmp_path: Path) -> list[str]:
     return sorted({str(tmp_path), str(tmp_path.resolve())})
 
 
-def _strict_payload(verdict: ValidateBundleError) -> dict[str, Any]:
-    return verdict.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
+def _caller_payload(error: PipelexError) -> dict[str, Any]:
+    """What a caller reads of a failure: its problem in the caller's view and, for a verdict, the validation items beside it."""
+    payload: dict[str, Any] = {"problem": error.to_problem(view=ProblemView.CALLER).to_wire()}
+    if isinstance(error, ValidateBundleError):
+        payload["validation_errors"] = [item.model_dump(mode="json", exclude_none=True) for item in error.validation_error_items()]
+    return payload
 
 
 def _assert_names_no_host_path(*, payload: dict[str, Any], tmp_path: Path) -> None:
     serialized = json.dumps(payload)
     for marker in _host_path_markers(tmp_path):
-        assert marker not in serialized, f"the STRICT payload names a path on the host ({marker}): {serialized}"
+        assert marker not in serialized, f"what the caller reads names a path on the host ({marker}): {serialized}"
+
+
+def _assert_the_host_s_fault(*, error: PipelexError, tmp_path: Path) -> None:
+    """The host's own directories are the operator's configuration: no verdict, no item, and nothing of the operator's message."""
+    caller = error.to_problem(view=ProblemView.CALLER)
+    assert caller.code == PipelexErrorCode.CONFIG_INVALID
+    assert caller.domain == ProblemDomain.OPERATOR
+    assert caller.errors is None
+    assert error.message not in json.dumps(caller.to_wire())
+    _assert_names_no_host_path(payload=_caller_payload(error), tmp_path=tmp_path)
 
 
 class _Surface(NamedTuple):
@@ -280,12 +320,12 @@ class TestVerdictNamesNoHostPath:
 
         verdict = await _verdict_on(surface=surface, caller_bundle=_CALLER_BUNDLE, tmp_path=tmp_path)
 
-        items = verdict.to_error_report().validation_errors or []
+        items = verdict.validation_error_items() or []
         (item,) = [item for item in items if item.error_type == PipeValidationErrorType.UNKNOWN_MODEL]
         assert item.pipe_code == "write_tide_notice"
         # The package's address, then the bundle's path inside the package: never where the host installed it.
         assert item.source == f"{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds", surface.description
-        _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+        _assert_names_no_host_path(payload=_caller_payload(verdict), tmp_path=tmp_path)
 
     @pytest.mark.parametrize("surface", _SURFACES, ids=[surface.surface_id for surface in _SURFACES])
     async def test_a_duplicate_declaration_in_a_dependency_names_its_files_by_address(
@@ -298,11 +338,15 @@ class TestVerdictNamesNoHostPath:
 
         verdict = await _verdict_on(surface=surface, caller_bundle=_CALLER_BUNDLE, tmp_path=tmp_path)
 
-        items: list[ValidationErrorItem] = verdict.to_error_report().validation_errors or []
-        (item,) = items
-        assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds'" in item.message, surface.description
-        assert f"'{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds'" in item.message, surface.description
-        _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+        items: list[ValidationErrorItem] = verdict.validation_error_items() or []
+        # One item per bundle declaring it, each located on its bundle and naming the other by the dependency's address.
+        first_file = f"{_DEPENDENCY_ADDRESS}/notices/tide_notices.mthds"
+        copy_file = f"{_DEPENDENCY_ADDRESS}/notices/tide_notices_copy.mthds"
+        assert sorted((item.source, item.message) for item in items) == [
+            (first_file, f"Pipe 'tides.write_tide_notice' is declared here and in '{copy_file}'."),
+            (copy_file, f"Pipe 'tides.write_tide_notice' is declared here and in '{first_file}'."),
+        ], surface.description
+        _assert_names_no_host_path(payload=_caller_payload(verdict), tmp_path=tmp_path)
 
     @pytest.mark.parametrize("surface", _SURFACES, ids=[surface.surface_id for surface in _SURFACES])
     async def test_a_dependency_s_tree_refusal_names_the_package_by_its_address(
@@ -317,7 +361,7 @@ class TestVerdictNamesNoHostPath:
         assert "github.com/acme-tests/harbour-methods" in verdict.message, surface.description
         assert "notices/linked_notices.mthds" in verdict.message, surface.description
         assert "max_files" not in verdict.message, "no advice about this host's limits reaches the caller"
-        _assert_names_no_host_path(payload=_strict_payload(verdict), tmp_path=tmp_path)
+        _assert_names_no_host_path(payload=_caller_payload(verdict), tmp_path=tmp_path)
 
     @pytest.mark.parametrize(
         "surface",
@@ -332,10 +376,7 @@ class TestVerdictNamesNoHostPath:
         with pytest.raises(HostLibraryTreeError) as raised:
             await _load_on(surface=surface, caller_bundle=_VALID_CALLER_BUNDLE, tmp_path=tmp_path)
 
-        report = raised.value.to_error_report()
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.caller_facing_message is False
-        _assert_names_no_host_path(payload=report.to_dict(disclosure_mode=DisclosureMode.STRICT), tmp_path=tmp_path)
+        _assert_the_host_s_fault(error=raised.value, tmp_path=tmp_path)
 
     async def test_a_callers_library_tree_that_cannot_be_listed_is_their_verdict(self, tmp_path: Path) -> None:
         library_dir = _valid_host_library(tmp_path=tmp_path)
@@ -352,61 +393,59 @@ class TestVerdictNamesNoHostPath:
 
         assert "linked_board.mthds" in raised.value.message
 
-    async def test_a_host_library_item_carries_no_source_on_submitted_content(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize(
+        "host_library_files",
+        [
+            {"harbour_board.mthds": _MISSPELLED_CONCEPT_LIBRARY_BUNDLE},
+            {"harbour_board.mthds": _OUTPUT_MISMATCH_LIBRARY_BUNDLE},
+            {"harbour_board.mthds": _BOARD_NOTICE_PIPE_BUNDLE, "harbour_board_copy.mthds": _BOARD_NOTICE_PIPE_BUNDLE},
+            {"harbour_board.mthds": _HOST_PIPE_FUNC_BUNDLE, "board_formatting.py": _HOST_PIPE_FUNC_MODULE, "json.py": "SHADOW = True\n"},
+        ],
+        ids=["unresolved_concept", "sequence_output_mismatch", "duplicate_declaration", "pipe_func_refused"],
+    )
+    async def test_a_host_library_refusal_beside_submitted_content_is_the_host_s_fault(
+        self, host_library_files: dict[str, str], tmp_path: Path
+    ) -> None:
+        """A method of the host's own directories that refuses to load is the deployment's fault: no verdict, and no host path."""
         host_library_dir = tmp_path / "host" / "library"
-        _write(path=host_library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
+        for file_name, content in host_library_files.items():
+            _write(path=host_library_dir / file_name, content=content)
 
-        with pytest.raises(ValidateBundleError) as raised:
+        with pytest.raises(HostLibraryLoadRefusalError) as raised:
             await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
 
-        items = raised.value.to_error_report().validation_errors or []
-        concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
-        assert concept_items, f"expected an unresolved_concept item, got {items!r}"
-        assert all(item.pipe_code == "pin_board_notice" for item in concept_items)
-        # Located by its pipe and domain, never by its file on the host.
-        assert all(item.source is None for item in items)
-        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
+        _assert_the_host_s_fault(error=raised.value, tmp_path=tmp_path)
 
-    async def test_a_host_library_pipe_located_from_its_source_names_no_host_file(self, tmp_path: Path) -> None:
-        host_library_dir = tmp_path / "host" / "library"
-        _write(path=host_library_dir / "harbour_board.mthds", content=_OUTPUT_MISMATCH_LIBRARY_BUNDLE)
-
-        with pytest.raises(ValidateBundleError) as raised:
-            await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
-
-        (item,) = raised.value.to_error_report().validation_errors or []
-        assert item.pipe_code == "post_board_notice"
-        assert item.source is None
-        assert item.field_path is None
-        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
-
-    async def test_a_host_library_message_names_no_host_file_on_submitted_content(self, tmp_path: Path) -> None:
+    async def test_a_verdict_on_the_callers_content_names_no_host_library_file(self, tmp_path: Path) -> None:
+        """The caller's content declaring a pipe the host's directories declare too: the caller's verdict, naming no host file."""
         host_library_dir = tmp_path / "host" / "library"
         _write(path=host_library_dir / "harbour_board.mthds", content=_BOARD_NOTICE_PIPE_BUNDLE)
-        _write(path=host_library_dir / "harbour_board_copy.mthds", content=_BOARD_NOTICE_PIPE_BUNDLE)
 
         with pytest.raises(ValidateBundleError) as raised:
-            await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
+            await validate_bundle(mthds_contents=[_BOARD_NOTICE_PIPE_BUNDLE], library_dirs=[host_library_dir])
 
-        (item,) = raised.value.to_error_report().validation_errors or []
+        # The host's own declaration is no item of the caller's: the caller's declaration is, naming the host's file by a placeholder.
+        (item,) = raised.value.validation_error_items() or []
         assert "harbour_board.pin_board_notice" in item.message
-        assert item.message.count(HOST_LIBRARY_FILE_PLACEHOLDER) >= 2
-        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
+        assert HOST_LIBRARY_FILE_PLACEHOLDER in item.message
+        _assert_names_no_host_path(payload=_caller_payload(raised.value), tmp_path=tmp_path)
 
-    async def test_a_host_library_pipe_func_refusal_names_no_host_path(self, tmp_path: Path) -> None:
-        host_library_dir = tmp_path / "host" / "library"
-        _write(path=host_library_dir / "harbour_board.mthds", content=_HOST_PIPE_FUNC_BUNDLE)
-        _write(path=host_library_dir / "board_formatting.py", content=_HOST_PIPE_FUNC_MODULE)
-        _write(path=host_library_dir / "json.py", content="SHADOW = True\n")
+    async def test_a_mistyped_selection_is_offered_no_pipe_of_the_host_s_library(self, tmp_path: Path) -> None:
+        with pytest.raises(PipelexError) as raised:
+            await _run_setup(
+                mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[str(_valid_host_library(tmp_path=tmp_path))], pipe_code="pin_board_notic"
+            )
 
+        assert raised.value.caller_params() == {"pipe": "pin_board_notic", "suggestions": ["harbour_notices.write_board_notice"]}
+
+    async def test_a_mistyped_reference_is_offered_no_pipe_of_the_host_s_library(self, tmp_path: Path) -> None:
         with pytest.raises(ValidateBundleError) as raised:
-            await validate_bundle(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[host_library_dir])
+            await validate_bundle(mthds_contents=[_MISTYPED_STEP_CALLER_BUNDLE], library_dirs=[_valid_host_library(tmp_path=tmp_path)])
 
-        items = raised.value.to_error_report().validation_errors or []
-        refused_items = [item for item in items if item.error_type == PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED]
-        assert refused_items, f"expected a pipe_func_function_refused item, got {items!r}"
-        assert "standard-library module 'json'" in refused_items[0].message
-        _assert_names_no_host_path(payload=_strict_payload(raised.value), tmp_path=tmp_path)
+        (item,) = raised.value.validation_error_items() or []
+        assert item.params is not None
+        assert item.params["candidates"] == ["harbour_notices.post_board_notice", "harbour_notices.write_board_notice"]
+        assert "pin_board_notice" not in item.message
 
     async def test_a_run_answers_a_host_library_refusal_without_a_host_path(self, tmp_path: Path) -> None:
         host_library_dir = tmp_path / "host" / "library"
@@ -416,9 +455,7 @@ class TestVerdictNamesNoHostPath:
             await _run_setup(mthds_contents=[_VALID_CALLER_BUNDLE], library_dirs=[str(host_library_dir)])
 
         assert not isinstance(raised.value, ValidateBundleError), "a host's library directories load untranslated on a run"
-        strict_payload = raised.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert "validation_errors" not in strict_payload
-        _assert_names_no_host_path(payload=strict_payload, tmp_path=tmp_path)
+        _assert_the_host_s_fault(error=raised.value, tmp_path=tmp_path)
 
     async def test_a_bundle_file_keeps_the_paths_of_its_library_directories(self, tmp_path: Path) -> None:
         library_dir = tmp_path / "caller" / "library"
@@ -428,18 +465,31 @@ class TestVerdictNamesNoHostPath:
         with pytest.raises(ValidateBundleError) as raised:
             await validate_bundle(mthds_file_path=caller_file, library_dirs=[library_dir])
 
-        items = raised.value.to_error_report().validation_errors or []
+        items = raised.value.validation_error_items() or []
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
         assert concept_items, f"expected an unresolved_concept item, got {items!r}"
         assert all(item.source == str(library_file) for item in concept_items)
 
-    @pytest.mark.parametrize("library_dirs_are_callers", [False, True], ids=["hosts_library", "callers_library"])
-    async def test_a_runtime_validates_content_against_the_library_it_is_told_is_whose(self, library_dirs_are_callers: bool, tmp_path: Path) -> None:
+    async def test_a_runtime_told_its_library_is_the_hosts_answers_its_refusal_as_the_hosts_fault(self, tmp_path: Path) -> None:
+        library_dir = tmp_path / "library"
+        _write(path=library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
+        runtime = PipelexMTHDSProtocol(
+            library_dirs=[str(library_dir)],
+            pipe_run_mode=PipeRunMode.DRY,
+            execution_config=_execution_config(),
+        )
+
+        with pytest.raises(HostLibraryLoadRefusalError) as raised:
+            await runtime.validate([_VALID_CALLER_BUNDLE])
+
+        _assert_the_host_s_fault(error=raised.value, tmp_path=tmp_path)
+
+    async def test_a_runtime_told_its_library_is_the_callers_validates_content_against_it(self, tmp_path: Path) -> None:
         library_dir = tmp_path / "library"
         library_file = _write(path=library_dir / "harbour_board.mthds", content=_MISSPELLED_CONCEPT_LIBRARY_BUNDLE)
         runtime = PipelexMTHDSProtocol(
             library_dirs=[str(library_dir)],
-            library_dirs_are_callers=library_dirs_are_callers,
+            library_dirs_are_callers=True,
             pipe_run_mode=PipeRunMode.DRY,
             execution_config=_execution_config(),
         )
@@ -447,8 +497,7 @@ class TestVerdictNamesNoHostPath:
         with pytest.raises(ValidateBundleError) as raised:
             await runtime.validate([_VALID_CALLER_BUNDLE])
 
-        items = raised.value.to_error_report().validation_errors or []
+        items = raised.value.validation_error_items() or []
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
         assert concept_items, f"expected an unresolved_concept item, got {items!r}"
-        expected_source = str(library_file) if library_dirs_are_callers else None
-        assert all(item.source == expected_source for item in concept_items)
+        assert all(item.source == str(library_file) for item in concept_items)

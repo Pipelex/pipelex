@@ -45,6 +45,7 @@ from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.pipelex.pipeline import ApiRunner
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -330,9 +331,8 @@ class TestExecuteDispatch:
             },
         )
 
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert response.json()["error_type"] == "OrchestrationModeOverrideForbidden"
+        problem = assert_problem(response, status=422, code="pipelex.deployment.orchestration_override_forbidden")
+        assert problem["params"] == {"requested_mode": "temporal"}
 
     def test_inbound_request_id_reaches_the_dispatched_job(self, mocker: MockerFixture) -> None:
         """On a `temporal` deployment, the inbound `X-Request-ID` rides the job the orchestrator is handed.
@@ -389,3 +389,21 @@ class TestExecuteDispatch:
             )
         # The packaged default is `direct`; the empty registry holds no orchestrator for it.
         assert exc_info.value.mode == "direct"
+        # The deployment's own default has no orchestrator: the operator installs its plugin.
+        assert exc_info.value.resolve_error_code() == "pipelex.plugin.not_found"
+
+    @pytest.mark.asyncio
+    async def test_missing_orchestrator_for_the_callers_override_is_unsupported(self, mocker: MockerFixture) -> None:
+        """An override the caller named and the policy allows, which no installed plugin serves, is the caller's to change."""
+        _force_config(mocker, mode="direct", allow_override=True)
+        mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry", return_value=OrchestratorRegistry({}))
+
+        with pytest.raises(MissingOrchestratorError) as exc_info:
+            await ApiRunner().execute(
+                pipe_code="echo",
+                mthds_contents=[VALID_MTHDS],
+                inputs={"text": "hello"},
+                requested_orchestration_mode="temporal",
+            )
+        assert exc_info.value.mode == "temporal"
+        assert exc_info.value.resolve_error_code() == "runtime.unsupported"

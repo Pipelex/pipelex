@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd as agent_run_bundle_cmd
@@ -21,7 +22,7 @@ _STEP_FIELDS = 'format = "docx"\ntemplate_file = "letter.docx"'
 
 
 def _run_agent_bundle(*, path: Path, pipe: str | None = None) -> dict[str, Any]:
-    """Run `run bundle` on `path` as a dry run with JSON errors, and return the error envelope it exits with."""
+    """Run `run bundle` on `path` as a dry run with JSON errors, which exits with the problem on stderr."""
     try:
         agent_run_bundle_cmd(
             path=str(path),
@@ -50,7 +51,7 @@ class TestPipeDocGenRunBundleTrees:
         mocker.patch("pipelex.cli.agent_cli.commands.run.bundle_cmd.Pipelex.teardown_if_needed")
 
     def test_a_bundle_named_alone_is_refused_the_file_beside_it(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """With no METHODS.toml at or above it, the bundle's method is that one file, and the run says how to give it the rest."""
+        """With no METHODS.toml at or above it, the bundle's method is that one file, and the run refuses the file beside it, naming it."""
         (tmp_path / "letter.docx").write_bytes(b"docx")
         bundle_path = write_bundle(directory=tmp_path, step_fields=_STEP_FIELDS, as_method=False)
 
@@ -58,11 +59,12 @@ class TestPipeDocGenRunBundleTrees:
             _run_agent_bundle(path=bundle_path)
 
         assert exc_info.value.exit_code == 1
-        envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "ValidateBundleError"
-        assert envelope["error_domain"] == "input"
-        messages = [item["message"] for item in envelope["validation_errors"]]
-        assert any("letter.docx" in message and "Run the method's folder instead, or add a METHODS.toml to it." in message for message in messages)
+        problem: dict[str, Any] = json.loads(capsys.readouterr().err)
+        assert problem["code"] == CoreCode.METHOD_INVALID
+        assert problem["domain"] == "method"
+        # The item reads the sentence of the refusal's code, which names the file the step could not read.
+        (item,) = problem["errors"]
+        assert "'letter.docx'" in item["detail"]
 
     def test_a_folder_whose_bundles_declare_several_main_pipes_is_refused_naming_them(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
@@ -75,9 +77,9 @@ class TestPipeDocGenRunBundleTrees:
         with pytest.raises(typer.Exit):
             _run_agent_bundle(path=tmp_path)
 
-        envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
-        assert envelope["error_domain"] == "input"
-        rendered = json.dumps(envelope)
+        problem: dict[str, Any] = json.loads(capsys.readouterr().err)
+        assert problem["domain"] == "input"
+        rendered = json.dumps(problem)
         assert "several of its bundles declare a main_pipe" in rendered
         assert "'invoice.mthds' declares 'print_invoice'" in rendered
         assert "'other/invoice.mthds' declares 'print_invoice'" in rendered

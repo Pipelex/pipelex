@@ -12,6 +12,7 @@ from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.pipe_machinery.pipe_blueprint import InputSlotBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipeline.hint_warnings import MAX_AUTHORED_TOKEN_LENGTH, MAX_HINT_FINDINGS_PER_SITE, build_hint_warnings
+from pipelex.pipeline.validation_errors import warning_problem_items
 from pipelex.validation_error_types import HintLintErrorType
 
 
@@ -38,12 +39,16 @@ class TestHintLintFindings:
         assert warning.concept_code == "Essay"
         assert warning.domain_code == "docs"
         assert "emphasis" in warning.message
+        # The key the finding is about, which its problem item names as `method.hint_invalid`'s `hint`.
+        assert warning.hint_key == "emphasis"
 
     def test_unknown_intent_word_warns(self):
         warnings = _lint(_crate({"docs.Essay": ConceptBlueprint(description="an essay", hints={"intent": "poetry"})}))
         assert len(warnings) == 1
         assert warnings[0].error_type == HintLintErrorType.HINT_UNKNOWN_INTENT
         assert "poetry" in warnings[0].message
+        # An intent finding is about the `intent` key, whatever word it holds.
+        assert warnings[0].hint_key == "intent"
 
     def test_choice_field_is_not_a_text_site(self):
         """Choices dominate the declared type (the deriver emits an enum), so a text intent on a
@@ -153,6 +158,8 @@ class TestHintLintFindings:
         assert len(warnings) == MAX_HINT_FINDINGS_PER_SITE + 1
         assert all(warning.error_type == HintLintErrorType.HINT_UNKNOWN_KEY for warning in warnings)
         assert warnings[-1].message.startswith("...and 4 more hint key(s) on concept 'docs.Essay'")
+        # The tail stands for every key past the cap and names the first of them.
+        assert warnings[-1].hint_key == f"key_{MAX_HINT_FINDINGS_PER_SITE:02d}"
 
     def test_exactly_the_cap_reports_every_key_with_no_tail(self):
         hints = {f"key_{index:02d}": "value" for index in range(MAX_HINT_FINDINGS_PER_SITE)}
@@ -180,6 +187,8 @@ class TestHintLintFindings:
         assert len(warnings) == 1
         assert long_key not in warnings[0].message
         assert f"'{'k' * MAX_AUTHORED_TOKEN_LENGTH}...'" in warnings[0].message
+        # The key rides elided, as the message quotes it.
+        assert warnings[0].hint_key == f"{'k' * MAX_AUTHORED_TOKEN_LENGTH}..."
 
     def test_a_long_authored_intent_value_is_elided_in_the_message(self):
         long_word = "w" * (MAX_AUTHORED_TOKEN_LENGTH + 50)
@@ -271,3 +280,42 @@ class TestHintLintOrdering:
         second = [(w.error_type, w.concept_code) for w in _lint(crate)]
         assert first == second
         assert [code for _, code in first] == ["Alpha", "Beta"]
+
+    def test_each_finding_s_problem_item_says_which_declaration_the_hint_is_on(self):
+        """`method.hint_invalid` names the hint and why, never where it is written: its location says which declaration.
+
+        A concept is located at its bundle-root path, a field of its structure at the field's, and a pipe's input at the
+        pipe and the input.
+        """
+        warnings = _lint(
+            _crate(
+                {
+                    "docs.Invoice": ConceptBlueprint(
+                        description="an invoice",
+                        structure={
+                            "total": ConceptStructureBlueprint(
+                                description="the total", type=ConceptStructureBlueprintFieldType.TEXT, hints={"typo": "x"}
+                            )
+                        },
+                        hints={"typo": "x"},
+                    )
+                },
+                {
+                    "docs.summarize": PipeLLMBlueprint(
+                        description="summarize",
+                        inputs={"invoice": InputSlotBlueprint(concept="Invoice", hints={"typo": "x"})},
+                        output="Text",
+                        prompt="Summarize $invoice",
+                    )
+                },
+            )
+        )
+
+        items = warning_problem_items(warnings=warnings)
+
+        dumped = [item.model_dump(mode="json", exclude_none=True) for item in items]
+        assert [(item["code"], item["params"], item.get("location")) for item in dumped] == [
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"field": "concept.Invoice"}),
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"field": "concept.Invoice.structure.total"}),
+            ("method.hint_invalid", {"reason": "unknown_key", "hint": "typo"}, {"pipe": "summarize", "input": "invoice"}),
+        ]

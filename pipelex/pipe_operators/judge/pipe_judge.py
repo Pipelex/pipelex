@@ -1,5 +1,6 @@
 from typing import Any, Literal, Self
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, model_validator
 from typing_extensions import override
 
@@ -188,13 +189,20 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
                 f"PipeJudge '{self.code}' reads {quoted_paths} in its {question_label}, which is an image or a document, and only the "
                 "prompt presents files to the judging model: read it in `prompt`, and ask about it in the question."
             )
+            # The code names the step's input, the root of the path the question reads, and the concept it declares.
+            # No `expected` is given: no concept of an input lets a question present a file, which the code cannot yet say.
+            input_name = get_root_from_dotted_path(question_file_paths[0])
+            input_params: dict[str, str] = {"input": input_name}
+            declared_spec = self.inputs.root.get(input_name)
+            if declared_spec is not None:
+                input_params["declared"] = declared_spec.concept.concept_ref
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 variable_names=question_file_paths,
-            )
+            ).with_params(**input_params)
 
         # Template lints: no private names, and every reference to a declared-optional input guarded (D7).
         labelled_templates = [(self.prompt_content.template, "prompt")]
@@ -369,6 +377,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
         raise self._inadequate_output_error(message=msg, required_concept_codes=[verdict_native.concept_ref])
 
     def _inadequate_output_error(self, *, message: str, required_concept_codes: list[str] | None = None) -> PipeValidationError:
+        # A refusal of the output's structure, rather than of its concept, has no concepts to offer as the ones that fit.
         return PipeValidationError(
             message=message,
             error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
@@ -376,7 +385,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             pipe_code=self.code,
             provided_concept_code=self.output.concept.concept_ref,
             required_concept_codes=required_concept_codes,
-        )
+        ).with_params(declared=self.output.concept.concept_ref, expected=required_concept_codes, pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(
@@ -469,7 +478,7 @@ class PipeJudge(PipeOperator[PipeJudgeOutput]):
             result_memory = judgment_result.memory
         else:
             msg = f"PipeJudge '{self.code}' asks no question, which its construction refuses."
-            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
+            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         # Capture execution data for the graph tracer.
         self._register_execution_data(job_metadata=job_metadata, execution_data=execution_data_dict)

@@ -293,7 +293,7 @@ def build_validate_body(
     - ``allow_signatures`` — always present (real clients send the bool verbatim;
       ``false`` is the strict default).
     - ``mthds_sources`` — when provided, parallel to ``mthds_contents``; each entry
-      names the owning file so server-side ``validation_errors[].source`` resolves.
+      names the owning file so server-side ``errors[].location.file`` resolves.
     - ``render`` — the opt-in Pipelex-API presentation hint (e.g. ``["markdown"]``).
       A **skill** validates with the default Markdown view, so it sends
       ``render: ["markdown"]`` and reads the ``rendered_markdown`` the 200 carries; a
@@ -718,7 +718,7 @@ def main() -> None:
                 f"- allow_signatures: {args.allow_signatures}\n"
                 f"{render_line}\n"
                 "Takes no pipe_code and no inputs. 200 discriminated on `is_valid`: the bundle blueprint, "
-                f"graph spec, and per-pipe IO contracts — or structured validation_errors[]. {trailer}"
+                f"graph spec, and per-pipe IO contracts — or structured errors[]. {trailer}"
             )
         if key == "resolve":
             return (
@@ -726,7 +726,7 @@ def main() -> None:
                 "refs, flattened refinement, materialized natives, fingerprint. NO inference, no dry-run sweep.\n\n"
                 f"{source_lines}\n"
                 "200 discriminated on `is_valid`: the canonical JSON crate on the valid arm, structured "
-                f"validation_errors[] on the invalid arm. {trailer}"
+                f"errors[] on the invalid arm. {trailer}"
             )
         # codegen
         return (

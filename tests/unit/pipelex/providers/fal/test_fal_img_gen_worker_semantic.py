@@ -59,7 +59,8 @@ class TestFalImgGenWorkerSemantic:
             # Unhandled 4xx: non-retryable client error, not TRANSIENT.
             (409, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
             (422, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHANGE_INPUT),
-            (500, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            # Billed and not idempotent: a 5xx after the request was sent is an unknown outcome.
+            (500, InferenceErrorCategory.AMBIGUOUS, UserActionKind.WAIT_AND_RETRY),
         ],
     )
     async def test_http_error_carries_semantic_user_action(
@@ -125,7 +126,7 @@ class TestFalImgGenWorkerSemantic:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
@@ -145,7 +146,7 @@ class TestFalImgGenWorkerSemantic:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._submit_and_get_result(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None

@@ -4,15 +4,16 @@ A subclass that mixes in ``ValueError`` / ``TypeError`` (so Pydantic validators 
 its raises into a ``ValidationError``) must list the ``PipelexError``-derived base
 *first*. Otherwise ``BaseException.__init__`` — inherited through ``ValueError`` /
 ``TypeError`` — shadows ``PipelexError.__init__`` in the MRO, ``self.message`` is never
-set, and ``to_error_report()`` raises ``AttributeError`` the moment an error-report
-rendering path touches the instance.
+set, and ``to_problem()`` raises ``AttributeError`` the moment a problem-building path touches
+the instance.
 """
 
 import pytest
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import RoutingProfileBlueprintValueError
-from pipelex.errors.error_pages_generator import iter_pipelex_error_subclasses
+from pipelex.errors.error_class_discovery import iter_pipelex_error_subclasses
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintValueError
 
 
@@ -30,15 +31,17 @@ class TestPipelexErrorMessageInit:
                     offenders.append(f"{error_cls.__module__}.{error_cls.__name__} (lists {shadow_cls.__name__} before PipelexError)")
         assert not offenders, "Exception classes shadow PipelexError.__init__ — `.message` will be unset:\n" + "\n".join(offenders)
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds the error with a message alone, to check how its message is set")
     @pytest.mark.parametrize("error_cls", [ConstructFieldBlueprintValueError, RoutingProfileBlueprintValueError])
-    def test_message_set_and_error_report_succeeds(self, error_cls: type[PipelexError]) -> None:
+    def test_message_set_and_problem_succeeds(self, error_cls: type[PipelexError]) -> None:
         """A reordered ``(PipelexError, ValueError)`` mixin sets ``.message``, keeps its
-        ``ValueError`` identity (so Pydantic still wraps validator raises), and renders a report.
+        ``ValueError`` identity (so Pydantic still wraps validator raises), and builds a problem.
         """
         message = "the configuration section is invalid"
         exc = error_cls(message)
         assert exc.message == message
         assert isinstance(exc, ValueError)
-        report = exc.to_error_report()
-        assert report.message == message
-        assert report.error_type == error_cls.__name__
+        problem = exc.to_problem(view=ProblemView.OPERATOR)
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.message == message
+        assert problem.diagnostics.error_class == error_cls.__name__

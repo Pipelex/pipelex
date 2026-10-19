@@ -218,7 +218,7 @@ def binding_path_unresolved_error(
         domain_code=domain_code,
         pipe_code=sequence_code,
         variable_names=[binding_step.from_path],
-    )
+    ).with_params(path=exc.path, segment=exc.failed_segment, available_fields=exc.available_fields)
 
 
 def derive_binding_spec(*, binding_step: BindingStep, root_spec: StuffSpec, sequence_code: str, domain_code: str) -> DerivedBinding:

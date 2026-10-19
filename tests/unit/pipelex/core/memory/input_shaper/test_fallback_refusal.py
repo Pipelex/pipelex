@@ -1,8 +1,8 @@
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.core.memory.exceptions import (
     StructureValidationError,
@@ -12,6 +12,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import build_input_specs
 
@@ -46,12 +47,17 @@ class TestInputShaperFallbackRefusal:
         # the chain as the cause and out of what a caller reads.
         assert "typing.Union" not in message
         assert isinstance(error.__cause__, StuffFactoryError)
-        assert error.error_domain == ErrorDomain.INPUT
-        # The fix is on the author's side: the declaration, and no envelope.
-        assert error.user_action is not None
-        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
-        assert "'JSON[]'" in error.user_action.detail
-        assert "envelope" not in error.user_action.detail
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_INVALID
+        assert caller.domain == ProblemDomain.INPUT
+        assert "typing.Union" not in str(caller.to_wire())
+        # The fix is on the author's side: the declaration, and no envelope. The advice is a local tip, never on a problem.
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHANGE_INPUT
+        assert "'JSON[]'" in advice.detail
+        assert "envelope" not in advice.detail
+        assert advice.detail not in str(caller.to_wire())
 
     def test_a_bare_number_at_a_dynamic_slot_is_refused_naming_the_input(self) -> None:
         input_specs = build_input_specs([("payload", "native.Dynamic", None)])
@@ -60,7 +66,10 @@ class TestInputShaperFallbackRefusal:
         with pytest.raises(StructureValidationError, match=r"Input 'payload' could not be built as 'native\.Dynamic'") as exc_info:
             InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
-        assert "a number (3)" in str(exc_info.value)
+        # The value is described by its kind, never quoted: it is the run's input.
+        refusal = str(exc_info.value).split("Expected shape")[0]
+        assert "you provided a number," in refusal
+        assert "3" not in refusal
         assert isinstance(exc_info.value.__cause__, StuffFactoryError)
 
     @pytest.mark.parametrize(
@@ -83,7 +92,7 @@ class TestInputShaperFallbackRefusal:
         with pytest.raises(StructureValidationError, match="with no reading for this one") as exc_info:
             InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
-        user_action = exc_info.value.user_action
+        user_action = exc_info.value.advised_action()
         assert user_action is not None
         assert f"as {suggested_declaration}," in user_action.detail
 
@@ -140,10 +149,11 @@ class TestInputShaperFallbackRefusal:
         assert "Expected shape:" in str(error)
         assert isinstance(error.__cause__, StuffFactoryError)
         # The value is right in substance: declaring the input as `JSON` would discard the concept the method asked for.
-        assert error.user_action is not None
-        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
-        assert "expected shape" in error.user_action.detail
-        assert "Declare" not in error.user_action.detail
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHANGE_INPUT
+        assert "expected shape" in advice.detail
+        assert "Declare" not in advice.detail
 
     @pytest.mark.parametrize(
         ("concept_ref", "multiplicity", "provided_value", "suggested_declaration"),
@@ -165,17 +175,17 @@ class TestInputShaperFallbackRefusal:
         with pytest.raises(StructureValidationError, match="with no reading for this one") as exc_info:
             InputShaper.shape(payload_input, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
 
-        user_action = exc_info.value.user_action
+        user_action = exc_info.value.advised_action()
         assert user_action is not None
         assert f"as {suggested_declaration}," in user_action.detail
 
     @pytest.mark.parametrize(
         ("concept_ref", "multiplicity", "provided_value", "provided_description"),
         [
-            ("native.Rating", None, 2, "a number (2)"),
+            ("native.Rating", None, 2, "a number"),
             ("native.Rating", True, [1, 2], "a list of 2 item(s)"),
-            ("native.Rating", None, True, "a boolean (true)"),
-            ("native.Choice", None, 3, "a number (3)"),
+            ("native.Rating", None, True, "a boolean"),
+            ("native.Choice", None, 3, "a number"),
         ],
     )
     def test_a_scalar_at_a_verdict_input_is_told_to_send_the_envelope(
@@ -192,7 +202,8 @@ class TestInputShaperFallbackRefusal:
         assert "Expected shape:" in str(error)
         assert isinstance(error.__cause__, StuffFactoryError)
         # A bare level is a verdict's level without the verdict: declaring the input `Anything` would discard the verdict the method branches on.
-        assert error.user_action is not None
-        assert error.user_action.kind == UserActionKind.CHANGE_INPUT
-        assert "expected shape" in error.user_action.detail
-        assert "Declare" not in error.user_action.detail
+        advice = error.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHANGE_INPUT
+        assert "expected shape" in advice.detail
+        assert "Declare" not in advice.detail

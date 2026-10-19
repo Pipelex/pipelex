@@ -5,7 +5,7 @@ from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.cogt.config_cogt import ModelDeckConfig
-from pipelex.cogt.exceptions import ImgGenHandleNotFoundError, LLMHandleNotFoundError, ModelChoiceNotFoundError, ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ImgGenHandleNotFoundError, LLMHandleNotFoundError, ModelChoiceNotFoundError, ModelDeckPresetValidationError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
@@ -123,7 +123,7 @@ class TestModelDeckTypeStrictness:
             missing_presets_reaction=ProblemReaction.RAISE,
         )
 
-        with pytest.raises(ModelDeckPresetValidatonError, match=r"Failed to validate all LLM presets: LLM preset 'painter': .* but not as an LLM"):
+        with pytest.raises(ModelDeckPresetValidationError, match=r"Failed to validate all LLM presets: LLM preset 'painter': .* but not as an LLM"):
             model_deck.validate_registered_models()
 
     def test_a_deck_that_logs_its_unresolvable_presets_warns_once_per_model_type_with_the_same_fields(self, mocker: MockerFixture) -> None:

@@ -15,9 +15,10 @@ from http import HTTPStatus
 from typing import Any, TypeAlias, cast
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.tools.typing.pydantic_utils import ValidatedType, describe_exception_without_input
 
 # SDK exception class-name substrings that identify a network/transport failure
 # (no HTTP status reached us). Matched case-insensitively against
@@ -92,7 +93,11 @@ class ProviderErrorMetadata(BaseModel):
     sdk_exception_type: str
     # Human-readable error text from the SDK exception (``str(exc)``). Both the
     # Classify step (quota / content-policy discrimination) and the Render step
-    # (message composition) read it, so the Extract step must capture it.
+    # (message composition) read it, so the Extract step must capture it. A
+    # pydantic ``ValidationError``, which ends instructor's re-asks, is written by
+    # its locations and reasons alone: its own text quotes the model's answer. Any
+    # other failure to parse that answer, such as instructor's assertion carrying a
+    # model's refusal, is written by its class alone.
     message: str = ""
     status_code: int | None = None
     request_id: str | None = None
@@ -162,6 +167,29 @@ class ProviderErrorMetadata(BaseModel):
         return self.body is not None and _is_content_policy_violation(_stringify_for_scan(self.body))
 
     @property
+    def is_context_window_exceeded(self) -> bool:
+        """Whether the provider refused the request because its inputs are over what the model can read.
+
+        For a language model, that is its context window, which holds the prompt and the output the request reserves
+        with ``max_tokens`` together, so a refusal the ``max_tokens`` sent caused reads the same. Reads the structured
+        error code first, ``provider_error_code`` and the code an error body carries
+        (OpenAI puts ``context_length_exceeded`` in ``code`` beside a generic ``type``, which the Extract step
+        prefers), then the wording each provider gives such a refusal, in its rendered message or in the in-process
+        ``body``, as the content-policy check reads them: a raw ``httpx`` error, such as Azure REST's, renders only
+        its status and URL, and keeps the provider's words in the body alone. The classifier reads it on a 400 and on
+        any other 4xx, which a gateway may answer such a refusal with, and the Render step words its next step from
+        the code the classifier picks, so a phrase in a 5xx, or quoted in a failure that reached no status, says
+        nothing.
+        """
+        if self.provider_error_code in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        if error_code_from_body_code_first(self.body) in _CONTEXT_WINDOW_ERROR_CODES:
+            return True
+        if _names_the_context_window(text=self.message):
+            return True
+        return self.body is not None and _names_the_context_window(text=_stringify_for_scan(self.body))
+
+    @property
     def is_network_error(self) -> bool:
         """Whether this is a network/transport failure that never reached an HTTP status."""
         if self.status_code is not None:
@@ -225,6 +253,35 @@ _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
     "safety system",
     "safety filter",
     "blocked by safety",
+)
+
+# The error code a provider gives a refusal of a prompt over the model's context window: OpenAI's, which Azure OpenAI
+# and the OpenAI-compatible gateways relay.
+_CONTEXT_WINDOW_ERROR_CODES: frozenset[str] = frozenset({"context_length_exceeded"})
+
+# How each provider words that refusal in the message its SDK renders, every one a 400. Each phrase names the
+# context window or the prompt's length, so a 400 about a malformed request matches none of them. A language model's
+# window also holds the output the request reserves with `max_tokens`, so two of them also match a 400 the
+# `max_tokens` sent caused, which the deck's default may be: Anthropic's "exceed context limit" and OpenAI's "maximum
+# context length", which counts the completion beside the messages. The Render step's advice for the language-model
+# family therefore names both the input and `max_tokens`.
+_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
+    # OpenAI's code, which its SDK renders into the message with the error body
+    "context_length_exceeded",
+    # OpenAI's earlier wording, also Mistral's and that of OpenAI-compatible servers such as vLLM, for the messages
+    # alone or for the messages and the completion together
+    "maximum context length",
+    # OpenAI's current wording
+    "exceeds the context window",
+    # Anthropic's, directly or through Bedrock
+    "prompt is too long",
+    # Anthropic's when the prompt and the max_tokens requested together pass the window
+    "exceed context limit",
+    # Bedrock's ValidationException, in full: a 400 about one field's length, such as a tool description's, may say
+    # "input is too long" of that field alone
+    "input is too long for requested model",
+    # Gemini's INVALID_ARGUMENT
+    "exceeds the maximum number of tokens allowed",
 )
 
 _GOOGLE_QUOTA_PATTERNS: tuple[str, ...] = (
@@ -325,6 +382,12 @@ def _is_content_policy_violation(error_message: str) -> bool:
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
 
 
+def _names_the_context_window(*, text: str) -> bool:
+    """Check if an error's text words a refusal of inputs over the model's context window, as some provider words it."""
+    lower_text = text.lower()
+    return any(pattern in lower_text for pattern in _CONTEXT_WINDOW_PATTERNS)
+
+
 def _stringify_for_scan(body: Any) -> str:
     """Render a metadata body into a lowercase string for content-policy / quota probing.
 
@@ -380,6 +443,44 @@ def extract_underlying_sdk_exception(instructor_exc: Any) -> BaseException | Non
     return None
 
 
+def describe_instructor_failure(*, instructor_exc: BaseException) -> str:
+    """Why instructor's structured generation failed, when :func:`extract_underlying_sdk_exception` recovered nothing.
+
+    The worker calls it with the result of that extraction already known to be ``None``: the wrapper's cause is then
+    either nothing or a retry error whose last attempt holds no exception, such as tenacity's ``RetryError``, whose text
+    is a ``Future``'s representation, a memory address included. Neither ``instructor``'s own text, which is the last
+    exception's and quotes the model's answer, nor the cause's is used: the failure is named by the class of the cause,
+    or of the wrapper itself when there is none.
+
+    Args:
+        instructor_exc: The ``InstructorRetryException`` instructor raised.
+
+    Returns:
+        The reason, such as ``RetryError``.
+    """
+    cause = instructor_exc.__cause__
+    return type(cause).__name__ if cause is not None else type(instructor_exc).__name__
+
+
+# The exception classes a provider's SDK raises as its own, as a worker catches them.
+SdkErrorTypes: TypeAlias = tuple[type[BaseException], ...]
+
+
+def _describe_provider_exception(*, exc: BaseException, validated_type: ValidatedType | None, sdk_error_types: SdkErrorTypes | None) -> str:
+    """The text a provider's metadata carries for ``exc``, which never quotes the model's answer.
+
+    ``sdk_error_types`` is ``None`` when the worker caught ``exc`` as its SDK's own error: its text is the provider's,
+    which the Classify step reads, quota against rate limiting or a content policy, and is kept. A tuple says ``exc``
+    was recovered from ``instructor``'s loop, which ends either on the SDK's own error, an instance of one of these
+    types, or on a failure to parse the model's answer, whose text can quote that answer: a ``ValidationError`` is
+    written by its locations and reasons, located by ``validated_type``, and any other parsing failure by its class
+    alone, such as the ``AssertionError`` that ``instructor``'s OpenAI parser raises with the model's refusal in its text.
+    """
+    if sdk_error_types is not None and not isinstance(exc, (ValidationError, *sdk_error_types)):
+        return type(exc).__name__
+    return describe_exception_without_input(exc=exc, validated_type=validated_type)
+
+
 def parse_retry_after_seconds(value: Any) -> float | None:
     """Parse a ``Retry-After`` header value into a delay in seconds.
 
@@ -425,8 +526,16 @@ def _provider_error_code_from_body(body: Any) -> str | None:
     return None
 
 
-def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
+def extract_openai_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill an OpenAI SDK exception into a ``ProviderErrorMetadata``.
+
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the SDK's two exception shapes:
 
@@ -463,7 +572,7 @@ def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.OPENAI,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -472,8 +581,16 @@ def extract_openai_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
+def extract_anthropic_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill an Anthropic SDK exception into a ``ProviderErrorMetadata``.
+
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the two exception shapes in the Anthropic SDK:
 
@@ -498,7 +615,7 @@ def extract_anthropic_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -614,8 +731,16 @@ def _google_provider_error_code_from_details(details: Any) -> str | None:
     return None
 
 
-def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
+def extract_google_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill a Google GenAI SDK exception into a ``ProviderErrorMetadata``.
+
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Google's exception shape differs from OpenAI/Anthropic:
 
@@ -642,7 +767,7 @@ def extract_google_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.GOOGLE,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=str(exc),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -663,7 +788,7 @@ def extract_azure_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return _build_azure_metadata(
         response=getattr(exc, "response", None),
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
     )
 
 
@@ -734,7 +859,7 @@ def extract_fal_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.FAL,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -767,7 +892,7 @@ def extract_huggingface_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.HUGGINGFACE,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -822,7 +947,7 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.GATEWAY,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -831,8 +956,16 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
     )
 
 
-def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
+def extract_mistral_metadata(
+    exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
+) -> ProviderErrorMetadata:
     """Distill a Mistral SDK exception into a ``ProviderErrorMetadata``.
+
+    ``exc`` can also be the exception that ended instructor's re-asks, recovered from its wrapper, for which the worker
+    passes its SDK's own error classes as ``sdk_error_types``: an exception of none of them failed to parse the model's
+    answer, and its text can quote that answer. The most common, the ``ValidationError`` of the model's last answer, is
+    written by its reasons, located by the schema of ``validated_type``, the class the structured generation asked for,
+    never by the answer's values, and any other parsing failure by its class alone.
 
     Tolerates the two shapes the Mistral SDK raises:
 
@@ -870,7 +1003,7 @@ def extract_mistral_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.MISTRAL,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),
-        message=str(exc),
+        message=_describe_provider_exception(exc=exc, validated_type=validated_type, sdk_error_types=sdk_error_types),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -936,7 +1069,7 @@ def extract_bedrock_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.BEDROCK,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
@@ -960,7 +1093,7 @@ def extract_linkup_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.LINKUP,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,
@@ -1030,7 +1163,7 @@ def extract_typesafe_metadata(exc: BaseException) -> ProviderErrorMetadata:
     return ProviderErrorMetadata(
         provider=ProviderName.TYPESAFE,
         sdk_exception_type=type(exc).__name__,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=status_code,
         request_id=request_id if isinstance(request_id, str) else None,
         retry_after_seconds=retry_after_seconds,
@@ -1072,7 +1205,7 @@ def extract_local_extract_metadata(exc: BaseException, *, provider: ProviderName
     return ProviderErrorMetadata(
         provider=provider,
         sdk_exception_type=normalized_type_name,
-        message=str(exc),
+        message=describe_exception_without_input(exc=exc),
         status_code=None,
         request_id=None,
         retry_after_seconds=None,

@@ -14,16 +14,19 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
 from mthds.method_tree.digest import sha256_hex
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
+from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
 
@@ -66,12 +69,13 @@ def sandbox_hosted_mode_fixture() -> Generator[None, None, None]:
         pipe_func_config.execution_mode = previous
 
 
-def _build_client(mocker: MockerFixture) -> TestClient:
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> TestClient:
+    """The routes behind the production handlers; `as_operator` marks each request as the operator's, who reads `diagnostics`."""
     mocker.patch(
         f"{_PIPELINE_NS}.get_api_config", return_value=ApiConfig(orchestration_mode="direct", allow_request_orchestration_mode_override=False)
     )
     app = FastAPI()
-    app.include_router(api_router, prefix="/v1")
+    app.include_router(api_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     app.include_router(blob_upload_router, prefix="/v1")
     register_exception_handlers(app)
     return TestClient(app)
@@ -95,6 +99,12 @@ def _upload_all(client: TestClient, *blobs: bytes, read_scope: str | None = None
 
 def _run_output(body: dict[str, Any]) -> str:
     return json.dumps(body["pipe_output"]["working_memory"])
+
+
+def _error_files(problem: dict[str, Any]) -> list[tuple[str, int | None, int | None]]:
+    """The file, line and column each item of an invalid method's problem is located at."""
+    assert problem["code"] == CoreCode.METHOD_INVALID, problem
+    return [(item["location"]["file"], item["location"].get("line"), item["location"].get("column")) for item in problem["errors"]]
 
 
 def _assert_no_host_path(body: Any) -> None:
@@ -129,11 +139,8 @@ class TestMethodTreeRuns:
             "/v1/execute", json={"files": {"greet.mthds": _GREET_MTHDS, "notes.txt": _hash_entry(_NOTES)}, "inputs": {"text": "x"}}
         )
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "MissingBlobs"
-        assert problem["missing_blobs"] == [sha256_hex(_NOTES)]
-        assert "/v1/blobs/missing" in problem["detail"]
+        problem = assert_problem(response, status=422, code="request.blobs_missing")
+        assert problem["params"] == {"missing_blobs": [sha256_hex(_NOTES)]}
 
     def test_a_size_other_than_the_held_bytes_is_a_mismatch_no_upload_repeats(self, mocker: MockerFixture) -> None:
         """A sender following the answers, asking which blobs are missing and uploading them, ends at the mismatch, never in a loop."""
@@ -151,10 +158,8 @@ class TestMethodTreeRuns:
 
         assert uploaded.status_code == 204, uploaded.text
         for response in (first, again):
-            assert response.status_code == 422, response.text
-            problem = response.json()
-            assert problem["error_type"] == "BlobMismatch"
-            assert problem["mismatched_blobs"] == [{"sha256": sha256_hex(_NOTES), "held_size": len(_NOTES)}]
+            # Not `request.blobs_missing`, which would send the sender to upload the same bytes again.
+            assert_problem(response, status=422, code="request.invalid", field="files")
 
     def test_a_hash_resolves_only_in_the_callers_own_scope(self, mocker: MockerFixture) -> None:
         client = _build_client(mocker)
@@ -166,8 +171,7 @@ class TestMethodTreeRuns:
 
         assert own.status_code == 200, own.text
         assert "Hello a" in _run_output(own.json())
-        assert other.status_code == 422, other.text
-        assert other.json()["error_type"] == "MissingBlobs"
+        assert_problem(other, status=422, code="request.blobs_missing")
 
     def test_a_callers_bundle_that_does_not_parse_is_its_422_named_by_tree_path(self, mocker: MockerFixture) -> None:
         """The written tree is the caller's own library directory, so its refusal is the caller's 422, never the runner's 500."""
@@ -178,8 +182,8 @@ class TestMethodTreeRuns:
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["error_type"] == "ValidateBundleError"
-        assert {item["source"] for item in body["validation_errors"]} == {"methods/broken.mthds"}
+        assert body["domain"] == "method"
+        assert {file for file, _, _ in _error_files(body)} == {"methods/broken.mthds"}
         _assert_no_host_path(body)
 
     def test_validate_a_method_tree_sent_as_files(self, mocker: MockerFixture) -> None:
@@ -202,7 +206,7 @@ class TestMethodTreeRuns:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert {item["source"] for item in body["validation_errors"]} == {"methods/broken.mthds"}
+        assert {item["location"]["file"] for item in body["errors"]} == {"methods/broken.mthds"}
         _assert_no_host_path(body)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
@@ -216,9 +220,9 @@ class TestMethodTreeRuns:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False, body
-        (item,) = body["validation_errors"]
-        assert item["source"] == "helpers/broken.py"
-        assert item["line"] == 4
+        (item,) = body["errors"]
+        assert item["location"]["file"] == "helpers/broken.py"
+        assert item["location"]["line"] == 4
         _assert_no_host_path(body)
 
     def test_python_in_a_tree_is_refused_where_it_could_not_run(self, mocker: MockerFixture) -> None:
@@ -226,8 +230,8 @@ class TestMethodTreeRuns:
 
         response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS, "helpers/tool.py": "VALUE = 1\n"}})
 
-        assert response.status_code == 403, response.text
-        assert response.json()["error_type"] == "CustomCodeRequiresSandbox"
+        problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
+        assert problem["params"] == {"origin": "bundle"}
 
     def test_a_json_constant_outside_the_tree_is_never_a_server_error(self, mocker: MockerFixture) -> None:
         """`NaN` is the rest of the server's to judge where it stands outside a map of file entries, and a 422 inside one."""
@@ -241,9 +245,9 @@ class TestMethodTreeRuns:
 
         for response in (inline, beside_a_tree):
             assert response.status_code == 422, response.text
-            assert response.json()["error_type"] == "WrongScalarKindError"
-        assert inside_the_tree.status_code == 422, inside_the_tree.text
-        assert inside_the_tree.json()["error_type"] == "InvalidMethodFiles"
+            assert response.json()["code"] == CoreCode.INPUT_INVALID
+            assert response.json()["domain"] == "input"
+        assert_problem(inside_the_tree, status=422, code="request.invalid", field="files")
 
     @pytest.mark.parametrize("encoding", ["utf-16", "utf-32", "utf-8-sig"])
     def test_validate_reads_a_tree_from_a_body_in_any_json_encoding(self, mocker: MockerFixture, encoding: str) -> None:
@@ -256,7 +260,7 @@ class TestMethodTreeRuns:
         assert response.json()["is_valid"] is True, response.text
 
     def test_a_bundle_that_is_not_utf8_text_is_the_callers_located_diagnostic(self, mocker: MockerFixture) -> None:
-        client = _build_client(mocker)
+        client = _build_client(mocker, as_operator=True)
         files = {"greet.mthds": _GREET_MTHDS, "bad.mthds": {"base64": "/w=="}}
 
         run = client.post("/v1/execute", json={"files": files, "pipe_code": "greeting.greet", "inputs": {"text": "x"}})
@@ -264,15 +268,16 @@ class TestMethodTreeRuns:
         validated = client.post("/v1/validate", json={"files": files})
 
         assert run.status_code == 422, run.text
-        assert run.json()["error_type"] == "ValidateBundleError"
-        assert [(item["source"], item["line"], item["column"]) for item in run.json()["validation_errors"]] == [("bad.mthds", 1, 1)]
+        assert _error_files(run.json()) == [("bad.mthds", 1, 1)]
         assert run_from_the_entry.status_code == 422, run_from_the_entry.text
-        assert run_from_the_entry.json()["error_type"] == "MethodEntryError"
-        assert "'bad.mthds'" in run_from_the_entry.json()["detail"]
+        entry_problem = run_from_the_entry.json()
+        assert entry_problem["code"] == CoreCode.METHOD_SYNTAX
+        assert entry_problem["diagnostics"]["error_class"] == "MethodEntryError"
+        assert "'bad.mthds'" in entry_problem["diagnostics"]["message"]
         assert validated.status_code == 200, validated.text
         verdict = validated.json()
         assert verdict["is_valid"] is False
-        assert [item["source"] for item in verdict["validation_errors"]] == ["bad.mthds"]
+        assert [item["location"]["file"] for item in verdict["errors"]] == ["bad.mthds"]
         _assert_no_host_path(verdict)
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
@@ -285,7 +290,7 @@ class TestMethodTreeRuns:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False, body
-        assert [item["source"] for item in body["validation_errors"]] == ["helpers/nul.py"]
+        assert [item["location"]["file"] for item in body["errors"]] == ["helpers/nul.py"]
 
     def test_files_sent_in_resources_are_held_to_the_tree_limits(self, mocker: MockerFixture) -> None:
         mocker.patch("pipelex_api.method_tree_request.MAX_METHOD_TREE_FILES", 2)
@@ -296,15 +301,17 @@ class TestMethodTreeRuns:
         past = client.post("/v1/validate", json={"files": files, "resources": {"extra.txt": base64.b64encode(b"one more").decode("ascii")}})
 
         assert within.status_code == 200, within.text
-        assert past.status_code == 422, past.text
-        assert past.json()["error_type"] == "MethodTreeTooLarge"
-        assert "`resources`" in past.json()["detail"]
+        problem = assert_problem(past, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "too_many_files", "limit": 2}
 
     @pytest.mark.parametrize(
-        ("limit", "value"),
-        [("MAX_METHOD_DEPENDENCIES", 0), ("MAX_METHOD_REQUEST_TOTAL_BYTES", len(_GREET_MTHDS) + 10)],
+        ("limit", "value", "reason"),
+        [
+            ("MAX_METHOD_DEPENDENCIES", 0, "too_many_dependencies"),
+            ("MAX_METHOD_REQUEST_TOTAL_BYTES", len(_GREET_MTHDS) + 10, "method_too_large"),
+        ],
     )
-    def test_a_method_and_its_dependencies_are_held_to_limits_together(self, mocker: MockerFixture, limit: str, value: int) -> None:
+    def test_a_method_and_its_dependencies_are_held_to_limits_together(self, mocker: MockerFixture, limit: str, value: int, reason: str) -> None:
         """Each tree passes its own limits, yet the request carries too many trees, or too many bytes across them."""
         mocker.patch(f"pipelex_api.method_tree_request.{limit}", value)
         client = _build_client(mocker)
@@ -312,8 +319,8 @@ class TestMethodTreeRuns:
 
         response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS}, "dependencies": {_DEPENDENCY_ADDRESS: dependency}})
 
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == "MethodTreeTooLarge"
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": reason, "limit": value}
 
     @pytest.mark.parametrize("last_segment", ["..", "."])
     def test_a_nameless_dependency_keyed_by_an_address_no_directory_can_take_is_refused(self, mocker: MockerFixture, last_segment: str) -> None:
@@ -324,7 +331,5 @@ class TestMethodTreeRuns:
 
         response = client.post("/v1/validate", json={"files": {"greet.mthds": _GREET_MTHDS}, "dependencies": {address: dependency}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert "cannot name a package's directory" in problem["detail"]
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "package_name_invalid", "path": f"{address}/METHODS.toml"}

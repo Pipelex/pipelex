@@ -14,6 +14,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
+from pipelex.errors.problem import MISSING_REQUIRED_PARAMS_MESSAGE, ProblemView
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
@@ -21,10 +22,13 @@ from pytest_mock import MockerFixture
 
 import pipelex_api.routes.pipelex.pipeline as pipeline_module
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exceptions import CallbackUrlRefusedError
+from pipelex_api.json_body import TOO_DEEPLY_NESTED_REASON
 from pipelex_api.limits import MAX_JSON_NESTING_DEPTH
 from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 
 def _build_client(mocker: MockerFixture, *, with_request_id_middleware: bool = False) -> tuple[TestClient, Any, Any]:
@@ -114,9 +118,7 @@ class TestPipelineRoutes:
             content=b'"just a string"',
             headers={"content-type": "application/json"},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidJSON"
+        assert_problem(response, status=422, code="request.invalid", field="body")
 
     def test_execute_rejects_invalid_json(self, mocker: MockerFixture):
         client, _, _ = _build_client(mocker)
@@ -125,14 +127,13 @@ class TestPipelineRoutes:
             content=b"{not json",
             headers={"content-type": "application/json"},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidJSON"
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["params"] == {"reason": "not_json"}
 
     def test_execute_rejects_recursion_error(self, mocker: MockerFixture):
         # A body nested this deep made `json.loads` raise `RecursionError` up to Python 3.13, while on
         # 3.14 it parses whenever the thread's stack is large enough. The server bounds the nesting
-        # before parsing, so the answer is the same 422 InvalidJSON on every interpreter and stack,
+        # before parsing, so the answer is the same 422 `request.malformed` on every interpreter and stack,
         # never the catch-all 500 nor a later `ValidationError`.
         client, _, _ = _build_client(mocker)
         depth = 100_000
@@ -141,14 +142,9 @@ class TestPipelineRoutes:
             content=b'{"inputs": ' + b"[" * depth + b"]" * depth + b"}",
             headers={"content-type": "application/json"},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        problem = response.json()
-        assert problem["error_type"] == "InvalidJSON"
-        assert problem["error_domain"] == "input"
-        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in problem["detail"]
-        # The opaque-500 sentinel must never appear for a caller-input failure.
-        assert problem["error_type"] != "InternalServerError"
+        problem = assert_problem(response, status=422, code="request.malformed")
+        assert problem["domain"] == "input"
+        assert problem["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
 
     @pytest.mark.parametrize("route", ["/v1/execute", "/v1/start"])
     def test_run_routes_bound_nesting_at_the_limit(self, mocker: MockerFixture, route: str):
@@ -164,9 +160,8 @@ class TestPipelineRoutes:
         assert execute_mock.await_count + start_mock.await_count == 1
 
         refused = client.post(route, content=run_body(MAX_JSON_NESTING_DEPTH - 1), headers={"content-type": "application/json"})
-        assert refused.status_code == 422
-        assert refused.json()["error_type"] == "InvalidJSON"
-        assert f"at most {MAX_JSON_NESTING_DEPTH} levels" in refused.json()["detail"]
+        refusal = assert_problem(refused, status=422, code="request.malformed")
+        assert refusal["params"] == {"reason": TOO_DEEPLY_NESTED_REASON}
         assert execute_mock.await_count + start_mock.await_count == 1
 
     @pytest.mark.parametrize("route", ["/v1/execute", "/v1/start"])
@@ -185,11 +180,8 @@ class TestPipelineRoutes:
                 "inputs": {"text": {"__class__": "Popen", "__module__": "subprocess", "args": ["touch", "pipelex-api-rce-probe"]}},
             },
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        problem = response.json()
-        assert problem["error_type"] == "ReservedObjectKey"
-        assert problem["error_domain"] == "input"
+        problem = assert_problem(response, status=422, code="pipelex.security.reserved_key")
+        assert problem["domain"] == "input"
         popen_mock.assert_not_called()
         execute_mock.assert_not_awaited()
         start_mock.assert_not_awaited()
@@ -212,27 +204,23 @@ class TestPipelineRoutes:
         """
         client, execute_mock, _ = _build_client(mocker)
         response = client.post("/v1/execute", json=body)
-        assert response.status_code == 422, label
-        assert response.headers["content-type"] == "application/problem+json", label
-        problem = response.json()
-        assert problem["error_type"] == "ReservedObjectKey", label
-        assert problem["error_domain"] == "input", label
-        assert f"'{reserved_key}'" in problem["detail"], label
+        problem = assert_problem(response, status=422, code="pipelex.security.reserved_key")
+        assert problem["domain"] == "input", label
+        assert problem["params"] == {"keys": [reserved_key]}, label
         execute_mock.assert_not_awaited()
 
     def test_execute_bounds_the_reserved_key_it_echoes(self, mocker: MockerFixture):
-        """Any key starting with `__kajson` is refused, so the caller picks its length. The `detail`
-        names it cut to the correlation-field bound, since the detail is also logged as a field.
+        """Any key starting with `__kajson` is refused, so the caller picks its length. The problem
+        names it cut to the correlation-field bound, so the caller cannot inflate the answer.
         """
         client, _, _ = _build_client(mocker)
         long_key = "__kajson" + "k" * 100_000
         response = client.post("/v1/execute", json={"pipe_code": "echo", "inputs": {"doc": {long_key: 1}}})
-        assert response.status_code == 422
-        problem = response.json()
-        assert problem["error_type"] == "ReservedObjectKey"
-        assert "'__kajsonkkkk" in problem["detail"]
-        assert "…'" in problem["detail"]
-        assert len(problem["detail"]) < 1_000
+        problem = assert_problem(response, status=422, code="pipelex.security.reserved_key")
+        (shown_key,) = problem["params"]["keys"]
+        assert shown_key.startswith("__kajsonkkkk")
+        assert shown_key.endswith("…")
+        assert len(response.text) < 2_000
 
     def test_execute_accepts_marker_lookalikes_as_plain_data(self, mocker: MockerFixture):
         """Only the reserved keys themselves are refused: a value that mentions `__class__`, and a
@@ -379,7 +367,7 @@ class TestPipelineRoutes:
             "/v1/start",
             json={
                 "pipe_code": body_pipe_code,
-                # An AWS-metadata URL — blocked by `_is_disallowed_host`, so
+                # An AWS-metadata URL — blocked by `is_disallowed_host`, so
                 # `_validate_extras` raises 422 before `from_body` runs.
                 "callback_urls": ["http://169.254.169.254/latest/meta-data/"],
             },
@@ -440,10 +428,37 @@ class TestPipelineRoutes:
             "/v1/start",
             json={"pipe_code": "echo", "callback_urls": [bad_url]},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidCallbackUrls"
+        problem = assert_problem(response, status=422, code="security.input_url_refused")
+        assert problem["params"]["input"] == "callback_urls"
+        assert problem["location"] == {"field": "callback_urls"}
+        assert bad_url not in response.text
         start_mock.assert_not_awaited()
+
+    @pytest.mark.parametrize("hostless_url", ["http://./hook", "https://../hook"])
+    def test_a_callback_host_of_dots_alone_names_no_host(self, mocker: MockerFixture, hostless_url: str):
+        # Empty once its trailing dots are dropped, as the SSRF rule drops them: a URL naming no host, the shape of the
+        # field, never a security refusal whose sentence names a class of destination it has none of.
+        client, _, start_mock = _build_client(mocker)
+        log_spy = mocker.patch("pipelex.errors.problem._warn")
+        response = client.post("/v1/start", json={"pipe_code": "echo", "callback_urls": [hostless_url]})
+        assert_problem(response, status=422, code="request.invalid", field="callback_urls")
+        log_spy.assert_not_called()
+        start_mock.assert_not_awaited()
+
+    @pytest.mark.builds_problems_without_required_params(reason="a refusal stating no class of destination has no `target_class` to give")
+    def test_a_callback_refusal_naming_no_class_leaves_the_parameter_out(self, mocker: MockerFixture):
+        # A refusal that states no class of destination gives no `target_class`, rather than a `None` for its code to
+        # refuse, so no parameter is dropped and logged; the problem logs instead that it lacks the parameter.
+        warn_spy = mocker.patch("pipelex.errors.problem._warn")
+        refusal = CallbackUrlRefusedError("callback URL host is not allowed")
+        assert "target_class" not in refusal.problem_params()
+        problem = refusal.to_problem(view=ProblemView.OPERATOR)
+        assert problem.params is not None
+        assert "target_class" not in problem.params.as_wire()
+        dropped = [call for call in warn_spy.call_args_list if "gives a parameter" in call.kwargs["message"]]
+        assert not dropped, dropped
+        lacking = [call.kwargs["fields"]["params"] for call in warn_spy.call_args_list if call.kwargs["message"] == MISSING_REQUIRED_PARAMS_MESSAGE]
+        assert lacking == [["target_class"]], warn_spy.call_args_list
 
     def test_start_rejects_too_many_callbacks(self, mocker: MockerFixture):
         client, _, start_mock = _build_client(mocker)
@@ -454,15 +469,10 @@ class TestPipelineRoutes:
                 "callback_urls": [f"https://example.com/{idx}" for idx in range(20)],
             },
         )
-        # `callback_urls` exceeds `PipelineApiExtras.max_length`. The route
-        # validates extras explicitly (`_validate_extras`) and re-raises the
-        # resulting Pydantic `ValidationError` via `raise_validation_error`
-        # with the more-specific `InvalidCallbackUrls` error_type — so the
-        # response is RFC 7807 422 / `application/problem+json` but classified
-        # one level finer than the generic FastAPI automatic-validation path.
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidCallbackUrls"
+        # `callback_urls` exceeds `PipelineApiExtras.max_length`. The route validates extras explicitly
+        # (`_validate_extras`) and answers the resulting pydantic `ValidationError` as the runner's own refusal,
+        # `request.invalid` naming the field, as FastAPI's automatic validation path does.
+        assert_problem(response, status=422, code="request.invalid", field="callback_urls")
         start_mock.assert_not_awaited()
 
 
@@ -510,9 +520,7 @@ class TestStorageScopeReachesTheRun:
         # becomes a storage key prefix, so a traversal in it escapes the tenant.
         client, _, start_mock = _build_client(mocker)
         response = client.post("/v1/start", json={"pipe_code": "echo", "storage_scope": bad_scope})
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        # Classified by the field that failed: this used to answer `InvalidCallbackUrls`
-        # on a request that carried no callback at all.
-        assert response.json()["error_type"] == "InvalidStorageScope"
+        # Named by the field that failed: this used to answer a callback URL refusal on a request that carried no
+        # callback at all.
+        assert_problem(response, status=422, code="request.invalid", field="storage_scope")
         start_mock.assert_not_awaited()

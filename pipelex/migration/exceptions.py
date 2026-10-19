@@ -1,30 +1,40 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError, PipelexSetupError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
+
+from pipelex.base_exceptions import PipelexError, PipelexSetupError, ProblemFacts
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, InheritsCause
+from pipelex.errors.problem import MigrationErrorBlock
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class MigrationError(PipelexError):
     """Base for every failure raised by the configuration-migration engine."""
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Migration error"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class MigrationRegistryError(MigrationError):
-    """The surface registry is inconsistent, or names a surface that does not exist."""
+    """The surface registry is inconsistent, or names a surface that does not exist: our packaged code is wrong."""
 
-    _declared_title = "Migration registry error"
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class MigrationLedgerError(MigrationError):
-    """A ledger file is missing, unparseable, or internally inconsistent."""
+    """A ledger file is missing, unparseable, or internally inconsistent: our packaged ledger is wrong."""
 
-    _declared_title = "Migration ledger error"
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class MigrationGoldenError(MigrationError):
-    """A checked-in golden is missing or unreadable, so no verdict can be produced."""
+    """A checked-in golden is missing or unreadable, so no verdict can be produced.
 
-    _declared_title = "Migration golden error"
+    Developer tooling: only `pipelex-dev check-ledger` and the schema update reach it.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class MigrationSnapshotRefusedError(MigrationError):
@@ -32,9 +42,11 @@ class MigrationSnapshotRefusedError(MigrationError):
 
     Raised so that a habitual regeneration cannot quietly erase the very removal the coverage gate
     exists to catch. The refusal names both readings of the situation and the flag that resolves it.
+
+    Developer tooling: only `pipelex-dev update-migration-schemas` reaches it.
     """
 
-    _declared_title = "Migration snapshot refused"
+    error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
 class FunctionNamesMigrationError(PipelexError):
@@ -43,11 +55,12 @@ class FunctionNamesMigrationError(PipelexError):
     Raised by `pipelex fix function-names` when the path it is handed is not a method's folder, its method tree cannot
     be listed, or a file cannot be read or written. The flat names it cannot resolve are not an error: the migration
     reports them for the author to decide.
+
+    A path that is not a folder is ``request.invalid``, chosen where it is raised; a tree that cannot be listed
+    takes the code of the error that refused it; a file that cannot be read or written is ``runtime.unexpected``.
     """
 
-    error_domain = ErrorDomain.INPUT
-    retryable = False
-    _declared_title = "Function names migration error"
+    error_code = InheritsCause(fallback=CoreCode.RUNTIME_UNEXPECTED, others=(CoreCode.REQUEST_INVALID,))
 
 
 class FormerReleaseConfigError(PipelexSetupError):
@@ -60,7 +73,7 @@ class FormerReleaseConfigError(PipelexSetupError):
     again, on the hosted Pipelex API or on this machine.
     """
 
-    _declared_title = "Configuration left by a former release"
+    error_code = PipelexErrorCode.CONFIG_INVALID
     # One next step for a person and an agent alike, since both read it: the human command first, then the loop an
     # agent runs, which shows the user what the cleanup would remove before it writes anything.
     user_action = UserAction(
@@ -71,3 +84,13 @@ class FormerReleaseConfigError(PipelexSetupError):
             "(its 'former_release' key), show the user, then run 'pipelex-agent migrate --yes'."
         ),
     )
+
+    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+        super().__init__(message)
+        # What `pipelex migrate` would do about it, from the cleanup's dry run, so a JSON reader of the problem, which
+        # carries no tip, branches on `diagnostics.migration` as it does for a stale configuration.
+        self.migration = migration
+
+    @override
+    def problem_facts(self) -> ProblemFacts:
+        return ProblemFacts(migration=self.migration)

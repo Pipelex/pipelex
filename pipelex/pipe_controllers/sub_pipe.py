@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, field_validator
 
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError, WorkingMemoryTypeError
@@ -83,7 +84,7 @@ class SubPipe(BaseModel):
         if self.output_multiplicity is not None:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
 
-        sub_pipe = get_required_pipe(pipe_code=self.pipe_code)
+        sub_pipe = get_required_pipe(pipe_code=self.pipe_code, referring_pipe_code=calling_pipe_code)
 
         # Case 1: Batch processing
         if batch_params := self.batch_params:
@@ -117,7 +118,7 @@ class SubPipe(BaseModel):
                     pipe_code=self.pipe_code,
                     variable_name=list_label,
                     concept_code=None,
-                ) from exc
+                ).with_error_code(CoreCode.METHOD_WIRING_INVALID) from exc
 
             try:
                 item_stuff_spec = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
@@ -132,7 +133,7 @@ class SubPipe(BaseModel):
                     pipe_code=self.pipe_code,
                     variable_name=batch_params.input_item_stuff_name,
                     concept_code=None,
-                ) from exc
+                ).with_error_code(CoreCode.METHOD_WIRING_INVALID) from exc
             # The batch is built as the runtime pipe, not from a blueprint: its list is a name of the calling sequence's memory,
             # a private one for a dotted `batch_over` the sequence rewrote, or any name a step stores under, never an input
             # name an author declares, so the input-name grammar a blueprint enforces does not apply to it.

@@ -63,12 +63,13 @@ class TestCsvInputDetection:
             WorkingMemoryFactory.make_from_pipeline_inputs(inputs, concept_provider=get_concept_library(), read_scope=None)
         message = str(exc_info.value)
         assert "local" in message.lower()
-        # The path is preserved so the user can identify the offending input...
-        assert "people.csv" in message
-        # ...but the signed query string / fragment (which can carry credentials) must be stripped:
-        # CsvError is caller-facing and survives STRICT disclosure, so it must not leak the token.
-        for secret in ("token=abc", "X-Amz-Signature=deadbeef", "frag"):
-            assert secret not in message
+        # The input is named, with the url's scheme...
+        assert "stuff 'people'" in message
+        assert f"scheme '{remote_url.split(':', 1)[0]}'" in message
+        # ...and the url itself, the input's value, is not: neither its host, its path, nor a signed query string or a
+        # fragment, which can carry credentials.
+        for url_part in ("example.com", "bucket", "people.csv", "token=abc", "X-Amz-Signature=deadbeef", "frag"):
+            assert url_part not in message
 
     def test_remote_csv_url_rejected_through_cli_inputs_resolution(self, load_test_library: Callable[[list[Path]], None]) -> None:
         load_test_library([BUNDLE_DIR])

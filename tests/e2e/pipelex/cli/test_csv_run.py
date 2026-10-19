@@ -173,4 +173,6 @@ class TestCsvRun:
         combined = result.stdout + result.stderr
         assert result.returncode != 0, f"a missing input .csv must fail.\n{combined!r}"
         assert "Traceback (most recent call last)" not in combined, f"error must be clean, not a raw traceback: {combined!r}"
-        assert "nope.csv" in combined, f"the error should name the offending CSV file: {combined!r}"
+        # The file's path is the caller's input, which no message carries: the error names the input it was given as.
+        assert "the CSV file given for input 'people'" in combined, f"the error should name the offending input: {combined!r}"
+        assert "nope.csv" not in combined, f"the error should not quote the path: {combined!r}"

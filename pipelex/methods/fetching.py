@@ -12,12 +12,15 @@ from pathlib import Path
 from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.schema import MethodsManifest
 from mthds.package.vcs_resolver import clone_at_version, clone_default_branch
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.methods.exceptions import MethodFetchError, MethodPackageSymlinkError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_FETCHED_PACKAGE_FILES, MAX_FETCHED_PACKAGE_TOTAL_BYTES
 from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.methods.structures_check import ensure_no_structured_content_python
 
 GIT_REV_PARSE_TIMEOUT_SECONDS = 30
@@ -102,7 +105,7 @@ def resolve_head_commit_sha(*, clone_dir: Path) -> str:
         )
     except FileNotFoundError as exc:
         msg = "git is not installed or not found on PATH"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.CalledProcessError as exc:
         msg = f"Failed to resolve the fetched commit: {_without_host_directory(text=exc.stderr.strip(), directory=clone_dir)}"
         raise MethodFetchError(msg) from exc
@@ -136,7 +139,7 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
         )
     except FileNotFoundError as exc:
         msg = "git is not installed or not found on PATH"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).with_error_code(PipelexErrorCode.CONFIG_DEPENDENCY_MISSING) from exc
     except subprocess.TimeoutExpired as exc:
         msg = f"Timed out verifying tag '{ref.tag}' of method reference '{ref.ref_str}'"
         raise MethodFetchError(msg) from exc
@@ -145,7 +148,7 @@ def ensure_cloned_at_tag(*, clone_dir: Path, ref: MethodRef) -> None:
             f"'{ref.tag}' in method reference '{ref.ref_str}' does not name a git tag on the repository — "
             f"`@<tag>` pins a git tag (recommended form vX.Y.Z); branch names are not accepted."
         )
-        raise MethodFetchError(msg)
+        raise MethodFetchError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND)
 
 
 def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> None:
@@ -176,17 +179,17 @@ def ensure_package_within_bounds(*, package_dir: Path, package_address: str) -> 
         if file_path.is_symlink():
             relative = "/".join(relative_parts)
             msg = f"Method package '{package_address}' contains a symlink ('{relative}') — fetched packages must not contain symlinks."
-            raise MethodPackageSymlinkError(msg)
+            raise MethodPackageSymlinkError(msg).with_params(path=relative)
         if not file_path.is_file():
             continue
         file_count += 1
         total_bytes += file_path.stat().st_size
         if file_count > MAX_FETCHED_PACKAGE_FILES:
             msg = f"Method package '{package_address}' exceeds the fetched-package ceiling of {MAX_FETCHED_PACKAGE_FILES} files."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TOO_MANY_FILES, limit=MAX_FETCHED_PACKAGE_FILES)
         if total_bytes > MAX_FETCHED_PACKAGE_TOTAL_BYTES:
             msg = f"Method package '{package_address}' exceeds the fetched-package ceiling of {MAX_FETCHED_PACKAGE_TOTAL_BYTES} bytes in total."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TREE_TOO_LARGE, limit=MAX_FETCHED_PACKAGE_TOTAL_BYTES)
 
 
 def fetch_method_package(
@@ -230,12 +233,15 @@ def fetch_method_package(
             clone_default_branch(clone_url=effective_clone_url, destination=dest_dir)
     except VCSFetchError as exc:
         msg = f"Failed to fetch method '{ref.ref_str}': {_without_host_directory(text=exc.message, directory=dest_dir)}"
-        raise MethodFetchError(msg) from exc
+        raise MethodFetchError(msg).for_method_ref(method_ref=ref.ref_str) from exc
 
-    if ref.tag:
-        ensure_cloned_at_tag(clone_dir=dest_dir, ref=ref)
-
-    commit_sha = resolve_head_commit_sha(clone_dir=dest_dir)
+    try:
+        if ref.tag:
+            ensure_cloned_at_tag(clone_dir=dest_dir, ref=ref)
+        commit_sha = resolve_head_commit_sha(clone_dir=dest_dir)
+    except MethodFetchError as fetch_error:
+        # The steps after the clone know the clone, not the reference the caller sent, which the sentences name.
+        raise fetch_error.for_method_ref(method_ref=ref.ref_str)  # ruff: ignore[raise-without-from-inside-except]
     located = locate_package_in_clone(clone_root=dest_dir, requested_address=ref.address)
     ensure_package_within_bounds(package_dir=located.package_dir, package_address=located.full_address)
     if refuse_structures:

@@ -13,10 +13,12 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import INVALID_MAIN_PIPE_MTHDS, STUB_METHOD_ADDRESS, VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 _METHOD_REF = f"{STUB_METHOD_ADDRESS}@v0.1.0"
 
@@ -47,10 +49,10 @@ class TestMethodRefValidate:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is False
-        assert body["validation_errors"], "an invalid verdict must carry a non-empty validation_errors[]"
+        assert body["errors"], "an invalid verdict must carry a non-empty errors[]"
         # The package's real relative file name fed `mthds_sources`, so the diagnostic points
-        # at the owning file rather than carrying a null source.
-        assert body["validation_errors"][0]["source"] == "broken.mthds"
+        # at the owning file rather than carrying no file.
+        assert body["errors"][0]["location"]["file"] == "broken.mthds"
 
     def test_resolution_failure_is_non_2xx_problem_json_never_a_false_verdict(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
@@ -59,7 +61,8 @@ class TestMethodRefValidate:
         assert response.status_code == 404, response.text
         assert response.headers["content-type"] == "application/problem+json"
         body = response.json()
-        assert body["error_type"] == "MethodPackageNotFoundError"
+        assert body["code"] == CoreCode.METHOD_NOT_FOUND
+        assert body["status"] == 404
         # The verdict discipline: no verdict was produced, so nothing here says `is_valid`.
         assert "is_valid" not in body
 
@@ -68,14 +71,13 @@ class TestMethodRefValidate:
         client = _build_client()
         both = client.post("/v1/validate", json={"method_ref": _METHOD_REF, "mthds_contents": [VALID_MTHDS]})
         neither = client.post("/v1/validate", json={})
-        for response in (both, neither):
-            assert response.status_code == 422, response.text
-            assert response.headers["content-type"] == "application/problem+json"
-            assert "exactly one of" in response.json()["detail"]
+        # The request model's own rule names the field to change: the second selector sent, or the first when none is.
+        # Its message is the operator's to read.
+        assert_problem(both, status=422, code="request.invalid", field="method_ref")
+        assert_problem(neither, status=422, code="request.invalid", field="mthds_contents")
 
     def test_mthds_sources_do_not_accompany_a_method_ref(self, install_method_package: Callable[..., Path]):
         install_method_package(files={"documents.mthds": VALID_MTHDS})
         client = _build_client()
         response = client.post("/v1/validate", json={"method_ref": _METHOD_REF, "mthds_sources": ["main.mthds"]})
-        assert response.status_code == 422, response.text
-        assert "named by their tree paths" in response.json()["detail"]
+        assert_problem(response, status=422, code="request.invalid", field="mthds_sources")

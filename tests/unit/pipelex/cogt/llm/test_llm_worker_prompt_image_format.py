@@ -10,9 +10,9 @@ import base64
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.exceptions import PromptImageFormatError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBase64, PromptImageBinary, PromptImageUri
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -23,6 +23,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -81,6 +82,7 @@ def _make_llm_job(*, user_images: list[PromptImage]) -> LLMJob:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMWorkerPromptImageFormat:
+    @pytest.mark.builds_problems_without_required_params(reason="a prompt image reaches the worker by its position, with no input name")
     @pytest.mark.parametrize(
         "pdf_image",
         [
@@ -97,7 +99,10 @@ class TestLLMWorkerPromptImageFormat:
             await worker.gen_text(llm_job=_make_llm_job(user_images=[png_image, pdf_image]))
 
         assert str(exc_info.value) == ("Prompt image 2 given to model 'gpt-vision-test' is a PDF document (.pdf), not an image.")
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"format": "pdf", "model": "gpt-vision-test"}
         assert worker.nb_provider_calls == 0
 
     @pytest.mark.parametrize(

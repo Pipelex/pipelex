@@ -97,6 +97,9 @@ output = "Summary"
 prompt = "Summarize $topic"
 """
 
+    # Both branches of the parallel give a list to a single field: two multiplicity faults in one combine.
+    PARALLEL_TWO_MULTIPLICITIES_MTHDS: ClassVar[str] = PARALLEL_MTHDS.replace('output = "Summary"', 'output = "Summary[]"')
+
     # A step force-unwraps ('!') an optional input the caller left out: a caller-facing failure.
     FORCE_MTHDS: ClassVar[str] = """
 domain = "located_failure_force"
@@ -118,7 +121,7 @@ template = "Clause: {{ clause }}"
 """
 
 
-class StrictMethodFaultsTestData:
+class RunFaultViewsTestData:
     """Bundles whose runs fail on a fault in the caller's own method, and on faults that are not the caller's."""
 
     # A sequence whose first step needs an input the caller may leave out of the request.
@@ -191,6 +194,50 @@ template = "An idea about $topic"
 type = "PipeCompose"
 description = "Write a one-line overview"
 output = "Overview"
+template = "One idea."
+"""
+
+    # The text a deployment's own structure class writes when its validator refuses a combination, which only the
+    # operator may read: it is the deployment's code talking, not the caller's method.
+    DEPLOYMENT_VALIDATOR_TEXT: ClassVar[str] = "Deployment rule DR-7 refused this review: internal threshold 0.83 not met"
+
+    # A parallel whose output concept takes the structure class a deployment loaded from its own library, the class
+    # named after the concept, whose model validator refuses every combination.
+    DEPLOYMENT_VALIDATOR_MTHDS: ClassVar[str] = """
+domain = "run_fault_views_deployment"
+description = "A parallel whose output's structure class is the deployment's own"
+
+[concept.RunFaultViewsValidatedReview]
+description = "An idea and an overview, validated by the deployment's own structure class"
+
+[pipe.flow]
+type = "PipeSequence"
+description = "Review the topic"
+inputs = { topic = "Text" }
+output = "RunFaultViewsValidatedReview"
+steps = [{ pipe = "analyze", result = "review" }]
+
+[pipe.analyze]
+type = "PipeParallel"
+description = "Draft an idea and an overview at the same time"
+inputs = { topic = "Text" }
+output = "RunFaultViewsValidatedReview"
+branches = [
+  { pipe = "draft_idea", result = "idea" },
+  { pipe = "write_overview", result = "overview" },
+]
+
+[pipe.draft_idea]
+type = "PipeCompose"
+description = "Draft one idea about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "An idea about $topic"
+
+[pipe.write_overview]
+type = "PipeCompose"
+description = "Write a one-line overview"
+output = "Text"
 template = "One idea."
 """
 
@@ -566,6 +613,269 @@ inputs = { description = "Text" }
 output = "Text"
 model = "$writing-creative"
 prompt = "Pitch this company in one sentence: $description"
+"""
+
+
+class RenderTimeTemplateTestData:
+    """Bundles whose template names a filter its environment lacks inside a branch, which only rendering that branch finds."""
+
+    UNKNOWN_FILTER: ClassVar[str] = "frob_the_lane"
+    # Text of the templates that no refusal may quote.
+    TEMPLATE_TEXT: ClassVar[str] = "quietly_routed"
+
+    # A condition whose expression parses and compiles, since its unknown filter sits in a branch, and which a run taking
+    # that branch cannot render.
+    CONDITION_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_condition"
+description = "Send a parcel down the lane the request names"
+main_pipe   = "route_parcel"
+
+[concept]
+Parcel = "A parcel waiting at the sorting bench"
+
+[pipe.route_parcel]
+type                = "PipeCondition"
+description         = "Choose the lane a parcel goes down"
+inputs              = { parcel = "Parcel", lane = "Text" }
+output              = "Parcel"
+<expression-line>
+outcomes            = { express = "send_express" }
+default_outcome     = "send_standard"
+
+[pipe.send_express]
+type        = "PipeCompose"
+description = "Note the parcel onto the express lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Express: $parcel"
+
+[pipe.send_standard]
+type        = "PipeCompose"
+description = "Note the parcel onto the standard lane"
+inputs      = { parcel = "Parcel" }
+output      = "Parcel"
+template    = "Standard: $parcel"
+"""
+
+    # Replaced by the condition's field, written as a template or as an expression, each with the branch in it.
+    EXPRESSION_LINE_SLOT: ClassVar[str] = "<expression-line>"
+    EXPRESSION_TEMPLATE_LINE: ClassVar[str] = (
+        "expression_template = \"{% if lane.text == 'express' %}{{ lane.text | frob_the_lane }}{% else %}quietly_routed{% endif %}\""
+    )
+    EXPRESSION_LINE: ClassVar[str] = "expression = \"lane.text | frob_the_lane if lane.text == 'express' else 'quietly_routed'\""
+
+    # Replaced by the prompt field each case puts the branch in, `prompt` or `system_prompt`.
+    PROMPT_FIELD_SLOT: ClassVar[str] = "<prompt-field>"
+    # A step whose prompt is only parsed at load, so its unknown filter in a branch passes the load and fails the render.
+    LLM_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_llm"
+description = "Summarize a topic"
+main_pipe   = "summarize"
+
+[pipe.summarize]
+type        = "PipeLLM"
+description = "Summarize the topic"
+inputs      = { topic = "Text" }
+output      = "Text"
+<prompt-field> = "{% if topic %}Summarize {{ topic.text | frob_the_lane }}{% else %}quietly_routed{% endif %}"
+"""
+    # The other prompt field, which renders, beside the one naming the unknown filter.
+    PLAIN_PROMPT: ClassVar[str] = 'prompt = "Summarize $topic"'
+
+    # A filter the deployment's structure-prompt template names and its environment lacks, which no method wrote.
+    UNKNOWN_STRUCTURE_FILTER: ClassVar[str] = "frob_the_structure"
+    # The deployment's structure-prompt template, edited to name that filter inside a branch.
+    BROKEN_STRUCTURE_PROMPT: ClassVar[str] = "{% if class_structure_str %}{{ class_structure_str | frob_the_structure }}{% endif %}"
+    # A step with a structured output, whose prompt renders and whose structure prompt is the deployment's template.
+    STRUCTURED_LLM_MTHDS: ClassVar[str] = """
+domain      = "render_time_template_structure"
+description = "Read a parcel label"
+main_pipe   = "read_label"
+
+[concept.ParcelLabel]
+description = "The label on a parcel"
+
+[concept.ParcelLabel.structure]
+recipient = { type = "text", description = "Who the parcel is for" }
+
+[pipe.read_label]
+type        = "PipeLLM"
+description = "Read the label off a note"
+inputs      = { note = "Text" }
+output      = "ParcelLabel"
+prompt      = "Read the label from $note"
+"""
+
+
+class SecurityRefusalTestData:
+    """Runs a security rule refuses, mid-run, before the run and at a template's render, and what none of their events may quote."""
+
+    READ_SCOPE: ClassVar[str] = "org_abc"
+    STORAGE_SCOPE: ClassVar[str] = "org_abc/mt_1/run_1"
+    EXTRAS: ClassVar[dict[str, str]] = {"org_id": "org_abc"}
+
+    # Another tenant's storage key, which a construct turns into an image URL the next step shows a model.
+    FOREIGN_KEY: ClassVar[str] = "pipelex-storage://org_other/mt_y/run_9/assets/payroll.png"
+    FORGED_IMAGE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_forged_image"
+description = "Forge an image URL from plain text, then show the image to a model"
+main_pipe = "describe_forged_photo"
+
+[concept.Photo]
+description = "A photo with a caption"
+
+[concept.Photo.structure]
+caption = { type = "text", description = "The caption" }
+picture = { type = "concept", concept_ref = "native.Image", description = "The picture" }
+
+[pipe.describe_forged_photo]
+type = "PipeSequence"
+description = "Forge a photo from a text, then describe it"
+inputs = { where = "Text" }
+output = "Text"
+steps = [
+  { pipe = "forge_photo", result = "photo" },
+  { pipe = "describe_photo", result = "description" },
+]
+
+[pipe.forge_photo]
+type = "PipeCompose"
+description = "Build a photo whose URL is the text it was given"
+inputs = { where = "Text" }
+output = "Photo"
+
+[pipe.forge_photo.construct]
+caption = "forged"
+
+[pipe.forge_photo.construct.picture]
+url = { template = "{{ where }}" }
+
+[pipe.describe_photo]
+type = "PipeLLM"
+description = "Describe the photo"
+inputs = { photo = "Photo" }
+output = "Text"
+prompt = \"\"\"
+Describe this image.
+$photo.picture
+\"\"\"
+"""
+
+    # A path on the server's disk passed as an image input, which the input seam refuses before the run exists.
+    LOCAL_PATH: ClassVar[str] = "/etc/passwd"
+    DESCRIBE_IMAGE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_input"
+description = "Describe an image input"
+main_pipe = "describe_image"
+
+[pipe.describe_image]
+type = "PipeLLM"
+description = "Describe an image"
+inputs = { photo = "Image" }
+output = "Text"
+prompt = \"\"\"
+Describe this image.
+$photo
+\"\"\"
+"""
+
+    # A template reading a private name off a value, which passes the load and which the sandbox refuses at render.
+    PRIVATE_READ_TEMPLATE: ClassVar[str] = "Talk about {{ topic['_owner'] }}"
+    # The same name, written by the template inside a string literal that the sandboxed `format` reads it through.
+    FORMAT_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {{ '{0._owner}'.format(topic) }}"
+    # A template that fails at render for a reason no security rule has, a method the value lacks.
+    MISSING_METHOD_TEMPLATE: ClassVar[str] = "Talk about {{ topic.model_dump_json() }}"
+    # A template looking a name up from the run's data, and a topic naming a private attribute: the sandbox refuses a name
+    # that is the run's input, which no problem may carry.
+    DATA_NAMED_TEMPLATE: ClassVar[str] = "Talk about {{ topic[topic.text] }}"
+    DATA_NAMED_TOPIC: ClassVar[str] = "_quokka_marmalade_4471"
+    # The same lookup, in a template whose condition compares the topic to a string literal holding the name the data
+    # chose as a word: a literal no access reads names nothing the template reached for.
+    DATA_NAMED_BESIDE_LITERAL_TEMPLATE: ClassVar[str] = "Talk about {% if topic.text == 'debug _token' %}debug{% endif %}{{ topic[topic.text] }}"
+    DATA_NAMED_BESIDE_LITERAL_TOPIC: ClassVar[str] = "_token"
+    TOPIC: ClassVar[str] = "the quarterly payroll"
+    COMPOSE_MTHDS_SLOT: ClassVar[str] = "TEMPLATE_SLOT"
+    COMPOSE_MTHDS: ClassVar[str] = """
+domain = "security_refusal_template"
+description = "Compose a line about a topic"
+main_pipe = "say"
+
+[pipe.say]
+type = "PipeCompose"
+description = "Say something about the topic"
+inputs = { topic = "Text" }
+output = "Text"
+template = "TEMPLATE_SLOT"
+"""
+
+
+class RunContentMarkerTestData:
+    """Steps that each fail on the run's own data, which carries a marker no log line and no view may hold."""
+
+    # A value no secret pattern matches, so no redaction hides it: only the raise sites' own rule can keep it out.
+    MARKER: ClassVar[str] = "zebra-quartz-ledger-5521"
+
+    # One step per family of raise site: the input shaper, the content factory, a method's function, the composer and a
+    # structure refusing the model's answer, the stand-in model answering the marker for every field.
+    MTHDS: ClassVar[str] = """
+domain = "run_content_marker"
+description = "Steps that each fail on the run's own data"
+
+[concept.Tally]
+description = "A count"
+
+[concept.Tally.structure]
+count = { type = "integer", description = "How many there are", required = true }
+
+[concept.Ticket]
+description = "A ticket and its priority"
+
+[concept.Ticket.structure]
+priority = { choices = ["low", "high"], description = "How urgent it is", required = true }
+
+[pipe.echo_amount]
+type = "PipeCompose"
+description = "Read a number input"
+inputs = { amount = "Number" }
+output = "Text"
+template = "{{ amount }}"
+
+[pipe.echo_tally]
+type = "PipeCompose"
+description = "Read a structured input"
+inputs = { tally = "Tally" }
+output = "Text"
+template = "{{ tally.count }}"
+
+[pipe.echo_date]
+type = "PipeCompose"
+description = "Read a date input"
+inputs = { when = "Date" }
+output = "Text"
+template = "{{ when }}"
+
+[pipe.file_note]
+type = "PipeFunc"
+description = "A function whose own refusal quotes its input"
+inputs = { note = "Text" }
+output = "Text"
+function_name = "tests.integration.pipelex.pipeline.test_run_content_stays_out_of_sinks.run_content_quote_the_note"
+
+[pipe.make_ticket]
+type = "PipeCompose"
+description = "Copy a text into a field holding one of its choices"
+inputs = { level = "Text" }
+output = "Ticket"
+
+[pipe.make_ticket.construct]
+priority = { from = "level" }
+
+[pipe.count_notes]
+type = "PipeLLM"
+description = "Ask a model for a count"
+inputs = { note = "Text" }
+output = "Tally"
+prompt = "Count the items in $note"
 """
 
 

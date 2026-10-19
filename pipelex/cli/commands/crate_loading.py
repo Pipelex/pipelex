@@ -17,7 +17,8 @@ from pathlib import Path
 import typer
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 
-from pipelex.interpreter_hub import get_library_manager
+from pipelex.cli.exceptions import BundleClosureEmptyError
+from pipelex.interpreter_hub import get_library_manager, resolve_library_dirs
 from pipelex.libraries.crate_normalization import normalize_crate
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_crate import LibraryCrate
@@ -31,14 +32,17 @@ def load_normalized_crate(*, library_dirs: list[Path] | None) -> LibraryCrate:
     Raises:
         LibraryLoadingError: The library is structurally invalid (a negative verdict).
         PipeLibraryError: A pipe conflict across bundles (a negative verdict).
-        FileNotFoundError: The closure could not be assembled, or it holds no .mthds bundles (no verdict).
+        FileNotFoundError: The closure could not be assembled (no verdict).
+        BundleClosureEmptyError: The closure holds no .mthds bundles (no verdict).
     """
     expanded_library_dirs = [library_dir.expanduser() for library_dir in library_dirs] if library_dirs is not None else None
     library_id = load_libraries_and_activate(expanded_library_dirs)
     crate = get_library_manager().get_crate(library_id)
     if crate is None:
         msg = "no .mthds bundles found in the closure."
-        raise FileNotFoundError(msg)
+        # The local command's own directories, which the person running it named or set as defaults.
+        closure_dirs, _ = resolve_library_dirs(expanded_library_dirs)
+        raise BundleClosureEmptyError(msg).with_params(method_ref=", ".join(str(closure_dir) for closure_dir in closure_dirs))
     # CrateNormalizationError (an internal invariant) is deliberately not caught — it must surface.
     return normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
 
@@ -56,7 +60,7 @@ def load_normalized_crate_or_exit(*, library_dirs: list[Path] | None) -> Library
         # Negative verdict: the library is structurally invalid, so no crate can be produced.
         typer.secho(f"Cannot resolve — the library is invalid:\n{exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, BundleClosureEmptyError) as exc:
         # No verdict: the closure could not even be assembled.
         typer.secho(f"Cannot resolve — {exc}", fg=typer.colors.RED, err=True)
         raise typer.Exit(2) from exc

@@ -2,14 +2,18 @@ import inspect
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
     PipeFactoryErrorData,
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
+from pipelex.errors.problem import ProblemView, make_location, make_problem_item
+from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items
 from pipelex.pipeline import validate_bundle_translation
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER, withholding_host_library_files
@@ -33,11 +37,18 @@ def _mentioning_the_host_file(*, label: str) -> str:
     return f"{label} in '{_HOST_FILE}'"
 
 
+class _MethodSyntaxError(PipelexError):
+    error_code = CoreCode.METHOD_SYNTAX
+
+
 class TestValidateBundleErrorWithholding:
     def test_every_channel_of_the_verdict_is_carried(self) -> None:
         constructor_channels = set(inspect.signature(ValidateBundleError.__init__).parameters) - {"self"}
         assert constructor_channels == _CHANNELS, "a channel added to ValidateBundleError must be carried by withholding_files too"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds every channel's error data in the test, and a residual item names no declaration"
+    )
     def test_every_channel_names_no_withheld_file(self) -> None:
         verdict = ValidateBundleError(
             message=_mentioning_the_host_file(label="raw"),
@@ -56,12 +67,19 @@ class TestValidateBundleErrorWithholding:
                     message=_mentioning_the_host_file(label="instantiation"), source="api://bundle-0.mthds", field_path=""
                 )
             ],
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="post_notice", message=_mentioning_the_host_file(label="dry run"), source=_HOST_FILE)],
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    pipe_code="post_notice",
+                    message=_mentioning_the_host_file(label="dry run"),
+                    source=_HOST_FILE,
+                    code=CoreCode.METHOD_WIRING_INVALID,
+                )
+            ],
         )
 
         withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
 
-        items = withheld.to_error_report().validation_errors or []
+        items = withheld.validation_error_items() or []
         assert [item.message for item in items] == [
             f"blueprint in '{HOST_LIBRARY_FILE_PLACEHOLDER}'",
             f"factory in '{HOST_LIBRARY_FILE_PLACEHOLDER}'",
@@ -73,6 +91,83 @@ class TestValidateBundleErrorWithholding:
         assert [item.source for item in items] == [None, None, None, "api://bundle-0.mthds", None]
         assert [item.field_path for item in items] == [None, None, None, None, None]
         assert _HOST_FILE not in withheld.message
+        # The withheld verdict's problem keeps its items' codes and names the withheld file in no reader's view.
+        problem_items = withheld.to_problem(view=ProblemView.CALLER).errors or []
+        assert problem_items[-1].code == CoreCode.METHOD_WIRING_INVALID
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert _HOST_FILE not in str(withheld.to_problem(view=view).to_wire())
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
+    def test_what_the_raise_site_chose_is_carried(self) -> None:
+        """The code a raise site chose, and the parameters and items it gave, survive the withholding, withheld as the messages are."""
+        item = make_problem_item(
+            code=CoreCode.METHOD_SYNTAX, params={"finding": _mentioning_the_host_file(label="item")}, location=make_location(file=_HOST_FILE)
+        )
+        verdict = (
+            ValidateBundleError(message=_mentioning_the_host_file(label="raw"))
+            .with_error_code(CoreCode.REQUEST_INVALID)
+            .with_params(field=_mentioning_the_host_file(label="field"))
+            .with_items(items=[item])
+        )
+
+        withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+
+        assert withheld.resolve_error_code() == CoreCode.REQUEST_INVALID
+        assert withheld.given_params == {"field": f"field in '{HOST_LIBRARY_FILE_PLACEHOLDER}'"}
+        (withheld_item,) = PipelexError.problem_items(withheld) or []
+        assert withheld_item.code == CoreCode.METHOD_SYNTAX
+        assert withheld_item.location is not None
+        assert withheld_item.location.file == HOST_LIBRARY_FILE_PLACEHOLDER
+        assert _HOST_FILE not in str(withheld_item.as_wire())
+        caller = withheld.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.REQUEST_INVALID
+        assert caller.detail == f"The request's field 'field in '{HOST_LIBRARY_FILE_PLACEHOLDER}'' does not match the route's schema."
+
+    def test_a_host_file_s_side_of_a_name_declared_twice_is_left_to_the_caller_s_side(self) -> None:
+        """A name the caller's content and a host file both declare is one item, the caller's, naming the host file by its placeholder."""
+        caller_side, host_side = duplicate_ref_items(
+            ref_kind=DeclarationKind.PIPE, ref="harbour_board.post_notice", existing_source=_HOST_FILE, incoming_source="api://bundle-0.mthds"
+        )
+        # A conflict declared in two host files keeps both items: no item of the caller's restates it.
+        host_pair = duplicate_ref_items(
+            ref_kind=DeclarationKind.PIPE, ref="harbour_board.pin", existing_source=_HOST_FILE, incoming_source=_HOST_FILE
+        )
+        verdict = ValidateBundleError(
+            message="Duplicate declarations", pipelex_bundle_blueprint_validation_errors=[caller_side, host_side, *host_pair]
+        )
+
+        withheld = verdict.withholding_files(withheld_files={_HOST_FILE}, placeholder=HOST_LIBRARY_FILE_PLACEHOLDER)
+
+        items = withheld.validation_error_items() or []
+        assert [(item.source, item.message) for item in items] == [
+            ("api://bundle-0.mthds", f"Pipe 'harbour_board.post_notice' is declared here and in '{HOST_LIBRARY_FILE_PLACEHOLDER}'."),
+            (None, "Pipe 'harbour_board.pin' is declared twice in this bundle."),
+        ]
+        assert [item.params for item in items] == [
+            {"name": "harbour_board.post_notice", "conflict": "duplicate_declaration"},
+            {"name": "harbour_board.pin", "conflict": "duplicate_declaration"},
+        ]
+
+    def test_an_item_taking_its_cause_s_parameters_names_no_withheld_file(self, tmp_path: Path) -> None:
+        """An item no stage classified reads its cause's parameters, which the withholding reaches too, its sentence with them."""
+        host_library_file = tmp_path / "harbour_board.mthds"
+        host_library_file.write_text('domain = "harbour_board"\n', encoding="utf-8")
+        cause = _MethodSyntaxError("the host's bundle does not parse").with_params(finding=f"unexpected '=' in '{host_library_file}'")
+
+        with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path]):
+            raise ValidateBundleError(message=f"Could not load '{host_library_file}'") from cause
+
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.errors is not None
+        (item,) = caller.errors
+        assert item.code == CoreCode.METHOD_SYNTAX
+        assert item.params is not None
+        assert item.params.as_wire() == {"finding": f"unexpected '=' in '{HOST_LIBRARY_FILE_PLACEHOLDER}'"}
+        assert item.detail == f"The method does not parse (unexpected '=' in '{HOST_LIBRARY_FILE_PLACEHOLDER}')."
+        for view in (ProblemView.CALLER, ProblemView.OPERATOR):
+            assert str(host_library_file) not in str(raised.value.to_problem(view=view).to_wire())
 
     def test_a_withheld_name_counts_only_standing_on_its_own(self) -> None:
         # A host library directory listed relatively names its files relatively, so a host file's name can be the
@@ -106,7 +201,7 @@ class TestValidateBundleErrorWithholding:
         with pytest.raises(ValidateBundleError) as raised, withholding_host_library_files(library_dirs=[tmp_path], caller_sources=[callers_source]):
             raise verdict
 
-        (item,) = raised.value.to_error_report().validation_errors or []
+        (item,) = raised.value.validation_error_items() or []
         assert item.source == callers_source
 
     def test_the_host_s_files_and_the_template_files_its_steps_name_are_found_in_one_walk(self, tmp_path: Path, mocker: MockerFixture) -> None:

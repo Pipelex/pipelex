@@ -30,15 +30,15 @@ not only the folder named, and so are the ``library_dirs`` passed beside it.
 import os
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple, cast
+from typing import Any, NamedTuple, Self, cast
 
 import tomlkit
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.base_exceptions import ValidationErrorItem
 from pipelex.config import get_config
 from pipelex.fix_ops.applier import apply_fix_ops, serialize_and_format
-from pipelex.fix_ops.exceptions import FixWriteConflictError
+from pipelex.fix_ops.exceptions import FixWriteConflictError, FixWriteFailedError
 from pipelex.fix_ops.file_transaction import (
     FileSnapshot,
     PendingFileUpdate,
@@ -54,9 +54,11 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, dirs_beside_method, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.pipeline.validation_errors import ValidationItemCode
 from pipelex.suggested_fix import DeleteKeyOp, DeleteTableOp, EnsureTableOp, FixOp, MoveKeyOp, RemapValueOp, RenameTableKeyOp, SetKeyOp, SuggestedFix
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 _MAIN_PIPE_KEY = "main_pipe"
 
@@ -86,6 +88,9 @@ class FixBundleResult(BaseModel):
     """Distinct files written, in first-write order across iterations (resolved paths)."""
     remaining_errors: list[ValidationErrorItem]
     """The last failed validation's structured errors; empty when ``is_valid``."""
+    remaining_error_codes: list[ValidationItemCode] = Field(default_factory=empty_list_factory_of(ValidationItemCode))
+    """The code each of ``remaining_errors`` takes, in its order, as ``validate`` codes the same errors: a surface that
+    reports them as a problem's items reads its codes here, never re-derived without the verdict that decided them."""
     pending_signatures: list[str] | None = None
     """Qualified refs still declared as ``PipeSignature`` after a successful validation."""
     is_runnable: bool | None = None
@@ -93,6 +98,15 @@ class FixBundleResult(BaseModel):
     bail_reason: str | None = None
     """Why the loop stopped early (no-progress repeat, out-of-scope targets, cross-file
     collision, max_iterations), if it did."""
+
+    @model_validator(mode="after")
+    def _each_remaining_error_has_its_code(self) -> Self:
+        if len(self.remaining_error_codes) != len(self.remaining_errors):
+            msg = (
+                f"{len(self.remaining_errors)} remaining error(s) but {len(self.remaining_error_codes)} code(s): each remaining error takes one code"
+            )
+            raise ValueError(msg)
+        return self
 
 
 def _fix_fingerprint(fix: SuggestedFix) -> str:
@@ -108,7 +122,7 @@ def _fix_fingerprint(fix: SuggestedFix) -> str:
 
 
 def _validation_error_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
-    """Project the error's categorized lists into wire items — same channels as ``to_error_report``."""
+    """Project the error's categorized lists into wire items — the same channels as its problem's items."""
     return exc.validation_error_items()
 
 
@@ -124,6 +138,7 @@ def unfixable_method_result(*, error: ValidateBundleError) -> FixBundleResult:
         fixes_applied=[],
         files_written=[],
         remaining_errors=_validation_error_items(error),
+        remaining_error_codes=error.item_codes(),
     )
 
 
@@ -139,6 +154,18 @@ def _pending_signatures_from_validation_result(validation_result: Any) -> list[s
             return []
         validated_pending_signatures.append(pipe_ref)
     return validated_pending_signatures
+
+
+def _write_failure_path(*, error: OSError, targets: Sequence[Path]) -> Path:
+    """What a failed commit could not write: the target the error names, else the directory of the file it names.
+
+    A target is replaced from a copy staged beside it, so an error naming a file that is no target names that copy, and
+    its directory is what refused the write. An error naming no file names the round's first target.
+    """
+    if error.filename is None:
+        return targets[0]
+    named = Path(os.fsdecode(error.filename))
+    return named if named in targets else named.parent
 
 
 def _absolute_source_path(path: Path) -> Path:
@@ -528,6 +555,7 @@ async def _fix_to_fixed_point(
     written_paths: set[Path] = set()
     apply_rounds = 0
     last_error_items: list[ValidationErrorItem] = []
+    last_error_codes: list[ValidationItemCode] = []
 
     for _ in range(max_iterations):
         # The snapshot lists the method's trees: one that cannot be listed is the invalid verdict, with nothing to fix.
@@ -541,6 +569,7 @@ async def _fix_to_fixed_point(
                 fixes_applied=fixes_applied,
                 files_written=files_written,
                 remaining_errors=_validation_error_items(exc),
+                remaining_error_codes=exc.item_codes(),
             )
         try:
             validation_result = await validate()
@@ -556,6 +585,7 @@ async def _fix_to_fixed_point(
             )
         except ValidateBundleError as exc:
             last_error_items = _validation_error_items(exc)
+            last_error_codes = exc.item_codes()
 
         safe_fixes = _safe_fixes(last_error_items, is_single_file=is_single_file, select_codes=select_codes, ignore_codes=ignore_codes)
         if not safe_fixes:
@@ -565,6 +595,7 @@ async def _fix_to_fixed_point(
                 fixes_applied=fixes_applied,
                 files_written=files_written,
                 remaining_errors=last_error_items,
+                remaining_error_codes=last_error_codes,
             )
 
         bound_fixes = _bind_fixes_to_snapshots(
@@ -584,6 +615,7 @@ async def _fix_to_fixed_point(
                 fixes_applied=fixes_applied,
                 files_written=files_written,
                 remaining_errors=last_error_items,
+                remaining_error_codes=last_error_codes,
                 bail_reason=bail_reason,
             )
 
@@ -602,6 +634,7 @@ async def _fix_to_fixed_point(
                     fixes_applied=fixes_applied,
                     files_written=files_written,
                     remaining_errors=last_error_items,
+                    remaining_error_codes=last_error_codes,
                     bail_reason=bail_reason,
                 )
 
@@ -621,6 +654,7 @@ async def _fix_to_fixed_point(
                 fixes_applied=fixes_applied,
                 files_written=files_written,
                 remaining_errors=last_error_items,
+                remaining_error_codes=last_error_codes,
                 bail_reason=bail_reason,
             )
 
@@ -644,7 +678,14 @@ async def _fix_to_fixed_point(
                 pending_updates.append(PendingFileUpdate(snapshot=snapshot, new_content=serialize_and_format(toml_doc)))
                 round_written_paths.append(target_path)
 
-        commit_file_updates(pending_updates)
+        try:
+            commit_file_updates(pending_updates)
+        except OSError as exc:
+            # The round is rolled back; what failed is a write, never a read of the method.
+            failed_path = _write_failure_path(error=exc, targets=[update.snapshot.path for update in pending_updates])
+            reason = exc.strerror.lower() if exc.strerror else "cannot be written"
+            msg = f"The fix could not write '{failed_path}': {reason}"
+            raise FixWriteFailedError(msg, path=failed_path, reason=reason) from exc
         seen_fingerprints.update(_fix_fingerprint(fix.fix) for fix in new_fixes)
         fixes_applied.extend(round_fixes_applied)
         for target_path in round_written_paths:
@@ -673,5 +714,6 @@ async def _fix_to_fixed_point(
             fixes_applied=fixes_applied,
             files_written=files_written,
             remaining_errors=_validation_error_items(exc),
+            remaining_error_codes=exc.item_codes(),
             bail_reason=f"max_iterations ({max_iterations}) reached without convergence",
         )

@@ -4,17 +4,29 @@ import sys
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
 
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, LLMCompletionRefusedError, LLMCompletionTruncatedError
+from pipelex.cogt.exceptions import (
+    CogtError,
+    CompletionOutputKind,
+    CompletionTruncationLimit,
+    InferenceErrorCategory,
+    LLMCapabilityError,
+    LLMCompletionError,
+    LLMCompletionRefusedError,
+    LLMCompletionTruncatedError,
+    MaxTokensCeiling,
+)
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, describe_instructor_failure
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.inference.prompt_file_checks import check_prompt_documents_are_read, check_prompt_images_are_images
-from pipelex.cogt.llm.completion_stop import CompletionStopOutcome, classify_stop_reason, raise_for_completion_stop
+from pipelex.cogt.llm.completion_stop import CompletionStopOutcome, classify_stop_reason, raise_for_completion_stop, read_incomplete_output
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.usage.token_category import TokenCategory
@@ -90,7 +102,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             return
         if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
             msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @classmethod
     def constrained_job_params(cls, *, inference_model: InferenceModelSpec, job_params: LLMJobParams) -> LLMJobParams | None:
@@ -510,6 +522,74 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             output_tokens=output_tokens,
         )
 
+    def _make_structured_generation_failure(self, *, api_name: str, schema: type[BaseModel], instructor_exc: BaseException) -> LLMCompletionError:
+        """The error of a structured generation `instructor` gave up on, when no exception could be recovered from it.
+
+        Every worker generating objects through `instructor` raises it in that case, `from` the wrapper. Its message names
+        the class of the wrapper's cause (`describe_instructor_failure`), never `instructor`'s own text, which is the
+        last validation error's and quotes the model's answer, the run's data. The common case, the re-asks ending on a
+        refused answer, recovers that `ValidationError` and is classified from it, located by the same schema.
+
+        Args:
+            api_name: The provider's API, as the message names it, such as `Anthropic`.
+            schema: The class the generation was asked for.
+            instructor_exc: The `InstructorRetryException` that ended the generation.
+
+        Returns:
+            The error, `runtime.unexpected`, for the worker to raise.
+        """
+        reason = describe_instructor_failure(instructor_exc=instructor_exc)
+        msg = (
+            f"{api_name} structured generation via 'instructor' failed with model '{self.inference_model.desc}' "
+            f"trying to generate schema '{schema.__name__}': {reason}"
+        )
+        return LLMCompletionError(
+            msg,
+            error_category=InferenceErrorCategory.UNKNOWN,
+            user_action=UserAction(
+                kind=UserActionKind.CONTACT_SUPPORT,
+                detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
+            ),
+        ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
+
+    def _incomplete_output_error(
+        self,
+        *,
+        llm_job: LLMJob,
+        last_completion: Any,
+        max_tokens: int | None,
+        max_tokens_ceiling: MaxTokensCeiling | None = None,
+    ) -> LLMCompletionTruncatedError:
+        """The error for a structured output instructor found cut at its output limit, for the worker to raise.
+
+        instructor reads the stop value of every structured answer it parses, and raises its `IncompleteOutputException`
+        for one cut at the request's output limit, `length` or `max_tokens`, which its re-asks never retry. A worker
+        whose structuring mode can raise it catches it and raises this instead, from it, so the structured output reads
+        `model.output_truncated`, as a text cut at the same limit does, rather than an exception no one classified, and
+        the error says a structured output was cut.
+
+        Args:
+            llm_job: The job whose output it was: its pipe is named by the error.
+            last_completion: The cut answer instructor's exception carries, whose stop value and output tokens are named.
+            max_tokens: The output limit the request sent, None when it sent none.
+            max_tokens_ceiling: Set by a worker that sent a lower max_tokens than it was given, to fit its call's
+                timeout, so the error's next step does not ask for a higher one.
+
+        Returns:
+            The truncation at the output limit, naming the provider's stop value as the answer carries it.
+        """
+        incomplete_output = read_incomplete_output(last_completion=last_completion)
+        return LLMCompletionTruncatedError(
+            model_handle=self.inference_model.name,
+            stop_reason=incomplete_output.stop_reason or "unknown",
+            truncation_limit=CompletionTruncationLimit.MAX_TOKENS,
+            output_kind=CompletionOutputKind.STRUCTURED,
+            pipe_code=llm_job.job_metadata.pipe_code,
+            max_tokens=max_tokens,
+            output_tokens=incomplete_output.output_tokens,
+            max_tokens_ceiling=max_tokens_ceiling,
+        )
+
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
         self._check_vision_support(llm_job=llm_job)
@@ -519,13 +599,17 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if llm_job.llm_prompt.user_images:
             if not self.inference_model.is_vision_supported:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not support vision."
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="images")
 
             nb_images = len(llm_job.llm_prompt.user_images)
             max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
-                raise LLMCapabilityError(msg)
+                raise (
+                    LLMCapabilityError(msg)
+                    .with_error_code(CoreCode.MODEL_CONTEXT_EXCEEDED)
+                    .with_params(limit=ModelContextExceededLimit.PROMPT_IMAGES, count=nb_images, max=max_prompt_images)
+                )
 
             check_prompt_images_are_images(model_name=self.inference_model.name, prompt_images=llm_job.llm_prompt.user_images)
 
@@ -535,7 +619,7 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         if not self.inference_model.is_document_supported:
             msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="documents")
 
         check_prompt_documents_are_read(
             model_name=self.inference_model.name,

@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 from typing import Any, NamedTuple, cast
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.cli.agent_cli.commands.agent_output import agent_argument_error, agent_error, agent_file_error, file_read_failure_reason
 from pipelex.cli.commands.run._inputs_file_loader import load_inputs_dict_from_bytes, load_inputs_dict_from_path, read_default_inputs_file
 from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
@@ -53,13 +55,15 @@ def _extract_stuff_entry(stuff_data: dict[str, Any], *, stuff_name: str) -> dict
     if concept_data is None or content_data is None:
         return None
     if not isinstance(concept_data, str):
-        # Not a JSONDecodeError: the envelope parsed. What failed is its *shape* — the concept
-        # field holds something the CLI I/O contract does not put there — and the label is a
-        # machine contract, so it must not send a consumer hunting for trailing commas.
-        agent_error(
+        # Not a parse failure: the envelope parsed. What failed is its *shape* — the concept field holds
+        # something the CLI I/O contract does not put there — and the reason says so, so it does not send
+        # a consumer hunting for trailing commas.
+        agent_argument_error(
             f"stdin envelope has invalid 'working_memory.root.{stuff_name}.concept': "
-            f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}",
-            error_type="StdinEnvelopeShapeError",
+            f"expected the concept ref string '<domain>.<Code>', got {type(concept_data).__name__}. "
+            "Replace the concept object with its ref, or re-pipe the output of a current 'pipelex-agent run --with-memory'.",
+            argument="stdin",
+            reason=f"working_memory.root.{stuff_name}.concept is not a concept ref string",
         )
     return {
         "concept": concept_data,
@@ -91,12 +95,16 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 
     working_memory_raw: Any = stdin_data[WORKING_MEMORY_KEY]
     if not isinstance(working_memory_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory': expected a dict", error_type="JSONDecodeError")
+        agent_argument_error(
+            "stdin envelope has invalid 'working_memory': expected a dict", argument="stdin", reason="working_memory is not an object"
+        )
     working_memory = cast("dict[str, Any]", working_memory_raw)
 
     root_raw: Any = working_memory.get("root", {})
     if not isinstance(root_raw, dict):
-        agent_error("stdin envelope has invalid 'working_memory.root': expected a dict", error_type="JSONDecodeError")
+        agent_argument_error(
+            "stdin envelope has invalid 'working_memory.root': expected a dict", argument="stdin", reason="working_memory.root is not an object"
+        )
     root = cast("dict[str, Any]", root_raw)
 
     aliases_raw: Any = working_memory.get("aliases", {})
@@ -174,7 +182,7 @@ def parse_cli_inputs(
         try:
             detected_inputs = read_default_inputs_file(directory=auto_inputs_dir)
         except (AmbiguousInputsFilesError, AutoDetectedInputsFileError) as inputs_file_exc:
-            agent_error(inputs_file_exc.message, error_type=type(inputs_file_exc).__name__, cause=inputs_file_exc)
+            agent_error(inputs_file_exc.message, cause=inputs_file_exc)
         if detected_inputs is not None:
             # Parsed from the bytes the probe read without following a link, never by opening the path again.
             return _parse_inputs_file(inputs_path=detected_inputs.path, label=str(detected_inputs.path), data=detected_inputs.data)
@@ -196,7 +204,7 @@ def _parse_inputs_arg(inputs_arg: str) -> ParsedCliInputs:
         try:
             result: dict[str, Any] = json.loads(inputs_arg)
         except json.JSONDecodeError as exc:
-            agent_error(f"Failed to parse inline JSON inputs: {exc}", error_type="JSONDecodeError", cause=exc)
+            agent_argument_error(f"Failed to parse inline JSON inputs: {exc}", argument="--inputs", reason="not valid JSON", cause=exc)
         return ParsedCliInputs(pipeline_inputs=result, inputs_base_dir=None)
     # expanduser so a quoted / `=`-form `~/inputs.json` resolves to the home dir, not a
     # literal `~` component (unquoted `~` is shell-expanded, but the quoted/`=` forms are not).
@@ -223,13 +231,20 @@ def _parse_inputs_file(*, inputs_path: Path, label: str, data: bytes | None) -> 
         base_dir = inputs_path.parent.resolve()
         return ParsedCliInputs(pipeline_inputs=resolve_inputs_paths(loaded, base_dir=base_dir), inputs_base_dir=base_dir)
     except FileNotFoundError as exc:
-        agent_error(f"Input file not found: {label}", error_type="FileNotFoundError", cause=exc)
+        agent_file_error(f"Input file not found: {label}", path=label, reason="not found", cause=exc)
     except json.JSONDecodeError as exc:
-        agent_error(f"Input file contains invalid JSON: {label}: {exc}", error_type="JSONDecodeError", cause=exc)
+        # A subclass of ValueError, never of the read failures below.
+        agent_argument_error(f"Input file contains invalid JSON: {label}: {exc}", argument="--inputs", reason="the file is not valid JSON", cause=exc)
+    except (OSError, UnicodeDecodeError) as exc:
+        reason = file_read_failure_reason(error=exc)
+        agent_file_error(f"Input file cannot be read: {label}: {reason}", path=label, reason=reason, cause=exc)
     except JsonTypeError as exc:
-        agent_error(f"Input file must be a valid JSON dictionary: {label}", error_type="JsonTypeError", cause=exc)
+        agent_argument_error(
+            f"Input file must be a valid JSON dictionary: {label}", argument="--inputs", reason="the file does not hold a JSON object", cause=exc
+        )
     except TomlError as exc:
-        agent_error(exc.message, error_type="TomlError", cause=exc)
+        # The inputs file is the caller's request, not the runtime's configuration.
+        agent_error(exc.message, cause=exc.with_error_code(CoreCode.REQUEST_MALFORMED))
 
 
 def _read_stdin_inputs() -> dict[str, Any] | None:
@@ -249,10 +264,10 @@ def _read_stdin_inputs() -> dict[str, Any] | None:
     try:
         parsed: Any = json.loads(stdin_raw)
     except json.JSONDecodeError as exc:
-        agent_error(f"Failed to parse stdin JSON: {exc}", error_type="JSONDecodeError", cause=exc)
+        agent_argument_error(f"Failed to parse stdin JSON: {exc}", argument="stdin", reason="not valid JSON", cause=exc)
 
     if not isinstance(parsed, dict):
-        agent_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, error_type="JSONDecodeError")
+        agent_argument_error("stdin JSON must be a dictionary, got " + type(parsed).__name__, argument="stdin", reason="not a JSON object")
 
     parsed_dict = cast("dict[str, Any]", parsed)
     return resolve_stdin_inputs(parsed_dict)

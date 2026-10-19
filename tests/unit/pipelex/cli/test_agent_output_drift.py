@@ -1,124 +1,195 @@
-"""Drift-detection tests for the agent CLI error lookup dicts.
+import ast
+from pathlib import Path
+from typing import Any, cast
 
-AGENT_ERROR_HINTS / AGENT_ERROR_DOMAINS / RETRYABLE_ERROR_TYPES are string-keyed
-by exception class name (or synthetic error_type label). These tests catch:
-- stale keys left behind when an exception class is renamed or deleted;
-- a PipelexError subclass that carries class-level metadata yet still has a
-  redundant lookup-dict entry (the class must be the single source of truth).
-"""
+import pytest
+from mthds.protocol.exceptions import PipelineRequestError
+from pipelex_sdk.error_models import RunErrorReport
+from pipelex_sdk.errors import ApiResponseError, RunFailedError
+from pipelex_sdk.runs import RunStatus
+from pydantic import BaseModel
 
-import importlib
-
-from pipelex.base_exceptions import PipelexError
-from pipelex.cli.agent_cli.commands.agent_output import AGENT_ERROR_DOMAINS, AGENT_ERROR_HINTS, RETRYABLE_ERROR_TYPES
-from pipelex.cogt.exceptions import CogtError
-
-# Modules defining every PipelexError subclass referenced by the lookup dicts.
-# Imported so PipelexError.__subclasses__() sees them when the registry is built.
-_EXCEPTION_MODULES: tuple[str, ...] = (
-    "pipelex.codegen.exceptions",
-    "pipelex.cogt.exceptions",
-    "pipelex.mthds_parsing.exceptions",
-    "pipelex.core.pipes.exceptions",
-    "pipelex.pipe_operators.exceptions",
-    "pipelex.pipeline.exceptions",
-    "pipelex.pipeline.validate_bundle",
-    "pipelex.system.telemetry.exceptions",
-    "pipelex.tools.misc.json_utils",
-    "pipelex.tools.misc.toml_utils",
+import pipelex.cli.agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import problem_payload
+from pipelex.cli.agent_cli.commands.run._run_hosted import PROBLEM_PARTS as READ_PROBLEM_PARTS
+from pipelex.cli.agent_cli.commands.run._run_hosted import hosted_failure_problem
+from pipelex.errors.problem import PipelexProblem
+from tests.unit.pipelex.cli.agent_cli.test_data import (
+    HostedPlaneRefusals,
+    OperatorViewAnswers,
+    RunnerOwnRefusals,
+    StoredRunReports,
+    UndeclaredMembers,
 )
 
-# Lookup-dict keys that are intentionally NOT PipelexError subclasses and
-# therefore cannot carry class-level metadata:
-# - builtin / third-party exception classes
-# - synthetic error_type labels passed straight to agent_error(...)
-_NON_PIPELEX_ERROR_KEYS: frozenset[str] = frozenset(
-    {
-        "FileNotFoundError",  # builtin
-        "JSONDecodeError",  # json builtin
-        "ValueError",  # builtin
-        "ValidationError",  # pydantic
-        "PipeValidationError",  # subclass of ValueError, not of PipelexError
-        "ArgumentError",  # synthetic error_type label
-        "BinaryNotFoundError",  # synthetic error_type label
-        "FixBundleError",  # synthetic error_type label
-        "GraphSpecParseError",  # synthetic error_type label
-        "BundleError",  # synthetic error_type label
-        "CodegenDriftError",  # synthetic error_type label (a drift verdict, not an exception)
-        "CodegenLockNotFoundError",  # synthetic error_type label
-        "InitConfigError",  # synthetic error_type label
-        "StdinEnvelopeShapeError",  # synthetic error_type label
-        "UnknownCommandError",  # synthetic error_type label
-    }
+# The functions that report a problem and take the command's own members as keyword arguments.
+_PROBLEM_REPORTERS: frozenset[str] = frozenset({"agent_error", "agent_argument_error", "agent_file_error"})
+
+# The members of the retired envelope, which a problem carries under its own names (code, domain, retry, next_step,
+# errors, diagnostics) or not at all.
+_RETIRED_ENVELOPE_MEMBERS: frozenset[str] = frozenset(
+    {"error", "error_type", "error_domain", "error_code", "error_category", "retryable", "hint", "validation_errors", "error_source"}
 )
 
+# The members only the retired envelope wrote, beside those above: the hosted run's own, read off the hosted plane's answer.
+_RETIRED_HOSTED_MEMBERS: frozenset[str] = frozenset({"http_status", "retry_after_seconds", "run_status"})
 
-def _all_pipelex_error_subclasses() -> set[type[PipelexError]]:
-    """Return every imported PipelexError subclass, walking the hierarchy recursively."""
-    for module_name in _EXCEPTION_MODULES:
-        importlib.import_module(module_name)
-    collected: set[type[PipelexError]] = set()
-    pending: list[type[PipelexError]] = [PipelexError]
-    while pending:
-        current = pending.pop()
-        for subclass in current.__subclasses__():
-            if subclass not in collected:
-                collected.add(subclass)
-                pending.append(subclass)
-    return collected
+
+# The parameters of ``client.argument_invalid``, which ``agent_argument_error`` takes.
+_ARGUMENT_REFUSAL_PARAMS: frozenset[str] = frozenset({"argument", "reason"})
+
+
+def _written_member(*, node: ast.AST) -> str | None:
+    """The string a dictionary display or a subscript assignment writes as a key, ``None`` for any other node."""
+    match node:
+        case ast.Dict(keys=keys):
+            for key in keys:
+                if isinstance(key, ast.Constant) and isinstance(key.value, str) and key.value in _RETIRED_ENVELOPE_MEMBERS | _RETIRED_HOSTED_MEMBERS:
+                    return key.value
+            return None
+        case ast.Assign(targets=targets):
+            for target in targets:
+                if isinstance(target, ast.Subscript) and isinstance(target.slice, ast.Constant):
+                    written = target.slice.value
+                    if isinstance(written, str) and written in _RETIRED_ENVELOPE_MEMBERS | _RETIRED_HOSTED_MEMBERS:
+                        return written
+            return None
+        case _:
+            return None
+
+
+# The parts of a reported problem, each read against the model that declares its members: the parts the reader of a
+# runner's answer walks, and the nested run's problem, which it reads as a problem of its own. A problem's `params` and
+# a fix's `ops` are the code's and the operation's own, so they are not walked.
+_PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
+    **READ_PROBLEM_PARTS,
+    PipelexProblem: {**READ_PROBLEM_PARTS[PipelexProblem], "run_error": PipelexProblem},
+}
+
+# The command's own sentence, which rides beside the problem's members.
+_COMMAND_MEMBERS: frozenset[str] = frozenset({"message"})
+
+
+def _undeclared_members(*, document: dict[str, Any], shape: type[BaseModel], path: str) -> list[str]:
+    """The members of ``document`` and of the parts it nests that their model does not declare, by their path."""
+    allowed: set[str] = set(shape.model_fields)
+    if path == "problem":
+        allowed |= _COMMAND_MEMBERS
+    offenders = [f"{path}.{name}" for name in document if name not in allowed]
+    for name, part_shape in _PROBLEM_PARTS.get(shape, {}).items():
+        part = document.get(name)
+        if isinstance(part, dict):
+            offenders += _undeclared_members(document=cast("dict[str, Any]", part), shape=part_shape, path=f"{path}.{name}")
+        elif isinstance(part, list):
+            for index_item, item in enumerate(cast("list[Any]", part)):
+                if isinstance(item, dict):
+                    offenders += _undeclared_members(document=cast("dict[str, Any]", item), shape=part_shape, path=f"{path}.{name}[{index_item}]")
+    return offenders
+
+
+def _refusal(*, status: int, body: str) -> ApiResponseError:
+    """A refusal of the run request as the client raises it, the answer read the way the client reads it."""
+    return ApiResponseError(
+        f"API POST /v1/start failed ({status})",
+        api_url="https://hosted.test",
+        status=status,
+        status_text="Refused",
+        response_body=body,
+        headers={},
+        may_start_run=True,
+    )
+
+
+def _reported_failures() -> list[PipelineRequestError]:
+    """Failures of a run on a runner whose answers carry members no reader declares, at every level."""
+    return [
+        _refusal(status=422, body=UndeclaredMembers.SENT),
+        _refusal(status=401, body=HostedPlaneRefusals.UNAUTHORIZED),
+        _refusal(status=429, body=HostedPlaneRefusals.RATE_LIMITED_BODY_DELAY),
+        _refusal(status=409, body=OperatorViewAnswers.UNREADABLE_REQUEST_ID),
+        _refusal(status=422, body=RunnerOwnRefusals.RESERVED_OBJECT_KEY),
+        RunFailedError(
+            "Run finished with status FAILED",
+            run_id="run_9",
+            status=RunStatus.FAILED,
+            error=RunErrorReport.model_validate(StoredRunReports.PROBLEM_WITH_REPORT_MEMBERS),
+        ),
+        RunFailedError(
+            "Run finished with status FAILED",
+            run_id="run_9",
+            status=RunStatus.FAILED,
+            error=RunErrorReport.model_validate(StoredRunReports.FORMER_SHAPE_WITH_ITEMS),
+        ),
+    ]
+
+
+def _reporter_name(*, call: ast.Call) -> str | None:
+    match call.func:
+        case ast.Name(id=name):
+            return name
+        case ast.Attribute(attr=name):
+            return name
+        case _:
+            return None
 
 
 class TestAgentOutputDrift:
-    """Guards the agent CLI lookup dicts against class renames and redundant entries."""
+    def test_no_call_site_passes_a_member_of_the_retired_envelope(self) -> None:
+        """No agent CLI call site passes a member of the envelope the problem replaced.
 
-    def test_every_dict_key_is_a_known_error_type(self) -> None:
-        """Every lookup-dict key resolves to a PipelexError subclass or a documented non-PipelexError type."""
-        known_pipelex_names = {cls.__name__ for cls in _all_pipelex_error_subclasses()}
-        all_keys = set(AGENT_ERROR_HINTS) | set(AGENT_ERROR_DOMAINS) | set(RETRYABLE_ERROR_TYPES)
-        for key in all_keys:
-            assert key in known_pipelex_names or key in _NON_PIPELEX_ERROR_KEYS, (
-                f"Lookup-dict key {key!r} is neither a known PipelexError subclass nor a documented "
-                f"non-PipelexError type — likely a stale entry after a rename or delete."
-            )
-
-    def test_class_level_error_domain_not_duplicated_in_dict(self) -> None:
-        """A subclass that declares class-level error_domain must not also sit in AGENT_ERROR_DOMAINS."""
-        for cls in _all_pipelex_error_subclasses():
-            if cls.error_domain is not None:
-                assert cls.__name__ not in AGENT_ERROR_DOMAINS, (
-                    f"{cls.__name__} carries a class-level error_domain; its AGENT_ERROR_DOMAINS entry "
-                    f"is redundant — remove it so the class is the single source of truth."
-                )
-
-    def test_category_derived_error_domain_not_duplicated_in_dict(self) -> None:
-        """A CogtError subclass whose error_category derives a domain must not sit in AGENT_ERROR_DOMAINS either.
-
-        Such a class self-describes without declaring an ``error_domain`` of its own:
-        ``InferenceErrorCategory.error_domain`` derives one and ``CogtError.to_error_report()``
-        puts it on the report, so ``agent_error()``'s report-first read always wins and the
-        lookup entry is unreachable. ``test_class_level_error_domain_not_duplicated_in_dict``
-        does not catch these, because the class attribute is genuinely ``None``.
+        ``agent_error`` takes a command's own members as ``**extra``, so a leftover ``error_type=`` or ``hint=`` would
+        not fail: it would ride beside the problem under a name consumers used to read as the envelope's.
         """
-        for cls in _all_pipelex_error_subclasses():
-            if not issubclass(cls, CogtError):
-                continue
-            category = cls.error_category
-            if category is None:
-                continue
-            derived_domain = category.error_domain
-            if derived_domain is None:
-                continue
-            assert cls.__name__ not in AGENT_ERROR_DOMAINS, (
-                f"{cls.__name__} derives error_domain {derived_domain!r} from its {category!r} category, "
-                f"so its AGENT_ERROR_DOMAINS entry can never be read — remove it. If that derived domain "
-                f"is wrong for this class, declare an explicit class-level error_domain on the class instead."
-            )
+        package_dir = Path(pipelex.cli.agent_cli.__file__).parent
+        offenders: list[str] = []
+        for source_file in sorted(package_dir.rglob("*.py")):
+            tree = ast.parse(source_file.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Call) or _reporter_name(call=node) not in _PROBLEM_REPORTERS:
+                    continue
+                reporter = _reporter_name(call=node)
+                for keyword in node.keywords:
+                    if keyword.arg in _RETIRED_ENVELOPE_MEMBERS:
+                        offenders.append(f"{source_file.relative_to(package_dir)}:{node.lineno} passes {keyword.arg}=")
+                    elif reporter == "agent_error" and keyword.arg in _ARGUMENT_REFUSAL_PARAMS:
+                        # The parameters of client.argument_invalid, passed to agent_error, ride as members of the
+                        # command's own beside a problem with no code of theirs: the call meant agent_argument_error.
+                        offenders.append(f"{source_file.relative_to(package_dir)}:{node.lineno} passes {keyword.arg}= to agent_error")
+        assert not offenders, (
+            "These calls pass a member of the envelope the problem replaced; name a code (code=, params=) or let the "
+            f"cause's own problem speak: {offenders}"
+        )
 
-    def test_class_level_user_action_not_duplicated_in_dict(self) -> None:
-        """A subclass that declares class-level user_action must not also sit in AGENT_ERROR_HINTS."""
-        for cls in _all_pipelex_error_subclasses():
-            if cls.user_action is not None:
-                assert cls.__name__ not in AGENT_ERROR_HINTS, (
-                    f"{cls.__name__} carries a class-level user_action; its AGENT_ERROR_HINTS entry "
-                    f"is redundant — remove it so the class is the single source of truth."
-                )
+    def test_no_agent_cli_module_writes_a_member_of_the_retired_envelope(self) -> None:
+        """No agent CLI module builds a payload with a member of the envelope the problem replaced, a hosted run's included.
+
+        A run on a runner used to leave in that envelope, built by hand as a dictionary; its failure is now the problem the
+        runner or the client produced, so no key of that envelope is written anywhere in the agent CLI.
+        """
+        package_dir = Path(pipelex.cli.agent_cli.__file__).parent
+        offenders: list[str] = []
+        for source_file in sorted(package_dir.rglob("*.py")):
+            tree = ast.parse(source_file.read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                member = _written_member(node=node)
+                if member is not None:
+                    offenders.append(f"{source_file.relative_to(package_dir)}:{getattr(node, 'lineno', 0)} writes '{member}'")
+        assert not offenders, f"These lines write a member of the envelope the problem replaced: {offenders}"
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the hosted plane's former-shape refusal names none of its code's parameters; the agent reads its status and own code alone"
+    )
+    def test_no_reported_problem_carries_a_member_its_reader_does_not_declare(self) -> None:
+        """The document a run on a runner reports holds only the members the standard and Pipelex declare, at every level.
+
+        A runner's answer may carry members beside its problem, those the envelope this CLI wrote before it reported
+        problems used to read (`error_type`, `error_domain`, `retryable`) among them, and a reader that copied them
+        through would bring that envelope back. This guards the emitted document itself, whatever builds it.
+        """
+        offenders: list[str] = []
+        for failure in _reported_failures():
+            document = problem_payload(problem=hosted_failure_problem(error=failure, credential_sent=True), message=None, extras={})
+            offenders += [
+                f"{type(failure).__name__}: {member}" for member in _undeclared_members(document=document, shape=PipelexProblem, path="problem")
+            ]
+        assert not offenders, f"These reported members are declared by no reader of the problem: {offenders}"

@@ -1,11 +1,10 @@
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, StepKind
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode, ErrorReport
 from pipelex.cogt.config_cogt import ModelDeckConfig
-from pipelex.cogt.exceptions import ModelNotFoundError
+from pipelex.cogt.exceptions import InferenceErrorCategory, ModelNotFoundError, find_inference_error_category_in_chain
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoices, LLMSettingChoicesDefaults
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -13,6 +12,8 @@ from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.system.runtime import ProblemReaction
 
 
@@ -72,18 +73,19 @@ def _raise_not_found(*, model_handle: str, model_type: ModelType) -> ModelNotFou
 
 class TestModelDeckUnknownReference:
     @pytest.mark.parametrize(
-        ("_topic", "model_handle", "model_type", "needed_model"),
+        ("_topic", "model_handle", "model_type", "expected_suggestions"),
         [
-            ("handle", "method-only-model", ModelType.LLM, "an LLM"),
-            ("alias", "@method-only-alias", ModelType.LLM, "an LLM"),
-            ("waterfall", "~method-only-waterfall", ModelType.LLM, "an LLM"),
-            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM, "an LLM"),
-            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR, "a text-extraction model"),
-            ("search_handle", "method-only-search", ModelType.SEARCH, "a search model"),
+            # A handle near one the deck serves as that type is offered it.
+            ("handle", "method-only-model", ModelType.LLM, ["served-model"]),
+            ("alias", "@method-only-alias", ModelType.LLM, []),
+            ("waterfall", "~method-only-waterfall", ModelType.LLM, []),
+            ("preset_used_as_a_model", "$deck-preset", ModelType.LLM, []),
+            ("extract_handle", "method-only-extractor", ModelType.TEXT_EXTRACTOR, []),
+            ("search_handle", "method-only-search", ModelType.SEARCH, []),
             # An LLM preset names it, but no image-generation entry does.
-            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN, "an image-generation model"),
+            ("img_gen_handle", "deck-preset-model", ModelType.IMG_GEN, []),
             # The deck serves it, but as an LLM, which an image-generation lookup refuses.
-            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN, "an image-generation model"),
+            ("served_handle_of_another_type", "served-model", ModelType.IMG_GEN, []),
         ],
     )
     def test_a_reference_only_the_method_names_is_the_callers_fault(
@@ -91,25 +93,28 @@ class TestModelDeckUnknownReference:
         _topic: str,
         model_handle: str,
         model_type: ModelType,
-        needed_model: str,
+        expected_suggestions: list[str],
     ) -> None:
-        """A reference the deck neither defines nor names came from the method: input domain, and caller-facing."""
-        report = _raise_not_found(model_handle=model_handle, model_type=model_type).to_error_report()
+        """A reference the deck neither defines nor names came from the method: `model.unknown`, in the method's domain."""
+        error = _raise_not_found(model_handle=model_handle, model_type=model_type)
+        caller = error.to_problem(view=ProblemView.CALLER)
 
-        assert report.error_type == "ModelNotFoundError"
-        assert report.message == f"Model handle '{model_handle}' was not found in the model deck."
-        assert report.error_domain == "input"
-        assert report.caller_facing_message is True
-        assert report.http_status == 422
+        assert caller.code == CoreCode.MODEL_UNKNOWN
+        assert caller.domain == ProblemDomain.METHOD
+        assert error_code_spec(CoreCode.MODEL_UNKNOWN).status == 422
         # The category still says the setup is wrong for the call; the domain says whose it is.
-        assert report.error_category == "configuration"
-        # The next step names the reference as the method wrote it and the type its lookup asked for,
-        # and nothing of the deck: not even the type the deck serves a model of another type as.
-        expected_detail = f"Change the model '{model_handle}' to {needed_model} the model deck serves."
-        assert report.user_action == UserAction(kind=UserActionKind.CHANGE_MODEL, detail=expected_detail)
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == report.message
-        assert strict_payload["user_action"] == {"kind": "change_model", "detail": expected_detail}
+        assert find_inference_error_category_in_chain(error) == InferenceErrorCategory.CONFIGURATION
+        # The caller reads the reference as the method wrote it and the type its lookup asked for, and nothing of the
+        # deck: not even the type the deck serves a model of another type as.
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": model_handle, "model_type": model_type, "suggestions": expected_suggestions}
+        assert caller.detail == f"The method names the {model_type} model '{model_handle}', which no catalog knows."
+        assert caller.next_step.kind == StepKind.CHANGE_MODEL
+        assert caller.diagnostics is None
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "ModelNotFoundError"
+        assert operator.diagnostics.message == f"Model handle '{model_handle}' was not found in the model deck."
 
     @pytest.mark.parametrize(
         ("_topic", "model_handle", "model_type"),
@@ -127,26 +132,31 @@ class TestModelDeckUnknownReference:
         ],
     )
     def test_a_reference_the_deck_names_is_the_deployments_fault(self, _topic: str, model_handle: str, model_type: ModelType) -> None:
-        """A reference the deck itself defines or names but does not serve stays config-domain and redacted."""
-        report = _raise_not_found(model_handle=model_handle, model_type=model_type).to_error_report()
+        """A reference the deck itself defines or names but does not serve is the operator's, its message the operator's alone."""
+        error = _raise_not_found(model_handle=model_handle, model_type=model_type)
+        caller = error.to_problem(view=ProblemView.CALLER)
+        operator = error.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "ModelNotFoundError"
-        assert report.error_domain == "config"
-        assert report.caller_facing_message is False
-        assert report.http_status == 500
-        # The caller cannot fix what the deck names, so no next step is theirs to read.
-        assert report.user_action is None
-        strict_payload = report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["message"] == INTERNAL_ERROR_PLACEHOLDER
-        assert "user_action" not in strict_payload
+        assert caller.code == CoreCode.MODEL_UNAVAILABLE
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert error_code_spec(CoreCode.MODEL_UNAVAILABLE).status == 501
+        # The caller can only choose another model; serving this one is the operator's to configure.
+        assert caller.next_step.kind == StepKind.CHANGE_MODEL
+        assert operator.next_step.kind == StepKind.FIX_CONFIGURATION
+        assert caller.diagnostics is None
+        assert "was not found in the model deck" not in str(caller.to_wire())
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "ModelNotFoundError"
+        assert operator.diagnostics.message == f"Model handle '{model_handle}' was not found in the model deck."
+        assert error.advised_action() is None
 
     def test_the_classification_rides_the_worker_to_runner_hop(self) -> None:
-        """On a hosted run the lookup fails on a worker: the report is packed VERBOSE there and projected STRICT on the runner."""
-        packed = _raise_not_found(model_handle="method-only-model", model_type=ModelType.LLM).to_error_report().to_dict()
-        recovered = ErrorReport.from_dict(packed)
+        """On a hosted run the lookup fails on a worker: the problem is built there and read back on the runner."""
+        packed = _raise_not_found(model_handle="method-only-model", model_type=ModelType.LLM).to_problem(view=ProblemView.CALLER).to_wire()
+        recovered = PipelexProblem.model_validate(packed)
 
-        assert recovered.caller_facing_message is True
-        payload = recovered.to_problem_document(disclosure_mode=DisclosureMode.STRICT)
-        assert payload["status"] == 422
-        assert payload["detail"] == "Model handle 'method-only-model' was not found in the model deck."
-        assert payload["user_action"] == {"kind": "change_model", "detail": "Change the model 'method-only-model' to an LLM the model deck serves."}
+        assert recovered.code == CoreCode.MODEL_UNKNOWN
+        assert error_code_spec(CoreCode.MODEL_UNKNOWN).status == 422
+        assert recovered.detail == "The method names the llm model 'method-only-model', which no catalog knows."
+        assert recovered.next_step.kind == StepKind.CHANGE_MODEL
+        assert recovered.to_wire() == packed

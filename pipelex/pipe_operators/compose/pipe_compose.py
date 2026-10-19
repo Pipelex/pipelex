@@ -3,6 +3,7 @@ from typing import Any, Literal
 from pydantic import Field
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.config import get_config
@@ -19,13 +20,14 @@ from pipelex.kernel.compose_ops import run_compose_template
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template, lint_template_private_names
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError, PipeComposeTemplateError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -42,6 +44,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     # Template mode fields (used when template is provided)
     template: str | None = None
+    # The key of the pipe's table holding the template's source, which a refusal its render meets is located on:
+    # `template.template` when the template is a table of its own. None in construct mode, whose fields each locate their
+    # own refusals (`construct.<path>`), and on a pipe built without its blueprint, whose template is the plain string.
+    template_field: str | None = None
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
@@ -82,7 +88,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             )
         except Jinja2DetectVariablesError as exc:
             msg = f"Error detecting required variables for PipeCompose: {exc}"
-            raise ValueError(msg) from exc
+            raise PipeComposeTemplateError(msg) from exc
         roots: set[str] = set()
         for path in full_paths:
             root = get_root_from_dotted_path(path)
@@ -163,6 +169,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+            ).with_params(
+                declared=self.output.concept.concept_ref,
+                expected=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+                pipe_type=self.type,
             )
 
     @override
@@ -199,8 +209,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
+            # The factory refuses a template mode with no template, so this is a bug of ours.
             msg = "Template is required for template mode"
-            raise ValueError(msg)
+            raise PipelexUnexpectedError(msg)
 
         # Resolved here rather than inside the kernel: turning a concept into a class is a library's
         # business, and handing the class over is what spares the kernel a registry read.
@@ -208,17 +219,18 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        compose_result = await run_compose_template(
-            memory=working_memory,
-            template=self.template,
-            category=self.category,
-            concept=self.output.concept,
-            output_class=structure_class,
-            templating_style=resolve_templating_style(authored=self.templating_style),
-            runtime_params=pipe_run_params.params,
-            extra_context=self.extra_context,
-            result_name=output_name,
-        )
+        with locating_template_refusal(template_field=self.template_field or "template"):
+            compose_result = await run_compose_template(
+                memory=working_memory,
+                template=self.template,
+                category=self.category,
+                concept=self.output.concept,
+                output_class=structure_class,
+                templating_style=resolve_templating_style(authored=self.templating_style),
+                runtime_params=pipe_run_params.params,
+                extra_context=self.extra_context,
+                result_name=output_name,
+            )
         working_memory = compose_result.memory
 
         # Capture execution data for the graph tracer
@@ -243,8 +255,9 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     ) -> PipeComposeOutput:
         """Run PipeCompose in construct mode (produces StructuredContent output)."""
         if self.construct_blueprint is None:
+            # The factory refuses a construct mode with no construct, so this is a bug of ours.
             msg = "Construct blueprint is required for construct mode"
-            raise ValueError(msg)
+            raise PipelexUnexpectedError(msg)
 
         # Get the output class from the registry
         output_class = get_class_registry().get_required_subclass(

@@ -19,6 +19,8 @@ import datetime
 import math
 from typing import Any, NamedTuple, cast
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -73,7 +75,7 @@ def bind_content(*, root_content: StuffContent, derivation: BindingDerivation) -
                     f"Binding '{derivation.path}' cannot read '{segment.name}' at '{reached_path}': the value there, a "
                     f"'{type(value).__name__}', has no such field, although the declared structure has one."
                 )
-                raise BindingStepRunError(msg)
+                raise BindingStepRunError(msg).with_params(binding=derivation.path, segment=segment.name)
             field_value = getattr(value, segment.name)
             if field_value is None:
                 if empty_path is None:
@@ -110,14 +112,22 @@ def _refuse_shape_mismatch(*, root_content: StuffContent, derivation: BindingDer
             f"{item_count} items, and a binding never chooses one item of a list. The root was typed before the run as a single value, "
             "so whatever stored it stored a list instead, such as a step whose caller asked for several outputs."
         )
-        raise BindingStepRunError(msg)
+        raise (
+            BindingStepRunError(msg)
+            .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
+            .with_params(output=derivation.root_name, produced="list", declared="single")
+        )
     if derivation.is_bare_name and derivation.is_plural:
         msg = (
             f"Binding '{derivation.path}' was derived as a list, but its root '{derivation.root_name}' holds a single value, "
             "and a bare name binds its root's value as it is. The root was typed before the run as a list, so whatever stored it "
             "stored a single value instead."
         )
-        raise BindingStepRunError(msg)
+        raise (
+            BindingStepRunError(msg)
+            .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
+            .with_params(output=derivation.root_name, produced="single", declared="list")
+        )
 
 
 def _list_items(*, value: Any, reached_path: str, path: str) -> list[Any]:
@@ -126,7 +136,7 @@ def _list_items(*, value: Any, reached_path: str, path: str) -> list[Any]:
     if isinstance(value, list):
         return list(cast("list[Any]", value))
     msg = f"Binding '{path}' expected a list at '{reached_path}', as its declared structure says, but found a '{type(value).__name__}'."
-    raise BindingStepRunError(msg)
+    raise BindingStepRunError(msg).with_params(binding=path, segment=reached_path.rsplit(".", 1)[-1])
 
 
 def _store_value(*, value: Any, leaf_kind: BindingValueKind, path: str) -> StuffContent:

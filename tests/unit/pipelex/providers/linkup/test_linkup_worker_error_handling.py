@@ -10,8 +10,9 @@ from linkup import LinkupAuthenticationError, LinkupInsufficientCreditError, Lin
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCategory, SearchJobFailureError, find_inference_error_category_in_chain
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.linkup.linkup_extract_worker import LinkupExtractWorker
 from pipelex.providers.linkup.linkup_search_worker import LinkupSearchWorker
 from tests.unit.pipelex.providers.linkup.test_data import LinkupExtractErrorHandlingTestData, LinkupSearchErrorHandlingTestData
@@ -79,6 +80,12 @@ def _make_search_job(mocker: MockerFixture) -> Any:
     job.job_params.to_date = None
     job.job_report.search_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -168,10 +175,13 @@ class TestLinkupWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is expected_kind
 
-    # ---- Error report tests ----
+    # ---- Problem tests ----
 
-    async def test_extract_error_report_for_auth(self, mocker: MockerFixture) -> None:
-        """to_error_report() for authentication error has CONFIGURATION category."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_extract_problem_for_auth(self, mocker: MockerFixture) -> None:
+        """An authentication error is a CONFIGURATION failure, and its problem invites no retry."""
         worker = _make_linkup_extract_worker(mocker)
         sdk_exc = LinkupAuthenticationError("Invalid API key")
         _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
@@ -179,13 +189,17 @@ class TestLinkupWorkerErrorHandling:
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "configuration"
-        assert report.retryable is False
-        assert report.error_type == "ExtractJobFailureError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "configuration"
+        assert problem.is_retryable is False
+        assert _diagnostics_of(problem).error_class == "ExtractJobFailureError"
 
-    async def test_search_error_report_for_rate_limit(self, mocker: MockerFixture) -> None:
-        """to_error_report() for rate limit error has TRANSIENT category and is retryable."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_search_problem_for_rate_limit(self, mocker: MockerFixture) -> None:
+        """A rate limit error is a TRANSIENT failure, and its problem invites a retry."""
         worker = _make_linkup_search_worker(mocker)
         sdk_exc = LinkupTooManyRequestsError("Too many requests")
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
@@ -193,12 +207,16 @@ class TestLinkupWorkerErrorHandling:
         with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
 
-    async def test_search_error_report_for_no_result(self, mocker: MockerFixture) -> None:
-        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_search_problem_for_no_result(self, mocker: MockerFixture) -> None:
+        """A no-result error is a CONTENT failure, and its problem invites no retry."""
         worker = _make_linkup_search_worker(mocker)
         sdk_exc = LinkupNoResultError("No results found")
         _get_linkup_client(worker).async_search.side_effect = sdk_exc
@@ -206,12 +224,16 @@ class TestLinkupWorkerErrorHandling:
         with pytest.raises(SearchJobFailureError) as exc_info:
             await worker._search_sourced_answer(search_job=_make_search_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "content"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "content"
+        assert problem.is_retryable is False
 
-    async def test_extract_error_report_for_no_result(self, mocker: MockerFixture) -> None:
-        """to_error_report() for no-result error has CONTENT category and is not retryable."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_extract_problem_for_no_result(self, mocker: MockerFixture) -> None:
+        """A no-result error is a CONTENT failure, and its problem invites no retry."""
         worker = _make_linkup_extract_worker(mocker)
         sdk_exc = LinkupNoResultError("No results found")
         _get_linkup_client(worker).async_fetch.side_effect = sdk_exc
@@ -219,6 +241,7 @@ class TestLinkupWorkerErrorHandling:
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker._extract_pages(extract_job=_make_extract_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "content"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "content"
+        assert problem.is_retryable is False

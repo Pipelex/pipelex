@@ -15,6 +15,7 @@ from mthds.method_tree.digest import digest_of_contents
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
 from pytest_mock import MockerFixture
 
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
@@ -85,11 +86,11 @@ class TestResolveCrateFromMethodDir:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
         if expects_items:
-            validation_errors = exc_info.value.to_error_report().validation_errors or []
+            validation_errors = exc_info.value.validation_error_items()
             assert validation_errors, "the shared builder must produce structured validation-error items"
             assert validation_errors[0].source == "broken.mthds"
-            # Nothing of the verdict names the directory the host wrote the tree to, the report's own message included.
-            report_text = exc_info.value.to_error_report().model_dump_json()
+            # Nothing of the verdict names the directory the host wrote the tree to, the operator's diagnostics included.
+            report_text = str(exc_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
             assert str(tmp_path) not in report_text
             assert str(tmp_path.resolve()) not in report_text
         else:
@@ -105,9 +106,13 @@ class TestResolveCrateFromMethodDir:
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
-        report = exc_info.value.to_error_report()
-        assert "['first.mthds', 'second.mthds']" in report.message
-        report_text = report.model_dump_json()
+        # Each declaration is an item located on its own bundle, its message naming the other bundle by its tree path.
+        items = exc_info.value.validation_error_items()
+        assert sorted((item.source, item.message) for item in items) == [
+            ("first.mthds", "Concept 'pipeline.Report' is declared here and in 'second.mthds'."),
+            ("second.mthds", "Concept 'pipeline.Report' is declared here and in 'first.mthds'."),
+        ]
+        report_text = str(exc_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
         assert str(tmp_path) not in report_text
         assert str(tmp_path.resolve()) not in report_text
 
@@ -129,10 +134,17 @@ class TestResolveCrateFromMethodDir:
 
         discovery.assert_not_called()
         # The unresolved dependency `/v1/validate` reports, located on the pipe calling it, in the words of the contents
-        # core's refusal, whose marker a hosted run tells it apart by.
-        validation_errors = exc_info.value.to_error_report().validation_errors or []
+        # core's refusal.
+        validation_errors = exc_info.value.validation_error_items()
         assert len(validation_errors) == 1, validation_errors
         item = validation_errors[0]
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
         assert item.source == "host.mthds"
         assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message
+        # A hosted run tells it apart by the problem item's code and parameters, the package it names included.
+        problem_errors = exc_info.value.to_problem(view=ProblemView.CALLER).errors
+        assert problem_errors is not None
+        (problem_item,) = problem_errors
+        assert problem_item.code == "method.dependency_missing"
+        assert problem_item.params is not None
+        assert problem_item.params.as_wire() == {"kind": "package", "name": "github.com/org/pkg", "reason": "not_found"}

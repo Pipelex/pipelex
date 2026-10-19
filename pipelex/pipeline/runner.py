@@ -5,11 +5,11 @@ from importlib import metadata
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
-from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
 from mthds.protocol.models import ModelDeck as MthdsModelDeck
 from mthds.protocol.models import ModelInfo as MthdsModelInfo
 from mthds.protocol.models import VersionInfo
+from mthds.protocol.problem.registry import CoreCode
 from mthds.protocol.protocol import PROTOCOL_VERSION, MTHDSProtocol
 from pydantic import Field, ValidationError
 from typing_extensions import override
@@ -17,6 +17,7 @@ from typing_extensions import override
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
+from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -26,9 +27,11 @@ from pipelex.interpreter_hub import (
     get_pipeline_manager,
     set_current_library,
 )
+from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_report_delegate, get_telemetry_manager
 from pipelex.system.caller_identity import CallerIdentity
@@ -37,7 +40,7 @@ from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, LOCAL_USER_ID
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     import asyncio
@@ -149,14 +152,14 @@ def _extract_validate_graph_pipe_code(extra: dict[str, Any] | None) -> str | Non
     unknown_keys = sorted(key for key in extra if key != _VALIDATE_EXTRA_GRAPH_PIPE_CODE)
     if unknown_keys:
         msg = f"The local runtime defines no extension args for: {unknown_keys}."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field="extra", unsupported_reason="unknown_validate_extension_args")
     graph_pipe_code = extra.get(_VALIDATE_EXTRA_GRAPH_PIPE_CODE)
     if graph_pipe_code is not None and not isinstance(graph_pipe_code, str):
         msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must be a string when provided."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field=f"extra.{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}")
     if graph_pipe_code is not None and not graph_pipe_code.strip():
         msg = f"validate extra '{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}' must not be blank when provided."
-        raise PipelineRequestError(msg)
+        raise PipelexRequestError(msg, field=f"extra.{_VALIDATE_EXTRA_GRAPH_PIPE_CODE}")
     return graph_pipe_code
 
 
@@ -303,9 +306,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             ``RunMetadata.request_id`` so every log line of the run, on
             whichever worker runs it, and the run's error reports carry it.
             An in-process host hook, like ``delivery_assignment``, not a wire
-            extension. It must be one to 128 printable ASCII characters: any
-            other value is the host's bug, refused with a ``ValueError``
-            before the run is set up.
+            extension. It must be one to 128 ASCII letters, digits, ``_``
+            or ``-`` (``validate_request_id``): any other value is the host's
+            bug, refused with a ``RunParameterError`` before the run is set up.
 
         Returns:
         -------
@@ -318,7 +321,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         """
         if extra:
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
-            raise PipelineRequestError(msg)
+            raise PipelexRequestError(msg, field="extra", unsupported_reason="extension_args_on_local_execute")
         # Refused here, before the `try`: `RunMetadata` would refuse it inside the setup, where the
         # `ValidationError` arm below would report the host's bug as the caller's invalid input.
         if request_id is not None:
@@ -370,9 +373,18 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipelexError as exc:
             # If pipe_job is None, the error occurred during pipeline_run_setup, before the job existed:
-            # it is not a run failure, and it propagates untouched.
+            # it is not a run failure, and it propagates untouched. A security refusal raised there, in this
+            # process, logs its security event here.
             if pipe_job is None:
+                emit_security_event(error=exc, request_id=request_id, extras=self.extras)
                 raise
+            # A refusal raised during the run is logged in the process that raised it, by whoever saw it first: `PipeRun`
+            # logged one its run raised in this process, and a remote orchestrator's worker one raised there, whose
+            # failure reaches this process rebuilt from its report and marked by the orchestrator that rebuilt it. Either
+            # way it is reported, and this logs nothing. What is left is a refusal raised in this process that the pipe
+            # run did not log, such as an input URL the SSRF guard refused while a remote pipe run uploaded the inputs
+            # before it dispatched: it is logged here, naming the run, and the handler above logs it no more.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
@@ -394,10 +406,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 output_name=pipe_job.output_name,
             ) from exc
         except ValidationError as exc:
-            formatted_error = format_pydantic_validation_error(exc)
+            # The run's inputs are the caller's data: the message names why they failed, never their values. Each site
+            # that validates an input into a known class refuses it there, located by that class's schema; a refusal
+            # that reaches this arm came from a model this frame does not know, and a location read without its schema
+            # could quote a key of the data, so it is named by its model and its reasons alone.
+            formatted_error = format_validation_error_without_input(validation_error=exc)
             model_name = exc.title
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
-            raise PipeExecutionError(message=msg) from exc
+            raise PipeExecutionError(message=msg).with_error_code(CoreCode.INPUT_INVALID) from exc
         finally:
             # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
             # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
@@ -473,7 +489,8 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         Asynchronous execution is owned by the API layer (pipelex-api overrides
         this with Temporal dispatch) and the hosted platform; locally, use
-        `execute`.
+        `execute`. It raises `AsyncExecutionNotEnabledError`, whose code is
+        `runtime.unsupported`.
         """
         _ = (
             pipe_code,
@@ -485,7 +502,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             extra,
         )
         msg = "start is not implemented by the local runtime. Use execute, or run against an MTHDS API runner."
-        raise NotImplementedError(msg)
+        raise AsyncExecutionNotEnabledError(msg)
 
     @override
     async def validate(

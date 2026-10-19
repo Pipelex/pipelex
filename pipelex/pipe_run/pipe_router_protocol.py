@@ -93,23 +93,27 @@ class PipeRouterProtocol(Protocol):
     def _as_pipelex_failure(self, *, error: Exception) -> PipelexError | None:
         """Return the `PipelexError` this router locates for `error`, or `None` to let `error` through untouched.
 
-        A `PipelexError` stands for itself, and that includes one carrying a report recovered
-        across a transport boundary, whose report then becomes the located failure's root fault.
+        A `PipelexError` stands for itself, and that includes one carrying a problem recovered
+        across a transport boundary, whose problem then becomes the located failure's root fault.
         Any other exception is foreign to Pipelex: it is wrapped into a `PipelexUnexpectedError`
-        that names its class and is never caller-facing, so it no longer escapes the runner raw.
+        that names its class, whose message only an operator reads, so it no longer escapes the runner raw.
 
         A host router overrides this for the exceptions its own transport raises, and returns `None`
         for a control-flow exception its runtime must see unchanged, such as a cancellation. A
-        transport failure carrying a recovered report is converted according to what the far side
-        packed, which must never be a report that is already located, since this router would
+        transport failure carrying a recovered problem is converted according to what the far side
+        packed, which must never be a problem that is already located, since this router would
         locate it again:
 
-        - the root fault's own report alone (`find_root_fault(...).to_error_report()`): return a
+        - the root fault's own problem alone (`find_root_fault(...).to_problem(view=ProblemView.OPERATOR)`): return a
           `PipelexError` carrying it, and this router locates it at the pipe it ran;
-        - that report together with the location the far side found (`find_failure_location(...)`,
+        - that problem together with the location the far side found (`find_failure_location(...)`,
           its `pipe_code` and `pipe_stack`): return `PipeRouterError.make_located(...)` over a
-          `PipelexError` carrying the report, chained to it. It already names its pipe, so this
-          router raises it untouched, and the report reads exactly as the local run's.
+          `PipelexError` carrying the problem, chained to it. It already names its pipe, so this
+          router raises it untouched, and the problem reads exactly as the local run's.
+
+        A `PipelexError` carrying a recovered problem overrides `recovered_problem()` to return it, and its `to_problem`
+        reports it projected to the view asked for (`pipelex.errors.problem.recovered_problem_in_view`), with the
+        location it is given.
         """
         if isinstance(error, PipelexError):
             return error

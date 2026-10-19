@@ -24,6 +24,7 @@ from typing import NamedTuple
 
 from mthds.method_tree.discovery import BUNDLE_SUFFIX
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.libraries.exceptions import EmptyMethodTreeError, MethodTreeLoadError
 from pipelex.libraries.method_trees import list_local_method_tree
@@ -99,7 +100,7 @@ def resolve_method_folder(*, directory: Path, pipe_override: str | None) -> Meth
         tree = list_method_folder(directory=directory)
     except EmptyMethodTreeError as exc:
         msg = f"The folder '{directory}' holds no .mthds bundle, so it has no pipe to start at."
-        raise MethodEntryError(msg) from exc
+        raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_INVALID) from exc
     if pipe_override:
         return MethodFolderTarget(tree=tree, pipe_code=pipe_override, entry=None, entry_bundle_file=None)
     with translate_to_validate_bundle_error():
@@ -110,11 +111,13 @@ def resolve_method_folder(*, directory: Path, pipe_override: str | None) -> Meth
 
 
 def resolve_method_folder_run(*, directory: Path, pipe_override: str | None) -> MethodFolderTarget:
-    """A method folder as `run bundle` reads it: every refusal, the method's lack of a single entry included, is the verdict.
+    """A method folder as `run bundle` reads it: every refusal of the method is the verdict.
 
     Raises:
-        ValidateBundleError: The tree is refused or past this machine's limits, a bundle does not parse, or the method
-            has no single pipe to start at, each as the invalid verdict `validate` gives.
+        ValidateBundleError: The tree is refused or past this machine's limits, or a bundle does not parse, each as the
+            invalid verdict `validate` gives.
+        MethodEntryError: The method has no single pipe to start at and `pipe_override` names none, which is no verdict
+            on the method, coded as the refusal of a run that selects no pipe.
     """
     with translate_to_validate_bundle_error():
         return resolve_method_folder(directory=directory, pipe_override=pipe_override)

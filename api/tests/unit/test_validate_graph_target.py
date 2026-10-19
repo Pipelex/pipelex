@@ -14,7 +14,10 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from pipelex.base_exceptions import ErrorReport, ValidationErrorCategory, ValidationErrorItem
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.system.caller_identity import CallerIdentity
 from pytest_mock import MockerFixture
@@ -56,13 +59,10 @@ class _RecordingBundleValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
-    ) -> ErrorReport:
+    ) -> BundleValidationFailure:
         self.graph_pipe_codes.append(graph_pipe_code)
-        return ErrorReport(
-            error_type="ValidateBundleError",
-            message="bundle is invalid",
-            title="Validate bundle error",
-            type_uri="https://errors.pipelex.com/validate-bundle-error/",
+        return BundleValidationFailure(
+            problem=make_problem(code=CoreCode.METHOD_INVALID, view=ProblemView.OPERATOR),
             validation_errors=[ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="bad ref")],
         )
 
@@ -132,8 +132,8 @@ class TestValidateGraphTarget:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
-        assert body["graph_spec"] is None
+        assert "default_pipe_ref" not in body
+        assert "graph_spec" not in body
 
     def test_a_manifest_naming_a_pipe_the_closure_lacks_gets_no_graph(self, install_method_package: Callable[..., Path]) -> None:
         # The manifest names `shout`; the closure holds only `smoke.echo`. No run by this address
@@ -147,8 +147,8 @@ class TestValidateGraphTarget:
         assert response.status_code == 200, response.text
         body = response.json()
         assert body["is_valid"] is True
-        assert body["default_pipe_ref"] is None
-        assert body["graph_spec"] is None
+        assert "default_pipe_ref" not in body
+        assert "graph_spec" not in body
 
     def test_inline_contents_graph_the_closures_declaration(self) -> None:
         client = _build_client()

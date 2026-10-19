@@ -19,6 +19,9 @@ from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers impor
     StubEngine,
     StubEngines,
     WorkerLikePipeRun,
+    caller_text,
+    diagnosed_error_classes,
+    refusal_messages,
     write_bundle,
 )
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
@@ -208,8 +211,8 @@ class TestPipeDocGenTemplateAssets:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        # The report names the caller's own bundle file as its source; the message names files by their tree paths alone.
-        message = exc_info.value.message
+        # The verdict names the caller's own bundle file as its source; the refusal names files by their tree paths alone.
+        message = refusal_messages(exc_info.value)
         assert f"names '{reference}' in the template file 'templates/invoice.html'" in message
         assert expected in message
         assert str(tmp_path) not in message
@@ -247,10 +250,11 @@ class TestPipeDocGenTemplateAssets:
                 mthds_contents=[bundle_path.read_text(encoding="utf-8")], inputs=inputs
             )
 
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert TemplateUrlRefusedError.__name__ in report
+        assert TemplateUrlRefusedError.__name__ in diagnosed_error_classes(exc_info.value)
+        report = refusal_messages(exc_info.value)
         assert expected in report
         assert str(tmp_path) not in report
+        assert str(tmp_path) not in caller_text(exc_info.value)
         assert engine.read == {}
 
     async def test_a_bundle_named_alone_is_told_to_hand_over_its_folder(self, engine: _AssetReadingEngine, tmp_path: Path) -> None:
@@ -262,8 +266,7 @@ class TestPipeDocGenTemplateAssets:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=bundle_path)
 
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert "Hand over the method's directory instead" in report
+        assert "Hand over the method's directory instead" in refusal_messages(exc_info.value)
         assert engine.jobs == []
 
     async def test_an_inline_template_of_a_bundle_with_no_method_tree_names_no_file(self, engine: _AssetReadingEngine) -> None:
@@ -273,7 +276,7 @@ class TestPipeDocGenTemplateAssets:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)])
 
-        assert "belongs to no method tree" in str(exc_info.value.to_error_report().model_dump())
+        assert "belongs to no method tree" in refusal_messages(exc_info.value)
         assert engine.jobs == []
 
     async def test_a_url_a_run_s_input_supplies_names_no_file_when_the_template_has_no_method_tree(self, engine: _AssetReadingEngine) -> None:
@@ -284,9 +287,8 @@ class TestPipeDocGenTemplateAssets:
         with pytest.raises(PipelexError) as exc_info:
             await PipelexMTHDSProtocol().execute(mthds_contents=[PipeDocGenTestData.bundle(step_fields=step_fields)], inputs=inputs)
 
-        report = str(exc_info.value.to_error_report().model_dump())
-        assert TemplateUrlRefusedError.__name__ in report
-        assert "belongs to no method's folder" in report
+        assert TemplateUrlRefusedError.__name__ in diagnosed_error_classes(exc_info.value)
+        assert "belongs to no method's folder" in refusal_messages(exc_info.value)
         (job,) = engine.jobs
         assert job.base_url is None
         assert engine.read == {}

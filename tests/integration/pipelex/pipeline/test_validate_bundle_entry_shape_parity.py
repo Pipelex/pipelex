@@ -81,7 +81,7 @@ async def _observed_from_library_dir(mthds_contents: str, *, directory: Path) ->
 
 
 def _observed(error: ValidateBundleError) -> list[tuple[ValidationErrorCategory, str | None]]:
-    items = error.to_error_report().validation_errors or []
+    items = error.validation_error_items() or []
     return [(item.category, item.error_type) for item in items]
 
 

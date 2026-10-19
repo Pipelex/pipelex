@@ -2,12 +2,14 @@ import tracemalloc
 
 import pytest
 from jinja2.exceptions import TemplateError
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.doc_gen import formatted_markdown
 from pipelex.cogt.doc_gen.exceptions import MarkdownFormattingBudgetError
 from pipelex.cogt.doc_gen.formatted_markdown import FormattedHeading, FormattedParagraph, TextSpan, format_markdown, spans_text
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.jinja2.jinja2_render_budget import (
     DEFAULT_RENDER_BUDGET_UNITS,
     MARKDOWN_UNITS_PER_CHARACTER,
@@ -103,12 +105,18 @@ class TestFormattedMarkdown:
         formatted = format_markdown(markdown=MarkdownFormattingTestData.LONG_REPORT)
         assert sum(isinstance(block, FormattedHeading) for block in formatted.blocks) == 300
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="outside a render, the Markdown conversion knows neither the input it formats nor the size it would reach; the engine that called it "
+        "names where the value goes"
+    )
     def test_the_budget_error_is_the_caller_s(self) -> None:
         with pytest.raises(MarkdownFormattingBudgetError) as caught:
             format_markdown(markdown=MarkdownFormattingTestData.PADDED_TABLE)
-        report = caught.value.to_error_report()
-        assert report.error_domain == "input"
-        assert report.caller_facing_message
+        caller = caught.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_TOO_LARGE
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"limit": DEFAULT_RENDER_BUDGET_UNITS}
         assert f"{DEFAULT_RENDER_BUDGET_UNITS:,} work units" in caught.value.message
 
     def test_inside_a_render_the_render_s_budget_is_charged_for_the_source_the_tables_and_the_result(self) -> None:

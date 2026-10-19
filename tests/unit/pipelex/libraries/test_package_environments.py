@@ -1,10 +1,11 @@
 from collections.abc import Callable
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.core.method_trees.requirements_file import RequirementLine, parse_requirements_text
+from pipelex.errors.problem import ProblemView
 from pipelex.libraries.exceptions import PipeFuncPackageSetUnstatedError
 from pipelex.libraries.package_environments import InterpreterPackageEnvironment, OfferedPackageEnvironment, resolve_pipe_func_package_environment
 from pipelex.plugins.pipe_func_package_offer_registry import (
@@ -86,4 +87,6 @@ class TestPackageEnvironments:
         assert exc_info.value.offer_registered is offer_registered, topic
         assert remedy in exc_info.value.message, topic
         assert ("registers a package offer that could not state" in exc_info.value.message) is offer_registered, topic
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.CONFIG
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.OPERATOR, topic
+        assert exc_info.value.message not in str(caller.to_wire()), topic

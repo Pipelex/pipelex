@@ -685,7 +685,7 @@ The system loads configurations in this order:
 Common error types:
 
 - `ModelDeckNotFoundError`: Missing LLM deck configuration files
-- `ModelNotFoundError`: Referenced model not found in the deck
+- `ModelNotFoundError`: Referenced model not found in the deck. On your machine, the deck may be out of date: new aliases and presets are added to Pipelex over time, and the files under `.pipelex/inference/deck/` are not refreshed automatically. Delete them, or the whole `.pipelex/inference/` directory, and run `pipelex init inference` to regenerate them; if the model is still not found, check that one of the deck's files defines the handle, that the backend it routes to in `.pipelex/inference/routing_profiles.toml` is enabled in `.pipelex/inference/backends.toml`, and that you hold that backend's credentials. `pipelex run` gives this remedy in its error panel, and no message of the error carries it, since the message also reaches hosted callers, who have no local deck
 - `LLMHandleNotFoundError`: Referenced model or alias not found
 - `ModelChoiceNotFoundError`: Referenced preset/choice not found
 

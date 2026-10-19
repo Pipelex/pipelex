@@ -55,7 +55,7 @@ class TestAgentCodegenCheckCmd:
         capsys.readouterr()
 
     def test_drift_is_structured_negative_verdict_exit_1(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-        """Drift is a produced negative verdict: exit 1 with the drifting artifacts enumerated in the envelope."""
+        """Drift is a produced negative verdict: exit 1, its problem naming the drifting artifacts, which ride beside it in full."""
         report = CodegenCheckReport(
             lock_found=True,
             drifts=[CodegenDrift(path="models.py", category=DriftCategory.HAND_EDITED, detail="Body was edited below the stamp.")],
@@ -67,7 +67,8 @@ class TestAgentCodegenCheckCmd:
 
         assert exc_info.value.exit_code == 1
         error = json.loads(capsys.readouterr().err)
-        assert error["error_type"] == "CodegenDriftError"
+        assert error["code"] == "pipelex.codegen.drifted"
+        assert error["params"] == {"artifacts": ["models.py"]}
         assert error["is_current"] is False
         assert error["drifts"] == [{"path": "models.py", "category": "hand-edited", "detail": "Body was edited below the stamp."}]
 
@@ -79,8 +80,10 @@ class TestAgentCodegenCheckCmd:
 
         assert exc_info.value.exit_code == 2
         error = json.loads(capsys.readouterr().err)
-        assert error["error_type"] == "CodegenLockNotFoundError"
+        assert error["code"] == "pipelex.codegen.lock_not_found"
+        assert error["params"] == {"path": str(tmp_path)}
 
+    @pytest.mark.builds_problems_without_required_params(reason="hands the command an error built in the test, without the file its raise site names")
     def test_unreadable_lock_is_no_verdict_exit_2(self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         mocker.patch(f"{CMD_MODULE}.run_codegen_check", side_effect=CodegenLockError("codegen.lock is not valid TOML"))
 
@@ -89,6 +92,21 @@ class TestAgentCodegenCheckCmd:
 
         assert exc_info.value.exit_code == 2
         error = json.loads(capsys.readouterr().err)
-        assert error["error_type"] == "CodegenLockError"
+        assert error["code"] == "pipelex.codegen.lock_invalid"
+        assert error["diagnostics"]["error_class"] == "CodegenLockError"
         assert "not valid TOML" in error["message"]
-        assert "remove it, then regenerate" in error["hint"]
+
+    @pytest.mark.builds_problems_without_required_params(reason="hands the command an error built in the test, without the file its raise site names")
+    def test_unreadable_lock_markdown_follows_the_success_format(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """With no --error-format, the error stream follows --format: Markdown here, naming the code and the lock's fault."""
+        mocker.patch(f"{CMD_MODULE}.run_codegen_check", side_effect=CodegenLockError("codegen.lock is not valid TOML"))
+
+        with pytest.raises(typer.Exit):
+            agent_codegen_check_cmd(root=str(tmp_path), output_format=CliOutputFormat.MARKDOWN, error_format=None)
+
+        err = capsys.readouterr().err
+        assert err.startswith("## ")
+        assert "- Code: `pipelex.codegen.lock_invalid`" in err
+        assert "codegen.lock is not valid TOML" in err

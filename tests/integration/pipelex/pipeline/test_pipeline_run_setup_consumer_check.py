@@ -12,11 +12,13 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain
 from pipelex.cogt.exceptions import ExtractInputFormatError
 from pipelex.config import get_config
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_pipe_router
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
@@ -167,10 +169,14 @@ class TestPipelineRunSetupConsumerCheck:
                 inputs={"transcripts": {"concept": "native.Document", "content": [{"url": docx_url}, {"url": docx_url}, {"url": docx_url}]}},
             )
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.http_status == 422
-        message = exc_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)["message"]
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+        assert problem.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.INPUT_FILE_TYPE_UNSUPPORTED).status == 422
+        # The root input is the `input`, and the path down to the first refused file the location's `field`.
+        assert problem.to_wire().get("params", {}).get("input") == "transcripts", problem.to_wire()
+        assert problem.to_wire().get("location") == {"input": "transcripts", "field": "transcripts[0]"}, problem.to_wire()
+        message = exc_info.value.message
         for index in range(3):
             assert (
                 f"Input 'transcripts[{index}]' is a Word document (.docx): pipe 'extract_transcript' extracts it "

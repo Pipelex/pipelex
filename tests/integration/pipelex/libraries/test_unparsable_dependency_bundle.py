@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -33,9 +33,10 @@ UNPARSABLE_BUNDLES: dict[str, str] = {
 
 
 def _assert_names_no_host_path(*, verdict: ValidateBundleError, tmp_path: Path) -> None:
-    strict_dump = json.dumps(verdict.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT))
+    items = [item.model_dump(mode="json", exclude_none=True) for item in verdict.validation_error_items()]
+    caller_dump = json.dumps({"problem": verdict.to_problem(view=ProblemView.CALLER).to_wire(), "validation_errors": items})
     for host_path in (str(tmp_path), str(tmp_path.resolve())):
-        assert host_path not in strict_dump
+        assert host_path not in caller_dump
 
 
 class TestUnparsableDependencyBundle:
@@ -48,7 +49,7 @@ class TestUnparsableDependencyBundle:
             acquire_library(library_id="", mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE], methods_dirs=[methods_dir])
 
         verdict = exc_info.value
-        items = verdict.to_error_report().validation_errors or []
+        items = verdict.validation_error_items() or []
         assert items, verdict.message
         assert {item.source for item in items} == {f"{PROBE_ALIAS}/probe_dep.mthds"}
         assert PROBE_ALIAS in verdict.message
@@ -64,6 +65,6 @@ class TestUnparsableDependencyBundle:
             await validate_bundle(mthds_contents=[ProbePackageTestData.CONSUMER_BUNDLE])
 
         verdict = exc_info.value
-        items = verdict.to_error_report().validation_errors or []
+        items = verdict.validation_error_items() or []
         assert [(item.source, item.line) for item in items] == [(f"{PROBE_ALIAS}/probe_dep.mthds", 3)]
         _assert_names_no_host_path(verdict=verdict, tmp_path=tmp_path)

@@ -1,15 +1,22 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class PluginError(PipelexError):
-    """Base for plugin-discovery and plugin-registration failures."""
+    """Base for plugin-discovery and plugin-registration failures, never raised directly."""
 
-    error_domain = ErrorDomain.CONFIG
-    _declared_title = "Plugin error"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class PluginApiVersionMismatchError(PluginError):
     """A discovered plugin targets a plugin-API version this Pipelex does not support."""
+
+    error_code = PipelexErrorCode.PLUGIN_API_MISMATCH
 
     def __init__(self, *, plugin_name: str, targets_api: object, supported_api: int):
         self.plugin_name = plugin_name
@@ -32,6 +39,8 @@ class InferenceBackendNotFoundError(PluginError):
     release renamed, which the plugin that serves it no longer registers.
     """
 
+    error_code = CoreCode.MODEL_UNAVAILABLE
+
     def __init__(self, *, family: str, sdk: str):
         self.family = family
         self.sdk = sdk
@@ -45,6 +54,8 @@ class InferenceBackendNotFoundError(PluginError):
 
 class DuplicateInferenceBackendError(PluginError):
     """Two plugins registered an inference backend for the same (family, sdk)."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, family: str, sdk: str, first_plugin: str, second_plugin: str):
         self.family = family
@@ -61,6 +72,8 @@ class DuplicateInferenceBackendError(PluginError):
 class DuplicateModelListerError(PluginError):
     """Two plugins registered a model lister for the same sdk."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, sdk: str, first_plugin: str, second_plugin: str):
         self.sdk = sdk
         self.first_plugin = first_plugin
@@ -74,6 +87,8 @@ class DuplicateModelListerError(PluginError):
 
 class DuplicateServiceErrorCodeError(PluginError):
     """Two plugins contributed the same service error code."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, code: str, first_plugin: str, second_plugin: str):
         self.code = code
@@ -89,6 +104,8 @@ class DuplicateServiceErrorCodeError(PluginError):
 class ReservedServiceErrorCodeError(PluginError):
     """A plugin contributed a service error code the runtime classifies itself."""
 
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
+
     def __init__(self, *, code: str, plugin: str):
         self.code = code
         self.plugin = plugin
@@ -101,6 +118,8 @@ class ReservedServiceErrorCodeError(PluginError):
 
 class DuplicateOrchestratorError(PluginError):
     """Two plugins registered an orchestrator for the same orchestration mode."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
@@ -116,6 +135,8 @@ class DuplicateOrchestratorError(PluginError):
 class DuplicateBundleValidatorError(PluginError):
     """Two plugins registered a bundle validator for the same orchestration mode."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
         self.first_plugin = first_plugin
@@ -129,6 +150,8 @@ class DuplicateBundleValidatorError(PluginError):
 
 class DuplicateStorageProviderError(PluginError):
     """Two plugins registered a storage provider for the same method."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
         self.method = method
@@ -144,6 +167,8 @@ class DuplicateStorageProviderError(PluginError):
 class DuplicateSecretsProviderError(PluginError):
     """Two plugins registered a secrets provider for the same method."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
         self.method = method
         self.first_plugin = first_plugin
@@ -158,6 +183,8 @@ class DuplicateSecretsProviderError(PluginError):
 class DuplicateLogSinkError(PluginError):
     """Two plugins registered a log sink for the same method."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
         self.method = method
         self.first_plugin = first_plugin
@@ -171,6 +198,8 @@ class DuplicateLogSinkError(PluginError):
 
 class DuplicateInternalModelError(PluginError):
     """Two plugins declared a model of the same name and model type in the internal backend."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, name: str, model_type: str, first_plugin: str, second_plugin: str):
         self.name = name
@@ -187,6 +216,8 @@ class DuplicateInternalModelError(PluginError):
 class DuplicateDocGenDefaultError(PluginError):
     """Two plugins declared the model deck's default document engine for the same format and source."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, choice_key: str, first_plugin: str, second_plugin: str):
         self.choice_key = choice_key
         self.first_plugin = first_plugin
@@ -200,6 +231,8 @@ class DuplicateDocGenDefaultError(PluginError):
 
 class DuplicatePipeFuncExecutorError(PluginError):
     """Two plugins registered a PipeFunc executor for the same execution mode."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
@@ -215,6 +248,8 @@ class DuplicatePipeFuncExecutorError(PluginError):
 class DuplicatePipeFuncPackageOfferError(PluginError):
     """Two plugins stated the package offer of the same PipeFunc execution mode."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, mode: str, first_plugin: str, second_plugin: str):
         self.mode = mode
         self.first_plugin = first_plugin
@@ -228,6 +263,8 @@ class DuplicatePipeFuncPackageOfferError(PluginError):
 
 class DuplicateHttpErrorMapperError(PluginError):
     """Two plugins registered an HTTP-error mapper for the same exception type."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
 
     def __init__(self, *, exc_type: str, first_plugin: str, second_plugin: str):
         self.exc_type = exc_type
@@ -243,6 +280,8 @@ class DuplicateHttpErrorMapperError(PluginError):
 class HubSlotAlreadyClaimedError(PluginError):
     """Two plugins claimed the same hub slot."""
 
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
     def __init__(self, *, slot: str, first_plugin: str, second_plugin: str):
         self.slot = slot
         self.first_plugin = first_plugin
@@ -256,6 +295,8 @@ class HubSlotAlreadyClaimedError(PluginError):
 
 class CoreUnconditionalPluginDisabledError(PluginError):
     """A plugin that core requires unconditionally was named in ``runtime.plugins.disabled``."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
 
     def __init__(self, *, plugin_name: str):
         self.plugin_name = plugin_name
@@ -272,6 +313,8 @@ class PluginLayerViolationError(PluginError):
     into a kernel-only process, it would hand back a ``Pipe``-aware object. Caught at register time,
     before anything it contributed is wired.
     """
+
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
 
     def __init__(self, *, plugin_name: str, capability: str, declared_group: str, interpreter_group: str):
         self.plugin_name = plugin_name
@@ -297,9 +340,7 @@ class RetiredPluginEntryPointGroupError(PluginError):
     should move to.
     """
 
-    # The message names the caller's own installed distributions and the exact fix; it is fully
-    # actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
 
     def __init__(self, *, plugin_names: list[str], retired_group: str, groups: list[str]):
         self.plugin_names = plugin_names
@@ -332,8 +373,7 @@ class PluginDeclaredInMultipleGroupsError(PluginError):
     tolerated — it is the declaration failing to say anything.
     """
 
-    # The message names the caller's own installed distribution and the exact fix.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
 
     def __init__(self, *, plugin_name: str, groups: list[str]):
         self.plugin_name = plugin_name
@@ -351,6 +391,8 @@ class PluginDeclaredInMultipleGroupsError(PluginError):
 
 class BrokenPluginError(PluginError):
     """A discovered plugin failed while loading or registering itself."""
+
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
 
     def __init__(self, *, plugin_name: str, reason: str):
         self.plugin_name = plugin_name
@@ -372,9 +414,7 @@ class UnknownBootOrchestratorError(PluginError):
     decoupled from its plugins.
     """
 
-    # The message describes the caller's own input (the requested orchestrator name) and is fully
-    # actionable; keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def __init__(self, *, requested: str):
         self.requested = requested
@@ -396,9 +436,7 @@ class UnknownStorageMethodError(PluginError):
     starting with no storage. The message lists the registered methods so the fix is obvious.
     """
 
-    # The message describes the caller's own input (the configured storage method) and lists the
-    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
@@ -422,9 +460,7 @@ class UnknownPipeFuncExecutionModeError(PluginError):
     registered modes so the fix is obvious.
     """
 
-    # The message describes the caller's own input (the configured execution mode) and lists the
-    # registered modes; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def __init__(self, *, mode: str, registered_modes: list[str]):
         self.mode = mode
@@ -447,9 +483,7 @@ class UnknownSecretsMethodError(PluginError):
     starting with no secrets provider. The message lists the registered methods so the fix is obvious.
     """
 
-    # The message describes the caller's own input (the configured secrets method) and lists the
-    # registered methods; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
@@ -472,9 +506,7 @@ class UnknownLogSinkError(PluginError):
     registered sinks so the fix is obvious.
     """
 
-    # The message describes the caller's own input (the configured sink) and lists the registered
-    # ones; it is fully actionable, so keep it verbatim under STRICT disclosure.
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
 
     def __init__(self, *, method: str, registered_methods: list[str]):
         self.method = method
@@ -483,5 +515,27 @@ class UnknownLogSinkError(PluginError):
         message = (
             f"No log sink is registered for '{method}'. Registered sinks: {available}. "
             "Check runtime.log.sink, or install/enable the plugin that provides that sink."
+        )
+        super().__init__(message)
+
+
+class PluginErrorCodeNotRegisteredError(PluginError):
+    """A plugin declared, at registration, a public error code that neither registry defines.
+
+    Every code a plugin raises is one a caller reads, with its page and its next step, so it must be a code of the
+    MTHDS core or of Pipelex's registry, whose names are public even where the plugin's implementation is closed.
+    ``PluginRegistrar.declare_error_codes`` binds each declared code at boot, and this refuses the boot on the first
+    code that does not parse, rather than letting it reach a caller as a code no page explains. The plugin is broken
+    as packaged: a release of it targets codes this Pipelex does not define, so the fix is the plugin's.
+    """
+
+    error_code = PipelexErrorCode.PLUGIN_BROKEN
+
+    def __init__(self, *, plugin_name: str, code: str):
+        self.plugin_name = plugin_name
+        self.code = code
+        message = (
+            f"Plugin '{plugin_name}' declares the error code '{code}', which is not a registered code of the MTHDS core or of "
+            "Pipelex. Upgrade Pipelex or install a release of the plugin whose codes this Pipelex defines."
         )
         super().__init__(message)

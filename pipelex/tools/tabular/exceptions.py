@@ -1,21 +1,61 @@
-from pipelex.base_exceptions import ErrorDomain
+from typing import Any, ClassVar, Self
+
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
+
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.problem import ProblemLocation, make_location
 from pipelex.system.exceptions import ToolError
 
 
 class CsvError(ToolError):
-    """Base for CSV codec errors.
+    """Base for CSV codec errors, also raised directly.
 
-    CSV problems are caller-fixable input issues (a missing/unreadable file, a header
-    that does not match the row concept, a cell that cannot be coerced), so the whole
-    family is classified under the ``INPUT`` error domain.
+    CSV problems are mostly caller-fixable input issues (a missing/unreadable file, a header
+    that does not match the row concept, a cell that cannot be coerced), so the default is
+    ``input.invalid``. Writing a table the CLI's ``--save-csv`` asked for is
+    ``request.invalid``, and a delimiter or a row the codec was handed by its own caller is
+    ``runtime.unexpected``. A table input refused before the codec reads it says what happened instead: a URL that
+    does not parse is ``input.file_unreadable``, a URL that is not a local path, which this runtime does not read a
+    table from, ``request.unsupported``, and a concept with no structure class to read rows into
+    ``method.concept_invalid``.
+
+    The codec reads a file and does not know the run input it was given as: the site that does names it with
+    :meth:`with_input`, which gives the problem its ``location.input`` and, for a code declaring it, its ``input``.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _declared_title = "CSV error"
-    # The whole family describes faults in the caller's OWN CSV input (a missing file, a header that
-    # does not match the concept, a cell that will not coerce), so the message is safe and useful to
-    # expose. Opt in so STRICT disclosure keeps it instead of redacting it to a generic placeholder.
-    _authors_caller_facing_message = True
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=CoreCode.INPUT_INVALID,
+        others=(
+            CoreCode.REQUEST_INVALID,
+            CoreCode.RUNTIME_UNEXPECTED,
+            CoreCode.INPUT_FILE_UNREADABLE,
+            CoreCode.REQUEST_UNSUPPORTED,
+            CoreCode.METHOD_CONCEPT_INVALID,
+        ),
+    )
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        # The run input the table was given as, which the site that knows it gives.
+        self.input_name: str | None = None
+
+    def with_input(self, *, input_name: str | None) -> Self:
+        """Name the run input the table was given as, where the site raising or catching the error knows it.
+
+        Returns:
+            This error, so that the site can raise it.
+        """
+        self.input_name = input_name
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name)
 
 
 class CsvReadError(CsvError):
@@ -26,7 +66,7 @@ class CsvReadError(CsvError):
     third-party exception escapes into core/runner.
     """
 
-    _declared_title = "CSV read error"
+    error_code = CoreCode.INPUT_FILE_UNREADABLE
 
 
 class CsvFlatnessError(CsvError):
@@ -38,7 +78,7 @@ class CsvFlatnessError(CsvError):
     offending field and telling the author to project to a flat concept first.
     """
 
-    _declared_title = "CSV flatness error"
+    error_code = CoreCode.INPUT_INVALID
 
 
 class CsvColumnError(CsvError):
@@ -50,7 +90,7 @@ class CsvColumnError(CsvError):
     that default.
     """
 
-    _declared_title = "CSV column error"
+    error_code = CoreCode.INPUT_INVALID
 
 
 class CsvCoercionError(CsvError):
@@ -60,4 +100,4 @@ class CsvCoercionError(CsvError):
     the offending cell.
     """
 
-    _declared_title = "CSV coercion error"
+    error_code = CoreCode.INPUT_INVALID

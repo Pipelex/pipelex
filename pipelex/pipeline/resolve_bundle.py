@@ -28,10 +28,12 @@ from pathlib import Path
 from typing import Sequence
 
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.crate_normalization import normalize_crate
@@ -105,7 +107,7 @@ def resolve_crate_from_contents(
         crate = library_manager.get_crate(library_id)
         if crate is None:
             # Unreachable with non-empty contents (load_from_blueprints accumulated them), so a
-            # None crate is an internal invariant break, not a caller-facing verdict.
+            # None crate is an internal invariant break, not a verdict on the caller's method.
             msg = "library crate unavailable after a successful bundle load"
             raise PipelexUnexpectedError(msg)
         return normalize_crate(crate, mthds_version=MTHDS_STANDARD_VERSION)
@@ -191,4 +193,8 @@ def _reject_address_based_dependencies(*, blueprints: list[PipelexBundleBlueprin
             alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref)
             if QualifiedRef.is_address_based_alias(alias):
                 msg = unshipped_address_dependency_message(alias=alias)
-                raise PipeLibraryError(msg)
+                raise (
+                    PipeLibraryError(msg)
+                    .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+                    .with_params(field="files", reason=ADDRESS_DEPENDENCY_UNSUPPORTED_REASON)
+                )

@@ -10,6 +10,8 @@ PipeJudge questions, PipeCondition expressions):
   located error.
 """
 
+from mthds.protocol.problem.registry import MethodOptionalUnhandledSite
+
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
@@ -115,7 +117,7 @@ def lint_optional_input_guards(
         pipe_code=pipe_code,
         variable_names=[finding.variable_name],
         explanation=f"Unguarded reference '{finding.path}' to optional input '{finding.variable_name}' in the {template_label}.",
-    )
+    ).with_params(input=finding.variable_name, site=MethodOptionalUnhandledSite.TEMPLATE)
 
 
 def lint_template_private_names(
@@ -165,5 +167,6 @@ def lint_template_private_names(
         error_type=PipeValidationErrorType.TEMPLATE_PRIVATE_NAME,
         domain_code=domain_code,
         pipe_code=pipe_code,
+        variable_names=list(refused_names),
         explanation=f"The {template_label} reads the private name '{refused_name}'.",
     )

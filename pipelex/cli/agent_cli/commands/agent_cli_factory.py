@@ -1,4 +1,4 @@
-"""Factory function for agent CLI commands -- JSON-only error output."""
+"""Factory function for agent CLI commands -- a failure to boot reported as its problem."""
 
 import logging
 import sys
@@ -7,17 +7,25 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, NoReturn
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
-from pipelex.migration.exceptions import FormerReleaseConfigError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.pipelex import Pipelex
 from pipelex.runtime_hub import RuntimeHub
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.runtime import IntegrationMode
-from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 from pipelex.tools.log.log import log
 from pipelex.tools.log.log_levels import LogLevel
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
+
+#: The tip of a boot that failed with no advice along its chain: the recovery path an agent can run. It is a tip, never
+#: a wrapper error, so the problem, its code and its diagnostics' error class stay the failure's own.
+AGENT_BOOT_RECOVERY_TIP = (
+    "Run 'pipelex-agent doctor' to diagnose the installation and its configuration. An out-of-date configuration is "
+    "brought up to date by 'pipelex-agent migrate --dry-run --format json', shown to the user, then "
+    "'pipelex-agent migrate --yes'; 'pipelex-agent init' (--global for the home configuration) writes a fresh one "
+    "instead, discarding its settings."
+)
 
 # Canonical leaf dict for "for any agent-CLI invocation, both Rich-managed channels land
 # on stderr AND Python's logging system is globally muted from the very first init call."
@@ -128,15 +136,6 @@ AGENT_CLI_CONFIG_OVERRIDES: Mapping[str, Any] = MappingProxyType(
 )
 
 
-#: The next step of a boot that failed, and of any other failure to read this machine's configuration. It names only
-#: commands an agent can run: `pipelex init config` asks questions and can open a browser.
-AGENT_INIT_FAILURE_HINT = (
-    "Initialization failed. Run 'pipelex-agent doctor' to diagnose. An out-of-date configuration is brought up to date by "
-    "'pipelex-agent migrate --dry-run --format json', shown to the user, then 'pipelex-agent migrate --yes'; "
-    "'pipelex-agent init' (--global for the home configuration) writes a fresh one instead, discarding its settings"
-)
-
-
 def apply_agent_cli_output_discipline() -> None:
     """Reaffirm the agent CLI output contract on the Rich/hub channels post-init.
 
@@ -164,43 +163,37 @@ def apply_agent_cli_output_discipline() -> None:
 
 
 def report_agent_init_failure(*, error: Exception) -> NoReturn:
-    """Report a failure to initialize Pipelex, or to read the configuration it boots from, as the agent error envelope.
+    """Report a failure to initialize Pipelex, or to read the configuration it boots from, as its problem.
 
     The one account of a failed boot, given whether the boot raised it or a step reading this machine's configuration
     before the boot did, such as listing a method's tree under the configured limits: the same configuration fails the
-    same way wherever it is first read.
+    same way wherever it is first read. A configuration that does not load, telemetry and a former release's leftovers
+    included, reports its own code, its next step, its advice and, when the migration history explains it, the pending
+    migration in its diagnostics. A failure whose chain gives no advice is tipped with the boot's recovery path, its
+    problem still its own.
     """
-    if isinstance(error, TelemetryConfigValidationError):
-        agent_error(error.message, error_type="TelemetryConfigValidationError", cause=error)
-    if isinstance(error, FormerReleaseConfigError):
-        # Its own hint, the class's user_action, rather than the generic one, which offers a reset: the cleanup keeps
-        # everything but what a former release left, and an agent can run it.
-        agent_error(error.message, error_type="FormerReleaseConfigError", cause=error)
-    if isinstance(error, ModelDeckPresetValidatonError):
+    if isinstance(error, ModelDeckPresetValidationError):
         agent_error(
             error.message,
-            error_type="ModelDeckPresetValidatonError",
             cause=error,
+            fallback_tip=AGENT_BOOT_RECOVERY_TIP,
             preset_id=error.preset_id,
             model_type=str(error.model_type),
             model_handle=error.model_handle,
             enabled_backends=sorted(error.enabled_backends),
         )
-    agent_error(
-        f"Pipelex initialization failed: {error}",
-        error_type=type(error).__name__,
-        cause=error,
-        hint=AGENT_INIT_FAILURE_HINT,
-    )
+    if isinstance(error, PipelexError):
+        agent_error(error.message, cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+    agent_error(f"Pipelex initialization failed: {error}", cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
 
 
 def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:
-    """Initialize Pipelex for agent CLI commands with JSON error output.
+    """Initialize Pipelex for agent CLI commands, a failure reported as its problem.
 
     This is the agent CLI counterpart of ``make_pipelex_for_cli`` in
     ``pipelex.cli.cli_factory``.  It catches the same initialization
-    exceptions but routes them through ``agent_error()`` so the output
-    is always machine-parseable JSON on stderr.
+    exceptions but routes them through ``agent_error()``, so a failure is
+    always the problem document on stderr, in the invocation's error format.
 
     Stdout / stderr contract: every ``pipelex-agent`` invocation reserves stdout
     exclusively for the structured success envelope (JSON via ``--format json``, or
@@ -229,7 +222,7 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
         Initialized Pipelex instance.
 
     Raises:
-        typer.Exit: If initialization fails (after printing JSON error to stderr).
+        typer.Exit: If initialization fails (after printing its problem to stderr).
     """
     # Process-global logging cutoff, BEFORE Pipelex.make can trigger any third-party
     # log line (anthropic/httpx/botocore credential probes, telemetry setup, etc.).
@@ -242,8 +235,8 @@ def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = 
             config_overrides=dict(AGENT_CLI_CONFIG_OVERRIDES),
         )
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: report_agent_init_failure() (NoReturn) converts any boot failure into the structured
-        # error payload, the known configuration failures with their own fields and hints.
+        # Agent CLI command boundary: report_agent_init_failure() (NoReturn) converts any boot failure into its problem,
+        # the model deck's preset refusal with its own fields.
         report_agent_init_failure(error=exc)
 
     # Silence pipelex logs and Rich pretty-printing so the agent CLI emits only the

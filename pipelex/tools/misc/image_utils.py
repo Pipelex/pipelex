@@ -3,6 +3,8 @@ from enum import StrEnum
 
 from PIL import Image
 
+from pipelex.tools.misc.exceptions import UnsupportedImageMimeTypeError
+
 
 class ImageFormat(StrEnum):
     PNG = "png"
@@ -60,7 +62,7 @@ class ImageFormat(StrEnum):
                 return fmt
         cls.raise_if_unsupported_mime_type(mime_type)
         msg = f"Unsupported MIME type: {mime_type}"
-        raise ValueError(msg)
+        raise UnsupportedImageMimeTypeError(msg)
 
     @classmethod
     def get_supported_mime_types(cls) -> frozenset[str]:
@@ -80,7 +82,7 @@ class ImageFormat(StrEnum):
             mime_type: The MIME type to validate.
 
         Raises:
-            ValueError: If the MIME type is not supported.
+            UnsupportedImageMimeTypeError: If the MIME type is not supported.
         """
         if not cls.is_supported_mime_type(mime_type):
             supported = ", ".join(sorted(cls.get_supported_mime_types()))
@@ -88,7 +90,7 @@ class ImageFormat(StrEnum):
                 msg = f"Unsupported image MIME type: {mime_type}. Supported types are: {supported}"
             else:
                 msg = f"Invalid image MIME type: {mime_type}. Expected format 'image/<subtype>'. Supported types are: {supported}"
-            raise ValueError(msg)
+            raise UnsupportedImageMimeTypeError(msg)
 
 
 def pil_image_to_bytes(pil_image: Image.Image, *, image_format: ImageFormat | None) -> bytes:

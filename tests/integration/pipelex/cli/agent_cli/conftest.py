@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import start_agent_cli_error_format
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture(autouse=True)
 def reset_agent_cli_error_format() -> Iterator[None]:
-    """Keep the module-level error-format ContextVar from leaking between tests."""
-    set_agent_cli_error_format(CliOutputFormat.JSON)
+    """Keep the error-format ContextVars, the program's and the active one, from leaking between tests."""
+    start_agent_cli_error_format()
     yield
-    set_agent_cli_error_format(CliOutputFormat.JSON)
+    start_agent_cli_error_format()

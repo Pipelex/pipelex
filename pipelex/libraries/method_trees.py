@@ -104,7 +104,7 @@ def list_local_method_tree(*, handed_over: Path, limits: TreeLimits | None = Non
     except MethodTreeRefusedError as exc:
         if _is_empty_tree(refusal_error=exc):
             raise EmptyMethodTreeError(exc.message) from exc
-        raise MethodTreeLoadError(exc.message) from exc
+        raise _tree_refusal_error(refusal_error=exc, message=exc.message) from exc
     except TreeSourceError as exc:
         raise MethodTreeLoadError(exc.message) from exc
 
@@ -130,7 +130,7 @@ def list_local_method_tree_at_root(*, root: Path, limits: TreeLimits | None = No
     except MethodTreeRefusedError as exc:
         if _is_empty_tree(refusal_error=exc):
             raise EmptyMethodTreeError(exc.message) from exc
-        raise MethodTreeLoadError(exc.message) from exc
+        raise _tree_refusal_error(refusal_error=exc, message=exc.message) from exc
     except TreeSourceError as exc:
         raise MethodTreeLoadError(exc.message) from exc
 
@@ -155,6 +155,20 @@ def method_tree_root(*, handed_over: Path) -> Path:
         raise MethodTreeLoadError(msg) from exc
     except TreeSourceError as exc:
         raise MethodTreeLoadError(exc.message) from exc
+
+
+def _tree_refusal_error(*, refusal_error: MethodTreeRefusedError, message: str, path_prefix: str = "") -> MethodTreeLoadError:
+    """The `MethodTreeLoadError` of a tree the standard refused, giving `method.package_invalid` the facts it declares.
+
+    Its `reason` is the standard's refusal code, such as `symbolic_link`, and its `path` the first tree path the refusal
+    names, behind `path_prefix` (a dependency package's address, as the caller names that package's files), so a caller
+    reads which rule the tree breaks and where without the message, which is the operator's.
+    """
+    error = MethodTreeLoadError(message)
+    refusal = refusal_error.refusal
+    if refusal.names:
+        return error.with_params(reason=refusal.code, path=f"{path_prefix}{refusal.names[0]}")
+    return error.with_params(reason=refusal.code)
 
 
 def _with_root_named(*, message: str, root: Path, label: str) -> str:
@@ -184,7 +198,10 @@ def list_package_method_tree(*, root: Path, package_address: str, limits: TreeLi
         return written
     try:
         return list_method_tree_at_root(root, limits=limits or local_tree_limits())
-    except (MethodTreeRefusedError, TreeLimitError, TreeSourceError) as exc:
+    except MethodTreeRefusedError as exc:
+        msg = _with_root_named(message=exc.message, root=root, label=package_address)
+        raise _tree_refusal_error(refusal_error=exc, message=msg, path_prefix=f"{package_address}/") from exc
+    except (TreeLimitError, TreeSourceError) as exc:
         msg = _with_root_named(message=exc.message, root=root, label=package_address)
         raise MethodTreeLoadError(msg) from exc
 
@@ -229,7 +246,7 @@ def tree_bundle_of_lone_file(*, bundle_file: Path, limits: TreeLimits | None = N
     tree = list_local_method_tree(handed_over=bundle_file, limits=limits)
     if tree.entry is None:
         msg = f"Listing the method tree of the bundle file '{bundle_file}' named no entry for it."
-        raise MethodTreeLoadError(msg)
+        raise MethodTreeLoadError(msg).with_params(reason=TreeRefusalCode.LONE_FILE_EXCLUDED)
     return TreeBundle(tree=tree, tree_path=tree.entry)
 
 

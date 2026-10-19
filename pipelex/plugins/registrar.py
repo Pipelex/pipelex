@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypeVar
 
 from pydantic import BaseModel, Field
 
-from pipelex.base_exceptions import ErrorReport
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR_CODES
 from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE
+from pipelex.errors.error_codes import ErrorCode, parse_error_code
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
@@ -25,6 +26,7 @@ from pipelex.plugins.exceptions import (
     DuplicateServiceErrorCodeError,
     DuplicateStorageProviderError,
     HubSlotAlreadyClaimedError,
+    PluginErrorCodeNotRegisteredError,
     PluginLayerViolationError,
     ReservedServiceErrorCodeError,
 )
@@ -50,11 +52,11 @@ if TYPE_CHECKING:
 _RegistryKeyT = TypeVar("_RegistryKeyT")
 _RegistryValueT = TypeVar("_RegistryValueT")
 
-# A plugin's framework-agnostic mapping from one transport/runtime exception to a
-# structured ``ErrorReport``. A host runtime (``pipelex-api``) renders the report
-# into its own HTTP error response (RFC 7807 + disclosure) — so core and the plugin
-# name no web framework.
-HttpErrorMapperFn = Callable[[Exception], ErrorReport]
+# A plugin's framework-agnostic mapping from one transport/runtime exception to the
+# ``PipelexError`` it stands for. A host runtime (``pipelex-api``) builds that error's
+# problem in the view of whoever asked and renders it into its own HTTP error response
+# — so core and the plugin name no web framework.
+HttpErrorMapperFn = Callable[[Exception], PipelexError]
 
 # A thunk returning the concrete exception class a mapper applies to. The mapper is
 # registered with this *provider* rather than the bare type so a plugin whose
@@ -75,7 +77,7 @@ class _HttpErrorMapperContribution(NamedTuple):
     """
 
     exc_type_provider: HttpErrorTypeProviderFn
-    to_error_report: HttpErrorMapperFn
+    to_pipelex_error: HttpErrorMapperFn
     source_plugin: str
 
 
@@ -184,6 +186,8 @@ class PluginRegistrar:
         self.internal_models: dict[tuple[str, str], dict[str, Any]] = {}
         self.doc_gen_defaults: dict[tuple[DocGenFormat, DocGenSource], str] = {}
         self.service_error_codes: dict[str, ServiceErrorCode] = {}
+        # The public codes each plugin declared it raises, bound to the registry and kept in the order declared.
+        self.declared_error_codes: dict[str, tuple[ErrorCode, ...]] = {}
         # Ordered list (not a type-keyed dict) because the exception types are
         # resolved lazily — only ``get_http_error_mappers`` invokes the providers,
         # so duplicate-by-type detection is deferred to resolution time too.
@@ -428,6 +432,32 @@ class PluginRegistrar:
         if contributed:
             self._active.contributions.append(f"service error codes {', '.join(contributed)}")
 
+    def declare_error_codes(self, *, codes: "Iterable[str]") -> None:
+        """Declare the public error codes this plugin raises, binding each to the registry that defines it.
+
+        A plugin, a closed one included, raises errors whose codes are public: a caller reads the code, its page and its
+        next step whatever plugin raised it, so each must be a code of the MTHDS core or of Pipelex's registry. Each
+        declared code is parsed here (``parse_error_code``), at boot, and an unregistered one refuses the boot with
+        ``PluginErrorCodeNotRegisteredError`` (``pipelex.plugin.broken``), naming the plugin and the code, before any of
+        the plugin's codes is bound: a release of the plugin that targets a code this Pipelex does not define fails
+        where its operator sees it, not on a caller's run. A code may be given as its string or as its constant, and
+        declared by several plugins, since a public code means one thing whoever raises it. The bound codes are kept
+        per plugin in ``declared_error_codes``, each once, in the order first declared.
+        """
+        bound: list[ErrorCode] = []
+        for code in codes:
+            error_code = parse_error_code(code)
+            if error_code is None:
+                raise PluginErrorCodeNotRegisteredError(plugin_name=self._active.name, code=code)
+            bound.append(error_code)
+        if not bound:
+            return
+        already_declared = self.declared_error_codes.get(self._active.name, ())
+        newly_declared = tuple(dict.fromkeys(error_code for error_code in bound if error_code not in already_declared))
+        self.declared_error_codes[self._active.name] = already_declared + newly_declared
+        if newly_declared:
+            self._active.contributions.append(f"error codes {', '.join(newly_declared)}")
+
     def add_pipe_func_executor(self, *, mode: str, factory: PipeFuncExecutorFactoryFn) -> None:
         """Contribute a factory for one PipeFunc execution mode, keyed by an open ``mode`` token.
 
@@ -476,8 +506,8 @@ class PluginRegistrar:
             ),
         )
 
-    def add_http_error_mapper(self, *, exc_type_provider: HttpErrorTypeProviderFn, to_error_report: HttpErrorMapperFn) -> None:
-        """Contribute a mapping from a transport/runtime exception to a structured ``ErrorReport``.
+    def add_http_error_mapper(self, *, exc_type_provider: HttpErrorTypeProviderFn, to_pipelex_error: HttpErrorMapperFn) -> None:
+        """Contribute a mapping from a transport/runtime exception to the ``PipelexError`` it stands for.
 
         ``exc_type_provider`` is a thunk returning the concrete exception class the
         mapper applies to. It is resolved *lazily* by ``get_http_error_mappers`` (at a
@@ -485,16 +515,16 @@ class PluginRegistrar:
         plugin's ``register`` import-light: a plugin whose exception type lives in a
         heavy orchestrator SDK (``temporalio``) passes ``lambda: TemporalError`` and the
         SDK import is deferred until a host runtime actually consumes the mappers. The
-        ``to_error_report`` closure is likewise uninvoked until an error is rendered.
+        ``to_pipelex_error`` closure is likewise uninvoked until an error is rendered.
 
         A host runtime (``pipelex-api``) iterates the resolved mappers at app
-        construction and wraps each into one framework error handler (FastAPI, …) using
-        its own RFC 7807 + disclosure rendering — so core and the plugin name no web
-        framework. Duplicate-by-type detection is deferred to ``get_http_error_mappers``
+        construction and wraps each into one framework error handler (FastAPI, …) that
+        renders the error's problem in the view of whoever asked — so core and the plugin
+        name no web framework. Duplicate-by-type detection is deferred to ``get_http_error_mappers``
         (the providers must run first); it stays fail-loud and names both plugins.
         """
         self.http_error_mappers.append(
-            _HttpErrorMapperContribution(exc_type_provider=exc_type_provider, to_error_report=to_error_report, source_plugin=self._active.name)
+            _HttpErrorMapperContribution(exc_type_provider=exc_type_provider, to_pipelex_error=to_pipelex_error, source_plugin=self._active.name)
         )
         self._active.contributions.append("http error mapper")
 
@@ -582,7 +612,7 @@ class PluginRegistrar:
                 raise DuplicateHttpErrorMapperError(
                     exc_type=exc_type.__qualname__, first_plugin=sources[exc_type], second_plugin=contribution.source_plugin
                 )
-            resolved[exc_type] = contribution.to_error_report
+            resolved[exc_type] = contribution.to_pipelex_error
             sources[exc_type] = contribution.source_plugin
         return resolved
 

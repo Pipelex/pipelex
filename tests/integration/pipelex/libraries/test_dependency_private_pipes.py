@@ -74,6 +74,31 @@ class TestDependencyPrivatePipes:
             (PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY, "go", private_ref)
         ]
 
+    def test_a_consumer_s_unresolved_reference_is_offered_no_private_pipe(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """The private `helper` is nearest the typo, but the consumer cannot name it: the refusal offers only exported pipes."""
+        isolate_installed_methods(mocker=mocker, root=tmp_path)
+        install_probe(root=tmp_path, manifest=ProbePackageTestData.MANIFEST_EXPORTING_ONLY_THE_ENTRY)
+        typo_ref = f"{PROBE_ALIAS}->probe_dep.helpr"
+        consumer_files = write_consumer(
+            root=tmp_path,
+            bundles={
+                "consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE,
+                "typo.mthds": ProbePackageTestData.consumer_calling(pipe_ref=typo_ref).replace("probe_consumer", "probe_typo"),
+            },
+        )
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        try:
+            with pytest.raises(LibraryLoadingError) as exc_info:
+                library_manager.load_libraries(library_id=library_id, library_file_paths=consumer_files)
+        finally:
+            library_manager.teardown(library_id=library_id)
+
+        items = exc_info.value.pipe_concept_validation_errors or []
+        assert [(item.error_type, item.missing_pipe_code, item.params) for item in items] == [
+            (PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY, typo_ref, {"candidates": []})
+        ]
+
     @pytest.mark.parametrize("orphan_ref", [f"{PROBE_ALIAS}->probe_dep.orphan", f"{PROBE_ALIAS}->orphan"])
     def test_a_reference_to_a_withheld_private_pipe_is_refused_as_unexported(self, tmp_path: Path, mocker: MockerFixture, orphan_ref: str) -> None:
         """`orphan` is never built, but the package declares it: a reference to it is unexported, not missing."""

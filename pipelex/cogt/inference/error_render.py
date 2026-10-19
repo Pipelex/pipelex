@@ -8,7 +8,8 @@ worker's error family, with a human-readable message and a structured
 """
 
 import math
-from enum import StrEnum
+
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit, ModelUnavailableReason
 
 from pipelex.cogt.exceptions import (
     CogtError,
@@ -25,18 +26,9 @@ from pipelex.cogt.exceptions import (
     SearchModelNotFoundError,
 )
 from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserAction, UserActionKind
-from pipelex.cogt.inference.error_classify import ClassificationResult
-
-
-class InferenceErrorFamily(StrEnum):
-    """The worker family raising an inference error — selects the exception class."""
-
-    LLM = "llm"
-    IMG_GEN = "img_gen"
-    EXTRACT = "extract"
-    SEARCH = "search"
-    JUDGMENT = "judgment"
-
+from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily
+from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 # Generic failure error class per family — used when the error is not a missing model.
 _FAILURE_CLASSES: dict[InferenceErrorFamily, type[CogtError]] = {
@@ -54,6 +46,16 @@ _NOT_FOUND_CLASSES: dict[InferenceErrorFamily, type[ModelNotFoundError]] = {
     InferenceErrorFamily.EXTRACT: ExtractModelNotFoundError,
     InferenceErrorFamily.SEARCH: SearchModelNotFoundError,
     InferenceErrorFamily.JUDGMENT: JudgmentModelNotFoundError,
+}
+
+
+# The kind of model each family's worker calls, which `model.unavailable` names.
+_FAMILY_MODEL_TYPES: dict[InferenceErrorFamily, ModelType] = {
+    InferenceErrorFamily.LLM: ModelType.LLM,
+    InferenceErrorFamily.IMG_GEN: ModelType.IMG_GEN,
+    InferenceErrorFamily.EXTRACT: ModelType.TEXT_EXTRACTOR,
+    InferenceErrorFamily.SEARCH: ModelType.SEARCH,
+    InferenceErrorFamily.JUDGMENT: ModelType.JUDGMENT,
 }
 
 
@@ -81,7 +83,34 @@ def _render_model_not_allowed_detail(*, model_handle: str) -> str:
     )
 
 
-def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, model_handle: str) -> str:
+def _render_context_exceeded_detail(*, family: InferenceErrorFamily) -> str:
+    """Produce the advice for inputs over what the model can read, worded for what the family's model reads.
+
+    The code, ``model.context_exceeded``, says the inputs exceed what the model can read, whatever the model. A language
+    model's window holds the output a request reserves with ``max_tokens`` as well as the prompt, and its providers
+    refuse both overflows alike, Anthropic's "input length and `max_tokens` exceed context limit" and OpenAI's
+    "maximum context length" counting the completion beside the messages, so its advice names both. The
+    ``max_tokens`` may be the deck's default rather than one the pipe set, and a pipe's own setting overrides it. An
+    image model reads a prompt and its input images, and an extraction model a document, neither of which has a
+    ``max_tokens`` to lower.
+    """
+    match family:
+        case InferenceErrorFamily.LLM:
+            return (
+                "The prompt plus the output requested with max_tokens exceed the model's context window — shorten the input "
+                "or lower max_tokens, or choose a model with a larger context window."
+            )
+        case InferenceErrorFamily.IMG_GEN:
+            return "The prompt or its input images exceed what the image model can read — shorten the prompt or send fewer images."
+        case InferenceErrorFamily.EXTRACT:
+            return "The document exceeds what the extraction model can read — send a shorter document, or split it."
+        case InferenceErrorFamily.SEARCH:
+            return "The query built from the inputs exceeds what the search model can read — shorten the inputs."
+        case InferenceErrorFamily.JUDGMENT:
+            return "The material to judge exceeds what the judgment model can read — shorten it."
+
+
+def _render_detail(metadata: SDKErrorEnvelope, *, classification: ClassificationResult, family: InferenceErrorFamily, model_handle: str) -> str:
     """Produce the free-form user-facing advice text for the classified error."""
     if classification.service_error_code is not None:
         # Branches ahead of the action kind rather than inside it: the service's own code names the
@@ -93,6 +122,9 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         # Same reason: ``CHANGE_MODEL`` renders "the requested model was not found", which is false
         # for a model that exists and is served, only not for this caller.
         return _render_model_not_allowed_detail(model_handle=model_handle)
+    if classification.category.is_outcome_unknown:
+        # A call that is not idempotent may have run: the kind's "run it again" would duplicate a billed result.
+        return "The provider failed after the request was sent, so it may have produced and billed a result — check for one before running it again."
     match classification.user_action_kind:
         case UserActionKind.WAIT_AND_RETRY:
             # The advice is read on a failed run's report, once every automatic retry is spent, so
@@ -108,6 +140,13 @@ def _render_detail(metadata: SDKErrorEnvelope, *, classification: Classification
         case UserActionKind.CHECK_CREDENTIALS:
             return "The provider rejected the credentials — check that the API key is valid and correctly configured."
         case UserActionKind.CHANGE_INPUT:
+            # Worded from the code the classification picked, not from the metadata's wording, so a 5xx, or a parse
+            # failure quoting the model's own text, never reads as the context window
+            match classification.error_code:
+                case CoreCode.MODEL_CONTEXT_EXCEEDED:
+                    return _render_context_exceeded_detail(family=family)
+                case CoreCode() | PipelexErrorCode():
+                    pass
             if metadata.is_content_policy_violation:
                 return "Content was rejected by the provider's safety filters — revise the prompt."
             return "The provider rejected the request — review the prompt, parameters, and inputs."
@@ -137,12 +176,12 @@ def render_inference_error(
 
     Returns:
         A ``CogtError`` subclass instance carrying the category, structured
-        ``UserAction``, and ``provider_metadata``.
+        ``UserAction``, and ``provider_metadata``, with the classification's code chosen.
     """
     message = _format_message(metadata, model_desc=model_desc)
     user_action = UserAction(
         kind=classification.user_action_kind,
-        detail=_render_detail(metadata, classification=classification, model_handle=model_handle),
+        detail=_render_detail(metadata, classification=classification, family=family, model_handle=model_handle),
     )
     if classification.is_model_not_found:
         not_found_class = _NOT_FOUND_CLASSES[family]
@@ -152,11 +191,25 @@ def render_inference_error(
             error_category=classification.category,
             user_action=user_action,
             provider_metadata=metadata,
-        )
+        ).with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.UNKNOWN_AT_PROVIDER)
+    # The not-found classes report ``model.unavailable`` alone, which the classification guarantees. A failure
+    # class declares every classified code, and its code is chosen here rather than inherited, since the
+    # provider's exception it is raised from carries none.
     failure_class = _FAILURE_CLASSES[family]
-    return failure_class(
+    failure = failure_class(
         message,
         error_category=classification.category,
         user_action=user_action,
         provider_metadata=metadata,
-    )
+    ).with_error_code(classification.error_code)
+    if classification.is_model_not_allowed:
+        # The provider serves the model but does not allow it for this caller.
+        failure.with_params(model=model_handle, model_type=_FAMILY_MODEL_TYPES[family], reason=ModelUnavailableReason.NOT_ALLOWED)
+    match classification.error_code:
+        case CoreCode.MODEL_CONTEXT_EXCEEDED:
+            # The provider's refusal says the inputs are over the model's context window, the bound it names, and
+            # never as numbers the runtime can read, so the prompt's size and the window's are not given.
+            failure.with_params(model=model_handle, limit=ModelContextExceededLimit.CONTEXT_WINDOW)
+        case CoreCode() | PipelexErrorCode():
+            pass
+    return failure

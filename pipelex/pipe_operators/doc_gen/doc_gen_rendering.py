@@ -9,10 +9,13 @@ Both raise the same errors, worded the same way.
 from typing import Any
 
 from jinja2.exceptions import UndefinedError
+from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenUndefinedValueError
-from pipelex.tools.jinja2.exceptions import Jinja2TemplateRenderError
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError, Jinja2TemplateRenderError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal, template_line_of, undefined_variable_name
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -24,32 +27,53 @@ async def render_doc_gen_template(
     category: TemplateCategory,
     context: dict[str, Any],
     label: str,
+    template_field: str,
     templating_style: TemplatingStyle | None = None,
 ) -> str:
     """A template of the step `pipe_code` rendered with `context`, every value it reads required to exist.
 
+    `template_field` is the field of the step the template is written in, `filename`, `template` or `template_file`,
+    which a refusal of the template sandbox is located on.
+
     Raises:
         PipeDocGenUndefinedValueError: The template reads a value that does not exist.
         PipeDocGenRunError: The template could not be rendered for another reason.
+        Jinja2TemplateSecurityError: The template sandbox refused what the template reached for.
     """
     try:
-        return await render_template(
-            template=template,
-            category=category,
-            context=context,
-            templating_style=templating_style,
-            is_undefined_strict=True,
-        )
+        with locating_template_refusal(template_field=template_field):
+            return await render_template(
+                template=template,
+                category=category,
+                context=context,
+                templating_style=templating_style,
+                is_undefined_strict=True,
+            )
+    except Jinja2TemplateInvalidError as exc:
+        if not exc.template_owner.is_method:
+            # One of Pipelex's own templates, reached from the method's render: ours, kept as it is.
+            raise
+        # The template is the method author's own: the message names the step, the template and what Jinja2 refused.
+        msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc.fault}"
+        raise (
+            PipeDocGenRunError(msg).with_error_code(CoreCode.METHOD_TEMPLATE_INVALID).with_params(pipe=pipe_code, template=label, finding=exc.fault)
+        ) from exc
     except Jinja2TemplateRenderError as exc:
         undefined_error = exc.__cause__
         if isinstance(undefined_error, UndefinedError):
-            # Raised from Jinja's own error rather than from the tools-layer wrapper, whose message quotes the
-            # template and is not caller-facing, so that this is the root fault a verdict or a run report names.
+            # Raised from Jinja's own error, so that this is the root fault a verdict or a run's problem names. Its text
+            # can quote a key of the run's data the template reached for, so the name is given only when the template
+            # itself spells it, read off the source Jinja2 compiled, its sigils rewritten, and the line Jinja2 failed at
+            # says where.
+            variable_name = undefined_variable_name(undefined_error=undefined_error, template_source=rewrite_template_sigils(template))
+            what = f"it reads '{variable_name}', which is not defined" if variable_name else "it reads a value that is not defined"
+            template_line = template_line_of(render_error=undefined_error)
+            where = f" (line {template_line})" if template_line is not None else ""
             msg = (
-                f"PipeDocGen '{pipe_code}' could not render its {label}: {undefined_error.message}. "
+                f"PipeDocGen '{pipe_code}' could not render its {label}: {what}{where}. "
                 "Every value a document's template reads must exist: check the name against the input's concept, "
                 "or test an optional value first with {% if ... %}."
             )
-            raise PipeDocGenUndefinedValueError(msg) from undefined_error
+            raise PipeDocGenUndefinedValueError(msg).with_params(pipe=pipe_code, variable=variable_name) from undefined_error
         msg = f"PipeDocGen '{pipe_code}' could not render its {label}: {exc}"
         raise PipeDocGenRunError(msg) from exc

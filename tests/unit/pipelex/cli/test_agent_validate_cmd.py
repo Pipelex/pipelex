@@ -98,8 +98,7 @@ class TestValidateBundleCmd:
 
         assert len(json_objects) == 1, f"Expected exactly 1 JSON error on stderr, got {len(json_objects)}. stderr was:\n{stderr_text}"
         error_obj = json_objects[0]
-        assert error_obj["error"] is True
-        assert error_obj["error_type"] == "PipelineExecutionError"
+        assert "code" in error_obj
         assert "graph" in error_obj["message"].lower()
 
     def test_view_generation_uses_pipe_override(

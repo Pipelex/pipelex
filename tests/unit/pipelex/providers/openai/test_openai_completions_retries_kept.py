@@ -12,6 +12,7 @@ from openai.types.chat.chat_completion_message_tool_call import Function
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.errors.problem import ProblemView
 from tests.helpers.completion_stop import make_text_llm_job
 from tests.helpers.instructor_test_utils import DummySchema
 from tests.helpers.openai_completions_request import make_worker, text_completion, tool_call_completion
@@ -67,6 +68,9 @@ class TestOpenAICompletionsRetriesKept:
 
         assert create.await_count == 3
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_a_rate_limited_text_call_stays_retryable(self, mocker: MockerFixture) -> None:
         """A provider failure on the text path is classified as before, its retryable category untouched by the stop check."""
         worker, create = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=text_completion())
@@ -76,4 +80,4 @@ class TestOpenAICompletionsRetriesKept:
             await worker._gen_text(llm_job=make_text_llm_job())  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
         assert exc_info.value.error_category == InferenceErrorCategory.TRANSIENT
-        assert exc_info.value.to_error_report().retryable is True
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).is_retryable is True

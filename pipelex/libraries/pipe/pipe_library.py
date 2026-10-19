@@ -1,6 +1,8 @@
+from collections.abc import Iterable
 from itertools import groupby
 from typing import Self
 
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import PrivateAttr, RootModel
 from typing_extensions import override
 
@@ -9,6 +11,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.library_state import next_library_state_token
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
+from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.tools.misc.rich_extra import RICH_TABLE_MISSING_MESSAGE, require_rich
 
@@ -25,6 +28,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     # The aliased keys of dependency pipes the package meant to load but that failed to build, with the reason, so a
     # reference to one is refused naming that failure rather than as a pipe the package does not have.
     _unbuilt_dependency_reasons: dict[str, str] = PrivateAttr(default_factory=dict)
+    # The refs of the pipes a caller's own bundles declare, when they are loaded beside a host's library directories:
+    # a refusal the caller reads offers only these among the library's own pipes, since the host's are its own to name.
+    # None when every own pipe is the caller's.
+    _caller_pipe_refs: frozenset[str] | None = PrivateAttr(default=None)
     # Replaced on every change to what the library holds, so a value derived from the pipes it resolves knows it is stale.
     _state_token: int = PrivateAttr(default_factory=next_library_state_token)
 
@@ -46,6 +53,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         self._private_dependency_keys = set()
         self._withheld_dependency_keys = set()
         self._unbuilt_dependency_reasons = {}
+        self._caller_pipe_refs = None
         self._mark_changed()
 
     @override
@@ -68,7 +76,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 "Check your library configuration: PIPELEXPATH environment variable, "
                 "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
-            raise PipeLibraryError(msg)
+            raise PipeLibraryError(msg).with_params(name=pipe.pipe_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
         self.root[pipe.pipe_ref] = pipe
         self._mark_changed()
 
@@ -119,8 +127,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                     return matches[0]
                 if len(matches) > 1:
                     domains = [match.domain_code for match in matches]
+                    # The aliased keys the matches are loaded under, the spellings that name each one unambiguously.
+                    candidates = sorted(f"{alias}->{match.pipe_ref}" for match in matches)
                     msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
-                    raise PipeLibraryError(msg)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.METHOD_REF_AMBIGUOUS).with_params(ref=pipe_code, candidates=candidates)
             return None
 
         return None
@@ -157,7 +167,8 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             # asserting the opposite — and handed a `user_action` naming candidates that never existed.
             raise
         except PipeLibraryError as exc:
-            raise EntryPipeAmbiguousError(str(exc)) from exc
+            # The candidates the lookup found, which the refusal's code names to the caller and a selection reads back.
+            raise EntryPipeAmbiguousError(str(exc)).with_params(pipe=pipe_code, candidates=exc.given_params.get("candidates", [])) from exc
         if pipe is not None:
             return pipe
 
@@ -172,7 +183,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if len(matches) > 1:
             candidates = sorted(match.pipe_ref for match in matches)
             msg = f"Pipe code '{pipe_code}' is ambiguous — it is declared by {candidates}. Name one of them explicitly, as 'domain.pipe_code'."
-            raise EntryPipeAmbiguousError(msg)
+            raise EntryPipeAmbiguousError(msg).with_params(pipe=pipe_code, candidates=candidates)
         return None
 
     @override
@@ -183,8 +194,48 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
                 f"Pipe '{pipe_code}' could not be resolved. Check for typos and make sure its bundle is loaded. "
                 "A bare code only matches this library's own domains — a pipe from a dependency package must be named 'alias->pipe_code'."
             )
-            raise EntryPipeNotFoundError(msg)
+            # The pipes nearest the code a caller supplied that it may select, so the refusal offers what it most likely meant.
+            suggestions = close_pipe_refs(name=pipe_code, pipe_refs=self._scope_pipe_refs(pipe_code=pipe_code))
+            raise EntryPipeNotFoundError(msg).with_params(pipe=pipe_code, suggestions=suggestions)
         return the_pipe
+
+    def _scope_pipe_refs(self, *, pipe_code: str) -> list[str]:
+        """The pipes a refusal of a code that names none may offer in its place, each in the form the code names a pipe.
+
+        A code naming a dependency (`alias->…`), whether an entry selection or a reference in a pipe's body, is offered
+        only the pipes that package exports, as `alias->domain.code`: its private pipes are no one else's to name. Any
+        other code is offered the entry package's own pipes, as `domain.code`, which a bare code or a domain-qualified
+        ref names; a dependency's pipe is never offered to it, since a bare code never names one.
+        """
+        if QualifiedRef.has_cross_package_prefix(pipe_code):
+            alias, _ = QualifiedRef.split_cross_package_ref(pipe_code)
+            return self.dependency_pipe_keys(alias=alias, with_private=False)
+        return self.selectable_own_pipe_refs()
+
+    def set_caller_pipe_refs(self, *, pipe_refs: Iterable[str]) -> None:
+        """Record the pipes the caller's own bundles declare, loaded beside a host's library directories.
+
+        From then on a refusal the caller reads offers only these among the library's own pipes, as a verdict names
+        none of the host's files: the host's pipes are its own, and their refs are not the caller's to read.
+        """
+        self._caller_pipe_refs = frozenset(pipe_refs)
+
+    @override
+    def selectable_own_pipe_refs(self) -> list[str]:
+        own_pipe_refs = [pipe.pipe_ref for pipe in self.get_own_pipes()]
+        if self._caller_pipe_refs is None:
+            return own_pipe_refs
+        return [pipe_ref for pipe_ref in own_pipe_refs if pipe_ref in self._caller_pipe_refs]
+
+    def dependency_pipe_keys(self, *, alias: str, with_private: bool) -> list[str]:
+        """The aliased keys, `alias->domain.code`, of the pipes the package loaded as `alias` holds in this library.
+
+        Args:
+            alias: The dependency alias.
+            with_private: Whether the package's private pipes are included, which only the package's own pipes may name.
+        """
+        prefix = f"{alias}->"
+        return [key for key in self.root if key.startswith(prefix) and (with_private or key not in self._private_dependency_keys)]
 
     def add_dependency_pipe(self, *, alias: str, pipe: PipeAbstract, is_exported: bool) -> None:
         """Add a pipe from a dependency package with an aliased key.
@@ -198,7 +249,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         key = f"{alias}->{pipe.pipe_ref}"
         if key in self.root:
             msg = f"Dependency pipe '{key}' already exists in the library"
-            raise PipeLibraryError(msg)
+            raise PipeLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         self.root[key] = pipe
         if not is_exported:
             self._private_dependency_keys.add(key)
@@ -254,11 +305,16 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         return sorted(key for key in keys if key.startswith(f"{alias}->") and key.endswith(f".{remainder}"))
 
     @override
-    def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
+    def get_required_pipe(self, pipe_code: str, *, referring_pipe_code: str | None = None) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
             msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in MTHDS file in an imported package."
-            raise PipeNotFoundError(msg)
+            # The candidates are the refs of the scope the ref is read in: the package it names, or this library's own pipes.
+            candidates = close_pipe_refs(name=pipe_code, pipe_refs=self._scope_pipe_refs(pipe_code=pipe_code))
+            refusal = PipeNotFoundError(msg).with_params(missing=pipe_code, candidates=candidates)
+            if referring_pipe_code is not None:
+                refusal = refusal.with_params(pipe=referring_pipe_code)
+            raise refusal
         return the_pipe
 
     @override

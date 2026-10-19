@@ -1,11 +1,13 @@
 from typing import Any, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 
 
 class FalFactory:
@@ -22,7 +24,7 @@ class FalFactory:
                     detail="FAL returned an unexpected number of images — try a different model",
                 ),
                 provider_metadata=None,
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         return generated_image_list[0]
 
     @classmethod
@@ -40,7 +42,7 @@ class FalFactory:
                         detail="FAL returned an unexpected response shape — try a different model",
                     ),
                     provider_metadata=None,
-                )
+                ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
             image_dicts = cast("list[dict[str, Any]]", image_dicts)
             for image_dict in image_dicts:
                 generated_image = GeneratedImageRawDetails(
@@ -50,7 +52,8 @@ class FalFactory:
                 )
                 generated_image_list.append(generated_image)
         except (KeyError, TypeError, ValidationError) as exc:
-            msg = f"Failed to parse image data from fal response: {exc}"
+            # The response is the provider's answer, the run's data: a ValidationError is written without its values.
+            msg = f"Failed to parse image data from fal response: {describe_exception_without_input(exc=exc)}"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,
@@ -59,6 +62,6 @@ class FalFactory:
                     detail="FAL returned a malformed image response — try a different model",
                 ),
                 provider_metadata=None,
-            ) from exc
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID) from exc
 
         return generated_image_list

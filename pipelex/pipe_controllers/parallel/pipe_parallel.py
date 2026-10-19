@@ -2,11 +2,16 @@ import asyncio
 import builtins
 from typing import TYPE_CHECKING, Any, Literal, get_origin
 
+from mthds.protocol.problem.registry import (
+    CoreCode,
+    MethodNameConflictConflict,
+    MethodOptionalUnhandledSite,
+    MethodOutputMultiplicityMismatchExpected,
+)
 from pydantic import ValidationError, field_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.annotation_shapes import list_item_annotation, strip_optional
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.exceptions import ConceptValueError
@@ -18,12 +23,14 @@ from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.pipes.variable_multiplicity import multiplicity_kind
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.composite_content import CompositeContent
 from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.errors.problem import make_problem_item
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
 from pipelex.interpreter_hub import get_concept_library, get_optional_pipe, get_required_pipe
@@ -43,6 +50,7 @@ from pipelex.pipe_machinery.pipe_abstract import CompanionSlot
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
 from pipelex.system.invocation_path import branch_segment
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -118,7 +126,7 @@ class PipeParallel(PipeController):
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
-            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes=visited_pipes_with_current)
             if sub_pipe.batch_params:
@@ -129,7 +137,7 @@ class PipeParallel(PipeController):
                         f"Batch input item named '{sub_pipe.batch_params.input_item_stuff_name}' is not "
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
-                    raise PipeValidationError(message=msg) from exc
+                    raise PipeValidationError(message=msg).with_error_code(CoreCode.METHOD_WIRING_INVALID) from exc
                 # A branch batches over a plain name only: a dotted `batch_over` is refused on a branch, since it binds.
                 needed_inputs.add_stuff_spec(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
@@ -168,7 +176,7 @@ class PipeParallel(PipeController):
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-            )
+            ).with_params(declared=multiplicity_kind(multiplicity=self.output.multiplicity), expected=MethodOutputMultiplicityMismatchExpected.SINGLE)
         output_concept = self.output.concept
         if Concept.is_native_concept(concept=output_concept):
             native_code = NativeConceptCode(output_concept.code)
@@ -184,7 +192,7 @@ class PipeParallel(PipeController):
                     domain_code=self.domain_code,
                     pipe_code=self.code,
                     provided_concept_code=output_concept.concept_ref,
-                )
+                ).with_params(declared=output_concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
     @override
     def validate_output_with_library(self):
@@ -210,7 +218,7 @@ class PipeParallel(PipeController):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            ) from exc
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type) from exc
         if issubclass(structure_class, CompositeContent):
             return
 
@@ -232,7 +240,7 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=sorted(missing_required_fields),
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
         extraneous_result_names = result_names - declared_fields
         if extraneous_result_names:
@@ -249,7 +257,7 @@ class PipeParallel(PipeController):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 variable_names=sorted(extraneous_result_names),
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.COMPOSITE.concept_ref], pipe_type=self.type)
 
         self._validate_branch_output_types(structure_class=structure_class)
 
@@ -279,7 +287,7 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=self.output.concept.concept_ref,
                     variable_names=[result_name],
-                )
+                ).with_params(input=result_name, site=MethodOptionalUnhandledSite.PARALLEL_BRANCH)
 
     def analyze_branch_taint(self, *, visited_pipes: set[str] | None = None) -> ParallelTaintAnalysis:
         """Static taint over the branches (D6): which branch results are maybe-absent.
@@ -395,7 +403,7 @@ class PipeParallel(PipeController):
             field_annotation = structure_class.model_fields[sub_pipe.output_name].annotation
             if not isinstance(field_annotation, type) or not issubclass(field_annotation, StuffContent):
                 continue
-            branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
+            branch_pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             if output_multiplicity_to_apply(
                 base_multiplicity=branch_pipe.output.multiplicity,
                 override_multiplicity=sub_pipe.output_multiplicity,
@@ -421,6 +429,8 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=branch_pipe.output.concept.concept_ref,
                     variable_names=[sub_pipe.output_name],
+                ).with_params(
+                    declared=branch_pipe.output.concept.concept_ref, expected=_concepts_held_as(content_class=field_annotation), pipe_type=self.type
                 ) from exc
             if not issubclass(branch_structure_class, field_annotation):
                 msg = (
@@ -437,6 +447,8 @@ class PipeParallel(PipeController):
                     pipe_code=self.code,
                     provided_concept_code=branch_pipe.output.concept.concept_ref,
                     variable_names=[sub_pipe.output_name],
+                ).with_params(
+                    declared=branch_pipe.output.concept.concept_ref, expected=_concepts_held_as(content_class=field_annotation), pipe_type=self.type
                 )
 
     @override
@@ -499,16 +511,12 @@ class PipeParallel(PipeController):
         output_stuff_contents: dict[str, StuffContent] = {}
 
         for output_index, pipe_output in enumerate(pipe_outputs):
-            sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
-            if not sub_pipe_output_name:
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' output name not specified"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
-            if sub_pipe_output_name in seen_output_names:
-                # TODO: check that at the blueprint / factory level
-                sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
-                msg = f"PipeParallel '{self.code}': sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            sub_pipe_output_name = branch_output_name(
+                pipe_code=self.code,
+                sub_pipe=self.parallel_sub_pipes[output_index],
+                seen_output_names=seen_output_names,
+                run_mode=pipe_run_params.run_mode,
+            )
             seen_output_names.add(sub_pipe_output_name)
             branch_resolved = pipe_output.working_memory.resolve_main_stuff()
             if isinstance(branch_resolved, AbsenceRecord):
@@ -526,7 +534,9 @@ class PipeParallel(PipeController):
                             f"'{self.output.concept.concept_ref}' is required. Make the field optional "
                             f"(required = false) or sink the absence upstream (a `?` input on the branch path)."
                         )
-                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+                        raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                            CoreCode.METHOD_OPTIONAL_UNHANDLED
+                        )
                 if self.add_each_output:
                     # Branch results are parent slots only under add_each_output — same gate as the
                     # present arm below and as lifted_companion_slots(). Writing the record without
@@ -564,33 +574,50 @@ class PipeParallel(PipeController):
             # the combined fields' validation errors.
             # The output concept as the author writes it in this bundle, in the next step as in the restatement below.
             output_concept_ref = self._concept_ref_for_message(concept=self.output.concept, package_alias=None)
-            method_next_step = (
-                f"Change the method so that each branch of PipeParallel '{self.code}' produces what the field of "
-                f"'{output_concept_ref}' it feeds expects, a list only where that field is a list, "
-                "and so that every required field is fed by a branch."
-            )
             # When the refusal is a branch whose multiplicity differs from its field's, say which one to change;
-            # any other refusal leaves as it came, flagged as the caller's fault.
+            # any other refusal leaves as it came, coded as an output that does not fit its concept.
             next_steps = self._multiplicity_next_steps(structure_class=structure_class, output_stuffs=output_stuffs)
             if not next_steps:
-                exc.as_caller_fault(user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=method_next_step))
+                # The combine's own message can quote a structure class's validator, which a deployment may have
+                # written: it stays the operator's, and the caller reads the code's sentence over the refused fields.
+                # A refusal of the whole structure, such as a model validator's, names no field: the caller reads the
+                # fields the branches fed, which the refusal is about together.
+                refused_field_names = _refused_field_names(exc=exc)
+                exc.with_error_code(CoreCode.PIPE_OUTPUT_INVALID).with_params(
+                    output_concept=output_concept_ref,
+                    fields=sorted(refused_field_names if refused_field_names is not None else output_stuff_contents),
+                )
                 raise
             lead = f"PipeParallel '{self.code}' cannot combine its branch results into its output '{output_concept_ref}'."
             message_parts = [lead, *next_steps.values()]
-            next_step_parts = list(next_steps.values())
             # Keep what the combine said about every other field it refused, so a second fault is not hidden
-            # behind the multiplicity one, and keep the general next step for it.
+            # behind the multiplicity one.
             refused_fields = _refused_field_names(exc=exc)
             if refused_fields is None or refused_fields - next_steps.keys():
                 message_parts.append(f"The combine also reported: {exc.message}")
-                next_step_parts.append(method_next_step)
             # A StuffFactoryError raised from the combine's own: a run failure is reported as its root fault, and
             # of two faults of the same class on the chain the outer one, which restates the inner with a remedy,
             # is that root (see `pipe_run.located_failure.find_root_fault`), so every surface reports this one.
-            # It is the caller's fault like the refusal it restates, with the multiplicity change as its next step.
-            raise StuffFactoryError(" ".join(message_parts)).as_caller_fault(
-                user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=" ".join(next_step_parts))
-            ) from exc
+            # It is the method's fault like the refusal it restates: its sentence names the first branch to change, and
+            # when several branches differ from their fields, its items name each one, so no branch to change is hidden.
+            multiplicity_params = {result_name: self._multiplicity_params(result_stuff=output_stuffs[result_name]) for result_name in next_steps}
+            first_result_name = next(iter(next_steps))
+            multiplicity_refusal = (
+                StuffFactoryError(" ".join(message_parts))
+                .with_error_code(CoreCode.PIPE_OUTPUT_MULTIPLICITY)
+                .with_params(output=first_result_name, **multiplicity_params[first_result_name])
+            )
+            if len(next_steps) > 1:
+                multiplicity_refusal.with_items(
+                    items=[
+                        make_problem_item(
+                            code=CoreCode.PIPE_OUTPUT_MULTIPLICITY,
+                            params={"pipe": self.code, "output": result_name, **branch_params},
+                        )
+                        for result_name, branch_params in multiplicity_params.items()
+                    ]
+                )
+            raise multiplicity_refusal from exc
         working_memory.set_new_main_stuff(
             stuff=combined_output_stuff,
             name=output_name,
@@ -647,7 +674,7 @@ class PipeParallel(PipeController):
         # Validate that all sub-pipes exist before dispatching the dry branches
         for sub_pipe in self.parallel_sub_pipes:
             try:
-                get_required_pipe(pipe_code=sub_pipe.pipe_code)
+                get_required_pipe(pipe_code=sub_pipe.pipe_code, referring_pipe_code=self.code)
             except PipeNotFoundError as exc:
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
@@ -659,6 +686,13 @@ class PipeParallel(PipeController):
             output_name=output_name,
             library_crate=library_crate,
         )
+
+    @staticmethod
+    def _multiplicity_params(*, result_stuff: "Stuff") -> dict[str, str]:
+        """The multiplicity a branch result produced, and the one its field declares, which differs from it."""
+        if result_stuff.is_list:
+            return {"declared": "single", "produced": "list"}
+        return {"declared": "list", "produced": "single"}
 
     def _multiplicity_next_steps(self, *, structure_class: builtins.type[StuffContent], output_stuffs: "dict[str, Stuff]") -> dict[str, str]:
         """Say, for each branch whose result and field differ only in multiplicity, which one to change.
@@ -845,6 +879,33 @@ class PipeParallel(PipeController):
         pass
 
 
+def branch_output_name(*, pipe_code: str, sub_pipe: SubPipe, seen_output_names: set[str], run_mode: PipeRunMode) -> str:
+    """The name a branch's output is combined under, refused when the branch names none or one an earlier branch took.
+
+    Args:
+        pipe_code: The parallel's code.
+        sub_pipe: The branch.
+        seen_output_names: The names the earlier branches' outputs took.
+        run_mode: The run's mode, which the refusal carries.
+
+    Raises:
+        PipeRunError: The branch names no output, or, under `method.name_conflict`, one an earlier branch took.
+    """
+    output_name = sub_pipe.output_name
+    if not output_name:
+        msg = f"PipeParallel '{pipe_code}': sub-pipe '{sub_pipe.pipe_code}' output name not specified"
+        raise PipeRunError(message=msg, run_mode=run_mode, pipe_code=pipe_code)
+    if output_name in seen_output_names:
+        # TODO: check that at the blueprint / factory level
+        msg = f"PipeParallel '{pipe_code}': sub-pipe '{sub_pipe.pipe_code}' duplicate output name '{output_name}'"
+        raise (
+            PipeRunError(message=msg, run_mode=run_mode, pipe_code=pipe_code)
+            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+            .with_params(name=output_name, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+        )
+    return output_name
+
+
 def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:
     """The top-level fields the combine's pydantic validation refused, or ``None`` when its cause says nothing."""
     cause = exc.__cause__
@@ -859,3 +920,8 @@ def _refused_field_names(*, exc: StuffFactoryError) -> set[str] | None:
             return None
         refused_fields.add(str(location[0]))
     return refused_fields
+
+
+def _concepts_held_as(*, content_class: type[StuffContent]) -> list[str]:
+    """The refs of the concepts whose content is ``content_class``, those a field of that class holds as they are."""
+    return sorted(concept.concept_ref for concept in get_concept_library().list_concepts() if concept.structure_class_name == content_class.__name__)

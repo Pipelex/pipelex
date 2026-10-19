@@ -21,11 +21,12 @@ import pytest
 from jinja2 import DictLoader
 from jinja2.sandbox import ImmutableSandboxedEnvironment
 from markupsafe import Markup
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.core.stuffs.markdown_content import MarkdownContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateBudgetError
 from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
 from pipelex.tools.jinja2.jinja2_filters import markdown_to_html
@@ -601,10 +602,17 @@ class TestRenderBudget:
         text = "word " * 2400
         assert _render("{{ doc | striptags }}", doc=_text_content(text)) == _render("{{ text | striptags }}", text=text)
 
-    def test_budget_error_is_the_caller_s_and_caller_facing(self) -> None:
-        report = Jinja2TemplateBudgetError("refused by the render budget").to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.caller_facing_message
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, whose failure location names the pipe; the render knows neither the budget operation's kind nor the input "
+        "a Pipelex template displays"
+    )
+    def test_budget_error_is_the_method_s_or_the_input_s(self) -> None:
+        """A method's template past its budget is the method's to fix; a Pipelex template's, the caller's input."""
+        method_fault = Jinja2TemplateBudgetError("refused by the render budget").to_problem(view=ProblemView.CALLER)
+        assert method_fault.code == CoreCode.PIPE_TEMPLATE_BUDGET_EXCEEDED
+        assert method_fault.domain == ProblemDomain.METHOD
+        input_fault = Jinja2TemplateBudgetError("refused by the render budget").with_error_code(CoreCode.INPUT_TOO_LARGE)
+        assert input_fault.to_problem(view=ProblemView.CALLER).domain == ProblemDomain.INPUT
 
     @pytest.mark.parametrize("template_source", _UNCHANGED)
     @pytest.mark.parametrize("autoescape", [False, True])

@@ -2,32 +2,36 @@
 
 A run loads its bundle before any pipe runs, and that load already refuses an invalid method. These tests
 pin that the refusal reaches the caller the way validating the same bundle reports it: a
-``ValidateBundleError`` carrying the same located ``validation_errors`` items, whose STRICT projection is
-an HTTP 422 that keeps them. Before, each refusal reached a host in the raw class of whichever check
+``ValidateBundleError`` carrying the same located ``validation_errors`` items, whose problem is
+``method.invalid``, an HTTP 422 listing one item per validation item. Before, each refusal reached a host in the raw class of whichever check
 made it: a misspelled concept as a ``ConceptLibraryError`` answered 500, a wiring mismatch as a
 ``PipeValidationError`` (a ``ValueError``) answered by the catch-all 500, a TOML fault as a 422 with no
 items, and a check firing inside a pipe's pydantic validator as a ``runtime`` ``PipeExecutionError``
 reading "Input validation failed".
 
 - **Parity.** For each bundle, ``pipeline_run_setup`` raises the verdict with exactly the items
-  ``validate_bundle`` produces, and the STRICT projection is a 422 carrying them.
+  ``validate_bundle`` produces, and its caller's problem is the one the validation gives.
 - **The model-validator case.** The runner's ``execute`` answers it with the verdict, not with the
   ``runtime`` input-validation failure.
 - **The unknown entry pipe** is not a bundle fault: it still raises its own ``PipeNotFoundError``.
 - **Whose library directories.** A local caller's directories are theirs, so a refusal while loading
-  them is the verdict too, located on their file; a host's directories load untranslated by default.
+  them is the verdict too, located on their file; by default the directories are the host's, and their refusal is the host's fault
+  (``HostLibraryLoadRefusalError``), never a verdict.
 """
 
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.config import get_config
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
-from pipelex.pipeline.exceptions import PipeExecutionError, ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, PipeExecutionError, ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -154,10 +158,11 @@ async def _run_setup(**kwargs: Any) -> None:
     )
 
 
-def _strict_items(verdict: ValidateBundleError) -> list[dict[str, Any]]:
-    strict_payload = verdict.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-    strict_items: list[dict[str, Any]] = strict_payload["validation_errors"]
-    return strict_items
+def _caller_problem_items(verdict: ValidateBundleError) -> list[dict[str, Any]]:
+    problem = verdict.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.METHOD_INVALID
+    problem_items: list[dict[str, Any]] = problem.to_wire()["errors"]
+    return problem_items
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -169,21 +174,19 @@ class TestRunPathBundleVerdict:
         with pytest.raises(ValidateBundleError) as raised:
             await _run_setup(mthds_contents=[case.bundle])
 
-        run_report = raised.value.to_error_report()
-        validate_items = validate_verdict.to_error_report().validation_errors
+        validate_items = validate_verdict.validation_error_items()
         assert validate_items, "the validate path gives at least one item for an invalid bundle"
-        assert run_report.validation_errors == validate_items
-        assert run_report.http_status == 422
-        strict_payload = run_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert strict_payload["error_type"] == "ValidateBundleError"
-        assert strict_payload["error_domain"] == "input"
-        assert _strict_items(raised.value) == _strict_items(validate_verdict)
+        assert raised.value.validation_error_items() == validate_items
+        assert error_code_spec(CoreCode.METHOD_INVALID).status == 422
+        run_problem_items = _caller_problem_items(raised.value)
+        assert len(run_problem_items) == len(validate_items)
+        assert run_problem_items == _caller_problem_items(validate_verdict)
 
     async def test_misspelled_concept_is_located_on_the_pipe_and_the_field(self) -> None:
         with pytest.raises(ValidateBundleError) as raised:
             await _run_setup(mthds_contents=[_MISSPELLED_CONCEPT_BUNDLE])
 
-        items = raised.value.to_error_report().validation_errors or []
+        items = raised.value.validation_error_items() or []
         (item,) = items
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT
         assert item.pipe_code == "write_tide_notice"
@@ -199,7 +202,7 @@ class TestRunPathBundleVerdict:
             await runner.execute(mthds_contents=[_MODEL_VALIDATOR_FAULT_BUNDLE])
 
         assert not isinstance(raised.value, PipeExecutionError)
-        items = raised.value.to_error_report().validation_errors or []
+        items = raised.value.validation_error_items() or []
         assert any("format_harbour_tide_notice_nowhere_registered" in item.message for item in items)
 
     async def test_unknown_entry_pipe_keeps_its_own_class(self) -> None:
@@ -215,20 +218,21 @@ class TestRunPathBundleVerdict:
         with pytest.raises(ValidateBundleError) as raised:
             await _run_setup(library_dirs=[str(tmp_path)], pipe_code="write_tide_notice", library_dirs_are_callers=True)
 
-        items = raised.value.to_error_report().validation_errors or []
+        items = raised.value.validation_error_items() or []
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]
         assert concept_items, f"expected an unresolved_concept item, got {items!r}"
         assert all(item.pipe_code == "write_tide_notice" for item in concept_items)
         # Validating the same file with the same library directory gives the same items.
         with pytest.raises(ValidateBundleError) as validated:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[tmp_path])
-        assert items == validated.value.to_error_report().validation_errors
+        assert items == validated.value.validation_error_items()
 
-    async def test_a_hosts_library_dir_refusal_loads_untranslated_by_default(self, tmp_path: Path) -> None:
+    async def test_a_hosts_library_dir_refusal_is_the_hosts_fault_by_default(self, tmp_path: Path) -> None:
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text(_MISSPELLED_CONCEPT_BUNDLE, encoding="utf-8")
 
-        with pytest.raises(LibraryError) as raised:
+        with pytest.raises(HostLibraryLoadRefusalError) as raised:
             await _run_setup(library_dirs=[str(tmp_path)], pipe_code="write_tide_notice")
 
-        assert not isinstance(raised.value, ValidateBundleError)
+        assert isinstance(raised.value.__cause__, LibraryError)
+        assert raised.value.to_problem(view=ProblemView.CALLER).code == PipelexErrorCode.CONFIG_INVALID

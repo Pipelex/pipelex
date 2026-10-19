@@ -11,6 +11,8 @@ import base64
 from enum import StrEnum
 from typing import Any, TypeAlias, TypeVar
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError, InferenceErrorCategory
 from pipelex.cogt.image.image_size import ImageSize
@@ -37,6 +39,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     SpecificTaxonomy,
 )
 from pipelex.config import get_config
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
@@ -73,7 +76,9 @@ class ImgGenArgsFactory:
             return taxonomy_class(taxonomy_value)
         except ValueError as exc:
             msg = f"Image model '{model_name}' has an unknown {topic} taxonomy '{taxonomy_value}'"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(
+                PipelexErrorCode.CONFIG_INVALID
+            ) from exc
 
     @classmethod
     async def make_args_for_model(
@@ -670,10 +675,10 @@ class ImgGenArgsFactory:
                     elif isinstance(prepped, PreparedFileHttpUrl):
                         # GPT Image API requires the image bytes as a file part, not an HTTP URL
                         msg = "GPT Image API requires image file data, but got HTTP URL"
-                        raise ImgGenParameterError(msg)
+                        raise ImgGenParameterError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                     else:
                         msg = f"Unexpected PreparedFile type for GPT Image API: {type(prepped).__name__}"
-                        raise ImgGenParameterError(msg)
+                        raise ImgGenParameterError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                 return {"image": image_files}
 
             case InputImagesTaxonomy.BFL_FLUX_2:
@@ -690,7 +695,7 @@ class ImgGenArgsFactory:
                         args[key] = prepped.url
                     else:
                         msg = f"Unexpected PreparedFile type for Flux 2 API: {type(prepped).__name__}"
-                        raise ImgGenParameterError(msg)
+                        raise ImgGenParameterError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                 return args
 
     @classmethod

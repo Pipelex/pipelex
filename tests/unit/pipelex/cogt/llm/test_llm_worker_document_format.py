@@ -12,9 +12,9 @@ import io
 import zipfile
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain
 from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentBase64, PromptDocumentBinary, PromptDocumentUri
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.exceptions import LLMCapabilityError, PromptDocumentFormatError
@@ -26,6 +26,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
@@ -104,6 +105,7 @@ def _make_llm_job(*, user_documents: list[PromptDocument]) -> LLMJob:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMWorkerDocumentFormat:
+    @pytest.mark.builds_problems_without_required_params(reason="a prompt document reaches the worker by its position, with no input name")
     async def test_a_document_format_the_model_does_not_read_is_an_input_error(self):
         worker = _make_worker(inputs=["text", "pdf"])
         documents: list[PromptDocument] = [
@@ -117,7 +119,10 @@ class TestLLMWorkerDocumentFormat:
         assert str(exc_info.value) == (
             "Prompt document 2 given to model 'gpt-docs-test' is a Word document (.docx), which it does not read: it reads PDF."
         )
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.domain == ProblemDomain.INPUT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"format": "docx", "model": "gpt-docs-test"}
         assert worker.nb_provider_calls == 0
 
     async def test_a_model_reading_no_documents_is_still_a_capability_error(self):

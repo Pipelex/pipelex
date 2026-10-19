@@ -14,6 +14,16 @@ class PipeJudgeLoadTestData:
 
     JUDGMENT_MODEL = "jev-1.13.0"
 
+    # A concept whose structure holds a file, which a question may read by a path into the input.
+    CLAIM_CONCEPT_TABLES = """
+[concept.Claim]
+description = "An insurance claim"
+
+[concept.Claim.structure]
+summary = { type = "text", description = "What happened" }
+photo = { type = "concept", concept_ref = "native.Image", description = "The damage" }
+"""
+
     @classmethod
     def bundle(
         cls,
@@ -23,10 +33,12 @@ class PipeJudgeLoadTestData:
         prompt: str | None = "@message",
         question: str | None = "Is it urgent?",
         step_fields: str = "",
+        concept_tables: str = "",
     ) -> str:
         """The step's fields as written: a `prompt` or a `question` given as `None` is left out of the table.
 
         A JSON string is a TOML basic string, escapes included, so the two templates are written that way.
+        `concept_tables` holds tables of further concepts, written after the bundle's own.
         """
         prompt_line = f"prompt = {json.dumps(prompt)}" if prompt is not None else ""
         question_line = f"question = {json.dumps(question)}" if question is not None else ""
@@ -37,6 +49,7 @@ description = "Loading a PipeJudge step"
 [concept]
 Team = {{ description = "The team a ticket goes to", refines = "Choice" }}
 Ticket = "A support ticket"
+{concept_tables}
 
 [pipe.judge_it]
 type = "PipeJudge"

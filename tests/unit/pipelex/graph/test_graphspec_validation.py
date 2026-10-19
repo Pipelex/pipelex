@@ -1,13 +1,14 @@
 """Unit tests for GraphSpec validation."""
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.graph.exceptions import GraphSpecValidationError
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
-    ErrorSpec,
     GraphSpec,
     GraphSpecMode,
     NodeKind,
@@ -229,9 +230,8 @@ class TestGraphSpecValidation:
 
     def test_accept_failed_status_with_error(self) -> None:
         """Test that nodes with status=failed and proper error are accepted."""
-        error = ErrorSpec(
-            error_type="PipeRunError",
-            message="Pipe execution failed",
+        error = make_problem(
+            code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, location=make_location(pipe="failed_pipe", path=["failed_pipe"])
         )
 
         node = NodeSpec(

@@ -10,6 +10,7 @@ from mthds.protocol.models import VersionInfo
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest, PipeIOValidReport
 from pipelex_sdk.errors import (
+    ApiResponseError,
     ApiUnreachableError,
     MissingMainStuffError,
     RunFailedError,
@@ -28,7 +29,7 @@ from pipelex.hosted.exceptions import (
     HostedRunPollingError,
 )
 from pipelex.hosted.hosted_run import HostedRunRequest, run_hosted
-from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoVerdicts, HostedVersions
+from tests.unit.pipelex.hosted.test_data import HostedDescriptors, HostedPipeIoRefusals, HostedPipeIoVerdicts, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -60,6 +61,21 @@ def _valid_report(*, pipe_ref: str, descriptor_json: str) -> PipeIOValidReport:
 
 def _invalid_report(*, verdict_json: str) -> CrateInvalidReport:
     return CrateInvalidReport.model_validate_json(verdict_json)
+
+
+def _pipe_io_refusal(*, problem_json: str) -> ApiResponseError:
+    """The error the client raises when `POST /v1/pipe-io` answers this problem document."""
+    problem: dict[str, Any] = json.loads(problem_json)
+    return ApiResponseError(
+        f"API POST /v1/pipe-io failed (422): {problem['detail']}",
+        api_url="https://hosted.test",
+        status=422,
+        status_text="Unprocessable Entity",
+        response_body=problem_json,
+        server_message=problem["detail"],
+        code=problem["code"],
+        problem_document=problem,
+    )
 
 
 def _mocked_client(
@@ -165,7 +181,8 @@ class TestHostedRun:
     @pytest.mark.asyncio
     async def test_an_address_dependency_runs_with_inputs_naming_no_local_file(self, mocker: MockerFixture) -> None:
         """pipe-io loads no address-based dependency; with no file to upload it is not asked, and the run route fetches the dependency."""
-        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.ADDRESS_DEPENDENCY))
+        client = _mocked_client(mocker)
+        client.pipe_io.side_effect = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.ADDRESS_DEPENDENCY)
         request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"item": "a widget"})
 
         outcome = await run_hosted(client=client, request=request)
@@ -231,9 +248,48 @@ class TestHostedRun:
     async def test_a_local_file_for_a_method_with_an_address_dependency_is_refused_with_a_url_to_use(
         self, mocker: MockerFixture, tmp_path: Path
     ) -> None:
-        """Uploading needs the signature, which pipe-io cannot read through an address-based dependency: the method is not at fault."""
+        """Uploading needs the signature, which pipe-io cannot read through an address-based dependency: the method is not at fault.
+
+        pipe-io answers the refusal with its problem, coded `request.unsupported` and giving the address-dependency reason.
+        """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
-        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.ADDRESS_DEPENDENCY))
+        client = _mocked_client(mocker)
+        client.pipe_io.side_effect = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.ADDRESS_DEPENDENCY)
+        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+
+        with pytest.raises(HostedLocalFileUploadUnavailableError) as exc_info:
+            await run_hosted(client=client, request=request)
+
+        error = exc_info.value
+        assert "address-based dependencies" in error.message
+        assert isinstance(error.__cause__, ApiResponseError)
+        assert error.user_action is not None
+        assert "https URL" in error.user_action.detail
+        assert "Fix the method" not in error.user_action.detail
+        client.upload_file.assert_not_awaited()
+        client.start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "verdict_json",
+        [
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY,
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS,
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_UNREADABLE_PROBLEM_ITEMS,
+        ],
+        ids=["validation_errors", "problem_items", "unreadable_problem_items"],
+    )
+    async def test_a_local_file_for_a_method_whose_address_dependency_was_not_shipped_is_refused_naming_it(
+        self, mocker: MockerFixture, tmp_path: Path, verdict_json: str
+    ) -> None:
+        """pipe-io loads only the packages shipped with the method, and answers a call into another one with its verdict.
+
+        The run route fetches that dependency, so the method is not at fault: the error names the dependency, read from
+        the `method.dependency_missing` item's parameters in either shape of the verdict, from `validation_errors` when no
+        item of `errors` reads, and the URL to use, never the verdict's advice to fix the method.
+        """
+        (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
         request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedLocalFileUploadUnavailableError) as exc_info:
@@ -246,6 +302,43 @@ class TestHostedRun:
         assert "https URL" in error.user_action.detail
         assert "Fix the method" not in error.user_action.detail
         client.upload_file.assert_not_awaited()
+        client.start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "verdict_json",
+        [HostedPipeIoVerdicts.ADDRESS_DEPENDENCY_WORDS_ONLY, HostedPipeIoVerdicts.DEPENDENCY_CYCLE_PROBLEM_ITEMS],
+        ids=["words_only", "dependency_cycle"],
+    )
+    async def test_a_verdict_naming_no_unshipped_dependency_is_the_method_s_fault(
+        self, mocker: MockerFixture, tmp_path: Path, verdict_json: str
+    ) -> None:
+        """The refusal is read from an item's code and parameters, never its words: an item only quoting them is the
+        method's, and so is a `method.dependency_missing` item whose reason is not `not_found`, such as a cycle.
+        """
+        (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
+        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+
+        with pytest.raises(HostedMethodInvalidError):
+            await run_hosted(client=client, request=request)
+
+        client.upload_file.assert_not_awaited()
+        client.start.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_another_unsupported_request_form_from_pipe_io_is_the_hosted_api_s_refusal(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The same code for another reason is no address-based dependency, so the hosted API's refusal propagates as it is."""
+        (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
+        refusal = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.OTHER_UNSUPPORTED_FORM)
+        client = _mocked_client(mocker)
+        client.pipe_io.side_effect = refusal
+        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+
+        with pytest.raises(ApiResponseError) as exc_info:
+            await run_hosted(client=client, request=request)
+
+        assert exc_info.value is refusal
         client.start.assert_not_awaited()
 
     @pytest.mark.asyncio

@@ -78,7 +78,7 @@ Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
 
 - `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
-- `RunFailedError` is a run that started and failed; `error` holds its stored report, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
+- `RunFailedError` is a run that started and failed; `error` holds the error the hosted API stored for the run, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
 - `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
 - `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its `__cause__` is httpx's exception, and its `code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
@@ -104,7 +104,7 @@ except ApiUnreachableError as exc:
 
 `start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs its cause read as above.
 
-`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own [`HostedRunOutcomeUnknownError`](../../errors/hosted-run-outcome-unknown-error.md). `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
+`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own `HostedRunOutcomeUnknownError`. `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
 
 ## Related Documentation
 

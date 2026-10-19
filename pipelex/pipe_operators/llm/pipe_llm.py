@@ -1,5 +1,6 @@
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 from typing_extensions import override
 
@@ -8,6 +9,7 @@ from pipelex.cogt.exceptions import LLMCompletionError, ModelChoiceNotFoundError
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.cogt.models.model_reference import ModelReference
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
@@ -40,14 +42,20 @@ from pipelex.pipe_run.pipe_run_params import (
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_param_key import PipeRunParamKey
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError
+from pipelex.tools.jinja2.jinja2_unknown_names import find_unknown_filters_and_tests
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.tools.templating.templating_style import TemplatingStyle
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.kernel.llm_results import StructuringPath
+
+
+#: A content class, named here because a pipe's `type` field shadows the builtin in its class body.
+StuffContentClass: TypeAlias = type[StuffContent]
 
 
 class PipeLLMOutput(PipeOutput):
@@ -149,7 +157,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            )
+            ).with_params(declared=self.output.concept.concept_ref, pipe_type=self.type)
 
         self._refuse_a_setting_its_model_refuses(is_dynamic_output=is_dynamic_output)
 
@@ -328,19 +336,28 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_name=output_name,
                     result_code=pipe_run_params.final_stuff_code,
                 )
+            except Jinja2TemplateInvalidError as exc:
+                if not exc.template_owner.is_method:
+                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                    raise
+                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main])
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_main], output_class=output_class)
                 msg = f"Error generating text with LLM {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
             except ValidationError as exc:
                 # Not classified as the caller's fault, here or on the object path below, where an
                 # output the model could not fit to the structure surfaces as `LLMCompletionError`:
                 # whether a model's output fits depends on what the model produced this time.
+                # The refused value is the model's answer, the run's data: the message names its fields and reasons alone.
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = format_pydantic_validation_error(exc)
+                error_details = format_validation_error_without_input(validation_error=exc, validated_type=output_class)
                 msg = f"Error generating text content in PipeLLM {location}: {error_details}"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code).with_error_code(
+                    CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH
+                ) from exc
             working_memory = text_result.memory
             rendered_llm_prompt = text_result.rendered_prompt
             structuring_path = text_result.structuring_path
@@ -361,9 +378,15 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                     result_name=output_name,
                     result_code=pipe_run_params.final_stuff_code,
                 )
+            except Jinja2TemplateInvalidError as exc:
+                if not exc.template_owner.is_method:
+                    # One of Pipelex's own templates failed within the step, such as the deployment's structure prompt:
+                    # ours, `runtime.unexpected`, which must not reach the caller as a fault of the method's prompt.
+                    raise
+                raise self._make_invalid_prompt_error(invalid_template_error=exc, pipe_run_params=pipe_run_params) from exc
             except LLMCompletionError as exc:
                 location = self._format_error_location(pipe_run_params=pipe_run_params)
-                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object])
+                error_details = self._format_llm_error(exc=exc, settings=[llm_setting_for_object], output_class=output_class)
                 what_failed = "list of objects" if is_multiple_output else "single object"
                 msg = f"Error generating {what_failed} with direct method {location}: {error_details}"
                 raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
@@ -391,15 +414,48 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
+    def _make_invalid_prompt_error(self, *, invalid_template_error: Jinja2TemplateInvalidError, pipe_run_params: PipeRunParams) -> PipeRunError:
+        """The refusal of a method's prompt that cannot render as written, naming the pipe, the prompt field and what Jinja2 refused.
+
+        Such a prompt names a filter or a test its environment does not define inside a branch, which only rendering that
+        branch finds, since a prompt is parsed at load and not compiled. The render reports what Jinja2 refused, not
+        which prompt it was, so the prompt fields are named by which of them names an unknown filter or test. The
+        message never quotes a prompt's text.
+        """
+        field_names: list[str] = []
+        for template_blueprint, template_label in [
+            (self.llm_prompt_spec.system_prompt_blueprint, "system_prompt"),
+            (self.llm_prompt_spec.prompt_blueprint, "prompt"),
+        ]:
+            if template_blueprint is None:
+                continue
+            unknown_names = find_unknown_filters_and_tests(
+                template_source=rewrite_template_sigils(template_blueprint.template),
+                template_category=template_blueprint.category,
+            )
+            if unknown_names:
+                field_names.append(template_label)
+        where = " and its ".join(field_names) if field_names else "prompt"
+        fault = invalid_template_error.fault
+        msg = f"PipeLLM '{self.code}': its {where} cannot render: {fault}"
+        return (
+            PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            .with_error_code(CoreCode.METHOD_TEMPLATE_INVALID)
+            .with_params(template=where, finding=fault)
+        )
+
     def _format_error_location(self, pipe_run_params: PipeRunParams) -> str:
         return f"in pipe '{pipe_run_params.pipe_stack_str}'"
 
-    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting]) -> str:
-        """Format an LLMCompletionError, extracting and formatting any ValidationError in the chain."""
+    def _format_llm_error(self, exc: LLMCompletionError, *, settings: list[LLMSetting], output_class: StuffContentClass) -> str:
+        """Format an LLMCompletionError, with any ValidationError in its chain written without the model's answer it refused.
+
+        Its locations name what the output's class names, when it is the class the error came from.
+        """
         error_details = str(exc)
         for current_exc in iter_cause_chain(exc):
             if isinstance(current_exc, ValidationError):
-                error_details += f"\n{format_pydantic_validation_error(current_exc)}"
+                error_details += f"\n{format_validation_error_without_input(validation_error=current_exc, validated_type=output_class)}"
                 break
         return f"{error_details}\nLLM settings: {settings}"
 

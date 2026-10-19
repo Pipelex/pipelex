@@ -1,12 +1,13 @@
 from typing import Any
 
 from botocore.exceptions import ClientError
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_bedrock_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
@@ -51,9 +52,9 @@ class BedrockLLMWorker(LLMWorkerAbstract):
                 f"Model '{inference_model.desc}' does not support reasoning parameters; "
                 "Bedrock native models do not support reasoning_effort or reasoning_budget"
             )
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="reasoning")
         if is_structured:
-            raise LLMCapabilityError(cls._structured_output_refusal(inference_model=inference_model))
+            raise LLMCapabilityError(cls._structured_output_refusal(inference_model=inference_model)).with_params(capability="structured output")
 
     @classmethod
     def _structured_output_refusal(cls, *, inference_model: InferenceModelSpec) -> str:
@@ -78,7 +79,7 @@ class BedrockLLMWorker(LLMWorkerAbstract):
             )
         except ClientError as exc:
             metadata = extract_bedrock_metadata(exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -100,7 +101,7 @@ class BedrockLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="Bedrock returned an empty text response — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
         return chat_result.text
 
     @override
@@ -111,4 +112,4 @@ class BedrockLLMWorker(LLMWorkerAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         # Refused by check_request before this is reached. TODO: try with the newest instructor release
-        raise LLMCapabilityError(self._structured_output_refusal(inference_model=self.inference_model))
+        raise LLMCapabilityError(self._structured_output_refusal(inference_model=self.inference_model)).with_params(capability="structured output")

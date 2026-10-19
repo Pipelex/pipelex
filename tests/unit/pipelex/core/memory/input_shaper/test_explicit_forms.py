@@ -2,6 +2,7 @@ import datetime
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex import log, pretty_print
@@ -11,8 +12,10 @@ from pipelex.core.memory.exceptions import (
     MultiplicityCountMismatchError,
 )
 from pipelex.core.memory.input_shaper import InputShaper
+from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.time_content import TimeContent
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_concept_library
 from tests.unit.pipelex.core.memory.input_shaper.data import OpeningTime, Question, ShaperInvoice, ShaperWeird, build_input_specs
 
@@ -135,12 +138,37 @@ class TestInputShaperExplicitForms:
 
     @pytest.mark.parametrize("declared_concept", ["native.Number", "native.Anything"])
     def test_explicit_number_envelope_holding_nan_raises(self, declared_concept: str) -> None:
-        """An explicit envelope builds its content bottom-up, and `NumberContent` refuses a number JSON cannot hold."""
+        """An explicit envelope builds its content bottom-up, and `NumberContent` refuses a number JSON cannot hold.
+
+        The refusal is the input's, located by the content class's schema, and names the input and the field.
+        """
         input_specs = build_input_specs([("payload", declared_concept, None)])
         provided: dict[str, Any] = {"concept": "Number", "content": {"number": float("nan")}}
 
-        with pytest.raises(ValidationError, match="number must be finite"):
+        with pytest.raises(StuffFactoryError, match="number: Value error, number must be finite") as exc_info:
             InputShaper.shape({"payload": provided}, input_specs=input_specs, concept_provider=get_concept_library(), read_scope=None)
+
+        assert isinstance(exc_info.value.__cause__, ValidationError)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.INPUT_INVALID
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"input": "payload", "field": "number"}
+
+    def test_explicit_structure_envelope_refusal_names_the_field_and_never_the_value(self) -> None:
+        """An explicit envelope of a structure refused by its class: the field is located, the value it held never quoted."""
+        input_specs = build_input_specs([("invoice", "shaper_test.ShaperInvoice", None)])
+        provided: dict[str, Any] = {"concept": "shaper_test.ShaperInvoice", "content": {"invoice_number": "INV-1", "amount": "jane.doe@acme.example"}}
+
+        with pytest.raises(StuffFactoryError) as exc_info:
+            InputShaper.shape(
+                {"invoice": provided}, input_specs=input_specs, search_scope="shaper_test", concept_provider=get_concept_library(), read_scope=None
+            )
+
+        assert "amount: Input should be a valid number" in str(exc_info.value)
+        assert "jane.doe@acme.example" not in str(exc_info.value)
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"input": "invoice", "field": "amount"}
 
     def test_explicit_single_into_fixed_count_raises(self) -> None:
         """A single value is one item, never the N a fixed count declares."""

@@ -5,6 +5,8 @@ import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.uri.uri_base64 import make_base64_url_from_any_uri
 from tests.cases import ImageTestCases
@@ -79,12 +81,13 @@ class TestMakeBase64UrlFromUriAsync:
         assert decoded == png_bytes
         mock_storage.load.assert_called_once_with(uri=storage_uri)
 
-    async def test_pipelex_storage_raises_value_error_without_storage(self) -> None:
-        """Test that pipelex-storage:// URIs raise ValueError when no storage provider is given."""
+    async def test_pipelex_storage_is_refused_without_storage(self) -> None:
+        """A pipelex-storage:// URI is refused as storage not configured when no storage provider is given."""
         storage_uri = f"{PIPELEX_STORAGE_SCHEME}images/photo.png"
 
-        with pytest.raises(ValueError, match="Cannot convert pipelex-storage"):
+        with pytest.raises(StorageNotConfiguredError, match="Cannot convert pipelex-storage") as exc_info:
             await make_base64_url_from_any_uri(storage_uri)
+        assert exc_info.value.resolve_error_code() == PipelexErrorCode.STORAGE_NOT_CONFIGURED
 
     async def test_http_url_converts_to_base64_data_url(self, mocker: MockerFixture) -> None:
         """Test that HTTP URLs are fetched and converted to base64 data URLs."""

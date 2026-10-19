@@ -11,8 +11,12 @@ against an already-open library without dispatching. The twin's callers (the pro
 cycle, which is why the two entrypoints are separate modules at separate altitudes.
 """
 
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.libraries.pipe.pipe_suggestions import declared_pipe_refs
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_run.exceptions import DryRunGraphNotProducedError
@@ -55,8 +59,9 @@ async def dry_run_pipeline(
         PipelineExecutionError: If dry-run execution fails.
     """
     if not mthds_contents:
+        # Every caller passes the contents it validated, so none is a bug of ours.
         msg = "mthds_contents must be provided"
-        raise ValueError(msg)
+        raise PipelexUnexpectedError(msg)
 
     # Pre-parse contents to extract the default main pipe's domain-qualified ref via the one
     # shared selection rule. Note: pipeline_run_setup will re-parse these contents. The
@@ -65,12 +70,14 @@ async def dry_run_pipeline(
     blueprints = [MthdsParser.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
     if pipe_code is not None and not pipe_code.strip():
         msg = "pipe_code must not be blank when provided"
-        raise MthdsParserError(msg)
+        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_INVALID)
     pipe_ref = pipe_code if pipe_code is not None else select_primary_blueprint(blueprints).main_pipe_ref
 
     if not pipe_ref:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise MthdsParserError(msg)
+        # With no entry pipe to start from, the request may select any pipe the bundles declare.
+        candidates = declared_pipe_refs(blueprints=blueprints)
+        raise MthdsParserError(msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
 
     execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(
         generate_graph=True,

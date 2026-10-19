@@ -45,6 +45,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple, Protocol, cast
 from opentelemetry import trace
 from typing_extensions import override
 
+from pipelex.base_exceptions import iter_traceback_chain
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_trace_fields_for_logs
 from pipelex.tools.log.exceptions import GcpLogSinkCredentialsError
@@ -463,22 +465,13 @@ class GcpCredentialsCheck:
 
     def _classify(self, *, failure: Exception) -> GcpCredentialsOutcome:
         """``UNREACHABLE`` when a transport failure is anywhere on the chain the traceback would print, ``REFUSED`` otherwise."""
-        seen: set[int] = set()
-        current: BaseException | None = failure
-        while current is not None and id(current) not in seen:
+        for current in iter_traceback_chain(failure):
             if isinstance(current, self._transport_error_types):
                 if _carries_a_final_answer(failure=current):
                     return GcpCredentialsOutcome.REFUSED
                 return GcpCredentialsOutcome.UNREACHABLE
             if getattr(current, "retryable", False) is True:
                 return GcpCredentialsOutcome.UNREACHABLE
-            seen.add(id(current))
-            if current.__cause__ is not None:
-                current = current.__cause__
-            elif current.__suppress_context__:
-                current = None
-            else:
-                current = current.__context__
         return GcpCredentialsOutcome.REFUSED
 
 
@@ -706,7 +699,7 @@ def confirm_credentials_at_boot(*, credentials_check: GcpCredentialsCheck, remed
                 f"was refused at boot, so every record it exported would be lost ({describe_failure(failure=verdict.failure)}). "
                 f"{remedy}, or select the '{LogSinkMethod.JSON}' sink in [runtime.log]."
             )
-            raise GcpLogSinkCredentialsError(msg) from verdict.failure
+            raise GcpLogSinkCredentialsError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from verdict.failure
         case GcpCredentialsOutcome.UNREACHABLE:
             why = f"a refresh could not reach the credential endpoint ({describe_failure(failure=verdict.failure)})"
         case GcpCredentialsOutcome.UNANSWERED:

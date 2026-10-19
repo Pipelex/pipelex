@@ -1,14 +1,16 @@
 from typing import TYPE_CHECKING, cast
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -16,7 +18,7 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -52,30 +54,31 @@ class _PassThroughRouter(_StubPipeRouter):
         return super()._as_pipelex_failure(error=error)
 
 
-class _RecoveredReportCarrierError(PipelexError):
-    """Carries a root fault's report recovered across a transport boundary."""
+class _RecoveredProblemCarrierError(PipelexError):
+    """Carries a root fault's problem recovered across a transport boundary, located where it is told."""
 
-    def __init__(self, message: str, *, error_report: ErrorReport):
+    def __init__(self, message: str, *, problem: PipelexProblem):
         super().__init__(message)
-        self.error_report = error_report
+        self.carried_problem = problem
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        return self.error_report
+    def recovered_problem(self) -> PipelexProblem | None:
+        return self.carried_problem
 
 
 class _RelocatingHostRouter(_StubPipeRouter):
-    """A host router whose transport packed the root fault's report and the location found on the far side."""
+    """A host router whose transport packed the root fault's problem and the location found on the far side."""
 
-    def __init__(self, error: Exception, *, packed_report: ErrorReport, packed_pipe_code: str, packed_pipe_stack: list[str]):
+    def __init__(self, error: Exception, *, packed_problem: PipelexProblem, packed_message: str, packed_pipe_code: str, packed_pipe_stack: list[str]):
         super().__init__(error=error)
-        self._packed_report = packed_report
+        self._packed_problem = packed_problem
+        self._packed_message = packed_message
         self._packed_pipe_code = packed_pipe_code
         self._packed_pipe_stack = packed_pipe_stack
 
     @override
     def _as_pipelex_failure(self, *, error: Exception) -> PipelexError | None:
-        carrier = _RecoveredReportCarrierError(self._packed_report.message, error_report=self._packed_report)
+        carrier = _RecoveredProblemCarrierError(self._packed_message, problem=self._packed_problem)
         located = PipeRouterError.make_located(
             failure=carrier, run_mode=PipeRunMode.LIVE, pipe_code=self._packed_pipe_code, output_name=None, pipe_stack=self._packed_pipe_stack
         )
@@ -105,21 +108,29 @@ def _make_pipe_job() -> PipeJob:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeRouterRun:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises an inference failure built by hand, below the worker that names its model and provider"
+    )
     async def test_transient_cogt_error_surfaces_on_first_attempt(self) -> None:
         """Direct execution is a single pipeline-level attempt: a transient CogtError is not retried.
 
         Pins the "direct = single attempt" contract against a future re-introduction of a retry loop.
-        The error leaves located at the pipe, chained to the CogtError, and still reports as it.
+        The error leaves located at the pipe, chained to the CogtError, and its problem is still the CogtError's.
         """
-        error = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT)
+        error = LLMCompletionError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).with_error_code(
+            CoreCode.PROVIDER_RATE_LIMITED
+        )
         router = _StubPipeRouter(error=error)
 
         with pytest.raises(PipeRouterError) as exc_info:
             await router.run(_make_pipe_job())
 
         assert exc_info.value.__cause__ is error
-        assert exc_info.value.to_error_report().error_type == "CogtError"
-        assert exc_info.value.to_error_report().retryable is True
+        problem = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "LLMCompletionError"
+        assert problem.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert problem.is_retryable is True
         assert router.call_count == 1
 
     async def test_pipe_run_error_wraps_as_pipe_router_error(self) -> None:
@@ -139,8 +150,9 @@ class TestPipeRouterRun:
         assert exc_info.value.pipe_stack == ["stub_pipe"]
         assert router.call_count == 1
 
-    async def test_any_pipelex_error_is_located_with_its_own_report(self) -> None:
-        """A PipelexError that is neither a CogtError nor a PipeRunError is located too, and reports as itself."""
+    @pytest.mark.builds_problems_without_required_params(reason="raises a failure built with a message alone, to check where the router locates it")
+    async def test_any_pipelex_error_is_located_with_its_own_problem(self) -> None:
+        """A PipelexError that is neither a CogtError nor a PipeRunError is located too, and its problem is its own."""
         stuff_error = StuffFactoryError("Error combining stuffs")
         router = _StubPipeRouter(error=stuff_error)
 
@@ -152,12 +164,16 @@ class TestPipeRouterRun:
         assert located.pipe_code == "stub_pipe"
         assert located.pipe_stack == ["stub_pipe"]
         assert located.message == "Pipe 'stub_pipe' failed: Error combining stuffs"
-        report = located.to_error_report()
-        assert report.error_type == "StuffFactoryError"
-        assert report.message == "Pipe 'stub_pipe' failed: Error combining stuffs"
+        problem = located.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == stuff_error.resolve_error_code()
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "stub_pipe", "path": ["stub_pipe"]}
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "StuffFactoryError"
+        assert problem.diagnostics.message == "Error combining stuffs"
 
     async def test_foreign_exception_is_located_as_unexpected_error(self) -> None:
-        """A non-PipelexError is wrapped into a PipelexUnexpectedError naming its class, never caller-facing."""
+        """A non-PipelexError is wrapped into a PipelexUnexpectedError naming its class, a fault of ours the caller never reads."""
         foreign_error = ValueError("unexpected value")
         router = _StubPipeRouter(error=foreign_error)
 
@@ -167,14 +183,19 @@ class TestPipeRouterRun:
         unexpected = exc_info.value.__cause__
         assert isinstance(unexpected, PipelexUnexpectedError)
         assert unexpected.__cause__ is foreign_error
-        assert unexpected.message == "ValueError: unexpected value"
-        report = exc_info.value.to_error_report()
-        assert report.error_type == "PipelexUnexpectedError"
-        assert report.message == "Pipe 'stub_pipe' failed: ValueError: unexpected value"
-        assert report.caller_facing_message is False
+        # Named by its class, never its text, which can carry anything of the run's data.
+        assert unexpected.message == "ValueError"
+        assert exc_info.value.message == "Pipe 'stub_pipe' failed: ValueError"
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.code == CoreCode.RUNTIME_UNEXPECTED
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "PipelexUnexpectedError"
+        assert operator.diagnostics.message == "ValueError"
+        assert "unexpected value" not in str(operator.to_wire())
+        assert "unexpected value" not in str(exc_info.value.to_problem(view=ProblemView.CALLER).to_wire())
 
-    async def test_pydantic_validation_error_keeps_its_readable_rendering(self) -> None:
-        """A pydantic ValidationError is named and rendered the way the runner renders one."""
+    async def test_pydantic_validation_error_is_rendered_without_the_value_it_refused(self) -> None:
+        """A pydantic ValidationError is named and rendered by its locations and reasons, the value being the run's data."""
         with pytest.raises(ValidationError) as validation_info:
             _MiniPayload(count="not-a-number")  # pyright: ignore[reportArgumentType]
         router = _StubPipeRouter(error=validation_info.value)
@@ -184,7 +205,8 @@ class TestPipeRouterRun:
 
         unexpected = exc_info.value.__cause__
         assert isinstance(unexpected, PipelexUnexpectedError)
-        assert unexpected.message == f"ValidationError: {format_pydantic_validation_error(validation_info.value)}"
+        assert unexpected.message == f"ValidationError: {format_validation_error_without_input(validation_error=validation_info.value)}"
+        assert "not-a-number" not in unexpected.message
 
     async def test_already_located_failure_keeps_the_innermost_location(self) -> None:
         """A failure a router below already located passes through untouched: the innermost location wins."""
@@ -203,11 +225,12 @@ class TestPipeRouterRun:
         assert exc_info.value is inner_failure
 
     async def test_a_host_router_rebuilding_the_far_location_is_not_located_again(self) -> None:
-        """A located failure the hook rebuilds from a packed report and location passes through, located once."""
-        root_report = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).to_error_report()
+        """A located failure the hook rebuilds from a packed problem and location passes through, located once."""
+        root_problem = CogtError(message="rate limited", error_category=InferenceErrorCategory.TRANSIENT).to_problem(view=ProblemView.OPERATOR)
         router = _RelocatingHostRouter(
             error=RuntimeError("child workflow failed"),
-            packed_report=root_report,
+            packed_problem=root_problem,
+            packed_message="rate limited",
             packed_pipe_code="leaf",
             packed_pipe_stack=["flow", "ctrl", "leaf"],
         )
@@ -216,10 +239,13 @@ class TestPipeRouterRun:
             await router.run(_make_pipe_job())
 
         assert exc_info.value.pipe_code == "leaf"
-        assert isinstance(exc_info.value.__cause__, _RecoveredReportCarrierError)
-        report = exc_info.value.to_error_report()
-        assert report.error_type == "CogtError"
-        assert report.message == "Pipe 'leaf' failed (flow → ctrl → leaf): rate limited"
+        assert isinstance(exc_info.value.__cause__, _RecoveredProblemCarrierError)
+        assert exc_info.value.message == "Pipe 'leaf' failed (flow → ctrl → leaf): rate limited"
+        problem = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == root_problem.code
+        assert problem.diagnostics == root_problem.diagnostics
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "leaf", "path": ["flow", "ctrl", "leaf"]}
 
     async def test_a_foreign_exception_raised_from_an_older_location_is_located_here(self) -> None:
         """A foreign exception raised from an earlier located failure is a new failure: converted and located at this pipe."""
@@ -240,7 +266,9 @@ class TestPipeRouterRun:
         assert exc_info.value.pipe_code == _StubPipe.code
         assert isinstance(exc_info.value.__cause__, PipelexUnexpectedError)
         assert exc_info.value.__cause__.__cause__ is foreign_failure
-        assert exc_info.value.to_error_report().error_type == "PipelexUnexpectedError"
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.error_class == "PipelexUnexpectedError"
 
     async def test_a_host_router_can_let_a_failure_through(self) -> None:
         """A host router whose hook answers None sees its transport's exception propagate unchanged."""

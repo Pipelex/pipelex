@@ -1,6 +1,6 @@
 """What a run's inference calls did, tallied as they end, for the run's `run_completed` and `model_used` events.
 
-The run's events carry its pipes and its token usage, but not what a call that failed was refused for, which backend
+The run's events carry its pipes and its token usage, but not who must act on a call that failed, which backend
 served a model, or how many images and pages a call produced. The inference call's own summary event knows all of it
 when the call ends, so it notes it here, in the tally of the run the call belongs to: a context variable `PipeRun`
 sets for the duration of a run, which the run's tasks inherit. With no run tallying (statistics off, or a call made
@@ -10,18 +10,31 @@ The tally is in-process: a run whose calls execute in other processes, a Tempora
 all. The hosted plane sets `DO_NOT_TRACK=1`, so no such run reports.
 """
 
+import re
 import threading
 from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import Any, cast
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
-from pipelex.system.usage_stats.usage_stats_contract import UsageStatsErrorDomain, UsageStatsMethodSource
+from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.answers import decode_json
+from mthds.protocol.problem.models import Problem
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from mthds.runners.api.exceptions import ApiResponseError
 
-#: The failure categories a `model_used` event counts, the runtime's own `InferenceErrorCategory` values.
-FAILURE_CATEGORIES: tuple[str, ...] = ("transient", "configuration", "content", "capacity", "ambiguous", "unknown")
-#: The category a failure is counted under when the runtime could not classify it.
-UNCLASSIFIED_FAILURE_CATEGORY = "unknown"
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import ProblemView
+from pipelex.system.usage_stats.usage_stats_contract import (
+    ERROR_CODE_MAX_LENGTH,
+    ERROR_CODE_PATTERN,
+    UsageStatsError,
+    UsageStatsErrorDomain,
+    UsageStatsMethodSource,
+)
+
+#: A failure that is no Pipelex error, which every surface reads as the registry's catch-all.
+UNEXPECTED_USAGE_STATS_ERROR = UsageStatsError(code=CoreCode.RUNTIME_UNEXPECTED, domain=UsageStatsErrorDomain.RUNTIME)
 
 
 class ModelCallTally:
@@ -31,7 +44,7 @@ class ModelCallTally:
         self.backend_name = backend_name
         self.calls = 0
         self.failures = 0
-        self.failures_by_category: dict[str, int] = dict.fromkeys(FAILURE_CATEGORIES, 0)
+        self.failures_by_domain: dict[UsageStatsErrorDomain, int] = dict.fromkeys(UsageStatsErrorDomain, 0)
         self.images_generated = 0
         self.pages_extracted = 0
 
@@ -55,14 +68,13 @@ class RunInferenceTally:
         *,
         model_handle: str,
         backend_name: str | None,
-        failed: bool,
-        failure_category: str | None,
+        failure_domain: UsageStatsErrorDomain | None,
         images_generated: int,
         pages_extracted: int,
     ) -> None:
         with self._lock:
             self.calls += 1
-            if failed:
+            if failure_domain is not None:
                 self.failures += 1
             if backend_name is None:
                 return
@@ -73,10 +85,9 @@ class RunInferenceTally:
             model_tally.calls += 1
             model_tally.images_generated += images_generated
             model_tally.pages_extracted += pages_extracted
-            if failed:
+            if failure_domain is not None:
                 model_tally.failures += 1
-                category = failure_category if failure_category in model_tally.failures_by_category else UNCLASSIFIED_FAILURE_CATEGORY
-                model_tally.failures_by_category[category] += 1
+                model_tally.failures_by_domain[failure_domain] += 1
 
 
 _RUN_TALLY: ContextVar[RunInferenceTally | None] = ContextVar("pipelex_usage_stats_run_tally", default=None)
@@ -103,27 +114,91 @@ def tallying_inference_calls(*, tally: RunInferenceTally | None) -> Generator[No
         _RUN_TALLY.reset(token)
 
 
-def usage_stats_error_domain(*, error: BaseException | None) -> UsageStatsErrorDomain:
-    """Who can fix a failure, by the runtime's own error report: `input`, `config`, `runtime`, or `other` when it cannot say."""
-    if not isinstance(error, PipelexError):
-        return UsageStatsErrorDomain.OTHER
-    return usage_stats_error_domain_of(domain=error.to_error_report().error_domain)
+def sent_usage_stats_error(*, error: ApiResponseError) -> UsageStatsError | None:
+    """What the usage statistics say of a refusal a server answered: the code and the domain its body sent, nothing inferred.
 
-
-def usage_stats_error_domain_of(*, domain: ErrorDomain | str | None) -> UsageStatsErrorDomain:
-    """The statistics' error domain of a runtime domain, given as the enum or as its value; `other` for none or another."""
-    if domain is None:
-        return UsageStatsErrorDomain.OTHER
+    The one rule for an answered refusal, every surface's: who has to act is only the server's to say, so the domain is
+    the problem document's own `domain` member, read off the body the server sent, and never the one the client reads
+    from the status when the body names none, as pipelex-sdk does for a gateway's error page. `None` when the answer
+    sent no reportable code with a domain.
+    """
+    decoded = decode_json(error.response_body)
+    sent: object = decoded.value if decoded.is_json else None
+    document = cast("dict[str, Any]", sent) if isinstance(sent, dict) else {}
+    sent_code = document.get("code")
+    sent_domain = document.get("domain")
+    if not isinstance(sent_code, str) or not isinstance(sent_domain, str) or not is_reportable_error_code(code=sent_code):
+        return None
     try:
-        runtime_domain = ErrorDomain(domain)
+        problem_domain = ProblemDomain(sent_domain)
     except ValueError:
-        return UsageStatsErrorDomain.OTHER
-    match runtime_domain:
-        case ErrorDomain.INPUT:
+        return None
+    return UsageStatsError(code=sent_code, domain=usage_stats_error_domain_of(domain=problem_domain))
+
+
+def usage_stats_error(*, error: BaseException | None) -> UsageStatsError:
+    """The code of a failure and its domain, as its problem gives them; `runtime.unexpected` for an error that carries none.
+
+    A Pipelex error's code is its problem's, which a cause reporting a problem of its own, such as one recovered across
+    a transport boundary, decides, as every other surface reads it. A refusal a server answered is read by what its body
+    sent alone (:func:`sent_usage_stats_error`), and as the catch-all when it sent nothing, never by the problem the
+    client inferred from the status. Any other request error of the MTHDS client carries the problem the client itself
+    decided, an unreachable runtime or a timeout, which is read as it is. Any other error, and a failure with no error
+    to read, is the catch-all, since every failure has a code.
+    """
+    if isinstance(error, PipelexError):
+        return usage_stats_error_of_problem(problem=error.to_problem(view=ProblemView.CALLER))
+    if isinstance(error, ApiResponseError):
+        return sent_usage_stats_error(error=error) or UNEXPECTED_USAGE_STATS_ERROR
+    if isinstance(error, PipelineRequestError):
+        return usage_stats_error_of_problem(problem=error.problem)
+    return UNEXPECTED_USAGE_STATS_ERROR
+
+
+def usage_stats_failure_domain(*, error: BaseException) -> UsageStatsErrorDomain:
+    """Who must act on a failure, read off its code alone, without building its problem.
+
+    The cheap reading a hot path takes, such as a failed inference call's: the code the error resolves to, and the
+    domain the registry gives it, the same domain :func:`usage_stats_error` reads off the problem.
+    """
+    if isinstance(error, PipelexError):
+        recovered = error.recovered_problem()
+        domain = recovered.effective_domain if recovered is not None else error.resolve_domain()
+        return usage_stats_error_domain_of(domain=domain)
+    if isinstance(error, ApiResponseError):
+        return (sent_usage_stats_error(error=error) or UNEXPECTED_USAGE_STATS_ERROR).domain
+    if isinstance(error, PipelineRequestError):
+        return usage_stats_error_domain_of(domain=error.problem.effective_domain)
+    return UNEXPECTED_USAGE_STATS_ERROR.domain
+
+
+def is_reportable_error_code(*, code: str) -> bool:
+    """Whether a code fits the contract's pattern and length, as every registry's does."""
+    return len(code) <= ERROR_CODE_MAX_LENGTH and re.fullmatch(ERROR_CODE_PATTERN, code) is not None
+
+
+def usage_stats_error_of_problem(*, problem: Problem) -> UsageStatsError:
+    """The code and the domain of a problem a surface reports.
+
+    A code the contract's pattern refuses, which no registry gives, reads as the catch-all rather than losing the event.
+    """
+    if not is_reportable_error_code(code=problem.code):
+        return UNEXPECTED_USAGE_STATS_ERROR
+    return UsageStatsError(code=problem.code, domain=usage_stats_error_domain_of(domain=problem.effective_domain))
+
+
+def usage_stats_error_domain_of(*, domain: ProblemDomain) -> UsageStatsErrorDomain:
+    """The statistics' error domain of a problem's domain: the same closed list, under the contract's own enum."""
+    match domain:
+        case ProblemDomain.INPUT:
             return UsageStatsErrorDomain.INPUT
-        case ErrorDomain.CONFIG:
-            return UsageStatsErrorDomain.CONFIG
-        case ErrorDomain.RUNTIME:
+        case ProblemDomain.METHOD:
+            return UsageStatsErrorDomain.METHOD
+        case ProblemDomain.ACCOUNT:
+            return UsageStatsErrorDomain.ACCOUNT
+        case ProblemDomain.OPERATOR:
+            return UsageStatsErrorDomain.OPERATOR
+        case ProblemDomain.RUNTIME:
             return UsageStatsErrorDomain.RUNTIME
 
 

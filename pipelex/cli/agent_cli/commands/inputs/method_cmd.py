@@ -9,7 +9,7 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, extract_validation_errors
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_file_error, use_agent_cli_error_format
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import emit_inputs_result, inputs_core
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -41,12 +41,16 @@ def inputs_method_cmd(
         bool,
         typer.Option("--explicit", help="Emit the ceremonial {concept, content} envelope form instead of the light values"),
     ] = False,
+    error_format: Annotated[
+        CliOutputFormat | None,
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to json)"),
+    ] = None,
 ) -> None:
     """Generate an example inputs template for an installed method.
 
     Resolves the method by name, finds its .mthds bundle, and generates inputs.
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, JSON to stderr on error with exit code 1.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
 
     Examples:
         pipelex-agent inputs method my-method
@@ -54,6 +58,7 @@ def inputs_method_cmd(
         pipelex-agent inputs method my-method --format toml
         pipelex-agent inputs method my-method --explicit
     """
+    use_agent_cli_error_format(error_format=error_format)
     try:
         pipe_code, method_library_dirs, method = resolve_method_target(
             method_name=name,
@@ -62,9 +67,9 @@ def inputs_method_cmd(
             raise_ref_errors=True,
         )
     except MethodRefError as exc:
-        # Method-reference failure (parse, fetch, location, bounds, refusal): report it through
-        # the structured error envelope instead of the human CLI's plain red text.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Method-reference failure (parse, fetch, location, bounds, refusal): report it as its problem
+        # instead of the human CLI's plain red text.
+        agent_error(str(exc), cause=exc)
 
     bundle_path: Path | None = None
     if method.mthds_files:
@@ -82,16 +87,15 @@ def inputs_method_cmd(
         emit_inputs_result(result, template_format=template_format, explicit=explicit)
 
     except FileNotFoundError as exc:
-        agent_error(f"Bundle file not found: {bundle_path}", error_type="FileNotFoundError", cause=exc)
+        agent_file_error(f"Bundle file not found: {bundle_path}", path=str(bundle_path), reason="not found", cause=exc)
 
     except ValidateBundleError as exc:
-        # A failing dry run rides validation_errors as one located dry_run item per failing pipe.
-        agent_error(exc.message, error_type="ValidateBundleError", cause=exc, validation_errors=extract_validation_errors(exc))
+        # A failing dry run is the problem's errors, one located item per failing pipe.
+        agent_error(exc.message, cause=exc)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
             exc.message,
-            error_type="PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
             model_type=str(exc.model_type),
@@ -107,11 +111,11 @@ def inputs_method_cmd(
             availability_extra["fallback_list"] = exc.fallback_list
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, error_type="PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+        agent_error(exc.message, cause=exc, **availability_extra)
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

@@ -141,12 +141,16 @@ review = [
 verify_commands = []
 
 [contracts.logging-docs]
-description = "The logging doc restates the console's field rules and the handled-exception fields, the log-sink page summarises what the console renders, and both must track the two modules that decide them."
-# The page restates, rule by rule, what the two modules decide: the style map (`FIELD_STYLES`) and
+description = "The logging doc restates the console's field rules and the handled-exception fields, the log-sink page summarises what the console renders, and both must track the modules that decide them."
+# The page restates, rule by rule, what the modules decide: the style map (`FIELD_STYLES`) and
 # the fields it colours, the cut lengths (`FIELD_VALUE_MAX_LENGTH` and the generous ones in
 # `FIELD_MAX_LENGTHS`), the field names whose value is cut at its start (`LEFT_CUT_FIELD_SUFFIXES`,
-# `LEFT_CUT_FIELDS`), when a pydantic message is kept rather than its error type
-# (`SCHEMA_CONTEXT_KEYS`), and where an `extra_forbidden` error is located. A name added to one of
+# `LEFT_CUT_FIELDS`), in `console_fields.py`; the handled-exception fields and their arguments, in
+# `error_fields.py`; and, in `pydantic_utils.py`, where `error_fields` writes a `ValidationError`
+# through `describe_exception_without_input`, when a pydantic message is kept rather than its error
+# type (`SCHEMA_CONTEXT_KEYS`, `refusal_reason_without_input`) and how a location is written
+# (`located_validation_errors`: what the schema names, `<key>` for the rest, an authored document's
+# as pydantic gives it). A name added to one of
 # those sets, or a length moved, silently falsifies a sentence quantifying over it, which is the
 # staleness this contract exists to catch. The log-sink plugins page describes the `console` sink
 # in its table of built-in sinks and again where it explains why that sink is the default, and
@@ -160,6 +164,7 @@ description = "The logging doc restates the console's field rules and the handle
 triggers = [
   "pipelex/tools/log/console_fields.py",
   "pipelex/tools/log/error_fields.py",
+  "pipelex/tools/typing/pydantic_utils.py",
 ]
 review = [
   "docs/tools/logging.md",

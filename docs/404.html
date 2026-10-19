@@ -136,7 +136,16 @@
             'cookbook/using-inference-plugins': 'under-the-hood/writing-an-inference-plugin',
         };
 
+        // A one-segment page under `errors/`, which a class-derived `type` URI names: an API-authored
+        // error's, or a retired per-class page that a release without the static redirects of
+        // mkdocs.yml's `redirect_maps` serves as missing. Send it to the error codes' index. A code's
+        // page is several segments deep, so this never catches one.
+        const retiredErrorPage = /^\/errors\/[a-z0-9]+(?:-[a-z0-9]+)*\/?$/;
+
         function rewritePath(p) {
+            if (retiredErrorPage.test(p)) {
+                return '/errors/';
+            }
             for (const [oldPrefix, newPrefix] of Object.entries(pathRewrites)) {
                 if (p.includes(oldPrefix)) {
                     return p.replace(oldPrefix, newPrefix);

@@ -12,6 +12,9 @@ from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_require
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 
+#: The field a bundle writes a condition's expression in: a template as written, or an expression.
+ConditionExpressionField = Literal["expression_template", "expression"]
+
 OutcomeMap = dict[str, str]
 
 
@@ -58,6 +61,14 @@ class PipeConditionBlueprint(PipeBlueprint):
             return "{{ " + self.expression + " }}"
         return None
 
+    @property
+    def runtime_expression_field(self) -> ConditionExpressionField:
+        """The field the bundle writes the condition in, which a refusal of its expression is located on.
+
+        ``expression_template`` when it gives one, else ``expression``, the field ``runtime_expression`` reads first.
+        """
+        return "expression_template" if self.expression_template else "expression"
+
     @field_validator("outcomes", mode="after")
     @classmethod
     def validate_outcome_map(cls, outcomes: OutcomeMap) -> OutcomeMap:
@@ -84,7 +95,7 @@ class PipeConditionBlueprint(PipeBlueprint):
         # a conditional only when it renders, so a wrong name there compiles and is left to the run, as it must be:
         # refusing it here would refuse an expression whose run never reaches it.
         # The message quotes neither the expression nor the parser's diagnosis, which names the token it stopped at:
-        # the verdict is kept verbatim under STRICT disclosure, and the condition may be a host library's.
+        # the verdict's item shows it to the caller, and the condition may be a host library's.
         if not has_exactly_one_among_attributes_from_list(self, attributes_list=["expression_template", "expression"]):
             # Both fields or neither: the validator of the pair refuses that and says why, where a refusal of the
             # parse of one of them, which runs first, would hide it.
@@ -92,7 +103,7 @@ class PipeConditionBlueprint(PipeBlueprint):
         runtime_expression = self.runtime_expression
         if runtime_expression is None:
             return
-        field_name = "expression_template" if self.expression_template else "expression"
+        field_name = self.runtime_expression_field
         wanted = "a Jinja2 template" if self.expression_template else "a Jinja2 expression"
         try:
             detect_jinja2_required_variables(template_category=TemplateCategory.EXPRESSION, template_source=runtime_expression)

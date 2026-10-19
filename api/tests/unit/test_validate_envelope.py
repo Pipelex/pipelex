@@ -10,7 +10,7 @@ DIRECT in-process on the orchestrator-agnostic base (F2): the real in-process va
 orchestrator-backend selection.
 
 Includes the D2 regression pin: a bundle that declares no `main_pipe` validates with 200 and
-`graph_spec=null` — the former 422 precondition is deleted.
+no `graph_spec` — the former 422 precondition is deleted.
 """
 
 from fastapi import FastAPI
@@ -82,7 +82,7 @@ class TestValidateEnvelope:
         response = client.post("/v1/validate", json={"mthds_contents": [NO_MAIN_PIPE_MTHDS]})
         assert response.status_code == 200, response.text
         body = response.json()
-        assert body["graph_spec"] is None
+        assert "graph_spec" not in body
         assert body["bundle_blueprint"]["domain"] == "nomain"
         assert body["pipe_io_contracts"]["nomain.echo"]["output"]["multiplicity"] == "single"
         assert body["validated_pipes"] == [{"pipe_ref": "nomain.echo", "status": DryRunStatus.SUCCESS}]

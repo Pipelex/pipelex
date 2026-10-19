@@ -16,9 +16,11 @@ from pipelex.cogt.exceptions import (
     InferenceErrorCategory,
     LLMCompletionError,
     LLMModelNotFoundError,
+    find_inference_error_category_in_chain,
 )
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 from pipelex.providers.google.google_llm_worker import GoogleLLMWorker
 from tests.unit.pipelex.providers.google.test_data import GoogleErrorHandlingTestData
@@ -112,6 +114,12 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.img_gen_prompt.positive_text = "a cute cat"
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -225,8 +233,8 @@ class TestGoogleWorkerErrorHandling:
 
     # ---- ImgGen worker ServerError test ----
 
-    async def test_img_gen_server_error_has_transient_category(self, mocker: MockerFixture) -> None:
-        """ServerError should be categorized as TRANSIENT for ImgGen worker."""
+    async def test_img_gen_server_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
+        """A ServerError on an image generation, which is billed and not idempotent, is an unknown outcome."""
         worker = _make_google_img_gen_worker(mocker)
         sdk_exc = _make_google_server_error(code=500, message="Internal server error")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -234,13 +242,16 @@ class TestGoogleWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.__cause__ is sdk_exc
 
-    # ---- to_error_report() integration ----
+    # ---- Problem integration ----
 
-    async def test_error_report_includes_category_and_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() includes error_category and retryable from the exception."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_problem_includes_category_and_retryable(self, mocker: MockerFixture) -> None:
+        """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_google_llm_worker(mocker)
         sdk_exc = _make_google_client_error(code=429, message="Too many requests")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -248,13 +259,17 @@ class TestGoogleWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
-        assert report.error_type == "LLMCompletionError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
+        assert _diagnostics_of(problem).error_class == "LLMCompletionError"
 
-    async def test_error_report_capacity_not_retryable(self, mocker: MockerFixture) -> None:
-        """to_error_report() for CAPACITY errors has retryable=False."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
+        """The problem of a CAPACITY error invites no retry."""
         worker = _make_google_llm_worker(mocker)
         sdk_exc = _make_google_client_error(code=429, message="Resource has been exhausted (e.g. check quota)")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -262,6 +277,7 @@ class TestGoogleWorkerErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_text(llm_job=_make_llm_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "capacity"
-        assert report.retryable is False
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "capacity"
+        assert problem.is_retryable is False

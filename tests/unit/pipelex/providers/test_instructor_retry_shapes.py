@@ -29,13 +29,15 @@ import openai
 import pytest
 from instructor import Mode, from_anthropic, from_openai
 from instructor.core import FailedAttempt, InstructorRetryException
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pydantic import ValidationError
 from tenacity import RetryError
 
-from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
-from pipelex.cogt.inference.error_classification import UserActionKind, extract_underlying_sdk_exception
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError, find_inference_error_category_in_chain
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_underlying_sdk_exception
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.providers.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -45,6 +47,8 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
     from pytest_mock import MockerFixture
+
+    from pipelex.base_exceptions import PipelexError
 
 _ORIGIN = "https://gateway.example.com"
 _MAX_ATTEMPTS = 3
@@ -84,6 +88,25 @@ _OPENAI_INVALID_OUTPUT: _ScriptedResponse = (
                         {"id": "call_1", "type": "function", "function": {"name": "DummySchema", "arguments": json.dumps(_INVALID_ARGUMENTS)}}
                     ],
                 },
+            }
+        ],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    },
+)
+# A model's refusal, which is its answer and the run's data: no message, diagnostic or provider text may carry it.
+_REFUSAL_MARKER = "confidential-patient-diagnosis"
+_OPENAI_REFUSAL: _ScriptedResponse = (
+    200,
+    {
+        "id": "chatcmpl-refusal",
+        "object": "chat.completion",
+        "created": 0,
+        "model": "some-model",
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {"role": "assistant", "content": None, "refusal": f"I cannot discuss {_REFUSAL_MARKER}."},
             }
         ],
         "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
@@ -177,6 +200,45 @@ _SPENT_BUDGET_SHAPES = [
 ]
 
 
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
+def _advice_of(error: PipelexError) -> UserAction:
+    """The advice nearest the error on its chain, which a local CLI prints as its tip."""
+    advice = error.advised_action()
+    assert advice is not None
+    return advice
+
+
+def _make_openai_completions_worker(mocker: MockerFixture, *, client: openai.AsyncOpenAI) -> OpenAICompletionsLLMWorker:
+    """The OpenAI completions worker over ``client`` and the real ``from_openai`` loop, built without its configuration."""
+    worker = object.__new__(OpenAICompletionsLLMWorker)
+    inference_model = mocker.MagicMock()
+    inference_model.name = _MODEL_HANDLE
+    inference_model.model_id = _WIRE_ID
+    inference_model.desc = f"{_MODEL_HANDLE} → SDK[portkey_completions]•Backend[portkey]•Model[{_WIRE_ID}]"
+    inference_model.thinking_mode = None
+    inference_model.listed_constraints = []
+    worker.inference_model = inference_model
+    completions_factory = mocker.MagicMock()
+    completions_factory.make_simple_messages = mocker.AsyncMock(return_value=[{"role": "user", "content": "Score this lead."}])
+    completions_factory.make_extras = mocker.MagicMock(return_value=({}, {}))
+    worker.openai_completions_factory = completions_factory
+    worker.instructor_for_objects = from_openai(client, mode=Mode.TOOLS)
+    return worker
+
+
+def _make_object_job(mocker: MockerFixture) -> Any:
+    """A structured-generation job re-asking up to ``_MAX_ATTEMPTS`` times."""
+    llm_job = make_llm_job(mocker)
+    llm_job.job_params.seed = None
+    llm_job.job_config.schema_reask_max_attempts = _MAX_ATTEMPTS
+    return llm_job
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestInstructorRetryShapes:
     @pytest.mark.parametrize(("raised_by", "responses", "sdk_exception_class", "nb_parse_failures"), _API_ERROR_SHAPES)
@@ -253,25 +315,11 @@ class TestInstructorRetryShapes:
         be retried or re-asked.
         """
         transport = _ScriptedTransport([_MODEL_NOT_ALLOWED])
-        worker = object.__new__(OpenAICompletionsLLMWorker)
-        inference_model = mocker.MagicMock()
-        inference_model.name = _MODEL_HANDLE
-        inference_model.model_id = _WIRE_ID
-        inference_model.desc = f"{_MODEL_HANDLE} → SDK[portkey_completions]•Backend[portkey]•Model[{_WIRE_ID}]"
-        inference_model.thinking_mode = None
-        inference_model.listed_constraints = []
-        worker.inference_model = inference_model
-        completions_factory = mocker.MagicMock()
-        completions_factory.make_simple_messages = mocker.AsyncMock(return_value=[{"role": "user", "content": "Score this lead."}])
-        completions_factory.make_extras = mocker.MagicMock(return_value=({}, {}))
-        worker.openai_completions_factory = completions_factory
-        llm_job = make_llm_job(mocker)
-        llm_job.job_params.seed = None
-        llm_job.job_config.schema_reask_max_attempts = _MAX_ATTEMPTS
+        llm_job = _make_object_job(mocker)
 
         async with transport.make_http_client() as http_client:
             client = openai.AsyncOpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client)
-            worker.instructor_for_objects = from_openai(client, mode=Mode.TOOLS)
+            worker = _make_openai_completions_worker(mocker, client=client)
             with pytest.raises(LLMCompletionError) as exc_info:
                 await worker._gen_object(llm_job=llm_job, schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
@@ -290,15 +338,51 @@ class TestInstructorRetryShapes:
             pipe_stack=["score_lead"],
         )
         located.__cause__ = failure
-        report = located.to_error_report()
+        problem = located.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "LLMCompletionError"
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.error_category == InferenceErrorCategory.CONFIGURATION
-        assert report.retryable is False
-        assert report.http_status == 500
-        assert report.user_action is not None
-        assert report.user_action.kind == UserActionKind.CHANGE_MODEL
-        assert f"'{_MODEL_HANDLE}'" in report.user_action.detail
-        assert _WIRE_ID not in report.user_action.detail
-        assert report.message.startswith("Pipe 'score_lead' failed: ")
+        # The deployment does not serve the model to this integration: the operator's to fix, the caller's to work around.
+        assert problem.code == CoreCode.MODEL_UNAVAILABLE
+        assert problem.domain == ProblemDomain.OPERATOR
+        assert error_code_spec(CoreCode.MODEL_UNAVAILABLE).status == 501
+        # The problem is the root fault's, located at the pipe the router wrapped it for.
+        assert _diagnostics_of(problem).error_class == "LLMCompletionError"
+        assert problem.location is not None
+        assert problem.location.pipe == "score_lead"
+        assert find_inference_error_category_in_chain(located) == InferenceErrorCategory.CONFIGURATION
+        assert problem.is_retryable is False
+        advice = _advice_of(located)
+        assert advice.kind == UserActionKind.CHANGE_MODEL
+        assert f"'{_MODEL_HANDLE}'" in advice.detail
+        assert _WIRE_ID not in advice.detail
+        assert "HTTP 412" in _diagnostics_of(problem).message
+
+    async def test_a_refusal_reaches_the_operator_by_its_class_alone(self, mocker: MockerFixture) -> None:
+        """Instructor's OpenAI parser asserts on a refusal with the refusal in its text: the operator reads the assertion's class.
+
+        The assertion is not re-asked, so it ends the loop on the first attempt and is what the worker recovers, which it
+        must tell apart from an error of the OpenAI SDK, whose text is the provider's: the refusal is the model's answer.
+        """
+        transport = _ScriptedTransport([_OPENAI_REFUSAL])
+        llm_job = _make_object_job(mocker)
+
+        async with transport.make_http_client() as http_client:
+            client = openai.AsyncOpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1", max_retries=0, http_client=http_client)
+            worker = _make_openai_completions_worker(mocker, client=client)
+            with pytest.raises(LLMCompletionError) as exc_info:
+                await worker._gen_object(llm_job=llm_job, schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        failure = exc_info.value
+        assert transport.nb_requests == 1
+        wrapper = failure.__cause__
+        assert isinstance(wrapper, InstructorRetryException)
+        assert isinstance(extract_underlying_sdk_exception(wrapper), AssertionError)
+        assert failure.provider_metadata is not None
+        assert failure.provider_metadata.message == "AssertionError"
+
+        problem = failure.to_problem(view=ProblemView.OPERATOR)
+        diagnostics = _diagnostics_of(problem)
+        assert diagnostics.message.endswith(": AssertionError")
+        assert _REFUSAL_MARKER not in diagnostics.message
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.message == "AssertionError"
+        assert _REFUSAL_MARKER not in json.dumps(problem.to_wire())

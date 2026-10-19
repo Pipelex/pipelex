@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mthds.protocol.pipeline_inputs import PipelineInputs
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex import log
 from pipelex.config import get_config
@@ -16,6 +17,7 @@ from pipelex.interpreter_hub import (
     get_pipeline_manager,
     get_required_entry_pipe,
     get_required_pipe,
+    get_selectable_own_pipe_refs,
     set_current_library,
 )
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -34,6 +36,7 @@ from pipelex.runtime_hub import (
 )
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.system.exceptions import RunParameterError
 from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
@@ -169,7 +172,7 @@ async def pipeline_run_setup(
     request_id:
         Optional inbound ``X-Request-ID`` from the dispatcher (the value the
         external HTTP caller can use to correlate every log line and every
-        ``ErrorReport`` back to its originating request). Threaded onto
+        problem back to its originating request). Threaded onto
         :attr:`pipelex.system.job_metadata.RunMetadata.request_id` so it
         crosses the Temporal serialization boundary intact.
     inputs_base_dir:
@@ -222,7 +225,8 @@ async def pipeline_run_setup(
     # production. The constant survives for telemetry only.
     if not mthds_contents and not pipe_code:
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
-        raise ValueError(msg)
+        # The request carries no method, so it has no pipe to select.
+        raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=[])
 
     # Validate the extras HERE, before this function causes anything observable.
     #
@@ -264,7 +268,7 @@ async def pipeline_run_setup(
                 "A run with a read_scope must pass its own storage_scope: the local storage scope becomes the run id, "
                 "which lies under no read_scope, and the run could not read what it writes."
             )
-            raise ValueError(msg)
+            raise RunParameterError(msg)
         validate_storage_scope_within_read_scope(storage_scope=storage_scope, read_scope=read_scope)
 
     # TODO: rethink this, it's not forcing
@@ -353,7 +357,9 @@ async def pipeline_run_setup(
                 pipe = get_required_pipe(pipe_code=qualified_main_pipe)
             else:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
-                raise PipeExecutionError(message=msg)
+                # With no entry pipe to start from, the request may select any pipe of the method it sent.
+                candidates = sorted(get_selectable_own_pipe_refs())
+                raise PipeExecutionError(message=msg).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
         elif pipe_code:
             pipe = get_required_entry_pipe(pipe_code=pipe_code)
         else:

@@ -1,20 +1,30 @@
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain, StepKind
 
-from pipelex.base_exceptions import INTERNAL_ERROR_PLACEHOLDER, DisclosureMode
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 
 
 class TestRuntimeBridgeExceptionDisclosure:
     @pytest.mark.parametrize("mode", ["temporal", "mistral-workflows", "acme"])
-    def test_generic_plugin_hint_survives_strict_disclosure(self, mode: str) -> None:
-        """MissingOrchestratorError carries a caller-actionable, plugin-decoupled hint in its message.
+    def test_generic_plugin_hint_reaches_the_operator(self, mode: str) -> None:
+        """MissingOrchestratorError's plugin-decoupled hint is the operator's to read, its code the caller's.
 
-        ``_authors_caller_facing_message = True`` must keep that message intact under
-        STRICT disclosure; without the flag STRICT would replace it with
-        ``INTERNAL_ERROR_PLACEHOLDER`` and the "is its plugin installed?" hint would be lost.
+        A configured mode with no orchestrator is the deployment's to fix: the operator reads the message naming the
+        mode and asking whether its plugin is installed, and the caller reads the code's sentences, which name no
+        plugin of the deployment.
         """
         error = MissingOrchestratorError(mode=mode)
-        payload = error.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert mode in payload["message"]
-        assert "is its plugin installed?" in payload["message"]
-        assert payload["message"] != INTERNAL_ERROR_PLACEHOLDER
+
+        caller = error.to_problem(view=ProblemView.CALLER)
+        operator = error.to_problem(view=ProblemView.OPERATOR)
+
+        assert caller.code == PipelexErrorCode.PLUGIN_NOT_FOUND
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert caller.next_step.kind == StepKind.REPORT
+        assert caller.diagnostics is None
+        assert "is its plugin installed?" not in str(caller.to_wire())
+        assert operator.next_step.kind == StepKind.FIX_CONFIGURATION
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.message == f"No orchestrator is registered for orchestration mode '{mode}'; is its plugin installed?"

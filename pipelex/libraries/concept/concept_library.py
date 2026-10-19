@@ -1,6 +1,7 @@
 from typing import Any, Callable, Self, cast
 
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
@@ -106,7 +107,11 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     def add_new_concept(self, concept: Concept):
         if concept.concept_ref in self.root:
             msg = f"Concept '{concept.concept_ref}' already exists in the library"
-            raise ConceptLibraryError(msg)
+            raise (
+                ConceptLibraryError(msg)
+                .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                .with_params(name=concept.concept_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+            )
         self.root[concept.concept_ref] = concept
         self._mark_changed()
 
@@ -223,7 +228,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         the_native_concept = self.get_optional_concept(f"{SpecialDomain.NATIVE}.{native_concept}")
         if not the_native_concept:
             msg = f"Native concept '{native_concept}' not found in the library"
-            raise ConceptLibraryConceptNotFoundError(msg)
+            raise ConceptLibraryConceptNotFoundError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         return the_native_concept
 
     def get_native_concepts(self) -> list[Concept]:
@@ -366,7 +371,7 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         key = f"{alias}->{concept.concept_ref}"
         if key in self.root:
             msg = f"Dependency concept '{key}' already exists in the library"
-            raise ConceptLibraryError(msg)
+            raise ConceptLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         self.root[key] = concept
         self._mark_changed()
 

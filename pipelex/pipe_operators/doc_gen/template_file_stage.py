@@ -19,6 +19,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import NamedTuple
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
@@ -159,7 +160,7 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         render_context = template_file.render_context
         if render_context is None:
             msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file.name}' with nothing to render it with."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         with _library_typing(render_context=render_context):
             working_memory = hydrate_working_memory(render_context.working_memory_raw)
             context = build_compose_context(memory=working_memory, runtime_params=render_context.runtime_params)
@@ -169,6 +170,7 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
                 category=TemplateCategory.HTML,
                 context=context,
                 label=f"template file '{template_file.name}'",
+                template_field="template_file",
                 templating_style=resolve_templating_style(authored=None),
             )
 
@@ -182,7 +184,8 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         if errors:
             listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
             msg = f"PipeDocGen '{pipe_code}': the template file '{template_file.name}' does not fit the step's inputs:\n{listed}"
-            raise PipeDocGenTemplateCheckError(msg)
+            findings_text = "; ".join(finding.message for finding in errors)
+            raise PipeDocGenTemplateCheckError(msg).with_params(template=template_file.name, reason="does_not_fit", finding=findings_text)
 
 
 def _report_template_warning(*, domain_code: str | None, pipe_code: str, template_file: str, finding: TemplateFinding) -> None:

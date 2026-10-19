@@ -1,3 +1,6 @@
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.libraries.exceptions import LibraryLoadingError
 
 
@@ -11,4 +14,13 @@ class ConceptLibraryError(LibraryLoadingError):
     pipe/field and the missing concept) rather than a bare message-only residual.
     Call sites that only pass a message keep working: the structured lists default
     to empty, so those raises behave exactly as before (one fallback residual).
+
+    The default ``method.concept_unresolved`` is a reference to a concept nothing declares; a raise site chooses
+    ``method.name_conflict`` for two declarations of one concept, and ``runtime.unexpected`` for an invariant of the
+    crate.
     """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.METHOD_CONCEPT_UNRESOLVED,
+        others=(CoreCode.METHOD_NAME_CONFLICT, CoreCode.RUNTIME_UNEXPECTED),
+    )

@@ -228,7 +228,10 @@ typeCheckingMode = "strict"
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -ra -m 'not gha_disabled'"
 asyncio_default_fixture_loop_scope = "session"
-markers = ["gha_disabled: tests that should not run in GitHub Actions"]
+markers = [
+  "gha_disabled: tests that should not run in GitHub Actions",
+  "builds_problems_without_required_params(reason): the test builds a problem lacking a parameter its code requires on purpose, which the sweep of tests/unit/conftest.py otherwise fails",
+]
 minversion = "8.0"
 xfail_strict = true
 

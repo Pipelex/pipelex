@@ -33,11 +33,17 @@ from typing import TYPE_CHECKING, Any
 import anthropic
 import httpx
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, StepKind
 from openai import OpenAI
 from portkey_ai import Portkey
 
-from pipelex.base_exceptions import ErrorDomain
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCompletionError, LLMModelNotFoundError
+from pipelex.cogt.exceptions import (
+    CogtError,
+    InferenceErrorCategory,
+    LLMCompletionError,
+    LLMModelNotFoundError,
+    find_inference_error_category_in_chain,
+)
 from pipelex.cogt.inference.error_classification import (
     MODEL_NOT_ALLOWED_ERROR_CODE,
     ProviderErrorMetadata,
@@ -46,9 +52,11 @@ from pipelex.cogt.inference.error_classification import (
     extract_gateway_metadata,
     extract_openai_metadata,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.system.pipe_run_mode import PipeRunMode
 
@@ -137,7 +145,7 @@ def _rendered_error(
 ) -> CogtError:
     return render_inference_error(
         metadata=metadata,
-        classification=classify_inference_error(metadata),
+        classification=classify_inference_error(metadata, family=family),
         family=family,
         model_desc=f"{model_handle} → Model[{_MODEL_NOT_ALLOWED_WIRE_ID}]",
         model_handle=model_handle,
@@ -204,22 +212,24 @@ class TestClassification:
         So ``CHANGE_MODEL`` is what the caller can do, and the flag stays unset:
         "not found" would be false.
         """
-        result = classify_inference_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE))
+        result = classify_inference_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE), family=InferenceErrorFamily.LLM)
 
         assert result.is_model_not_allowed is True
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.category.is_retryable is False
         assert result.user_action_kind == UserActionKind.CHANGE_MODEL
         assert result.is_model_not_found is False
+        assert result.error_code == CoreCode.MODEL_UNAVAILABLE
         assert result.service_error_code is None
 
     def test_a_412_without_the_code_still_takes_the_status_ladder(self) -> None:
         """The contrast: the ladder's generic 4xx arm, which is what the refusal would otherwise read as."""
-        result = classify_inference_error(_envelope("something-else"))
+        result = classify_inference_error(_envelope("something-else"), family=InferenceErrorFamily.LLM)
 
         assert result.is_model_not_allowed is False
         assert result.category == InferenceErrorCategory.CONFIGURATION
         assert result.user_action_kind == UserActionKind.CHANGE_INPUT
+        assert result.error_code == CoreCode.RUNTIME_UNEXPECTED
 
 
 class TestEndToEnd:
@@ -286,29 +296,31 @@ class TestRenderedAdvice:
 
 
 class TestWhatItAnswersOverHTTP:
-    def test_it_answers_500_as_an_unrecognized_412_does(self) -> None:
-        """At its real status the refusal's answer does not move: only its advice does.
+    def test_it_answers_as_the_operator_s_where_an_unrecognized_412_is_a_runtime_fault(self) -> None:
+        """Recognizing the code moves the refusal from a request of ours the provider could not take to the operator's.
 
-        The ladder's generic 4xx arm already reads a 412 as ``CONFIGURATION``, so
-        recognizing the code changes this refusal's ``user_action`` and nothing about
-        its status.
+        The ladder's generic 4xx arm reads an unrecognized 412 as ``runtime.unexpected``; the refusal's code is
+        ``model.unavailable``, which the deployment's operator settles by serving or allowing the model.
         """
-        report = _rendered_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE)).to_error_report()
-        unrecognized_report = _rendered_error(_envelope("something-else")).to_error_report()
+        problem = _rendered_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE)).to_problem(view=ProblemView.CALLER)
+        unrecognized_problem = _rendered_error(_envelope("something-else")).to_problem(view=ProblemView.CALLER)
 
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.http_status == 500
-        assert unrecognized_report.error_domain == ErrorDomain.CONFIG
-        assert unrecognized_report.http_status == 500
+        assert problem.code == CoreCode.MODEL_UNAVAILABLE
+        assert problem.domain == ProblemDomain.OPERATOR
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"model": _MODEL_NOT_ALLOWED_HANDLE, "model_type": "llm", "reason": "not_allowed"}
+        assert error_code_spec(CoreCode.MODEL_UNAVAILABLE).status == 501
+        assert unrecognized_problem.code == CoreCode.RUNTIME_UNEXPECTED
+        assert unrecognized_problem.domain == ProblemDomain.RUNTIME
+        assert error_code_spec(CoreCode.RUNTIME_UNEXPECTED).status == 500
 
 
 class TestTheAdviceSurvivesThePipeBoundary:
     def test_the_advice_reaches_the_caller_through_the_located_failure(self) -> None:
         """The failure class is not re-raised by the pipe operator, so the router's location is the boundary.
 
-        ``PipeRouterError`` reports the root fault located at the failing pipe, with
-        the classification its cause chain carries. When nothing on the chain carried
-        a user action, that report would fall back to "the message gives the cause".
+        ``PipeRouterError`` reports the root fault located at the failing pipe, with the classification its cause
+        chain carries, and the advice a local reader is printed is the nearest one on that chain.
         """
         rendered = _rendered_error(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE))
         located = PipeRouterError.make_located(
@@ -320,12 +332,19 @@ class TestTheAdviceSurvivesThePipeBoundary:
         )
         located.__cause__ = rendered
 
-        report = located.to_error_report()
+        problem = located.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_type == "LLMCompletionError"
-        assert report.error_domain == ErrorDomain.CONFIG
-        assert report.error_category == InferenceErrorCategory.CONFIGURATION
-        assert report.retryable is False
-        assert report.user_action is not None
-        assert report.user_action.kind == UserActionKind.CHANGE_MODEL
-        assert report.user_action_detail() == _rendered_detail(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE))
+        assert problem.code == CoreCode.MODEL_UNAVAILABLE
+        assert problem.domain == ProblemDomain.OPERATOR
+        assert problem.is_retryable is False
+        assert problem.location is not None
+        assert problem.location.pipe == "score_lead"
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.error_class == "LLMCompletionError"
+        assert find_inference_error_category_in_chain(located) == InferenceErrorCategory.CONFIGURATION
+        # The caller reads its own step: choose another model, the operator's being to serve or allow this one.
+        assert located.to_problem(view=ProblemView.CALLER).next_step.kind == StepKind.CHANGE_MODEL
+        advice = located.advised_action()
+        assert advice is not None
+        assert advice.kind == UserActionKind.CHANGE_MODEL
+        assert advice.detail == _rendered_detail(_envelope(MODEL_NOT_ALLOWED_ERROR_CODE))

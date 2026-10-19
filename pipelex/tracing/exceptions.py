@@ -1,8 +1,15 @@
+from typing import ClassVar
+
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.base_exceptions import PipelexError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
 
 
 class EventLogError(PipelexError):
     """Base error for trace-event log backend failures."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class EventLogReadError(EventLogError):
@@ -14,7 +21,12 @@ class EventLogReadError(EventLogError):
     best-effort observability callers — graph assembly degrades to ``None``
     rather than failing the pipeline run — catch a single Pipelex error instead
     of re-widening their ``except`` clauses to raw third-party exception types.
+
+    Its causes mix throttling and network failures, which pass, with a refused credential; the code follows
+    the common case, and the cause rides the report's diagnostics.
     """
+
+    error_code = CoreCode.RUNTIME_UNAVAILABLE
 
 
 class EventLogSchemaMismatchError(EventLogReadError):
@@ -29,6 +41,8 @@ class EventLogSchemaMismatchError(EventLogReadError):
     truncated version of the record returns none of it, and says why.
     """
 
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
 
 class EventLogSetupError(EventLogError):
     """Raised when constructing the configured event-log backend fails.
@@ -42,6 +56,8 @@ class EventLogSetupError(EventLogError):
     aborting the pipeline run.
     """
 
+    error_code = CoreCode.RUNTIME_MISCONFIGURED
+
 
 class TraceEventModeError(PipelexError):
     """Raised when a set of trace events states no single run mode to build a graph in.
@@ -51,3 +67,5 @@ class TraceEventModeError(PipelexError):
     more than one run, such as a dry run and a live run written under one pipeline run id, and an empty set states no
     mode at all: neither describes one run, so the assembler builds no graph from it rather than guess its mode.
     """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED

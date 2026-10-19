@@ -1,9 +1,10 @@
 contract = "logging-docs"
-digest = "sha256:d9ec388a1a3a14e1cf3fa4316211776c0a55a6a33d646202bd93c5aa3e5265b0"
-reviewed_by = "Claude (Opus 5.5)"
-reviewed_at = "2026-10-10T12:37:22Z"
-rationale = "real-catch: The contract now lists docs/under-the-hood/log-sink-plugins.md as a review target, since its table of built-in sinks and its explanation of why console is the default both describe what the console renders, which console_fields.py decides; no trigger file changed since the last ack. Reviewed that page against console_fields.py, console_log_sink.py and console_prefix.py: the console row named an emoji formatter that no longer exists, the handler now taking the stdlib's plain logging.Formatter, and the default's rationale promised emoji and clickable paths, while the path column is off unless is_show_path turns it on. Both passages now state what the console renders: the fields after the message coloured by name per FIELD_STYLES, the advice line from advice_segments, the dimmed package name before another library's line, and the layouts. The rest of the page, the sink contract, what a sink reads off a record and the reserved keys, states nothing console_fields.py or error_fields.py decides. logging.md was reviewed at the previous ack against the same trigger blobs; its console sections were re-read and still hold."
+digest = "sha256:e9d1efdae09623788998bf78a017bf4ab34e85bf61e88c64ff02b29f6f613494"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-19T10:03:38Z"
+rationale = "real-catch: the merge of dev's #1452 into this branch left error_fields.py with two ERROR_CODE_FIELD constants, #1452's for a pipe's failure line and this branch's for a CLI root's failure line and the security event; one remains. logging.md's field table row for error.code was merged in the merge commit to name all three carriers, and its Exceptions section, which #1452 rewrote for a pipe's failure and a secondary failure, still holds against error_fields.py and pydantic_utils.py; log-sink-plugins.md states nothing these modules decide."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
-"pipelex/tools/log/error_fields.py" = "blob:515b7649ddd22dceb192faa21713732ec61cd6e0"
+"pipelex/tools/log/error_fields.py" = "blob:76a1e4c88aa57427a11e7550c1144644494d56f3"
+"pipelex/tools/typing/pydantic_utils.py" = "blob:6c469e95f53135d426c00e7b4cfc8711004f518b"

@@ -13,10 +13,13 @@ from pathlib import Path
 from mthds.package.discovery import MANIFEST_FILENAME
 from mthds.package.manifest.parser import parse_methods_toml
 from mthds.package.manifest.schema import MethodsManifest
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
+from pipelex.cli.exceptions import DuplicateMethodNameError, MethodNotFoundError
 from pipelex.methods.exceptions import MethodInstallError
 from pipelex.methods.fetching import MethodProvenance
+from pipelex.methods.package_reason import MethodPackageReason
 
 GLOBAL_METHODS_DIR = Path.home() / ".mthds" / "methods"
 PROJECT_METHODS_DIR = Path(".mthds") / "methods"
@@ -26,22 +29,6 @@ PROJECT_METHODS_DIR = Path(".mthds") / "methods"
 PROVENANCE_FILENAME = ".provenance.json"
 
 _STAGING_SUFFIX = ".staging"
-
-
-class MethodNotFoundError(Exception):
-    """Raised when no installed method matches the given name."""
-
-    def __init__(self, message: str = "") -> None:
-        self.message = message
-        super().__init__(message)
-
-
-class DuplicateMethodNameError(Exception):
-    """Raised when two installed methods share the same name."""
-
-    def __init__(self, message: str = "") -> None:
-        self.message = message
-        super().__init__(message)
 
 
 class InstalledMethod(BaseModel):
@@ -368,7 +355,7 @@ def install_method_package(
     final_dir = (target_root / name).resolve()
     if final_dir == target_root or final_dir.parent != target_root or name.startswith("."):
         msg = f"Cannot install method '{name}': the name escapes the methods directory '{target_root}' or is not a valid method directory name."
-        raise MethodInstallError(msg)
+        raise MethodInstallError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason=MethodPackageReason.PACKAGE_NAME_INVALID)
     if final_dir.exists():
         return _resolve_occupied_install_target(final_dir=final_dir, name=name, full_address=full_address)
 
@@ -394,5 +381,5 @@ def install_method_package(
     if installed is None:
         shutil.rmtree(final_dir, ignore_errors=True)
         msg = f"Installed method '{name}' at '{final_dir}' carries no {MANIFEST_FILENAME} — the source package was not a method package."
-        raise MethodInstallError(msg)
+        raise MethodInstallError(msg).with_error_code(CoreCode.METHOD_PACKAGE_INVALID).with_params(reason=MethodPackageReason.MANIFEST_MISSING)
     return installed

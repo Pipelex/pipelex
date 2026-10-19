@@ -1,11 +1,13 @@
 from typing import Any, Literal
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field
 from typing_extensions import override
 
+from pipelex.cogt.img_gen.exceptions import ImgGenSettingValueError
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_param_support import ImgGenParamSupport
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting, ImgGenSettingValueError
+from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_img_gen_choice_with_deck
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -121,7 +123,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 error_type=PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR,
                 domain_code=self.domain_code,
                 pipe_code=self.code,
-            )
+            ).with_error_code(CoreCode.MODEL_CAPABILITY_UNSUPPORTED)
 
     @override
     def validate_inputs_with_library(self):
@@ -149,7 +151,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.IMAGE.concept_ref],
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.IMAGE.concept_ref], pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(

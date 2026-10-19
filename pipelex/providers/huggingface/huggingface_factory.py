@@ -1,5 +1,7 @@
 from huggingface_hub.inference._providers import PROVIDER_OR_POLICY_T
 
+from pipelex.providers.huggingface.huggingface_exceptions import HuggingFaceProviderUnknownError
+
 
 class HuggingFaceFactory:
     @classmethod
@@ -48,5 +50,5 @@ class HuggingFaceFactory:
             case "auto":
                 return "auto"
             case _:
-                msg = f"Unknown HuggingFace inference provider: {provider_str}"
-                raise ValueError(msg)
+                msg = f"Unknown Hugging Face inference provider: {provider_str}"
+                raise HuggingFaceProviderUnknownError(msg)

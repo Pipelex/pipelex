@@ -16,6 +16,7 @@ vendor's worker, so a second judgment backend is free to accept what this one wi
 
 from typing import Any, assert_never
 
+from mthds.protocol.problem.registry import CoreCode
 from typesafe_sdk import (
     Choice as TypesafeChoice,
 )
@@ -125,7 +126,9 @@ def _score_criterion(*, level: RatingLevel) -> str:
     # `RatingLevel`'s own validator refuses a level carrying neither, so a validated level never reaches
     # this; it is stated for the type checker, which cannot see a validator.
     msg = "A rating level carries neither a label nor a description"
-    raise TypesafeQuestionUnsupportedError(msg, error_category=InferenceErrorCategory.CONTENT, provider_metadata=None)
+    raise TypesafeQuestionUnsupportedError(msg, error_category=InferenceErrorCategory.CONTENT, provider_metadata=None).with_error_code(
+        CoreCode.RUNTIME_UNEXPECTED
+    )
 
 
 def from_typesafe_response(*, questions: dict[str, JudgmentQuestion], response: SystemOneResponse) -> dict[str, JudgmentAnswer]:

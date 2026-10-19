@@ -3,15 +3,19 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import ErrorReport, PipelexError, PipelexUnexpectedError
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
+from pipelex.errors.security_event import emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
+from pipelex.pipe_run.located_failure import find_root_fault, make_unexpected_failure
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
@@ -19,13 +23,68 @@ from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of
 from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
-from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD, error_fields
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graphspec import GraphSpec
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+
+
+def _secondary_failure_fields(*, exc: Exception) -> dict[str, str]:
+    """The fields of a failure that followed the pipe's own, by its class and, for a Pipelex error, its code.
+
+    Like the line about the pipe's failure, a line about what failed after it never carries the exception's text: a
+    delivery's names the caller's webhook URL or the place it stored to, and an ``OSError``'s the file it could not
+    close, each the run's data.
+    """
+    fields = {ERROR_TYPE_FIELD: type(exc).__name__}
+    if isinstance(exc, PipelexError):
+        fields[ERROR_CODE_FIELD] = str(exc.resolve_error_code())
+    return fields
+
+
+def _failure_code(*, error: Exception) -> str:
+    """The registry code a run's failure reports, read without building its problem, which only a webhook needs.
+
+    A bare exception stands as a fault of ours, ``runtime.unexpected``. A Pipelex error reports the code its cause chain
+    resolves to, or, when its root fault carries a problem recovered across a transport boundary, that problem's code,
+    as the problem the caller receives does.
+    """
+    if not isinstance(error, PipelexError):
+        return CoreCode.RUNTIME_UNEXPECTED
+    root_fault = find_root_fault(error=error)
+    recovered = root_fault.recovered_problem() if root_fault is not None else None
+    if recovered is not None:
+        return recovered.code
+    return str(error.resolve_error_code())
+
+
+WEBHOOK_PROBLEM_FAULT_MESSAGE = "The problem of a failed run could not be built for its webhooks"
+"""The error logged when a failed run's problem raises while it is built for the run's webhooks."""
+
+
+def _webhook_problem(*, error: Exception, pipeline_run_id: str, request_id: str | None) -> PipelexProblem:
+    """The problem of a failed run that its webhooks receive, in the operator's view, which each webhook projects to its own.
+
+    A Pipelex error carries its own code, and a bare exception stands as a fault of ours, so a webhook still receives
+    an ``error`` object. Delivery never changes how a run fails: this runs while the run's own error is on its way to
+    the caller, so building the problem must not raise in its place. A problem that cannot be built is logged as an
+    error, and the webhooks receive ``runtime.unexpected``, as a traced node does (``make_node_problem``).
+    """
+    failure = error if isinstance(error, PipelexError) else make_unexpected_failure(error=error)
+    try:
+        return failure.to_problem(view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+    except Exception as problem_fault:  # ruff: ignore[blind-except]
+        # Unbounded code: `to_problem` reads hooks overridden across the whole error hierarchy, the errors plugins
+        # define included, and walks the error's cause chain, so what it raises cannot be enumerated. The run's own
+        # error is the one it fails with, so the fault is logged and the webhooks receive a fault of ours.
+        log.error(
+            WEBHOOK_PROBLEM_FAULT_MESSAGE,
+            fields={"failed_error_type": type(error).__name__, **error_fields(exc=problem_fault)},
+        )
+    return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
 
 
 class PipeRun(PipeRunProtocol):
@@ -54,7 +113,14 @@ class PipeRun(PipeRunProtocol):
         # The run's identifiers ride the payload; here is where a direct-mode run binds them onto every
         # record it emits, the delivery's included. The binding is released when the run returns.
         with pipe_job.job_metadata.log_context():
-            return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            try:
+                return await self._run_bound(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            except PipelexError as exc:
+                # This run owns the security events of the refusals raised while it executes, in this process; the runner
+                # that dispatched it logs none. A refusal its pipes raised was logged already; one its tail raised, such as a
+                # webhook the SSRF guard refuses at fire time after the run completed, is logged here.
+                emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+                raise
 
     async def _run_bound(
         self,
@@ -66,7 +132,7 @@ class PipeRun(PipeRunProtocol):
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
         execution_error: Exception | None = None
-        error_report: ErrorReport | None = None
+        problem: PipelexProblem | None = None
         closed_graph: GraphSpec | None = None
         # The run's statistics: its inputs are read before the run adds its own outputs to its working memory.
         usage_tally = RunInferenceTally() if self._reports_usage_stats and usage_stats_are_enabled() else None
@@ -85,21 +151,31 @@ class PipeRun(PipeRunProtocol):
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
-            # Always build a report for the FAILED webhook: Pipelex errors carry their own
-            # classification; a bare exception is wrapped in PipelexUnexpectedError so the
-            # webhook still receives an `error` object — matching Temporal mode, where
-            # recover_error_report() is total.
-            if isinstance(exc, PipelexError):
-                error_report = exc.to_error_report()
-            else:
-                error_report = PipelexUnexpectedError(str(exc) or repr(exc)).to_error_report()
-            # The error rides as fields and no traceback: the exception is re-raised below, and its traceback
-            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice.
+            # The problem a FAILED webhook receives, built only when a webhook is there to receive it.
+            if delivery_assignment is not None and delivery_assignment.webhooks:
+                problem = _webhook_problem(
+                    error=exc,
+                    pipeline_run_id=pipeline_run_id,
+                    request_id=pipe_job.job_metadata.run_metadata.request_id,
+                )
+            # The error rides as identifiers and no traceback: the exception is re-raised below, and its traceback
+            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice. The
+            # line carries the failure's code and the exception's class, never its text: the text can hold the
+            # caller's own words, a function's message or a template's source, and a refused host, which no log line
+            # carries, while the problem the caller receives holds them where the code declares them. The code is read
+            # without building the problem, which a run with no webhook never builds.
             # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
             log.error(
                 "The execution of a pipe failed",
-                fields={"pipe_code": pipe_job.pipe.code, "pipe_ref": pipe_job.pipe.pipe_ref, **error_fields(exc=exc)},
+                fields={
+                    "pipe_code": pipe_job.pipe.code,
+                    "pipe_ref": pipe_job.pipe.pipe_ref,
+                    ERROR_CODE_FIELD: _failure_code(error=exc),
+                    ERROR_TYPE_FIELD: type(exc).__name__,
+                },
             )
+            # A security refusal also logs its security event, once, naming the run and never what it refused.
+            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
         finally:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
@@ -109,10 +185,11 @@ class PipeRun(PipeRunProtocol):
                     if execution_error is None:
                         raise
                     # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
-                    # its traceback would print the execution error's text, which can quote the run's inputs.
+                    # its traceback would print the execution error's text, which can quote the run's inputs. Its own
+                    # text is not written either: an OSError's names the file of the run's trace.
                     log.error(
                         "The graph tracer could not be closed after the pipe execution failed",
-                        fields=error_fields(exc=close_error),
+                        fields=_secondary_failure_fields(exc=close_error),
                     )
 
             # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
@@ -170,16 +247,17 @@ class PipeRun(PipeRunProtocol):
                         pipeline_run_id=pipeline_run_id,
                         delivery_assignment=delivery_assignment,
                         status=status,
-                        error_report=error_report,
+                        problem=problem,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
                 except DeliveryError as delivery_error:
                     if execution_error is None:
                         raise
                     # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
+                    # By its code and class, never its text, which names the caller's webhook URL or the store it wrote to.
                     log.error(
                         "The delivery also failed after the pipe execution failed",
-                        fields=error_fields(exc=delivery_error),
+                        fields=_secondary_failure_fields(exc=delivery_error),
                     )
 
         if execution_error is not None:

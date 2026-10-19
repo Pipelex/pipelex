@@ -2,8 +2,8 @@
 
 Validates MTHDS bundles in-process via ``validate_bundles_in_process``, the same sweep
 the local protocol runtime uses. Returns the verdict as a value (decision A): the canonical
-``PipelexValidationReport`` on success, or the structured ``ErrorReport`` an invalid bundle's
-``ValidateBundleError`` projects. Any other exception propagates as a no-verdict infra fault.
+``PipelexValidationReport`` on success, or the ``BundleValidationFailure`` of an invalid bundle's
+``ValidateBundleError``. Any other exception propagates as a no-verdict fault.
 
 Registered unconditionally by the core ``direct`` plugin alongside ``DirectOrchestrator``, so
 the agnostic base gets in-process ``/validate`` "for free" through the same seam the Temporal
@@ -14,6 +14,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 
@@ -21,7 +23,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
     from pathlib import Path
 
-    from pipelex.base_exceptions import ErrorReport
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.system.caller_identity import CallerIdentity
 
@@ -50,7 +51,7 @@ class DirectBundleValidator:
         # The in-process arm reads every file of the method in this process, from the trees its libraries hold, and
         # reads no blob store, so the scope a dispatched arm hands its worker the trees through has no use here.
         read_scope: str | None,  # ruff: ignore[unused-method-argument]
-    ) -> PipelexValidationReport | ErrorReport:
+    ) -> PipelexValidationReport | BundleValidationFailure:
         try:
             return await validate_bundles_in_process(
                 mthds_contents=mthds_contents,
@@ -65,6 +66,6 @@ class DirectBundleValidator:
                 methods_dirs=methods_dirs,
             )
         except ValidateBundleError as exc:
-            # An invalid bundle is a produced verdict, not a fault: surface its structured
-            # report as the invalid arm. Any other exception (genuine infra fault) propagates.
-            return exc.to_error_report()
+            # An invalid bundle is a produced verdict, not a fault: surface its problem and its items
+            # as the invalid arm. Any other exception (a fault with no verdict) propagates.
+            return BundleValidationFailure(problem=exc.to_problem(view=ProblemView.OPERATOR), validation_errors=exc.validation_error_items())

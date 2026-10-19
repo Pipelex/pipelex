@@ -1,6 +1,7 @@
 from enum import StrEnum
 from typing import NamedTuple, cast
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 from pipelex import log
@@ -8,7 +9,6 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.exceptions import (
     ConceptFactoryError,
-    ConceptRefineError,
     ConceptStringError,
 )
 from pipelex.core.concepts.helpers import make_qualified_structure_class_name, normalize_structure_blueprint
@@ -256,17 +256,17 @@ class ConceptFactory:
             ref = QualifiedRef.parse_concept_ref(remainder)
             if ref.domain_path is None:
                 msg = f"Cross-package concept ref '{concept_ref_or_code}' must include a domain"
-                raise ConceptFactoryError(msg)
+                raise ConceptFactoryError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
             return DomainAndConceptCode(domain_code=f"{alias}->{ref.domain_path}", concept_code=ref.local_code)
 
         if "." not in concept_ref_or_code and not domain_code:
             msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
-            raise ConceptFactoryError(msg)
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
         try:
             validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
         except ConceptStringError as exc:
             msg = f"Concept string or code '{concept_ref_or_code}' is not a valid concept string or code"
-            raise ConceptFactoryError(msg) from exc
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION) from exc
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
             native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
@@ -281,7 +281,7 @@ class ConceptFactory:
             return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_ref_or_code)
         else:
             msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
-            raise ConceptFactoryError(msg)
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
 
     @classmethod
     def make_concept_ref_with_domain(cls, *, domain_code: str, concept_code: str) -> str:
@@ -348,7 +348,7 @@ class ConceptFactory:
         structure_class_name = blueprint.structure
         if not isinstance(structure_class_name, str):
             msg = f"Expected structure to be a string, got {type(structure_class_name)}"
-            raise ConceptFactoryError(msg)
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         if not _is_valid_structure_class(structure_class_name=structure_class_name):
             msg = (
                 f"Structure class '{structure_class_name}' set for concept '{concept_code}' in domain '{domain_code}' "
@@ -380,7 +380,7 @@ class ConceptFactory:
         """
         if not isinstance(blueprint.structure, dict):
             msg = f"Expected structure to be a dict, got {type(blueprint.structure)}"
-            raise ConceptFactoryError(msg)
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         # Normalize the structure blueprint to ensure all values are ConceptStructureBlueprint objects
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
@@ -459,13 +459,9 @@ class ConceptFactory:
         """
         if blueprint.refines is None:
             msg = "Expected refines to be set"
-            raise ConceptFactoryError(msg)
+            raise ConceptFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
-        try:
-            current_refine = cls.make_refine(refine=blueprint.refines, domain_code=domain_code)
-        except ConceptRefineError as exc:
-            msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
-            raise ConceptFactoryError(msg) from exc
+        current_refine = cls.make_refine(refine=blueprint.refines, domain_code=domain_code)
 
         qualified_class_name = make_qualified_structure_class_name(domain_code=domain_code, concept_code=concept_code)
 
@@ -600,7 +596,7 @@ class ConceptFactory:
                 blueprint = cast("ConceptBlueprint", blueprint_or_string_description)
                 if not isinstance(blueprint.structure, dict):
                     msg = f"Expected structure to be a dict, got {type(blueprint.structure)}"
-                    raise ConceptFactoryError(msg)
+                    raise ConceptFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                 return Concept(
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,

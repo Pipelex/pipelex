@@ -42,6 +42,7 @@ from typing import NamedTuple, cast
 
 from mthds.method_tree.models import MethodTree
 from mthds.method_tree.tree_path import nfc
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from typing_extensions import Buffer, override
 
 from pipelex import log
@@ -94,13 +95,13 @@ def tree_python_identity(*, tree: MethodTree, label: str) -> TreePythonIdentity:
     """
     if tree.directory is None:
         msg = "The method tree was read from a map of file entries and has no directory on this host, so its Python cannot be imported here."
-        raise TreePythonError(msg)
+        raise TreePythonError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)
     if tree.is_one_file:
         msg = (
             f"The bundle {tree.entry or ''} was read alone, as a one-file tree, which holds no Python: hand over the method's folder, "
             "whose tree holds the bundle and its Python."
         )
-        raise TreePythonError(msg)
+        raise TreePythonError(msg).with_error_code(CoreCode.REQUEST_UNSUPPORTED)
     return TreePythonIdentity(root=tree.directory.resolve(), digest=tree.digest, label=label)
 
 
@@ -159,7 +160,7 @@ def check_tree_module_names(*, top_level_modules: Mapping[str, str], tree_label:
             "With the tree's root first on the import path, it would replace that module for the whole process: rename it, "
             "for example by moving it into a package of the method's own."
         )
-        raise TreeModuleShadowingError(msg)
+        raise TreeModuleShadowingError(msg).with_params(name=module_name, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
     if passed_checks is not None:
         passed_checks.add(check_key)
 
@@ -577,5 +578,9 @@ def import_held_tree_module(*, identity: TreePythonIdentity, module_name: str) -
             f"The module '{module_name}' resolved outside {identity.describe()}: a module of that name was imported in this "
             "process before the tree's Python loaded."
         )
-        raise TreePythonError(msg)
+        raise (
+            TreePythonError(msg)
+            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+            .with_params(name=module_name, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+        )
     return module

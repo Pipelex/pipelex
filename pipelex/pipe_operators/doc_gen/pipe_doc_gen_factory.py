@@ -2,7 +2,8 @@ from typing import Any
 
 from mthds.method_tree.exceptions import MethodTreeRefusedError
 from mthds.method_tree.references import is_file_reference
-from mthds.method_tree.vocabulary import ReferenceContext
+from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -42,7 +43,8 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                 f"The output of PipeDocGen '{pipe_code}' is '{output.concept.concept_ref}', which is not a Document. "
                 f"Declare the output as {document_concept.concept_ref}, or as a concept that refines it."
             )
-            raise PipeDocGenFactoryError(msg)
+            facts = {"pipe": pipe_code, "pipe_type": pipe_type, "declared": output.concept.concept_ref, "expected": [document_concept.concept_ref]}
+            raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH)
 
         template_file_ref: MethodFileRef | None = None
         template_bundle_ref: TreeBundleRef | None = None
@@ -84,10 +86,14 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                         msg = (
                             f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which its method tree cannot give it. {exc.message}"
                         )
-                        raise PipeDocGenFactoryError(msg) from exc
+                        raise PipeDocGenFactoryError(msg, facts=_file_facts(pipe_code=pipe_code, file=template_file)).with_error_code(
+                            _template_file_refusal_code(refusal_error=exc)
+                        ) from exc
                     template_file_ref = MethodFileRef(tree_digest=tree_bundle_ref.tree_digest, tree_path=resolved_tree_path)
                 case None:
-                    raise PipeDocGenFactoryError(cls._unsubmitted_template_file_message(pipe_code=pipe_code, template_file=template_file))
+                    msg = cls._unsubmitted_template_file_message(pipe_code=pipe_code, template_file=template_file)
+                    facts = _file_facts(pipe_code=pipe_code, file=template_file)
+                    raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
 
         pipe_doc_gen = PipeDocGen(
             domain_code=domain_code,
@@ -140,7 +146,9 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                             "loaded from a string with no file sent beside it, so it belongs to no method tree and a relative URL "
                             "names no file. Load the method from its folder, or name the file by an https:// or a data: URL."
                         )
-                        raise PipeDocGenFactoryError(msg)
+                        raise PipeDocGenFactoryError(msg, facts=_file_facts(pipe_code=pipe_code, file=url)).with_error_code(
+                            CoreCode.METHOD_RESOURCE_MISSING
+                        )
                 return None, False
 
     @classmethod
@@ -160,7 +168,8 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
         if refusal is None:
             return
         msg = f"PipeDocGen '{pipe_code}' names '{refusal.reference}' in {refusal.holder_label}, which its method cannot give it. {refusal.reason}"
-        raise PipeDocGenFactoryError(msg)
+        facts = _file_facts(pipe_code=pipe_code, file=refusal.reference)
+        raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
 
     @classmethod
     def _resolve_template_file(cls, *, pipe_code: str, template_file: str, tree_bundle: TreeBundle) -> str:
@@ -178,10 +187,13 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
         except MethodTreeRefusedError as exc:
             if tree_bundle.tree_path is None:
                 msg = cls._unsubmitted_template_file_message(pipe_code=pipe_code, template_file=template_file)
-                raise PipeDocGenFactoryError(msg) from exc
+                facts = _file_facts(pipe_code=pipe_code, file=template_file)
+                raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_RESOURCE_MISSING) from exc
             reason = reference_refusal_reason(refusal_error=exc, tree_bundle=tree_bundle)
             msg = f"PipeDocGen '{pipe_code}' names the template file '{template_file}', which its method tree cannot give it. {reason}"
-            raise PipeDocGenFactoryError(msg) from exc
+            raise PipeDocGenFactoryError(msg, facts=_file_facts(pipe_code=pipe_code, file=template_file)).with_error_code(
+                _template_file_refusal_code(refusal_error=exc)
+            ) from exc
 
     @staticmethod
     def _unsubmitted_template_file_message(*, pipe_code: str, template_file: str) -> str:
@@ -210,12 +222,15 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                 f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as its method tree listed it: "
                 "the file changed or went missing since the tree was listed."
             )
-            raise PipeDocGenFactoryError(msg)
+            raise PipeDocGenFactoryError(msg, facts=_file_facts(pipe_code=pipe_code, file=template_file)).with_error_code(
+                CoreCode.METHOD_RESOURCE_MISSING
+            )
         try:
             return data.decode("utf-8")
         except UnicodeError as exc:
             msg = f"PipeDocGen '{pipe_code}' could not read the template file '{template_file}' as UTF-8 text."
-            raise PipeDocGenFactoryError(msg) from exc
+            facts = {"pipe": pipe_code, "template": template_file, "finding": "the file is not UTF-8 text"}
+            raise PipeDocGenFactoryError(msg, facts=facts) from exc
 
     @classmethod
     def _check_html_template_file(cls, *, pipe_code: str, template: str, inputs: InputStuffSpecs, template_file: str) -> None:
@@ -230,7 +245,46 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             )
         except ValueError as exc:
             msg = f"PipeDocGen '{pipe_code}': {exc}"
-            raise PipeDocGenFactoryError(msg) from exc
+            raise PipeDocGenFactoryError(msg, facts={"pipe": pipe_code, "template": template_file, "finding": str(exc)}) from exc
         for root in sorted(roots - declared_inputs):
             msg = f"Variable '{root}' in the template file '{template_file}' of PipeDocGen '{pipe_code}' is not in the inputs of the pipe."
-            raise PipeDocGenFactoryError(msg)
+            raise PipeDocGenFactoryError(msg, facts={"pipe": pipe_code, "variables": [root]}).with_error_code(CoreCode.METHOD_INPUT_UNDECLARED)
+
+
+def _file_facts(*, pipe_code: str, file: str) -> dict[str, Any]:
+    """The facts of a refusal of a file the step names, for whichever of its codes the raise site chooses.
+
+    A file the method's tree does not hold is the reason a `method.resource_missing` gives here, where a path its
+    tree refuses as a security matter takes `security.method_path_refused`, which declares no reason.
+    """
+    return {"pipe": pipe_code, "file": file, "reason": "not_in_tree"}
+
+
+def _template_file_refusal_code(*, refusal_error: MethodTreeRefusedError) -> CoreCode:
+    """The code of a template file reference its method tree refused: a path that leaves the tree, or names a link or a
+    special file, is refused as a security matter; any other refusal leaves the method without the file it names.
+    """
+    match refusal_error.refusal.code:
+        case TreeRefusalCode.REFERENCE_LEAVES_TREE | TreeRefusalCode.SYMBOLIC_LINK | TreeRefusalCode.SPECIAL_FILE:
+            return CoreCode.SECURITY_METHOD_PATH_REFUSED
+        case (
+            TreeRefusalCode.INVALID_TREE_PATH
+            | TreeRefusalCode.NORMALIZATION_COLLISION
+            | TreeRefusalCode.PATH_COLLISION
+            | TreeRefusalCode.EMPTY_TREE
+            | TreeRefusalCode.LONE_FILE_EXCLUDED
+            | TreeRefusalCode.GITIGNORE_NOT_UTF8
+            | TreeRefusalCode.DUPLICATE_KEY
+            | TreeRefusalCode.EXCLUDED_NAME
+            | TreeRefusalCode.MALFORMED_ENTRY
+            | TreeRefusalCode.MISSING_BLOB
+            | TreeRefusalCode.REFERENCE_INVALID
+            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
+            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
+            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
+            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
+            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
+            | TreeRefusalCode.MODULE_NOT_IN_TREE
+            | TreeRefusalCode.MODULE_AMBIGUOUS
+        ):
+            return CoreCode.METHOD_RESOURCE_MISSING

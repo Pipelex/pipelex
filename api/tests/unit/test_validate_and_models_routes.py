@@ -4,13 +4,16 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.models import ModelCategory as MthdsModelCategory
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.cogt.models.model_listing import ModelCategory
+from pipelex.errors.error_codes import error_code_spec
 from pipelex.interpreter_hub import get_library_manager
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem
 
 
 def _build_client() -> TestClient:
@@ -28,9 +31,7 @@ class TestValidateAndModelsRoutes:
             "/v1/validate",
             json={"mthds_contents": [oversized]},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid", field="mthds_contents")
 
     def test_validate_rejects_too_many_files(self):
         client = _build_client()
@@ -38,9 +39,7 @@ class TestValidateAndModelsRoutes:
             "/v1/validate",
             json={"mthds_contents": [VALID_MTHDS] * 32},
         )
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid", field="mthds_contents")
 
     def test_validate_invalid_mthds_returns_200_invalid_report(self):
         # `/validate` is a diagnostic endpoint: an invalid bundle is a produced verdict, so it rides
@@ -58,19 +57,16 @@ class TestValidateAndModelsRoutes:
         body = response.json()
         assert body["is_valid"] is False
         assert body["is_runnable"] is False
-        # The pipelex message is preserved (caller-facing under `_authors_caller_facing_message`) so
-        # the client gets the actual interpreter complaint, not a generic placeholder.
-        assert "TOML" in body["message"]
-        # The diagnostics list is non-empty on every invalid arm — the structured-info invariant is
-        # total. A raw TOML-syntax error is a parse-level failure the interpreter raises with no
-        # categorized error-data, but the shared builder's last-resort residual still emits one
-        # `blueprint_validation` item carrying the message (no `source` at this layer). A categorized
-        # failure (e.g. an invalid `main_pipe`) yields richer items; that path is pinned in
-        # test_validate_errors.py.
-        assert isinstance(body["validation_errors"], list)
-        assert body["validation_errors"], "an invalid verdict must carry a non-empty validation_errors[]"
-        assert body["validation_errors"][0]["category"] == "blueprint_validation"
-        assert body["validation_errors"][0]["message"]
+        # The verdict's message is the sentence its code renders, `method.invalid`'s; the interpreter's
+        # actual complaint rides the item, so the client still reads what is wrong and where.
+        assert body["message"] == error_code_spec(CoreCode.METHOD_INVALID).detail
+        # The item list is non-empty on every invalid arm — the structured-info invariant is total. A raw
+        # TOML-syntax error is the method's syntax finding, located where the parser stopped; a categorized
+        # failure (e.g. an invalid `main_pipe`) yields its own codes, pinned in test_validate_errors.py.
+        (item,) = body["errors"]
+        assert item["code"] == "method.syntax"
+        assert item["location"]["line"] == 1
+        assert item["params"]["finding"].startswith("TOML syntax error")
         # The valid arm's structural artifacts + the retired `success` extra are absent.
         assert "bundle_blueprint" not in body
         assert "success" not in body
@@ -86,21 +82,16 @@ class TestValidateAndModelsRoutes:
         # the unfiltered deck.
         client = _build_client()
         response = client.get(f"/v1/models?type={bad_type}")
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "InvalidModelCategory"
+        assert_problem(response, status=422, code="request.invalid", field="type")
 
     def test_models_rejects_repeated_type_param(self):
         # D11: the protocol's `type` filter is a single plain value. The old route accepted
         # repeated `?type=` values (list[str] Query) — that extension is dropped, and FastAPI
         # would otherwise silently keep one of the values, so the rejection is explicit.
-        # Generic ValidationError (not InvalidModelCategory): both values are valid
-        # categories — what's wrong is the arity.
+        # Both values are valid categories — what's wrong is the arity, still a refusal of the field.
         client = _build_client()
         response = client.get("/v1/models?type=llm&type=extract")
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid", field="type")
 
     def test_models_returns_protocol_deck(self):
         # The deck is the protocol `ModelDeck` shape produced by `PipelexMTHDSProtocol.models`:
@@ -141,9 +132,7 @@ class TestValidateAndModelsRoutes:
         # crate routes take `files[]`, whose empty-selector rejection is pinned in the pipe-io suite).
         client = _build_client()
         response = client.post("/v1/validate", json={"mthds_contents": []})
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "ValidationError"
+        assert_problem(response, status=422, code="request.invalid", field="mthds_contents")
 
     def test_validate_tears_down_validate_bundle_library_without_leaking(self, mocker: MockerFixture):
         # validate_bundle opens a library and leaves it loaded + current on success (the D6 contract);

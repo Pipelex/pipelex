@@ -1,5 +1,7 @@
 from enum import StrEnum
 
+from pipelex.cogt.doc_gen.doc_gen_format_exceptions import DocGenChoiceKeyError
+
 
 class DocGenFormat(StrEnum):
     """The file formats a `PipeDocGen` step can ask for.
@@ -145,7 +147,7 @@ def parse_doc_gen_choice_key(key: str) -> tuple[DocGenFormat, DocGenSource]:
     """The format and source a key of the model deck's doc-gen defaults names.
 
     Raises:
-        ValueError: the key is not '<format>.<source>', or no step composes that format from that source.
+        DocGenChoiceKeyError: the key is not '<format>.<source>', or no step composes that format from that source.
     """
     format_token, separator, source_token = key.partition(".")
     try:
@@ -153,8 +155,8 @@ def parse_doc_gen_choice_key(key: str) -> tuple[DocGenFormat, DocGenSource]:
         source = DocGenSource(source_token)
     except ValueError as exc:
         msg = f"'{key}' is not a '<format>.<source>' key, such as 'pdf.layout'."
-        raise ValueError(msg) from exc
+        raise DocGenChoiceKeyError(msg) from exc
     if not separator or source not in DocGenSource.possible_for(doc_gen_format=doc_gen_format):
         msg = f"'{key}' names no step: {doc_gen_format.with_article} is never composed {source.desc}."
-        raise ValueError(msg)
+        raise DocGenChoiceKeyError(msg)
     return doc_gen_format, source

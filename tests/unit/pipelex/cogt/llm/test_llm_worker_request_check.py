@@ -15,6 +15,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
+from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 
 if TYPE_CHECKING:
@@ -106,7 +107,9 @@ class TestLLMWorkerRequestCheck:
         with pytest.raises(LLMCapabilityError) as exc_info:
             await invocation
         assert worker.calls == []
-        assert exc_info.value.to_error_report().model == "gpt-test"
+        diagnostics = exc_info.value.to_problem(view=ProblemView.OPERATOR).diagnostics
+        assert diagnostics is not None
+        assert diagnostics.model == "gpt-test"
 
     @pytest.mark.asyncio
     async def test_an_accepted_request_reaches_the_provider(self) -> None:

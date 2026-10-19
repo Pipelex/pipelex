@@ -7,8 +7,9 @@ from typing import TYPE_CHECKING, Any
 import httpx
 import pytest
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.providers.azure_rest.azure_img_gen_worker import AzureImgGenWorker
 from tests.unit.pipelex.providers.azure_rest.test_data import AzureErrorHandlingTestData
 
@@ -45,6 +46,12 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.img_gen_prompt.positive_text = "a sunset over mountains"
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -164,8 +171,11 @@ class TestAzureWorkerErrorHandling:
         assert exc_info.value.user_action.kind is expected_user_action_kind
         assert exc_info.value.__cause__ is sdk_exc
 
-    async def test_error_report_includes_category(self, mocker: MockerFixture) -> None:
-        """to_error_report() includes error_category and retryable from the exception."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_problem_includes_category(self, mocker: MockerFixture) -> None:
+        """The category stays on the chain, and the problem takes the retry verdict of the code it gives."""
         worker = _make_azure_img_gen_worker(mocker)
         sdk_exc = _make_httpx_status_error(429, "Rate limit exceeded")
 
@@ -186,10 +196,11 @@ class TestAzureWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image_list(img_gen_job=_make_img_gen_job(mocker), nb_images=1)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "transient"
-        assert report.retryable is True
-        assert report.error_type == "ImgGenGenerationError"
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.is_retryable is True
+        assert _diagnostics_of(problem).error_class == "ImgGenGenerationError"
         assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY

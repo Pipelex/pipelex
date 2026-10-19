@@ -4,12 +4,14 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import JudgmentCapabilityError
 from pipelex.cogt.inference.error_classification import extract_typesafe_metadata
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.judgment.judgment_job import JudgmentJob
 from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
 from pipelex.cogt.judgment.judgment_worker_abstract import JudgmentWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.providers.typesafe.typesafe_error_classification import classify_typesafe_error
 from pipelex.providers.typesafe.typesafe_translation import from_typesafe_response, to_typesafe_questions
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -52,7 +54,7 @@ class TypesafeJudgmentWorker(JudgmentWorkerAbstract):
                 f"TypeSafe judges text alone, and this judgment's prompt presents files for model '{self.inference_model.name}': "
                 "its spec must not declare that it reads images or documents."
             )
-            raise JudgmentCapabilityError(msg)
+            raise JudgmentCapabilityError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         typesafe_questions = to_typesafe_questions(questions=judgment_job.questions)
         try:
             # The SDK types its state as a recursive JSON alias that pyright cannot resolve to the end.

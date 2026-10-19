@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib.util
 from typing import TYPE_CHECKING
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.plugins.model_handle import ModelHandle
 from pipelex.runtime_hub import get_console
@@ -64,7 +66,7 @@ async def list_anthropic_models(
             )
     except AuthenticationError as auth_exc:
         msg = f"Authentication error for SDK '{sdk}' in backend '{backend_name}': {auth_exc}"
-        raise PipelexCLIError(msg) from auth_exc
+        raise PipelexCLIError(msg).with_error_code(CoreCode.PROVIDER_CREDENTIAL_REFUSED) from auth_exc
 
 
 def _display_anthropic_models_flat(

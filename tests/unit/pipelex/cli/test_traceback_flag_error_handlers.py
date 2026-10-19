@@ -14,15 +14,15 @@ import typer
 from rich.traceback import Traceback
 
 from pipelex.cli.error_handlers import ErrorContext, handle_model_deck_preset_error
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _deck_preset_error() -> ModelDeckPresetValidatonError:
-    return ModelDeckPresetValidatonError(
+def _deck_preset_error() -> ModelDeckPresetValidationError:
+    return ModelDeckPresetValidationError(
         message="preset references unavailable model",
         model_type=ModelType.LLM,
         preset_id="default",
@@ -37,14 +37,14 @@ class TestTracebackFlagInErrorHandlers:
     def test_handler_prints_traceback_when_flag_active(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error prints traceback when --traceback is set."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=mock_console)
 
         exc = _deck_preset_error()
         ctx = click.Context(click.Command("test"), obj={"traceback": True})
         with ctx:
             try:
                 raise exc
-            except ModelDeckPresetValidatonError:
+            except ModelDeckPresetValidationError:
                 with pytest.raises(typer.Exit):
                     handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
@@ -55,14 +55,14 @@ class TestTracebackFlagInErrorHandlers:
     def test_handler_does_not_print_traceback_when_flag_absent(self, mocker: MockerFixture) -> None:
         """handle_model_deck_preset_error does NOT print traceback without --traceback."""
         mock_console = mocker.MagicMock()
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=mock_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=mock_console)
 
         exc = _deck_preset_error()
         ctx = click.Context(click.Command("test"), obj={"traceback": False})
         with ctx:
             try:
                 raise exc
-            except ModelDeckPresetValidatonError:
+            except ModelDeckPresetValidationError:
                 with pytest.raises(typer.Exit):
                     handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 

@@ -48,15 +48,21 @@ class TestJobMetadataRequestId:
             "abc\tdef",  # tab (outside printable ASCII range)
             "café",  # non-ASCII (latin-1 supplement)
             "x" * 129,  # exceeds max_length=128
+            " ",  # a space alone, which a header trims to nothing
+            "abc def",  # a space, which splits a key=value log line
+            "abc error.code=forged",  # a forged field of a key=value log line
+            'abc"def',  # a quote, which closes a quoted value
+            "abc;q=1",  # a header parameter
+            "req_abc.123",  # a dot: outside the one rule the API server's middleware applies too
         ],
     )
     def test_request_id_rejects_unsanitized_input(self, bad_request_id: str) -> None:
-        """``request_id`` is constrained to printable ASCII (max 128 chars).
+        """``request_id`` holds ASCII letters, digits, ``_`` and ``-`` alone (max 128 chars).
 
         Defense-in-depth: an upstream consumer of pipelex that forwards the
-        ``X-Request-ID`` header without sanitization cannot inject newlines,
-        ANSI escapes, or control characters into the log lines and
-        ``ErrorReport`` envelopes that quote it.
+        ``X-Request-ID`` header without sanitization cannot inject a line, a
+        field or a header parameter into the log lines, the headers and the
+        problem documents that carry it.
         """
         with pytest.raises(ValidationError):
             JobMetadata(
@@ -68,12 +74,13 @@ class TestJobMetadataRequestId:
         [
             "abc-123",
             "11111111-2222-3333-4444-555555555555",  # uuid
-            "req_abc.123",
+            "01JA2B3C4D5E6F7G8H9J0K1M2N",  # ulid
+            "req_abc_123",
             "x" * 128,  # at the limit
         ],
     )
     def test_request_id_accepts_well_formed_input(self, good_request_id: str) -> None:
-        """Common ``X-Request-ID`` shapes (UUID, hyphenated, dot-separated) round-trip cleanly."""
+        """Common ``X-Request-ID`` shapes (UUID, ULID, hyphenated, underscored) round-trip cleanly."""
         meta = JobMetadata(
             run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="r", request_id=good_request_id)
         )

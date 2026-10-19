@@ -1,8 +1,11 @@
 """The read scope's check: a scoped run reads only its own storage prefix, and never the local disk."""
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain, SecurityInputUrlRefusedTargetClass, SecurityMethodUrlRefusedTargetClass
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.tools.uri.exceptions import UriReadRefusalReason, UriReadRefusedError
 from pipelex.tools.uri.uri_read_scope import UriReference, authorize_uri_read, authorize_uri_reads
 
@@ -47,6 +50,8 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="image 1 of the prompt")
         assert exc_info.value.reason == UriReadRefusalReason.FOREIGN_STORAGE_KEY
+        # The security event names the class of what was refused, never the key.
+        assert exc_info.value.security_target_class == SecurityTargetClass.FOREIGN_STORAGE_KEY
 
     @pytest.mark.parametrize(
         "uri",
@@ -66,6 +71,44 @@ class TestAuthorizeUriRead:
         with pytest.raises(UriReadRefusedError) as exc_info:
             authorize_uri_read(uri=uri, read_scope=READ_SCOPE, position="the input 'photo'")
         assert exc_info.value.reason == UriReadRefusalReason.LOCAL_PATH
+        # A path on the server's disk, or a scheme the run does not read, is a refused scheme to the security event.
+        assert exc_info.value.security_target_class == SecurityTargetClass.SCHEME
+
+    @pytest.mark.parametrize(
+        ("reason", "event_target_class", "listed_target_class"),
+        [
+            (UriReadRefusalReason.FOREIGN_STORAGE_KEY, SecurityTargetClass.FOREIGN_STORAGE_KEY, "private"),
+            (UriReadRefusalReason.LOCAL_PATH, SecurityTargetClass.SCHEME, "scheme"),
+        ],
+    )
+    def test_the_problem_s_target_class_is_a_value_the_registry_lists(
+        self, reason: UriReadRefusalReason, event_target_class: SecurityTargetClass, listed_target_class: str
+    ) -> None:
+        """The caller reads a `target_class` the registry lists, which its sentence reads as a word, never a Pipelex token.
+
+        The security event keeps the finer class the refusal states, which the registry lists no value for.
+        """
+        as_input = UriReadRefusedError("refused", reason=reason).with_params(input="photo")
+        as_method = UriReadRefusedError("refused", reason=reason).with_error_code(CoreCode.SECURITY_METHOD_URL_REFUSED).with_params(pipe="describe")
+
+        assert listed_target_class in {str(value) for value in SecurityInputUrlRefusedTargetClass}
+        assert listed_target_class in {str(value) for value in SecurityMethodUrlRefusedTargetClass}
+        for refusal in (as_input, as_method):
+            assert refusal.security_target_class == event_target_class
+            for view in ProblemView:
+                params = refusal.to_problem(view=view).params
+                assert params is not None
+                assert params.as_wire()["target_class"] == listed_target_class
+        assert as_input.to_problem(view=ProblemView.CALLER).detail == (
+            f"The URL of the input 'photo' points at a {listed_target_class} target, which a security rule forbids (reason: {reason.desc})."
+        )
+        assert as_method.to_problem(view=ProblemView.CALLER).detail == (
+            f"Pipe 'describe' names a URL that points at a {listed_target_class} target, which a security rule forbids (reason: {reason.desc})."
+        )
+
+    @pytest.mark.parametrize("target_class", list(SecurityTargetClass))
+    def test_every_target_class_falls_under_a_value_the_registry_lists(self, target_class: SecurityTargetClass) -> None:
+        assert str(target_class.listed_target_class) in {str(value) for value in SecurityInputUrlRefusedTargetClass}
 
     def test_a_multi_segment_scope_compares_every_segment(self) -> None:
         authorize_uri_read(uri="pipelex-storage://org_abc/team_1/x.png", read_scope="org_abc/team_1", position="p")
@@ -94,15 +137,20 @@ class TestAuthorizeUriRead:
         assert "secret.png" not in message
         assert READ_SCOPE not in message
 
-    def test_the_refusal_is_a_caller_facing_input_error_answered_as_a_422(self) -> None:
+    def test_the_refusal_is_an_input_error_answered_as_a_422_quoting_no_uri(self) -> None:
         with pytest.raises(UriReadRefusedError) as exc_info:
-            authorize_uri_read(uri="/etc/passwd", read_scope=READ_SCOPE, position="the input 'photo'")
-        error_report = exc_info.value.to_error_report()
-        assert error_report.error_domain == ErrorDomain.INPUT
-        assert error_report.http_status == 422
-        strict = error_report.to_dict(disclosure_mode=DisclosureMode.STRICT)
-        assert "the input 'photo'" in strict["message"]
-        assert "/etc/passwd" not in strict["message"]
+            authorize_uri_read(uri="/etc/passwd", read_scope=READ_SCOPE, position="the input 'photo'", input_name="photo")
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert caller.params is not None
+        assert caller.params.as_wire()["input"] == "photo"
+        assert caller.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.SECURITY_INPUT_URL_REFUSED).status == 422
+        assert "/etc/passwd" not in str(caller.to_wire())
+        operator = exc_info.value.to_problem(view=ProblemView.OPERATOR)
+        assert operator.diagnostics is not None
+        assert "the input 'photo'" in operator.diagnostics.message
+        assert "/etc/passwd" not in operator.diagnostics.message
 
     def test_the_list_form_refuses_the_first_reference_the_scope_does_not_allow(self) -> None:
         uri_references = [

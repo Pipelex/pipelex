@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 from rich.console import Console
 
 from pipelex.base_exceptions import MigrationErrorBlock
@@ -23,11 +24,12 @@ from pipelex.cli.error_handlers import (
     handle_telemetry_config_validation_error,
     handle_validate_bundle_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.exceptions import DryRunFailureErrorData, PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
@@ -42,7 +44,7 @@ class TestErrorHandlersExtended:
     def console(self, mocker: MockerFixture) -> Console:
         """Recorded console patched into the error handlers module."""
         recorded_console = Console(width=120, record=True, color_system=None)
-        mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+        mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
         return recorded_console
 
     def test_display_error_panel_full_layout(self) -> None:
@@ -53,6 +55,7 @@ class TestErrorHandlersExtended:
             title="Something failed",
             fields=[("Pipe", "'my_pipe'"), ("Model Choice", "'gpt-5'")],
             error_message="model not found",
+            problem=None,
             tip="try another model",
             links=[("Docs", "https://docs.example.com")],
         )
@@ -64,6 +67,35 @@ class TestErrorHandlersExtended:
         assert "💡 Tip: try another model" in output
         assert "Docs: https://docs.example.com" in output
 
+    def test_display_error_panel_prints_the_problem_s_rows(self) -> None:
+        """The problem's title, next step, code with its verdict, location, request id and run follow the error message."""
+        console = Console(width=200, record=True, color_system=None)
+        problem = make_problem(
+            code=CoreCode.RUNTIME_UNEXPECTED,
+            view=ProblemView.OPERATOR,
+            location=make_location(pipe="summarize", path=["main", "summarize"]),
+            request_id="req-123",
+            pipeline_run_id="run-456",
+        )
+        display_error_panel(
+            console=console,
+            title="Something failed",
+            fields=[("Pipe", "'summarize'")],
+            error_message="the step broke",
+            problem=problem,
+            tip="try again",
+            links=[],
+        )
+        output = console.export_text()
+        assert f"Problem:    {problem.title}" in output
+        assert f"Detail:     {problem.detail}" in output
+        assert f"Next step:  {problem.next_step.detail}" in output
+        assert "Code:       runtime.unexpected (domain runtime, retry no)" in output
+        assert "Location:   pipe 'summarize', path main > summarize" in output
+        assert "Request id: req-123" in output
+        assert "Run:        run-456" in output
+        assert output.index("Error: the step broke") < output.index("Problem:") < output.index("💡 Tip: try again")
+
     def test_display_error_panel_omits_error_block_when_none(self) -> None:
         """A None error_message omits the Error block entirely."""
         console = Console(width=120, record=True, color_system=None)
@@ -72,6 +104,7 @@ class TestErrorHandlersExtended:
             title="Soft failure",
             fields=[],
             error_message=None,
+            problem=None,
             tip="a tip",
             links=[],
         )
@@ -87,6 +120,7 @@ class TestErrorHandlersExtended:
             title="Failure",
             fields=[],
             error_message=None,
+            problem=None,
             tip="first line\nsecond line",
             links=[],
         )
@@ -94,8 +128,8 @@ class TestErrorHandlersExtended:
         assert "first line" in output
         assert "second line" in output
 
-    def _make_deck_preset_error(self, enabled_backends: set[str] | None) -> ModelDeckPresetValidatonError:
-        return ModelDeckPresetValidatonError(
+    def _make_deck_preset_error(self, enabled_backends: set[str] | None) -> ModelDeckPresetValidationError:
+        return ModelDeckPresetValidationError(
             message="preset references unavailable model",
             model_type=ModelType.LLM,
             preset_id="default_text",
@@ -118,20 +152,42 @@ class TestErrorHandlersExtended:
         assert "anthropic, openai" in output
         assert "Possible solutions:" in output
         assert "Configure model 'gpt-5' in one of your enabled backends" in output
+        # The tip's markup is the handler's own and is rendered, never printed as text.
+        assert "[bold]" not in output
+        assert "[yellow]" not in output
 
     def test_handle_model_deck_preset_error_uses_user_action_detail(self, console: Console) -> None:
-        """When the error carries user-action advice, it becomes the tip verbatim."""
+        """When the error carries user-action advice, it becomes the tip verbatim, brackets included and escaped once."""
         exc = self._make_deck_preset_error(enabled_backends=None)
-        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="switch to gpt-4o in the preset")
+        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="switch to 'gpt-4o → SDK[openai]' in the preset")
 
         with pytest.raises(typer.Exit):
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
 
         output = console.export_text()
-        assert "switch to gpt-4o in the preset" in output
+        assert "💡 Tip: switch to 'gpt-4o → SDK[openai]' in the preset" in output
+        assert "\\[" not in output
         assert "Possible solutions:" not in output
         assert "Enabled Backends:" not in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
+    def test_handle_validate_bundle_error_prints_a_bracketed_tip_as_written(self, console: Console) -> None:
+        """The verdict's advice is plain text: `SDK[openai]` prints as written, neither swallowed as a style tag nor escaped twice."""
+        exc = ValidateBundleError(message="validation failed")
+        exc.user_action = UserAction(kind=UserActionKind.CHANGE_MODEL, detail="use 'gpt-4o → SDK[openai]' in the pipe")
+
+        with pytest.raises(typer.Exit):
+            handle_validate_bundle_error(exc)
+
+        output = console.export_text()
+        assert "💡 Tip: use 'gpt-4o → SDK[openai]' in the pipe" in output
+        assert "\\[" not in output
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors and its dry-run failure in the test, without the facts their raise sites give their items' codes"
+    )
     def test_handle_validate_bundle_error_renders_all_sections(self, console: Console) -> None:
         """Blueprint, pipe, and dry-run sections all render with their details."""
         blueprint_error = PipelexBundleBlueprintValidationErrorData(
@@ -158,6 +214,7 @@ class TestErrorHandlersExtended:
             pipe_validation_errors=[pipe_error],
             dry_run_failures=[
                 DryRunFailureErrorData(
+                    code=CoreCode.PIPE_OUTPUT_INVALID,
                     pipe_code="third_pipe",
                     domain_code="demo",
                     source="bundle.mthds",
@@ -186,6 +243,9 @@ class TestErrorHandlersExtended:
         assert "Pipe: third_pipe" in output
         assert "Pipe 'third_pipe' failed its dry run: dry run exploded" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_handle_validate_bundle_error_minimal_renders_fallback_residual(self, console: Console) -> None:
         """A message-only error renders the fallback residual item, so the message is never lost.
 

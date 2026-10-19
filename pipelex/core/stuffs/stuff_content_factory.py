@@ -2,6 +2,8 @@ import datetime
 import re
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.exceptions import StuffContentFactoryError
@@ -54,15 +56,16 @@ class StuffContentFactory:
         # down to the basic spellings and the end-of-day 24:00 form. Splitting rather than calling
         # datetime.fromisoformat is what makes the time half reachable by that parser at all.
         match = re.fullmatch(r"(?P<date>\d{4}-\d{2}-\d{2})(?:[Tt ](?P<time>.+))?", value)
+        # A refusal names the form it expected, never the value, which is the run's input.
         if not match:
-            msg = f"Date input '{value}' is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00')."
+            msg = "A Date input is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00')."
             raise StuffContentFactoryError(msg)
         time_text = match.group("time")
         try:
             the_date = parse_iso_date(match.group("date"))
             the_time = parse_iso_time(time_text) if time_text is not None else None
         except ValueError as exc:
-            msg = f"Date input '{value}' is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00'): {exc}"
+            msg = f"A Date input is not an extended ISO 8601 date or datetime (e.g. '2026-07-07' or '2026-07-07T15:40:00+02:00'): {exc}"
             raise StuffContentFactoryError(msg) from exc
         return the_date, the_time
 
@@ -77,7 +80,7 @@ class StuffContentFactory:
         try:
             parsed = parse_iso_time(value)
         except ValueError as exc:
-            msg = f"Time input '{value}' is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00'): {exc}"
+            msg = f"A Time input is not an extended ISO 8601 time of day (e.g. '15:40:00' or '15:40:00+02:00'): {exc}"
             raise StuffContentFactoryError(msg) from exc
         return time_subclass(time=parsed)
 
@@ -102,6 +105,6 @@ class StuffContentFactory:
 
         if not issubclass(the_structure_class, StuffContent):
             msg = f"Concept '{concept.code}', subclass '{the_structure_class}' is not a subclass of StuffContent"
-            raise StuffContentFactoryError(msg)
+            raise StuffContentFactoryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
         return cls.make_content_from_value(stuff_content_subclass=the_structure_class, value=value)

@@ -19,6 +19,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, SizeTier
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 GeminiAspectRatioType = Literal["1:1", "1:4", "1:8", "2:3", "3:2", "3:4", "4:1", "4:3", "4:5", "5:4", "8:1", "9:16", "16:9", "21:9"]
 
@@ -142,12 +143,14 @@ class ImgGenGeminiMapping:
                 f"Google image model '{inference_model.name}' has no 'aspect_ratio' rules configured; "
                 f"set rules.aspect_ratio to a Gemini taxonomy (e.g. 'gemini_3_flash')"
             )
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         try:
             return AspectRatioTaxonomy(taxonomy_value)
         except ValueError as exc:
             msg = f"Google image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}'"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(
+                PipelexErrorCode.CONFIG_INVALID
+            ) from exc
 
     @classmethod
     def optional_img_gen_taxonomy(cls, inference_model: InferenceModelSpec) -> AspectRatioTaxonomy | None:
@@ -182,7 +185,7 @@ class ImgGenGeminiMapping:
         taxonomy_value = rules.get(ImgGenArgTopic.ASPECT_RATIO)
         if taxonomy_value is None:
             msg = f"Image model '{inference_model.name}' declares no aspect_ratio rule, so whether it takes Google's image_config cannot be decided"
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
         try:
             taxonomy = AspectRatioTaxonomy(taxonomy_value)
         except ValueError as exc:
@@ -190,7 +193,9 @@ class ImgGenGeminiMapping:
                 f"Image model '{inference_model.name}' has an unknown aspect_ratio taxonomy '{taxonomy_value}', "
                 "so whether it takes Google's image_config cannot be decided"
             )
-            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(
+                PipelexErrorCode.CONFIG_INVALID
+            ) from exc
         if not taxonomy.is_gemini:
             return None
         return taxonomy
@@ -300,7 +305,7 @@ class ImgGenGeminiMapping:
                 | AspectRatioTaxonomy.QWEN_IMAGE
             ):
                 msg = f"Taxonomy '{taxonomy}' configured for model '{model_name}' is not a Google Gemini image generation taxonomy"
-                raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+                raise ImgGenParameterError(msg, error_category=InferenceErrorCategory.CONFIGURATION).with_error_code(PipelexErrorCode.CONFIG_INVALID)
 
     @classmethod
     def dimensions_for_aspect_ratio_and_size(

@@ -1,9 +1,11 @@
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import ErrorDomain
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 
@@ -82,7 +84,7 @@ class TestPipeLibraryLookup:
         """Two domains declaring the code: refuse to guess, and name both so the user can pick.
 
         The code came from a human — a CLI argument or an API request field — so the failure is the
-        caller's to fix: INPUT domain, 422, never a server fault the caller would retry.
+        caller's to fix: the input domain, 422, never a server fault the caller would retry.
         """
         library = PipeLibrary.make_empty()
         library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
@@ -92,23 +94,30 @@ class TestPipeLibraryLookup:
         assert "analytics.compute_score" in str(exc_info.value)
         assert "scoring.compute_score" in str(exc_info.value)
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.http_status == 422
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.REQUEST_PIPE_AMBIGUOUS
+        assert problem.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.REQUEST_PIPE_AMBIGUOUS).status == 422
+        params = problem.to_wire()["params"]
+        assert params["pipe"] == "compute_score"
+        assert "analytics.compute_score" in str(params["candidates"])
+        assert "scoring.compute_score" in str(params["candidates"])
 
     def test_entry_pipe_no_match_returns_none(self):
         library = PipeLibrary.make_empty()
         assert library.get_optional_entry_pipe("nonexistent") is None
 
     def test_entry_pipe_required_raises_not_found(self):
-        """An entry code that resolves to nothing is a caller typo, reported as INPUT / 422."""
+        """An entry code that resolves to nothing is a caller typo, reported in the input domain, 422."""
         library = PipeLibrary.make_empty()
         with pytest.raises(EntryPipeNotFoundError) as exc_info:
             library.get_required_entry_pipe("nonexistent")
 
-        report = exc_info.value.to_error_report()
-        assert report.error_domain == ErrorDomain.INPUT
-        assert report.http_status == 422
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.REQUEST_PIPE_NOT_FOUND
+        assert problem.domain == ProblemDomain.INPUT
+        assert error_code_spec(CoreCode.REQUEST_PIPE_NOT_FOUND).status == 422
+        assert problem.detail == "The method declares no pipe 'nonexistent'."
 
     def test_entry_pipe_translates_aliased_ambiguity(self, mocker: MockerFixture):
         """An ambiguous `alias->bare_code` reaching the entry lookup is still the caller's typo.
@@ -128,7 +137,12 @@ class TestPipeLibraryLookup:
         cause = exc_info.value.__cause__
         assert isinstance(cause, PipeLibraryError)
         assert not isinstance(cause, EntryPipeAmbiguousError)
-        assert exc_info.value.to_error_report().error_domain == ErrorDomain.INPUT
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.domain == ProblemDomain.INPUT
+        # The candidates ride the refusal, for its caller and for a selection that reads them back.
+        expected_candidates = ["lib->analytics.compute_score", "lib->scoring.compute_score"]
+        assert exc_info.value.given_params["candidates"] == expected_candidates
+        assert problem.to_wire()["params"] == {"pipe": "lib->compute_score", "candidates": expected_candidates}
 
     def test_entry_pipe_does_not_translate_a_miss_into_an_ambiguity(self, mocker: MockerFixture):
         """A miss surfacing from `get_optional_pipe` must not be re-raised as an ambiguity.
@@ -147,10 +161,10 @@ class TestPipeLibraryLookup:
         assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
 
     def test_in_body_aliased_ambiguity_is_not_translated(self, mocker: MockerFixture):
-        """The same lookup through the in-body door keeps the plain, unclassified error.
+        """The same lookup through the in-body door keeps the plain error, with the method's code.
 
-        In-body resolution failures are not a caller's input mistake — the ref was written in a
-        bundle — so the entry classification must not leak onto them.
+        In-body resolution failures are not a caller's request mistake — the ref was written in a
+        bundle — so the entry classification must not leak onto them: the method's author fixes it.
         """
         library = PipeLibrary.make_empty()
         library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
@@ -159,15 +173,61 @@ class TestPipeLibraryLookup:
         with pytest.raises(PipeLibraryError) as exc_info:
             library.get_optional_pipe("lib->compute_score")
         assert not isinstance(exc_info.value, EntryPipeAmbiguousError)
-        assert exc_info.value.to_error_report().error_domain is None
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_REF_AMBIGUOUS
+        assert problem.domain == ProblemDomain.METHOD
+        assert exc_info.value.message not in str(problem.to_wire())
 
-    def test_in_body_required_miss_stays_unclassified(self):
-        """`get_required_pipe` is the in-body door and keeps raising the plain, domain-less error."""
+    def test_in_body_required_miss_carries_the_method_code(self, mocker: MockerFixture):
+        """`get_required_pipe` is the in-body door and keeps raising the plain error, with the method's code."""
         library = PipeLibrary.make_empty()
+        library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         with pytest.raises(PipeNotFoundError) as exc_info:
-            library.get_required_pipe("scoring.nonexistent")
+            library.get_required_pipe("scoring.compute_scor", referring_pipe_code="review")
         assert not isinstance(exc_info.value, EntryPipeNotFoundError)
-        assert exc_info.value.to_error_report().error_domain is None
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_PIPE_UNRESOLVED
+        assert problem.domain == ProblemDomain.METHOD
+        assert exc_info.value.message not in str(problem.to_wire())
+        # The pipe whose body writes the ref, the ref that names nothing, and the pipes nearest it.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"pipe": "review", "missing": "scoring.compute_scor", "candidates": ["scoring.compute_score"]}
+
+    @pytest.mark.parametrize(
+        ("selection", "expected_suggestions"),
+        [
+            pytest.param("compute_scor", ["scoring.compute_score"], id="bare_code_offers_the_entry_package_s_own_pipes"),
+            pytest.param("lib->compute_scor", ["lib->scoring.compute_score"], id="aliased_offers_that_package_s_exported_pipes"),
+        ],
+    )
+    def test_an_entry_miss_offers_only_the_pipes_the_caller_may_select(self, mocker: MockerFixture, selection: str, expected_suggestions: list[str]):
+        """A dependency's private pipe, another package's pipe and the host's pipes for an aliased selection are never offered."""
+        library = PipeLibrary.make_empty()
+        library.root["scoring.compute_score"] = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
+        library.add_dependency_pipe(alias="lib", pipe=_make_stub_pipe(mocker, code="compute_scores", domain_code="scoring"), is_exported=False)
+        library.add_dependency_pipe(alias="other", pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"), is_exported=True)
+
+        with pytest.raises(EntryPipeNotFoundError) as exc_info:
+            library.get_required_entry_pipe(selection)
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"pipe": selection, "suggestions": expected_suggestions}
+        # The message names what the caller typed and nothing from the loaded library.
+        assert "scoring.compute_score" not in exc_info.value.message
+
+    def test_a_pipe_added_twice_names_its_ref_and_the_conflict(self, mocker: MockerFixture):
+        library = PipeLibrary.make_empty()
+        library.add_new_pipe(pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
+
+        with pytest.raises(PipeLibraryError) as exc_info:
+            library.add_new_pipe(pipe=_make_stub_pipe(mocker, code="compute_score", domain_code="scoring"))
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_NAME_CONFLICT
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"name": "scoring.compute_score", "conflict": "duplicate_declaration"}
 
     def test_entry_pipe_ignores_aliased_dependency_entries(self, mocker: MockerFixture):
         """An installed package must not make a host pipe's bare code ambiguous.

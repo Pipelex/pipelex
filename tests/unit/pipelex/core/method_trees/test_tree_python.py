@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 from mthds.method_tree.lister import list_method_tree
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode
 from pipelex.core.method_trees import tree_python
 from pipelex.core.method_trees.exceptions import TreeModuleExcludedError, TreeModuleShadowingError, TreePythonError, TreePythonHeldError
 from pipelex.core.method_trees.tree_python import (
@@ -17,6 +17,7 @@ from pipelex.core.method_trees.tree_python import (
     import_held_tree_module,
     sharing_module_name_checks,
 )
+from pipelex.errors.problem import ProblemView
 from pipelex.tools.typing.module_inspector import import_module_from_file
 
 _LABEL = "the method tree holding probe.mthds"
@@ -203,13 +204,17 @@ class TestTreePython:
         finally:
             sys.modules.pop("tree_probe_site", None)
 
-    def test_the_errors_of_a_tree_name_no_path_of_this_host_under_strict_disclosure(self, tmp_path: Path) -> None:
+    def test_the_errors_of_a_tree_name_no_path_of_this_host(self, tmp_path: Path) -> None:
         shadowing = _write_tree(root=tmp_path / "shadowing", files={"shadowing.mthds": 'domain = "shadowing"\n', "json.py": "X = 1\n"})
         with pytest.raises(TreeModuleShadowingError) as shadowing_info:
             TREE_PYTHON_HOLD.acquire(tree=shadowing, holder="run-shadowing", label="the method tree holding shadowing.mthds")
-        strict_report = json.dumps(shadowing_info.value.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT))
-        assert "the method tree holding shadowing.mthds" in strict_report
-        assert "json.py" in strict_report
+        shadowing_problem = shadowing_info.value.to_problem(view=ProblemView.CALLER)
+        assert shadowing_problem.code == CoreCode.METHOD_NAME_CONFLICT
+        assert shadowing_problem.params is not None
+        assert shadowing_problem.params.as_wire() == {"name": "json", "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}
+        operator_report = json.dumps(shadowing_info.value.to_problem(view=ProblemView.OPERATOR).to_wire())
+        assert "the method tree holding shadowing.mthds" in operator_report
+        assert "json.py" in operator_report
 
         guarded = _write_tree(
             root=tmp_path / "guarded",
@@ -229,7 +234,9 @@ class TestTreePython:
         with pytest.raises(TreePythonHeldError) as held_info:
             TREE_PYTHON_HOLD.acquire(tree=other, holder="run-other", label="the method tree holding other.mthds")
 
-        for message in (strict_report, excluded_info.value.message, held_info.value.message):
+        # The excluded-module refusal is an ImportError the import machinery raises, read by its message alone.
+        caller_reports = [json.dumps(error.to_problem(view=ProblemView.CALLER).to_wire()) for error in (shadowing_info.value, held_info.value)]
+        for message in (operator_report, excluded_info.value.message, held_info.value.message, *caller_reports):
             for host_path in _host_paths(tmp_path=tmp_path):
                 assert host_path not in message
 
@@ -244,3 +251,18 @@ class TestTreePython:
 
         check_tree_module_names(top_level_modules=top_level_modules, tree_label=_LABEL, root=tmp_path, checks_this_process=True)
         assert judged_spy.call_count == 2 * len(top_level_modules)
+
+    def test_a_module_resolving_outside_the_tree_is_a_name_conflict_naming_it(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A module of that name imported before the tree's Python loaded hides the tree's own: the conflict names the module."""
+        tree = _write_tree(root=tmp_path / "hidden", files={"hidden.mthds": 'domain = "hidden"\n', "tree_probe_hidden_by.py": "X = 1\n"})
+        identity = TREE_PYTHON_HOLD.acquire(tree=tree, holder="run-hidden", label=_LABEL)
+        # Only the tree module's own reference to `importlib` is replaced, so no other import of the test resolves to it.
+        mocker.patch.object(tree_python, "importlib", mocker.MagicMock(import_module=mocker.MagicMock(return_value=json)))
+
+        with pytest.raises(TreePythonError) as raised:
+            import_held_tree_module(identity=identity, module_name="tree_probe_hidden_by")
+
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_NAME_CONFLICT
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"name": "tree_probe_hidden_by", "conflict": MethodNameConflictConflict.DUPLICATE_DECLARATION}

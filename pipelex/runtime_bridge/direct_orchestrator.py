@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.interpreter_hub import scoped_pipe_router
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
@@ -57,4 +59,4 @@ class DirectOrchestrator:
             f"DIRECT orchestrator cannot fire-and-forget pipe '{pipe_job.pipe.code}': in-process execution has no genuine async path. "
             "Callers must check `supports_fire_and_forget` before dispatching a fire-and-forget job."
         )
-        raise PipelexBridgeDispatchError(msg)
+        raise PipelexBridgeDispatchError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)

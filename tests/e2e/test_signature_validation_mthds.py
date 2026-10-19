@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.located_failure import find_root_fault
 from pipelex.pipe_signature.exceptions import PipeSignatureNotExecutableError
 from pipelex.pipeline.bundle_validator import DryRunStatus
@@ -89,4 +90,6 @@ class TestSignatureValidationE2E:
         root_fault = find_root_fault(error=exc_info.value)
         assert isinstance(root_fault, PipeSignatureNotExecutableError)
         assert root_fault.pipe_ref.endswith("summarize_doc")
-        assert exc_info.value.to_error_report().error_type == "PipeSignatureNotExecutableError"
+        diagnostics = exc_info.value.to_problem(view=ProblemView.OPERATOR).diagnostics
+        assert diagnostics is not None
+        assert diagnostics.error_class == "PipeSignatureNotExecutableError"

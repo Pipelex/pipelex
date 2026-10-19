@@ -1,15 +1,42 @@
 from collections.abc import Iterator
 from enum import StrEnum
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, NamedTuple, Self
 
+from mthds.protocol.problem.models import ProblemItem, ProblemLocation
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field
 from typing_extensions import override
 
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserAction
-from pipelex.migration.plan import MigrationPlan
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.errors.error_code_declaration import (
+    ABSTRACT_ERROR,
+    AbstractError,
+    ErrorCodeDeclaration,
+    ErrorCodeSet,
+    InheritsCause,
+    declared_error_codes,
+    describe_error_code_declaration,
+)
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
+from pipelex.errors.problem import (
+    DiagnosticCause,
+    MigrationErrorBlock,
+    PipelexProblem,
+    ProblemDiagnostics,
+    ProblemView,
+    ProviderDiagnostics,
+    accepted_params,
+    cap_problem_text,
+    make_problem,
+    merge_locations,
+    recovered_problem_in_view,
+    runtime_version,
+)
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.suggested_fix import SuggestedFix
-from pipelex.tools.misc.string_utils import pascal_case_to_kebab, pascal_case_to_sentence
-from pipelex.urls import URLs
+from pipelex.system.telemetry.current_span import current_span_context_for_logs, pipelex_span_context_for_logs
 from pipelex.validation_error_types import ValidationErrorType
 
 
@@ -33,165 +60,72 @@ def iter_cause_chain(exc: BaseException) -> Iterator[BaseException]:
         node = node.__cause__
 
 
-# Placeholder ``message`` substituted into a STRICT-mode serialization of a
-# report whose ``message`` is not caller-facing copy. A report flagged
-# ``caller_facing_message`` keeps its original ``message`` instead.
-INTERNAL_ERROR_PLACEHOLDER = "An internal error occurred."
+def iter_traceback_chain(exc: BaseException) -> Iterator[BaseException]:
+    """Yield ``exc`` and each exception a traceback of it prints, outermost first, exactly once.
 
-# Stable identifiers preserved verbatim on every STRICT envelope, regardless of
-# the report's ``caller_facing_message`` flag. ``message`` and ``user_action``
-# are intentionally absent and handled separately by the two STRICT branches:
-# the caller-facing branch keeps both, the redacted branch replaces ``message``
-# with ``INTERNAL_ERROR_PLACEHOLDER`` and drops ``user_action``.
-# ``provider_metadata`` is also absent here — it is reattached on both branches
-# as a curated subset (see ``_STRICT_PROVIDER_METADATA_KEPT_FIELDS``).
-# Provider/model attribution (``provider``, ``model``) is unconditionally
-# excluded: it never belongs on an external surface, whatever the report's
-# ``error_domain``. The internal ``caller_facing_message`` flag is likewise
-# excluded — it is redaction plumbing that rides only the VERBOSE round-trip
-# format, never the lossy external projection.
-#
-# Single source of truth for both STRICT branches. Adding a new top-level
-# ``ErrorReport`` field is one decision: include it here to surface it on both
-# branches, or leave it out to keep both branches consistently silent.
-#
-# ``validation_errors`` IS surfaced: it describes the caller's own submitted
-# bundle (per-error diagnostics on a ``ValidateBundleError``), not server
-# internals, so redacting it would gut the hosted path's diagnostics. It only
-# ever rides a ``ValidateBundleError`` report (a caller-facing INPUT error), but
-# it is kept here — not by the caller-facing branch's bespoke logic — so the
-# decision lives in this one allowlist.
-#
-# Caveat — ``validation_errors[].source``: on the *in-memory* validate and run
-# paths ``source`` is the caller-supplied logical source (e.g. ``api://bundle-0.mthds``),
-# which is the hosted/STRICT case and safe to surface; a bundle of an address-based
-# dependency is named by the package's address and its path inside the package, and
-# a file of the host's own library directories is withheld from the verdict, source
-# and messages alike (``withholding_host_library_files``). On the *on-disk* path a
-# ``source`` is a real server filesystem path, and STRICT does NOT redact it
-# (consistent with ``DisclosureMode`` being a classification-projection, not a
-# path-leak shield — see its docstring). A hosted surface that validates from disk
-# should therefore use the in-memory path with logical sources rather than rely on
-# STRICT to scrub the path.
-#
-# ``migration`` is NOT surfaced, and the contrast with ``validation_errors`` is
-# the whole reason: a pending configuration migration describes the *host's* own
-# configuration directories — server filesystem paths, and the shape of a
-# deployment's settings — never anything the caller submitted. It is diagnostics
-# for whoever runs the process, which on a hosted surface is not the caller.
-_STRICT_KEPT_FIELDS: frozenset[str] = frozenset(
-    {"error_type", "title", "type_uri", "error_domain", "error_category", "retryable", "validation_errors"}
-)
-
-# The curated subset of ``ProviderErrorMetadata`` that survives STRICT
-# projection. ``status_code`` and ``retry_after_seconds`` are actionable client
-# hints (HTTP status mapping, ``Retry-After`` header) — they are not provider
-# attribution. Every other ``ProviderErrorMetadata`` field carries either
-# provider identity (``provider``, ``provider_error_code``, ``sdk_exception_type``)
-# or internal correlation IDs / free-form text (``request_id``, ``message``) that
-# the external surface has no business seeing.
-_STRICT_PROVIDER_METADATA_KEPT_FIELDS: frozenset[str] = frozenset({"status_code", "retry_after_seconds"})
-
-
-def _redact_provider_metadata_for_strict(metadata_payload: dict[str, Any]) -> dict[str, Any] | None:
-    """Project a ``ProviderErrorMetadata`` payload through STRICT's curated subset.
-
-    Keeps only the fields in :data:`_STRICT_PROVIDER_METADATA_KEPT_FIELDS`
-    (``status_code`` / ``retry_after_seconds``). Returns ``None`` when no curated
-    field is present, so the caller can omit the key entirely rather than emit
-    an empty dict on the wire.
+    The walk a traceback makes, where :func:`iter_cause_chain` follows ``__cause__`` alone: an explicit cause
+    (``raise ... from``) is followed, else the exception being handled when it was raised, ``__context__``, unless the
+    raise suppressed it (``from None``). It is for a reader that must account for everything a traceback would print
+    of a failure, such as a log record naming the chain's classes in place of the traceback, or a classifier looking
+    for a transport failure anywhere below the error it received. Cycle-guarded like :func:`iter_cause_chain`, since it
+    runs on the error path.
     """
-    curated = {key: value for key, value in metadata_payload.items() if key in _STRICT_PROVIDER_METADATA_KEPT_FIELDS}
-    return curated or None
+    node: BaseException | None = exc
+    seen: set[int] = set()
+    while node is not None and id(node) not in seen:
+        seen.add(id(node))
+        yield node
+        if node.__cause__ is not None:
+            node = node.__cause__
+        elif node.__suppress_context__:
+            node = None
+        else:
+            node = node.__context__
 
 
-# Fields already mapped into RFC 7807 standard slots (``detail`` / ``title`` /
-# ``type``) by ``to_problem_document`` — must NOT be echoed as extension
-# members on the returned envelope.
-_RFC7807_MAPPED_FIELDS: frozenset[str] = frozenset({"message", "title", "type_uri"})
+def iter_pipelex_cause_chain(exc: BaseException) -> Iterator["PipelexError"]:
+    """Yield ``exc`` and each Pipelex error below it along its ``__cause__`` chain, stopping at the first that is not one.
 
-# Fields ``to_problem_document`` must not surface as RFC 7807 extension members:
-# the standard-slot mappings plus ``caller_facing_message``, which is internal
-# redaction plumbing carried on the serialized report, not consumer-facing
-# classification.
-_PROBLEM_DOCUMENT_OMITTED_FIELDS: frozenset[str] = _RFC7807_MAPPED_FIELDS | frozenset({"caller_facing_message"})
-
-
-class DisclosureMode(StrEnum):
-    """How much detail to include when serializing an ``ErrorReport`` for external surfaces.
-
-    - ``VERBOSE``: all classification fields plus the original ``message``. Use for
-      internal-trust boundaries (webhook payloads, internal RPCs) where the receiver
-      decides what to expose further downstream. ``from_dict(to_dict(report, VERBOSE))``
-      reconstructs the original report exactly.
-
-    - ``STRICT``: a lossy projection for untrusted external surfaces.
-      ``provider`` / ``model`` are dropped unconditionally — provider/model
-      attribution never belongs on an external surface. ``provider_metadata`` is
-      projected through a curated subset: only ``status_code`` and
-      ``retry_after_seconds`` survive (actionable HTTP client hints, not provider
-      attribution). The ``message`` is then projected by *provenance*:
-
-      - A report flagged :attr:`ErrorReport.caller_facing_message` keeps its
-        ``message`` and ``user_action``. The flag is set by error classes whose
-        message is genuinely caller-facing copy — text describing the *caller's
-        own* input, e.g. ``MthdsParserError`` (a ``.mthds`` syntax error)
-        or ``ValidateBundleError`` (a failed bundle validation) — or, for a
-        class raised both for the caller's faults and for others, by the raise
-        site that knows, through :meth:`PipelexError.as_caller_fault`.
-      - Every other report has its ``message`` replaced with a generic
-        placeholder and its ``user_action`` dropped, keeping only the stable
-        identifiers (``error_type``, ``error_domain``, ``error_category``,
-        ``retryable``, ``title``, ``type_uri``).
-
-      ``from_dict(to_dict(report, STRICT))`` does NOT reconstruct the original —
-      STRICT is lossy. Beyond the redacted message and dropped fields, a STRICT
-      payload that carries ``provider_metadata`` cannot be rehydrated at all:
-      the curated dict lacks the ``provider`` / ``sdk_exception_type`` fields
-      required by :class:`pipelex.cogt.inference.error_classification.ProviderErrorMetadata`,
-      so :meth:`ErrorReport.from_dict` raises :class:`pydantic.ValidationError`.
-      Consumers of a STRICT payload must read the dict directly (e.g. via
-      :meth:`ErrorReport.to_problem_document`) rather than rebuilding an
-      ``ErrorReport`` through ``from_dict``. Use VERBOSE on any surface that
-      needs round-trip semantics (webhook payloads, internal RPCs).
-
-      STRICT keys the ``message`` decision on the *provenance of the message*,
-      not on ``error_domain``: ``error_domain`` is inherited up the ``__cause__``
-      chain, so a domain-less wrapper raised ``from`` an ``INPUT`` cause is
-      classified ``INPUT`` while still carrying its own internal ``message`` —
-      which STRICT must redact. ``caller_facing_message`` is not inherited, so it
-      tracks the wrapper's own message correctly. STRICT is a
-      *classification-projection*, **not a path-leak shield**: if a genuinely
-      caller-facing ``message`` could surface a server-resolved path or secret,
-      fix the upstream message — don't expand STRICT mode's scope.
-
-      The curated ``provider_metadata`` subset, in contrast, IS inherited up the
-      ``__cause__`` chain via :meth:`PipelexError._enrich_error_report_from_cause`
-      and is preserved on both STRICT branches. A wrapper error (e.g.
-      ``PipelexUnexpectedError``) raised ``from`` a categorized ``CogtError``
-      therefore surfaces the cause's ``status_code`` / ``retry_after_seconds`` on
-      the STRICT envelope, even though the wrapper itself advertises no provider
-      relationship. This is deliberate, by the same reasoning as the previous
-      paragraph: the curated fields are HTTP client hints (status mapping,
-      ``Retry-After`` header), not provider attribution, and STRICT does not
-      hide internal failure topology.
+    A foreign exception raised from an earlier failure is a new failure, raised by code of its own, so nothing below it
+    belongs to the error above it: neither a code, a fact, a location, an item nor a piece of advice. Every walk that
+    reads an error's chain for its problem reads it through this one, over the cycle-guarded :func:`iter_cause_chain`.
     """
-
-    VERBOSE = "verbose"
-    STRICT = "strict"
+    for node in iter_cause_chain(exc):
+        if not isinstance(node, PipelexError):
+            return
+        yield node
 
 
 class ErrorDomain(StrEnum):
-    """Classifies where an error originates, so consumers can route it.
+    """The three-way reading of who acts that the CLIs' error output and the usage statistics still carry.
 
     - INPUT: the caller can fix it (bad .mthds, wrong args, malformed JSON).
     - CONFIG: an environment or configuration change is needed.
     - RUNTIME: a failure that occurred during execution.
+
+    The problem document carries the code's own domain, from the MTHDS core's closed list; this reading is derived
+    from it through :meth:`from_problem_domain` for the surfaces that have not moved to it.
     """
 
     INPUT = "input"
     CONFIG = "config"
     RUNTIME = "runtime"
+
+    @classmethod
+    def from_problem_domain(cls, problem_domain: ProblemDomain) -> "ErrorDomain":
+        """The report domain of a code's registry domain.
+
+        The caller's input and the method the caller sent are both the caller's to change, so both read
+        ``INPUT``; the account's owner and whoever runs the runtime act outside the request, so both read
+        ``CONFIG``; and ``runtime`` stays ``RUNTIME``.
+        """
+        match problem_domain:
+            case ProblemDomain.INPUT | ProblemDomain.METHOD:
+                return cls.INPUT
+            case ProblemDomain.ACCOUNT | ProblemDomain.OPERATOR:
+                return cls.CONFIG
+            case ProblemDomain.RUNTIME:
+                return cls.RUNTIME
 
     @property
     def is_input(self) -> bool:
@@ -207,52 +141,12 @@ class ErrorDomain(StrEnum):
                 return False
 
 
-def error_domain_to_http_status(error_domain: ErrorDomain | str | None) -> int:
-    """Map an error domain to an HTTP status code.
-
-    Domain-level building block for downstream HTTP APIs that render an
-    :class:`ErrorReport` as a response. When you have a full report, prefer
-    :attr:`ErrorReport.http_status` — it layers the provider 429 (rate-limit)
-    passthrough on top of this mapping. The library itself stays HTTP-agnostic —
-    no web-framework import lives here, only the mapping table.
-
-    Accepts a raw ``str`` because ``ErrorReport.error_domain`` is serialized as
-    one. A value this version does not recognize (e.g. a report serialized by a
-    newer Pipelex) is treated as unclassified rather than crashing rendering.
-
-    - ``INPUT`` -> 422: the caller sent something it can fix (bad input).
-    - ``CONFIG`` / ``RUNTIME`` -> 500: a server-side problem.
-    - unknown / ``None`` -> 500: unclassified, treated as a server-side problem.
-    """
-    if isinstance(error_domain, str):
-        try:
-            error_domain = ErrorDomain(error_domain)
-        except ValueError:
-            error_domain = None
-    match error_domain:
-        case ErrorDomain.INPUT:
-            return 422
-        case ErrorDomain.CONFIG | ErrorDomain.RUNTIME:
-            return 500
-        case None:
-            return 500
-
-
 def error_domain_is_input(error_domain: ErrorDomain | str | None) -> bool:
     """True when ``error_domain`` is the caller-fixable ``INPUT`` domain.
 
-    The serialized-form counterpart to :attr:`ErrorDomain.is_input`, mirroring
-    :func:`error_domain_to_http_status`: it accepts the raw ``str`` / ``None``
-    shape that :attr:`ErrorReport.error_domain` carries (and the value pulled out
-    of a serialized problem-document dict), so HTTP consumers can branch on
-    "is this the caller's mistake?" without re-implementing the coercion. Holds
-    a single source of truth — it delegates the per-value decision to
-    :attr:`ErrorDomain.is_input`.
-
-    ``None`` or an unrecognized string (e.g. a report serialized by a newer
-    Pipelex) is treated as non-input — the conservative default those consumers
-    want, matching :func:`error_domain_to_http_status` which maps the same cases
-    to a server-side 500.
+    The serialized-form counterpart to :attr:`ErrorDomain.is_input`: it accepts the raw ``str`` / ``None`` shape a
+    CLI's JSON envelope carries, so a consumer can branch on "is this the caller's mistake?" without re-implementing
+    the coercion. ``None`` or an unrecognized string is treated as non-input, the conservative default.
     """
     if error_domain is None:
         return False
@@ -289,9 +183,10 @@ class ValidationErrorCategory(StrEnum):
 
 
 class ValidationErrorItem(BaseModel):
-    """One structured bundle-validation error, projected onto the error wire.
+    """One structured bundle-validation error, as the validation verdicts carry it.
 
-    The typed wire item carried by :attr:`ErrorReport.validation_errors`. Its
+    The typed item of an invalid verdict's ``validation_errors``; the problem document of a refusal carries each as an
+    ``errors`` item instead (``pipelex.pipeline.validation_errors.problem_item_of``). Its
     fields are the *union* across the three ``ValidateBundleError`` error-data
     models (``PipelexBundleBlueprintValidationErrorData``, ``PipeFactoryErrorData``,
     ``PipesAndConceptValidationErrorData``); a given item only populates the
@@ -299,20 +194,19 @@ class ValidationErrorItem(BaseModel):
     ``exclude_none`` wire projection.
 
     The error channel is built exclusively by
-    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which both the agent
-    CLI (``extract_validation_errors``) and the API path
-    (``ValidateBundleError.to_error_report``) call — so the CLI's structured
-    output and the API's 422 ``validation_errors`` can never drift. The same
+    ``pipelex.pipeline.validation_errors.build_validation_error_items``, which the agent
+    CLI's problem and the API's invalid verdict both reach through ``ValidateBundleError.problem_items``,
+    and a validator's invalid arm through ``ValidateBundleError.validation_error_items`` — so the CLI's
+    structured output and the API's invalid verdict can never drift. The same
     item type also carries the report's advisory ``warnings``, built by
     ``pipelex.pipeline.advisory_warnings``: a warning is the same shape of
     diagnostic, differing only in that it does not make the verdict invalid.
 
     ``source`` is the declaring file path (CLI) or the per-content source the API
     threads onto the in-memory load path — it hands a consumer the owning file
-    for cross-file diagnostics. Lives here, alongside :class:`ErrorReport`,
-    rather than next to the source error-data models because ``ErrorReport``
-    references it as a typed field and ``base_exceptions`` must not import the
-    ``pipelex.core`` error modules (which import back into this module).
+    for cross-file diagnostics. Lives here rather than next to the source error-data
+    models because ``base_exceptions`` must not import the ``pipelex.core`` error
+    modules (which import back into this module).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -352,473 +246,659 @@ class ValidationErrorItem(BaseModel):
     # (a defined name, a Table, a cell, a shape, a tag). Optional and additive, like ``declared_concepts``.
     template_file: str | None = None
     template_location: str | None = None
+    # The identifier locator, carried by an ``invalid_pipe_code_syntax`` item: the name that breaks the naming rules, as
+    # the method writes it, a declaration key or the ``main_pipe`` value, which ``field_path`` (``main_pipe``) tells
+    # apart. Optional and additive, like ``declared_concepts``.
+    identifier_name: str | None = None
+    # The hint locator, carried by a hint lint item: the hint key the finding is about, elided as its message quotes it,
+    # which its problem item names as the code's ``hint`` parameter. Optional and additive, like ``declared_concepts``.
+    hint_key: str | None = None
+    # The parameters of its problem item's code the stage that found it knows about this one item, by the registry's
+    # names, beside those its locators give: the facts a raise site gave its refusal (the concept a step declares and
+    # those it expects), and on an item no ``error_type`` classifies, which takes the code of the refusal it rides,
+    # those of this one fault where the refusal's own describe only its first. Optional and additive, like
+    # ``declared_concepts``.
+    params: dict[str, Any] | None = None
     # Structured, deterministic fix for this error, when the fix planner derived one from the
     # enriched error data. Optional and additive: non-fixable items serialize unchanged under
     # ``exclude_none``.
     suggested_fix: SuggestedFix | None = None
 
 
-class MigrationErrorBlock(BaseModel):
-    """A pending configuration migration, reported alongside the error it explains.
+_FALLBACK_ERROR_CODE: ErrorCode = CoreCode.RUNTIME_UNEXPECTED
+"""The code of an error whose cause chain names none: the catch-all, ``runtime.unexpected``, step ``report``."""
 
-    The structured half of the answer to *why does my configuration not load* — carried by
-    :attr:`ErrorReport.migration`, and present only when a scan of this machine's configuration
-    directories found something to say. **Consumers branch on its presence**, never on the
-    message text: an absent block means the failure is not staleness.
 
-    ``plans`` is the same shape ``pipelex-agent migrate --dry-run --format json`` emits under its
-    own ``plans`` key, deliberately — an agent that reads one has already parsed the other, and a
-    projection of its own here would be a second contract to keep in step with the first.
+class ProblemFacts(NamedTuple):
+    """The facts an error knows that its problem's operator diagnostics and retry delay carry.
 
-    Declared in this module rather than beside the migration engine for the same reason
-    :class:`ValidationErrorItem` is: :class:`ErrorReport` references it as a typed field, and
-    ``base_exceptions`` must not import the migration package's error modules, which import back
-    into this one. ``pipelex.migration.plan`` holds itself to stdlib + pydantic + low-level
-    siblings precisely so this import stays legal.
+    An error contributes the facts it holds (:meth:`PipelexError.problem_facts`), and a problem takes, for each, the
+    one nearest the error it is built from along the cause chain, so that a wrapper that knows a fact overrides its
+    cause and a wrapper that does not inherits it.
 
-    > **No value read from a user's file is ever rendered** here either. The plans carry paths,
-    > operation kinds and ledger-supplied values, and nothing else — the same mechanical rule the
-    > migration report and the CLI output obey, on the third of the three channels it names.
+    Attributes:
+        model: The model a failed inference call addressed.
+        provider: What the provider said about the call.
+        migration: A pending configuration migration that explains the failure.
+        retry_after: The delay the provider asked for before a retry, in seconds.
     """
 
-    model_config = ConfigDict(frozen=True, extra="forbid")
-
-    remedy: str
-    """The command that applies whatever can be applied without a decision."""
-
-    would_write: bool
-    """Whether running ``remedy`` would actually rewrite any of these files.
-
-    The block's *presence* says the migration history has something to report about this machine.
-    It does not say the remedy repairs it, and this field is what separates the two. A block whose
-    ``would_write`` is False carries a diagnosis and nothing to apply — a path no entry explains, a
-    file that could not be read, an entry blocked before any of its operations landed — so naming
-    ``remedy`` there would send a reader to a run that visits the files, writes nothing, and leaves
-    the same refusal standing. The dry run is what carries the answer on that side.
-
-    Independent of :attr:`needs_attention`, and the pair is never both False: a file with nothing to
-    write and nothing for a person is clean, and clean files are not in ``plans``."""
-
-    needs_attention: bool
-    """Whether something here is a person's to resolve rather than the tool's — a blocked file, a
-    blocked entry, or a path no ledger entry explains. When this is False, running ``remedy`` is
-    expected to be enough."""
-
-    plans: list[MigrationPlan]
-    """One per configuration file the scan found something in. Files with nothing to say are left
-    out: unlike the ``migrate`` commands' report, which answers *what did the walk visit*, this
-    block answers *what is wrong with this machine's configuration*."""
-
-
-class ErrorReport(BaseModel):
-    """Structured error report — single source of truth for all error serialization.
-
-    Used by CLI JSON output, agent output, and Temporal error details.
-
-    ``title`` and ``type_uri`` are the stable identity pair surfaced to consumers
-    (CLI, API, docs). Every ``PipelexError`` populates them automatically via
-    :meth:`PipelexError.title` / :meth:`PipelexError.type_uri`; consumers never
-    humanize or kebab-case a class name themselves.
-
-    Frozen: wrappers must rebuild via :meth:`model_copy` rather than mutate, so
-    a cause-enrichment pass cannot accidentally overwrite an outer wrapper's
-    identity in-place.
-    """
-
-    model_config = ConfigDict(frozen=True, extra="forbid", arbitrary_types_allowed=True)
-
-    error_type: str
-    message: str
-    title: str
-    type_uri: str
-    error_category: str | None = None
-    error_domain: str | None = None
-    retryable: bool | None = None
-    user_action: UserAction | None = None
     model: str | None = None
-    provider: str | None = None
-    provider_metadata: ProviderErrorMetadata | None = None
-    # True when ``message`` was authored as caller-facing copy — set at report
-    # construction from ``PipelexError._authors_caller_facing_message``, or from
-    # the raise site's :meth:`PipelexError.as_caller_fault`. STRICT
-    # disclosure keys its ``message`` passthrough on this flag (see
-    # :class:`DisclosureMode`). Defaults to False so an unflagged report — and
-    # any payload that predates the field — is redacted, never leaked.
-    caller_facing_message: bool = False
-    # Structured per-error diagnostics on a bundle-validation failure. Populated
-    # only by ``ValidateBundleError.to_error_report`` (None on every other
-    # report), so the 422 problem document carries the same machine-mappable
-    # items the agent CLI emits. Surfaced under STRICT disclosure (see
-    # ``_STRICT_KEPT_FIELDS``): these describe the caller's own submitted bundle,
-    # not server internals.
-    validation_errors: list[ValidationErrorItem] | None = None
-    # A pending configuration migration that explains this failure. Populated only by
-    # ``PipelexConfigError`` reports whose raiser ran a scan (see
-    # ``pipelex.core.validation.report_validation_error``); None on every other report, so a
-    # consumer branching on its presence is asking exactly "is my configuration stale?".
-    # Deliberately outside ``_STRICT_KEPT_FIELDS`` — it describes the host's own configuration
-    # directories, not the caller's submission.
+    provider: ProviderDiagnostics | None = None
     migration: MigrationErrorBlock | None = None
-
-    def to_dict(self, *, disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE) -> dict[str, Any]:
-        """Return a dict with only non-None fields, projected through ``disclosure_mode``.
-
-        ``VERBOSE`` is the strict inverse of :meth:`from_dict` — every populated
-        field round-trips. ``STRICT`` is a lossy projection (see
-        :class:`DisclosureMode`): ``provider`` / ``model`` are always dropped,
-        ``provider_metadata`` is projected through the curated subset (just
-        ``status_code`` and ``retry_after_seconds``), and unless the report is
-        flagged :attr:`caller_facing_message` its ``message`` is replaced with a
-        generic placeholder and ``user_action`` is dropped, leaving only the
-        stable identifiers plus the curated ``provider_metadata`` slice.
-        """
-        payload = self.model_dump(exclude_none=True)
-        if self.migration is not None:
-            # JSON mode for this field alone. ``MigrationPlan`` carries real ``Path`` values, and
-            # a payload holding one is not serializable by ``json.dumps`` — which is what the
-            # webhook delivery path hands this dict to. Dumping the whole report in JSON mode
-            # instead would re-serialize every other field too, so the narrow fix is the safe one.
-            # ``from_dict`` still round-trips: pydantic accepts a string for a ``Path`` field.
-            payload["migration"] = self.migration.model_dump(mode="json")
-        # ``caller_facing_message`` is redaction plumbing, not consumer-facing
-        # classification: emit it only when set, so the common (non-caller-facing)
-        # report serializes exactly as a report without the field would.
-        # ``from_dict`` defaults it back to False when absent, so the round-trip
-        # still holds.
-        if not self.caller_facing_message:
-            payload.pop("caller_facing_message", None)
-        match disclosure_mode:
-            case DisclosureMode.VERBOSE:
-                return payload
-            case DisclosureMode.STRICT:
-                # Both STRICT branches start from the same allowlist — single
-                # source of truth, so adding a new top-level ``ErrorReport``
-                # field is one decision (include / exclude), not two.
-                projected: dict[str, Any] = {key: payload[key] for key in _STRICT_KEPT_FIELDS if key in payload}
-                if self.caller_facing_message:
-                    # The error class that authored this message designed it as
-                    # caller-facing copy — reflect it (and ``user_action``) back
-                    # on top of the shared allowlist.
-                    projected["message"] = payload["message"]
-                    if "user_action" in payload:
-                        projected["user_action"] = payload["user_action"]
-                else:
-                    projected["message"] = INTERNAL_ERROR_PLACEHOLDER
-                # Reattach a curated ``provider_metadata`` slice — even on the
-                # fully-redacted branch, ``status_code`` and ``retry_after_seconds``
-                # are actionable client hints (HTTP status mapping, ``Retry-After``
-                # header) that the HTTP adapter needs to emit a useful response.
-                if "provider_metadata" in payload:
-                    curated_metadata = _redact_provider_metadata_for_strict(payload["provider_metadata"])
-                    if curated_metadata is not None:
-                        projected["provider_metadata"] = curated_metadata
-                return projected
-
-    def to_problem_document(
-        self,
-        *,
-        instance: str | None = None,
-        request_id: str | None = None,
-        disclosure_mode: DisclosureMode = DisclosureMode.VERBOSE,
-    ) -> dict[str, Any]:
-        """Render this report as an RFC 7807 ``application/problem+json`` envelope.
-
-        The runner stays HTTP-agnostic — this returns a plain ``dict`` that
-        downstream HTTP adapters serialize as JSON. The standard 7807 slots are
-        sourced from the report:
-
-        - ``type`` from :attr:`type_uri`
-        - ``title`` from :attr:`title`
-        - ``status`` from :attr:`http_status`
-        - ``detail`` from :attr:`message` (subject to ``disclosure_mode`` redaction)
-        - ``instance`` from the ``instance`` arg (URN provided by the caller)
-
-        Pipelex-native classification fields ride as extension members
-        (``error_type`` / ``error_domain`` / ``error_category`` / ``retryable`` /
-        ``user_action`` / ``model`` / ``provider`` / ``provider_metadata``).
-        ``type_uri`` and ``title`` are mapped — not duplicated — so the returned
-        dict has exactly one ``title`` key. The ``caller_facing_message`` flag is
-        internal redaction plumbing and is never echoed onto the envelope. When
-        the caller supplies a ``request_id``, it rides as an extension member too.
-        """
-        payload = self.to_dict(disclosure_mode=disclosure_mode)
-        document: dict[str, Any] = {
-            "type": self.type_uri,
-            "title": self.title,
-            "status": self.http_status,
-            "detail": payload["message"],
-        }
-        if instance is not None:
-            document["instance"] = instance
-        if request_id is not None:
-            document["request_id"] = request_id
-        for key, value in payload.items():
-            if key in _PROBLEM_DOCUMENT_OMITTED_FIELDS:
-                continue
-            document[key] = value
-        return document
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "ErrorReport":
-        """Rebuild an ``ErrorReport`` from a :meth:`to_dict` payload — the strict inverse of :meth:`to_dict` in ``VERBOSE`` mode.
-
-        Used to recover a report that crossed a serialization boundary (e.g. a
-        Temporal ``ApplicationError.details`` payload) so it re-enters the
-        ``to_error_report()`` world. The nested ``UserAction`` /
-        ``ProviderErrorMetadata`` models round-trip through their dict form.
-
-        Strict: ``ErrorReport`` is ``extra="forbid"``, so a malformed dict
-        raises :class:`pydantic.ValidationError`. Within a single deploy the
-        writer (activity bridge) and reader (submitter) share the schema, so a
-        validation failure is an internal contract bug. ``recover_error_report``
-        catches it to keep failure-webhook delivery intact; any other caller
-        should treat it as a bug to fix.
-        """
-        return cls.model_validate(data)
-
-    def user_action_detail(self) -> str | None:
-        """Return the free-form advice text on ``user_action``, or ``None`` when absent."""
-        return self.user_action.detail if self.user_action is not None else None
-
-    @property
-    def http_status(self) -> int:
-        """HTTP status code for this error, for downstream HTTP API adapters.
-
-        A provider 429 (rate limit) takes precedence so the API can surface a
-        ``Retry-After`` header from ``provider_metadata.retry_after_seconds``;
-        otherwise the status follows ``error_domain`` (see
-        :func:`error_domain_to_http_status`, which also tolerates an
-        ``error_domain`` string this version does not recognize — e.g. a report
-        serialized by a newer Pipelex — rather than crashing response rendering).
-        """
-        if self.provider_metadata is not None and self.provider_metadata.status_code == 429:
-            return 429
-        return error_domain_to_http_status(self.error_domain)
+    retry_after: float | None = None
 
 
-def _humanize_class_name(class_name: str) -> str:
-    """Derive a human-readable title from a ``PipelexError`` subclass name.
-
-    Strips a trailing ``Error`` (if present) and runs the remainder through
-    :func:`pipelex.tools.misc.string_utils.pascal_case_to_sentence`. Single-token
-    leaves (``CogtError`` -> ``Cogt``) read awkwardly and warrant a curated
-    :attr:`PipelexError._declared_title` override.
-    """
-    stem = class_name.removesuffix("Error") if class_name.endswith("Error") and class_name != "Error" else class_name
-    return pascal_case_to_sentence(stem)
+def _merged_provider(*, nearer: ProviderDiagnostics | None, farther: ProviderDiagnostics | None) -> ProviderDiagnostics | None:
+    """What two errors of one chain say about the provider, member by member, the nearer error's winning."""
+    if nearer is None or farther is None:
+        return nearer or farther
+    return ProviderDiagnostics.model_validate({**farther.model_dump(exclude_none=True), **nearer.model_dump(exclude_none=True)})
 
 
 class PipelexError(Exception):
-    error_domain: ErrorDomain | None = None
+    """The root of every error Pipelex raises, each carrying a registry code, and each becoming a problem document.
+
+    Every subclass declares ``error_code`` in its own class body, as :mod:`pipelex.errors.error_code_declaration`
+    describes: the code it raises, the set its raise sites choose from, that it takes its cause's code, or that it
+    is an abstract base. The code decides the problem's title, documentation page, domain, retry verdict, step and
+    sentences, so a class declares none of them; ``tests/unit/pipelex/errors/test_error_code_gate.py`` fails the build
+    on a subclass that declares no code, and ``docs/under-the-hood/error-model.md`` explains the model.
+
+    :meth:`to_problem` builds the error's problem document in the view of its reader. The error's own message is the
+    operator's diagnostics, never a caller's sentence: the caller reads the code's templates, rendered from the
+    parameters the raise site gives (:meth:`with_params`) or the class derives (:meth:`problem_params`).
+    """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
+    # Advice a local reader of the error can act on, which the human and agent CLIs print as a tip. It never reaches a
+    # problem document, whose step is the code's.
     user_action: UserAction | None = None
-    # Whether running the same request again could succeed, declared by a class whose every instance answers the
-    # same: ``False`` on a deterministic refusal of what the caller sent. ``None`` says nothing, and the report then
-    # takes the answer from the ``__cause__`` chain, or carries none. The ``CogtError`` family derives it from its
-    # ``error_category`` instead.
-    retryable: bool | None = None
 
-    # When declared *directly in a subclass body*, ``title()`` returns this
-    # verbatim instead of auto-deriving from the class name. Use to fix awkward
-    # auto-derives (e.g. ``CogtError`` -> ``Cogt``) or to publish a curated
-    # user-facing label. ``title()`` consults ``cls.__dict__`` so inheritance
-    # is bypassed — each class either declares its own title or auto-derives
-    # from its own name. That is why the curated ``"Pipelex error"`` value is
-    # set on ``PipelexError`` *itself* without leaking to bare subclasses.
-    _declared_title: ClassVar[str | None] = "Pipelex error"
-    # When declared *directly in a subclass body*, ``type_uri()`` returns this
-    # verbatim instead of appending the kebab-cased class name to the
-    # ``URLs.error_docs_base`` constant. Same inheritance-bypass semantics
-    # as ``_declared_title``.
-    _declared_type_uri: ClassVar[str | None] = None
-    # When True, ``ErrorReport``s built from this class keep their ``message``
-    # verbatim under STRICT disclosure (see :class:`DisclosureMode`). Set it on
-    # classes whose ``message`` is genuinely caller-facing copy — text describing
-    # the *caller's own* input (a ``.mthds`` syntax error, a failed bundle
-    # validation). It is consulted by plain attribute access, so it inherits
-    # normally — a subclass of a caller-facing error stays caller-facing.
-    # (Contrast ``_declared_title`` / ``_declared_type_uri``, which ``title()`` /
-    # ``type_uri()`` deliberately read via ``cls.__dict__`` to bypass inheritance.)
-    _authors_caller_facing_message: ClassVar[bool] = False
-    # The per-instance counterpart of ``_authors_caller_facing_message``, set only by
-    # :meth:`as_caller_fault`, for a class whose instances are not all the caller's fault.
-    _raised_as_caller_fault: bool = False
+    # The code the raise site chose with :meth:`with_error_code`, from the codes the class declares.
+    _chosen_error_code: ErrorCode | None = None
+    # The parameters the raise site gave with :meth:`with_params`.
+    _given_params: dict[str, Any] | None = None
+    # The items the raise site gave with :meth:`with_items`, one per fault of a refusal of several.
+    _given_items: list[ProblemItem] | None = None
+    # The class of destination a security refusal refused, stated by the raise site with
+    # :meth:`with_security_target_class`; the security event carries it and nothing else about the target.
+    _security_target_class: SecurityTargetClass | None = None
 
-    @classmethod
-    def title(cls) -> str:
-        """Return the human-readable title for this error class.
-
-        Used as the RFC 7807 ``title`` field on every ``ErrorReport``. Auto-derived
-        from the class name unless a subclass sets :attr:`_declared_title` directly
-        in its own body. Inheritance is bypassed so a parent's curated title does
-        not silently capture every subclass — each class either declares its own
-        title or auto-derives.
-        """
-        declared = cls.__dict__.get("_declared_title")
-        if isinstance(declared, str):
-            return declared
-        return _humanize_class_name(cls.__name__)
-
-    @classmethod
-    def type_uri(cls) -> str:
-        """Return the per-class documentation URI for this error class.
-
-        Used as the RFC 7807 ``type`` field on every ``ErrorReport``. Auto-derived
-        as ``<URLs.error_docs_base>/<kebab-class-name>/`` unless a subclass sets
-        :attr:`_declared_type_uri` directly in its own body. The trailing slash
-        matches the canonical form MkDocs (with the default
-        ``use_directory_urls: true``) and mike's ``/latest/`` alias serve at —
-        clients dereferencing the URI hit the docs page directly without a 301
-        round-trip.
-
-        Pure function: the base URI is the :data:`pipelex.urls.URLs.error_docs_base`
-        constant, so this is safe to call before Pipelex bootstrap and inside
-        Temporal workflow code without any determinism hazard.
-
-        Footgun: ``pascal_case_to_kebab`` is case-folding — acronym-casing
-        variants of an existing class name collide (``LLMError`` and ``LlmError``
-        both kebab to ``llm-error``). ``test_pipelex_error_type_uri_uniqueness``
-        catches this at CI time, and ``generate_error_pages`` raises loudly at
-        docs-generation time. Pick one casing per acronym in the codebase.
-        """
-        declared = cls.__dict__.get("_declared_type_uri")
-        if isinstance(declared, str):
-            return declared
-        return f"{URLs.error_docs_base}/{pascal_case_to_kebab(cls.__name__)}/"
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        declaration = cls.__dict__.get("error_code")
+        if declaration is not None and not isinstance(declaration, (CoreCode, PipelexErrorCode, ErrorCodeSet, InheritsCause, AbstractError)):
+            msg = (
+                f"{cls.__qualname__}.error_code must be a CoreCode, a PipelexErrorCode, an ErrorCodeSet, an InheritsCause "
+                f"or ABSTRACT_ERROR, not {declaration!r}."
+            )
+            raise TypeError(msg)
 
     def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
-    def as_caller_fault(self, *, user_action: UserAction | None = None) -> Self:
-        """Classify this error, where it is raised, as a fault in the caller's own method or inputs.
+    def with_error_code(self, error_code: ErrorCode) -> Self:
+        """Choose, where this error is raised, which of its class's codes it carries.
 
-        Its report then carries the ``INPUT`` domain, so an HTTP surface answers 422, and a
-        caller-facing ``message``, which STRICT disclosure keeps (see :class:`DisclosureMode`): the
-        two facts a class declares with ``error_domain = ErrorDomain.INPUT`` and
-        ``_authors_caller_facing_message = True``. It serves a class raised both for the caller's
-        faults and for faults that are not the caller's, which therefore cannot declare them: the
-        raise site that knows says so there, for this one error. A plain wrapper raised from this
-        error inherits the ``INPUT`` domain through the cause chain, but never the caller-facing
-        flag, since its own message is not this one.
-
-        The raise site vouches for the message: it names only the caller's own method and data
-        (pipe codes, concept codes, variable names, the values the caller sent), never a server
-        path, a secret, or the text of an exception that is not a Pipelex error.
+        A class whose raise sites need different codes declares them as an :class:`ErrorCodeSet`, or as the
+        codes an :class:`InheritsCause` class's raise site may choose, and the raise site that knows which
+        applies chooses it here: ``raise SomeError(msg).with_error_code(CoreCode.MODEL_UNAVAILABLE)``. A chosen
+        code stops the cause walk at this error, as a declared code does.
 
         Args:
-            user_action: The next step for the caller, when the raise site can name one.
+            error_code: One of the codes the class declares.
 
         Returns:
-            This error, so that the raise site reads ``raise SomeError(msg).as_caller_fault()``.
+            This error, so that the raise site reads ``raise SomeError(msg).with_error_code(code)``.
+
+        Raises:
+            ValueError: When the class does not declare the code, which is a fault of the raise site; the gate
+                test checks every raise site that chooses a code on the class it constructs.
         """
-        self.error_domain = ErrorDomain.INPUT
-        self._raised_as_caller_fault = True
-        if user_action is not None:
-            self.user_action = user_action
+        declared_codes = declared_error_codes(type(self).error_code)
+        if error_code not in declared_codes:
+            declared = describe_error_code_declaration(type(self).error_code)
+            msg = f"{type(self).__name__} does not declare the code '{error_code}': its declaration is {declared}."
+            raise ValueError(msg)
+        self._chosen_error_code = error_code
         return self
 
-    def to_error_report(self) -> ErrorReport:
-        """Return a structured error report, enriched from the ``__cause__`` chain.
+    def with_params(self, **params: Any) -> Self:
+        """Give, where this error is raised, the parameters its code's sentences are rendered from.
 
-        Wrapper exceptions (``PipeRunError`` -> ``PipeRouterError`` ->
-        ``PipelineExecutionError``) carry no ``error_category`` / ``retryable`` /
-        ``model`` / ``provider`` of their own. This surfaces those classification
-        fields from the underlying exception (typically a ``CogtError``) so they
-        survive every wrapping layer up to the CLI / HTTP boundary.
+        A raise site gives the facts its code declares, by the names the registry gives them, such as
+        ``raise PipeRunError(...).with_error_code(CoreCode.PIPE_CONDITION_UNMATCHED).with_params(pipe=self.code)``. A
+        parameter the code does not declare, or one of the wrong type, is dropped and logged when the problem is
+        built, and a parameter given here overrides one the class derives.
 
-        ``title`` / ``type_uri`` are *wrapper-wins*: enrichment never overwrites
-        them with the cause's identity — the outermost wrapper's class is what
-        the consumer sees.
+        Args:
+            **params: The parameters, by name.
 
-        Subclasses override to include additional fields (error_category, model,
-        etc.); an override must end with ``self._enrich_error_report_from_cause(report)``
-        so the cause-chain enrichment stays uniform across the hierarchy.
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_params(name=value)``.
         """
-        report = ErrorReport(
-            error_type=type(self).__name__,
-            message=self.message,
-            title=type(self).title(),
-            type_uri=type(self).type_uri(),
-            error_domain=self.error_domain,
-            retryable=self.retryable,
-            user_action=self.user_action,
-            caller_facing_message=self._authors_caller_facing_message or self._raised_as_caller_fault,
+        self._given_params = {**(self._given_params or {}), **params}
+        return self
+
+    def with_items(self, *, items: list[ProblemItem]) -> Self:
+        """Give, where this error is raised, one item per fault when it refuses several at once.
+
+        A raise site that finds several faults of one kind reports them all, each item rendered from its own
+        parameters with :func:`pipelex.errors.problem.make_problem_item`, while the error's own code and parameters
+        describe the first. A subclass that derives its items overrides :meth:`problem_items` instead.
+
+        Args:
+            items: The items, one per fault.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_items(items=items)``.
+        """
+        self._given_items = list(items)
+        return self
+
+    def own_advice(self) -> UserAction | None:
+        """The advice this error gives by itself, before its causes': its ``user_action``.
+
+        A class whose advice follows what its raise site chose, such as a configuration refusal's code, overrides it.
+        """
+        return self.user_action
+
+    def advised_action(self) -> UserAction | None:
+        """The advice nearest this error along its cause chain, which a local CLI prints as a tip; never part of a problem."""
+        for node in iter_pipelex_cause_chain(self):
+            advice = node.own_advice()
+            if advice is not None:
+                return advice
+        return None
+
+    @property
+    def given_params(self) -> dict[str, Any]:
+        """The parameters the raise site gave with :meth:`with_params`."""
+        return dict(self._given_params or {})
+
+    def with_security_target_class(self, target_class: SecurityTargetClass | None) -> Self:
+        """State, where a security refusal is decided, which class of destination it refused.
+
+        The security event (:mod:`pipelex.errors.security_event`) names that class, a loopback or a private address,
+        a cloud metadata endpoint, a scheme the runtime does not read, and never the destination itself. Only the
+        raise site knows it: the SSRF guard has the address in hand, the read scope the reason. ``None`` leaves the
+        class unknown, for a site that refused something it cannot classify, such as a name that resolved to nothing.
+
+        Args:
+            target_class: The class of destination refused, or ``None`` when the site cannot tell.
+
+        Returns:
+            This error, so that the raise site reads ``raise SomeError(msg).with_security_target_class(target_class)``.
+        """
+        self._security_target_class = target_class
+        return self
+
+    @property
+    def security_target_class(self) -> SecurityTargetClass | None:
+        """The class of destination this security refusal refused, ``None`` when nobody stated it."""
+        return self._security_target_class
+
+    @property
+    def own_error_code(self) -> ErrorCode | None:
+        """The code this error carries by itself, ``None`` when it takes its cause's.
+
+        The code its raise site chose; else its class's code, or the default of its class's set; else ``None``
+        for a class that takes its cause's code or an abstract base.
+        """
+        if self._chosen_error_code is not None:
+            return self._chosen_error_code
+        declaration = type(self).error_code
+        if isinstance(declaration, ErrorCodeSet):
+            return declaration.default
+        if isinstance(declaration, (InheritsCause, AbstractError)):
+            return None
+        return declaration
+
+    @property
+    def implied_error_code(self) -> ErrorCode | None:
+        """The code this error implies without carrying it, ``None`` for an error that implies none.
+
+        An inference error built by hand with a category and no code implies its category's code
+        (``CogtError``). :meth:`resolve_error_code` reads it in the same walk as the codes the chain carries: a code
+        any error along the chain carries by itself wins over it, and the deepest implied code wins over a wrapper's
+        fallback.
+        """
+        return None
+
+    def resolve_error_code(self) -> ErrorCode:
+        """The registry code this error reports, resolved along its ``__cause__`` chain.
+
+        The walk starts at this error and stops at the first error that carries a code by itself
+        (:attr:`own_error_code`). It descends through every error that takes its cause's code, and through an
+        abstract base raised by mistake, and stops at a cause that is not a Pipelex error. When no error along
+        the way carries a code, the error reports the code the deepest error implies (:attr:`implied_error_code`),
+        else the fallback of the deepest error that takes its cause's code, and ``runtime.unexpected`` when none
+        names one. The walk is the one cycle-guarded ``iter_cause_chain``, which no error's code walks again.
+        """
+        implied_code: ErrorCode | None = None
+        fallback: ErrorCode | None = None
+        for node in iter_pipelex_cause_chain(self):
+            own_code = node.own_error_code
+            if own_code is not None:
+                return own_code
+            implied_code = node.implied_error_code or implied_code
+            declaration = type(node).error_code
+            if isinstance(declaration, InheritsCause):
+                fallback = declaration.fallback
+        return implied_code or fallback or _FALLBACK_ERROR_CODE
+
+    def resolve_domain(self) -> ProblemDomain:
+        """Who must act on this error: the domain the registry gives the code it resolves to."""
+        return error_code_spec(self.resolve_error_code()).domain
+
+    def code_carrier(self) -> "PipelexError":
+        """The error along the cause chain whose code this one reports, which gives the problem its facts about the fault.
+
+        The first error that carries a code by itself, as :meth:`resolve_error_code` walks; else the deepest error that
+        implies one; else this error, whose code is a fallback.
+        """
+        implied_node: PipelexError | None = None
+        for node in iter_pipelex_cause_chain(self):
+            if node.own_error_code is not None:
+                return node
+            if node.implied_error_code is not None:
+                implied_node = node
+        return implied_node or self
+
+    def problem_params(self) -> dict[str, Any]:
+        """The facts this error holds that its codes declare as parameters, by the registry's names.
+
+        A subclass that holds such facts overrides it. A fact the resolved code does not declare is left out
+        silently, since a class's codes declare different parameters, and a parameter its raise site gave
+        (:meth:`with_params`) overrides a fact of the same name.
+        """
+        return {}
+
+    def chain_items(self) -> list[ProblemItem] | None:
+        """The items of the first error along the cause chain that refuses several faults at once."""
+        for node in iter_pipelex_cause_chain(self):
+            items = node.problem_items()
+            if items:
+                return items
+        return None
+
+    def chain_location(self, *, carrier: "PipelexError") -> ProblemLocation | None:
+        """The location this error and the errors below it know, down to ``carrier``, the nearest the fault winning.
+
+        A wrapper that takes its cause's code often knows where its cause was met, the pipe, the field or the file, which
+        the cause does not: each error's own location is merged over the ones above it, member by member, so a member
+        the error whose code the problem reports knows wins, and the wrappers fill the members it lacks.
+        """
+        location: ProblemLocation | None = None
+        for node in iter_pipelex_cause_chain(self):
+            node_location = node.problem_location()
+            if node_location is not None:
+                location = merge_locations(base=location, override=node_location)
+            if node is carrier:
+                break
+        return location
+
+    def problem_location(self) -> ProblemLocation | None:
+        """Where this error happened, when it knows; a subclass that holds a place overrides it."""
+        return None
+
+    def problem_items(self) -> list[ProblemItem] | None:
+        """One item per fault, for an error that refuses several at once: those its raise site gave with :meth:`with_items`.
+
+        A subclass that holds several faults of its own overrides it.
+        """
+        return list(self._given_items) if self._given_items else None
+
+    def recovered_problem(self) -> PipelexProblem | None:
+        """The problem this error carries from across a transport boundary, in the operator's view; ``None`` for any other error.
+
+        A host plugin's carrier of a problem a far worker packed overrides it, and is the only kind of error that does:
+        :meth:`to_problem` then reports that problem rather than one built from the carrier's class
+        (:func:`pipelex.errors.problem.recovered_problem_in_view`), and a located wrapper above the carrier reports it as
+        it is (``pipelex.pipe_run.located_failure``). Overriding :meth:`to_problem` for any other reason makes no carrier.
+        """
+        return None
+
+    def errors_above(self, *, carrier: "PipelexError") -> list["PipelexError"]:
+        """The errors from this one down to ``carrier``, ``carrier`` left out, this one first; empty when the chain never reaches it."""
+        errors: list[PipelexError] = []
+        for node in iter_pipelex_cause_chain(self):
+            if node is carrier:
+                return errors
+            errors.append(node)
+        return []
+
+    def problem_facts(self) -> ProblemFacts:
+        """The facts this error itself holds for its problem's diagnostics; a subclass that holds some overrides it."""
+        return ProblemFacts()
+
+    def chain_facts(self) -> ProblemFacts:
+        """For each fact, the one nearest this error along its cause chain, which ends at the first foreign exception.
+
+        The provider's answer is merged member by member, the nearest error's winning: a wrapper a worker attributed
+        to its backend names the provider, while the cause it wraps keeps what the provider answered.
+        """
+        model: str | None = None
+        provider: ProviderDiagnostics | None = None
+        migration: MigrationErrorBlock | None = None
+        retry_after: float | None = None
+        for node in iter_pipelex_cause_chain(self):
+            facts = node.problem_facts()
+            model = model or facts.model
+            provider = _merged_provider(nearer=provider, farther=facts.provider)
+            migration = migration or facts.migration
+            retry_after = retry_after if retry_after is not None else facts.retry_after
+        return ProblemFacts(model=model, provider=provider, migration=migration, retry_after=retry_after)
+
+    def _diagnostics(self, *, facts: ProblemFacts) -> ProblemDiagnostics:
+        """The operator's diagnostics of this error: its class, its message capped, its causes and its facts."""
+        causes: list[DiagnosticCause] = []
+        for node in iter_cause_chain(self):
+            if node is self:
+                continue
+            own_code = node.own_error_code if isinstance(node, PipelexError) else None
+            causes.append(DiagnosticCause(error_class=type(node).__name__, code=own_code))
+        span_context = pipelex_span_context_for_logs() or current_span_context_for_logs()
+        return ProblemDiagnostics(
+            error_class=type(self).__name__,
+            message=cap_problem_text(text=self.message),
+            causes=causes or None,
+            model=facts.model,
+            provider=facts.provider,
+            migration=facts.migration,
+            runtime_version=runtime_version(),
+            trace_id=trace.format_trace_id(span_context.trace_id) if span_context is not None else None,
+            span_id=trace.format_span_id(span_context.span_id) if span_context is not None else None,
         )
-        return self._enrich_error_report_from_cause(report)
 
-    def _enrich_error_report_from_cause(self, report: ErrorReport) -> ErrorReport:
-        """Fill the ``None`` classification fields of ``report`` from the ``__cause__`` chain.
+    def operator_diagnostics(self) -> ProblemDiagnostics | None:
+        """The diagnostics the operator's view of this error's problem carries (:meth:`to_problem`), without building it.
 
-        A wrapper keeps its own ``error_type``, ``message``, ``title``,
-        ``type_uri`` and ``caller_facing_message`` but inherits every
-        classification field it does not set itself — ``error_category``,
-        ``error_domain``, ``retryable``, ``user_action``, ``model``, ``provider``,
-        ``provider_metadata`` — from the underlying ``PipelexError`` that knows
-        them. ``caller_facing_message`` is pointedly NOT inherited: it records
-        the provenance of ``report.message``, which is always the wrapper's own
-        message, so a domain-less wrapper raised ``from`` an ``INPUT`` cause does
-        not pick up caller-facing status. ``to_error_report()`` overrides call
-        this so enrichment stays uniform.
+        A command refusing something under a code of its own reads the error it caught for these alone, so the
+        parameters the caught error's code requires, which no reader of that refusal is shown, are never asked of it.
         """
-        cause = self.__cause__
-        if not isinstance(cause, PipelexError):
-            return report
-        # Guard against a cyclic __cause__ chain: if self is reachable from cause, recursing
-        # into cause.to_error_report() would never terminate. Bail out with the enrichment
-        # gathered so far rather than raising a RecursionError from the error-reporting path.
-        if any(node is self for node in iter_cause_chain(cause)):
-            return report
-        cause_report = cause.to_error_report()
-        # Only the cause-merged classification fields are updated; the wrapper-wins
-        # fields (error_type, message, title, type_uri, caller_facing_message)
-        # stay untouched, so a future wrapper-wins field added to ErrorReport
-        # does not need to be re-listed here.
-        # Footgun: ``provider_metadata`` uses whole-object OR, and a Pydantic
-        # model instance is always truthy — a wrapper that attached
-        # attribution-only metadata (no ``status_code`` / ``retry_after_seconds``)
-        # discards the cause's actionable hints. Pinned by
-        # ``tests/unit/pipelex/cogt/test_cogt_provider_metadata_wrapper_wins.py``.
-        return report.model_copy(
-            update={
-                "error_category": report.error_category or cause_report.error_category,
-                "error_domain": report.error_domain or cause_report.error_domain,
-                "retryable": report.retryable if report.retryable is not None else cause_report.retryable,
-                "user_action": report.user_action or cause_report.user_action,
-                "model": report.model or cause_report.model,
-                "provider": report.provider or cause_report.provider,
-                "provider_metadata": report.provider_metadata or cause_report.provider_metadata,
-            }
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            return recovered_problem_in_view(problem=recovered, view=ProblemView.OPERATOR).diagnostics
+        return self._diagnostics(facts=self.chain_facts())
+
+    def to_problem(
+        self,
+        *,
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        """This error as a problem document, in the view of its reader.
+
+        The code is :meth:`resolve_error_code`'s, and everything the code decides is the registry's. The rest is
+        :meth:`problem_reported_by`'s, this error being its own reporter. An error carrying a problem recovered across a
+        transport boundary (:meth:`recovered_problem`) reports that problem instead, in the view asked for.
+
+        Args:
+            view: The view of the reader the problem is built for, picked by the identity the boundary authenticated.
+            request_id: The request that carried the failure, when known.
+            pipeline_run_id: The run the failure belongs to, when one exists.
+            failure_location: Where a run's failing pipe is, when the failure was located at a pipe.
+
+        Returns:
+            The problem.
+        """
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            return recovered_problem_in_view(
+                problem=recovered, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
+            )
+        return self.problem_reported_by(
+            reporter=self, view=view, request_id=request_id, pipeline_run_id=pipeline_run_id, failure_location=failure_location
+        )
+
+    def caller_params(self) -> dict[str, Any]:
+        """The parameters this error's problem carries as a caller reads them, read without building the problem.
+
+        They are the parameters :meth:`to_problem` gives in the caller's view, its items' aside: a refusal whose faults
+        its items carry gives none of its own for a code that requires some, which building its problem would log as a
+        fault, while a reader wanting only the parameters, such as a verdict whose items take this refusal's code, has
+        nothing to report.
+        """
+        recovered = self.recovered_problem()
+        if recovered is not None:
+            recovered_params = self.to_problem(view=ProblemView.CALLER).params
+            return recovered_params.as_wire() if recovered_params is not None else {}
+        code = self.resolve_error_code()
+        params, _ = self._reported_params_and_location(reporter=self, failure_location=None)
+        operator_only_params = error_code_spec(code).operator_only_params
+        return {name: value for name, value in accepted_params(code=code, params=params).items() if name not in operator_only_params}
+
+    def _reported_params_and_location(
+        self, *, reporter: "PipelexError", failure_location: ProblemLocation | None
+    ) -> tuple[dict[str, Any], ProblemLocation | None]:
+        """The parameters and the location of this error's problem as ``reporter`` reports it (see :meth:`problem_reported_by`)."""
+        code = self.resolve_error_code()
+        carrier = self.code_carrier()
+        wrappers = reporter.errors_above(carrier=carrier)
+        facts = reporter.chain_facts()
+        spec = error_code_spec(code)
+        params: dict[str, Any] = {}
+        for wrapper in wrappers:
+            # Given in order from the reporter down, so a wrapper nearer the carrier wins over one above it; checked
+            # against the carrier's code when the problem is built, an undeclared one being dropped and logged.
+            params.update(wrapper.given_params)
+        # A fact the carrier does not hold is no parameter, so the location's pipe and the chain's model still fill it below.
+        params.update({name: value for name, value in carrier.problem_params().items() if name in spec.param_names and value is not None})
+        params.update(carrier.given_params)
+        location = reporter.chain_location(carrier=carrier)
+        if failure_location is not None:
+            location = merge_locations(base=location, override=failure_location)
+        if location is not None and location.pipe is not None and "pipe" in spec.param_names:
+            params.setdefault("pipe", location.pipe)
+        if facts.model is not None and "model" in spec.param_names:
+            params.setdefault("model", facts.model)
+        if facts.provider is not None and facts.provider.name is not None and "provider" in spec.param_names:
+            params.setdefault("provider", facts.provider.name)
+        return params, location
+
+    def problem_reported_by(
+        self,
+        *,
+        reporter: "PipelexError",
+        view: ProblemView,
+        request_id: str | None = None,
+        pipeline_run_id: str | None = None,
+        failure_location: ProblemLocation | None = None,
+    ) -> PipelexProblem:
+        """This error's problem as ``reporter`` reports it: this error itself, or a wrapper above it that located it.
+
+        A run failure is reported as its root fault under the wrappers that located or carried it
+        (``pipelex.pipe_run.located_failure``), and those wrappers may know what the root fault does not, so the problem
+        is this error's, read along the reporter's chain:
+
+        - the code is this error's (:meth:`resolve_error_code`), and the parameters are those of the error whose code it
+          is (:meth:`code_carrier`): the facts it holds and the parameters its raise site gave, then, for a parameter it
+          gives none of, the one the nearest error between the reporter and it gave with :meth:`with_params`, a
+          parameter its code does not declare being dropped and logged;
+        - the items are those of the first error at or below the error whose code it is that refuses several faults,
+          then those each error between the reporter and it refuses, the nearest it first;
+        - the location is assembled from the reporter down to the error whose code it is, each error's own location
+          winning over those above it member by member, so a wrapper that knows the pipe, the field or the file a cause
+          was met at locates a cause that does not; the location of the failing pipe a run found (``failure_location``)
+          then takes precedence for the pipe and its path, and the pipe names the pipe parameter of a code that declares one;
+        - the facts are the nearest the reporter along its chain, so a fact a wrapper above this error holds, such as
+          the model and the backend a worker attributed it to, overrides its cause's;
+        - the operator view's diagnostics name this error: its class, its message and its causes.
+
+        Args:
+            reporter: This error, or an error above it on whose cause chain it sits.
+            view: The view of the reader the problem is built for, picked by the identity the boundary authenticated.
+            request_id: The request that carried the failure, when known.
+            pipeline_run_id: The run the failure belongs to, when one exists.
+            failure_location: Where a run's failing pipe is, when the failure was located at a pipe.
+
+        Returns:
+            The problem.
+        """
+        code = self.resolve_error_code()
+        carrier = self.code_carrier()
+        # The wrappers between the reporter and the error whose code the problem reports, the reporter first.
+        wrappers = reporter.errors_above(carrier=carrier)
+        facts = reporter.chain_facts()
+        params, location = self._reported_params_and_location(reporter=reporter, failure_location=failure_location)
+        items = list(carrier.chain_items() or [])
+        for wrapper in reversed(wrappers):
+            items.extend(wrapper.problem_items() or [])
+        return make_problem(
+            code=code,
+            view=view,
+            params=params,
+            location=location,
+            errors=items or None,
+            retry_after=facts.retry_after,
+            pipeline_run_id=pipeline_run_id,
+            request_id=request_id,
+            diagnostics=self._diagnostics(facts=facts) if view.shows_diagnostics else None,
         )
 
 
 class PipelexUnexpectedError(PipelexError):
-    _declared_title = "Unexpected internal error"
+    """A fault of ours: an invariant that did not hold, or a host wired wrongly."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = CoreCode.RUNTIME_UNEXPECTED
+
+
+#: The advice a configuration that does not validate gives when no pending migration explains it.
+CONFIG_DOCTOR_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "Run 'pipelex doctor' (from an agent, 'pipelex-agent doctor') to find what in the configuration does not "
+        "validate, correct it, then run the command again."
+    ),
+)
+
+#: The advice a stale configuration gives, which a migration brings up to date.
+CONFIG_MIGRATE_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "The configuration is out of date: run 'pipelex migrate' to bring it up to date, which keeps a copy of each file it "
+        "changes. From an agent, run 'pipelex-agent migrate --dry-run --format json' to see what it would change, show the "
+        "user, then run 'pipelex-agent migrate --yes'. 'pipelex-agent init' (with --global for the home configuration) "
+        "writes a fresh configuration instead, discarding its settings."
+    ),
+)
+
+#: The advice a configuration gives when a migration has something to say but would write nothing.
+CONFIG_MIGRATE_BY_HAND_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A migration would rewrite nothing here: correct by hand what the migration's plans name (the problem's "
+        "'diagnostics.migration', or 'pipelex-agent migrate --dry-run --format json'), then run the command again. "
+        "Do not write a fresh configuration over it, which would discard settings a migration keeps."
+    ),
+)
+
+
+#: The advice a configuration file that is missing gives: restore it, or write the default one.
+CONFIG_INIT_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A configuration file is missing: restore it, or run 'pipelex init' (from an agent, 'pipelex-agent init', with "
+        "--global for the home configuration) to write the default configuration, then run the command again."
+    ),
+)
+
+#: The advice a variable the configuration reads and finds unset gives: set it where the configuration reads it.
+CONFIG_VARIABLE_ADVICE = UserAction(
+    kind=UserActionKind.UNKNOWN,
+    detail=(
+        "A variable the configuration reads is not set: set the one the message names, in the environment or in the "
+        "secrets provider the configuration reads it from, then run the command again."
+    ),
+)
+
+#: The advice of a configuration refusal no migration explains, by its code; any other code is a configuration that
+#: does not validate or does not parse, which ``doctor`` finds.
+_CONFIG_ADVICE_BY_CODE: dict[ErrorCode, UserAction] = {
+    PipelexErrorCode.CONFIG_FILE_MISSING: CONFIG_INIT_ADVICE,
+    PipelexErrorCode.CONFIG_VARIABLE_MISSING: CONFIG_VARIABLE_ADVICE,
+}
+
+
+def config_refusal_advice(*, migration: MigrationErrorBlock | None, code: ErrorCode | None) -> UserAction:
+    """The advice a refused configuration gives: the migration's that explains it, when one does, else its code's.
+
+    A migration that would write: the configuration is old, and a migration brings it up to date. One that would write
+    nothing: the plans are a diagnosis, to act on by hand. No migration: a missing file is restored or written by
+    ``init``, a variable that is not set is set, and a configuration that does not validate or parse is what ``doctor``
+    finds.
+    """
+    if migration is None:
+        if code is None:
+            return CONFIG_DOCTOR_ADVICE
+        return _CONFIG_ADVICE_BY_CODE.get(code, CONFIG_DOCTOR_ADVICE)
+    if migration.would_write:
+        return CONFIG_MIGRATE_ADVICE
+    return CONFIG_MIGRATE_BY_HAND_ADVICE
 
 
 class PipelexConfigError(PipelexError):
     """A configuration this process cannot use, optionally with the migration that explains it.
 
-    ``error_domain`` stays :attr:`ErrorDomain.CONFIG` whether or not a migration is attached —
-    that value is a closed cross-repo enum and the agent-hook spec routes anything else to BLOCK,
-    so staleness is reported *inside* the CONFIG domain rather than as a domain of its own.
+    Its raise site names what its code's step reads, as far as it knows them: the part of the configuration at fault
+    (``surface``), the file (``file``) and the setting (``setting``). Its advice, the tip a local CLI prints, is read
+    off the migration and the code (:func:`config_refusal_advice`): migrate, or correct what the plans name, or else
+    write a missing file with ``init``, set a missing variable, or find with ``doctor`` what does not validate.
     """
 
-    error_domain = ErrorDomain.CONFIG
+    error_code: ClassVar[ErrorCodeDeclaration] = ErrorCodeSet(
+        default=PipelexErrorCode.CONFIG_INVALID,
+        others=(PipelexErrorCode.CONFIG_SYNTAX, PipelexErrorCode.CONFIG_FILE_MISSING),
+    )
 
-    def __init__(self, message: str, *, migration: MigrationErrorBlock | None = None):
+    def __init__(
+        self,
+        message: str,
+        *,
+        migration: MigrationErrorBlock | None = None,
+        surface: str | None = None,
+        file: str | None = None,
+        setting: str | None = None,
+    ):
         super().__init__(message)
         self.migration = migration
+        self.surface = surface
+        self.file = file
+        self.setting = setting
 
     @override
-    def to_error_report(self) -> ErrorReport:
-        report = super().to_error_report()
-        if self.migration is None:
-            return report
-        return report.model_copy(update={"migration": self.migration})
+    def own_advice(self) -> UserAction | None:
+        # Read when the advice is, so it follows the code a raise site chose after building the error.
+        if self.user_action is not None:
+            return self.user_action
+        return config_refusal_advice(migration=self.migration, code=self.own_error_code)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {name: value for name, value in {"surface": self.surface, "file": self.file, "setting": self.setting}.items() if value is not None}
+
+    @override
+    def problem_facts(self) -> ProblemFacts:
+        return ProblemFacts(migration=self.migration)
 
 
 class PipelexSetupError(PipelexError):
-    error_domain = ErrorDomain.CONFIG
+    """A boot that cannot complete: an embedding host calling it wrongly, or a configuration it wraps."""
+
+    error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(
+        fallback=CoreCode.RUNTIME_MISCONFIGURED,
+        others=(
+            CoreCode.RUNTIME_UNEXPECTED,
+            PipelexErrorCode.CONFIG_FILE_MISSING,
+            PipelexErrorCode.CONFIG_INVALID,
+            PipelexErrorCode.CONFIG_SYNTAX,
+        ),
+    )
 
 
 class SecurityError(PipelexError):
@@ -828,4 +908,4 @@ class SecurityError(PipelexError):
     swallowed by domain-level `except` handlers (e.g. `except PipelexError`).
     """
 
-    _declared_title = "Security policy violation"
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR

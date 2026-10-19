@@ -1,4 +1,5 @@
 import uuid
+from collections import deque
 from collections.abc import Generator, Mapping
 from contextlib import ExitStack, contextmanager
 from graphlib import CycleError, TopologicalSorter
@@ -13,14 +14,16 @@ from mthds.package.dependency_resolver import ResolvedDependency, determine_expo
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
+from mthds.package.visibility import VisibilityError
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import BaseModel, PydanticUserError, ValidationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError, SecurityError, error_domain_is_input, iter_cause_chain
+from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError, iter_cause_chain
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.config import is_pipe_func_sandbox_hosted
-from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files
+from pipelex.core.bundle_resources.bundle_resource import canonical_submitted_files, path_refusal_error, root_escape_of
 from pipelex.core.bundle_resources.exceptions import BundleResourcePathError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -38,7 +41,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.interpreter_hub import get_current_library, get_current_library_id_or_none, scoped_current_library
-from pipelex.libraries.collision_messages import duplicate_ref_msg
+from pipelex.libraries.collision_messages import DeclarationKind, duplicate_ref_items, duplicate_ref_msg
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.concept_reference_validation import validate_concept_references_in_blueprints
 from pipelex.libraries.crate_qualification import qualify_crate
@@ -66,7 +69,7 @@ from pipelex.libraries.method_trees import (
     tree_python_sources,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
-from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
+from pipelex.libraries.visibility_utils import make_visibility_checker
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodDependencyNotShippedError, MethodFetchDisabledError
@@ -88,7 +91,8 @@ from pipelex.runtime_hub import get_class_registry
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
-from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
+from pipelex.tools.misc.exceptions import SemVerError
+from pipelex.tools.misc.semver import parse_constraint, parse_version, version_satisfies
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -161,7 +165,11 @@ def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_ad
         mthds_content = mthds_path.read_text(encoding="utf-8")
     except UnicodeDecodeError as exc:
         msg = f"Bundle '{bundle_source}' of method package '{package_address}' is not valid UTF-8."
-        raise MthdsParserError(msg, validation_errors=[PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]) from exc
+        raise (
+            MthdsParserError(msg, validation_errors=[PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)])
+            .with_error_code(CoreCode.METHOD_DEPENDENCY_INVALID)
+            .with_params(package=package_address, finding=f"its bundle '{bundle_source}' is not UTF-8 text")
+        ) from exc
     try:
         return MthdsParser.make_pipelex_bundle_blueprint(mthds_content=mthds_content, mthds_source=bundle_source)
     except MthdsParserError as exc:
@@ -170,8 +178,10 @@ def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_ad
         context = f"Bundle '{bundle_source}' of method package '{package_address}' does not parse"
         items = [item.model_copy(update={"source": bundle_source, "message": f"{context}: {item.message}"}) for item in exc.validation_errors]
         msg = f"{context}: {exc.message}"
-        raise MthdsParserError(
-            msg, validation_errors=items or [PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)]
+        raise (
+            MthdsParserError(msg, validation_errors=items or [PipelexBundleBlueprintValidationErrorData(source=bundle_source, message=msg)])
+            .with_error_code(CoreCode.METHOD_DEPENDENCY_INVALID)
+            .with_params(package=package_address, finding=f"its bundle '{bundle_source}' does not parse")
         ) from exc
 
 
@@ -302,8 +312,8 @@ def _locating_pipe_build_refusals(
       as a ``PipeLoadRefusalError`` naming the pipe and the file, ``from`` the original.
     - Everything else leaves untouched: a configuration or runtime fault keeps its identity and stays a
       no-verdict fault, a security refusal is never absorbed into a verdict, a library error keeps the
-      structured items its own arm forwards, and pydantic's ``ValidationError`` and the
-      ``PipeValidationError`` family (not ``PipelexError``s) keep their categorizers.
+      structured items its own arm forwards, and pydantic's ``ValidationError`` and a
+      ``PipeValidationError``, whose own arm locates it, keep their categorizers.
 
     A synthetic helper the bundle elaborator generated (the ``<code>__draft_text`` and ``<code>__structure``
     pipes of a ``preliminary_text`` PipeLLM) is not in the author's file, so its refusal is located on
@@ -320,10 +330,10 @@ def _locating_pipe_build_refusals(
         if relocated is model_choice_error:
             raise
         raise relocated from model_choice_error
-    except (SecurityError, LibraryError):
+    except (SecurityError, LibraryError, PipeValidationError):
         raise
     except PipelexError as refusal:
-        if not error_domain_is_input(refusal.to_error_report().error_domain):
+        if not ErrorDomain.from_problem_domain(refusal.resolve_domain()).is_input:
             raise
         authored_pipe_code = elaboration.parent_pipe_code if elaboration is not None else pipe_code
         raise PipeLoadRefusalError.make_from_refusal(
@@ -630,7 +640,7 @@ class LibraryManager(LibraryManagerAbstract):
             violation = tree_path_violation(path)
             if violation is not None:
                 msg = f"The file '{path}' submitted beside the method cannot be a file of its tree: {violation}."
-                raise BundleResourcePathError(msg)
+                raise path_refusal_error(message=msg, escape=root_escape_of(path=path))
             already_held = joined.get(path)
             if already_held is not None and already_held.sha256 != held_file.sha256:
                 msg = (
@@ -638,13 +648,13 @@ class LibraryManager(LibraryManagerAbstract):
                     "beside a method's content strings, from its library directories and with its request, make one tree, "
                     "so each path names one file: give them distinct paths."
                 )
-                raise BundleResourcePathError(msg)
+                raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
             joined[path] = held_file
         collisions = path_collisions(joined)
         if collisions:
             listed = ", ".join(f"'{collision}'" for collision in collisions)
             msg = f"The files submitted beside the method cannot make one tree: their paths collide at {listed}."
-            raise BundleResourcePathError(msg)
+            raise BundleResourcePathError(msg).with_error_code(CoreCode.REQUEST_INVALID).with_params(field="resources")
         return joined
 
     def _submitted_tree(self, *, library_id: str) -> MethodTree | None:
@@ -970,7 +980,7 @@ class LibraryManager(LibraryManagerAbstract):
                 parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
-                    raise PipeLibraryError(msg)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                 domain_code = parsed.domain_path
                 pipe_code = parsed.local_code
 
@@ -1149,13 +1159,25 @@ class LibraryManager(LibraryManagerAbstract):
                     # Detect duplicate concept declarations across different bundles in the same library
                     if concept_ref in concept_source_in_this_load:
                         existing_source = concept_source_in_this_load[concept_ref]
-                        raise ConceptLibraryError(
-                            duplicate_ref_msg(
-                                ref_kind="concept",
-                                ref=concept_ref,
-                                existing_source=str(existing_source) if existing_source else None,
-                                incoming_source=str(new_source) if new_source else None,
+                        existing_source_str = str(existing_source) if existing_source else None
+                        incoming_source_str = str(new_source) if new_source else None
+                        raise (
+                            ConceptLibraryError(
+                                duplicate_ref_msg(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=existing_source_str,
+                                    incoming_source=incoming_source_str,
+                                ),
+                                blueprint_validation_errors=duplicate_ref_items(
+                                    ref_kind=DeclarationKind.CONCEPT,
+                                    ref=concept_ref,
+                                    existing_source=existing_source_str,
+                                    incoming_source=incoming_source_str,
+                                ),
                             )
+                            .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                            .with_params(name=concept_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
                         )
                     concept_source_in_this_load[concept_ref] = new_source
                     ref_to_entry[concept_ref] = (
@@ -1194,7 +1216,7 @@ class LibraryManager(LibraryManagerAbstract):
             parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
             if parsed.domain_path is None:
                 msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
-                raise ConceptLibraryError(msg)
+                raise ConceptLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             ref_to_entry[concept_ref] = (
                 parsed.domain_path,
                 parsed.local_code,
@@ -1249,7 +1271,7 @@ class LibraryManager(LibraryManagerAbstract):
             sorted_refs = list(sorter.static_order())
         except CycleError as exc:
             msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
-            raise LibraryLoadingError(msg) from exc
+            raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_CYCLE) from exc
 
         all_concepts: list[Concept] = []
         for concept_ref in sorted_refs:
@@ -1328,7 +1350,7 @@ class LibraryManager(LibraryManagerAbstract):
                 blueprint.place_in_tree(tree_bundle=bundle_file.tree_bundle)
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find MTHDS bundle at '{bundle_source}'"
-                raise LibraryLoadingError(msg) from file_not_found_error
+                raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND) from file_not_found_error
             except MthdsParserError as parser_error:
                 # Forward BLUEPRINT validation errors from interpreter
                 msg = f"Could not load MTHDS bundle from '{bundle_source}' because of: {parser_error.message}"
@@ -1399,13 +1421,20 @@ class LibraryManager(LibraryManagerAbstract):
             # items that make an unresolved concept a categorized `unresolved_concept` rather than a
             # bare residual. Reconstructing it message-only silently dropped them.
             msg = f"Could not load blueprints from {bundle_sources} because of: {ref_error}"
+            # The new error keeps the code its raise site chose, which a fresh instance of the class would not carry.
+            rewrapped_error: ConceptLibraryError | PipeLibraryError
             if isinstance(ref_error, LibraryLoadingError):
-                raise type(ref_error)(
+                rewrapped_error = type(ref_error)(
                     msg,
                     blueprint_validation_errors=ref_error.blueprint_validation_errors,
                     pipe_concept_validation_errors=ref_error.pipe_concept_validation_errors,
-                ) from ref_error
-            raise type(ref_error)(msg) from ref_error
+                )
+            else:
+                rewrapped_error = type(ref_error)(msg)
+            chosen_code = ref_error.own_error_code
+            if chosen_code is not None:
+                rewrapped_error.with_error_code(chosen_code)
+            raise rewrapped_error from ref_error
 
     def _warn_if_mthds_version_unsatisfied(
         self,
@@ -1465,10 +1494,7 @@ class LibraryManager(LibraryManagerAbstract):
             checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
-                error_messages = [err.message for err in reserved_errors]
-                joined_errors = "\n  - ".join(error_messages)
-                msg = f"Reserved domain violations found:\n  - {joined_errors}"
-                raise LibraryLoadingError(msg) from exc
+                raise _reserved_domain_refusal(reserved_errors=reserved_errors, blueprints=blueprints) from exc
             return None
 
         if manifest is None:
@@ -1476,18 +1502,17 @@ class LibraryManager(LibraryManagerAbstract):
             checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
-                error_messages = [err.message for err in reserved_errors]
-                joined_errors = "\n  - ".join(error_messages)
-                msg = f"Reserved domain violations found:\n  - {joined_errors}"
-                raise LibraryLoadingError(msg)
+                raise _reserved_domain_refusal(reserved_errors=reserved_errors, blueprints=blueprints)
             return None
 
-        visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
-        if visibility_errors:
-            error_messages = [err.message for err in visibility_errors]
-            joined_errors = "\n  - ".join(error_messages)
-            msg = f"Package visibility violations found:\n  - {joined_errors}"
-            raise LibraryLoadingError(msg)
+        # A reserved domain is refused as in a standalone bundle, before the exports are read: the two are different faults.
+        checker = make_visibility_checker(manifest=manifest, blueprints=blueprints)
+        reserved_errors = checker.validate_reserved_domains()
+        if reserved_errors:
+            raise _reserved_domain_refusal(reserved_errors=reserved_errors, blueprints=blueprints)
+        export_errors = checker.validate_all_pipe_references() + checker.validate_cross_package_references()
+        if export_errors:
+            raise _unexported_pipe_refusal(export_errors=export_errors, blueprints=blueprints, package_address=manifest.address)
 
         return manifest
 
@@ -1542,7 +1567,7 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_deps = resolve_all_dependencies(manifest=manifest, package_root=package_root)
         except DependencyResolveError as exc:
             msg = f"Failed to resolve dependencies: {exc}"
-            raise LibraryLoadingError(msg) from exc
+            raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_DEPENDENCY_MISSING) from exc
 
         library = self.get_library(library_id=library_id)
 
@@ -1711,7 +1736,7 @@ class LibraryManager(LibraryManagerAbstract):
                 parsed_pipe = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
                 if parsed_pipe.domain_path is None:
                     msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
-                    raise PipeLibraryError(msg)
+                    raise PipeLibraryError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
                 domain_code = parsed_pipe.domain_path
                 pipe_code = parsed_pipe.local_code
                 # A private pipe nothing public reaches is never built, so a broken one cannot refuse the consumer's load.
@@ -1747,9 +1772,11 @@ class LibraryManager(LibraryManagerAbstract):
                     pipe.validate_once_built()
                     child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except ValidationError as exc:
+                    # The pipe's blueprint is the dependency author's own document, no run's data: its refusal is
+                    # located as pydantic gives it.
                     log.warning(
                         "A pipe of a dependency could not be loaded",
-                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc)},
+                        fields={"dependency_alias": alias, "pipe_code": pipe_code, **error_fields(exc=exc, is_authored_input=True)},
                     )
                     unbuilt_pipe_reasons[pipe_ref] = "; ".join(str(error["msg"]) for error in exc.errors()) or str(exc)
                 except PipeValidationError as exc:
@@ -1857,7 +1884,7 @@ class LibraryManager(LibraryManagerAbstract):
                     address_dependency_sources=address_dependency_sources,
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError, MethodDependencyNotShippedError) as exc:
-                # The item carries the caller-facing text; the host's log keeps the whole cause chain, git's raw output
+                # The item carries the sentence its code renders; the host's log keeps the whole cause chain, git's raw output
                 # included, since a cause on the host (git missing, an unwritable clone directory) becomes an item too.
                 causes = " <- ".join(f"{type(cause).__name__}: {cause}" for cause in iter_cause_chain(exc))
                 log.warning("A method package could not be resolved", fields={"package_address": full_address, **error_fields(exc=exc, text=causes)})
@@ -2090,7 +2117,7 @@ class LibraryManager(LibraryManagerAbstract):
                 "A structure field may name a concept declared by a bundle already loaded, or by a method package that "
                 "one of the bundle's pipes references (`address->domain.Concept`)."
             )
-            raise LibraryLoadingError(" ".join(refusals))
+            raise LibraryLoadingError(" ".join(refusals)).with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
 
     def _detect_concept_cycles(self, concepts: list["Concept"], *, concept_sources: "Mapping[str, str]") -> None:
         """Detect cycles in concept references and raise an error if found.
@@ -2169,7 +2196,7 @@ class LibraryManager(LibraryManagerAbstract):
                 source = concept_sources.get(concept_ref)
                 where = f" (declared in '{source}')" if source else ""
                 msg = f"Cycle detected in concept references: {cycle_str}{where}"
-                raise LibraryLoadingError(msg)
+                raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_CYCLE)
 
             # Find the concept by ref
             concept = next((c for c in concepts if c.concept_ref == concept_ref), None)
@@ -2206,3 +2233,69 @@ def _building_bundle_of(
     if live_tree is None:
         return tree_bundle_ref
     return TreeBundle(tree=live_tree, tree_path=tree_bundle_ref.tree_path)
+
+
+def _unexported_pipe_refusal(
+    *, export_errors: list[VisibilityError], blueprints: list[PipelexBundleBlueprint], package_address: str
+) -> LibraryLoadingError:
+    """The refusal of pipe references a domain of the package does not export, one item per reference.
+
+    Each item names the pipe and the package declaring it, the parameters of ``method.pipe_not_exported``, and is
+    located on the bundle, the pipe and the field that write the reference: the checker names a reference by its
+    domain and by its field path, its ``context``, which the bundles' references are indexed by.
+    """
+    # Where each reference is written, by the domain of its bundle and its field path; a field path holds one reference.
+    referring_sites: dict[tuple[str, str], tuple[str | None, str]] = {}
+    for blueprint in blueprints:
+        for reference in blueprint.collect_located_pipe_references():
+            referring_sites.setdefault((blueprint.domain, reference.field_path), (blueprint.source, reference.referring_pipe_code))
+    items: list[PipelexBundleBlueprintValidationErrorData] = []
+    for export_error in export_errors:
+        source, referring_pipe_code = referring_sites.get((export_error.source_domain, export_error.context), (None, None))
+        items.append(
+            PipelexBundleBlueprintValidationErrorData(
+                source=source,
+                domain_code=export_error.source_domain,
+                pipe_code=referring_pipe_code,
+                field_path=export_error.context,
+                message=export_error.message,
+                params={"pipe": export_error.pipe_ref, "package": package_address},
+            )
+        )
+    joined_errors = "\n  - ".join(export_error.message for export_error in export_errors)
+    msg = f"Package visibility violations found:\n  - {joined_errors}"
+    return (
+        LibraryLoadingError(msg, blueprint_validation_errors=items)
+        .with_error_code(CoreCode.METHOD_PIPE_NOT_EXPORTED)
+        .with_params(pipe=export_errors[0].pipe_ref, package=package_address)
+    )
+
+
+def _reserved_domain_refusal(*, reserved_errors: list[VisibilityError], blueprints: list[PipelexBundleBlueprint]) -> LibraryLoadingError:
+    """The refusal of bundles declaring a reserved domain, one item per bundle, each naming the domain and located on its bundle.
+
+    The checker reports one error per bundle, in the order of the bundles, naming only its domain: each error is paired
+    with the next bundle of that domain not yet paired, so that two bundles declaring one reserved domain are each
+    located on their own file.
+    """
+    sources_by_domain: dict[str, deque[str | None]] = {}
+    for blueprint in blueprints:
+        sources_by_domain.setdefault(blueprint.domain, deque()).append(blueprint.source)
+    items: list[PipelexBundleBlueprintValidationErrorData] = []
+    for reserved_error in reserved_errors:
+        domain_sources = sources_by_domain.get(reserved_error.source_domain)
+        items.append(
+            PipelexBundleBlueprintValidationErrorData(
+                source=domain_sources.popleft() if domain_sources else None,
+                domain_code=reserved_error.source_domain,
+                message=reserved_error.message,
+                params={"name": reserved_error.source_domain, "conflict": MethodNameConflictConflict.RESERVED_DOMAIN},
+            )
+        )
+    joined_errors = "\n  - ".join(reserved_error.message for reserved_error in reserved_errors)
+    msg = f"Reserved domain violations found:\n  - {joined_errors}"
+    return (
+        LibraryLoadingError(msg, blueprint_validation_errors=items)
+        .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+        .with_params(name=reserved_errors[0].source_domain, conflict=MethodNameConflictConflict.RESERVED_DOMAIN)
+    )

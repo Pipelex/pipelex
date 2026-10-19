@@ -66,7 +66,7 @@ def get_required_env(key: str) -> str:
     value = os.getenv(key)
     if not value:
         msg = f"Environment variable '{key}' is required but not set"
-        raise EnvVarNotFoundError(msg)
+        raise EnvVarNotFoundError(msg).with_params(variable=key, source="env")
     return value
 
 

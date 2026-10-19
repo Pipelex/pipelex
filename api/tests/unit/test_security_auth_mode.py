@@ -2,7 +2,8 @@
 
 import pytest
 
-from pipelex_api.security import AUTH_MODE_ENV_VAR, AuthMode, InvalidAuthModeError, get_auth_dependency, get_auth_mode
+from pipelex_api.exceptions import InvalidAuthModeError
+from pipelex_api.security import AUTH_MODE_ENV_VAR, AuthMode, get_auth_dependency, get_auth_mode
 
 
 class TestAuthMode:

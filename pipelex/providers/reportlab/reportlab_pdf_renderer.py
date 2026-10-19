@@ -55,6 +55,7 @@ from pipelex.cogt.doc_gen.layout_tree import (
 )
 from pipelex.cogt.doc_gen.render_job import RenderedDocument, RenderJob, RenderResources
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.providers.reportlab.markdown_flowables import markdown_to_flowables
 from pipelex.providers.reportlab.pdf_elements import (
     MUTED_COLOR,
@@ -147,7 +148,11 @@ class ReportlabPdfWorker(DocGenWorkerAbstract):
                 f"The PDF engine cannot print '{job.filename}': {where} does not fit on an A4 page, "
                 "as part of it is taller than a page and cannot be split across pages."
             )
-            raise DocGenRenderError(msg).as_caller_fault() from exc
+            raise (
+                DocGenRenderError(msg)
+                .with_error_code(PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE)
+                .with_params(reason="too_tall_for_page", element=where)
+            ) from exc
         return _BuiltPass(data=buffer.getvalue(), page_count=doc_template.page)
 
 
@@ -216,10 +221,14 @@ def _decode_image(*, url: str, data: bytes, position: str) -> _LoadedImage:
             width_px, height_px = pil_image.size
     except (OSError, ValueError, SyntaxError, PilImage.DecompressionBombError) as exc:
         msg = f"The PDF engine cannot print {position}: its file is not an image it reads, such as PNG, JPEG, GIF or WebP."
-        raise DocGenRenderError(msg).as_caller_fault() from exc
+        raise (
+            DocGenRenderError(msg)
+            .with_error_code(PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE)
+            .with_params(reason="image_unreadable", element=position)
+        ) from exc
     if width_px <= 0 or height_px <= 0:
         msg = f"The PDF engine cannot print {position}: the image is empty."
-        raise DocGenRenderError(msg).as_caller_fault()
+        raise DocGenRenderError(msg).with_error_code(PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE).with_params(reason="image_empty", element=position)
     return _LoadedImage(url=url, data=data, width_px=width_px, height_px=height_px)
 
 

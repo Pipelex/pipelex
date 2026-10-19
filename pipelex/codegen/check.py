@@ -99,7 +99,7 @@ def run_codegen_check(*, root: Path) -> CodegenCheckReport:
         raise
     except CodegenError as exc:
         msg = f"Unsafe codegen artifact tree at '{root}': {exc}"
-        raise CodegenLockError(msg) from exc
+        raise CodegenLockError(msg).with_params(file=CODEGEN_LOCK_FILENAME) from exc
 
 
 def _check_locked_artifacts(*, root: Path, lock: CodegenLock) -> list[CodegenDrift]:

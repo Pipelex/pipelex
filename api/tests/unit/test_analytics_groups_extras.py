@@ -29,6 +29,7 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem, problem_items_fields
 
 if TYPE_CHECKING:
     from pipelex.system.job_metadata import RunMetadata
@@ -141,24 +142,20 @@ class TestAnalyticsGroupsReachTheRun:
 
         response = client.post(route, json=_run_body(analytics_groups=bad_groups))
 
-        assert response.status_code == 422, response.text
-        assert response.headers["content-type"] == "application/problem+json"
-        body = response.json()
-        assert body["error_type"] == "InvalidAnalyticsGroups"
-        assert "analytics_groups" in body["detail"]
+        body = assert_problem(response, status=422, code="request.invalid")
+        # The refused field, or a key inside it, which the path names from the field down.
+        assert body["params"]["field"].split(".")[0] == "analytics_groups", body
+        # A single refused field is the problem itself, with no list restating it.
+        assert "errors" not in body, body
         assert orchestrator.run_metadatas == []
 
-    def test_a_body_failing_on_two_extras_gets_the_generic_error_type(self, mocker: MockerFixture) -> None:
+    def test_a_body_failing_on_two_extras_names_both(self, mocker: MockerFixture) -> None:
         # Naming one of the two fields would send the caller to fix that one and leave the other
-        # for the next request, so the classification falls back to the generic type and the
-        # detail names both.
+        # for the next request, so the refusal carries one item per refused field.
         client, orchestrator = _build_client(mocker)
 
         response = client.post("/v1/start", json=_run_body(storage_scope="../escape", analytics_groups={"Organization": "org_acme"}))
 
-        assert response.status_code == 422, response.text
-        body = response.json()
-        assert body["error_type"] == "ValidationError"
-        assert "storage_scope" in body["detail"]
-        assert "analytics_groups" in body["detail"]
+        body = assert_problem(response, status=422, code="request.invalid")
+        assert sorted(problem_items_fields(body)) == ["analytics_groups", "storage_scope"]
         assert orchestrator.run_metadatas == []

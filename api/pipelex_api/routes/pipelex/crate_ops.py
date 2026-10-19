@@ -9,7 +9,7 @@ calls by its address loads only when the request shipped it, in `dependencies` o
 `.mthds/methods/`, and one nothing shipped is the invalid verdict, never a lookup among the methods installed on this
 server or a fetch. They speak the same verdict vocabulary as
 `POST /validate`: a produced verdict is a 200 discriminated on `is_valid`, with the invalid arm carrying the
-structured `validation_errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
+structured `errors[]` built by pipelex's one shared builder. This module holds the pieces they share so
 the envelopes cannot drift.
 
 The invalid arm here is the *crate* verdict: it deliberately omits `/validate`'s runnability facts
@@ -29,11 +29,13 @@ from typing import Literal, NamedTuple, NoReturn, TypeVar
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from pipelex.base_exceptions import ErrorReport, ValidationErrorItem
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from mthds.protocol.problem.models import ProblemItem
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeNotFoundError
+from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION
 from pipelex.methods.method_ref import looks_like_method_ref
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -41,14 +43,16 @@ from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pydantic import BaseModel, Field
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_not_implemented
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.method_tree_request import RequestMethod, WrittenMethod, manifest_of, written_method
 from pipelex_api.routes.pipelex.method_selection import select_request_method
 from pipelex_api.schemas.models import MethodTreeRequest
 
 #: What a route makes of a resolved method, in the worker thread that holds it loaded.
 ProjectionT = TypeVar("ProjectionT")
+
+# The `reason` of the `request.unsupported` refusing a registry-form `method_ref`, which no registry here resolves.
+REGISTRY_FORM_METHOD_REF_REASON = "registry_form_method_ref"
 
 
 class GeneratedArtifact(BaseModel):
@@ -59,34 +63,36 @@ class GeneratedArtifact(BaseModel):
 
 
 class CrateInvalidReport(BaseModel):
-    """The 200 **invalid** arm shared by `/resolve` and `/codegen` — the crate-verdict vocabulary.
+    """The 200 **invalid** arm shared by `/resolve`, `/codegen` and `/pipe-io` — the crate-verdict vocabulary.
 
     Same discipline as `/validate`'s `InvalidReport`: an invalid library is the *successful
     product* of a diagnostic call (the request was well-formed; the library was not), so it rides
-    a 200 discriminated on `is_valid`, carrying the same structured `ValidationErrorItem`s the
-    local CLI and `/validate` emit for the identical failure.
+    a 200 discriminated on `is_valid`, carrying the same problem items in `errors` that `/validate`
+    emits for the identical failure.
     """
 
     is_valid: Literal[False] = False
     """Discriminant of the invalid arm (mirrors the valid arms' `Literal[True]`)."""
 
-    validation_errors: list[ValidationErrorItem] = Field(
-        default_factory=empty_list_factory_of(ValidationErrorItem),
-        description="Per-error diagnostics, built by pipelex's one shared builder — non-empty on every invalid verdict.",
+    errors: list[ProblemItem] = Field(
+        default_factory=empty_list_factory_of(ProblemItem),
+        description=(
+            "One problem item per error, each with its own code, its parameters and its location — non-empty on every "
+            "invalid verdict. The items of the verdict's problem, as a refusal's `errors` carry them."
+        ),
     )
     message: str = Field(default="MTHDS library could not be resolved", description="Human-readable summary of the verdict.")
 
 
-def invalid_crate_report_response(error_report: ErrorReport) -> JSONResponse:
+def invalid_crate_report_response(validate_error: ValidateBundleError, *, view: ProblemView) -> JSONResponse:
     """Render a produced "could not resolve" verdict as a 200 `CrateInvalidReport`.
 
-    `exclude_none` drops each item's unset locators so the wire items match the agent CLI's
-    byte-for-byte — the "one error item, two surfaces" guarantee `/validate` already keeps.
+    The items are those of the error's problem in the view of the request's reader (`ValidateBundleError.problem_items`,
+    one per item of pipelex's one shared builder), and the message is its `detail`, the sentence its code renders, which
+    reads the same in every view. `exclude_none` drops each item's unset members, as the standard writes a problem item.
     """
-    invalid_report = CrateInvalidReport(
-        validation_errors=error_report.validation_errors or [],
-        message=error_report.message,
-    )
+    problem = validate_error.to_problem(view=view)
+    invalid_report = CrateInvalidReport(errors=list(problem.errors or []), message=problem.detail)
     return JSONResponse(content=invalid_report.model_dump(mode="json", serialize_as_any=True, by_alias=True, exclude_none=True))
 
 
@@ -111,17 +117,17 @@ class ResolvedMethod(NamedTuple):
         Raises:
             MethodEntryError: The manifest is not UTF-8 text, or not a valid manifest (a 422 in the input domain).
         """
-        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}")
+        manifest = manifest_of(tree=self.request_method.tree, label=f"the method {self.method_label}", root="")
         return manifest.main_pipe if manifest is not None else None
 
 
-def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ErrorReport:
+def _resolve_written_method(*, written: WrittenMethod) -> LibraryCrate | ValidateBundleError:
     """The crate of a method written out, or the invalid verdict when it does not resolve."""
     try:
         return resolve_crate_from_method_dir(method_dir=written.method_dir, methods_dirs=written.methods_dirs)
     except ValidateBundleError as validate_error:
         # The produced negative verdict: the core already tore its library down.
-        return validate_error.to_error_report()
+        return validate_error
 
 
 def _project_written_method(
@@ -129,7 +135,7 @@ def _project_written_method(
     request_method: RequestMethod,
     method_label: str,
     project: Callable[[ResolvedMethod], ProjectionT],
-) -> ProjectionT | ErrorReport:
+) -> ProjectionT | ValidateBundleError:
     """Write the method out, resolve it, hand it to `project` while it is loaded, and release everything: blocking work.
 
     Runs whole in one worker thread, so the library the core binds as current in this thread's context is the one
@@ -137,7 +143,7 @@ def _project_written_method(
     """
     with written_method(request_method=request_method) as written:
         resolution = _resolve_written_method(written=written)
-        if isinstance(resolution, ErrorReport):
+        if isinstance(resolution, ValidateBundleError):
             return resolution
         try:
             return project(ResolvedMethod(crate=resolution, request_method=request_method, method_label=method_label))
@@ -150,26 +156,30 @@ async def project_resolved_method(
     request: Request,
     request_data: MethodTreeRequest,
     project: Callable[[ResolvedMethod], ProjectionT],
-) -> ProjectionT | ErrorReport:
+) -> ProjectionT | ValidateBundleError:
     """Resolve the method the request names into its normalized crate, and return what `project` makes of it.
 
     The method is read as `/validate` reads it (`select_request_method`), then written out as a run writes it and loaded
     alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread.
     `project` runs in that thread with the freshly opened library loaded and current, so it can read live pipes, and the
     written tree held; both are released when it returns or raises. A method that does not resolve returns its invalid
-    verdict instead, an `ErrorReport` carrying the structured `validation_errors`, with `project` never called and
+    verdict instead, the `ValidateBundleError` carrying the structured validation items, with `project` never called and
     nothing left loaded.
 
-    Raises (as problem documents): 501 for a registry-form `method_ref`; the 422s and 403s of `select_request_method`;
-    the address-form fetch and location failures (`MethodRefError` subclasses); and whatever `project` raises, such as
-    a selection refusal.
+    Raises (as problem documents): a 422 `request.unsupported` for a registry-form `method_ref`; the refusals of
+    `select_request_method`; the address-form fetch and location failures (`MethodRefError` subclasses); and whatever
+    `project` raises, such as a selection refusal.
     """
     if request_data.method_ref is not None and not looks_like_method_ref(request_data.method_ref):
-        raise_not_implemented(
+        msg = (
             "Registry-form method_ref resolution is not available on this server: no method registry is wired. "
             "Use an address-form reference (a `github.com/...` address, e.g. `github.com/Pipelex/methods/documents@v0.1.0`) "
-            "or send the method's tree in `files`.",
-            error_type=ErrorType.METHOD_REF_NOT_SUPPORTED,
+            "or send the method's tree in `files`."
+        )
+        raise (
+            RunnerRequestError(msg, field="method_ref")
+            .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+            .with_params(reason=REGISTRY_FORM_METHOD_REF_REASON)
         )
     selected = await select_request_method(
         request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
@@ -199,6 +209,14 @@ class PipeSelectionMissKind(StrEnum):
     AMBIGUOUS = "ambiguous"
 
 
+class SelectorOrigin(StrEnum):
+    """Where a pipe selector came from, which is what its refusal must tell the caller, and who must act on it."""
+
+    REQUEST = "request"
+    MANIFEST = "manifest"
+    CLOSURE = "closure"
+
+
 class PipeSelectionMiss(NamedTuple):
     """A link of the pipe selection chain that selected no pipe, with the refusal a selection answers."""
 
@@ -208,16 +226,16 @@ class PipeSelectionMiss(NamedTuple):
     message: str
     """The detail of the `422` a selection that depends on this link raises."""
 
-    user_action: UserAction | None = None
-    """The fix to name instead of the error class's own, when the class's is wrong for this miss."""
+    origin: SelectorOrigin | None
+    """Where the selector that missed came from, which picks the refusal's code; `None` when there was no selector
+    at all, because the request named no pipe and the closure declares no single `main_pipe`."""
 
+    selector: str | None = None
+    """The selector that missed, the request's `pipe_ref` or a declared `main_pipe`; `None` when there was none."""
 
-class _SelectorOrigin(StrEnum):
-    """Where a pipe selector came from, which is what its refusal must tell the caller."""
-
-    REQUEST = "request"
-    MANIFEST = "manifest"
-    CLOSURE = "closure"
+    candidates: list[str] | None = None
+    """The qualified refs the refusal offers: the `main_pipe`s the closure declares, when it declares several; the
+    pipes nearest a selector that names none; every pipe of the closure, when it gives no `main_pipe` to start from."""
 
 
 def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifest_main_pipe: str | None) -> RequestedPipe:
@@ -227,14 +245,14 @@ def resolve_requested_pipe(crate: LibraryCrate, *, pipe_ref: str | None, manifes
     failed selection — an unknown ref, an ambiguous one, a chain that finds no entry pipe or several —
     is an input-domain 422 rather than an invalid-crate verdict, since nothing about the *closure* is
     wrong in any of them. It is raised as the engine's own entry-lookup error class (see
-    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the `error_type` the run routes
+    `_raise_selection_refusal`), so an unknown or ambiguous ref carries the code the run routes
     answer for the same `pipe_code`. A chain finding no entry pipe or several has no run-route twin to
     match: this route refuses both the way the pipe-selector design classifies them.
 
     Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if pipe_ref is not None:
-        selected = _select_entry_pipe(pipe_ref, origin=_SelectorOrigin.REQUEST)
+        selected = _select_entry_pipe(pipe_ref, origin=SelectorOrigin.REQUEST)
     else:
         selected = select_default_pipe(crate, manifest_main_pipe=manifest_main_pipe)
     if isinstance(selected, PipeSelectionMiss):
@@ -248,21 +266,61 @@ def _raise_selection_refusal(miss: PipeSelectionMiss) -> NoReturn:
     A selection refusal must not share `ValidationError` with a malformed request, or a client has no
     field to tell the two apart. So it is raised as `EntryPipeNotFoundError` or
     `EntryPipeAmbiguousError`, the classes the engine's entry lookup raises and the run routes answer
-    with for an unknown or ambiguous `pipe_code`. The global `PipelexError` handler then renders it —
-    the class name as `error_type`, the INPUT domain as a 422, the class's `user_action` — exactly as
-    it renders the run routes' refusal. Both classes declare their messages caller-facing, which every
-    message built here honours: it names the caller's selector, the manifest's `main_pipe`, or the
-    qualified refs of the closure the caller submitted, and nothing from a host library.
+    with for an unknown or ambiguous `pipe_code`. The global `PipelexError` handler then renders its
+    problem exactly as it renders the run routes' refusal: the code's status and sentences, filled
+    with the parameters given here, the selector that missed and the candidates. The message built
+    here rides the operator's diagnostics alone.
 
     The no-entry-pipe miss is a not-found and the several-`main_pipe`s miss an ambiguity, the way the
-    pipe-selector design classifies them. Neither is a typo in a pipe code, so each carries its own
-    `user_action`, which replaces the class's code-typo advice for that one error.
+    pipe-selector design classifies them.
+
+    The code says who must act, which is where the selector came from. A selector the request named that
+    misses is the caller's (`request.pipe_not_found`, `request.pipe_ambiguous`), and so is a request naming no
+    pipe where the closure gives no single `main_pipe` to default to (`request.pipe_unspecified`, naming as its
+    `candidates` the `main_pipe`s the closure declares when it declares several, since there is then no selector
+    for `request.pipe_ambiguous` to name). A `main_pipe` the method itself declares, in the fetched package's
+    manifest or in the closure, is the method's, whose author fixes the declaration: one that names no pipe of
+    the closure is `method.pipe_unresolved`, naming it as the `missing` pipe, and one that matches pipes in
+    several domains is `method.ref_ambiguous`, naming it as the `ref` with its `candidates`, so the refusal
+    never says a pipe that exists twice does not exist.
     """
+    candidates = miss.candidates or []
     match miss.kind:
         case PipeSelectionMissKind.NOT_FOUND:
-            raise EntryPipeNotFoundError(miss.message).as_caller_fault(user_action=miss.user_action)
+            match miss.origin:
+                case SelectorOrigin.REQUEST:
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_NOT_FOUND)
+                        .with_params(pipe=miss.selector, suggestions=candidates)
+                    )
+                case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
+                    # The reference is the method's `main_pipe` declaration, which no pipe declares: it is the `pipe` naming it.
+                    raise (
+                        EntryPipeNotFoundError(miss.message)
+                        .with_error_code(CoreCode.METHOD_PIPE_UNRESOLVED)
+                        .with_params(pipe=MAIN_PIPE_DECLARATION, missing=miss.selector, candidates=candidates)
+                    )
+                case None:
+                    raise (EntryPipeNotFoundError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates))
         case PipeSelectionMissKind.AMBIGUOUS:
-            raise EntryPipeAmbiguousError(miss.message).as_caller_fault(user_action=miss.user_action)
+            match miss.origin:
+                case SelectorOrigin.REQUEST:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.REQUEST_PIPE_AMBIGUOUS)
+                        .with_params(pipe=miss.selector, candidates=miss.candidates)
+                    )
+                case None:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message).with_error_code(CoreCode.REQUEST_PIPE_UNSPECIFIED).with_params(candidates=candidates)
+                    )
+                case SelectorOrigin.MANIFEST | SelectorOrigin.CLOSURE:
+                    raise (
+                        EntryPipeAmbiguousError(miss.message)
+                        .with_error_code(CoreCode.METHOD_REF_AMBIGUOUS)
+                        .with_params(ref=miss.selector, candidates=miss.candidates)
+                    )
 
 
 def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) -> RequestedPipe | PipeSelectionMiss:
@@ -287,31 +345,28 @@ def select_default_pipe(crate: LibraryCrate, *, manifest_main_pipe: str | None) 
     Must be called from the `project` of `project_resolved_method`, while its library is loaded + current.
     """
     if manifest_main_pipe:
-        return _select_entry_pipe(manifest_main_pipe, origin=_SelectorOrigin.MANIFEST)
+        return _select_entry_pipe(manifest_main_pipe, origin=SelectorOrigin.MANIFEST)
     candidates = [f"{domain_code}.{domain.main_pipe}" for domain_code, domain in crate.domains.items() if domain.main_pipe]
     if not candidates:
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.NOT_FOUND,
             message="No `pipe_ref` was given and the closure declares no `main_pipe` — name the pipe explicitly.",
-            user_action=UserAction(
-                kind=UserActionKind.CHANGE_INPUT,
-                detail="Send a `pipe_ref` naming the pipe to select, since the closure declares no `main_pipe` to default to.",
-            ),
+            origin=None,
+            # With no entry pipe to start from, the request may select any pipe of the closure.
+            candidates=sorted(crate.pipes),
         )
     if len(candidates) > 1:
         joined = ", ".join(sorted(candidates))
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"No `pipe_ref` was given and the closure declares several `main_pipe`s ({joined}) — name the pipe explicitly.",
-            user_action=UserAction(
-                kind=UserActionKind.CHANGE_INPUT,
-                detail="Send a `pipe_ref` naming one of the declared `main_pipe`s.",
-            ),
+            origin=None,
+            candidates=sorted(candidates),
         )
-    return _select_entry_pipe(candidates[0], origin=_SelectorOrigin.CLOSURE)
+    return _select_entry_pipe(candidates[0], origin=SelectorOrigin.CLOSURE)
 
 
-def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPipe | PipeSelectionMiss:
+def _select_entry_pipe(selector: str, *, origin: SelectorOrigin) -> RequestedPipe | PipeSelectionMiss:
     """Look one selector up through the engine's entry lookup, the way every selection chain link does.
 
     The returned `ref` is read back off the **resolved pipe**, never echoed from the selector: the
@@ -325,14 +380,14 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
     missing, which would contradict the candidates in the same sentence.
     """
     match origin:
-        case _SelectorOrigin.REQUEST:
+        case SelectorOrigin.REQUEST:
             described = f"Pipe '{selector}'"
             scope = "the submitted closure"
-        case _SelectorOrigin.MANIFEST:
+        case SelectorOrigin.MANIFEST:
             # The caller never spelled this selector — say where it came from, or the 422 names a pipe out of nowhere.
             described = f"Pipe '{selector}' (the `main_pipe` of the method's manifest)"
             scope = "the method's closure"
-        case _SelectorOrigin.CLOSURE:
+        case SelectorOrigin.CLOSURE:
             described = f"Pipe '{selector}' (the closure's declared `main_pipe`)"
             scope = "the submitted closure"
     try:
@@ -341,9 +396,20 @@ def _select_entry_pipe(selector: str, *, origin: _SelectorOrigin) -> RequestedPi
         return PipeSelectionMiss(
             kind=PipeSelectionMissKind.AMBIGUOUS,
             message=f"{described} matches pipes in several domains of {scope}, so it selects none: {exc}",
+            origin=origin,
+            selector=selector,
+            # The qualified refs the entry lookup found, which the refusal names to the caller.
+            candidates=exc.given_params.get("candidates"),
         )
     except PipeNotFoundError as exc:
-        return PipeSelectionMiss(kind=PipeSelectionMissKind.NOT_FOUND, message=f"{described} not found in {scope}: {exc}")
+        return PipeSelectionMiss(
+            kind=PipeSelectionMissKind.NOT_FOUND,
+            message=f"{described} not found in {scope}: {exc}",
+            origin=origin,
+            selector=selector,
+            # The pipes of the closure nearest the selector, which the entry lookup found.
+            candidates=exc.given_params.get("suggestions"),
+        )
     return RequestedPipe(ref=the_pipe.pipe_ref, pipe=the_pipe)
 
 

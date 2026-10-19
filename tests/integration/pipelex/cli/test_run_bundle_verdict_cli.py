@@ -7,7 +7,7 @@ verdict. These tests drive the real run cores on a bundle whose pipe names a mis
   item, and exits 1 — whether the bundle is run from its directory (loaded as a library directory) or as
   a file, and whether the parse or the load refuses it. It used to print one line, ``Failed to execute
   pipeline '<pipe>': Could not load blueprints from [...] because of: …``.
-- ``pipelex-agent run bundle`` copies the verdict's ``validation_errors`` into its error envelope, and its
+- ``pipelex-agent run bundle`` reports the verdict's problem, its items the problem's ``errors``, and its
   markdown error renders them as the same grouped prose ``validate`` prints.
 """
 
@@ -56,7 +56,7 @@ main_pipe   = "write_tide_notice"
 def console(mocker: MockerFixture) -> Console:
     """A recording console patched into the error handlers, so the panel can be read back."""
     recorded_console = Console(width=200, record=True, color_system=None)
-    mocker.patch("pipelex.cli.error_handlers.get_console", return_value=recorded_console)
+    mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
 
 
@@ -134,7 +134,7 @@ class TestRunBundleVerdictCli:
         assert "Bundle validation failed" in output
         assert "TOML syntax error at line 2" in output
 
-    def test_agent_run_bundle_carries_the_validation_errors(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
+    def test_agent_run_bundle_carries_the_verdict_s_items(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
         mocker.patch("pipelex.cli.agent_cli.commands.run.bundle_cmd.make_pipelex_for_agent_cli")
         mocker.patch("pipelex.cli.agent_cli.commands.run.bundle_cmd.Pipelex.teardown_if_needed")
         bundle_path = _write_bundle(directory=tmp_path, content=_MISSPELLED_CONCEPT_BUNDLE)
@@ -143,18 +143,18 @@ class TestRunBundleVerdictCli:
             _run_agent_bundle(bundle_path=bundle_path, output_format=CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
-        envelope: dict[str, Any] = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "ValidateBundleError"
-        assert envelope["error_domain"] == "input"
-        concept_items = [item for item in envelope["validation_errors"] if item.get("error_type") == "unresolved_concept"]
-        assert concept_items, f"expected an unresolved_concept item, got {envelope['validation_errors']!r}"
+        problem: dict[str, Any] = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "method.invalid"
+        assert problem["domain"] == "method"
+        concept_items = [item for item in problem["errors"] if item["code"] == "method.concept_unresolved"]
+        assert concept_items, f"expected a method.concept_unresolved item, got {problem['errors']!r}"
         (item,) = concept_items
-        assert item["pipe_code"] == "write_tide_notice"
-        assert item["concept_code"] == "TideNotise"
-        assert item["field_path"] == "pipe.write_tide_notice.output"
-        assert item["source"] == str(bundle_path)
+        assert item["params"]["concept"] == "TideNotise"
+        assert item["location"]["pipe"] == "write_tide_notice"
+        assert item["location"]["field"] == "output"
+        assert item["location"]["file"] == str(bundle_path)
 
-    def test_agent_run_bundle_markdown_renders_the_items_as_prose(
+    def test_agent_run_bundle_markdown_renders_the_problem_items(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         mocker.patch("pipelex.cli.agent_cli.commands.run.bundle_cmd.make_pipelex_for_agent_cli")
@@ -166,7 +166,10 @@ class TestRunBundleVerdictCli:
 
         assert exc_info.value.exit_code == 1
         markdown = capsys.readouterr().err
-        assert markdown.startswith("# Error: ValidateBundleError")
-        assert "## Pipe validation errors" in markdown
-        assert "Concept 'TideNotise' in pipe.write_tide_notice.output is not declared" in markdown
+        assert markdown.startswith("## The method does not validate")
+        assert (
+            "### Errors\n\n- `method.concept_unresolved`: The method names the concept 'TideNotise', which no library declares. "
+            f"(pipe 'write_tide_notice', field 'output', file '{bundle_path}')"
+        ) in markdown
+        assert "## Pipe validation errors" not in markdown
         assert '"validation_errors"' not in markdown

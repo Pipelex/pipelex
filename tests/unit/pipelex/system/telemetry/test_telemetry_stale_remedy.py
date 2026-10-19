@@ -17,12 +17,15 @@ The stale documents here are the package's own: `telemetry-config@2` is the ship
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import ProblemDomain
 
 from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import ProblemView
 from pipelex.migration.goldens import pre_history_document_path
 from pipelex.migration.ledger import packaged_migration_dir
 from pipelex.system.configuration.config_surface import TELEMETRY_CONFIG_SURFACE_ID
@@ -100,6 +103,20 @@ class TestTheErrorSaysWhetherTheFileIsOldOrWrong:
         assert MIGRATE_COMMAND not in exc.message
         assert "custom_posthog.mode" in exc.message
 
+    def test_the_operator_s_step_names_the_setting_the_file_and_the_surface(self, global_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """The code's step renders from the refused setting, never falling back on the generic sentence; the advice is doctor's."""
+        exc = load_and_capture(config_dir=global_dir, body='[custom_posthog]\nmode = "no-such-mode"\n')
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = exc.to_problem(view=ProblemView.OPERATOR)
+        assert problem.next_step.detail == (
+            "Correct the setting 'custom_posthog.mode' in the file 'telemetry.toml' of the telemetry configuration, then restart the runtime."
+        )
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
+        advice = exc.advised_action()
+        assert advice is not None
+        assert "'pipelex-agent doctor'" in advice.detail
+
     def test_a_key_no_build_knows_is_named_even_with_nothing_to_migrate(self, global_dir: Path) -> None:
         """The diagnosis speaks on its own: an unknown root key is a finding without a single step."""
         exc = load_and_capture(config_dir=global_dir, body=f"{UNKNOWN_KEY} = true\n")
@@ -108,15 +125,18 @@ class TestTheErrorSaysWhetherTheFileIsOldOrWrong:
         assert exc.migration.needs_attention is True
         assert [unexplained.path for plan in exc.migration.plans for unexplained in plan.unexplained] == [UNKNOWN_KEY]
 
-    def test_the_domain_comes_from_the_class_and_the_block_rides_the_report(self, global_dir: Path) -> None:
-        """What an agent consumer actually reads: one structured envelope, `config` either way."""
+    def test_the_domain_comes_from_the_class_and_the_block_rides_the_operator_s_problem(self, global_dir: Path) -> None:
+        """What an agent consumer actually reads: one structured envelope, the operator's either way."""
         exc = load_and_capture(config_dir=global_dir, body=f"{old_shape_document()}\n{UNKNOWN_KEY} = true\n")
 
-        report = exc.to_error_report()
+        operator = exc.to_problem(view=ProblemView.OPERATOR)
 
-        assert report.error_domain == "config"
-        assert report.migration is not None
-        assert report.to_dict()["migration"]["remedy"] == MIGRATE_COMMAND
+        assert operator.domain == ProblemDomain.OPERATOR
+        assert operator.diagnostics is not None
+        assert operator.diagnostics.migration is not None
+        assert operator.to_wire()["diagnostics"]["migration"]["remedy"] == MIGRATE_COMMAND
+        # The block describes this host's own configuration directories: no caller reads it.
+        assert MIGRATE_COMMAND not in str(exc.to_problem(view=ProblemView.CALLER).to_wire())
 
     def test_no_remedy_ever_tells_a_reader_to_start_the_file_over(self, global_dir: Path) -> None:
         """The whole point of the change: a migratable file is never answered with a reset."""

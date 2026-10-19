@@ -6,8 +6,14 @@ correct trace events as a side effect alongside its existing in-memory accumulat
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
+from pipelex.graph.node_problem import make_node_problem
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tracing.in_memory_event_log import InMemoryEventLog
@@ -190,11 +196,15 @@ class TestGraphTracerEventEmission:
         )
 
         ended_at = started_at + timedelta(milliseconds=50)
+        problem = make_problem(
+            code=CoreCode.RUNTIME_UNEXPECTED,
+            view=ProblemView.CALLER,
+            location=make_location(pipe="test_pipe", path=["test_pipe"]),
+        )
         tracer.on_pipe_end_error(
             node_id=node_id,
             ended_at=ended_at,
-            error_type="ValueError",
-            error_message="Something went wrong",
+            problem=problem,
             error_stack="traceback line 1\nline 2",
         )
 
@@ -205,14 +215,16 @@ class TestGraphTracerEventEmission:
         evt = error_events[0]
         assert evt.node_id == node_id
         assert evt.ended_at == ended_at
-        assert evt.error.error_type == "ValueError"
-        assert evt.error.message == "Something went wrong"
-        assert evt.error.caller_facing is False
+        assert evt.error == problem
+        assert evt.error_stack == "traceback line 1\nline 2"
         # An end event names the pipe it ends, as its start does, and the invocation's path.
         assert (evt.pipe_code, evt.pipe_ref, evt.pipe_type, evt.path) == ("test_pipe", "tests.test_pipe", "PipeLLM", "tests.test_pipe")
 
-    def test_pipe_end_error_states_whether_its_message_was_written_for_the_caller(self) -> None:
-        """The failure's `caller_facing` reaches the event and the node of the graph."""
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds the step's failure with a message alone, to check where its problem is recorded"
+    )
+    def test_pipe_end_error_records_the_same_caller_view_on_the_event_and_the_node(self) -> None:
+        """The node's problem reaches the event and the node of the graph alike, in the caller's view, without the error's message."""
         tracer, event_log = self._make_tracer_with_event_log()
         context = tracer.setup(
             graph_id=self.GRAPH_ID,
@@ -232,21 +244,24 @@ class TestGraphTracerEventEmission:
             started_at=started_at,
         )
 
-        tracer.on_pipe_end_error(
-            node_id=node_id,
-            ended_at=started_at + timedelta(milliseconds=50),
-            error_type="StuffFactoryError",
-            error_message="PipeParallel 'test_pipe' cannot combine its branch results into its output 'Report'.",
-            caller_facing=True,
+        error_message = "PipeParallel 'test_pipe' cannot combine its branch results into its output 'Report'."
+        problem = make_node_problem(
+            error=StuffFactoryError(error_message).with_error_code(CoreCode.PIPE_OUTPUT_INVALID),
+            pipe_code="test_pipe",
+            pipe_path=["test_pipe"],
         )
+        tracer.on_pipe_end_error(node_id=node_id, ended_at=started_at + timedelta(milliseconds=50), problem=problem)
         graph_spec = tracer.teardown()
 
         error_events = [evt for evt in event_log.read_events(self.PIPELINE_RUN_ID) if isinstance(evt, PipeEndErrorEvent)]
-        assert [evt.error.caller_facing for evt in error_events] == [True]
+        assert [evt.error for evt in error_events] == [problem]
         assert graph_spec is not None
         failed_node = next(node for node in graph_spec.nodes if node.node_id == node_id)
         assert failed_node.error is not None
-        assert failed_node.error.caller_facing is True
+        assert failed_node.error == problem
+        assert failed_node.error.code == CoreCode.PIPE_OUTPUT_INVALID
+        assert failed_node.error.diagnostics is None
+        assert error_message not in str(failed_node.error.to_wire())
         assert failed_node.path == "tests.test_pipe"
 
     def test_add_edge_emits_event(self) -> None:

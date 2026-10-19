@@ -1,64 +1,48 @@
 version = 1
 
-["pipelex/base_exceptions.py::ErrorReport.from_dict"]
-param = "data"
-rationale = "Factory from source: builds the report from the dict; single operand."
+["pipelex/base_exceptions.py::ErrorDomain.from_problem_domain"]
+param = "problem_domain"
+rationale = "Converts its one operand, a registry domain: ErrorDomain.from_problem_domain(spec.domain) reads as a conversion."
 
-["pipelex/base_exceptions.py::PipelexError._enrich_error_report_from_cause"]
-param = "report"
-rationale = "Verb-object: enriches the report; single operand."
+["pipelex/base_exceptions.py::PipelexError.with_error_code"]
+param = "error_code"
+rationale = "Chained at every raise site on its one operand, the chosen code: raise SomeError(msg).with_error_code(CoreCode.INPUT_MISSING)."
 
-["pipelex/base_exceptions.py::_humanize_class_name"]
-param = "class_name"
-rationale = "Transforms the class name into a human title; single operand."
-
-["pipelex/base_exceptions.py::_redact_provider_metadata_for_strict"]
-param = "metadata_payload"
-rationale = "Transforms the metadata payload; single operand."
+["pipelex/base_exceptions.py::PipelexError.with_security_target_class"]
+param = "target_class"
+rationale = "Chained at every raise site on its one operand, the class of destination refused: raise SsrfBlockedError(msg).with_security_target_class(target_class)."
 
 ["pipelex/base_exceptions.py::error_domain_is_input"]
 param = "error_domain"
 rationale = "Predicate on the error domain; single operand."
 
-["pipelex/base_exceptions.py::error_domain_to_http_status"]
-param = "error_domain"
-rationale = "Conversion: maps the error domain to a status; single operand."
-
 ["pipelex/base_exceptions.py::iter_cause_chain"]
 param = "exc"
 rationale = "Verb-object: iterates the exception's cause chain; single operand."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
-param = "message"
-rationale = "Builds the error JSON around the message; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::_assemble_error_payload"]
-param = "message"
-rationale = "Assembles the error payload around the message; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::_build_error_source"]
+["pipelex/base_exceptions.py::iter_pipelex_cause_chain"]
 param = "exc"
-rationale = "Derives from the exc; single operand."
+rationale = "Verb-object: iterates the Pipelex part of the exception's cause chain; single operand, as iter_cause_chain."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_render_error_markdown"]
-param = "payload"
-rationale = "Renders the payload; single operand."
+["pipelex/base_exceptions.py::iter_traceback_chain"]
+param = "exc"
+rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_render_validate_bundle_markdown"]
-param = "items"
-rationale = "Verb-object: renders the validation error items; the rest is context."
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_argument_error"]
+param = "message"
+rationale = "Refuses an argument with the command's message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
 rationale = "Emits an agent error for the message; single operand."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_markdown"]
-param = "message"
-rationale = "Renders the message; single operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_validate_bundle"]
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
+
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_file_error"]
+param = "message"
+rationale = "Refuses a local file with the command's message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success"]
 param = "result"
@@ -67,10 +51,6 @@ rationale = "Emits the success result payload; single operand."
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success_formatted"]
 param = "result"
 rationale = "Emits the formatted success result; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::extract_validation_errors"]
-param = "exc"
-rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::set_agent_cli_error_format"]
 param = "error_format"
@@ -3020,57 +3000,53 @@ rationale = "Verb-object: renders the stuff data; options stay keyword."
 param = "stuff"
 rationale = "Verb-object: renders the stuff; options stay keyword."
 
-["pipelex/errors/error_pages_generator.py::_group_by_subsystem"]
-param = "classes"
-rationale = "Verb-object: groups the error classes; single operand."
-
-["pipelex/errors/error_pages_generator.py::_humanize_subsystem"]
-param = "key"
-rationale = "Transforms the subsystem key into a human heading; single operand."
-
-["pipelex/errors/error_pages_generator.py::_is_production_subclass"]
+["pipelex/errors/error_class_discovery.py::_is_production_subclass"]
 param = "cls"
 rationale = "Predicate on the error class; single operand."
 
-["pipelex/errors/error_pages_generator.py::_parent_link"]
+["pipelex/errors/error_code_declaration.py::declared_error_codes"]
+param = "declaration"
+rationale = "Lists the codes of its one operand, a class's declaration: declared_error_codes(cls.error_code)."
+
+["pipelex/errors/error_code_declaration.py::describe_error_code_declaration"]
+param = "declaration"
+rationale = "Describes its one operand, a class's declaration: describe_error_code_declaration(cls.error_code)."
+
+["pipelex/errors/error_code_sites.py::_chosen_code"]
+param = "call"
+rationale = "Reads the code its one operand, a with_error_code call node, chooses: _chosen_code(call)."
+
+["pipelex/errors/error_code_sites.py::constructed_class_name"]
+param = "node"
+rationale = "Names the class its one operand, an AST expression, constructs: constructed_class_name(node)."
+
+["pipelex/errors/error_codes.py::error_code_spec"]
+param = "code"
+rationale = "Looks up its one operand, a code: error_code_spec(code) reads as the code's spec."
+
+["pipelex/errors/error_codes.py::parse_error_code"]
+param = "value"
+rationale = "Parses its one operand, a code string: parse_error_code(value) reads as a parse."
+
+["pipelex/errors/foreign_raises.py::_decorator_names"]
+param = "function"
+rationale = "Lists the decorators of its one operand, a function node: _decorator_names(function)."
+
+["pipelex/errors/foreign_raises.py::_expression_name"]
+param = "node"
+rationale = "Names its one operand, an AST expression: _expression_name(node), applied recursively."
+
+["pipelex/errors/foreign_raises.py::_raised_class_name"]
+param = "node"
+rationale = "Names the class its one operand, a raise's expression, constructs: _raised_class_name(node.exc)."
+
+["pipelex/errors/retired_error_pages.py::_code_page_target"]
+param = "code"
+rationale = "Maps its one operand, a code, to its page: _code_page_target(code)."
+
+["pipelex/errors/retired_error_pages.py::_representative_code"]
 param = "cls"
-rationale = "Derivation from the error class ('the parent link of cls'); single operand."
-
-["pipelex/errors/error_pages_generator.py::_remove_orphans"]
-param = "output_dir"
-rationale = "Verb-object: prunes the output dir; expected stems and report stay keyword."
-
-["pipelex/errors/error_pages_generator.py::_resolve_class_level_domain"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_resolve_class_level_user_action"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_short_docstring"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::_subsystem_key"]
-param = "cls"
-rationale = "Derivation from the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::has_authored_marker"]
-param = "content"
-rationale = "Predicate on the page content; single operand."
-
-["pipelex/errors/error_pages_generator.py::page_slug"]
-param = "cls"
-rationale = "Derivation from the error class ('the page slug of cls'); single operand."
-
-["pipelex/errors/error_pages_generator.py::render_error_page"]
-param = "cls"
-rationale = "Verb-object: renders the page for the error class; single operand."
-
-["pipelex/errors/error_pages_generator.py::render_index_page"]
-param = "by_subsystem"
-rationale = "Verb-object: renders the index from the subsystem grouping; single operand."
+rationale = "Picks the code of its one operand, an error class: _representative_code(cls)."
 
 ["pipelex/fix_ops/applier.py::_as_tomlkit_value"]
 param = "value"
@@ -3956,10 +3932,6 @@ rationale = "Single-operand transformation of the code; the rest is context."
 param = "loc"
 rationale = "Verb-object: categorizes the error at the loc; context stays keyword."
 
-["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_syntax_validation_error"]
-param = "message"
-rationale = "Verb-object: categorizes the error message; context stays keyword."
-
 ["pipelex/mthds_parsing/validation_error_categorizer.py::_categorize_typeless_pipe_error"]
 param = "message"
 rationale = "Verb-object: categorizes the message; the rest is context."
@@ -4496,9 +4468,9 @@ rationale = "Verb-object: formats the fix payload; bundle_path is context."
 param = "result"
 rationale = "Positional-Callable protocol shape: markdown renderer over the result dict."
 
-["pipelex/pipeline/fixes/fix_render.py::format_fix_still_invalid_markdown"]
+["pipelex/pipeline/fixes/fix_render.py::format_fix_progress_markdown"]
 param = "result"
-rationale = "Verb-object: formats the fix result; bundle_path is context."
+rationale = "Verb-object: formats the fix result's progress; bundle_path is context."
 
 ["pipelex/pipeline/fixes/planner.py::_plan_match_sequence_output"]
 param = "error_data"
@@ -4636,14 +4608,6 @@ rationale = "Verb-object: validates bundles from the directory; options stay key
 param = "pipe_error"
 rationale = "Verb-object: backfills the pipe error in place; single operand."
 
-["pipelex/pipeline/validation_render.py::_markdown_category_header"]
-param = "category"
-rationale = "Noun-named derivation: the header text for the category; single operand."
-
-["pipelex/pipeline/validation_render.py::_render_error_item_markdown"]
-param = "item"
-rationale = "Verb-object: renders the error item; index is context."
-
 ["pipelex/pipeline/validation_render.py::count_applicable_fixes"]
 param = "items"
 rationale = "Single-operand count over the error items; scope stays keyword."
@@ -4651,14 +4615,6 @@ rationale = "Single-operand count over the error items; scope stays keyword."
 ["pipelex/pipeline/validation_render.py::format_validate_markdown"]
 param = "result"
 rationale = "Verb-object: formats the validate result; single operand."
-
-["pipelex/pipeline/validation_render.py::format_validation_error_items_markdown"]
-param = "items"
-rationale = "Verb-object: formats the error items; single operand."
-
-["pipelex/pipeline/validation_render.py::render_invalid_validation_markdown"]
-param = "report"
-rationale = "Verb-object: renders the validation report; single operand."
 
 ["pipelex/plugins/backend_extras_factory.py::BackendExtrasFactory.make_extras"]
 param = "inference_model"
@@ -4827,14 +4783,6 @@ rationale = "Submits the img-gen job and returns its result; single operand."
 ["pipelex/providers/fal/fal_plugin.py::FalPlugin.register"]
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
-
-["pipelex/providers/fal/fal_poller.py::FalPoller._is_transient_http"]
-param = "exc"
-rationale = "Predicate on the exc; single operand."
-
-["pipelex/providers/fal/fal_poller.py::FalPoller.poll_queue_until_complete"]
-param = "response_dict"
-rationale = "Parses/consumes the response_dict; single operand."
 
 ["pipelex/providers/google/google_config.py::GoogleConfig.get_reasoning_level"]
 param = "effort"
@@ -5688,25 +5636,9 @@ rationale = "Transforms the templating_context; single operand."
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_non_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
 ["pipelex/tools/jinja2/jinja2_rendering.py::_prepare_templating_context"]
 param = "templating_context"
 rationale = "Jinja op on the templating_context; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_async"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_sync"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::render_jinja2_async"]
 param = "template_source"
@@ -6396,6 +6328,10 @@ rationale = "Parses/reads the path; single operand."
 param = "data"
 rationale = "Transforms the data; single operand."
 
+["pipelex/tools/network/host_rules.py::classify_disallowed_host"]
+param = "host"
+rationale = "Reads as classify(host): its one operand is the host the SSRF guard refused, as is_disallowed_host takes it."
+
 ["pipelex/tools/network/host_rules.py::is_disallowed_host"]
 param = "host"
 rationale = "Predicate on the host; single operand."
@@ -6607,10 +6543,6 @@ rationale = "Transforms the value; single operand."
 ["pipelex/tools/tabular/csv_codec.py::_validate_header"]
 param = "header"
 rationale = "Validates/checks the header; single operand."
-
-["pipelex/tools/tabular/csv_codec.py::_validation_error_label"]
-param = "error"
-rationale = "Validates/checks the error; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::assert_supported_table_suffix"]
 param = "path"

@@ -9,12 +9,14 @@ an image or a document URI is a question about the memory's stuffs and the conce
 is the caller's business; the kernel takes the `ExtractInput` already built.
 """
 
+from functools import partial
 from typing import TYPE_CHECKING
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
@@ -28,10 +30,17 @@ if TYPE_CHECKING:
 
 
 def resolve_extract_setting(*, extract_choice: ExtractModelChoice | None = None) -> ExtractSetting:
-    """The deck chain for an extraction: the step's own choice, then the deck's default."""
+    """The deck chain for an extraction: the step's own choice, then the deck's default.
+
+    The step's choice that the deck does not resolve is the method's, `model.unknown`; the deck's default is the
+    deployment's, `ModelDeckChoiceUnresolvedError`.
+    """
     model_deck = get_model_deck()
-    resolved_choice = extract_choice or model_deck.extract_choice_default
-    return model_deck.get_extract_setting(extract_choice=resolved_choice)
+    if extract_choice:
+        return model_deck.get_extract_setting(extract_choice=extract_choice)
+    return resolve_deck_choice(
+        deck_setting="extract.choice_default", resolve=partial(model_deck.get_extract_setting, extract_choice=model_deck.extract_choice_default)
+    )
 
 
 def build_extract_job_params(

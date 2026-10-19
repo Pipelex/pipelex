@@ -8,6 +8,7 @@ import pytest
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 from pipelex import log
+from pipelex.system.job_metadata import is_valid_request_id
 from pipelex.tools.log.log_context import get_log_context
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import Message, Receive, Scope, Send
@@ -129,6 +130,16 @@ class TestRequestIdMiddleware:
         returned = response.headers[REQUEST_ID_HEADER]
         assert returned != "bad id with spaces"
         assert _ULID_RE.match(returned) is not None
+
+    @pytest.mark.parametrize("inbound", ["abc error.code=forged", 'abc"def', "abc;q=1", "req.123"])
+    def test_replaces_an_inbound_id_the_runtime_s_rule_refuses(self, inbound: str):
+        """The middleware applies the runtime's one rule, so every id it passes on is one a run accepts."""
+        response = _build_client().get("/probe", headers={REQUEST_ID_HEADER: inbound})
+        returned = response.headers[REQUEST_ID_HEADER]
+        assert returned != inbound
+        assert _ULID_RE.match(returned) is not None
+        assert not is_valid_request_id(value=inbound)
+        assert is_valid_request_id(value=returned)
 
     def test_replaces_overlong_inbound_id(self):
         overlong = "a" * 200

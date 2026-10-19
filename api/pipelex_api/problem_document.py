@@ -1,134 +1,81 @@
-"""RFC 7807 problem-document construction.
+"""The rendering of a problem document as the HTTP response that carries it.
 
-A pure module — no FastAPI imports, no I/O. It turns the two error sources of
-the API into the single `application/problem+json` body shape clients see:
-
-- `build_problem_document` — for a pipelex `ErrorReport`. Delegates to
-  `ErrorReport.to_problem_document(...)`: pipelex owns the field mapping
-  (standard RFC 7807 slots plus classification extension members) and the
-  `disclosure_mode` redaction. The API only chooses the disclosure mode and
-  supplies the request context.
-- `build_problem_document_from_api_error` — for an API-authored 4xx that has
-  no `ErrorReport` behind it (`raise_validation_error` and friends in
-  `pipelex_api.errors`). Built from the static `ErrorType` enum; always `INPUT` domain.
-
-Both return a plain `dict` the caller serializes as `application/problem+json`.
+A pure module: no logging and no request state of its own. Every failure the runner answers is a problem
+(`pipelex.errors.problem.PipelexProblem`) built in the operator's view, and this module renders it as the response a
+reader receives: the view of that reader, the status its code declares, and the headers the status calls for. The
+global handlers in `pipelex_api.exception_handlers` log the failure and then render it here, and so does the body-size
+middleware in `pipelex_api.middleware`, which answers before any handler runs. Keeping the rendering here lets both
+share it while the handlers import the middleware's request-id reader, with no import cycle between them.
 """
 
-from typing import Any
+import math
 
-from pipelex.base_exceptions import DisclosureMode, ErrorDomain, ErrorReport
+from fastapi.responses import JSONResponse
+from pipelex.errors.error_codes import error_code_spec, parse_error_code
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.error_uri import error_type_title, error_type_uri
-
-# Content type for every error response — RFC 7807 problem documents. Lives
-# here, the module that builds them, so the FastAPI app, the middleware, and
-# the error handlers can all reference one constant without a circular import.
+# Content type for every error response, an RFC 9457 problem document. Lives here, the module that renders them, so the
+# FastAPI app, the middleware and the error handlers all reference one constant.
 PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 
+# The HTTP status of a problem whose code the registry gives none, which only a client's own failure has.
+_FALLBACK_PROBLEM_STATUS = 500
 
-def build_problem_document(
-    report: ErrorReport,
-    *,
-    instance: str | None,
-    request_id: str | None,
-    disclosure_mode: DisclosureMode,
-) -> dict[str, Any]:
-    """Build an RFC 7807 problem document from a pipelex `ErrorReport`.
 
-    Thin wrapper over `ErrorReport.to_problem_document(...)`: the field mapping
-    and the `disclosure_mode` redaction both live upstream in pipelex. The
-    API's only responsibility is to choose the disclosure mode and pass the
-    request context through.
+def problem_status(problem: PipelexProblem) -> int:
+    """The HTTP status of the response a problem is the body of: its code's, from the error registry."""
+    code = parse_error_code(problem.code)
+    if code is None:
+        return _FALLBACK_PROBLEM_STATUS
+    return error_code_spec(code).status or _FALLBACK_PROBLEM_STATUS
+
+
+def _retry_after_header(problem: PipelexProblem, *, status: int) -> dict[str, str]:
+    """Return a `Retry-After` header dict when a retry hint applies to this response.
+
+    Emitted only when the response is itself a retry invitation, a 429 such as a provider's rate limit passed through,
+    so a hint never rides a 500 or a 422, where `Retry-After` is meaningless. The problem's `retry_after`, which only a
+    code inviting a retry carries and which is always finite, is rounded up to an integer. Empty when no hint applies.
     """
-    return report.to_problem_document(
-        instance=instance,
-        request_id=request_id,
-        disclosure_mode=disclosure_mode,
+    if status != 429:
+        return {}
+    seconds = problem.retry_after
+    if seconds is None or not math.isfinite(seconds):
+        return {}
+    return {"Retry-After": str(max(0, math.ceil(seconds)))}
+
+
+def problem_json_response(
+    problem: PipelexProblem, *, view: ProblemView, headers: dict[str, str] | None = None, status: int | None = None
+) -> JSONResponse:
+    """Render a problem built in the operator's view as the `application/problem+json` response a reader of `view` receives.
+
+    The status is the one the problem's code declares, unless `status` names another, and the body's `status` member
+    repeats it, as RFC 9457 asks. The caller's view leaves the operator's `diagnostics` out and aims the step at the
+    caller. A 429 carries the `Retry-After` its problem gives. `headers` are added to it, such as the `Allow` header of a
+    405 or the `WWW-Authenticate` challenge of a 401, which the refusal names only where the deployment reads a bearer
+    credential.
+
+    Args:
+        problem: The problem, in the operator's view.
+        view: The view of whoever receives the response.
+        headers: Further headers of the response.
+        status: The status to answer with in place of the code's, which only a refusal the web framework raised gives,
+            when the code it is answered under declares another, so that it keeps the status it was raised with.
+
+    Returns:
+        The response.
+    """
+    status = status or problem_status(problem)
+    match view:
+        case ProblemView.OPERATOR:
+            reader_problem = problem
+        case ProblemView.CALLER:
+            reader_problem = caller_view_of(problem=problem)
+    response_headers = {**(headers or {}), **_retry_after_header(problem, status=status)}
+    return JSONResponse(
+        status_code=status,
+        content=reader_problem.model_copy(update={"status": status}).to_wire(),
+        media_type=PROBLEM_JSON_MEDIA_TYPE,
+        headers=response_headers,
     )
-
-
-def build_problem_document_from_api_error(
-    error_type: ErrorType,
-    message: str,
-    status: int,
-    *,
-    instance: str | None,
-    request_id: str | None,
-    error_domain: ErrorDomain | None = ErrorDomain.INPUT,
-    retryable: bool = False,
-) -> dict[str, Any]:
-    """Build an RFC 7807 problem document for an API-authored error.
-
-    Used by the `pipelex_api.errors` 4xx/5xx helpers, whose failures are the API's own
-    request validation, auth, or configuration checks rather than a pipelex
-    domain error — there is no `ErrorReport` to delegate to. The `type` URI and
-    `title` are derived from the static `ErrorType` enum the same way pipelex
-    derives them for its own classes, so the standard RFC 7807 slots and the
-    `error_type` / `error_domain` members line up with what a pipelex error
-    renders.
-
-    Extension-member parity with a pipelex `ErrorReport` is by-field, not
-    wholesale, with two distinct rules:
-
-    - `retryable` is emitted unconditionally here (every API-authored error is
-      non-retryable; see below). pipelex emits it only when the source error
-      populated it, so a non-inference pipelex report (`PipelexConfigError`,
-      `EnvVarNotFoundError`) renders with no `retryable`. Asymmetric by design:
-      the API knows the answer for every error it authors, and clients can
-      drive retry logic uniformly without branching on field presence.
-    - Classification fields pipelex sets only on classifiable failures
-      (`error_category`, `user_action`, `model`, `provider`, `provider_metadata`)
-      are NOT manufactured here. The same omission rule pipelex applies to its
-      own non-inference reports (`PipelexConfigError`, `EnvVarNotFoundError`
-      carry no `error_category` either) — surfacing a fake category for an
-      API-authored validation or auth failure would lie about what the API
-      actually classified.
-
-    `error_domain` defaults to `INPUT` — the caller can fix a 4xx. API-owned
-    5xx (a missing secret, a misconfigured backend) pass `CONFIG`: an operator,
-    not the caller, fixes those. `None` omits the member entirely, matching how
-    a domain-less pipelex error renders.
-
-    `retryable` defaults to `False`: every error this builder authors is a
-    caller-input mistake or a server misconfiguration, neither of which a blind
-    retry fixes. Carried as a positional contract member rather than dropped on
-    `None`, so clients can drive retry logic uniformly without branching on
-    field presence.
-
-    `None`-valued context (`instance`, `request_id`) is dropped rather than
-    emitted as `null`, matching `ErrorReport.to_problem_document` semantics.
-    """
-    document: dict[str, Any] = {
-        "type": error_type_uri(error_type),
-        "title": error_type_title(error_type),
-        "status": status,
-        "detail": message,
-    }
-    if instance is not None:
-        document["instance"] = instance
-    if request_id is not None:
-        document["request_id"] = request_id
-    document["error_type"] = error_type
-    if error_domain is not None:
-        document["error_domain"] = error_domain
-    document["retryable"] = retryable
-    return document
-
-
-def with_request_context(document: dict[str, Any], *, instance: str | None, request_id: str | None) -> dict[str, Any]:
-    """Return a copy of a problem document carrying the two request-scoped members.
-
-    The `pipelex_api.errors` helpers build their document where no `Request` is in hand — a validation
-    check deep inside a route, an auth refusal — so `instance` and `request_id` are stamped later,
-    by the handler that renders the response and does hold the request. A copy rather than an
-    in-place edit, because the `ApiError` a caller catches and inspects must read exactly as it was
-    raised. `None` is dropped rather than emitted as `null`, the rule every builder here follows.
-    """
-    stamped = dict(document)
-    if instance is not None:
-        stamped["instance"] = instance
-    if request_id is not None:
-        stamped["request_id"] = request_id
-    return stamped

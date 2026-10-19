@@ -1,5 +1,6 @@
 from pydantic import HttpUrl, TypeAdapter, ValidationError
 
+from pipelex.tools.misc.exceptions import LocalFileMissingError, UrlSyntaxError
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -16,14 +17,17 @@ def validate_http_url_syntax(*, url: str) -> None:
     """Check that ``url`` is a well-formed http(s) URL, without touching the network.
 
     Raises:
-        ValueError: If the URL does not parse as an http(s) URL.
+        UrlSyntaxError: If the URL does not parse as an http(s) URL.
     """
     try:
         _HTTP_URL_ADAPTER.validate_python(url)
     except ValidationError as exc:
-        first_error = exc.errors()[0]["msg"] if exc.errors() else "not a valid http(s) URL"
-        msg = f"URL '{url}' is not a valid http(s) URL: {first_error}"
-        raise ValueError(msg) from exc
+        # The URL is an input's value, possibly a signed link: the message names the URL parser's reason, a fixed
+        # sentence such as "empty host", and never the URL.
+        errors = exc.errors(include_url=False, include_input=False)
+        first_error = errors[0]["msg"] if errors else "not a valid http(s) URL"
+        msg = f"The URL is not a valid http(s) URL: {first_error}"
+        raise UrlSyntaxError(msg) from exc
 
 
 def get_user_agent() -> str:
@@ -53,7 +57,7 @@ def validate_url_resource_exists(url: str) -> None:
     Skips validation for internal URIs (base64 data URLs, pipelex-storage://).
 
     Raises:
-        ValueError: If a local file path does not exist.
+        LocalFileMissingError: If a local file path does not exist.
     """
     if url.startswith(_SKIP_VALIDATION_PREFIXES):
         return
@@ -67,4 +71,4 @@ def validate_url_resource_exists(url: str) -> None:
 def _validate_local_path(url: str) -> None:
     if not path_exists(url):
         msg = f"File '{url}' does not exist"
-        raise ValueError(msg)
+        raise LocalFileMissingError(msg)

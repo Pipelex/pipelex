@@ -9,7 +9,6 @@ from kajson.exceptions import KajsonException
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import DisclosureMode, ErrorReport
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
@@ -18,10 +17,12 @@ from pipelex.core.memory.absence import AbsenceRecord
 from pipelex.core.memory.absence_render import build_absence_html, build_absence_json, build_absence_markdown
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import INPUT_FORM_FILE_NAME, OUTPUT_FORM_FILE_NAME, PIPE_IO_CONTRACTS_FILE_NAME
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+    from pipelex.tools.storage.storage_provider_abstract import StorageKind
 
 
 class ResultFile(NamedTuple):
@@ -45,6 +47,27 @@ class ResultFile(NamedTuple):
 
     data: bytes
     content_type: str
+
+
+def _problem_wires_by_view(*, problem: PipelexProblem | None, webhooks: list[WebhookTarget]) -> dict[ProblemView, dict[str, Any]]:
+    """A failed run's problem in the wire form of each view the webhooks read it in, each view built once.
+
+    ``problem`` is in the operator's view, which an operator's webhook receives as it is, and a caller's webhook
+    receives its caller view, projected once for every caller webhook rather than once per webhook.
+    """
+    wires: dict[ProblemView, dict[str, Any]] = {}
+    if problem is None:
+        return wires
+    for webhook in webhooks:
+        view = webhook.problem_view
+        if view in wires:
+            continue
+        match view:
+            case ProblemView.OPERATOR:
+                wires[view] = problem.to_wire()
+            case ProblemView.CALLER:
+                wires[view] = caller_view_of(problem=problem).to_wire()
+    return wires
 
 
 class DeliveryExecutor:
@@ -58,10 +81,12 @@ class DeliveryExecutor:
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
-        error_report: ErrorReport | None = None,
+        problem: PipelexProblem | None = None,
         request_id: str | None = None,
     ) -> None:
         """Execute a full delivery: generate result files, store them, then notify webhooks.
+
+        ``problem`` is a failed run's problem in the operator's view, which each webhook receives in its own view.
 
         ``request_id`` is the originating API request id (when set). The delivery binds it
         with ``pipeline_run_id`` onto the log context, so every record the delivery emits,
@@ -81,13 +106,14 @@ class DeliveryExecutor:
                 )
 
             # Step 2: Notify webhooks with status + result_url (always, even on failure)
+            problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
             for webhook in delivery_assignment.webhooks:
                 await self._notify_webhook(
                     pipeline_run_id=pipeline_run_id,
                     status=status,
                     result_url=result_url,
                     webhook=webhook,
-                    error_report=error_report,
+                    problem_wire=problem_wires.get(webhook.problem_view),
                 )
 
     # ---- Result file generation ----
@@ -216,7 +242,7 @@ class DeliveryExecutor:
             # error rides as its fields, never its text or traceback, which quote the values the record held.
             log.error(
                 "The absence record of the main output is malformed",
-                fields=error_fields(exc=validation_error),
+                fields=error_fields(exc=validation_error, validated_type=AbsenceRecord),
             )
             return None
 
@@ -289,6 +315,8 @@ class DeliveryExecutor:
         raw-dict render. A warning is emitted on the fallback path so silent regressions
         on built-in hydration surface in logs.
         """
+        # The class the content validates into, whose schema names a refusal's locations in the warning.
+        structure_class: type[StuffContent] | None = None
         try:
             concept_ref = stuff_raw["concept"]
             if not isinstance(concept_ref, str):
@@ -310,6 +338,7 @@ class DeliveryExecutor:
                         fields={"concept_ref": concept_ref, "structure_class_name": concept.structure_class_name},
                     )
                     return None
+                structure_class = item_class
             content = hydrate_content(concept=concept, raw_content=stuff_raw["content"])
             return Stuff(
                 stuff_code=stuff_raw["stuff_code"],
@@ -320,7 +349,7 @@ class DeliveryExecutor:
         except (PipeJobError, ValidationError, KajsonException, KeyError, TypeError) as exc:
             log.warning(
                 "A delivered result could not be hydrated and was rendered raw",
-                fields=error_fields(exc=exc),
+                fields=error_fields(exc=exc, validated_type=structure_class),
             )
             return None
 
@@ -426,8 +455,10 @@ class DeliveryExecutor:
         appears in the key; it stays a parameter because the failure below
         names it.
         """
+        storage_kind: StorageKind | None = None
         try:
             storage_provider = get_storage_provider()
+            storage_kind = storage_provider.storage_kind
             prefix: str = storage.key_prefix or ""
             base_key: str = f"{storage_scope}/{prefix}results"
 
@@ -446,7 +477,12 @@ class DeliveryExecutor:
         except Exception as exc:
             # Delivery boundary: any failure across result-file generation or storage is converted to StorageDeliveryError. Re-raises, never swallows.
             msg = f"Storage delivery failed for pipeline_run_id={pipeline_run_id}"
-            raise StorageDeliveryError(msg) from exc
+            # The storage's kind is what `pipelex.storage.unavailable`, the fallback of an uncoded cause, names; a coded
+            # cause that names its own keeps it.
+            delivery_error = StorageDeliveryError(msg)
+            if storage_kind is not None:
+                delivery_error = delivery_error.with_params(scheme=storage_kind)
+            raise delivery_error from exc
 
     # ---- Webhooks ----
 
@@ -457,12 +493,13 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         result_url: str | None,
         webhook: WebhookTarget,
-        error_report: ErrorReport | None = None,
+        problem_wire: dict[str, Any] | None = None,
     ) -> None:
-        """POST status, optional result_url, and optional VERBOSE error report to a webhook URL.
+        """POST status, optional result_url, and a failed run's problem to a webhook URL.
 
-        VERBOSE on the wire is deliberate: the receiver decides what to re-expose
-        downstream (it can render STRICT via :meth:`ErrorReport.to_problem_document`).
+        ``problem_wire`` is the problem in the webhook's own view (``WebhookTarget.problem_view``),
+        already in its wire form: an operator's webhook, such as a hosted plane's completion
+        callback, receives the diagnostics, and a caller's receives the problem without them.
 
         The HTTP client uses :class:`SsrfGuardedTransport`, which re-resolves the
         callback host at connect time and refuses private/loopback/metadata
@@ -484,8 +521,8 @@ class DeliveryExecutor:
             payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
-            if error_report is not None:
-                payload["error"] = error_report.to_dict(disclosure_mode=DisclosureMode.VERBOSE)
+            if problem_wire is not None:
+                payload["error"] = problem_wire
 
             async with httpx.AsyncClient(transport=SsrfGuardedTransport()) as client:
                 response = await client.post(
@@ -501,5 +538,6 @@ class DeliveryExecutor:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
             raise WebhookDeliveryError(msg) from exc
         except httpx.RequestError as exc:
-            msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {exc}"
+            # By the failure's class, never its text, which can quote the caller's webhook URL.
+            msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {type(exc).__name__}"
             raise WebhookDeliveryError(msg) from exc

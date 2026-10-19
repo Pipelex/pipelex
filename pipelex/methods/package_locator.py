@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_MANIFEST_FILE_BYTES, MAX_SCANNED_MANIFESTS
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 _SKIPPED_DIR_NAMES = {".git"}
@@ -134,7 +135,7 @@ def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
         manifest_count += 1
         if manifest_count > MAX_SCANNED_MANIFESTS:
             msg = f"The fetched repository contains more than {MAX_SCANNED_MANIFESTS} {MANIFEST_FILENAME} manifests; refusing to scan further."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TOO_MANY_MANIFESTS, limit=MAX_SCANNED_MANIFESTS)
         relative_path = manifest_path.relative_to(clone_root).as_posix()
         manifest_read = _read_manifest_text(manifest_path=manifest_path)
         if manifest_read.text is None:
@@ -190,11 +191,13 @@ def locate_package_in_clone(*, clone_root: Path, requested_address: str) -> Pack
         if scan.skipped_manifests:
             details = "; ".join(scan.skipped_manifests)
             msg = f"{msg} Manifests skipped: {details}"
-        raise MethodPackageNotFoundError(msg)
+        raise MethodPackageNotFoundError(msg).with_params(method_ref=requested_address)
 
     matched = ", ".join(sorted(f"{candidate.full_address} ({candidate.package_dir.name}/)" for candidate in matches))
     msg = (
         f"Ambiguous method address '{requested_address}': it matches more than one package in the fetched repository: {matched}. "
         f"Use the package's full address (address + '/' + name) to disambiguate."
     )
-    raise MethodPackageAmbiguityError(msg)
+    raise MethodPackageAmbiguityError(msg).with_params(
+        method_ref=requested_address, candidates=sorted(candidate.full_address for candidate in matches)
+    )

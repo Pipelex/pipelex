@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMSettingRefusedError
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting
 from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.problem import ProblemView
 from pipelex.pipe_operators.shared.llm_setting_check import refuse_llm_setting_its_model_refuses
 from pipelex.validation_error_types import PipeValidationErrorType
 
@@ -18,6 +22,14 @@ if TYPE_CHECKING:
 
 _SETTING = LLMSetting(model="@some-alias", temperature=0.2, reasoning_effort=ReasoningEffort.HIGH)
 _WORKER_REFUSAL = "Model 'some-model' does not support reasoning (thinking_mode=none)"
+
+
+class _ClassNamedCapabilityError(LLMCapabilityError):
+    """A refusal whose class, not its raise site, names the capability the model lacks, as a plugin's may."""
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"model": "some-model", "capability": "reasoning"}
 
 
 class TestLLMSettingCheck:
@@ -156,6 +168,9 @@ class TestLLMSettingCheck:
         assert message.endswith(expected_remedy)
         assert "choice_defaults" not in message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a worker's own refusal, built with a message alone, is named by its code's title, which is what the test checks"
+    )
     def test_a_refusal_not_worded_for_the_caller_is_named_by_its_title(self, mocker: MockerFixture) -> None:
         """A worker's own refusal names the SDK and the backend, which a verdict kept under strict disclosure must not show."""
         self._patch_deck_overrides(mocker, for_text=None, for_object=None)
@@ -175,4 +190,27 @@ class TestLLMSettingCheck:
             )
         message = str(exc_info.value)
         assert "internal" not in message
-        assert "which the model it resolves to refuses: LLM capability. " in message
+        capability_title = error_code_spec(CoreCode.MODEL_CAPABILITY_UNSUPPORTED).title.rstrip(".")
+        assert f"which the model it resolves to refuses: {capability_title}. " in message
+
+    def test_the_capability_a_refusal_s_class_names_reaches_the_verdict(self, mocker: MockerFixture) -> None:
+        """The capability is read from both channels a refusal gives it by, its class's facts as well as its raise site's."""
+        self._patch_deck_overrides(mocker, for_text=None, for_object=None)
+        mocker.patch(
+            "pipelex.pipe_operators.shared.llm_setting_check.check_llm_setting_with_served_model",
+            side_effect=_ClassNamedCapabilityError("Model 'some-model' does not reason"),
+        )
+        with pytest.raises(PipeValidationError) as exc_info:
+            refuse_llm_setting_its_model_refuses(
+                pipe_type="PipeLLM",
+                pipe_code="answer_it",
+                domain_code="some_domain",
+                llm_setting=_SETTING,
+                llm_choice=_SETTING,
+                field_name="model",
+                is_structured=False,
+            )
+
+        params = exc_info.value.to_problem(view=ProblemView.CALLER).params
+        assert params is not None
+        assert params.as_wire().get("capability") == "reasoning"

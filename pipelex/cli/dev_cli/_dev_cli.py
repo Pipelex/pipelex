@@ -22,9 +22,13 @@ from pipelex.cli.dev_cli.commands.check_rich_imports_cmd import check_rich_impor
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
 from pipelex.cli.dev_cli.commands.drift.drift_cmd import drift_app
+from pipelex.cli.dev_cli.commands.error_registry.error_registry_cmd import (
+    check_error_registry_cmd,
+    generate_error_registry_cmd,
+    write_error_type_redirects_cmd,
+)
 from pipelex.cli.dev_cli.commands.generate_corpus_vocabulary_cmd import generate_corpus_vocabulary_cmd
 from pipelex.cli.dev_cli.commands.generate_error_identity_cmd import generate_error_identity_cmd
-from pipelex.cli.dev_cli.commands.generate_error_pages_cmd import generate_error_pages_cmd
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import generate_projection_corpus_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
@@ -49,6 +53,7 @@ class PipelexDevCLI(TyperGroup):
         return [
             "check-actions-allowlist",
             "check-config-sync",
+            "check-error-registry",
             "check-hub-layering",
             "check-keyword-only",
             "check-ledger",
@@ -61,7 +66,7 @@ class PipelexDevCLI(TyperGroup):
             "drift",
             "generate-corpus-vocabulary",
             "generate-error-identity",
-            "generate-error-pages",
+            "generate-error-registry",
             "generate-mthds-schema",
             "generate-projection-corpus",
             "kit",
@@ -73,6 +78,7 @@ class PipelexDevCLI(TyperGroup):
             "sync-main-config",
             "trace-input-semantics",
             "update-migration-schemas",
+            "write-error-type-redirects",
         ]
 
     @override
@@ -207,7 +213,7 @@ def generate_corpus_vocabulary_command(
         sys.exit(1)
 
 
-@app.command(name="generate-error-identity", help="Regenerate the committed (error_type, title, type_uri) snapshot of every PipelexError subclass")
+@app.command(name="generate-error-identity", help="Regenerate the committed (error_type, code declaration) snapshot of every PipelexError subclass")
 def generate_error_identity_command(
     output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output path for the snapshot file")] = None,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
@@ -229,15 +235,63 @@ def generate_error_identity_command(
         sys.exit(1)
 
 
-@app.command(name="generate-error-pages", help="Generate one docs page per PipelexError subclass under docs/errors/")
-def generate_error_pages_command(
-    output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output directory for the error pages")] = None,
+@app.command(
+    name="generate-error-registry",
+    help="Write the Pipelex error registry's JSON snapshot, its typed Python and its pages under docs/errors/, from its YAML source",
+)
+def generate_error_registry_command(
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
 ) -> None:
-    """Generate per-class error documentation pages under ``docs/errors/``."""
+    """Generate every file derived from ``pipelex/errors/registry/pipelex-error-registry.yaml``."""
     try:
-        output_path = Path(output) if output else None
-        generate_error_pages_cmd(output=output_path, quiet=quiet)
+        generate_error_registry_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # ruff: ignore[blind-except]
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(
+    name="check-error-registry",
+    help="Check the Pipelex error registry against the MTHDS standard, and that every file derived from it is up to date",
+)
+def check_error_registry_command(
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Check the error registry and its derived files, without writing anything."""
+    try:
+        check_error_registry_cmd(quiet=quiet)
+    except (typer.Exit, typer.Abort):
+        # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
+        raise
+    except Exception:  # ruff: ignore[blind-except]
+        # Dev CLI command root: print a traceback for any unexpected failure and exit non-zero.
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(
+    name="write-error-type-redirects",
+    help="Write, at the root of the published documentation, the redirect that makes each error code's type URI reach its page",
+)
+def write_error_type_redirects_command(
+    site_root: Annotated[str, typer.Option("--site-root", help="The root of the published site: a checkout of its gh-pages branch")],
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single status line")] = False,
+) -> None:
+    """Write the type URI redirect stubs into a checkout of the published site."""
+    try:
+        write_error_type_redirects_cmd(site_root=Path(site_root), quiet=quiet)
     except (typer.Exit, typer.Abort):
         # Typer control-flow exits carry an intended exit code — not a failure. Let them through.
         raise

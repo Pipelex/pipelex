@@ -36,7 +36,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `RuntimeHub`, `get_runtime_hub`, `set_runtime_hub` |
 | config | `get_required_config`, `get_optional_config` |
-| console | `get_console` |
+| console | `get_console`, `get_error_console` |
 | secrets | `get_secrets_provider`, `get_secret` |
 | system registries | `get_class_registry` |
 | storage | `get_storage_provider` |
@@ -59,7 +59,7 @@ There is deliberately **no** `pipelex.hub`. It was deleted rather than kept as a
 | --- | --- |
 | container | `InterpreterHub`, `get_interpreter_hub`, `set_interpreter_hub` |
 | library manager | `get_library_manager`, `get_library` |
-| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_own_pipes`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
+| library lookups | `get_concept_library`, `get_required_concept`, `get_native_concept`, `get_required_domain`, `get_optional_domain`, `get_pipe_library`, `get_pipes`, `get_own_pipes`, `get_selectable_own_pipe_refs`, `get_required_pipe`, `get_optional_pipe`, `get_required_entry_pipe`, `get_optional_entry_pipe`, `get_pipe_source` |
 | current-library contextvar | `set_current_library`, `get_current_library`, `get_current_library_id_or_none`, `clear_current_library`, `scoped_current_library` |
 | library dirs | `resolve_library_dirs`, `get_default_library_dirs` |
 | pipe router | `get_pipe_router`, `set_pipe_router`, `teardown_current_pipe_router`, `scoped_pipe_router` |
@@ -145,7 +145,7 @@ It is **read-side only**. Managing a library — adding, removing, listing, setu
 
 **There is deliberately no pipe counterpart.** Nothing in core's kernel half resolves a pipe. The two places that follow a pipe reference found *inside* a pipe graph — a condition's mapped pipes, a sequence's last step — live in `pipe_machinery/rendering/`, which is interpreter-layer and calls `interpreter_hub.get_required_pipe` directly; a provider parameter there would buy no closure property. `get_required_pipe` therefore stays on `PipeLibraryAbstract`. Split a read half out when a kernel-layer caller actually needs one, not for symmetry with concepts.
 
-Pipe resolution comes in two flavours on this hub, and picking the wrong one is a correctness bug rather than a style choice. `get_required_pipe` / `get_optional_pipe` resolve an **in-body** reference — one pipe naming another from inside a method — and are strict: the ref names its own domain or it names nothing. `get_required_entry_pipe` / `get_optional_entry_pipe` resolve a code a **human** supplied at an entry point (a CLI argument, an API request field), where a bare code is still matched across domains. A CLI command on the strict pair is needlessly strict; a controller on the entry pair reopens the cross-domain hole that makes `[exports]` unenforceable.
+Pipe resolution comes in two flavours on this hub, and picking the wrong one is a correctness bug rather than a style choice. `get_required_pipe` / `get_optional_pipe` resolve an **in-body** reference — one pipe naming another from inside a method — and are strict: the ref names its own domain or it names nothing. A caller that knows the pipe whose body writes the reference passes it as `referring_pipe_code`, which the refusal names as its `pipe`. `get_required_entry_pipe` / `get_optional_entry_pipe` resolve a code a **human** supplied at an entry point (a CLI argument, an API request field), where a bare code is still matched across domains. A CLI command on the strict pair is needlessly strict; a controller on the entry pair reopens the cross-domain hole that makes `[exports]` unenforceable.
 
 One caveat on "strict", so nobody relies on it absolutely: a **cross-package** `alias->bare_code` ref is still resolved by searching the aliased entries, because the qualification pass leaves `alias->…` refs alone — it cannot know a dependency's domain layout, so there would be no canonical spelling to migrate such a ref to. That search is alias-scoped and cannot reach a host pipe, so it does not reopen the hole; it is a deferral to the packaging design, not an exception to the rule.
 

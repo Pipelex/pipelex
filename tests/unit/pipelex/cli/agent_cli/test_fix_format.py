@@ -7,13 +7,16 @@ from typing import TYPE_CHECKING
 
 import pytest
 import typer
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
-from pipelex.suggested_fix import FixSafety, SuggestedFix
+from pipelex.pipeline.validation_errors import ValidationItemCode
+from pipelex.suggested_fix import FixSafety, SetKeyOp, SuggestedFix
 from pipelex.validation_error_types import PipeValidationErrorType
+from tests.helpers.fix_results import fix_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -30,7 +33,7 @@ def _applied_fix(source: str) -> SuggestedFix:
         description="Set output of pipe 'list_ideas' to 'Idea[]'",
         safety=FixSafety.SAFE,
         source=source,
-        ops=[],
+        ops=[SetKeyOp(table_path=["pipe", "list_ideas"], key="output", value="Idea[]")],
     )
 
 
@@ -150,10 +153,13 @@ class TestFixFormat:
         assert parsed["is_runnable"] is False
         assert parsed["pending_signatures"] == ["fix_format.pending_pipe"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_still_invalid_emits_json_error(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=1,
             fixes_applied=[_applied_fix(str(bundle_path))],
@@ -168,17 +174,49 @@ class TestFixFormat:
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error"] is True
-        assert parsed["error_type"] == "FixBundleError"
+        assert parsed["code"] == "method.invalid"
         assert parsed["is_valid"] is False
         assert parsed["bail_reason"] == "no safe fixes remain"
-        assert parsed["remaining_errors"][0]["source"] == str(bundle_path)
+        assert parsed["bundle_path"] == str(bundle_path.resolve())
+        assert [fix["fix_code"] for fix in parsed["fixes_applied"]] == ["match-sequence-output"]
+        # The remaining errors are the problem's own faults, located in their file.
+        assert "remaining_errors" not in parsed
+        assert [item["location"]["file"] for item in parsed["errors"]] == [str(bundle_path)]
+        assert "error_type" not in parsed
 
+    def test_still_invalid_items_keep_the_codes_the_verdict_gave_them(
+        self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """A remaining error no stage classified takes the code the loop's last verdict gave it, as `validate` reports it."""
+        bundle_path = tmp_path / "bundle.mthds"
+        bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
+        unparsed = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="Expected a value", source=str(bundle_path))
+        result = fix_result(
+            is_valid=False,
+            iterations=0,
+            fixes_applied=[],
+            remaining_errors=[unparsed],
+            remaining_error_codes=[ValidationItemCode(code=CoreCode.METHOD_SYNTAX, params={"finding": "Expected a value"})],
+        )
+        _patch_command(mocker, result=result)
+
+        with pytest.raises(typer.Exit):
+            fix_bundle_cmd(path=str(bundle_path), output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().err)
+        (item,) = parsed["errors"]
+        assert item["code"] == "method.syntax"
+        assert item["params"] == {"finding": "Expected a value"}
+        assert "remaining_error_codes" not in parsed
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_still_invalid_markdown_renders_prose(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Default (markdown) still-invalid renders the remaining errors as prose on stderr, not a JSON dump."""
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
-        result = FixBundleResult(
+        result = fix_result(
             is_valid=False,
             iterations=1,
             fixes_applied=[_applied_fix(str(bundle_path))],
@@ -194,10 +232,15 @@ class TestFixFormat:
         assert exc_info.value.exit_code == 1
         captured = capsys.readouterr()
         assert captured.out == ""
-        assert captured.err.startswith("# Fix incomplete - bundle still invalid")
-        assert "## Applied Fixes" in captured.err
+        assert captured.err.startswith("## The method does not validate")
+        assert "Fix loop stopped after 1 iteration(s)" in captured.err
+        assert "### Errors\n\n- `" in captured.err
+        assert f"file '{bundle_path}')" in captured.err
+        assert "## Pipe validation errors" not in captured.err
+        assert "### Applied Fixes" in captured.err
         assert "**Stopped:** no safe fixes remain" in captured.err
-        assert "## Pipe validation errors" in captured.err
+        assert f"- **bundle_path:** {bundle_path.resolve()}" in captured.err
+        assert "fixes_applied" not in captured.err
         with pytest.raises(json.JSONDecodeError):
             json.loads(captured.err)
 
@@ -212,7 +255,8 @@ class TestFixFormat:
 
         assert exc_info.value.exit_code == 2
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error_type"] == "ArgumentError"
+        assert parsed["code"] == "client.argument_invalid"
+        assert parsed["params"] == {"argument": "--ignore", "reason": "contradicts --select"}
         assert "mutually exclusive" in parsed["message"]
 
     def test_unknown_fix_code_is_rejected(self, capsys: pytest.CaptureFixture[str]) -> None:
@@ -221,6 +265,7 @@ class TestFixFormat:
 
         assert exc_info.value.exit_code == 2
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error_type"] == "ArgumentError"
+        assert parsed["code"] == "client.argument_invalid"
+        assert parsed["params"] == {"argument": "typo-rule", "reason": "unknown fix rule code"}
         assert parsed["unknown_fix_codes"] == ["typo-rule"]
         assert "match-sequence-output" in parsed["known_fix_codes"]

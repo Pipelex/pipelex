@@ -1,35 +1,39 @@
 """Unit tests for ``build_validation_error_items`` — the shared structured-error builder.
 
-The single builder feeds both the agent CLI's ``validation_errors`` JSON array
-(via ``extract_validation_errors``) and the API 422's
-``ErrorReport.validation_errors`` (via ``ValidateBundleError.to_error_report``),
-so the two surfaces can never drift. These tests pin the per-category field
-projection — including the ``source`` / ``field_name`` / ``concept_code`` fields
-that the older CLI-only extractor dropped — and the CLI↔API shape parity.
+The single builder feeds the problem's ``errors`` (via ``ValidateBundleError.problem_items``), which the agent CLI
+prints, and the API's invalid verdict (``BundleValidationFailure.validation_errors``, via
+``ValidateBundleError.validation_error_items``), so the surfaces can never drift. These tests pin the per-category
+field projection, including the ``source`` / ``field_name`` / ``concept_code`` fields, and that the problem's errors
+follow the builder's items one for one.
 """
 
 import json
 
+import pytest
+from mthds.protocol.problem.registry import CoreCode
+
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cli.agent_cli.commands.agent_output import extract_validation_errors
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
     PipeFactoryErrorData,
     PipelexBundleBlueprintValidationErrorData,
     PipesAndConceptValidationErrorData,
 )
-from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validation_errors import build_validation_error_items
+from pipelex.errors.bundle_validation_failure import BundleValidationFailure
+from pipelex.errors.problem import ProblemView
+from pipelex.libraries.exceptions import LibraryLoadingError
+from pipelex.pipeline.exceptions import TreePythonSyntaxError, ValidateBundleError
+from pipelex.pipeline.validation_errors import build_validation_error_items, warning_problem_items
 from pipelex.suggested_fix import DeleteKeyOp, RenameTableKeyOp, SetKeyOp
-from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
+from pipelex.validation_error_types import HintLintErrorType, PipeFactoryErrorType, PipeValidationErrorType, TemplateCheckErrorType
 
 
 def _build_items(exc: ValidateBundleError) -> list[ValidationErrorItem]:
     """Call the builder with the error's categorized lists only — for the category-projection tests.
 
     The pipe-validation arm uses ``pipe_validation_error_data`` (pipe validation **plus**
-    pipe/concept instantiation errors) — the same combined accessor both real call sites
-    (``ValidateBundleError.to_error_report`` and the CLI ``extract_validation_errors``) pass.
+    pipe/concept instantiation errors) — the same combined accessor the real call site
+    (``ValidateBundleError.validation_error_items``, which the problem's items and the API verdict both read) passes.
     The dry-run failures and the ``fallback_message`` residual are intentionally omitted here so these
     tests pin the categorized projection in isolation; they have their own dedicated tests below.
     """
@@ -134,9 +138,15 @@ class TestBuildValidationErrorItems:
             pipe_validation_errors=[],
             dry_run_failures=[
                 DryRunFailureErrorData(
-                    pipe_code="analyze", domain_code="probe", source="probe.mthds", message="Pipe 'analyze' failed its dry run: x"
+                    code=CoreCode.METHOD_WIRING_INVALID,
+                    pipe_code="analyze",
+                    domain_code="probe",
+                    source="probe.mthds",
+                    message="Pipe 'analyze' failed its dry run: x",
                 ),
-                DryRunFailureErrorData(pipe_code="publish", domain_code="probe", message="Pipe 'publish' failed its dry run: y"),
+                DryRunFailureErrorData(
+                    code=CoreCode.RUNTIME_UNEXPECTED, pipe_code="publish", domain_code="probe", message="Pipe 'publish' failed its dry run: y"
+                ),
             ],
         )
         assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN, ValidationErrorCategory.DRY_RUN]
@@ -158,19 +168,33 @@ class TestBuildValidationErrorItems:
                 ),
             ],
             pipe_validation_errors=[],
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="pipe_y", domain_code="dom", message="Pipe 'pipe_y' failed its dry run: z")],
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    code=CoreCode.METHOD_WIRING_INVALID, pipe_code="pipe_y", domain_code="dom", message="Pipe 'pipe_y' failed its dry run: z"
+                )
+            ],
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY, ValidationErrorCategory.DRY_RUN]
 
-    def test_to_error_report_projects_dry_run_failures(self) -> None:
-        """A ``ValidateBundleError`` carrying dry-run failures surfaces one ``dry_run`` item per failure on the report."""
-        report = ValidateBundleError(
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
+    def test_a_verdict_projects_its_dry_run_failures(self) -> None:
+        """A ``ValidateBundleError`` carrying dry-run failures lists one ``dry_run`` item per failure, and its problem one item each."""
+        exc = ValidateBundleError(
             message="Dry run failed",
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="analyze", domain_code="probe", message="Pipe 'analyze' failed its dry run: x")],
-        ).to_error_report()
-        assert report.validation_errors is not None
-        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.DRY_RUN]
-        assert report.message == "Pipe 'analyze' failed its dry run: x"
+            dry_run_failures=[
+                DryRunFailureErrorData(
+                    code=CoreCode.METHOD_WIRING_INVALID, pipe_code="analyze", domain_code="probe", message="Pipe 'analyze' failed its dry run: x"
+                )
+            ],
+        )
+        assert [item.category for item in exc.validation_error_items()] == [ValidationErrorCategory.DRY_RUN]
+        assert exc.message == "Pipe 'analyze' failed its dry run: x"
+        problem = exc.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        assert problem.errors is not None
+        assert [(item.code, item.location.pipe if item.location else None) for item in problem.errors] == [
+            (CoreCode.METHOD_WIRING_INVALID, "analyze")
+        ]
 
     def test_fallback_message_residual_becomes_single_blueprint_item(self) -> None:
         """A parse-level failure (only a message, no categorized data) yields one ``blueprint_validation`` item.
@@ -197,7 +221,9 @@ class TestBuildValidationErrorItems:
             blueprint_errors=[],
             factory_errors=[],
             pipe_validation_errors=[],
-            dry_run_failures=[DryRunFailureErrorData(pipe_code="analyze", message="Pipe 'analyze' failed its dry run: x")],
+            dry_run_failures=[
+                DryRunFailureErrorData(code=CoreCode.METHOD_WIRING_INVALID, pipe_code="analyze", message="Pipe 'analyze' failed its dry run: x")
+            ],
             fallback_message="should not be used",
         )
         assert [item.category for item in items] == [ValidationErrorCategory.DRY_RUN]
@@ -219,23 +245,24 @@ class TestBuildValidationErrorItems:
         )
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_FACTORY]
 
-    def test_to_error_report_is_total_for_message_only_error(self) -> None:
-        """A bare-message ``ValidateBundleError`` still surfaces a non-empty ``validation_errors`` — the invariant is total.
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
+    def test_validation_items_are_total_for_message_only_error(self) -> None:
+        """A bare-message ``ValidateBundleError`` still lists a non-empty set of items — the invariant is total.
 
-        ``to_error_report`` passes ``fallback_message=self.message``, so even an error with no
-        categorized data and no dry-run channel projects one ``blueprint_validation`` residual.
-        An invalid verdict is therefore NEVER a bare ``detail`` with an empty ``validation_errors[]``.
+        ``validation_error_items`` passes ``fallback_message=self.message``, so even an error with no
+        categorized data and no dry-run channel projects one ``blueprint_validation`` residual, and its
+        problem one ``method.schema_violation`` item. An invalid verdict is therefore NEVER a bare
+        ``detail`` with no items.
         """
-        report = ValidateBundleError(message="Could not make 'PipelexBundleBlueprint': no blueprint found").to_error_report()
-        assert report.validation_errors is not None
-        assert report.validation_errors  # non-empty: the totality guarantee
-        assert [item.category for item in report.validation_errors] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
-        assert report.validation_errors[0].message == "Could not make 'PipelexBundleBlueprint': no blueprint found"
-
-    def test_cli_extractor_is_total_for_message_only_error(self) -> None:
-        """The CLI ``extract_validation_errors`` is also total — a bare-message error yields one item, never an empty array."""
-        cli_dicts = extract_validation_errors(ValidateBundleError(message="empty blueprint"))
-        assert cli_dicts == [{"category": "blueprint_validation", "message": "empty blueprint"}]
+        exc = ValidateBundleError(message="Could not make 'PipelexBundleBlueprint': no blueprint found")
+        items = exc.validation_error_items()
+        assert [item.category for item in items] == [ValidationErrorCategory.BLUEPRINT_VALIDATION]
+        assert items[0].message == "Could not make 'PipelexBundleBlueprint': no blueprint found"
+        problem = exc.to_problem(view=ProblemView.CALLER)
+        assert problem.errors is not None
+        assert [item.code for item in problem.errors] == [CoreCode.METHOD_SCHEMA_VIOLATION]
 
     def test_empty_collections_collapse_to_none(self) -> None:
         """An empty ``declared_concepts`` / ``variable_names`` becomes ``None`` so it drops from the wire."""
@@ -253,32 +280,23 @@ class TestBuildValidationErrorItems:
         factory_item = _build_items(exc)[0]
         assert factory_item.declared_concepts is None
 
-    def test_cli_extractor_matches_builder_dumped_shape(self) -> None:
-        """The CLI ``extract_validation_errors`` dicts equal the dumped builder items — single shape, two surfaces.
+    def test_the_problem_s_errors_follow_the_builder_s_items_one_for_one(self) -> None:
+        """The problem the agent CLI prints lists one fault per item of the API's invalid verdict, at the same pipe.
 
-        Pins that the agent CLI and the API 422 emit the identical structured
-        items: the CLI adapter is exactly ``model_dump(exclude_none=True)`` over
-        the same builder the API report uses.
+        The API's verdict is the ``BundleValidationFailure`` a validator returns, built as the direct validator builds
+        it; its items are dumped to the wire and compared as encoded JSON, so a field that diverges between Python and
+        JSON would show.
         """
         exc = _all_category_error()
-        cli_dicts = extract_validation_errors(exc)
+        verdict = BundleValidationFailure(problem=exc.to_problem(view=ProblemView.OPERATOR), validation_errors=exc.validation_error_items())
+        verdict_items = verdict.model_dump(mode="json", exclude_none=True)["validation_errors"]
         builder_dicts = [item.model_dump(mode="json", exclude_none=True) for item in _build_items(exc)]
-        assert cli_dicts == builder_dicts
+        assert json.dumps(verdict_items, sort_keys=True) == json.dumps(builder_dicts, sort_keys=True)
 
-    def test_cli_extractor_equals_api_report_validation_errors(self) -> None:
-        """The CLI array and the API 422 ``validation_errors`` are identical on the wire.
-
-        The API report path dumps in python mode (``to_dict`` → ``model_dump(exclude_none=True)``),
-        so ``category`` rides as a live ``ValidationErrorCategory`` enum, while the CLI dumps
-        ``mode="json"`` strings. A plain ``==`` would pass merely because ``StrEnum`` subclasses
-        ``str``; to prove *wire-byte* parity (and catch a future python/json-divergent field that
-        is not a StrEnum), we also compare the encoded JSON, not just the in-memory dicts.
-        """
-        exc = _all_category_error()
-        cli_dicts = extract_validation_errors(exc)
-        problem_document = exc.to_error_report().to_problem_document()
-        assert problem_document["validation_errors"] == cli_dicts
-        assert json.dumps(problem_document["validation_errors"], sort_keys=True) == json.dumps(cli_dicts, sort_keys=True)
+        problem_items = exc.to_problem(view=ProblemView.OPERATOR).errors
+        assert problem_items is not None
+        assert len(problem_items) == len(builder_dicts)
+        assert [item.location.pipe if item.location else None for item in problem_items] == [item.get("pipe_code") for item in builder_dicts]
 
     def test_enriched_pipe_validation_error_rides_a_suggested_fix(self) -> None:
         """An enriched output-mismatch error data yields an item carrying the planner's suggested_fix."""
@@ -425,7 +443,95 @@ class TestBuildValidationErrorItems:
         items = _build_items(exc)
         assert [item.category for item in items] == [ValidationErrorCategory.PIPE_VALIDATION]
         assert items[0].source == "instantiated.mthds"
-        # And the API report surfaces it (would be None/empty if the list were dropped).
-        report = exc.to_error_report()
-        assert report.validation_errors is not None
-        assert report.validation_errors[0].pipe_code == "pipe_inst"
+        # And the verdict lists it (it would be missing if the list were dropped).
+        assert [item.pipe_code for item in exc.validation_error_items()] == ["pipe_inst"]
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a warning no type classifies names no declaration, so its item carries no field path"
+    )
+    def test_warnings_become_problem_items_under_the_code_their_type_names(self) -> None:
+        """A valid report's warnings, as a surface speaking problem items carries them: each type names its code, and a
+        warning no type classifies takes `method.schema_violation`, as an unclassified item of an invalid verdict does.
+        """
+        hint_warning = ValidationErrorItem(
+            category=ValidationErrorCategory.BLUEPRINT_VALIDATION,
+            error_type=HintLintErrorType.HINT_UNKNOWN_KEY,
+            concept_code="Essay",
+            domain_code="docs",
+            hint_key="emphasis",
+            message="Hint key 'emphasis' on concept 'docs.Essay' is not defined by this version of the standard.",
+        )
+        template_warning = ValidationErrorItem(
+            category=ValidationErrorCategory.DRY_RUN,
+            error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
+            pipe_code="print_invoice",
+            template_file="invoice.xlsx",
+            message="The name Totl matches no field.",
+        )
+        unclassified_warning = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="Something to look at.")
+
+        items = warning_problem_items(warnings=[hint_warning, template_warning, unclassified_warning])
+
+        assert [item.model_dump(mode="json", exclude_none=True) for item in items] == [
+            {
+                "code": "method.hint_invalid",
+                "detail": items[0].detail,
+                "params": {"reason": "unknown_key", "hint": "emphasis"},
+                # The declaration the hint is on, which neither parameter names.
+                "location": {"field": "concept.Essay"},
+            },
+            {
+                "code": "pipelex.docgen.template_warning",
+                "detail": "The document template 'invoice.xlsx' may be faulty: The name Totl matches no field.",
+                "params": {"template": "invoice.xlsx", "finding": "The name Totl matches no field."},
+                "location": {"pipe": "print_invoice"},
+            },
+            {
+                "code": "method.schema_violation",
+                "detail": items[2].detail,
+                "params": {"finding": "Something to look at."},
+            },
+        ]
+        assert "emphasis" in items[0].detail
+
+    def test_a_pipe_refusal_s_own_facts_reach_its_problem_item(self) -> None:
+        """The facts the check that found the fault knows ride the item beside the pipe its locators give."""
+        verdict = ValidateBundleError(
+            message="validation failed",
+            pipe_validation_errors=[
+                PipesAndConceptValidationErrorData(
+                    error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                    domain_code="testapp",
+                    source="main.mthds",
+                    pipe_code="summarize",
+                    message="The output does not fit.",
+                    field_path="summarize.output",
+                    params={"declared": "testapp.Summary", "expected": ["native.Text", "native.Html"], "pipe_type": "PipeCompose"},
+                ),
+            ],
+        )
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH
+        assert item.params is not None
+        assert item.params.as_wire() == {
+            "pipe": "summarize",
+            "declared": "testapp.Summary",
+            "expected": ["native.Text", "native.Html"],
+            "pipe_type": "PipeCompose",
+        }
+
+    def test_an_unclassified_item_reads_through_the_verdict_s_umbrella_to_the_refusal_it_forwards(self) -> None:
+        """A library that could not load a bundle forwards the parser's refusal under `method.invalid`: the item takes the parser's code and facts."""
+        syntax_refusal = TreePythonSyntaxError("The file does not parse.").with_params(finding="invalid syntax at line 3")
+        umbrella = LibraryLoadingError("The library could not be loaded.")
+        umbrella.__cause__ = syntax_refusal
+        verdict = ValidateBundleError(message="The library could not be loaded.")
+        verdict.__cause__ = umbrella
+
+        (item,) = verdict.problem_items() or []
+
+        assert item.code == CoreCode.METHOD_SYNTAX
+        assert item.params is not None
+        assert item.params.as_wire() == {"finding": "invalid syntax at line 3"}

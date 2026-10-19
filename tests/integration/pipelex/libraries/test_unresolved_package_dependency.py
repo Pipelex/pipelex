@@ -15,16 +15,19 @@ from pathlib import Path
 import pytest
 from mthds.package.exceptions import VCSFetchError
 from mthds.package.manifest.parser import parse_methods_toml
+from mthds.protocol.problem.registry import ProblemDomain
 from pytest_mock import MockerFixture
 
-from pipelex.base_exceptions import DisclosureMode, ValidationErrorCategory, ValidationErrorItem
+from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.methods.exceptions import MethodInstallError, MethodPackageNotFoundError
 from pipelex.methods.fetching import FetchedMethodPackage, fetch_method_package
 from pipelex.methods.method_ref import MethodRef, parse_method_ref
 from pipelex.mthds_parsing.parser import MthdsParser
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import HostLibraryLoadRefusalError, ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.tools.log.error_fields import ERROR_MESSAGE_FIELD, ERROR_TYPE_FIELD
@@ -68,14 +71,16 @@ async def _verdict_for(*, mthds_content: str) -> ValidateBundleError:
 
 
 def _package_items(verdict: ValidateBundleError) -> list[ValidationErrorItem]:
-    items = verdict.to_error_report().validation_errors or []
+    items = verdict.validation_error_items() or []
     package_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY]
     assert len(package_items) == len(items), f"Only package items were expected, got {[(item.category, item.error_type) for item in items]}"
     return package_items
 
 
-def _strict_dump(verdict: ValidateBundleError) -> str:
-    return json.dumps(verdict.to_error_report().to_dict(disclosure_mode=DisclosureMode.STRICT))
+def _caller_dump(verdict: ValidateBundleError) -> str:
+    """What a caller reads of a verdict: its problem in the caller's view and its validation items."""
+    items = [item.model_dump(mode="json", exclude_none=True) for item in verdict.validation_error_items()]
+    return json.dumps({"problem": verdict.to_problem(view=ProblemView.CALLER).to_wire(), "validation_errors": items})
 
 
 def _assert_located_on_go(item: ValidationErrorItem, *, reference: str) -> None:
@@ -143,10 +148,10 @@ class TestUnresolvedPackageDependency:
         _assert_located_on_go(item, reference=PROBE_REFERENCE)
         # Git's own explanation stays; its progress line naming the runner's clone directory does not.
         assert "does not appear to be a git repository" in item.message
-        strict_dump = _strict_dump(verdict)
-        assert "does not appear to be a git repository" in strict_dump
-        assert "Cloning into" not in strict_dump
-        assert "mthds_fetch_on_miss_" not in strict_dump
+        caller_dump = _caller_dump(verdict)
+        assert "does not appear to be a git repository" in caller_dump
+        assert "Cloning into" not in caller_dump
+        assert "mthds_fetch_on_miss_" not in caller_dump
 
     async def test_the_host_log_keeps_what_caused_the_item(self, tmp_path: Path, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
         """The item carries the caller-facing text; the host's own log keeps the whole cause chain, git's raw output included."""
@@ -225,8 +230,12 @@ class TestUnresolvedPackageDependency:
         host_dir.mkdir()
         write_consumer(root=host_dir, bundles={"consumer.mthds": ProbePackageTestData.CONSUMER_BUNDLE})
 
-        with pytest.raises(LibraryLoadingError) as exc_info:
+        with pytest.raises(HostLibraryLoadRefusalError) as exc_info:
             acquire_library(library_id="", library_dirs=[str(host_dir)])
 
-        assert not isinstance(exc_info.value, ValidateBundleError)
-        assert exc_info.value.to_error_report().error_domain is None
+        # The refusal is the deployment's misconfiguration, raised from the library's own refusal, which the operator reads.
+        assert isinstance(exc_info.value.__cause__, LibraryLoadingError)
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == PipelexErrorCode.CONFIG_INVALID
+        assert caller.domain == ProblemDomain.OPERATOR
+        assert caller.errors is None

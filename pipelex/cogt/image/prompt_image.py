@@ -38,11 +38,17 @@ class PromptImageDetail(StrEnum):
 
 
 class PromptImageUri(BaseModel):
-    """A prompt image specified by URI (path, URL, storage URI, or data URL)."""
+    """A prompt image specified by URI (path, URL, storage URI, or data URL).
+
+    ``input_name`` is the input the image came from, as a caller writes it (``photos[2]``), when the prompt reads it
+    from one: a fetch of its URL that fails names that input, since the failure never names the URL, which is the
+    run's data.
+    """
 
     kind: Literal["uri"] = "uri"
     uri: str
     mime_type: str | None = None
+    input_name: str | None = None
 
     @field_validator("uri", mode="before")
     @classmethod

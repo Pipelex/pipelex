@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import Any
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData
@@ -22,6 +23,36 @@ def _decode_error_position(exc: UnicodeDecodeError) -> tuple[int, int]:
     before = exc.object[: exc.start].decode("utf-8")
     line_start = before.rfind("\n") + 1
     return before.count("\n") + 1, len(before) - line_start + 1
+
+
+def undecodable_mthds_error(*, error: UnicodeDecodeError, source: str | None) -> MthdsParserError:
+    """The refusal of an MTHDS file that is not UTF-8 text: ``method.syntax``, located at its first byte that does not decode.
+
+    TOML is UTF-8 text, so such a file does not parse: it is the method's syntax fault, which every command reports as
+    ``validate`` does, and never a file this machine cannot read.
+    """
+    line, column = _decode_error_position(error)
+    msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
+    return (
+        MthdsParserError(
+            msg,
+            validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
+        )
+        .with_error_code(CoreCode.METHOD_SYNTAX)
+        .with_params(finding=msg)
+    )
+
+
+def decode_mthds_text(*, content: bytes, source: str | None) -> str:
+    """The text of an MTHDS file read as bytes, decoded as the parser decodes a file it reads itself.
+
+    Raises:
+        MthdsParserError: The bytes are not UTF-8 text (:func:`undecodable_mthds_error`).
+    """
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise undecodable_mthds_error(error=exc, source=source) from exc
 
 
 class MthdsParser(BaseModel):
@@ -75,7 +106,7 @@ class MthdsParser(BaseModel):
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source
             else:
                 msg = "Either 'bundle_path' or 'mthds_content' must be provided for the MthdsParser to make a PipelexBundleBlueprint"
-                raise MthdsParserError(msg)
+                raise MthdsParserError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         except TomlError as exc:
             toml_message = exc.message
             if bundle_path is not None and mthds_source is not None:
@@ -83,31 +114,30 @@ class MthdsParser(BaseModel):
                 toml_message = toml_message.replace(str(bundle_path), mthds_source)
             msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {toml_message}"
             source = str(bundle_path) if bundle_path is not None and mthds_source is None else mthds_source
-            raise MthdsParserError(
-                msg,
-                validation_errors=[
-                    PipelexBundleBlueprintValidationErrorData(
-                        source=source,
-                        message=msg,
-                        # tomli counts both from 1, as the item's locators do.
-                        line=exc.lineno,
-                        column=exc.colno,
-                    )
-                ],
+            raise (
+                MthdsParserError(
+                    msg,
+                    validation_errors=[
+                        PipelexBundleBlueprintValidationErrorData(
+                            source=source,
+                            message=msg,
+                            # tomli counts both from 1, as the item's locators do.
+                            line=exc.lineno,
+                            column=exc.colno,
+                        )
+                    ],
+                )
+                .with_error_code(CoreCode.METHOD_SYNTAX)
+                .with_params(finding=msg)
             ) from exc
         except UnicodeDecodeError as exc:
             # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
             source = mthds_source if mthds_source is not None else str(bundle_path)
-            line, column = _decode_error_position(exc)
-            msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
-            raise MthdsParserError(
-                msg,
-                validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
-            ) from exc
+            raise undecodable_mthds_error(error=exc, source=source) from exc
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"
-            raise MthdsParserError(msg)
+            raise MthdsParserError(msg).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION)
 
         try:
             # ``source`` is already populated from the seeded ``blueprint_dict`` above
@@ -133,7 +163,7 @@ class MthdsParser(BaseModel):
         try:
             elaborated_blueprint = BundleElaborator.elaborate(bundle=pipelex_bundle_blueprint)
         except BundleElaboratorError as exc:
-            raise MthdsParserError(message=str(exc)) from exc
+            raise MthdsParserError(message=str(exc)).with_error_code(CoreCode.METHOD_SCHEMA_VIOLATION) from exc
         # Only a bundle read from a file here may read beside it: a content string's `mthds_source` is a label.
         if bundle_path is not None:
             elaborated_blueprint.mark_read_from_host_file(bundle_file=Path(bundle_path))

@@ -52,7 +52,7 @@ class TestCollectPossibleOutputsCondition:
         result = _collect_possible_outputs(condition_pipe, output_format=ConceptRepresentationFormat.JSON)
 
         assert result == [{"concept_ref": "test.Summary", "content": {"text": "summary text"}}]
-        get_pipe_mock.assert_called_once_with(pipe_code="make_summary")
+        get_pipe_mock.assert_called_once_with(pipe_code="make_summary", referring_pipe_code=condition_pipe.code)
         mapped_pipe.output.render_stuff_spec.assert_called_once_with(
             concept_provider=renderer_concept_library, output_format=ConceptRepresentationFormat.JSON
         )
@@ -66,7 +66,8 @@ class TestCollectPossibleOutputsCondition:
             mapped_pipe.output.render_stuff_spec.return_value = {"content": {"from": pipe_code}}
             mapped_pipes[pipe_code] = mapped_pipe
 
-        def resolve_pipe(pipe_code: str) -> Any:
+        def resolve_pipe(pipe_code: str, referring_pipe_code: object) -> Any:
+            assert referring_pipe_code is condition_pipe.code
             return mapped_pipes[pipe_code]
 
         mocker.patch(GET_REQUIRED_PIPE_TARGET, side_effect=resolve_pipe)

@@ -11,11 +11,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.exceptions import ExtractJobFailureError, ExtractModelNotFoundError, InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserActionKind
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode, ServiceErrorVocabulary
 
@@ -28,12 +29,14 @@ _TOO_LARGE = ServiceErrorCode(
     code="svc-too-large",
     category=InferenceErrorCategory.CONTENT,
     user_action_kind=UserActionKind.CHANGE_INPUT,
+    error_code=CoreCode.INPUT_TOO_LARGE,
     detail="The request was over the service's limit — send less.",
 )
 _UNKNOWN_MODEL = ServiceErrorCode(
     code="svc-unknown-model",
     category=InferenceErrorCategory.CONFIGURATION,
     user_action_kind=UserActionKind.CHANGE_MODEL,
+    error_code=CoreCode.MODEL_UNAVAILABLE,
     detail="The service does not serve that model.",
     is_model_not_found=True,
 )
@@ -41,6 +44,7 @@ _NOT_CONFIGURED = ServiceErrorCode(
     code="svc-not-configured",
     category=InferenceErrorCategory.CONFIGURATION,
     user_action_kind=UserActionKind.CONTACT_SUPPORT,
+    error_code=CoreCode.RUNTIME_MISCONFIGURED,
     detail="The service is not configured for this — contact support.",
 )
 
@@ -64,18 +68,19 @@ class TestClassification:
     def test_a_contributed_code_decides_ahead_of_the_ladder(self, mocker: MockerFixture, entry: ServiceErrorCode) -> None:
         mocker.patch(_ACCESSOR, return_value=_vocabulary())
 
-        classification = classify_inference_error(_metadata(status_code=400, code=entry.code))
+        classification = classify_inference_error(_metadata(status_code=400, code=entry.code), family=InferenceErrorFamily.LLM)
 
         assert classification.service_error_code == entry
         assert classification.category == entry.category
         assert classification.user_action_kind == entry.user_action_kind
         assert classification.is_model_not_found == entry.is_model_not_found
+        assert classification.error_code == entry.error_code
 
     def test_it_runs_ahead_of_the_quota_rules(self, mocker: MockerFixture) -> None:
         """A 402 the quota rules would call billing is the service's own refusal when it carries a contributed code."""
         mocker.patch(_ACCESSOR, return_value=_vocabulary())
 
-        classification = classify_inference_error(_metadata(status_code=402, code=_NOT_CONFIGURED.code))
+        classification = classify_inference_error(_metadata(status_code=402, code=_NOT_CONFIGURED.code), family=InferenceErrorFamily.LLM)
 
         assert classification.category == InferenceErrorCategory.CONFIGURATION
         assert classification.user_action_kind == UserActionKind.CONTACT_SUPPORT
@@ -83,7 +88,7 @@ class TestClassification:
     def test_a_code_nobody_contributed_takes_the_ladder(self, mocker: MockerFixture) -> None:
         mocker.patch(_ACCESSOR, return_value=_vocabulary())
 
-        classification = classify_inference_error(_metadata(status_code=400, code="svc-unheard-of"))
+        classification = classify_inference_error(_metadata(status_code=400, code="svc-unheard-of"), family=InferenceErrorFamily.LLM)
 
         assert classification.service_error_code is None
         assert classification.category == InferenceErrorCategory.CONTENT
@@ -93,7 +98,7 @@ class TestClassification:
     def test_without_the_contribution_the_ladder_reads_the_status(self, mocker: MockerFixture, vocabulary: ServiceErrorVocabulary | None) -> None:
         mocker.patch(_ACCESSOR, return_value=vocabulary)
 
-        classification = classify_inference_error(_metadata(status_code=400, code=_NOT_CONFIGURED.code))
+        classification = classify_inference_error(_metadata(status_code=400, code=_NOT_CONFIGURED.code), family=InferenceErrorFamily.LLM)
 
         assert classification.service_error_code is None
         assert classification.category == InferenceErrorCategory.CONTENT
@@ -103,7 +108,7 @@ class TestClassification:
         accessor = mocker.patch(_ACCESSOR, return_value=_vocabulary())
         metadata = ProviderErrorMetadata(provider=ProviderName.GATEWAY, sdk_exception_type="ConnectTimeout", message="timed out")
 
-        classification = classify_inference_error(metadata)
+        classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
 
         assert classification.category == InferenceErrorCategory.TRANSIENT
         accessor.assert_not_called()
@@ -116,13 +121,14 @@ class TestRendering:
 
         error = render_inference_error(
             metadata=metadata,
-            classification=classify_inference_error(metadata),
+            classification=classify_inference_error(metadata, family=InferenceErrorFamily.LLM),
             family=InferenceErrorFamily.LLM,
             model_desc="some-model",
             model_handle="some-model",
         )
 
         assert isinstance(error, LLMCompletionError)
+        assert error.resolve_error_code() == CoreCode.INPUT_TOO_LARGE
         assert error.user_action is not None
         assert error.user_action.detail == _TOO_LARGE.detail
         assert error.error_category == InferenceErrorCategory.CONTENT
@@ -134,13 +140,14 @@ class TestRendering:
 
         error = render_inference_error(
             metadata=metadata,
-            classification=classify_inference_error(metadata),
+            classification=classify_inference_error(metadata, family=InferenceErrorFamily.LLM),
             family=InferenceErrorFamily.EXTRACT,
             model_desc="some-model",
             model_handle="some-handle",
         )
 
         assert isinstance(error, ExtractModelNotFoundError)
+        assert error.resolve_error_code() == CoreCode.MODEL_UNAVAILABLE
         assert error.user_action is not None
         assert error.user_action.detail == _UNKNOWN_MODEL.detail
 
@@ -150,7 +157,7 @@ class TestRendering:
 
         error = render_inference_error(
             metadata=metadata,
-            classification=classify_inference_error(metadata),
+            classification=classify_inference_error(metadata, family=InferenceErrorFamily.LLM),
             family=InferenceErrorFamily.EXTRACT,
             model_desc="some-model",
             model_handle="some-handle",
@@ -158,3 +165,4 @@ class TestRendering:
 
         assert isinstance(error, ExtractJobFailureError)
         assert not isinstance(error, ExtractModelNotFoundError)
+        assert error.resolve_error_code() == CoreCode.RUNTIME_MISCONFIGURED

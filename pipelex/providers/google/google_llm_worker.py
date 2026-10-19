@@ -8,15 +8,13 @@ from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
+from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.inference.error_classification import (
-    UserAction,
-    UserActionKind,
     extract_google_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.completion_stop import classify_prompt_block_reason
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -37,6 +35,11 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
+
+
+# The Google GenAI SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError)
 
 
 class GoogleLLMWorker(LLMWorkerAbstract):
@@ -173,7 +176,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     @classmethod
     def _thinking_off_config(cls, *, inference_model: InferenceModelSpec) -> genai_types.ThinkingConfig:
@@ -183,7 +186,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 f"Model '{inference_model.desc}' cannot turn thinking off, so it cannot take reasoning_effort 'none': "
                 f"set another reasoning effort, or remove the reasoning setting"
             )
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="turning its reasoning off")
         return genai_types.ThinkingConfig(thinking_budget=0)
 
     @classmethod
@@ -214,7 +217,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
                 msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
+                raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
     #########################################################
 
@@ -250,9 +253,9 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                 contents=contents,
                 config=generation_config,
             )
-        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -266,15 +269,15 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             llm_job.job_report.llm_tokens_usage.nb_tokens_by_category = GoogleFactory.extract_token_usage(response.usage_metadata)
 
         # Read before the text, so a candidate cut or filtered with no text left is reported for what stopped it
-        if response.candidates:
-            if finish_reason := response.candidates[0].finish_reason:
-                self._check_completion_stop(llm_job=llm_job, stop_reason=finish_reason.value, max_tokens=job_params.max_tokens)
-        elif response.prompt_feedback and (block_reason := response.prompt_feedback.block_reason):
+        stop_signal = GoogleFactory.read_stop_signal(response=response)
+        if stop_signal.finish_reason is not None:
+            self._check_completion_stop(llm_job=llm_job, stop_reason=stop_signal.finish_reason, max_tokens=job_params.max_tokens)
+        elif stop_signal.block_reason is not None:
             # A blocked prompt gets no candidate at all, its block reason in the prompt feedback: a refusal, named for its reason
             self._raise_for_completion_stop(
                 llm_job=llm_job,
-                outcome=classify_prompt_block_reason(block_reason=block_reason.value, model_handle=self.inference_model.name),
-                stop_reason=block_reason.value,
+                outcome=classify_prompt_block_reason(block_reason=stop_signal.block_reason, model_handle=self.inference_model.name),
+                stop_reason=stop_signal.block_reason,
                 max_tokens=job_params.max_tokens,
             )
 
@@ -344,8 +347,8 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_google_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                metadata = extract_google_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -353,18 +356,10 @@ class GoogleLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {instructor_exc}"
-            raise LLMCompletionError(
-                msg,
-                error_category=InferenceErrorCategory.UNKNOWN,
-                user_action=UserAction(
-                    kind=UserActionKind.CONTACT_SUPPORT,
-                    detail="Structured generation failed for an unrecognized reason — retry, and report this if it persists",
-                ),
-            ) from instructor_exc
-        except (genai_errors.ServerError, genai_errors.ClientError, httpx.TransportError) as sdk_exc:
+            raise self._make_structured_generation_failure(api_name="Google", schema=schema, instructor_exc=instructor_exc) from instructor_exc
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_google_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -374,7 +369,7 @@ class GoogleLLMWorker(LLMWorkerAbstract):
             ) from sdk_exc
 
         if not isinstance(result_object, schema):
-            msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"
+            msg = f"Google Gemini API returned an object that is not of type {schema}: a {type(result_object).__name__}"
             raise GoogleLLMWorkerError(msg)
 
         # Track token usage if available from completion

@@ -47,7 +47,7 @@ class TestMthdsCorpusEntries:
         with pytest.raises(ValidateBundleError) as raised:
             await validate_bundle(mthds_file_path=entry.bundle_path, library_dirs=[entry.directory])
 
-        observed = [item.error_type for item in raised.value.to_error_report().validation_errors or []]
+        observed = [item.error_type for item in raised.value.validation_error_items()]
         assert observed == [entry.manifest.expected_error], (
             f"Corpus entry '{entry.name}' declares expected_error={entry.manifest.expected_error!r} but produced {observed!r}"
         )
@@ -85,6 +85,6 @@ prompt      = "Write the berth note for $vessel arriving on the $tide tide."
         declared_by_a_correct_entry = "missing_input_variable"
         declared_by_a_drifted_entry = "unknown_pipe_type"
 
-        observed = [item.error_type for item in raised.value.to_error_report().validation_errors or []]
+        observed = [item.error_type for item in raised.value.validation_error_items()]
         assert observed == [declared_by_a_correct_entry]
         assert observed != [declared_by_a_drifted_entry]

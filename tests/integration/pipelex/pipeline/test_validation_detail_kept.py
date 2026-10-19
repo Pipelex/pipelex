@@ -10,7 +10,7 @@ Validation used to lose detail before the verdict was built. These tests load re
   field fails its combine; nested in a ``PipeSequence``, the failure used to reach the reader as one
   item holding a Python repr of the sweep's records, once for each level of nesting. It is now one
   ``dry_run`` item for the innermost failing pipe, carrying its code, domain and source, whose text
-  follows the disclosure rule: the failure's own message only when it is caller-facing.
+  is the sentence the failure's code renders for a caller, never the failure's own message.
 - **The positions the parser knew.** A TOML syntax error's item carries its 1-based line and column, and
   an unresolved concept's item lists the concepts its domain declares.
 """
@@ -18,27 +18,23 @@ Validation used to lose detail before the verdict was built. These tests load re
 from pathlib import Path
 
 import pytest
-from pytest_mock import MockerFixture
+from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
-from pipelex.cogt.inference.error_classification import UserAction
-from pipelex.core.stuffs.exceptions import StuffFactoryError
+from pipelex.errors.problem import ProblemView
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.validation_error_types import PipeValidationErrorType
 from tests.integration.pipelex.test_data import ValidationDetailBundles
 
-
-def _keep_unclassified(self: StuffFactoryError, *, user_action: UserAction | None = None) -> StuffFactoryError:
-    """Stands in for ``as_caller_fault``, leaving the error unclassified."""
-    del user_action
-    return self
+# The sentence `pipe.output_multiplicity` renders for the parallel whose plural branch feeds a single field.
+_MULTIPLICITY_SENTENCE = "Pipe 'analyze_topic' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'."
 
 
 async def _validation_items(*, bundle: str, dry_run_pipe_codes: list[str] | None = None) -> list[ValidationErrorItem]:
     with pytest.raises(ValidateBundleError) as exc_info:
         await validate_bundle(mthds_contents=[bundle], mthds_sources=[ValidationDetailBundles.SOURCE], dry_run_pipe_codes=dry_run_pipe_codes)
-    return list(exc_info.value.to_error_report().validation_errors or [])
+    return list(exc_info.value.validation_error_items() or [])
 
 
 class TestValidationDetailKept:
@@ -62,8 +58,7 @@ class TestValidationDetailKept:
 
     @pytest.mark.asyncio
     async def test_a_nested_dry_run_failure_is_one_item_at_the_innermost_pipe(self) -> None:
-        # The combine's refusal is the caller's own method fault, restated with its multiplicity next step
-        # and classified caller-facing at its raise site, so the item carries that restatement.
+        # The combine's refusal is the caller's own method fault: the item reads the sentence of its multiplicity code.
         items = await _validation_items(bundle=ValidationDetailBundles.NESTED_PARALLEL_MISMATCH)
 
         (item,) = items
@@ -72,23 +67,26 @@ class TestValidationDetailKept:
         assert item.pipe_code == "analyze_topic"
         assert item.domain_code == ValidationDetailBundles.DOMAIN
         assert item.source == ValidationDetailBundles.SOURCE
-        assert item.message.startswith(
-            "Pipe 'analyze_topic' failed its dry run: PipeParallel 'analyze_topic' cannot combine its branch results into its output 'IdeaReport'."
-        )
-        assert "Branch 'propose_ideas' gives result 'ideas' as a list, 'Idea[]'" in item.message
+        assert item.message == f"Pipe 'analyze_topic' failed its dry run: {_MULTIPLICITY_SENTENCE}"
         assert not any(marker in item.message for marker in ValidationDetailBundles.RECORD_REPR_MARKERS)
 
     @pytest.mark.asyncio
-    async def test_a_dry_run_failure_that_is_not_caller_facing_names_its_title(self, mocker: MockerFixture) -> None:
-        # The combine classifies its refusal as the caller's fault; with that classification withheld, the
-        # same failure is not caller-facing, and the item names its title.
-        mocker.patch.object(StuffFactoryError, "as_caller_fault", new=_keep_unclassified)
+    async def test_a_dry_run_failure_reads_its_codes_sentence_never_its_own_message(self) -> None:
+        """The combine's own restatement, naming the branch to change, is the operator's: the verdict carries the code's sentence."""
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[ValidationDetailBundles.NESTED_PARALLEL_MISMATCH], mthds_sources=[ValidationDetailBundles.SOURCE])
 
-        items = await _validation_items(bundle=ValidationDetailBundles.NESTED_PARALLEL_MISMATCH)
-
-        (item,) = items
-        assert item.pipe_code == "analyze_topic"
-        assert item.message == f"Pipe 'analyze_topic' failed its dry run: {StuffFactoryError.title()}"
+        (item,) = exc_info.value.validation_error_items()
+        assert "Branch 'propose_ideas'" not in item.message
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_INVALID
+        assert problem.errors is not None
+        (problem_item,) = problem.errors
+        assert problem_item.code == CoreCode.PIPE_OUTPUT_MULTIPLICITY
+        assert problem_item.location is not None
+        assert problem_item.location.pipe == "analyze_topic"
+        assert problem_item.detail == _MULTIPLICITY_SENTENCE
+        assert "Branch 'propose_ideas'" not in str(problem.to_wire())
 
     @pytest.mark.asyncio
     async def test_the_enclosing_pipe_alone_reports_the_innermost_failing_pipe(self) -> None:
@@ -132,7 +130,7 @@ class TestValidationDetailKept:
                 library_dirs=[library_dir],
             )
 
-        (item,) = exc_info.value.to_error_report().validation_errors or []
+        (item,) = exc_info.value.validation_error_items() or []
         assert item.category == ValidationErrorCategory.DRY_RUN
         assert (item.pipe_code, item.domain_code) == ("analyze_topic", ValidationDetailBundles.DOMAIN)
         assert item.source is None
@@ -154,7 +152,7 @@ class TestValidationDetailKept:
                 library_dirs_are_callers=True,
             )
 
-        (item,) = exc_info.value.to_error_report().validation_errors or []
+        (item,) = exc_info.value.validation_error_items() or []
         assert item.category == ValidationErrorCategory.DRY_RUN
         assert (item.pipe_code, item.domain_code) == ("analyze_topic", ValidationDetailBundles.DOMAIN)
         assert item.source is not None
@@ -173,7 +171,7 @@ class TestValidationDetailKept:
         with pytest.raises(ValidateBundleError) as exc_info:
             await validate_bundle(mthds_file_path=entry_file, library_dirs=[method_dir])
 
-        (item,) = exc_info.value.to_error_report().validation_errors or []
+        (item,) = exc_info.value.validation_error_items() or []
         assert (item.pipe_code, item.domain_code) == ("analyze_topic", ValidationDetailBundles.DOMAIN)
         assert item.source is not None
         assert Path(item.source).resolve() == sibling_file.resolve()

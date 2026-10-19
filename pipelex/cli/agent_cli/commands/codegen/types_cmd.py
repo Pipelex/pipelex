@@ -18,10 +18,12 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import (
     CliOutputFormat,
     agent_error,
+    agent_file_error,
     agent_success_formatted,
-    set_agent_cli_error_format,
+    use_agent_cli_error_format,
 )
 from pipelex.cli.commands.crate_loading import load_normalized_crate
+from pipelex.cli.exceptions import BundleClosureEmptyError
 from pipelex.codegen.emission import write_stamped_projection
 from pipelex.codegen.emitters.target import CodegenKind, CodegenTarget
 from pipelex.codegen.emitters.types_emitter import emit_types
@@ -59,7 +61,7 @@ def agent_codegen_types_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Project the crate's concept set into typed artifacts for the chosen target.
@@ -72,7 +74,7 @@ def agent_codegen_types_cmd(
         pipelex-agent codegen types ./my_pipes/ --target ts-zod -o ./generated/
         pipelex-agent codegen types --target python-structures -L ./shared_pipes/ --format json
     """
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     output_root = Path(output_dir).expanduser()
     make_pipelex_for_agent_cli(needs_inference=False)
 
@@ -85,10 +87,14 @@ def agent_codegen_types_cmd(
                 crate = load_normalized_crate(library_dirs=combined_dirs or None)
             except (LibraryLoadingError, PipeLibraryError) as exc:
                 # Negative verdict: the library is structurally invalid, so no crate can be produced.
-                agent_error(f"Cannot resolve — the library is invalid: {exc}", error_type=type(exc).__name__, cause=exc, exit_code=1)
+                agent_error(f"Cannot resolve — the library is invalid: {exc}", cause=exc, exit_code=1)
             except FileNotFoundError as exc:
                 # No verdict: the closure could not even be assembled.
-                agent_error(f"Cannot resolve — {exc}", error_type="FileNotFoundError", cause=exc, exit_code=2)
+                missing_path = str(exc.filename) if exc.filename else ", ".join(str(combined_dir) for combined_dir in combined_dirs)
+                agent_file_error(f"Cannot resolve — {exc}", path=missing_path, reason="not found", cause=exc, exit_code=2)
+            except BundleClosureEmptyError as exc:
+                # No verdict: the closure holds no bundle to read.
+                agent_error(f"Cannot resolve — {exc}", cause=exc, exit_code=2)
             generation_report.describe(crate=crate)
 
             emitted = emit_types(crate, target=target)
@@ -118,8 +124,8 @@ def agent_codegen_types_cmd(
         raise
 
     except Exception as exc:  # ruff: ignore[blind-except]
-        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into the structured error payload.
-        agent_error(str(exc), error_type=type(exc).__name__, cause=exc)
+        # Agent CLI command boundary: agent_error() (NoReturn) converts any unexpected failure into its problem.
+        agent_error(str(exc), cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

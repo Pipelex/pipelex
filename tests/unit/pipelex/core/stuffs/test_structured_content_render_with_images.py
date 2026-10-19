@@ -14,6 +14,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.interpreter_hub import get_native_concept
+from pipelex.tools.jinja2.exceptions import Jinja2ContextError
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.templating.text_format import TextFormat
 from pipelex.urls import URLs
@@ -185,8 +186,8 @@ class TestStructuredContentRenderWithImages:
 class TestStuffArtefactWithImagesFailFast:
     """Tests for fail-fast behavior when | with_images is used on non-image content."""
 
-    def test_text_content_raises_type_error_via_artefact(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that TextContent wrapped in StuffArtefact raises TypeError."""
+    def test_text_content_raises_context_error_via_artefact(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that TextContent wrapped in StuffArtefact raises Jinja2ContextError, which the render reports."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
         stuff = StuffFactory.make_stuff(
@@ -197,5 +198,5 @@ class TestStuffArtefactWithImagesFailFast:
         artefact = StuffArtefact(stuff)
         registry = ImageRegistry()
 
-        with pytest.raises(TypeError, match="does not implement ImageRenderable"):
+        with pytest.raises(Jinja2ContextError, match="does not implement ImageRenderable"):
             artefact.render_with_images(registry=registry, text_format=TextFormat.PLAIN)

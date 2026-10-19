@@ -15,6 +15,7 @@ dispatch — answering them needs something the kernel does not have:
   when it takes an already-mapped `LlmPromptContent`.
 """
 
+from functools import partial
 from typing import TYPE_CHECKING, Literal
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -22,6 +23,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, ImgGenSize
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
+from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -38,11 +40,17 @@ if TYPE_CHECKING:
 
 
 def resolve_img_gen_setting(*, img_gen_choice: ImgGenModelChoice | None = None) -> ImgGenSetting:
-    """The deck chain for an image generation: the step's own choice, then the deck's default."""
+    """The deck chain for an image generation: the step's own choice, then the deck's default.
+
+    The step's choice that the deck does not resolve is the method's, `model.unknown`; the deck's default is the
+    deployment's, `ModelDeckChoiceUnresolvedError`.
+    """
     model_deck = get_model_deck()
     if img_gen_choice is not None:
         return model_deck.get_img_gen_setting(img_gen_choice)
-    return model_deck.get_img_gen_setting(model_deck.img_gen_choice_default)
+    return resolve_deck_choice(
+        deck_setting="img_gen.choice_default", resolve=partial(model_deck.get_img_gen_setting, model_deck.img_gen_choice_default)
+    )
 
 
 def resolve_default_size(*, explicit_aspect_ratio: AspectRatio | None, default_size: ImgGenSize | None) -> ImgGenSize | None:

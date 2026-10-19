@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import openai
+from mthds.protocol.problem.registry import CoreCode
 from openai import (
     NOT_GIVEN,
     omit,
@@ -15,8 +16,8 @@ from pipelex.cogt.inference.error_classification import (
     extract_openai_metadata,
     extract_underlying_sdk_exception,
 )
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.llm.instructor_retry import make_instructor_schema_retrying
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
@@ -32,6 +33,11 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
+
+
+# The OpenAI SDK's own errors, a call the API refused or that failed in transport: caught as they are,
+# and told apart from a failure to parse the model's answer when one of them ends instructor's loop.
+_SDK_ERRORS = (openai.APIStatusError, openai.APIConnectionError)
 
 
 class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
@@ -109,22 +115,22 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     return get_config().inference.llm.openai.get_reasoning_level(effort=effort)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         if job_params.reasoning_budget is not None:
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     msg = f"Model '{inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="a reasoning budget")
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="adaptive reasoning through this provider's API")
                 case ThinkingMode.NONE:
                     msg = f"Model '{inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                    raise LLMCapabilityError(msg)
+                    raise LLMCapabilityError(msg).with_params(capability="reasoning")
 
         return None
 
@@ -153,9 +159,9 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -174,7 +180,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="OpenAI returned no completion choices — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
             llm_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
@@ -186,7 +192,8 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content
         if response_text is None:
-            msg = f"OpenAI response message content is None: {response}\nmodel: {self.inference_model.desc}"
+            # The response is the model's answer, the run's data: the message names the model and the finish reason alone.
+            msg = f"OpenAI response message content is None (finish reason: {response.choices[0].finish_reason})\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CONTENT,
@@ -195,7 +202,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     kind=UserActionKind.CHANGE_INPUT,
                     detail="OpenAI returned a response with no content — try rephrasing the prompt or using a different model",
                 ),
-            )
+            ).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)
 
         return response_text
 
@@ -211,7 +218,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
         self._log_reasoning_sent(api_name="OpenAI Chat Completions", settings={"reasoning_effort": openai_reasoning_effort})
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+        from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         extra_headers, extra_body = self.openai_completions_factory.make_extras(
             inference_model=self.inference_model, inference_job=llm_job, output_desc=schema.__name__
@@ -238,8 +245,8 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
             # one so transient/capacity/auth errors aren't all flattened to UNKNOWN.
             underlying_exc = extract_underlying_sdk_exception(instructor_exc=instructor_exc)
             if underlying_exc is not None:
-                metadata = extract_openai_metadata(underlying_exc)
-                classification = classify_inference_error(metadata)
+                metadata = extract_openai_metadata(underlying_exc, validated_type=schema, sdk_error_types=_SDK_ERRORS)
+                classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
                 raise render_inference_error(
                     metadata=metadata,
                     classification=classification,
@@ -247,14 +254,15 @@ class OpenAICompletionsLLMWorker(LLMWorkerAbstract):
                     model_desc=self.inference_model.desc,
                     model_handle=self.inference_model.name,
                 ) from instructor_exc
-            msg = (
-                f"OpenAI structured generation via 'instructor' failed with model: {self.inference_model.desc} "
-                f"trying to generate schema: {schema} with error: {instructor_exc}"
-            )
-            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.UNKNOWN) from instructor_exc
-        except (openai.APIStatusError, openai.APIConnectionError) as sdk_exc:
+            raise self._make_structured_generation_failure(api_name="OpenAI", schema=schema, instructor_exc=instructor_exc) from instructor_exc
+        except IncompleteOutputException as incomplete_exc:
+            # instructor found the answer's first choice finished on `length`
+            raise self._incomplete_output_error(
+                llm_job=llm_job, last_completion=incomplete_exc.last_completion, max_tokens=job_params.max_tokens
+            ) from incomplete_exc
+        except _SDK_ERRORS as sdk_exc:
             metadata = extract_openai_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

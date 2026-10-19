@@ -14,7 +14,7 @@ from pipelex.cli.error_handlers import (
     handle_model_deck_preset_error,
     handle_validate_bundle_error,
 )
-from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
+from pipelex.cogt.exceptions import ModelDeckPresetValidationError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -28,9 +28,9 @@ if TYPE_CHECKING:
 class TestErrorHandlers:
     """Tests for Rich error handler functions."""
 
-    def test_handle_model_choice_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_choice_error should call to_error_report() and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+    def test_handle_model_choice_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_choice_error should read the advice for its tip and exit with code 1."""
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = PipeOperatorModelChoiceError(
             message="model 'gpt-5' not found",
             pipe_type="llm_text",
@@ -40,7 +40,7 @@ class TestErrorHandlers:
             model_type=ModelType.LLM,
             model_choice="gpt-5",
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN)
@@ -48,9 +48,12 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_model_availability_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_availability_error should call to_error_report() and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a model availability failure in the test with no cause, whose code and parameters the failed lookup gives"
+    )
+    def test_handle_model_availability_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_availability_error should read the advice for its tip and exit with code 1."""
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = PipeOperatorModelAvailabilityError(
             message="model not available",
             run_mode=PipeRunMode.LIVE,
@@ -60,7 +63,7 @@ class TestErrorHandlers:
             model_handle="gpt-4o",
             fallback_list=["gpt-4o-mini"],
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_availability_error(exc, context=ErrorContext.PIPE_RUN)
@@ -68,17 +71,17 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_model_deck_preset_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_model_deck_preset_error should call to_error_report() and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
-        exc = ModelDeckPresetValidatonError(
+    def test_handle_model_deck_preset_error_exits_and_reads_the_advice(self, mocker: MockerFixture) -> None:
+        """handle_model_deck_preset_error should read the advice for its tip and exit with code 1."""
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
+        exc = ModelDeckPresetValidationError(
             message="preset references unavailable model",
             model_type=ModelType.LLM,
             preset_id="default",
             model_handle="gpt-5",
             enabled_backends={"openai"},
         )
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "advised_action")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_model_deck_preset_error(exc, context=ErrorContext.VALIDATION)
@@ -86,14 +89,24 @@ class TestErrorHandlers:
         assert exc_info.value.exit_code == 1
         spy.assert_called_once()
 
-    def test_handle_validate_bundle_error_exits_and_calls_to_error_report(self, mocker: MockerFixture) -> None:
-        """handle_validate_bundle_error should call to_error_report() and exit with code 1."""
-        mocker.patch("pipelex.cli.error_handlers.get_console")
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
+    def test_handle_validate_bundle_error_exits_and_reads_its_items(self, mocker: MockerFixture) -> None:
+        """handle_validate_bundle_error should read the verdict's items and exit with code 1.
+
+        The items are read exactly twice: once for the panel's own sections, and once by the problem the panel prints
+        rows from, since ``to_problem`` builds its ``errors`` through ``problem_items``. Both reads are the same builder
+        over the same error data, so the sections and the problem cannot disagree.
+        """
+        mocker.patch("pipelex.cli.error_handlers.get_error_console")
         exc = ValidateBundleError(message="validation failed")
-        spy = mocker.spy(exc, "to_error_report")
+        spy = mocker.spy(exc, "validation_error_items")
+        problem_items_spy = mocker.spy(exc, "problem_items")
 
         with pytest.raises(typer.Exit) as exc_info:
             handle_validate_bundle_error(exc)
 
         assert exc_info.value.exit_code == 1
-        spy.assert_called_once()
+        assert spy.call_count == 2
+        problem_items_spy.assert_called_once()

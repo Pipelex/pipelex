@@ -6,28 +6,55 @@ envelopes and assert the classification, with no SDK installed or imported.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
+from pydantic import ValidationError
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, UserActionKind
-from pipelex.cogt.inference.error_classify import classify_inference_error
+from pipelex.cogt.inference.error_classify import ClassificationResult, InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+
+if TYPE_CHECKING:
+    from pipelex.errors.error_codes import ErrorCode
+
+_LLM = InferenceErrorFamily.LLM
+_IMG_GEN = InferenceErrorFamily.IMG_GEN
+_EXTRACT = InferenceErrorFamily.EXTRACT
+_SEARCH = InferenceErrorFamily.SEARCH
 
 
 class _TestCases:
-    # (topic, provider, sdk_exception_type, message, status_code,
-    #  expected_category, expected_action, expected_is_model_not_found)
-    PARITY: ClassVar[list[tuple[str, ProviderName, str, str, int | None, InferenceErrorCategory, UserActionKind, bool]]] = [
+    # (topic, provider, sdk_exception_type, message, status_code, family,
+    #  expected_category, expected_action, expected_error_code, expected_is_model_not_found)
+    PARITY: ClassVar[
+        list[tuple[str, ProviderName, str, str, int | None, InferenceErrorFamily, InferenceErrorCategory, UserActionKind, ErrorCode, bool]]
+    ] = [
         (
             "rate_limit_429",
             ProviderName.OPENAI,
             "RateLimitError",
             "Rate limit reached",
             429,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_RATE_LIMITED,
+            False,
+        ),
+        (
+            "rate_limit_429_on_an_image_generation_ran_nothing",
+            ProviderName.OPENAI,
+            "RateLimitError",
+            "Rate limit reached",
+            429,
+            _IMG_GEN,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_RATE_LIMITED,
             False,
         ),
         (
@@ -36,8 +63,10 @@ class _TestCases:
             "RateLimitError",
             "You exceeded your current quota",
             429,
+            _LLM,
             InferenceErrorCategory.CAPACITY,
             UserActionKind.CHECK_BILLING,
+            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
             False,
         ),
         (
@@ -46,8 +75,10 @@ class _TestCases:
             "SDKError",
             "Payment required",
             402,
+            _LLM,
             InferenceErrorCategory.CAPACITY,
             UserActionKind.CHECK_BILLING,
+            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
             False,
         ),
         (
@@ -56,8 +87,10 @@ class _TestCases:
             "AuthenticationError",
             "Invalid API key",
             401,
+            _LLM,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHECK_CREDENTIALS,
+            CoreCode.PROVIDER_CREDENTIAL_REFUSED,
             False,
         ),
         (
@@ -66,8 +99,10 @@ class _TestCases:
             "PermissionDeniedError",
             "Forbidden",
             403,
+            _LLM,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHECK_CREDENTIALS,
+            CoreCode.PROVIDER_CREDENTIAL_REFUSED,
             False,
         ),
         (
@@ -76,8 +111,10 @@ class _TestCases:
             "PermissionDeniedError",
             "Your credit balance is too low",
             403,
+            _LLM,
             InferenceErrorCategory.CAPACITY,
             UserActionKind.CHECK_BILLING,
+            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
             False,
         ),
         (
@@ -86,18 +123,120 @@ class _TestCases:
             "NotFoundError",
             "The model does not exist",
             404,
+            _LLM,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHANGE_MODEL,
+            CoreCode.MODEL_UNAVAILABLE,
             True,
         ),
         (
-            "bad_request_400",
+            "bad_request_400_is_a_request_of_ours",
             ProviderName.OPENAI,
             "BadRequestError",
             "Bad request",
             400,
+            _LLM,
             InferenceErrorCategory.CONTENT,
             UserActionKind.CHANGE_INPUT,
+            CoreCode.RUNTIME_UNEXPECTED,
+            False,
+        ),
+        (
+            "bad_request_400_saying_the_prompt_is_over_the_context_window",
+            ProviderName.ANTHROPIC,
+            "BadRequestError",
+            "prompt is too long: 208310 tokens > 200000 maximum",
+            400,
+            _LLM,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_CONTEXT_EXCEEDED,
+            False,
+        ),
+        (
+            # A gateway may answer the window's refusal with another 4xx, which reads it as a 400 does
+            "unprocessable_422_saying_the_prompt_is_too_long",
+            ProviderName.OPENAI,
+            "UnprocessableEntityError",
+            "prompt is too long",
+            422,
+            _LLM,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_CONTEXT_EXCEEDED,
+            False,
+        ),
+        (
+            "request_too_large_413_saying_the_context_window",
+            ProviderName.GATEWAY,
+            "APIStatusError",
+            "Your input exceeds the context window of this model",
+            413,
+            _LLM,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_CONTEXT_EXCEEDED,
+            False,
+        ),
+        (
+            # A 5xx is the provider's, whatever words it carries
+            "internal_server_error_500_saying_the_prompt_is_too_long",
+            ProviderName.OPENAI,
+            "InternalServerError",
+            "prompt is too long",
+            500,
+            _LLM,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_FAILED,
+            False,
+        ),
+        (
+            "bad_request_400_with_a_content_policy_signal",
+            ProviderName.OPENAI,
+            "BadRequestError",
+            "Your request was rejected as a result of our safety system",
+            400,
+            _IMG_GEN,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_CONTENT_REFUSED,
+            False,
+        ),
+        (
+            "request_too_large_413",
+            ProviderName.ANTHROPIC,
+            "RequestTooLargeError",
+            "Request too large",
+            413,
+            _LLM,
+            InferenceErrorCategory.CONFIGURATION,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.INPUT_TOO_LARGE,
+            False,
+        ),
+        (
+            "request_timeout_408_is_retried",
+            ProviderName.OPENAI,
+            "APIStatusError",
+            "Request timeout",
+            408,
+            _LLM,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_TIMEOUT,
+            False,
+        ),
+        (
+            "image_timeout_408_through_the_gateway_is_retried",
+            ProviderName.GATEWAY,
+            "APIStatusError",
+            "The operation was timeout.",
+            408,
+            _IMG_GEN,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_TIMEOUT,
             False,
         ),
         (
@@ -106,8 +245,10 @@ class _TestCases:
             "UnprocessableEntityError",
             "Unprocessable entity",
             422,
+            _LLM,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHANGE_INPUT,
+            CoreCode.RUNTIME_UNEXPECTED,
             False,
         ),
         (
@@ -116,8 +257,22 @@ class _TestCases:
             "InternalServerError",
             "Internal server error",
             500,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_FAILED,
+            False,
+        ),
+        (
+            "bad_gateway_502",
+            ProviderName.OPENAI,
+            "InternalServerError",
+            "Bad gateway",
+            502,
+            _LLM,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_FAILED,
             False,
         ),
         (
@@ -126,8 +281,46 @@ class _TestCases:
             "ServerError",
             "Service unavailable",
             503,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
+            False,
+        ),
+        (
+            "gateway_timeout_504",
+            ProviderName.GOOGLE,
+            "ServerError",
+            "Gateway timeout",
+            504,
+            _EXTRACT,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_TIMEOUT,
+            False,
+        ),
+        (
+            "anthropic_overloaded_529",
+            ProviderName.ANTHROPIC,
+            "OverloadedError",
+            "Overloaded",
+            529,
+            _LLM,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
+            False,
+        ),
+        (
+            "server_error_on_an_image_generation_may_have_run",
+            ProviderName.OPENAI,
+            "InternalServerError",
+            "Internal server error",
+            500,
+            _IMG_GEN,
+            InferenceErrorCategory.AMBIGUOUS,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_OUTCOME_UNKNOWN,
             False,
         ),
         (
@@ -136,8 +329,22 @@ class _TestCases:
             "ConflictError",
             "Conflict",
             409,
+            _LLM,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHANGE_INPUT,
+            CoreCode.RUNTIME_UNEXPECTED,
+            False,
+        ),
+        (
+            "non_error_status_on_an_error_envelope",
+            ProviderName.AZURE,
+            "JSONDecodeError",
+            "Expecting value",
+            200,
+            _IMG_GEN,
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
+            CoreCode.PROVIDER_RESPONSE_INVALID,
             False,
         ),
         (
@@ -146,8 +353,46 @@ class _TestCases:
             "APIConnectionError",
             "Connection failed",
             None,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
+            False,
+        ),
+        (
+            "statusless_sdk_connection_error_on_an_image_generation_may_have_been_sent",
+            ProviderName.OPENAI,
+            "APIConnectionError",
+            "Connection failed",
+            None,
+            _IMG_GEN,
+            InferenceErrorCategory.AMBIGUOUS,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_OUTCOME_UNKNOWN,
+            False,
+        ),
+        (
+            "statusless_httpx_connect_error_on_an_image_generation_was_never_sent",
+            ProviderName.AZURE,
+            "ConnectError",
+            "Connection refused",
+            None,
+            _IMG_GEN,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
+            False,
+        ),
+        (
+            "statusless_connect_timeout_is_an_outage_not_a_timeout",
+            ProviderName.AZURE,
+            "ConnectTimeout",
+            "Connect timed out",
+            None,
+            _LLM,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
             False,
         ),
         (
@@ -156,8 +401,22 @@ class _TestCases:
             "APITimeoutError",
             "Request timed out",
             None,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_TIMEOUT,
+            False,
+        ),
+        (
+            "statusless_read_timeout_on_an_image_generation",
+            ProviderName.HUGGINGFACE,
+            "InferenceTimeoutError",
+            "Inference timed out",
+            None,
+            _IMG_GEN,
+            InferenceErrorCategory.AMBIGUOUS,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_OUTCOME_UNKNOWN,
             False,
         ),
         (
@@ -166,8 +425,10 @@ class _TestCases:
             "ValidationError",
             "Schema validation failed",
             None,
+            _LLM,
             InferenceErrorCategory.CONTENT,
             UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH,
             False,
         ),
         (
@@ -176,8 +437,22 @@ class _TestCases:
             "FileNotFoundError",
             "No such file",
             None,
+            _EXTRACT,
             InferenceErrorCategory.CONTENT,
             UserActionKind.CHANGE_INPUT,
+            CoreCode.INPUT_REFERENCE_NOT_FOUND,
+            False,
+        ),
+        (
+            "statusless_file_that_does_not_parse",
+            ProviderName.PYPDFIUM2,
+            "ValueError",
+            "Failed to load document",
+            None,
+            _EXTRACT,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.INPUT_FILE_UNREADABLE,
             False,
         ),
         (
@@ -186,8 +461,10 @@ class _TestCases:
             "OSError",
             "I/O error",
             None,
-            InferenceErrorCategory.TRANSIENT,
-            UserActionKind.WAIT_AND_RETRY,
+            _EXTRACT,
+            InferenceErrorCategory.UNKNOWN,
+            UserActionKind.CONTACT_SUPPORT,
+            CoreCode.RUNTIME_UNEXPECTED,
             False,
         ),
         (
@@ -196,8 +473,10 @@ class _TestCases:
             "LinkupAuthenticationError",
             "Authentication failed",
             None,
+            _SEARCH,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHECK_CREDENTIALS,
+            CoreCode.PROVIDER_CREDENTIAL_REFUSED,
             False,
         ),
         (
@@ -206,8 +485,34 @@ class _TestCases:
             "LinkupInsufficientCreditError",
             "Insufficient credits",
             None,
+            _SEARCH,
             InferenceErrorCategory.CAPACITY,
             UserActionKind.CHECK_BILLING,
+            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+            False,
+        ),
+        (
+            "statusless_linkup_failed_fetch_is_the_caller_s_url",
+            ProviderName.LINKUP,
+            "LinkupFailedFetchError",
+            "Failed to fetch the page",
+            None,
+            _EXTRACT,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.INPUT_URL_UNREACHABLE,
+            False,
+        ),
+        (
+            "statusless_linkup_no_result",
+            ProviderName.LINKUP,
+            "LinkupNoResultError",
+            "No result",
+            None,
+            _SEARCH,
+            InferenceErrorCategory.CONTENT,
+            UserActionKind.CHANGE_INPUT,
+            CoreCode.MODEL_NO_RESULT,
             False,
         ),
         (
@@ -216,18 +521,22 @@ class _TestCases:
             "MissingCredentialsError",
             "FAL API key is not configured",
             None,
+            _IMG_GEN,
             InferenceErrorCategory.CONFIGURATION,
             UserActionKind.CHECK_CREDENTIALS,
+            PipelexErrorCode.CONFIG_CREDENTIAL_MISSING,
             False,
         ),
         (
-            "statusless_fal_client_error",
+            "statusless_fal_client_error_may_have_run",
             ProviderName.FAL,
             "FalClientError",
             "FAL SDK failed without a recoverable HTTP status",
             None,
-            InferenceErrorCategory.TRANSIENT,
+            _IMG_GEN,
+            InferenceErrorCategory.AMBIGUOUS,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_OUTCOME_UNKNOWN,
             False,
         ),
         (
@@ -236,8 +545,10 @@ class _TestCases:
             "BrandNewSdkError",
             "Something nobody has seen before",
             None,
+            _LLM,
             InferenceErrorCategory.UNKNOWN,
             UserActionKind.CONTACT_SUPPORT,
+            CoreCode.RUNTIME_UNEXPECTED,
             False,
         ),
         # httpx TransportError subclasses whose class names lack a recognized network token
@@ -250,8 +561,10 @@ class _TestCases:
             "ReadError",
             "stream read failed",
             None,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
             False,
         ),
         (
@@ -260,8 +573,10 @@ class _TestCases:
             "RemoteProtocolError",
             "server disconnected",
             None,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
             False,
         ),
         (
@@ -270,8 +585,10 @@ class _TestCases:
             "ProxyError",
             "proxy refused",
             None,
+            _LLM,
             InferenceErrorCategory.TRANSIENT,
             UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_UNAVAILABLE,
             False,
         ),
     ]
@@ -279,7 +596,7 @@ class _TestCases:
 
 class TestClassifyInferenceError:
     @pytest.mark.parametrize(
-        ("_topic", "provider", "sdk_exception_type", "message", "status_code", "provider_error_code", "expected_category"),
+        ("_topic", "provider", "sdk_exception_type", "message", "status_code", "provider_error_code", "expected_category", "expected_error_code"),
         [
             (
                 "fal_content_policy_on_422",
@@ -289,6 +606,7 @@ class TestClassifyInferenceError:
                 422,
                 "ContentPolicyViolation",
                 InferenceErrorCategory.CONTENT,
+                CoreCode.MODEL_CONTENT_REFUSED,
             ),
             (
                 "content_policy_message_on_422",
@@ -298,6 +616,7 @@ class TestClassifyInferenceError:
                 422,
                 None,
                 InferenceErrorCategory.CONTENT,
+                CoreCode.MODEL_CONTENT_REFUSED,
             ),
             (
                 "plain_422_stays_configuration",
@@ -307,6 +626,7 @@ class TestClassifyInferenceError:
                 422,
                 None,
                 InferenceErrorCategory.CONFIGURATION,
+                CoreCode.RUNTIME_UNEXPECTED,
             ),
             (
                 "bedrock_service_quota_via_error_code",
@@ -316,6 +636,7 @@ class TestClassifyInferenceError:
                 400,
                 "ServiceQuotaExceededException",
                 InferenceErrorCategory.CAPACITY,
+                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
             ),
         ],
     )
@@ -328,6 +649,7 @@ class TestClassifyInferenceError:
         status_code: int | None,
         provider_error_code: str | None,
         expected_category: InferenceErrorCategory,
+        expected_error_code: ErrorCode,
     ) -> None:
         """Extra signals beyond status code: provider_error_code and content-policy detection."""
         metadata = ProviderErrorMetadata(
@@ -338,9 +660,10 @@ class TestClassifyInferenceError:
             provider_error_code=provider_error_code,
         )
 
-        result = classify_inference_error(metadata)
+        result = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
 
         assert result.category == expected_category
+        assert result.error_code == expected_error_code
 
     @pytest.mark.parametrize(
         (
@@ -349,8 +672,10 @@ class TestClassifyInferenceError:
             "sdk_exception_type",
             "message",
             "status_code",
+            "family",
             "expected_category",
             "expected_action",
+            "expected_error_code",
             "expected_model_not_found",
         ),
         _TestCases.PARITY,
@@ -362,8 +687,10 @@ class TestClassifyInferenceError:
         sdk_exception_type: str,
         message: str,
         status_code: int | None,
+        family: InferenceErrorFamily,
         expected_category: InferenceErrorCategory,
         expected_action: UserActionKind,
+        expected_error_code: ErrorCode,
         expected_model_not_found: bool,
     ) -> None:
         metadata = ProviderErrorMetadata(
@@ -373,10 +700,11 @@ class TestClassifyInferenceError:
             status_code=status_code,
         )
 
-        result = classify_inference_error(metadata)
+        result = classify_inference_error(metadata, family=family)
 
         assert result.category == expected_category
         assert result.user_action_kind == expected_action
+        assert result.error_code == expected_error_code
         assert result.is_model_not_found is expected_model_not_found
 
     @pytest.mark.parametrize(
@@ -402,7 +730,34 @@ class TestClassifyInferenceError:
             status_code=429,
         )
 
-        result = classify_inference_error(metadata)
+        result = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
 
         assert result.category == InferenceErrorCategory.TRANSIENT
         assert result.user_action_kind == UserActionKind.WAIT_AND_RETRY
+        assert result.error_code == CoreCode.PROVIDER_RATE_LIMITED
+
+    @pytest.mark.parametrize(
+        ("category", "error_code", "is_model_not_found", "expected_fragment"),
+        [
+            (InferenceErrorCategory.UNKNOWN, CoreCode.PIPE_PROMPT_EMPTY, False, "not one an inference failure class declares"),
+            (InferenceErrorCategory.UNKNOWN, PipelexErrorCode.CONFIG_VARIABLE_MISSING, False, "not one an inference failure class declares"),
+            (InferenceErrorCategory.UNKNOWN, CoreCode.PROVIDER_FAILED, True, "reports 'model.unavailable'"),
+            # The run repeats a transient call, so its report cannot say no retry clears it.
+            (InferenceErrorCategory.TRANSIENT, CoreCode.RUNTIME_UNEXPECTED, False, "reports a code that invites a retry"),
+        ],
+    )
+    def test_a_classification_refuses_a_code_its_render_could_not_report(
+        self,
+        category: InferenceErrorCategory,
+        error_code: ErrorCode,
+        is_model_not_found: bool,
+        expected_fragment: str,
+    ) -> None:
+        """The render constructs a family's class with the code, so a code no family class declares, or its category contradicts, is refused first."""
+        with pytest.raises(ValidationError, match=expected_fragment):
+            ClassificationResult(
+                category=category,
+                user_action_kind=UserActionKind.CONTACT_SUPPORT,
+                error_code=error_code,
+                is_model_not_found=is_model_not_found,
+            )

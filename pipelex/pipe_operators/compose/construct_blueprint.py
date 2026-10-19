@@ -14,7 +14,7 @@ from typing import Any, Self, cast
 from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
-from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTypeError, ConstructFieldBlueprintValueError
+from pipelex.pipe_operators.compose.exceptions import ConstructFieldBlueprintTypeError, ConstructFieldBlueprintValueError, PipeComposeTemplateError
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -296,7 +296,7 @@ class ConstructBlueprint(BaseModel):
                             )
                         except Jinja2DetectVariablesError as exc:
                             msg = f"Error detecting required variables in construct template: {exc}"
-                            raise ValueError(msg) from exc
+                            raise PipeComposeTemplateError(msg) from exc
                         # Filter out internal and special variables by their root (same approach as template mode)
                         for var in template_vars:
                             root_var = get_root_from_dotted_path(var)

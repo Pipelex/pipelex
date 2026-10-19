@@ -17,8 +17,8 @@ from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind, extract_linkup_metadata
-from pipelex.cogt.inference.error_classify import classify_inference_error
-from pipelex.cogt.inference.error_render import InferenceErrorFamily, render_inference_error
+from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
+from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -80,7 +80,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             LinkupUnknownError,
         ) as sdk_exc:
             metadata = extract_linkup_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.SEARCH)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,
@@ -152,7 +152,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             LinkupUnknownError,
         ) as sdk_exc:
             metadata = extract_linkup_metadata(sdk_exc)
-            classification = classify_inference_error(metadata)
+            classification = classify_inference_error(metadata, family=InferenceErrorFamily.SEARCH)
             raise render_inference_error(
                 metadata=metadata,
                 classification=classification,

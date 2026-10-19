@@ -3,11 +3,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_pipe_run
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.system.exceptions import RunParameterError
 from tests.integration.pipelex.pipeline.test_data import ExecuteRequestIdTestData
 
 if TYPE_CHECKING:
@@ -56,11 +59,11 @@ class TestExecuteRequestId:
 
     @pytest.mark.parametrize("bad_request_id", ["forged\nline", "", "x" * 129])
     async def test_malformed_request_id_is_the_hosts_bug_refused_before_the_run(self, bad_request_id: str) -> None:
-        """Refused as a `ValueError`, not relabelled as the caller's invalid input, and no job is set up."""
+        """Refused as the host's own run parameter, not relabelled as the caller's bundle or inputs, and no job is set up."""
         pipe_run = _RecordingPipeRun()
         runner = PipelexMTHDSProtocol(pipe_run=pipe_run)
 
-        with pytest.raises(ValueError, match="Invalid request_id") as exc_info:
+        with pytest.raises(RunParameterError, match="Invalid request_id") as exc_info:
             await runner.execute(
                 pipe_code="restate",
                 mthds_contents=[ExecuteRequestIdTestData.COMPOSE_MTHDS],
@@ -68,5 +71,6 @@ class TestExecuteRequestId:
                 request_id=bad_request_id,
             )
 
-        assert type(exc_info.value) is ValueError
+        assert type(exc_info.value) is RunParameterError
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_INVALID
         assert pipe_run.pipe_jobs == []

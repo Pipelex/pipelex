@@ -1,20 +1,34 @@
+from typing import ClassVar
+
 from pipelex.base_exceptions import PipelexConfigError, PipelexError
+from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 
 class TelemetryConfigError(PipelexConfigError):
-    """A telemetry configuration this process cannot use.
+    """A telemetry configuration this process cannot use; never raised directly.
 
-    A :class:`PipelexConfigError` rather than a bare :class:`PipelexError`, and both halves of
-    that are load-bearing. It carries ``error_domain = CONFIG`` from the class instead of from the
-    agent CLI's lookup table, so the class is the single source of truth the drift test asks for;
-    and it can carry a :class:`MigrationErrorBlock`, which is what lets a stale ``telemetry.toml``
-    say *old* rather than *wrong* on every surface that reports it.
+    A :class:`PipelexConfigError` rather than a bare :class:`PipelexError`, so that it can carry a
+    :class:`MigrationErrorBlock`, which is what lets a stale ``telemetry.toml`` say *old* rather than *wrong*
+    on every surface that reports it. Its subclasses carry a ``pipelex.config.*`` code, the operator's.
     """
+
+    error_code: ClassVar[ErrorCodeDeclaration] = ABSTRACT_ERROR
 
 
 class TelemetryConfigValidationError(TelemetryConfigError):
-    pass
+    """The telemetry configuration does not parse or does not validate."""
+
+    error_code = PipelexErrorCode.CONFIG_INVALID
+
+
+class TelemetryApiKeyMissingError(TelemetryConfigError):
+    """A telemetry destination is enabled without the API key it sends with: a variable the operator sets."""
+
+    error_code = PipelexErrorCode.CONFIG_VARIABLE_MISSING
 
 
 class LangfuseCredentialsError(PipelexError):
-    pass
+    """Langfuse telemetry is enabled without its keys: a variable the operator sets."""
+
+    error_code = PipelexErrorCode.CONFIG_VARIABLE_MISSING

@@ -1,9 +1,14 @@
 from enum import StrEnum
+from typing import Any
 
 from mthds.method_tree.vocabulary import TreeRefusalCode
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
+from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 # The package whose engines print what open Pipelex does not: a PDF from a template, Excel, Word and PowerPoint.
 DOC_GEN_PLUGIN_PACKAGE = "pipelex-doc-gen"
@@ -33,6 +38,17 @@ class DocGenEngineGap(StrEnum):
     NOT_REGISTERED = "not_registered"
     """The engine's model is declared, and no installed plugin registers a worker for its sdk."""
 
+    @property
+    def desc(self) -> str:
+        """What is missing, as the operator's step names it after the engine."""
+        match self:
+            case DocGenEngineGap.NO_DEFAULT:
+                return "the model deck names no default engine for the format"
+            case DocGenEngineGap.NOT_DECLARED:
+                return "its model is not declared in this installation"
+            case DocGenEngineGap.NOT_REGISTERED:
+                return "no installed plugin registers a worker for it"
+
 
 def _step_label(*, pipe_code: str | None) -> str:
     return f"PipeDocGen '{pipe_code}'" if pipe_code else "A PipeDocGen step"
@@ -48,12 +64,12 @@ class DocGenEngineMissingError(PipelexError):
     engines when it loads. Or the model may be declared with no worker registered for it: open Pipelex registers
     `reportlab-pdf`'s, and the plugin registers the rest. Raised when the method loads, before a run spends
     anything, and again by the print stage should the engine have gone since. A runtime that disables the built-in
-    plugin and installs no other refuses every `PipeDocGen` step this way. Its message names only the step, the
-    format, the source, the engine and the plugin, so it is kept verbatim for the caller.
+    plugin and installs no other refuses every `PipeDocGen` step this way. Every remedy it names is the operator's,
+    so it is ``pipelex.docgen.engine_unavailable``. Its message names only the step, the format, the source, the
+    engine and the plugin, so it is kept verbatim for the caller.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
+    error_code = PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
 
     def __init__(
         self,
@@ -98,6 +114,12 @@ class DocGenEngineMissingError(PipelexError):
                     message = f"{asks}, on the engine '{model}', which is not installed in this runtime. {comes_with_the_plugin}"
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The engine and the gap are the operator's own facts, operator-only parameters of the code.
+        engine = self.model or f"default engine for {self.doc_gen_format.with_article} {self.source.desc}"
+        return {"format": self.doc_gen_format, "engine": engine, "gap": self.gap.desc}
+
 
 class DocGenModelCapabilityError(PipelexError):
     """The document engine a `PipeDocGen` step names does not print the step's format from its source.
@@ -106,8 +128,7 @@ class DocGenModelCapabilityError(PipelexError):
     that names one outside them is refused when the method loads.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
+    error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
 
     def __init__(self, *, doc_gen_format: DocGenFormat, source: DocGenSource, model: str, pipe_code: str | None = None):
         self.doc_gen_format = doc_gen_format
@@ -120,6 +141,10 @@ class DocGenModelCapabilityError(PipelexError):
         )
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"model": self.model, "capability": f"printing {self.doc_gen_format.with_article} {self.source.desc}"}
+
 
 class DocGenRenderError(PipelexError):
     """A document engine could not print a render job.
@@ -127,9 +152,26 @@ class DocGenRenderError(PipelexError):
     Engines raise it for what they cannot lay out, such as a table cell taller than a page, and the print stage
     raises it for an engine failure it did not expect. Engines outside Pipelex raise it too: it is part of the
     render contract (`render_job.py`).
+
+    Its raise site chooses the code: ``pipelex.docgen.content_unprintable`` for the run's data an engine cannot lay
+    out (an element taller than a page, an image that is not one), whose raise site gives the code's ``reason`` and
+    ``element`` parameters; ``pipelex.docgen.print_timeout`` for a print stopped at its deadline;
+    ``pipelex.docgen.resource_refused`` or ``security.method_url_refused`` for a file the printed document may not
+    name; ``pipelex.docgen.template_invalid`` for a method's template file the print cannot read; and
+    ``runtime.unexpected``, the default, for an engine failure or a job an engine was never meant to get,
+    since the step's engine was checked to print it before printing.
     """
 
-    error_domain = ErrorDomain.RUNTIME
+    error_code = ErrorCodeSet(
+        default=CoreCode.RUNTIME_UNEXPECTED,
+        others=(
+            PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE,
+            PipelexErrorCode.DOCGEN_PRINT_TIMEOUT,
+            PipelexErrorCode.DOCGEN_RESOURCE_REFUSED,
+            PipelexErrorCode.DOCGEN_TEMPLATE_INVALID,
+            CoreCode.SECURITY_METHOD_URL_REFUSED,
+        ),
+    )
 
 
 class MarkdownFormattingBudgetError(PipelexError):
@@ -143,9 +185,7 @@ class MarkdownFormattingBudgetError(PipelexError):
     goes.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
-    _declared_title = "Markdown formatting budget exceeded"
+    error_code = CoreCode.INPUT_TOO_LARGE
 
 
 class TemplateUrlRefusedError(PipelexError):
@@ -163,14 +203,16 @@ class TemplateUrlRefusedError(PipelexError):
     these last three, which the standard does not name. A URL the template writes as it is is checked when the method
     loads, so this is raised for one the run's input supplied.
 
-    `RenderResources.load` raises it, and an engine lets it pass, as it lets the read scope's refusal pass. The method's
-    author or the run's caller fixes it, so it is an input error, and its message names only the method's own files, by
-    their tree paths, and where the URL sat in the document, so it is kept for the caller.
+    `RenderResources.load` raises it, and an engine lets it pass, as it lets the read scope's refusal pass. Every one of
+    its refusals keeps a document inside its method tree's read perimeter, which a path that climbs out of the tree,
+    names a file the tree keeps out or names the method's own code would cross, so it is ``security.method_path_refused``:
+    a refused path into the method's tree, which its author bounds, rather than ``method.resource_missing``, a file the
+    method itself refers to and lacks, which the load-time check already refuses for a URL the template writes. Its
+    message names only the method's own files, by their tree paths, and where the URL sat in the document, so it is
+    kept for the caller.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
-    _declared_title = "Relative URL refused"
+    error_code = CoreCode.SECURITY_METHOD_PATH_REFUSED
 
     def __init__(self, message: str, *, refusal_code: TreeRefusalCode | None):
         super().__init__(message)

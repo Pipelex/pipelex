@@ -56,9 +56,13 @@ registrar.add_orchestrator(mode="temporal", orchestrator=TemporalOrchestrator())
 
 Constructing the orchestrator instance must be **import-light** — it must not import the host-runtime SDK (`temporalio`, …) at module scope or in its `__init__`. The heavy import happens lazily inside `execute` (and a friendly `MissingOrchestratorError` is raised there if the mode's extra is absent), so discovering and registering the plugin never pulls the SDK. This is what keeps boot import-light even on a process that will never use the mode.
 
+### Security refusals are logged where they are raised
+
+A refusal a security rule makes during a run logs one [security event](./error-model.md#security-refusals-and-the-security-event), in the process that raised it. The runner that dispatched the job logs a run failure only when nobody reported it: a refusal `PipeRun` raised and logged in this process is found reported, and so must be a failure rebuilt from a worker's report, whose worker logged it, while a refusal raised in this process that the orchestrator did not log, such as an input URL the SSRF guard refuses while it uploads the inputs before it dispatches, is logged by the runner, naming the run. A `/start` run, whose failure the dispatching side never sees, is covered by the same rule. An orchestrator that runs the job in this process to its end, as core's DIRECT does through `PipeRun`, owes nothing more. One that runs it in another process owes two things there: it calls `emit_security_event_for_run` (or `emit_security_event` with the run's identity) on every failure at the boundary where it leaves the process that raised it, before converting it for the wire, and it calls `mark_security_event_emitted` on every error it rebuilds from another process's report, a batch branch's included, on the outermost error of the chain it raises, so that neither its own boundaries nor the runner log a refusal a second time: an error the orchestrator raises unmarked is one the runner logs, and an error carrying a code of its own chained above a marked one is a new refusal. Both functions live in `pipelex.errors.security_event`.
+
 ### A missing orchestrator is a generic, plugin-decoupled error
 
-A token with no registered orchestrator (its plugin is not installed) raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message names the token but **no orchestrator** — *"No orchestrator is registered for orchestration mode '{mode}'; is its plugin installed?"* — so core stays fully decoupled from its plugins (it never spells out the Temporal or Mistral Workflows backend). The one special case is the core `"direct"` token: its orchestrator is always present, so a miss there reports a boot/discovery fault. The message survives STRICT error disclosure.
+A token with no registered orchestrator (its plugin is not installed) raises `MissingOrchestratorError(mode=...)` (`pipelex/runtime_bridge/exceptions.py`). The message names the token but **no orchestrator** — *"No orchestrator is registered for orchestration mode '{mode}'; is its plugin installed?"* — so core stays fully decoupled from its plugins (it never spells out the Temporal or Mistral Workflows backend). The one special case is the core `"direct"` token: its orchestrator is always present, so a miss there reports a boot/discovery fault, `runtime.unexpected`. The message rides only the operator view; a caller reads the sentences of the error's code: `pipelex.plugin.not_found` for a mode the deployment configured, and `runtime.unsupported` for a mode the request named that this runtime does not offer.
 
 ---
 
@@ -91,7 +95,7 @@ The quoted annotations are forward references because `Mapping`, `Sequence` and 
 Two contract points distinguish it from `OrchestratorProtocol.execute`:
 
 - **No fire-and-forget arm.** Validation is inherently blocking, so — unlike orchestration's `execute`/`start` split — there is no `start` counterpart and no `supports_fire_and_forget` capability flag.
-- **Verdict-as-value, not raise.** `validate_bundles` *returns* the verdict — `BundleValidationVerdict` is the union of the valid arm (a `ValidationReport`) and the invalid arm (an `ErrorReport` carrying `validation_errors`) — and raises only for a no-verdict infra fault, which a host runtime maps to a 5xx. This is the same valid/invalid pair the API maps onto its 200-always `/validate` wire, so the verdict contract is backend-independent.
+- **Verdict-as-value, not raise.** `validate_bundles` *returns* the verdict — `BundleValidationVerdict` is the union of the valid arm (a `ValidationReport`) and the invalid arm (a `BundleValidationFailure`, `pipelex/errors/bundle_validation_failure.py`, carrying the refusal's problem in the operator view and its `validation_errors`) — and raises only for a no-verdict infra fault, which a host runtime maps to a 5xx. This is the same valid/invalid pair the API maps onto its 200-always `/validate` wire, so the verdict contract is backend-independent. The failure crosses process boundaries as a model, and the host that serves the verdict projects its problem to the view of whoever asked.
 
 The seam is deliberately typed at the MTHDS-protocol level (`ValidationReport` from `mthds.protocol`), not the concrete `PipelexValidationReport` envelope: the concrete report's module reaches the hub, so naming it from this hub-reachable seam would close an import cycle, and the seam is generic across orchestrators (language-standard altitude), so it speaks the protocol report — the Pipelex-runtime envelope is the concrete `ValidationReport` subtype the validators actually produce, and the API recovers that precise type at its edge. `library_dirs` is host context the in-process arm needs to load the method library; a worker-dispatched arm ignores it — its worker loads its own library.
 
@@ -118,12 +122,14 @@ The failure modes mirror the orchestrator seam exactly: a duplicate token fails 
 
 An orchestrator's *runtime* (a Temporal client, a Mistral workflow runner) raises SDK-specific transport faults — a server unreachable, a workflow timeout — that a host runtime serving HTTP must turn into a proper error response, not a catch-all 500. But core names no web framework and the SDK lives only in the plugin, so the host (`pipelex-api`) cannot itself know how to classify `temporalio.TemporalError`.
 
-The plugin bridges that gap by contributing a **framework-agnostic mapper** — a function from one exception type to a structured `ErrorReport` (`pipelex/base_exceptions.py`):
+The plugin bridges that gap by contributing a **framework-agnostic mapper** — a function from one exception type to the `PipelexError` it stands for (`pipelex/base_exceptions.py`), whose code classifies it:
 
 ```python
 registrar.add_http_error_mapper(
     exc_type_provider=lambda: TemporalError,  # SDK imported only when a host resolves the mappers, never at register
-    to_error_report=lambda exc: ErrorReport(...),  # classified transient / RUNTIME
+    to_pipelex_error=lambda exc: OrchestratorUnavailableError(...).with_error_code(
+        CoreCode.RUNTIME_UNAVAILABLE
+    ),  # an error of the plugin's own, classified by its code
 )
 ```
 
@@ -131,9 +137,9 @@ The exc type is supplied as a **provider thunk**, not the bare class, on purpose
 
 The contract is deliberately split so no layer overreaches:
 
-- **The plugin** owns *classification* — which exception, transient or not, which error domain. It stays import-light: `register` only records the provider + closure; the SDK import happens when the provider runs at read time (and the `to_error_report` closure when the mapper is first invoked), never at registration.
-- **Core** owns *transport* — `registrar.get_http_error_mappers()` runs every provider, builds the `{exc_type: mapper}` dict, and is fail-loud on a duplicate *resolved* exception type (naming both plugins). `ErrorReport` is a core type, so the seam carries **no** web-framework import.
-- **The host runtime** owns *presentation* — at app construction it iterates the resolved mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the `ErrorReport` through its own RFC 7807 + `DisclosureMode` path. FastAPI / Starlette stays only in the host; core and the plugin import neither.
+- **The plugin** owns *classification* — which exception, and which code it carries, which decides its status, its domain and whether a retry can help. It stays import-light: `register` only records the provider + closure; the SDK import happens when the provider runs at read time (and the `to_pipelex_error` closure when the mapper is first invoked), never at registration.
+- **Core** owns *transport* — `registrar.get_http_error_mappers()` runs every provider, builds the `{exc_type: mapper}` dict, and is fail-loud on a duplicate *resolved* exception type (naming both plugins). `PipelexError` is a core type, so the seam carries **no** web-framework import.
+- **The host runtime** owns *presentation* — at app construction it iterates the resolved mappers and wraps each into one framework error handler (FastAPI, …) that runs the mapper, then renders the error's problem through its own RFC 9457 path, in the view the request's identity gives it (see [Error Responses](../api-server/error-responses.md#views-chosen-by-identity)). FastAPI / Starlette stays only in the host; core and the plugin import neither.
 
 This is what lets the public `pipelex-api` base be orchestrator-agnostic and still render a Temporal (or Mistral) transport fault correctly: install the flavor's plugin and its mapper rides in; install none and there is simply nothing to wrap. The capability is optional, contributing one method to the plugin contract.
 
@@ -203,7 +209,7 @@ What an out-of-tree orchestrator imports *is* a contract. The SPI is a documente
 | Area | Modules / symbols |
 |---|---|
 | Boundary serialization + boot | `pipelex.runtime_bridge.serialization` (`serialize_pipe_output`, `serialize_completed_output`, `PIPE_DISPATCH_ERRORS`), `pipelex.runtime_bridge.payloads` (`PipelexPipeRunInput`, `PipelexPipeRunOutput`, `PipelexPipeDispatchAck`), `pipelex.runtime_bridge.bootstrap` (`ensure_pipelex_booted`) |
-| Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`) |
+| Mode + delivery + errors | `pipelex.runtime_bridge.orchestration_mode` (`OrchestrationMode`, `DIRECT_ORCHESTRATION_MODE`), `pipelex.runtime_bridge.delivery_mode` (`DeliveryMode`), `pipelex.runtime_bridge.exceptions` (`MissingOrchestratorError`, `PipelexBridgeDispatchError`), `pipelex.errors.security_event` (`emit_security_event_for_run`, `emit_security_event`, `mark_security_event_emitted`) |
 | Working-memory hydration | `pipelex.runtime_bridge.primitives.hydration` (re-hydrate `working_memory_raw` → typed `WorkingMemory`; stayed open because it is host-agnostic — used by core delivery and the open `pipelex-api` runner, and re-used across the boundary by the commercial plugins) |
 | Plugin contract | `pipelex.plugins.contract` (`PipelexPlugin`, `PLUGIN_API_VERSION`), `pipelex.plugins.registrar` (`PluginRegistrar` menu: `add_orchestrator`, `add_bundle_validator`, `add_http_error_mapper`, `claim_*`, `add_teardown`; read accessor: `get_http_error_mappers`), `pipelex.plugins.orchestrator_registry` (`OrchestratorProtocol`), `pipelex.plugins.bundle_validator_registry` (`BundleValidatorProtocol`, `BundleValidationVerdict`) |
 | Execution protocols | `PipeRouterProtocol` (incl. the [`run_batch_branch`](./pipe-routing-and-execution.md#the-batch-branch-hook) fan-out hook — concrete default, override it only to isolate batch branches), `PipeRunProtocol`, `ContentGeneratorProtocol`, the task-manager protocol |

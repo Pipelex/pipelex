@@ -13,7 +13,7 @@ Two routes tell a client about the models a method may name on this runner: the 
 
 The MTHDS Protocol's `models` operation, tagged `x-mthds-protocol` in the [OpenAPI artifact](openapi/pipelex-api.openapi.yaml). It answers the protocol's model deck: a flat `models` list of the deck's presets, each a `{name, type}` entry whose `type` is one of the protocol's model categories, plus this implementation's routing extensions, `aliases` and `waterfalls`, keyed by category because the same alias name exists in several categories.
 
-The optional `type` query parameter filters the deck to one category: `llm`, `extract`, `img_gen`, `search` or `judgment`. It takes a single value, so a repeated `type` is a `422` `ValidationError`, and an unknown or empty one is a `422` `InvalidModelCategory`.
+The optional `type` query parameter filters the deck to one category: `llm`, `extract`, `img_gen`, `search` or `judgment`. It takes a single value, so a repeated `type`, and an unknown or empty one, is a `422` `request.invalid` naming the field `type`.
 
 ## Check a model reference
 
@@ -118,12 +118,11 @@ A preset name asked under the alias sigil:
 
 ### Refusals
 
-A request the route cannot produce a verdict for is a `422` `application/problem+json` in the `input` error domain, carrying no verdict:
+A request the route cannot produce a verdict for is a `422` `application/problem+json` with the code `request.invalid`, carrying no verdict, whose `field` parameter names the query parameter it refuses:
 
-| Cause | `error_type` |
+| Cause | `field` |
 |---|---|
-| `reference` missing or given more than once, or `type` given more than once | `ValidationError` |
-| `reference` blank once trimmed, a sigil or namespace with nothing after it, or longer than 199 characters | `InvalidModelReference` |
-| `type` unknown or empty | `InvalidModelCategory` |
+| `reference` missing or given more than once, blank once trimmed, a sigil or namespace with nothing after it, or longer than 199 characters | `reference` |
+| `type` given more than once, unknown or empty | `type` |
 
 A reference that parses and resolves nowhere is never refused: it is the `not_found` verdict, which is the successful product of the call. See [Error Responses](error-responses.md) for the problem document's shape.

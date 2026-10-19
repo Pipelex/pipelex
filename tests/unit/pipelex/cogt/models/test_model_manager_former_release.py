@@ -12,6 +12,7 @@ files laid over it, copied from that release's wheel.
 
 from __future__ import annotations
 
+import logging
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -20,12 +21,19 @@ import pytest
 
 from pipelex.base_exceptions import PipelexSetupError
 from pipelex.cogt.models.model_manager import ModelManager
+from pipelex.core.validation import MIGRATE_COMMAND
+from pipelex.errors.problem import ProblemView
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.migration.exceptions import FormerReleaseConfigError
 from pipelex.migration.former_release import kit_default_routing_profile_name
 from pipelex.migration.former_release_cleanup import clean_former_release
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
-from pipelex.system.configuration.config_loader import BACKENDS_FILE_NAME, INFERENCE_DIR_NAME, ROUTING_PROFILES_OVERRIDE_FILE_NAME
+from pipelex.system.configuration.config_loader import (
+    BACKENDS_FILE_NAME,
+    INFERENCE_DIR_NAME,
+    ROUTING_PROFILES_OVERRIDE_FILE_NAME,
+    config_manager,
+)
 from pipelex.system.environment import CONFIG_DIR_NAME
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
@@ -93,6 +101,48 @@ class TestAFormerReleaseHomeAtBoot:
         message = str(refused.value)
         assert "'all_pipelex_gateway'" in message
         assert "enables the 'pipelex_gateway' backend" not in message
+        # The step names the first blocker: the routing profile file making the Gateway's profile active.
+        step = refused.value.to_problem(view=ProblemView.OPERATOR).next_step.detail
+        assert step.startswith("Correct the setting 'active' in the file '")
+        assert step.endswith("' of the inference configuration, then restart the runtime.")
+
+    def test_the_refusal_s_step_names_the_first_blocker(self, home_config_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
+        """The code's step renders from the first blocker, the enabled Gateway table, and never falls back on the generic sentence."""
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = refused.value.to_problem(view=ProblemView.OPERATOR)
+        # The file is named under the home directory as `~/…`: a step an agent reads, prints and logs names no account.
+        backends_label = f"~/{CONFIG_DIR_NAME}/{INFERENCE_DIR_NAME}/{BACKENDS_FILE_NAME}"
+        assert problem.next_step.detail == (
+            f"Correct the setting 'pipelex_gateway' in the file '{backends_label}' of the inference configuration, then restart the runtime."
+        )
+        assert str(home_config_dir) not in problem.next_step.detail
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
+
+    def test_the_refusal_carries_what_pipelex_migrate_would_do(self, home_config_dir: Path) -> None:
+        """A JSON reader, who gets no tip, reads the remedy off `diagnostics.migration`: the cleanup would write, and needs nobody."""
+        assert home_config_dir.is_dir()
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        wire = refused.value.to_problem(view=ProblemView.OPERATOR).to_wire()
+        assert wire["diagnostics"]["error_class"] == "FormerReleaseConfigError"
+        assert wire["diagnostics"]["migration"] == {"remedy": MIGRATE_COMMAND, "would_write": True, "needs_attention": False, "plans": []}
+        assert "diagnostics" not in refused.value.to_problem(view=ProblemView.CALLER).to_wire()
+
+    def test_a_refusal_the_walk_cannot_reach_needs_attention(self, home_config_dir: Path, mocker: MockerFixture) -> None:
+        """When `pipelex migrate` walks no directory holding the blockers, the block says the command repairs nothing."""
+        assert home_config_dir.is_dir()
+        mocker.patch.object(type(config_manager), "existing_config_dirs", new_callable=mocker.PropertyMock, return_value=[])
+
+        with pytest.raises(FormerReleaseConfigError) as refused:
+            _setup(needs_inference=False)
+
+        migration = refused.value.to_problem(view=ProblemView.OPERATOR).to_wire()["diagnostics"]["migration"]
+        assert migration["would_write"] is False
+        assert migration["needs_attention"] is True
 
     def test_a_home_whose_overrides_moved_it_off_the_gateway_boots(self, home_config_dir: Path) -> None:
         """Only what stops the boot is refused: what is inert is left for `pipelex migrate` and the doctor to report."""

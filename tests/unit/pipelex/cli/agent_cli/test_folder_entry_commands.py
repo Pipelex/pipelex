@@ -9,14 +9,13 @@ import pytest
 import typer
 
 from pipelex.base_exceptions import PipelexConfigError
-from pipelex.cli.agent_cli.commands.agent_cli_factory import AGENT_INIT_FAILURE_HINT
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.fix.bundle_cmd import fix_bundle_cmd
 from pipelex.cli.agent_cli.commands.inputs.bundle_cmd import inputs_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
-from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
 
@@ -36,8 +35,8 @@ _VALID_RESULT: dict[str, Any] = {"success": True, "is_valid": True, "is_runnable
 
 
 def _run_refusal(*, directory: Path) -> str:
-    """The message `run bundle` refuses the folder with."""
-    with pytest.raises(ValidateBundleError) as exc_info:
+    """The message `run bundle` refuses the folder with: no single pipe to start at is the run's own refusal, no verdict."""
+    with pytest.raises(MethodEntryError) as exc_info:
         resolve_method_folder_run(directory=directory, pipe_override=None)
     return exc_info.value.message
 
@@ -193,10 +192,10 @@ class TestAgentFolderEntryCommands:
         assert mock_fix.call_args.kwargs["method_dir"] == tmp_path
         assert mock_fix.call_args.kwargs["library_dirs"] == [tmp_path]
 
-    def test_fix_reports_a_folder_whose_tree_is_refused_in_the_fix_envelope(
+    def test_fix_reports_a_folder_whose_tree_is_refused_as_the_still_invalid_problem(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """The documented FixBundleError envelope, as a fix that could not be made, never a bare refusal."""
+        """The still-invalid problem of a fix that could not be made, `method.invalid` with the fix result beside it, never a bare refusal."""
         mock_fix = _patch_fix(mocker)
         _write_folder_with_a_refused_tree(directory=tmp_path)
 
@@ -204,22 +203,30 @@ class TestAgentFolderEntryCommands:
             fix_bundle_cmd(path=str(tmp_path), error_format=CliOutputFormat.JSON)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "FixBundleError"
-        assert envelope["is_valid"] is False
-        assert envelope["bundle_path"] == str(tmp_path.resolve())
-        assert envelope["iterations"] == 0
-        assert envelope["fixes_applied"] == []
-        assert envelope["files_written"] == []
-        assert envelope["remaining_errors"]
-        assert any("linked.mthds" in item["message"] for item in envelope["remaining_errors"])
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "method.invalid"
+        assert problem["is_valid"] is False
+        assert problem["bundle_path"] == str(tmp_path.resolve())
+        assert problem["iterations"] == 0
+        assert problem["fixes_applied"] == []
+        assert problem["files_written"] == []
+        (item,) = problem["errors"]
+        # The item names the rule the tree breaks and the file at fault, the symbolic link, without quoting the refusal.
+        assert item["code"] == "method.package_invalid"
+        assert item["params"] == {"reason": "symbolic_link", "path": "linked.mthds"}
+        assert item["location"]["file"] == "linked.mthds"
+
+        # The Markdown lists the same item, naming the file the tree refused.
+        with pytest.raises(typer.Exit):
+            fix_bundle_cmd(path=str(tmp_path), error_format=CliOutputFormat.MARKDOWN)
+        assert "linked.mthds" in capsys.readouterr().err
         mock_fix.assert_not_called()
 
     @pytest.mark.parametrize("command", ["validate", "fix", "inputs", "run"])
-    def test_a_configuration_that_does_not_validate_before_the_boot_is_the_failed_boot_envelope(
+    def test_a_configuration_that_does_not_validate_before_the_boot_is_the_failed_boot_problem(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
     ) -> None:
-        """Listing the tree reads its limits from the configuration: a refusal there is the envelope a failed boot gives."""
+        """Listing the tree reads its limits from the configuration: a refusal there is the problem a failed boot gives."""
         mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
@@ -227,10 +234,10 @@ class TestAgentFolderEntryCommands:
             _invoke_pre_boot_command(command=command, path=tmp_path)
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "PipelexConfigError"
-        assert envelope["message"] == "Pipelex initialization failed: the configuration is out of date"
-        assert envelope["hint"] == AGENT_INIT_FAILURE_HINT
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
+        assert problem["message"] == "the configuration is out of date"
 
     @pytest.mark.parametrize("command", ["validate", "fix"])
     def test_validate_and_fix_refuse_a_folder_holding_no_bundle_with_no_verdict(
@@ -243,9 +250,10 @@ class TestAgentFolderEntryCommands:
             _invoke_validate_or_fix_for_json(command=command, path=tmp_path)
 
         assert exc_info.value.exit_code == 2
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "EmptyMethodTreeError"
-        assert envelope["message"] == f"The folder '{tmp_path}' holds no .mthds bundle."
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "method.invalid"
+        assert problem["diagnostics"]["error_class"] == "EmptyMethodTreeError"
+        assert problem["message"] == f"The folder '{tmp_path}' holds no .mthds bundle."
         mocks.folder.assert_not_called()
         mock_fix.assert_not_called()
 
@@ -285,7 +293,8 @@ class TestAgentFolderEntryCommands:
             inputs_bundle_cmd(path=str(tmp_path))
 
         assert exc_info.value.exit_code == 1
-        envelope = json.loads(capsys.readouterr().err)
-        assert envelope["error_type"] == "MethodEntryError"
-        assert envelope["message"] == _run_refusal(directory=tmp_path)
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "request.pipe_unspecified"
+        assert problem["diagnostics"]["error_class"] == "MethodEntryError"
+        assert problem["message"] == _run_refusal(directory=tmp_path)
         mock_inputs.assert_not_called()

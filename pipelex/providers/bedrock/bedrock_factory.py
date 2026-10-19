@@ -65,6 +65,6 @@ class BedrockFactory:
             message.content.append(BedrockContentItem(text=user_text))
         if llm_job.llm_prompt.user_images:
             msg = "BedrockFactory does not support images. Skipping images."
-            raise LLMCapabilityError(msg)
+            raise LLMCapabilityError(msg).with_params(capability="images")
 
         return message

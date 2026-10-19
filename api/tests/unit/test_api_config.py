@@ -12,12 +12,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from pipelex_api.api_config import ApiBootConfigError, ApiConfig, get_api_config, resolve_boot_orchestrator, resolve_orchestration_mode
-from pipelex_api.errors import ApiError
+from pipelex_api.api_config import ApiConfig, get_api_config, resolve_boot_orchestrator, resolve_orchestration_mode
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exceptions import ApiBootConfigError, OrchestrationOverrideForbiddenError
 from pipelex_api.middleware import RequestIdMiddleware
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
+from tests.unit._problems import assert_problem, problem_of
 
 
 def _temporal_locked_config() -> ApiConfig:
@@ -48,10 +49,12 @@ class TestResolveOrchestrationMode:
 
     def test_forbidden_override_is_refused(self):
         # A caller must not be able to force `direct` on a locked-down distributed runner.
-        with pytest.raises(ApiError) as exc_info:
+        with pytest.raises(OrchestrationOverrideForbiddenError) as exc_info:
             resolve_orchestration_mode("direct", config=_temporal_locked_config())
-        assert exc_info.value.status_code == 403
-        assert exc_info.value.document["error_type"] == "OrchestrationModeOverrideForbidden"
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 422
+        assert problem["code"] == "pipelex.deployment.orchestration_override_forbidden"
+        assert problem["params"] == {"requested_mode": "direct"}
 
     def test_allowed_override_is_honored(self):
         config = ApiConfig(orchestration_mode="temporal", allow_request_orchestration_mode_override=True)
@@ -93,14 +96,13 @@ class TestStartOverridePolicyEndToEnd:
         register_exception_handlers(app)
         return TestClient(RequestIdMiddleware(app))
 
-    def test_forbidden_per_request_mode_on_start_is_403(self):
+    def test_forbidden_per_request_mode_on_start_is_422(self):
         # The base config is `direct` with override off, so a caller forcing a different backend on
-        # `POST /start` is refused with a 403 BEFORE any library load / dispatch — the policy gate
+        # `POST /start` is refused with a 422 BEFORE any library load / dispatch — the policy gate
         # is the first thing `ApiRunner.start` checks.
         response = self._client().post(
             "/v1/start",
             json={"pipe_code": "echo", "mthds_contents": [VALID_MTHDS], "orchestration_mode": "temporal"},
         )
-        assert response.status_code == 403, response.text
-        assert response.headers["content-type"].startswith("application/problem+json")
-        assert response.json()["error_type"] == "OrchestrationModeOverrideForbidden"
+        body = assert_problem(response, status=422, code="pipelex.deployment.orchestration_override_forbidden")
+        assert body["params"] == {"requested_mode": "temporal"}

@@ -18,11 +18,14 @@ code does, and a service that contributes codes vouches that no vendor emits int
 """
 
 from collections.abc import Mapping
+from typing import Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from mthds.protocol.problem.registry import CoreCode
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from pipelex.cogt.exceptions import InferenceErrorCategory
+from pipelex.cogt.exceptions import INFERENCE_FAILURE_CODES, InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.error_codes import ErrorCode, error_code_spec
 
 
 class ServiceErrorCode(BaseModel):
@@ -30,8 +33,10 @@ class ServiceErrorCode(BaseModel):
 
     `detail` is the advice rendered beside the service's own message. It names what the caller, or
     whoever operates the service, should do; the service's message already names the specifics.
-    `is_model_not_found` selects the family's `*ModelNotFoundError` class, for a code that means the
-    service does not know the model at all.
+    `error_code` is the registry code the rendered error reports, which says who acts and whether a
+    retry can succeed: one of the codes an inference failure class declares, and `model.unavailable`
+    for an entry flagged `is_model_not_found`, which selects the family's `*ModelNotFoundError` class,
+    for a code that means the service does not know the model at all.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -39,8 +44,22 @@ class ServiceErrorCode(BaseModel):
     code: str
     category: InferenceErrorCategory = Field(strict=False)
     user_action_kind: UserActionKind = Field(strict=False)
+    error_code: ErrorCode
     detail: str
     is_model_not_found: bool = False
+
+    @model_validator(mode="after")
+    def validate_error_code(self) -> Self:
+        if self.error_code not in INFERENCE_FAILURE_CODES:
+            msg = f"Service error code '{self.code}' reports '{self.error_code}', which no inference failure class declares"
+            raise ValueError(msg)
+        if self.is_model_not_found and self.error_code is not CoreCode.MODEL_UNAVAILABLE:
+            msg = f"Service error code '{self.code}' means the model is not found, so it reports 'model.unavailable', not '{self.error_code}'"
+            raise ValueError(msg)
+        if self.category.is_retryable and not error_code_spec(self.error_code).invites_retry:
+            msg = f"Service error code '{self.code}' is {self.category}, so it reports a code that invites a retry, not '{self.error_code}'"
+            raise ValueError(msg)
+        return self
 
 
 class ServiceErrorVocabulary:

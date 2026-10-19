@@ -91,8 +91,22 @@ class TestAgentInitExecution:
         exit_code, payload = _init(config={"execution": "elsewhere"})
 
         assert exit_code != 0
-        assert payload["error_type"] == "ArgumentError"
+        assert payload["code"] == "client.argument_invalid"
+        assert payload["params"] == {"argument": "execution", "reason": "unknown execution"}
         assert "elsewhere" in payload["message"]
+        assert not target_dir.exists()
+
+    def test_a_config_file_that_cannot_be_read_is_a_file_refusal(self, target_dir: Path, tmp_path: Path) -> None:
+        """A --config path naming a directory is `client.file_unreadable` with the system's reason, never the catch-all."""
+        config_dir = tmp_path / "config.json"
+        config_dir.mkdir()
+
+        result = CliRunner().invoke(_app, ["--format", "json", "--config", str(config_dir)])
+
+        assert result.exit_code != 0
+        payload = json.loads(result.stderr)
+        assert payload["code"] == "client.file_unreadable"
+        assert payload["params"] == {"path": str(config_dir), "reason": "is a directory"}
         assert not target_dir.exists()
 
     @pytest.mark.parametrize("config", [{"execution": "hosted", "backends": ["openai"]}, {"execution": "hosted", "primary_backend": "openai"}])
@@ -100,7 +114,8 @@ class TestAgentInitExecution:
         exit_code, payload = _init(config=config)
 
         assert exit_code != 0
-        assert payload["error_type"] == "ArgumentError"
+        assert payload["code"] == "client.argument_invalid"
+        assert payload["params"]["argument"] in {"backends", "primary_backend"}
         assert not target_dir.exists()
 
     def test_a_global_init_names_a_project_that_overrides_it(self, target_dir: Path, mocker: MockerFixture, tmp_path: Path) -> None:

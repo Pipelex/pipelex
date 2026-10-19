@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import ValidationErrorCategory, ValidationErrorItem
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.validation_error_types import TemplateCheckErrorType
 from pytest_mock import MockerFixture
 
@@ -42,9 +43,13 @@ class TestValidateTemplateCheckWarnings:
         body = response.json()
         assert body["is_valid"] is True
         family.assert_called_once()
-        template_warnings = [warning for warning in body["warnings"] if warning["error_type"] == TemplateCheckErrorType.TEMPLATE_CHECK_WARNING]
+        # The warning rides as a problem item under its code, with the facts its sentence is rendered from.
+        template_warnings = [warning for warning in body["warnings"] if warning["code"] == PipelexErrorCode.DOCGEN_TEMPLATE_WARNING]
         assert len(template_warnings) == 1
-        assert {key: value for key, value in template_warnings[0].items() if value is not None} == _TEMPLATE_WARNING.model_dump(
-            mode="json", exclude_none=True
-        )
+        assert template_warnings[0] == {
+            "code": PipelexErrorCode.DOCGEN_TEMPLATE_WARNING,
+            "detail": f"The document template 'invoice.xlsx' may be faulty: {_TEMPLATE_WARNING.message}",
+            "params": {"template": "invoice.xlsx", "finding": _TEMPLATE_WARNING.message},
+            "location": {"pipe": "print_invoice"},
+        }
         assert f"- **{TemplateCheckErrorType.TEMPLATE_CHECK_WARNING}** — {_TEMPLATE_WARNING.message}" in body["rendered_markdown"]

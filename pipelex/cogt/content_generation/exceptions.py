@@ -1,12 +1,33 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError, SecurityError
+from mthds.protocol.problem.registry import CoreCode
+
+from pipelex.base_exceptions import PipelexError, SecurityError
 
 
 class NeitherUrlNorDataError(PipelexError):
-    pass
+    """A generated image a provider returned with neither a URL nor data."""
+
+    error_code = CoreCode.PROVIDER_RESPONSE_INVALID
+
+
+class MockUsageOnLiveRunError(PipelexError, ValueError):
+    """A run asking for synthetic usage, which only a dry run reports, on a live run.
+
+    A ``ValueError`` too, because the model validators of ``CogtRunParams`` and ``PipeRunParams`` raise it and pydantic
+    wraps only a ``ValueError`` into its validation error.
+    """
+
+    error_code = CoreCode.REQUEST_INVALID
 
 
 class UnsafeSchemaError(SecurityError):
-    pass
+    """A JSON schema carrying the code generator's extensions, refused before any code is generated from it.
+
+    The schema is the method's output concept, or a payload forged across a process boundary, so it is refused as a
+    security policy rather than read as a malformed method. The same perimeter refuses, as this error, an import the
+    generated code makes outside its allowlist.
+    """
+
+    error_code = CoreCode.SECURITY_SCHEMA_REFUSED
 
 
 class DryRunObjectFidelityError(PipelexError):
@@ -23,13 +44,9 @@ class DryRunObjectFidelityError(PipelexError):
     ``ValidationError`` behavior.
     """
 
-    # The caller's output concept enforces an invariant the schema round-trip drops; they can fix it by
-    # declaring `examples` / `mock_format` on the offending fields — caller-fixable input, not a
-    # server-side fault.
-    error_domain = ErrorDomain.INPUT
-    # The message is pure caller-facing guidance (names the caller's own output concept class and the
-    # field-level remedy) with no internal paths or secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
+    # The method's output concept enforces an invariant the schema round-trip drops; its author fixes it by
+    # declaring `examples` / `mock_format` on the offending fields, not a server-side fault.
+    error_code = CoreCode.METHOD_MOCK_UNSATISFIABLE
 
     @classmethod
     def for_object_class(cls, object_class_name: str) -> "DryRunObjectFidelityError":
@@ -56,12 +73,9 @@ class OutputStructureSchemaError(PipelexError):
     the class.
     """
 
-    # The caller's output concept uses a type pydantic cannot describe as JSON Schema; they fix it by
-    # changing the field or teaching the type `__get_pydantic_json_schema__` — caller-fixable input.
-    error_domain = ErrorDomain.INPUT
-    # The message names the caller's own output concept class and the remedy, with no internal paths or
-    # secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
+    # The method's output concept uses a type pydantic cannot describe as JSON Schema; its author fixes it by
+    # changing the field or teaching the type `__get_pydantic_json_schema__`.
+    error_code = CoreCode.METHOD_CONCEPT_INVALID
 
     @classmethod
     def for_object_class(cls, *, object_class_name: str, reason: str) -> "OutputStructureSchemaError":
@@ -88,12 +102,9 @@ class DryRunMockBuildError(PipelexError):
     ``mock_format`` on fields whose constraints polyfactory cannot satisfy from the schema alone.
     """
 
-    # The caller's output concept has field constraints the mock factory cannot satisfy; fixable by
-    # declaring `examples` / `mock_format` on those fields — caller-fixable input, not a server fault.
-    error_domain = ErrorDomain.INPUT
-    # The message is pure caller-facing guidance (names the caller's own output concept class and the
-    # field-level remedy) with no internal paths or secrets, so it should survive STRICT disclosure intact.
-    _authors_caller_facing_message = True
+    # The method's output concept has field constraints the mock factory cannot satisfy; its author fixes it
+    # by declaring `examples` / `mock_format` on those fields, not a server fault.
+    error_code = CoreCode.METHOD_MOCK_UNSATISFIABLE
 
     @classmethod
     def for_object_class(cls, object_class_name: str) -> "DryRunMockBuildError":

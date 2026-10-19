@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 from mthds.method_tree.models import MethodTree
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel
 
 # TypedDict from typing_extensions, not typing: pydantic rejects typing.TypedDict as a model
@@ -26,14 +27,19 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.method_trees import list_local_method_tree, reporting_host_library_tree_faults
+from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
+from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs, declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunOutput, DryRunStatus
-from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error, withholding_host_library_files
+from pipelex.pipeline.exceptions import TreePythonSyntaxError, ValidateBundleError
+from pipelex.pipeline.validate_bundle_translation import (
+    reporting_host_library_faults,
+    translate_to_validate_bundle_error,
+    withholding_host_library_files,
+)
 from pipelex.system.caller_identity import CallerIdentity
 
 PYTHON_SUFFIX = ".py"
@@ -115,10 +121,10 @@ def _pipes_to_dry_run(loaded_pipes: list[PipeAbstract], *, dry_run_pipe_codes: l
     if missing:
         missing_str = ", ".join(f"'{code}'" for code in sorted(missing))
         msg = f"Pipe(s) {missing_str} not found in the bundle. Check for typos and make sure they are declared in the bundle."
-        # The bundle-scoped wording stays the raise site's own — more precise here than the class's
-        # library-lookup message — and is safe under ``_authors_caller_facing_message``: it names only
-        # the caller's own selector codes (derived from ``wanted``), nothing from the loaded library.
-        raise EntryPipeNotFoundError(msg)
+        # The bundle-scoped wording stays the raise site's own, more precise here than the class's library-lookup message.
+        loaded_refs = [pipe.pipe_ref for pipe in loaded_pipes]
+        suggestions = list(dict.fromkeys(ref for code in sorted(missing) for ref in close_pipe_refs(name=code, pipe_refs=loaded_refs)))
+        raise EntryPipeNotFoundError(msg).with_params(pipe=", ".join(sorted(missing)), suggestions=suggestions)
     return selected
 
 
@@ -177,7 +183,7 @@ async def validate_bundle(
     if provided_params == 0:
         # Programmer error: a caller (the HTTP request layer, a builder op) must wire exactly one
         # input. It is not a content verdict the end user can fix → PipelexUnexpectedError (→ 500,
-        # redacted under STRICT), matching the mthds_sources-mismatch guard below — never a
+        # runtime.unexpected), matching the mthds_sources-mismatch guard below — never a
         # ValidateBundleError, which would 200/422 a host-wiring bug as if the bundle were invalid.
         msg = "One of mthds_contents, mthds_file_path or method_dir must be provided to validate_bundle"
         raise PipelexUnexpectedError(msg)
@@ -195,15 +201,15 @@ async def validate_bundle(
         # guard it would yield a blueprint-less result that downstream consumers (the canonical
         # report's primary-blueprint selection) cannot represent.
         msg = "mthds_contents must not be empty: provide at least one MTHDS content to validate"
-        raise ValidateBundleError(message=msg)
+        raise ValidateBundleError(message=msg).with_error_code(CoreCode.REQUEST_INVALID)
     if mthds_sources is not None and (mthds_contents is None or len(mthds_sources) != len(mthds_contents)):
         # ``mthds_sources`` is a per-content source list (the host — e.g. an HTTP API —
         # threads each bundle's source onto the in-memory load path so its diagnostics carry a
         # real ``source``). It is never supplied by the end caller, so a missing-alongside /
         # length-mismatch is a host wiring bug, not bad user input: raise an internal error
-        # (→ 500, redacted under STRICT) rather than ``ValidateBundleError`` (→ caller-facing
-        # 422). Contrast the empty-``mthds_contents`` guard above, which can legitimately
-        # reflect an end user submitting no bundles and so stays a caller-facing input error.
+        # (→ 500, runtime.unexpected) rather than ``ValidateBundleError`` (→ 422). Contrast the
+        # empty-``mthds_contents`` guard above, which can legitimately reflect an end user
+        # submitting no bundles and so stays the caller's input error.
         msg = "mthds_sources, when provided, must be a per-item source list matching mthds_contents in length"
         raise PipelexUnexpectedError(msg)
 
@@ -241,7 +247,8 @@ async def validate_bundle(
         # Beside submitted content, a host's library directories are withheld from the verdict: their files are paths
         # on the host. The caller's own directories, and every directory of a bundle file, keep their paths.
         host_library_withholding: AbstractContextManager[None]
-        # A host's library directories whose trees cannot be listed are the host's fault, never the caller's verdict.
+        # A host's library directories whose trees cannot be listed, or whose methods refuse to load, are the host's
+        # fault, never the caller's verdict.
         host_library_tree_faults: AbstractContextManager[None]
         if mthds_contents is not None and not library_dirs_are_callers:
             host_library_withholding = withholding_host_library_files(
@@ -249,7 +256,7 @@ async def validate_bundle(
                 caller_sources=[source for source in mthds_sources or [] if source is not None],
                 caller_contents=mthds_contents,
             )
-            host_library_tree_faults = reporting_host_library_tree_faults()
+            host_library_tree_faults = reporting_host_library_faults()
         else:
             host_library_withholding = nullcontext()
             host_library_tree_faults = nullcontext()
@@ -276,6 +283,9 @@ async def validate_bundle(
                 if submitted_files:
                     check_submitted_files(blueprints=loaded_blueprints, submitted_files=submitted_files)
                     library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
+                if not library_dirs_are_callers:
+                    # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
+                    library.pipe_library.set_caller_pipe_refs(pipe_refs=declared_pipe_refs(blueprints=loaded_blueprints))
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
@@ -359,28 +369,43 @@ def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
         try:
             source = tree.file_location(tree_path).read_bytes().decode("utf-8")
         except UnicodeDecodeError:
-            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=f"The Python file '{tree_path}' is not UTF-8 text."))
+            items.append(
+                _tree_python_item(tree_path=tree_path, finding="not UTF-8 text", message=f"The Python file '{tree_path}' is not UTF-8 text.")
+            )
             continue
         try:
             ast.parse(source, filename=tree_path)
         except SyntaxError as exc:
-            items.append(
-                PipelexBundleBlueprintValidationErrorData(
-                    source=tree_path,
-                    message=f"The Python file '{tree_path}' does not parse: {exc.msg} (line {exc.lineno}).",
-                    line=exc.lineno,
-                    column=exc.offset,
-                )
-            )
+            items.append(_tree_python_item(tree_path=tree_path, finding=f"{exc.msg} (line {exc.lineno})", line=exc.lineno, column=exc.offset))
         except ValueError as exc:
             # Python 3.11 refuses a source holding a NUL byte with a ValueError where later versions raise a SyntaxError.
-            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=f"The Python file '{tree_path}' does not parse: {exc}."))
+            items.append(_tree_python_item(tree_path=tree_path, finding=str(exc)))
         except (RecursionError, MemoryError):
             # Nesting deep enough to exhaust the parser, which Python's own import refuses the same way.
-            message = f"The Python file '{tree_path}' does not parse: it nests too deeply."
-            items.append(PipelexBundleBlueprintValidationErrorData(source=tree_path, message=message))
+            items.append(_tree_python_item(tree_path=tree_path, finding="it nests too deeply"))
     if items:
-        raise ValidateBundleError(message=" ".join(item.message for item in items), pipelex_bundle_blueprint_validation_errors=items)
+        message = " ".join(item.message for item in items)
+        # Each item takes the code of the verdict's cause, `method.syntax`, with its own finding.
+        first_finding = (items[0].params or {}).get("finding")
+        raise ValidateBundleError(message=message, pipelex_bundle_blueprint_validation_errors=items) from TreePythonSyntaxError(message).with_params(
+            finding=first_finding
+        )
+
+
+def _tree_python_item(
+    *, tree_path: str, finding: str, message: str | None = None, line: int | None = None, column: int | None = None
+) -> PipelexBundleBlueprintValidationErrorData:
+    """The item of a Python file of a method's tree that does not parse, located on the file and, when known, its line.
+
+    Its ``finding`` is what the parser found, the ``method.syntax`` parameter; its message says so, naming the file.
+    """
+    return PipelexBundleBlueprintValidationErrorData(
+        source=tree_path,
+        message=message or f"The Python file '{tree_path}' does not parse: {finding}.",
+        line=line,
+        column=column,
+        params={"finding": finding},
+    )
 
 
 def _is_member_blueprint(*, blueprint: PipelexBundleBlueprint, tree: MethodTree) -> bool:

@@ -67,22 +67,22 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             # it's an image, we can't accept documnt-related fields
             if self.should_caption_images:
                 msg = "PipeExtract with image input cannot have should_caption_images set to True"
-                raise ValueError(msg)
+                raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
             if self.should_include_page_views:
                 msg = "PipeExtract with image input cannot have should_include_page_views set to True"
-                raise ValueError(msg)
+                raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
             if self.page_views_dpi is not None:
                 msg = "PipeExtract with image input cannot have page_views_dpi set"
-                raise ValueError(msg)
+                raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
             if self.max_page_images is not None:
                 msg = "PipeExtract with image input cannot have max_page_images set"
-                raise ValueError(msg)
+                raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
         elif not concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=document_concept, strict=True):
             msg = (
                 "The input to PipeExtract must be an image or a document (or a concept that refines one of them), "
                 f"but is {the_single_input.concept.concept_ref}"
             )
-            raise TypeError(msg)
+            raise PipeValidationError(message=msg, domain_code=self.domain_code, pipe_code=self.code)
 
     @override
     def validate_output_static(self):
@@ -99,7 +99,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.PAGE.concept_ref],
-            )
+            ).with_params(declared=self.output.concept.concept_ref, expected=[NativeConceptCode.PAGE.concept_ref], pipe_type=self.type)
 
     @override
     async def _live_run_operator_pipe(

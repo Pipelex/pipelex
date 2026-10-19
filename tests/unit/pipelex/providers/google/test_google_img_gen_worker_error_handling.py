@@ -16,10 +16,11 @@ from google.genai import errors as genai_errors
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, InferenceErrorCategory, find_inference_error_category_in_chain
 from pipelex.cogt.img_gen.img_gen_gemini_mapping import ResolvedGeminiImageConfig
 from pipelex.cogt.img_gen.img_gen_model_rules import AspectRatioTaxonomy, ImgGenArgTopic
 from pipelex.cogt.inference.error_classification import UserActionKind
+from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView, ProviderDiagnostics
 from pipelex.providers.google.google_img_gen_worker import GoogleImgGenWorker
 
 
@@ -60,6 +61,19 @@ def _make_img_gen_job(mocker: MockerFixture) -> Any:
     job.img_gen_prompt.positive_text = "a cute cat"
     job.job_report.img_gen_tokens_usage = None
     return job
+
+
+def _diagnostics_of(problem: PipelexProblem) -> ProblemDiagnostics:
+    """The operator's diagnostics of a problem built in the operator view."""
+    assert problem.diagnostics is not None
+    return problem.diagnostics
+
+
+def _provider_of(problem: PipelexProblem) -> ProviderDiagnostics:
+    """What the provider answered, from the operator's diagnostics."""
+    provider = _diagnostics_of(problem).provider
+    assert provider is not None
+    return provider
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -169,7 +183,7 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHANGE_INPUT
 
-    async def test_server_error_500_is_wait_and_retry(self, mocker: MockerFixture) -> None:
+    async def test_server_error_500_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_server_error(500, "Internal server error")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -177,29 +191,32 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 500
 
     @pytest.mark.parametrize(
-        ("exc_class", "expected_sdk_type"),
+        ("exc_class", "expected_sdk_type", "expected_category"),
         [
-            (httpx.ConnectError, "ConnectError"),
-            (httpx.ConnectTimeout, "ConnectTimeout"),
-            (httpx.ReadError, "TransportError"),
-            (httpx.RemoteProtocolError, "TransportError"),
+            # Never sent: the connection was not opened, so the image was not generated.
+            (httpx.ConnectError, "ConnectError", InferenceErrorCategory.TRANSIENT),
+            (httpx.ConnectTimeout, "ConnectTimeout", InferenceErrorCategory.TRANSIENT),
+            # Dropped after the request left: the image may exist and be billed.
+            (httpx.ReadError, "TransportError", InferenceErrorCategory.AMBIGUOUS),
+            (httpx.RemoteProtocolError, "TransportError", InferenceErrorCategory.AMBIGUOUS),
         ],
     )
-    async def test_httpx_transport_error_is_wrapped_as_transient(
+    async def test_httpx_transport_error_is_wrapped_by_whether_it_was_sent(
         self,
         mocker: MockerFixture,
         exc_class: type[httpx.TransportError],
         expected_sdk_type: str,
+        expected_category: InferenceErrorCategory,
     ) -> None:
-        """A direct httpx.TransportError from generate_content() must be caught and routed through
-        the categorizer as a TRANSIENT ImgGenGenerationError, matching the Google LLM worker.
+        """A direct httpx.TransportError from generate_content() is caught and routed through the categorizer as an
+        ImgGenGenerationError: transient when the request was never sent, an unknown outcome when it may have been.
         """
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://generativelanguage.googleapis.com/v1/models/imagen-3.0-generate-002:generateContent")
@@ -209,7 +226,7 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is expected_category
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None
@@ -218,7 +235,10 @@ class TestGoogleImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata.sdk_exception_type == expected_sdk_type
         assert exc_info.value.__cause__ is sdk_exc
 
-    async def test_to_error_report_serializes_metadata(self, mocker: MockerFixture) -> None:
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
+    async def test_the_operator_problem_carries_the_provider_facts(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = _make_google_client_error(429, "Resource has been exhausted", status="RESOURCE_EXHAUSTED")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -226,9 +246,10 @@ class TestGoogleImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        report = exc_info.value.to_error_report()
-        assert report.error_category == "capacity"
-        assert report.retryable is False
-        assert report.provider_metadata is not None
-        assert report.provider_metadata.provider == "google"
-        assert report.provider_metadata.status_code == 429
+        error = exc_info.value
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert find_inference_error_category_in_chain(error) == "capacity"
+        assert problem.is_retryable is False
+        # The provider's `name` is the backend the error names, which the worker leaves to its caller to fill.
+        assert _provider_of(problem).name is None
+        assert _provider_of(problem).status == 429

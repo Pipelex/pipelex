@@ -35,3 +35,14 @@ class ModelDeckCheckTestData:
         "held-nowhere",
         "@held-nowhere",
     ]
+
+
+class UnservedReferenceTestData:
+    # The one model the deck serves, as an LLM.
+    SERVED_HANDLE = "served-model"
+    # A model a catalog of the deployment declares on a backend it does not enable, as `claude-4.5-haiku` is with
+    # `anthropic` switched off.
+    CATALOGED_HANDLE = "switched-off-model"
+    # Names no catalog knows: one a letter away from the served handle, one near nothing.
+    NEAR_HANDLE = "served-modle"
+    FAR_HANDLE = "zzz"

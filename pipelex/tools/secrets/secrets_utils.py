@@ -168,7 +168,7 @@ def _get_env_var(var_name: str) -> str:
         return get_required_env(var_name)
     except EnvVarNotFoundError as exc:
         msg = f"Could not get variable '{var_name}': {exc!s}"
-        raise VarNotFoundError(message=msg, var_name=var_name) from exc
+        raise VarNotFoundError(message=msg, var_name=var_name).with_params(variable=var_name, source="env") from exc
 
 
 def _get_secret(secret_name: str, *, secrets_provider: SecretsProviderAbstract) -> str:
@@ -177,4 +177,4 @@ def _get_secret(secret_name: str, *, secrets_provider: SecretsProviderAbstract) 
         return secrets_provider.get_secret(secret_id=secret_name)
     except SecretNotFoundError as exc:
         msg = f"Could not get variable '{secret_name}': {exc!s}"
-        raise VarNotFoundError(message=msg, var_name=secret_name) from exc
+        raise VarNotFoundError(message=msg, var_name=secret_name).with_params(variable=secret_name, source="secret") from exc

@@ -4,13 +4,13 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, final
 
 import shortuuid
+from mthds.protocol.problem.registry import CoreCode
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -25,8 +25,8 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
+from pipelex.graph.node_problem import make_node_problem
 from pipelex.graph.stuff_io_spec import make_stuff_io_spec
-from pipelex.graph.traced_failure import make_traced_failure
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_machinery.memory_writes import MemoryWrite
 from pipelex.pipe_machinery.pipe_blueprint import PipeCategory, PipeType, valid_pipe_type_tags
@@ -482,7 +482,7 @@ class PipeAbstract(ABC, BaseModel):
                         variable_names=[var_name],
                         expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
                         declared_inputs=self._declared_inputs_for_fix(),
-                    )
+                    ).with_params(input=var_name, declared=declared_ref, expected=[required_ref])
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:
@@ -598,19 +598,28 @@ class PipeAbstract(ABC, BaseModel):
             ]
             if optional_input_names:
                 msg += f" These optional inputs may be omitted: {', '.join(optional_input_names)}."
-            # Whether the caller left the inputs out of the request or an earlier step of their
-            # method did not produce them, the fault is in the caller's own request or method, and
-            # the message names only the pipe and its input names.
-            raise PipeRunInputsError(
-                message=msg,
-                run_mode=pipe_run_params.run_mode,
-                pipe_code=self.code,
-                missing_inputs=presence_scan.missing_names,
-            ).as_caller_fault(
-                user_action=UserAction(
-                    kind=UserActionKind.CHANGE_INPUT,
-                    detail=f"Provide the missing required inputs of '{self.code}': {', '.join(presence_scan.missing_names)}.",
+            # The run's entry pipe reads what the caller sent, so a name missing there is an input the caller left
+            # out of the request; a nested pipe reads what earlier steps of the method produced, so a name missing
+            # there is the method's wiring. The pipe stack tells them apart: it holds this pipe alone at the entry.
+            # Either way the message names only the pipe and its input names.
+            missing_inputs_str = ", ".join(presence_scan.missing_names)
+            missing_inputs_code: CoreCode
+            missing_inputs_params: dict[str, str]
+            if len(pipe_run_params.pipe_stack) <= 1:
+                missing_inputs_code = CoreCode.INPUT_MISSING
+                missing_inputs_params = {"input": missing_inputs_str}
+            else:
+                missing_inputs_code = CoreCode.PIPE_INPUT_UNRESOLVED
+                missing_inputs_params = {"variable": missing_inputs_str}
+            raise (
+                PipeRunInputsError(
+                    message=msg,
+                    run_mode=pipe_run_params.run_mode,
+                    pipe_code=self.code,
+                    missing_inputs=presence_scan.missing_names,
                 )
+                .with_error_code(missing_inputs_code)
+                .with_params(**missing_inputs_params)
             )
 
         # The pipe is about to be lifted (skipped): per-pipe validation and resource checks are
@@ -632,16 +641,16 @@ class PipeAbstract(ABC, BaseModel):
                     try:
                         stuff.content.validate_resources()
                     except ValueError as exc:
-                        # Not classified as the caller's fault, although the resource is the
-                        # caller's: the check's message names the path as resolved on this host,
-                        # which STRICT disclosure must not show, as `PipelineInputContentError`'s.
+                        # No parameter repeats the check's message, although the resource is the
+                        # caller's: it names the path as resolved on this host, which only the
+                        # operator's diagnostics may show, as `PipelineInputContentError`'s.
                         msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
                         raise PipeRunInputsError(
                             message=msg,
                             run_mode=pipe_run_params.run_mode,
                             pipe_code=self.code,
                             variable_name=variable_name,
-                        ) from exc
+                        ).with_error_code(CoreCode.INPUT_REFERENCE_NOT_FOUND) from exc
 
         # Specific pipe validation function
         await self._validate_before_run(
@@ -887,15 +896,12 @@ class PipeAbstract(ABC, BaseModel):
                 error_stack: str | None = None
                 if parent_trace_context.data_inclusion.error_stack_traces:
                     error_stack = traceback.format_exc()
-                traced_failure = make_traced_failure(error=exc)
                 tracer_manager.on_pipe_end_error(
                     lookup_key=parent_trace_context.lookup_key,
                     node_id=graph_node_id,
                     ended_at=datetime.now(UTC),
-                    error_type=type(exc).__name__,
-                    error_message=traced_failure.message,
+                    problem=make_node_problem(error=exc, pipe_code=self.code, pipe_path=list(pipe_run_params.pipe_stack)),
                     error_stack=error_stack,
-                    caller_facing=traced_failure.caller_facing,
                 )
             raise
 

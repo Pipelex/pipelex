@@ -21,14 +21,16 @@ Three properties are what the tests below exist to hold:
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
 from pydantic import BaseModel, ValidationError
 
-from pipelex.base_exceptions import ErrorDomain, ErrorReport, PipelexConfigError
+from pipelex.base_exceptions import ErrorDomain, PipelexConfigError
 from pipelex.core.validation import MIGRATE_COMMAND, raise_config_setup_error, report_validation_error
+from pipelex.errors.problem import PipelexProblem, ProblemView
 from pipelex.migration import run as migration_run_module
 from pipelex.migration.exceptions import MigrationLedgerError
 from pipelex.migration.goldens import pre_history_document_path
@@ -260,7 +262,7 @@ class TestAFailureInsideTheScanIsNotTheFailureTheUserSees:
 
 
 class TestTheErrorCarriesBothTheDomainAndTheBlock:
-    """The charter's own pair: `error_domain` stays `config`, and the block rides beside it."""
+    """The charter's own pair: the error's domain stays `config`, and the block rides beside it in the operator's diagnostics."""
 
     def test_the_raised_error_reports_the_config_domain_and_the_migration(self, machine: Path) -> None:
         machine.joinpath("telemetry.toml").write_text(_old_shape_telemetry_document(), encoding="utf-8")
@@ -270,19 +272,20 @@ class TestTheErrorCarriesBothTheDomainAndTheBlock:
         with pytest.raises(PipelexConfigError) as raised:
             raise_config_setup_error(config_error=refusal, surface_id=TELEMETRY_CONFIG_SURFACE_ID)
 
-        error_report = raised.value.to_error_report()
-        assert error_report.error_domain == ErrorDomain.CONFIG, "a new domain would route the agent hooks to BLOCK"
-        assert error_report.migration is not None
-        assert error_report.migration.remedy == MIGRATE_COMMAND
+        problem = raised.value.to_problem(view=ProblemView.OPERATOR)
+        assert ErrorDomain.from_problem_domain(problem.effective_domain) == ErrorDomain.CONFIG, "a new domain would route the agent hooks to BLOCK"
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.migration is not None
+        assert problem.diagnostics.migration.remedy == MIGRATE_COMMAND
 
     @pytest.mark.usefixtures("machine")
     def test_the_report_the_error_produces_is_json_serializable(self, machine: Path) -> None:
-        """`ErrorReport.to_dict()` is a serialization surface, and the block carries real `Path`s.
+        """The problem's wire form is a serialization surface, and the block carries real `Path`s.
 
         The webhook delivery path hands that dict straight to `json.dumps`, which cannot serialize
         a `PosixPath`. Not reachable from a pipeline run today — nothing raises this error inside
-        one — but `to_dict` is documented as *the* serialization surface, so a field that quietly
-        makes it unserializable is a trap left for whoever wires the next consumer.
+        one — but `to_wire` is *the* serialization surface, so a field that quietly makes it
+        unserializable is a trap left for whoever wires the next consumer.
         """
         machine.joinpath("telemetry.toml").write_text(_old_shape_telemetry_document(), encoding="utf-8")
         refusal = ConfigValidationError("the configuration was refused")
@@ -291,9 +294,11 @@ class TestTheErrorCarriesBothTheDomainAndTheBlock:
         with pytest.raises(PipelexConfigError) as raised:
             raise_config_setup_error(config_error=refusal, surface_id=TELEMETRY_CONFIG_SURFACE_ID)
 
-        payload = raised.value.to_error_report().to_dict()
+        payload = raised.value.to_problem(view=ProblemView.OPERATOR).to_wire()
         assert json.dumps(payload), "the block must survive a plain json.dumps"
-        assert ErrorReport.from_dict(payload).migration is not None, "and it must come back through the round-trip"
+        diagnostics = PipelexProblem.model_validate(payload).diagnostics
+        assert diagnostics is not None
+        assert diagnostics.migration is not None, "and it must come back through the round-trip"
 
     @pytest.mark.usefixtures("machine")
     def test_a_healthy_machine_raises_the_same_error_without_a_block(self) -> None:
@@ -304,7 +309,38 @@ class TestTheErrorCarriesBothTheDomainAndTheBlock:
         with pytest.raises(PipelexConfigError) as raised:
             raise_config_setup_error(config_error=refusal, surface_id=TELEMETRY_CONFIG_SURFACE_ID)
 
-        assert raised.value.to_error_report().migration is None
+        diagnostics = raised.value.to_problem(view=ProblemView.OPERATOR).diagnostics
+        assert diagnostics is not None
+        assert diagnostics.migration is None
+
+    @pytest.mark.usefixtures("machine")
+    @pytest.mark.parametrize(
+        ("surface_id", "expected_step"),
+        [
+            (
+                PIPELEX_CONFIG_SURFACE_ID,
+                "Correct the setting 'required_field' in the file 'pipelex.toml' of the pipelex configuration, then restart the runtime.",
+            ),
+            (
+                TELEMETRY_CONFIG_SURFACE_ID,
+                "Correct the setting 'required_field' in the file 'telemetry.toml' of the telemetry configuration, then restart the runtime.",
+            ),
+        ],
+    )
+    def test_the_operator_s_step_names_the_setting_the_file_and_the_surface(
+        self, surface_id: str, expected_step: str, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The code's step renders from the parameters the refusal gives, never falling back on the generic sentence."""
+        refusal = ConfigValidationError("the configuration was refused")
+        refusal.__cause__ = _make_validation_error()
+
+        with pytest.raises(PipelexConfigError) as raised:
+            raise_config_setup_error(config_error=refusal, surface_id=surface_id)
+
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            problem = raised.value.to_problem(view=ProblemView.OPERATOR)
+        assert problem.next_step.detail == expected_step
+        assert not [record for record in caplog.records if record.name == "pipelex.errors.problem"]
 
     def test_a_refusal_carrying_no_pydantic_error_is_re_raised_as_itself(self) -> None:
         """There is nothing to translate, and its own message is already the whole account."""

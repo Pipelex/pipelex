@@ -10,13 +10,12 @@ from pipelex.cogt.models.model_reference_check import ModelCheckCategory, ModelR
 from pipelex.pipeline.runner import PipelexModelDeck
 from pipelex.runtime_hub import get_model_deck
 
-from pipelex_api.error_types import ErrorType
-from pipelex_api.errors import raise_validation_error
+from pipelex_api.exceptions import RunnerRequestError
 from pipelex_api.routes.pipelex.pipeline import ApiRunner
 
 router = APIRouter(tags=["agent"])
 
-# The longest reference the check accepts once trimmed; one character more is refused with `InvalidModelReference`.
+# The longest reference the check accepts once trimmed; one character more is refused with `request.invalid`.
 MAX_MODEL_REFERENCE_LENGTH = 199
 
 
@@ -34,25 +33,21 @@ async def get_models(
     the flat `models` list (`{name, type}` entries) plus this implementation's
     category-keyed routing extensions (`aliases`, `waterfalls`). The `type` query
     param is a SINGLE protocol `ModelCategory` value: repeated `?type=` values
-    (arity, `ValidationError`) and unknown categories (`InvalidModelCategory`) are
-    both 422s (RFC 7807).
+    and unknown categories are both 422 `request.invalid` naming `type`.
     """
     # Protocol arity: `type` is a plain single-value enum. FastAPI silently keeps one of
     # several repeated scalar query params, so the multi-value rejection must be explicit.
-    # Generic ValidationError, not InvalidModelCategory: the values may all be valid —
-    # what's wrong is the arity.
     if len(request.query_params.getlist("type")) > 1:
-        raise_validation_error(message="The `type` query parameter accepts a single value")
+        msg = "The `type` query parameter accepts a single value"
+        raise RunnerRequestError(msg, field="type")
     category: ModelCategory | None = None
     if model_type is not None:
         try:
             category = ModelCategory(model_type)
-        except ValueError:
+        except ValueError as exc:
             valid = ", ".join(sorted(member.value for member in ModelCategory))
-            raise_validation_error(
-                message=f"Invalid model category. Valid values: {valid}",
-                error_type=ErrorType.INVALID_MODEL_CATEGORY,
-            )
+            msg = f"Invalid model category. Valid values: {valid}"
+            raise RunnerRequestError(msg, field="type") from exc
     return await ApiRunner().models(category=category)
 
 
@@ -88,34 +83,33 @@ async def check_model(
     reference found `resolved` in a category is one a pipe of that category may name, and one found
     `not_found` is one a validation refuses. A verdict is a `200` whatever the resolution, and on
     `not_found` it carries the suggestions a failing validation of the same reference offers. A
-    request that cannot produce a verdict is an input `422`: `ValidationError` for a missing or
-    repeated `reference` or a repeated `type`, `InvalidModelReference` for a reference that is blank,
-    a sigil or a namespace alone, or too long, and `InvalidModelCategory` for an unknown `type`.
+    request that cannot produce a verdict is an input `422` `request.invalid` naming the parameter: a
+    missing or repeated `reference`, a repeated `type`, a reference that is blank, a sigil or a namespace
+    alone, or too long, and an unknown `type`.
     """
     for parameter_name in ("reference", "type"):
         if len(request.query_params.getlist(parameter_name)) > 1:
-            raise_validation_error(message=f"The `{parameter_name}` query parameter accepts a single value")
+            msg = f"The `{parameter_name}` query parameter accepts a single value"
+            raise RunnerRequestError(msg, field=parameter_name)
 
     # The parser trims the reference itself, and its `raw` is the trimmed text the length limit measures.
     try:
         parsed_reference = ModelReference.parse(reference)
     except ModelReferenceParseError as exc:
-        raise_validation_error(message=exc.message, error_type=ErrorType.INVALID_MODEL_REFERENCE)
+        raise RunnerRequestError(exc.message, field="reference") from exc
     if len(parsed_reference.raw) > MAX_MODEL_REFERENCE_LENGTH:
         too_long_message = (
             f"The model reference holds {len(parsed_reference.raw)} characters once trimmed, more than the {MAX_MODEL_REFERENCE_LENGTH} accepted"
         )
-        raise_validation_error(message=too_long_message, error_type=ErrorType.INVALID_MODEL_REFERENCE)
+        raise RunnerRequestError(too_long_message, field="reference")
 
     category: ModelCheckCategory | None = None
     if model_type is not None:
         try:
             category = ModelCheckCategory(model_type)
-        except ValueError:
+        except ValueError as exc:
             valid = ", ".join(sorted(member.value for member in ModelCheckCategory))
-            raise_validation_error(
-                message=f"Invalid model category. Valid values: {valid}",
-                error_type=ErrorType.INVALID_MODEL_CATEGORY,
-            )
+            msg = f"Invalid model category. Valid values: {valid}"
+            raise RunnerRequestError(msg, field="type") from exc
 
     return check_model_reference(model_deck=get_model_deck(), reference=parsed_reference, category=category)

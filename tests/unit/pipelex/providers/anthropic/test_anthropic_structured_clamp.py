@@ -9,6 +9,7 @@ from anthropic.types import ToolUseBlock
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic import anthropic_llm_worker
 from tests.helpers.anthropic_structured_request import make_message, make_structured_worker, sent_request
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
@@ -101,6 +102,9 @@ class TestAnthropicStructuredClamp:
 
         assert "was lowered" not in exc_info.value.message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     @pytest.mark.parametrize("is_wrapped", [True, False])
     async def test_a_timeout_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture, is_wrapped: bool) -> None:
         """The note is added to the error the call raises, whose class and retryable category stay as they were."""
@@ -114,7 +118,7 @@ class TestAnthropicStructuredClamp:
         assert error.message.endswith(LOWERED_NOTE)
         assert str(error) == error.message
         assert error.error_category == InferenceErrorCategory.TRANSIENT
-        assert error.to_error_report().retryable is True
+        assert error.to_problem(view=ProblemView.CALLER).is_retryable is True
 
     async def test_an_invalid_output_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture) -> None:
         """An output that still fails validation once instructor's re-asks are spent may have been cut by the lowered limit."""

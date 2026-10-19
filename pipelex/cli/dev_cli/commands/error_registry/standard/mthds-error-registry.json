@@ -1,0 +1,4900 @@
+{
+  "version": "8.0.0",
+  "base_url": "https://mthds.ai/errors",
+  "extension_prefixes": [
+    {
+      "prefix": "pipelex",
+      "owner": "Pipelex",
+      "base_url": "https://docs.pipelex.com/errors"
+    }
+  ],
+  "families": [
+    {
+      "family": "request",
+      "description": "The HTTP request itself, before any run."
+    },
+    {
+      "family": "auth",
+      "description": "Credentials and permissions."
+    },
+    {
+      "family": "account",
+      "description": "The account's limits."
+    },
+    {
+      "family": "input",
+      "description": "A run's inputs."
+    },
+    {
+      "family": "method",
+      "description": "The method as written, the validation vocabulary included."
+    },
+    {
+      "family": "pipe",
+      "description": "A pipe failing at run time because of what the method does."
+    },
+    {
+      "family": "model",
+      "description": "The model a step names."
+    },
+    {
+      "family": "provider",
+      "description": "The inference provider behind a model."
+    },
+    {
+      "family": "run",
+      "description": "A run's lifecycle and its reads."
+    },
+    {
+      "family": "security",
+      "description": "Refusals made for safety. An implementation may also record each one as a security event."
+    },
+    {
+      "family": "runtime",
+      "description": "The runtime itself."
+    },
+    {
+      "family": "client",
+      "description": "What a client detects itself, and never receives as a response body."
+    }
+  ],
+  "codes": [
+    {
+      "code": "request.malformed",
+      "title": "The request body cannot be parsed",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The runner cannot parse the request body (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Fix the body so that it parses, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must send a request body that parses."
+        }
+      },
+      "params": {
+        "reason": {
+          "type": "enum",
+          "values": [
+            "not_json",
+            "not_utf8",
+            "bad_base64",
+            "bad_zip"
+          ],
+          "description": "What could not be parsed: the body as JSON, a text entry as UTF-8, a Base64 entry, or a zip archive the request carries."
+        }
+      },
+      "meaning": "The body is not parseable JSON, a Base64 or zip payload it carries is corrupt, or a text entry holds a code point UTF-8 cannot encode. The protocol answers a malformed body with a `422`.",
+      "what_to_do": "Check how the client builds the body: that it serializes valid JSON, writes text in UTF-8, and encodes every Base64 entry in standard padded Base64 with its pad bits zero. Then send the request again.",
+      "see": [
+        {
+          "title": "Method files",
+          "href": "spec/protocol.md#method-files"
+        }
+      ]
+    },
+    {
+      "code": "request.invalid",
+      "title": "The request does not match the route's schema",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The request's field '{field}' does not match the route's schema.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Correct the field '{field}' as the route's schema requires, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must correct the field '{field}' of the request."
+        }
+      },
+      "params": {
+        "field": {
+          "type": "identifier",
+          "description": "The field of the request body that fails the route's schema, as a dotted path."
+        }
+      },
+      "meaning": "The body parses, but a field fails the route's schema. A problem with several such faults carries one item per fault in `errors`, each naming its field in `location.field`. The protocol's refusals of one hash given twice with different sizes, of a blob upload whose bytes differ from the hash in its path, and of an undefined `?type=` category on `GET /models` are this code.",
+      "what_to_do": "Read each fault's `location.field`, compare the request with the route's schema in the protocol's OpenAPI document, correct the request and send it again.",
+      "see": [
+        {
+          "title": "Route reference",
+          "href": "spec/protocol.md#route-reference"
+        }
+      ]
+    },
+    {
+      "code": "request.too_large",
+      "title": "The request exceeds a size limit",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 413,
+      "detail": "The request reaches {size} bytes, past the runner's limit of {limit} bytes.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Make the request smaller than {limit} bytes, then send it again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must make the request smaller than {limit} bytes."
+        }
+      },
+      "params": {
+        "limit": {
+          "type": "bytes",
+          "description": "The bound the request passes."
+        },
+        "size": {
+          "type": "bytes",
+          "description": "The size the request, or the file in it, reached."
+        }
+      },
+      "meaning": "The body, or a file in it, is larger than a size bound of the route. Each implementation sets its own bounds.",
+      "what_to_do": "Make the request fit under `params.limit`. A method's large files can travel by hash to a runner whose `GET /version` declares `blob_store: true`, which keeps them out of the body.",
+      "see": [
+        {
+          "title": "Sending files by hash",
+          "href": "spec/protocol.md#sending-files-by-hash"
+        }
+      ]
+    },
+    {
+      "code": "request.not_found",
+      "title": "No such route",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 404,
+      "detail": "This runner serves no such route.",
+      "steps": {
+        "actor": {
+          "kind": "upgrade",
+          "detail": "Use a client written for the protocol version this runner reports in GET /version, or upgrade the runner."
+        },
+        "other": {
+          "kind": "upgrade",
+          "detail": "Upgrade the client or the runner so that both implement the same protocol version."
+        }
+      },
+      "params": {},
+      "meaning": "The route does not exist on this runner. The client was usually written for a newer or an older protocol version than the runner implements, or it called an optional route the runner does not serve.",
+      "what_to_do": "Read the runner's `GET /version`, which reports the protocol version it implements and whether it keeps a blob store, and use a client that matches it, or upgrade the runner.",
+      "see": [
+        {
+          "title": "The routes",
+          "href": "spec/protocol.md#the-routes"
+        }
+      ]
+    },
+    {
+      "code": "request.method_not_allowed",
+      "title": "The route does not accept this HTTP method",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 405,
+      "detail": "This route does not accept the request's HTTP method.",
+      "steps": {
+        "actor": {
+          "kind": "upgrade",
+          "detail": "Use a client written for the protocol version this runner reports in GET /version, which sends each route the HTTP method the protocol defines."
+        },
+        "other": {
+          "kind": "upgrade",
+          "detail": "Upgrade the client or the runner so that both implement the same protocol version."
+        }
+      },
+      "params": {},
+      "meaning": "The route exists, but not for the HTTP method the request used, which usually means that the client and the runner implement different protocol versions.",
+      "what_to_do": "Check the HTTP method the protocol defines for the route, and use a client that matches the protocol version the runner reports in `GET /version`.",
+      "see": [
+        {
+          "title": "The routes",
+          "href": "spec/protocol.md#the-routes"
+        }
+      ]
+    },
+    {
+      "code": "request.unsupported",
+      "title": "The request uses a form this runtime does not accept",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "This runtime does not accept the form the request's field '{field}' uses (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Send the field '{field}' in a form this runtime accepts, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must send the field '{field}' in a form this runtime accepts."
+        }
+      },
+      "params": {
+        "field": {
+          "type": "identifier",
+          "description": "The field of the request, as a dotted path, that uses the form."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "Which form the runtime refuses."
+        }
+      },
+      "meaning": "The request is well formed, but uses a form this runtime never supports, such as a method address in a form it does not resolve, or a member that only an extension of another implementation defines.",
+      "what_to_do": "Remove the member, or change its form to one this runtime documents. A request written against the protocol alone uses no form this code refuses."
+    },
+    {
+      "code": "request.idempotency_conflict",
+      "title": "The idempotency key was used for a different request",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The request's idempotency key was already used with a different body.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Send this request with a new idempotency key."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must send the request with a new idempotency key."
+        }
+      },
+      "params": {},
+      "meaning": "An earlier request with the same idempotency key carried another body, so the runtime cannot treat this one as its repeat.",
+      "what_to_do": "Generate a new idempotency key for every distinct request, and reuse a key only to repeat the very same request.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "request.idempotency_key_in_use",
+      "title": "A request under this idempotency key is still running",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "An earlier request with the same idempotency key and the same body is still in flight.",
+      "steps": {
+        "actor": {
+          "kind": "wait",
+          "detail": "Wait for the earlier request to finish, then repeat this one unchanged."
+        },
+        "other": {
+          "kind": "wait",
+          "detail": "Wait for the earlier request to finish, then repeat this one unchanged."
+        }
+      },
+      "params": {},
+      "meaning": "An earlier request with the same idempotency key and the same body has not finished, so the runtime neither runs this one again nor has an answer to return yet.",
+      "what_to_do": "Repeat the request unchanged, after `retry_after` seconds when the problem gives it. Once the first request has finished, the repeat returns its outcome.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "request.already_executed",
+      "title": "The request already ran and its answer is not kept",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The request under this idempotency key already ran, and its answer is not kept.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read what the first request created, such as its run, rather than sending the request again."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read what the first request created, such as its run, rather than sending the request again."
+        }
+      },
+      "params": {},
+      "meaning": "The request under this idempotency key ran, and the runtime cannot return its answer a second time.",
+      "what_to_do": "Read the outcome where it is kept, such as the run the first request started. Sending the request again with a new key would run it a second time.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "request.pipe_not_found",
+      "title": "The selected pipe is not in the method",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method declares no pipe '{pipe}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Select a pipe the method declares, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must select a pipe the method declares."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe the request selects."
+        },
+        "suggestions": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The pipes of the method the selection most likely meant, the likeliest first."
+        }
+      },
+      "meaning": "The `pipe_code` the request selects is not a pipe the method declares.",
+      "what_to_do": "Look in `params.suggestions` for the pipe the selection most likely meant, or list the method's pipes, and send the request again with one of them.",
+      "see": [
+        {
+          "title": "Executing a method",
+          "href": "spec/protocol.md#executing-a-method"
+        }
+      ]
+    },
+    {
+      "code": "request.pipe_ambiguous",
+      "title": "The pipe selection matches several pipes",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The pipe selection '{pipe}' matches several pipes: {candidates}.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Select one of the matching pipes by a reference that names it alone, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must select one of the matching pipes unambiguously."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe selection the request gives."
+        },
+        "candidates": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The pipes the selection matches."
+        }
+      },
+      "meaning": "A bare pipe code matches pipes in several domains or methods, so the runtime cannot tell which one the request means.",
+      "what_to_do": "Pick one of `params.candidates` and select it by a reference that names it alone, such as its domain-qualified reference.",
+      "see": [
+        {
+          "title": "Namespace Resolution Rules",
+          "href": "spec/namespace-resolution.md"
+        }
+      ]
+    },
+    {
+      "code": "request.pipe_unspecified",
+      "title": "No pipe is selected",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The request selects no pipe, and the method gives no main pipe to start from.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Select a pipe with pipe_code, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must select a pipe with pipe_code."
+        }
+      },
+      "params": {
+        "candidates": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The pipes the request could select."
+        }
+      },
+      "meaning": "The request names no `pipe_code`, and the method gives no `main_pipe` to start from: its manifest declares none or, with no manifest, its bundles declare none or several.",
+      "what_to_do": "Send a `pipe_code` naming one of `params.candidates`. The method's author can instead declare a `main_pipe`, so that a request without `pipe_code` starts there.",
+      "see": [
+        {
+          "title": "Executing a method",
+          "href": "spec/protocol.md#executing-a-method"
+        }
+      ]
+    },
+    {
+      "code": "request.blobs_missing",
+      "title": "The runner does not hold some files sent by hash",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "This runner does not hold a file the request sends by hash.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Upload each listed blob, or send its file inline if this runner keeps no blob store, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must upload each listed blob, or send its file inline if this runner keeps no blob store."
+        }
+      },
+      "params": {
+        "missing_blobs": {
+          "type": "list",
+          "items": {
+            "type": "sha256"
+          },
+          "description": "Each hash of the request that the runner does not hold, in lowercase hexadecimal."
+        }
+      },
+      "meaning": "A hash entry of the request's `files` names bytes this runner does not hold, or the runner keeps no blob store at all, so it cannot assemble the method's tree. This is the protocol's own refusal of hash entries.",
+      "what_to_do": "Read `params.missing_blobs`. To a runner whose `GET /version` declares `blob_store: true`, upload each listed blob as `POST /blobs/missing` says; to any other runner, send each listed file inline. Then send the request again.",
+      "see": [
+        {
+          "title": "Method files",
+          "href": "spec/protocol.md#method-files"
+        },
+        {
+          "title": "Sending files by hash",
+          "href": "spec/protocol.md#sending-files-by-hash"
+        }
+      ]
+    },
+    {
+      "code": "auth.missing_credential",
+      "title": "No credential was sent",
+      "domain": "account",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 401,
+      "detail": "This route needs a credential, and the request carried none.",
+      "steps": {
+        "actor": {
+          "kind": "check_credentials",
+          "detail": "Send the request with a credential this runtime accepts."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the account's owner for a credential this runtime accepts."
+        }
+      },
+      "params": {},
+      "meaning": "The route requires a credential, and the request carried none. How a runtime authenticates is implementation-defined; the protocol reserves a bearer-token slot, and `GET /version` needs no credential.",
+      "what_to_do": "Configure the client with a credential for this runtime, such as a bearer token in the `Authorization` header, and send the request again.",
+      "see": [
+        {
+          "title": "The routes",
+          "href": "spec/protocol.md#the-routes"
+        }
+      ]
+    },
+    {
+      "code": "auth.invalid_credential",
+      "title": "The credential was refused",
+      "domain": "account",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 401,
+      "detail": "The runtime refused the request's credential.",
+      "steps": {
+        "actor": {
+          "kind": "check_credentials",
+          "detail": "Check that the credential is the one issued for this runtime and that it was not revoked, then send the request again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the account's owner for a valid credential."
+        }
+      },
+      "params": {},
+      "meaning": "The credential is unknown to the runtime, revoked or malformed.",
+      "what_to_do": "Compare the configured credential with the one the account issued, issue a new one if it was revoked, and send the request again."
+    },
+    {
+      "code": "auth.credential_expired",
+      "title": "The credential has expired",
+      "domain": "account",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 401,
+      "detail": "The request's credential has expired.",
+      "steps": {
+        "actor": {
+          "kind": "refresh",
+          "detail": "Fetch a fresh credential, then send the request again with it."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the account's owner for a fresh credential."
+        }
+      },
+      "params": {},
+      "meaning": "The credential was valid and is past its expiry.",
+      "what_to_do": "Fetch a fresh credential, through the refresh its issuer provides, and send the request again with it."
+    },
+    {
+      "code": "auth.forbidden",
+      "title": "The credential does not permit this",
+      "domain": "account",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 403,
+      "detail": "The request's identity lacks '{requirement}', which this operation needs.",
+      "steps": {
+        "actor": {
+          "kind": "request_access",
+          "detail": "Ask for '{requirement}' on this account, then send the request again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the account's owner to grant '{requirement}'."
+        }
+      },
+      "params": {
+        "requirement": {
+          "type": "identifier",
+          "description": "The role, flag or session the operation needs."
+        }
+      },
+      "meaning": "The request is authenticated, but its identity lacks the role, the flag or the session the operation needs.",
+      "what_to_do": "Have the account's owner grant what `params.requirement` names, or send the request with an identity that holds it."
+    },
+    {
+      "code": "account.rate_limited",
+      "title": "The account is over its request rate",
+      "domain": "account",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 429,
+      "detail": "The account sent more than {limit} requests in {window} seconds.",
+      "steps": {
+        "actor": {
+          "kind": "wait",
+          "detail": "Wait for the rate window to pass, then send the request again."
+        },
+        "other": {
+          "kind": "wait",
+          "detail": "Wait for the rate window to pass, then send the request again."
+        }
+      },
+      "params": {
+        "limit": {
+          "type": "integer",
+          "description": "The number of requests the account may send in one window."
+        },
+        "window": {
+          "type": "seconds",
+          "description": "The length of the window."
+        }
+      },
+      "meaning": "The account sent more requests than its rate allows.",
+      "what_to_do": "Send the request again after `retry_after` seconds when the problem gives it, and spread later requests so that they stay under the rate."
+    },
+    {
+      "code": "account.quota_exhausted",
+      "title": "The account's quota is used up",
+      "domain": "account",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 429,
+      "detail": "The account's quota '{quota}' is used up.",
+      "steps": {
+        "actor": {
+          "kind": "check_account",
+          "detail": "Check the account's quota '{quota}', and raise it or wait for it to renew."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the account's owner to raise the quota '{quota}'."
+        }
+      },
+      "params": {
+        "quota": {
+          "type": "identifier",
+          "description": "The quota that is spent."
+        }
+      },
+      "meaning": "A quota of the account other than its request rate is spent, so the operation is refused until the quota renews or is raised.",
+      "what_to_do": "Check the account's quotas, then raise the one `params.quota` names or wait until it renews. Repeating the request before then fails the same way."
+    },
+    {
+      "code": "input.missing",
+      "title": "A required input is missing",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The request does not give the input '{input}', which the method requires.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Add the input '{input}' to the request, then send it again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must add the input '{input}' to the request."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input the method requires and the request omits."
+        }
+      },
+      "meaning": "The request omits an input that the selected pipe requires.",
+      "what_to_do": "Give every input the selected pipe declares as required. A runner that reports `input_form` on `/validate` lists them, with the concept each one takes.",
+      "see": [
+        {
+          "title": "Input-Form Descriptor",
+          "href": "spec/input-form-descriptor.md"
+        }
+      ]
+    },
+    {
+      "code": "input.unexpected",
+      "title": "An input the method does not declare",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The request gives the input '{input}', which the method does not declare.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Remove the input '{input}' from the request, or give it under the name the method declares, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must remove the input '{input}' from the request."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input the request gives and the method does not declare."
+        }
+      },
+      "meaning": "The request carries an input that the selected pipe does not declare.",
+      "what_to_do": "Check the input's name against the pipe's declared inputs, for a misspelling in particular, and send only those."
+    },
+    {
+      "code": "input.wrong_concept",
+      "title": "An input is not the declared concept",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The input '{input}' is given as '{provided}', but the method accepts '{expected}' there.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give the input '{input}' as '{expected}', then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must give the input '{input}' as '{expected}'."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "expected": {
+          "type": "identifier",
+          "description": "The concept the method accepts for the input."
+        },
+        "provided": {
+          "type": "identifier",
+          "description": "The concept the request gives."
+        }
+      },
+      "meaning": "An input names or holds a concept that the method does not accept there, an unknown concept included.",
+      "what_to_do": "Give the input as the concept the method declares, or as one that refines it. A stuff names its concept by its crate key, in its `concept` member.",
+      "see": [
+        {
+          "title": "Stuffs on the wire",
+          "href": "spec/cli-io-contract.md#stuffs-on-the-wire"
+        }
+      ]
+    },
+    {
+      "code": "input.wrong_multiplicity",
+      "title": "An input has the wrong number of items",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The input '{input}' gives {provided_count} item or items, which does not fit the multiplicity the method declares ({expected}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give the input '{input}' with the multiplicity the method declares, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must give the input '{input}' with the multiplicity the method declares."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "expected": {
+          "type": "enum",
+          "values": [
+            "single",
+            "list",
+            "count"
+          ],
+          "description": "What the method expects: one item, a list of any length, or a list of a fixed length."
+        },
+        "expected_count": {
+          "type": "integer",
+          "optional": true,
+          "description": "The number of items the method expects, when it expects a fixed count."
+        },
+        "provided_count": {
+          "type": "integer",
+          "description": "The number of items the request gives."
+        }
+      },
+      "meaning": "The request gives a list where the method expects one item, one item where it expects a list, or a list of the wrong length.",
+      "what_to_do": "Give one item for a single input, a list for a list input, and exactly `params.expected_count` items for an input of a fixed count.",
+      "see": [
+        {
+          "title": "Multiplicity",
+          "href": "language/multiplicity.md"
+        }
+      ]
+    },
+    {
+      "code": "input.invalid",
+      "title": "An input does not fit its concept's structure",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The input '{input}' does not fit its concept's structure at '{field}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Correct the field '{field}' of the input '{input}', then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must correct the field '{field}' of the input '{input}'."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "field": {
+          "type": "identifier",
+          "description": "The field of the input that fails, as a dotted path."
+        }
+      },
+      "meaning": "An input's value fails its concept's structure, such as a required field that is missing or a value of the wrong type, or breaks the rules of its content type. The problem names the field and never what the check found in the value, which a validator's message can quote and which is the content of the run's input.",
+      "what_to_do": "Compare the input with its concept's structure at the field `params.field` names, and correct the value.",
+      "see": [
+        {
+          "title": "Concepts",
+          "href": "language/concepts.md"
+        }
+      ]
+    },
+    {
+      "code": "input.file_unreadable",
+      "title": "An input file cannot be read",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The file of the input '{input}' cannot be read as '{file_type}' (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give a readable file as the input '{input}', then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must give a readable file as the input '{input}'."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "file_type": {
+          "type": "identifier",
+          "description": "The kind of file the input was read as, such as a PDF or an image."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "Why it could not be read."
+        }
+      },
+      "meaning": "A file given as an input does not decode, parse or open, such as a corrupt PDF or an image whose bytes are not of the format it claims.",
+      "what_to_do": "Open the file locally to check that it is intact and of the format it claims, then send a sound copy."
+    },
+    {
+      "code": "input.file_type_unsupported",
+      "title": "An input file's type is not supported here",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model '{model}' cannot take the file of the input '{input}', whose format is '{format}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give the input '{input}' in a format the model '{model}' takes, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must give the input '{input}' in a format the model takes."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "format": {
+          "type": "identifier",
+          "description": "The file's format."
+        },
+        "model": {
+          "type": "identifier",
+          "description": "The model the pipe would send the file to."
+        }
+      },
+      "meaning": "The file's format is one that the pipe, or the model it calls, cannot take.",
+      "what_to_do": "Convert the file to a format the model takes, such as a PDF or a common image format, or use a method whose model takes this one."
+    },
+    {
+      "code": "input.too_large",
+      "title": "An input exceeds a size limit",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The input '{input}' reaches {size}, past the limit of {limit}.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Make the input '{input}' smaller than {limit}, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must make the input '{input}' smaller."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "The bound the input passes."
+        },
+        "size": {
+          "type": "integer",
+          "description": "The size the input, or what a template renders from it, reached."
+        }
+      },
+      "meaning": "An input, or what a template renders from it, passes a bound of the runtime or of the pipe that reads it.",
+      "what_to_do": "Shrink the input below `params.limit`, by splitting a document or reducing an image's resolution, for instance."
+    },
+    {
+      "code": "input.reference_not_found",
+      "title": "An input refers to something that does not exist",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The input '{input}' refers to something that does not exist.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Point the input '{input}' at something that exists, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose input '{input}' refers to something that does not exist."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        }
+      },
+      "meaning": "A file path, a stored object or a URL that an input names is not there.",
+      "what_to_do": "Check the reference the input carries: that the file or the object exists, and that the runtime can reach it."
+    },
+    {
+      "code": "input.url_unreachable",
+      "title": "An input's URL could not be fetched",
+      "domain": "input",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The URL of the input '{input}', on '{host}', did not answer or answered with an error.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Send the request again later, or point the input '{input}' at a URL that answers."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose input '{input}' names a URL that did not answer."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input at fault."
+        },
+        "host": {
+          "type": "identifier",
+          "description": "The host of the URL."
+        }
+      },
+      "meaning": "A URL given in an input did not answer, or answered with an error, when the runtime fetched it. It may answer later.",
+      "what_to_do": "Check that the URL opens from outside your network, then send the request again. If the host keeps failing, send the file itself rather than its URL."
+    },
+    {
+      "code": "method.invalid",
+      "title": "The method does not validate",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method does not validate.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Fix each fault the problem's errors list, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the faults the problem's errors list."
+        }
+      },
+      "params": {},
+      "meaning": "The umbrella refusal of a method that does not validate. It carries one item per fault in `errors`, each with its own code, and it is the refusal only when at least one of its items is a fault of the method itself.",
+      "what_to_do": "Read each item of `errors`: its code says what is wrong and its `location` where. Fix them, then validate the method with `POST /validate`, which answers its verdict without running it.",
+      "see": [
+        {
+          "title": "Validating a bundle",
+          "href": "spec/protocol.md#validating-a-bundle"
+        },
+        {
+          "title": "Validation Rules",
+          "href": "implementers/validation-rules.md"
+        }
+      ]
+    },
+    {
+      "code": "method.syntax",
+      "title": "The method does not parse",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method does not parse ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Fix the syntax at the place the problem's location names, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the method's syntax."
+        }
+      },
+      "params": {
+        "finding": {
+          "type": "caller_text",
+          "description": "What the parser found."
+        }
+      },
+      "meaning": "A `.mthds` file is not valid TOML, or not valid MTHDS syntax. The problem's `location` names the file, the line and the column.",
+      "what_to_do": "Open the file `location.file` names at `location.line`, fix the syntax, and validate the method again. An editor with MTHDS support reports such faults as you type.",
+      "see": [
+        {
+          "title": ".mthds File Format",
+          "href": "spec/mthds-format.md"
+        }
+      ]
+    },
+    {
+      "code": "method.schema_violation",
+      "title": "The method breaks a rule of the language",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The declaration at '{field_path}' breaks a rule of the language ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the declaration at '{field_path}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the declaration at '{field_path}'."
+        }
+      },
+      "params": {
+        "field_path": {
+          "type": "identifier",
+          "description": "The key path of the declaration that breaks the rule."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What the check found."
+        }
+      },
+      "meaning": "A declaration fails the language's schema, or a rule of its pipe type that no sharper code names. It is also the code of a fault of the method that no other code describes.",
+      "what_to_do": "Read the rule for the declaration's section or pipe type in the `.mthds` file format, correct the declaration, and validate the method again.",
+      "see": [
+        {
+          "title": ".mthds File Format",
+          "href": "spec/mthds-format.md"
+        },
+        {
+          "title": "Validation Rules",
+          "href": "implementers/validation-rules.md"
+        }
+      ]
+    },
+    {
+      "code": "method.not_found",
+      "title": "No method at this address",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 404,
+      "detail": "No method is found at '{method_ref}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Correct the method's address, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose request names a method that does not exist."
+        }
+      },
+      "params": {
+        "method_ref": {
+          "type": "identifier",
+          "description": "The method address, name or path the request gives."
+        }
+      },
+      "meaning": "The method address, name or path the caller gave names no method.",
+      "what_to_do": "Check the address for a misspelling, and for the version or the path it names, then send the request again.",
+      "see": [
+        {
+          "title": "Distribution",
+          "href": "packages/distribution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.ambiguous",
+      "title": "The method address matches several methods",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method address '{method_ref}' matches several methods: {candidates}.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Name one of the matching methods by an address that matches it alone, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, who must name one of the matching methods unambiguously."
+        }
+      },
+      "params": {
+        "method_ref": {
+          "type": "identifier",
+          "description": "The method address, name or directory the request gives."
+        },
+        "candidates": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The methods the address matches."
+        }
+      },
+      "meaning": "The address, the name or the directory matches several packages or installed methods.",
+      "what_to_do": "Pick one of `params.candidates`, and name it by an address that matches it alone."
+    },
+    {
+      "code": "method.fetch_failed",
+      "title": "The method could not be fetched",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The method '{method_ref}', or one of its dependencies, could not be fetched.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Send the request again, since the host serving the method may answer later."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Send the request again, since the host serving the method may answer later."
+        }
+      },
+      "params": {
+        "method_ref": {
+          "type": "identifier",
+          "description": "The method or the dependency that could not be fetched."
+        }
+      },
+      "meaning": "The host serving the method, or one of its dependencies, did not answer or failed while the runtime fetched it.",
+      "what_to_do": "Send the request again after a while. If the host keeps failing, check that the method's repository is reachable from the runtime.",
+      "see": [
+        {
+          "title": "Distribution",
+          "href": "packages/distribution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.package_invalid",
+      "title": "The method's package breaks a package rule",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method's package breaks a package rule (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Bring the method's tree within the package rules, then send it again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to bring the method's tree within the package rules."
+        }
+      },
+      "params": {
+        "reason": {
+          "type": "identifier",
+          "description": "The package rule the method breaks."
+        },
+        "path": {
+          "type": "identifier",
+          "optional": true,
+          "description": "The tree path at fault, when one is."
+        },
+        "limit": {
+          "type": "integer",
+          "optional": true,
+          "description": "The limit the package passes, when the rule is a limit."
+        }
+      },
+      "meaning": "The package's layout, manifest, lock, files or size break a rule: a symbolic link, too many files or bytes, no manifest, no source, or file names that clash or cannot be loaded. The protocol's refusals of a `files` map that is not a tree, and of a blob or a tree past a runner's limits, are this code.",
+      "what_to_do": "Read `params.reason`, and `params.path` or `params.limit` when they are given, then fix the tree: remove the symbolic link, rename the clashing file, or trim the tree under the limit.",
+      "see": [
+        {
+          "title": "Method Tree",
+          "href": "spec/method-tree.md"
+        },
+        {
+          "title": "Method files",
+          "href": "spec/protocol.md#method-files"
+        }
+      ]
+    },
+    {
+      "code": "method.dependency_missing",
+      "title": "A dependency of the method is not available",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method depends on the {kind} '{name}', which is not available here (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare a dependency this runtime can satisfy in place of '{name}', then send the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare a dependency this runtime can satisfy in place of '{name}'."
+        }
+      },
+      "params": {
+        "kind": {
+          "type": "enum",
+          "values": [
+            "package",
+            "function",
+            "requirement"
+          ],
+          "description": "What is missing: a package, a function the method calls, or a Python requirement of the tree's `requirements.txt`."
+        },
+        "name": {
+          "type": "identifier",
+          "description": "The missing dependency's name."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "not_found",
+            "no_matching_version",
+            "cycle"
+          ],
+          "description": "Why it is not available: it exists nowhere this runtime looks, no version satisfies the method's constraints, or the dependencies form a cycle."
+        }
+      },
+      "meaning": "A package or a function the method depends on is not available here, no version satisfies the method's constraints, the dependencies form a cycle, or this runtime cannot satisfy a Python requirement of the tree's `requirements.txt`.",
+      "what_to_do": "Check the dependency's name and version constraint, in the manifest or in `requirements.txt`, and correct or loosen it so that an available version satisfies it.",
+      "see": [
+        {
+          "title": "Dependencies",
+          "href": "packages/dependencies.md"
+        },
+        {
+          "title": "Method Tree",
+          "href": "spec/method-tree.md"
+        }
+      ]
+    },
+    {
+      "code": "method.dependency_invalid",
+      "title": "A dependency of the method does not load",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A file of the dependency '{package}' does not load ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Depend on a version of '{package}' whose files load, then send the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to depend on a version of '{package}' whose files load."
+        }
+      },
+      "params": {
+        "package": {
+          "type": "identifier",
+          "description": "The dependency package that does not load."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What the parser found."
+        }
+      },
+      "meaning": "A file of a dependency package is not UTF-8, or does not parse.",
+      "what_to_do": "Report the fault to the dependency's owner, and pin a version of it that loads in the meantime.",
+      "see": [
+        {
+          "title": "Dependencies",
+          "href": "packages/dependencies.md"
+        }
+      ]
+    },
+    {
+      "code": "method.resource_missing",
+      "title": "A file the method refers to is not in its tree",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The file reference '{file}' resolves to no file of the method's tree (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Point the reference '{file}' at a file of the method's tree, written as a relative path with forward slashes, then send the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to point the reference '{file}' at a file of the method's tree."
+        }
+      },
+      "params": {
+        "file": {
+          "type": "identifier",
+          "description": "The file reference at fault."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "not_in_tree",
+            "leaves_tree",
+            "absolute",
+            "backslash",
+            "scheme"
+          ],
+          "description": "Why the reference resolves to no file of the tree: it names none, it climbs above the root, or it is written as an absolute path, with a backslash or with a scheme."
+        }
+      },
+      "meaning": "A file reference names no file of the method's tree, climbs above its root, or is written as an absolute path, with a backslash or with a scheme. Resolving a reference is a lookup in the tree's set of paths and never opens a file, so this is a fault of the method rather than a security matter.",
+      "what_to_do": "Check that the file is in the tree the request sends, and write its reference relative to the referring file, with forward slashes.",
+      "see": [
+        {
+          "title": "File references",
+          "href": "spec/method-tree.md#file-references"
+        }
+      ]
+    },
+    {
+      "code": "method.concept_unresolved",
+      "title": "The method names a concept no library declares",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method names the concept '{concept}', which no library declares.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the concept '{concept}', or correct the reference, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare or correct the concept '{concept}'."
+        }
+      },
+      "params": {
+        "concept": {
+          "type": "identifier",
+          "description": "The concept reference that resolves nowhere."
+        },
+        "suggestions": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The concepts the reference most likely meant, the likeliest first."
+        }
+      },
+      "meaning": "A concept reference resolves to no concept of the bundle, of its domain, of its dependencies or of the native set.",
+      "what_to_do": "Look in `params.suggestions` for the concept the reference most likely meant, then correct the reference or declare the concept.",
+      "see": [
+        {
+          "title": "Namespace Resolution Rules",
+          "href": "spec/namespace-resolution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.pipe_unresolved",
+      "title": "The method names a pipe that does not exist",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' names the pipe '{missing}', which does not exist.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the pipe '{missing}', or correct the reference in pipe '{pipe}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare or correct the pipe '{missing}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe whose declaration names the missing pipe."
+        },
+        "missing": {
+          "type": "identifier",
+          "description": "The pipe reference that names nothing."
+        },
+        "candidates": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The pipes the reference most likely meant, the likeliest first."
+        }
+      },
+      "meaning": "A controller's step, a branch, an outcome or the manifest's `main_pipe` names a pipe that does not exist.",
+      "what_to_do": "Look in `params.candidates` for the pipe the reference most likely meant, then correct the reference or declare the pipe.",
+      "see": [
+        {
+          "title": "Namespace Resolution Rules",
+          "href": "spec/namespace-resolution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.pipe_not_exported",
+      "title": "The method calls a pipe its dependency does not export",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method calls the pipe '{pipe}' of '{package}', which does not export it.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Call a pipe that '{package}' exports, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to call only the pipes '{package}' exports."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The dependency's pipe the method calls."
+        },
+        "package": {
+          "type": "identifier",
+          "description": "The dependency that declares the pipe."
+        }
+      },
+      "meaning": "A pipe of a dependency is called, but the dependency does not export it.",
+      "what_to_do": "Read the dependency's `[exports]` for the pipes it offers and call one of them, or ask its owner to export the pipe.",
+      "see": [
+        {
+          "title": "Exports & Visibility",
+          "href": "packages/exports-visibility.md"
+        }
+      ]
+    },
+    {
+      "code": "method.ref_ambiguous",
+      "title": "A reference matches several declarations",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The reference '{ref}' matches several declarations: {candidates}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Qualify the reference '{ref}' so that it names one declaration, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to qualify the reference '{ref}'."
+        }
+      },
+      "params": {
+        "ref": {
+          "type": "identifier",
+          "description": "The bare reference."
+        },
+        "candidates": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The declarations it matches."
+        }
+      },
+      "meaning": "A bare pipe or concept reference resolves in several packages.",
+      "what_to_do": "Write the reference package-qualified, as `alias->domain.Name`, or domain-qualified, so that it names one of `params.candidates`.",
+      "see": [
+        {
+          "title": "Namespace Resolution Rules",
+          "href": "spec/namespace-resolution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.name_conflict",
+      "title": "A name is declared twice or collides with a reserved one",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The name '{name}' collides with another declaration (conflict: {conflict}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Rename '{name}' so that it is unique and reserved by nothing, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to rename '{name}'."
+        }
+      },
+      "params": {
+        "name": {
+          "type": "identifier",
+          "description": "The name declared twice, or colliding."
+        },
+        "conflict": {
+          "type": "enum",
+          "values": [
+            "duplicate_declaration",
+            "native_concept",
+            "batch_item",
+            "reserved_domain"
+          ],
+          "description": "What the name collides with: another declaration, a native concept, another batch item, or a reserved domain."
+        }
+      },
+      "meaning": "Two declarations share a name, or a name collides with a native concept, with another batch item or with a reserved domain.",
+      "what_to_do": "Rename one of the colliding declarations. A domain may not be one of the reserved domains, and a concept may not take the name of a native one.",
+      "see": [
+        {
+          "title": "Namespace Resolution Rules",
+          "href": "spec/namespace-resolution.md"
+        }
+      ]
+    },
+    {
+      "code": "method.cycle",
+      "title": "Declarations form a cycle",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "These declarations form a cycle: {cycle}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Break the cycle by removing one of its links, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to break the cycle."
+        }
+      },
+      "params": {
+        "kind": {
+          "type": "enum",
+          "values": [
+            "refines",
+            "structure",
+            "pipe"
+          ],
+          "description": "What forms the cycle: concepts refining each other, structures referring to each other, or pipes calling each other."
+        },
+        "cycle": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The declarations around the cycle, in order."
+        }
+      },
+      "meaning": "Concepts refine or refer to each other, or pipes call each other, in a loop.",
+      "what_to_do": "Follow `params.cycle` and remove one of its links, such as a refinement or a call that leads back to its start."
+    },
+    {
+      "code": "method.identifier_invalid",
+      "title": "A name is not a valid identifier",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The name '{name}' breaks the naming rules of a {identifier_kind}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Rename '{name}' to a plain snake_case identifier, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to rename '{name}'."
+        }
+      },
+      "params": {
+        "identifier_kind": {
+          "type": "enum",
+          "values": [
+            "pipe_code",
+            "main_pipe",
+            "input_name"
+          ],
+          "description": "What the name is: a pipe code, the main pipe, or an input name, which a stored name takes the form of."
+        },
+        "name": {
+          "type": "caller_text",
+          "description": "The name as the method writes it."
+        }
+      },
+      "meaning": "A pipe code, a main pipe or an input name breaks the naming rules: each is a plain `snake_case` identifier matching `[a-z][a-z0-9_]*`. A stored name, such as a step's `result` or `batch_as` or a PipeBatch's `input_item_name`, takes the form of an input name, so one that breaks it is this code too, and so is a plain `batch_over` starting with the reserved prefix `_bound_`.",
+      "what_to_do": "Rename it to a plain `snake_case` identifier, with no dot and no capital letter, and update every reference to it.",
+      "see": [
+        {
+          "title": "Input names",
+          "href": "spec/mthds-format.md#input-names"
+        },
+        {
+          "title": "Stored names",
+          "href": "spec/mthds-format.md#stored-names"
+        }
+      ]
+    },
+    {
+      "code": "method.pipe_type_invalid",
+      "title": "A pipe's type is missing, unknown or retired",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' has no usable type (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Give pipe '{pipe}' one of the language's pipe types, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to give pipe '{pipe}' a valid type."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "missing",
+            "unknown",
+            "retired"
+          ],
+          "description": "Whether the type is missing, unknown or retired."
+        },
+        "pipe_type": {
+          "type": "caller_text",
+          "optional": true,
+          "description": "The type as the method writes it, when it writes one."
+        }
+      },
+      "meaning": "A pipe names no type, an unknown one, or one the language has retired.",
+      "what_to_do": "Set the pipe's `type` to one of the operators or controllers the language defines, and give it that type's fields.",
+      "see": [
+        {
+          "title": "Pipes — Operators",
+          "href": "language/pipes-operators.md"
+        },
+        {
+          "title": "Pipes — Controllers",
+          "href": "language/pipes-controllers.md"
+        }
+      ]
+    },
+    {
+      "code": "method.signature_mismatch",
+      "title": "A pipe differs from its signature",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' differs from the signature it implements ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make pipe '{pipe}' take the inputs and give the output its signature declares, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make pipe '{pipe}' match its signature."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The concrete pipe."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "How the pipe differs from its signature."
+        }
+      },
+      "meaning": "A concrete pipe's inputs or output differ from those of the signature it implements.",
+      "what_to_do": "Compare the pipe with its signature's `inputs` and `output`, and change one or the other so that they agree.",
+      "see": [
+        {
+          "title": "Contract-only pipe signatures",
+          "href": "spec/mthds-format.md#contract-only-pipe-signatures"
+        }
+      ]
+    },
+    {
+      "code": "method.not_runnable",
+      "title": "The method still holds pipe signatures",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The run reached pipe '{pipe}', a signature with no implementation.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Implement the signature '{pipe}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to implement the signature '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The signature the run reached."
+        }
+      },
+      "meaning": "A run reached a pipe that is still declared as a signature, with no implementation. Validation reports such pipes as a runnability fact, `pending_signatures`, rather than as a fault.",
+      "what_to_do": "Implement each pipe that `pending_signatures` lists on the `/validate` verdict before running the method.",
+      "see": [
+        {
+          "title": "Validating a bundle",
+          "href": "spec/protocol.md#validating-a-bundle"
+        }
+      ]
+    },
+    {
+      "code": "method.input_undeclared",
+      "title": "A pipe reads an input it does not declare",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' reads names its inputs do not declare: {variables}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare what pipe '{pipe}' reads in its inputs, or stop reading it, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare the inputs pipe '{pipe}' reads."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "variables": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The names it reads and does not declare."
+        }
+      },
+      "meaning": "A template or a step reads a variable that the pipe's inputs do not declare.",
+      "what_to_do": "Add each of `params.variables` to the pipe's `inputs` with its concept, or correct the name the template reads.",
+      "see": [
+        {
+          "title": "Inputs read through templates",
+          "href": "spec/mthds-format.md#inputs-read-through-templates"
+        }
+      ]
+    },
+    {
+      "code": "method.input_unused",
+      "title": "A pipe declares an input it never reads",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' declares inputs it never reads: {variables}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the inputs pipe '{pipe}' never reads, or read them, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the inputs pipe '{pipe}' never reads."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "variables": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The declared inputs nothing reads."
+        }
+      },
+      "meaning": "A pipe declares an input that nothing it runs reads.",
+      "what_to_do": "Remove each of `params.variables` from the pipe's `inputs`, or read it where it was meant to be read. The item's `suggested_fix` may carry the removal.",
+      "see": [
+        {
+          "title": "Suggested fixes",
+          "href": "spec/protocol.md#suggested-fixes"
+        }
+      ]
+    },
+    {
+      "code": "method.input_concept_mismatch",
+      "title": "A pipe's input concept does not fit its use",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' declares the input '{input}' as '{declared}', which its use does not accept. It accepts: {expected}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the input '{input}' of pipe '{pipe}' with a concept its use accepts, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare the input '{input}' of pipe '{pipe}' with a concept its use accepts."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "input": {
+          "type": "identifier",
+          "description": "The input."
+        },
+        "declared": {
+          "type": "identifier",
+          "description": "The concept the input is declared as."
+        },
+        "expected": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The concepts its use accepts."
+        }
+      },
+      "meaning": "An input is declared as a concept that its use does not accept, such as a step that hands it to a pipe expecting another concept.",
+      "what_to_do": "Declare the input as one of `params.expected`, or as a concept that refines one, or change what reads it."
+    },
+    {
+      "code": "method.output_concept_mismatch",
+      "title": "A pipe's output concept does not fit",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}', a {pipe_type}, declares its output as '{declared}', which does not fit. It accepts: {expected}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the output of pipe '{pipe}' with a concept that fits, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to declare the output of pipe '{pipe}' with a concept that fits."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "declared": {
+          "type": "identifier",
+          "description": "The concept the output is declared as."
+        },
+        "expected": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The concepts that would fit."
+        },
+        "pipe_type": {
+          "type": "identifier",
+          "description": "The pipe's type."
+        }
+      },
+      "meaning": "The output concept breaks the rule of the pipe's type or its wiring, such as a `PipeLLM` declaring an image as its output.",
+      "what_to_do": "Declare the output as one of `params.expected`, or use a pipe type that produces the concept you need.",
+      "see": [
+        {
+          "title": "Pipes — Operators",
+          "href": "language/pipes-operators.md"
+        }
+      ]
+    },
+    {
+      "code": "method.output_multiplicity_mismatch",
+      "title": "A pipe's declared multiplicity does not fit its use",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' declares its output with the multiplicity '{declared}', but its use expects '{expected}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the output of pipe '{pipe}' with the multiplicity '{expected}', or change its use, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the output multiplicity of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "declared": {
+          "type": "identifier",
+          "description": "The multiplicity the pipe declares."
+        },
+        "expected": {
+          "type": "enum",
+          "values": [
+            "single",
+            "list",
+            "fixed"
+          ],
+          "description": "The multiplicity its use expects: one item, a list, or a list of a fixed length."
+        }
+      },
+      "meaning": "A pipe's declared output multiplicity does not fit how the method uses it. Validation finds it before any run; its run-time twin is `pipe.output_multiplicity`.",
+      "what_to_do": "Make the output one item, a list, or a list of a fixed length, as its consumer expects, or change the consumer.",
+      "see": [
+        {
+          "title": "Multiplicity",
+          "href": "language/multiplicity.md"
+        }
+      ]
+    },
+    {
+      "code": "method.wiring_invalid",
+      "title": "A pipe's wiring does not give it what it reads",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' reads '{variable_path}' in a shape its wiring does not give it ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Wire pipe '{pipe}' so that '{variable_path}' reaches it in the shape it reads, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the wiring of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "variable_path": {
+          "type": "identifier",
+          "description": "The variable or the attribute path the pipe reads."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "How the wiring differs from what the pipe reads."
+        }
+      },
+      "meaning": "A pipe reads a variable or an attribute in a shape its wiring does not give it, or a controller's steps do not connect.",
+      "what_to_do": "Follow the variable from the step that stores it to the pipe that reads it, and make the stored concept and multiplicity match what the reader declares.",
+      "see": [
+        {
+          "title": "Working Memory",
+          "href": "language/working-memory.md"
+        }
+      ]
+    },
+    {
+      "code": "method.field_path_unresolved",
+      "title": "A path names a field its concept does not have",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "In pipe '{pipe}', the path '{path}' cannot follow '{segment}', which is not a field of the value before it.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the path '{path}' so that it names fields its concepts hold, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the path '{path}' in pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe holding the path."
+        },
+        "path": {
+          "type": "identifier",
+          "description": "The path."
+        },
+        "segment": {
+          "type": "identifier",
+          "description": "The segment the walk cannot follow."
+        },
+        "available_fields": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The fields the structure holds where the walk stops, empty when the walk stops at a leaf."
+        }
+      },
+      "meaning": "A binding's `from`, a construct's `from` or a template's field read walks past what the declared structures hold, such as a segment naming no field, or one following a native that holds its value in a single field.",
+      "what_to_do": "Compare the path with the concepts' structures, using `params.available_fields` at the failing segment, and correct it, or bind the field first and walk on from the bound value.",
+      "see": [
+        {
+          "title": "The concept of the result",
+          "href": "spec/mthds-format.md#the-concept-of-the-result"
+        }
+      ]
+    },
+    {
+      "code": "method.binding_step_invalid",
+      "title": "A binding step is malformed",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A binding step of pipe '{pipe}', at '{field_path}', is malformed.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the binding step at '{field_path}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the binding step at '{field_path}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The controller holding the step."
+        },
+        "field_path": {
+          "type": "identifier",
+          "description": "The step's place, as a key path."
+        }
+      },
+      "meaning": "A controller's binding step breaks its shape: a step carrying both `pipe` and `from`, a binding step lacking `result` or carrying `nb_output`, `multiple_output`, `batch_over` or `batch_as`, a `result` that is not a plain input name, a `from` or a dotted `batch_over` that breaks the path grammar, or a binding step or a dotted `batch_over` in a PipeParallel's branches.",
+      "what_to_do": "Give the step exactly one of `pipe` and `from`, give a binding step only `from` and a plain `result`, and bind a field in a sequence step before a PipeParallel rather than in one of its branches.",
+      "see": [
+        {
+          "title": "Binding steps",
+          "href": "spec/mthds-format.md#binding-steps"
+        }
+      ]
+    },
+    {
+      "code": "method.optional_marker_invalid",
+      "title": "An optional marker is misplaced",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' carries a presence marker at '{field_path}', where the language does not allow one.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove or move the marker at '{field_path}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the presence marker at '{field_path}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "field_path": {
+          "type": "identifier",
+          "description": "Where the marker sits, as a key path."
+        }
+      },
+      "meaning": "A presence marker sits where the language does not allow one, such as a `?` on a plural reference or a `!` on an output.",
+      "what_to_do": "Read where `?` and `!` may appear, and move or remove the marker.",
+      "see": [
+        {
+          "title": "Optionality",
+          "href": "language/optionality.md"
+        }
+      ]
+    },
+    {
+      "code": "method.optional_unhandled",
+      "title": "An optional value reaches a place that needs a required one",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "In pipe '{pipe}', the maybe-absent '{input}' reaches a place that needs a value (site: {site}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Guard '{input}' where it is used, or declare the receiving side optional, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to guard the optional '{input}' in pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "input": {
+          "type": "identifier",
+          "description": "The maybe-absent input or output."
+        },
+        "site": {
+          "type": "enum",
+          "values": [
+            "sequence_step",
+            "condition",
+            "condition_output",
+            "template",
+            "parallel_branch"
+          ],
+          "description": "Where the value escapes: `sequence_step` when it escapes through a step or a sequence whose boundary is not optional, `condition` when it escapes through a condition whose boundary is not optional, `condition_output` when a `PipeCondition` can continue without producing its output while that output is not `?`, `template` when a template reads it without a guard, and `parallel_branch` when a maybe-absent PipeParallel branch feeds a required structured field."
+        }
+      },
+      "meaning": "A maybe-absent input or output is used where a value is required: it escapes through a step, a sequence or a condition whose boundary is not optional, a `PipeCondition` can continue without producing its output while that output is not `?`, a template reads it without a guard, or a maybe-absent PipeParallel branch feeds a required structured field.",
+      "what_to_do": "Guard the read, declare the receiving output or field optional with `?`, or force the input with `!` when it is always present at that point.",
+      "see": [
+        {
+          "title": "Optionality",
+          "href": "language/optionality.md#validation-surface"
+        }
+      ]
+    },
+    {
+      "code": "method.template_invalid",
+      "title": "A template in the method is invalid",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The template '{template}' of pipe '{pipe}' is invalid ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the template '{template}' of pipe '{pipe}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the template '{template}' of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "template": {
+          "type": "identifier",
+          "description": "The template's field, such as the pipe's prompt."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What the check found."
+        }
+      },
+      "meaning": "A prompt, an expression or a construct template does not parse, cannot be read, or misuses an input or a filter. The problem's `location` gives the place.",
+      "what_to_do": "Open the template at the place `location` names and correct it, checking each variable it reads against the pipe's inputs.",
+      "see": [
+        {
+          "title": "Inputs read through templates",
+          "href": "spec/mthds-format.md#inputs-read-through-templates"
+        }
+      ]
+    },
+    {
+      "code": "method.template_private_name",
+      "title": "A template reads a name reserved to the runtime",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A template of pipe '{pipe}' reads names reserved to the runtime: {variables}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Stop reading the reserved names in the templates of pipe '{pipe}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the reserved names from the templates of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "variables": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The reserved names the template reads."
+        }
+      },
+      "meaning": "A template reaches for a name the runtime reserves for its own context, such as a name starting with an underscore.",
+      "what_to_do": "Read only the pipe's declared inputs, and their fields, in its templates."
+    },
+    {
+      "code": "method.function_invalid",
+      "title": "A function the method declares cannot be used",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The function '{function}' of pipe '{pipe}' cannot be used ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the function '{function}' of pipe '{pipe}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the function '{function}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The PipeFunc at fault."
+        },
+        "function": {
+          "type": "identifier",
+          "description": "The function's import path."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What is wrong with the function."
+        }
+      },
+      "meaning": "A `PipeFunc`'s function cannot be imported from the method's tree under the import path it names, lacks or breaks its return type, or shares its name with another.",
+      "what_to_do": "Check that `function_name` is the function's import path from the root of the method's tree, that its module is in the tree, and that the function declares the return type the pipe's output needs.",
+      "see": [
+        {
+          "title": "Operator: PipeFunc",
+          "href": "spec/mthds-format.md#operator-pipefunc"
+        }
+      ]
+    },
+    {
+      "code": "method.concept_invalid",
+      "title": "A concept's structure cannot be built or described",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The structure of the concept '{concept}' cannot be built ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the structure of the concept '{concept}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the concept '{concept}'."
+        }
+      },
+      "params": {
+        "concept": {
+          "type": "identifier",
+          "description": "The concept at fault."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What the check found."
+        }
+      },
+      "meaning": "A concept's structure cannot be generated, found, completed or described as a JSON Schema.",
+      "what_to_do": "Check the concept's fields against the concept structure language, the type and the references of each field in particular.",
+      "see": [
+        {
+          "title": "Concepts",
+          "href": "language/concepts.md"
+        }
+      ]
+    },
+    {
+      "code": "method.model_setting_invalid",
+      "title": "A model setting in the method is invalid",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model setting '{field}' is invalid ({finding}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the model setting '{field}', then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the model setting '{field}'."
+        }
+      },
+      "params": {
+        "field": {
+          "type": "identifier",
+          "description": "The setting at fault."
+        },
+        "finding": {
+          "type": "caller_text",
+          "description": "What the check found."
+        }
+      },
+      "meaning": "A model reference does not parse, or the settings a step gives conflict with each other.",
+      "what_to_do": "Check the reference and the inline settings against the rules for model references, and remove the settings that conflict.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "method.mock_unsatisfiable",
+      "title": "The dry run cannot mock an output concept",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The dry run cannot mock the concept '{concept}', since no value satisfies its constraints.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Loosen the constraints of the concept '{concept}' so that a value can satisfy them, then validate the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make the concept '{concept}' satisfiable."
+        }
+      },
+      "params": {
+        "concept": {
+          "type": "identifier",
+          "description": "The concept no mock value satisfies."
+        }
+      },
+      "meaning": "Validation's dry run needs a mock value of an output concept, and no value satisfies the concept's constraints together.",
+      "what_to_do": "Find the constraints of the concept that contradict each other, such as a default outside its choices, and relax one of them."
+    },
+    {
+      "code": "method.changed_concurrently",
+      "title": "A method file changed while it was being fixed",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "A file of the method changed after the fix read it and before the fix wrote it.",
+      "steps": {
+        "actor": {
+          "kind": "refresh",
+          "detail": "Read the method's files again, then apply the fix to their current content."
+        },
+        "other": {
+          "kind": "refresh",
+          "detail": "Read the method's files again, then apply the fix to their current content."
+        }
+      },
+      "params": {},
+      "meaning": "A file a fix read was changed by someone else before the fix wrote it, so the fix stopped rather than overwrite the change.",
+      "what_to_do": "Reload the method's files, and apply the fix to their current content.",
+      "see": [
+        {
+          "title": "Suggested fixes",
+          "href": "spec/protocol.md#suggested-fixes"
+        }
+      ]
+    },
+    {
+      "code": "method.hint_invalid",
+      "title": "A hint is not understood",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "warning",
+      "detail": "The hint '{hint}' is not understood (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct or remove the hint '{hint}'."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to correct the hint '{hint}'."
+        }
+      },
+      "params": {
+        "reason": {
+          "type": "enum",
+          "values": [
+            "unknown_key",
+            "unknown_intent",
+            "inapplicable_intent"
+          ],
+          "description": "Whether the hint's key is unknown, its intent word is unknown, or its intent does not apply where it is written."
+        },
+        "hint": {
+          "type": "caller_text",
+          "description": "The hint as the method writes it."
+        }
+      },
+      "meaning": "An advisory finding: a hint's key or intent word is unknown, or its intent does not apply where it is written. It never makes a method invalid.",
+      "what_to_do": "Check the hint against the intent hints the standard defines, and correct or remove it.",
+      "see": [
+        {
+          "title": "Intent Hints",
+          "href": "spec/intent-hints.md"
+        }
+      ]
+    },
+    {
+      "code": "method.input_presence_vacuous",
+      "title": "A presence check always holds",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "warning",
+      "detail": "Pipe '{pipe}' checks whether '{input}' is present, and it always is.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the presence check on '{input}' in pipe '{pipe}'."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the presence check on '{input}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe holding the check."
+        },
+        "input": {
+          "type": "identifier",
+          "description": "The input it checks."
+        }
+      },
+      "meaning": "An advisory finding: a presence check tests an input that is always present, so it always holds.",
+      "what_to_do": "Remove the check, or declare the input optional if it can in fact be absent.",
+      "see": [
+        {
+          "title": "Optionality",
+          "href": "language/optionality.md"
+        }
+      ]
+    },
+    {
+      "code": "method.optional_force_redundant",
+      "title": "An optional force is redundant",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "warning",
+      "detail": "The force marker on '{input}' in pipe '{pipe}' changes nothing.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the force marker on '{input}' in pipe '{pipe}'."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the redundant force marker on '{input}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe holding the marker."
+        },
+        "input": {
+          "type": "identifier",
+          "description": "The input it forces."
+        }
+      },
+      "meaning": "An advisory finding: a `!` marker forces an input that is already present wherever it is read.",
+      "what_to_do": "Remove the `!`.",
+      "see": [
+        {
+          "title": "Optionality",
+          "href": "language/optionality.md"
+        }
+      ]
+    },
+    {
+      "code": "pipe.output_multiplicity",
+      "title": "A pipe's output does not have the declared multiplicity",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' produced an output of the multiplicity '{produced}', but its output '{output}' is declared '{declared}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Declare the output '{output}' as '{produced}', or make pipe '{pipe}' produce '{declared}'."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make the output '{output}' of pipe '{pipe}' match its declared multiplicity."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "output": {
+          "type": "identifier",
+          "description": "The output whose multiplicity differs."
+        },
+        "declared": {
+          "type": "enum",
+          "values": [
+            "single",
+            "list"
+          ],
+          "description": "The multiplicity the method declares."
+        },
+        "produced": {
+          "type": "enum",
+          "values": [
+            "single",
+            "list"
+          ],
+          "description": "The multiplicity the pipe produced."
+        }
+      },
+      "meaning": "At run time a pipe produced a list where its output is declared as a single item, or the reverse. Validation catches what it can before any run as `method.output_multiplicity_mismatch`; this code is what a run finds.",
+      "what_to_do": "Declare the output with the multiplicity the pipe produces, or change the pipe so that it produces the declared one, such as by telling a PipeLLM how many items to give.",
+      "see": [
+        {
+          "title": "Multiplicity",
+          "href": "language/multiplicity.md"
+        },
+        {
+          "title": "Errors",
+          "href": "spec/protocol.md#errors"
+        }
+      ]
+    },
+    {
+      "code": "pipe.output_invalid",
+      "title": "A pipe's output does not fit its concept",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' produced an output that does not fit the concept '{output_concept}', at the fields {fields}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make pipe '{pipe}' produce an output that fits '{output_concept}', or loosen the concept, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make pipe '{pipe}' produce an output that fits its concept."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe at fault."
+        },
+        "output_concept": {
+          "type": "identifier",
+          "description": "The concept the output is declared as."
+        },
+        "fields": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The fields of the output that fail the concept's structure."
+        }
+      },
+      "meaning": "What a pipe produced fails its declared concept's structure, such as a required field that is missing or a value of the wrong type.",
+      "what_to_do": "Compare the pipe's output with the concept's structure at `params.fields`, then change the pipe, its prompt or its function, or the concept, so that they agree.",
+      "see": [
+        {
+          "title": "Concepts",
+          "href": "language/concepts.md"
+        }
+      ]
+    },
+    {
+      "code": "pipe.function_raised",
+      "title": "The method's function raised",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The function '{function}' of pipe '{pipe}' raised an error.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Fix the function '{function}' so that it does not raise on these inputs, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the function '{function}' of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The PipeFunc whose function raised."
+        },
+        "function": {
+          "type": "identifier",
+          "description": "The function's import path."
+        }
+      },
+      "meaning": "A PipeFunc's own code raised an error. The problem does not carry the error's message, which the runtime cannot inspect and which can quote the run's inputs or outputs; an implementation keeps it for whoever runs the runtime, in its logs for instance.",
+      "what_to_do": "Run the function locally on the same inputs to reproduce the error and read its message, or read the message where whoever runs the runtime keeps it, then fix the function and run the method again.",
+      "see": [
+        {
+          "title": "Operator: PipeFunc",
+          "href": "spec/mthds-format.md#operator-pipefunc"
+        }
+      ]
+    },
+    {
+      "code": "pipe.function_timed_out",
+      "title": "The method's function ran past its time limit",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The function '{function}' of pipe '{pipe}' ran past its limit of {timeout} seconds.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make the function '{function}' finish within {timeout} seconds, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make the function '{function}' finish in time."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The PipeFunc whose function timed out."
+        },
+        "function": {
+          "type": "identifier",
+          "description": "The function's import path."
+        },
+        "timeout": {
+          "type": "seconds",
+          "description": "The time limit it passed."
+        }
+      },
+      "meaning": "A PipeFunc's function ran longer than the runtime lets one run.",
+      "what_to_do": "Make the function do less work per call, such as by splitting it across a PipeBatch, or move its slow part out of the method.",
+      "see": [
+        {
+          "title": "Operator: PipeFunc",
+          "href": "spec/mthds-format.md#operator-pipefunc"
+        }
+      ]
+    },
+    {
+      "code": "pipe.template_render_failed",
+      "title": "A template failed to render",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A template of pipe '{pipe}' failed to render at '{variable}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Fix the template of pipe '{pipe}' where it reads '{variable}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the template of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe whose template failed."
+        },
+        "variable": {
+          "type": "identifier",
+          "description": "The variable the template was reading when it failed."
+        }
+      },
+      "meaning": "A method's template raised while rendering with this run's values, such as a filter applied to a value it cannot take. The problem does not carry what the template engine reported, which can quote the run's inputs or outputs; an implementation keeps it for whoever runs the runtime, in its logs for instance.",
+      "what_to_do": "Check how the template uses the variable `params.variable` names, rendering it locally on the same inputs to read the engine's report, or reading the report where whoever runs the runtime keeps it. Guard the read if the value can be absent, and run the method again.",
+      "see": [
+        {
+          "title": "Inputs read through templates",
+          "href": "spec/mthds-format.md#inputs-read-through-templates"
+        }
+      ]
+    },
+    {
+      "code": "pipe.template_budget_exceeded",
+      "title": "A template exceeded its render budget",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A template of pipe '{pipe}' passed its render budget in a {operation} operation (limit {limit}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make the template of pipe '{pipe}' do less in one render, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make the template of pipe '{pipe}' do less in one render."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe whose template passed the budget."
+        },
+        "operation": {
+          "type": "enum",
+          "values": [
+            "repeat",
+            "pad",
+            "join",
+            "loop",
+            "recursion",
+            "output"
+          ],
+          "description": "The kind of operation that passed the budget."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "The bound it passed."
+        }
+      },
+      "meaning": "A method's template tried to allocate or compute more than one render may, such as a loop over too many items or an output too long.",
+      "what_to_do": "Simplify the template, or move the work it does into a pipe of its own, such as a PipeBatch over the items it loops on."
+    },
+    {
+      "code": "pipe.condition_unmatched",
+      "title": "A condition matched no outcome",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The condition of pipe '{pipe}' rendered a value that no outcome maps.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Map every value the condition of pipe '{pipe}' can render to an outcome, or give it a default outcome."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to map every value of the condition of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The PipeCondition at fault."
+        }
+      },
+      "meaning": "A PipeCondition's expression rendered a value that none of its outcomes maps, and the pipe gives no default.",
+      "what_to_do": "Add the missing value to the pipe's `outcomes`, or set a `default_outcome`.",
+      "see": [
+        {
+          "title": "Controller: PipeCondition",
+          "href": "spec/mthds-format.md#controller-pipecondition"
+        }
+      ]
+    },
+    {
+      "code": "pipe.condition_refused",
+      "title": "The method refused these inputs",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' chose the outcome '{outcome}', which the method maps to a refusal of these inputs.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Change the inputs so that the method accepts them, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose inputs the method refuses."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The PipeCondition that refused."
+        },
+        "outcome": {
+          "type": "identifier",
+          "description": "The outcome it chose."
+        }
+      },
+      "meaning": "A PipeCondition chose an outcome that the method maps to failure, so the method itself refuses these inputs.",
+      "what_to_do": "Read what the method expects of its inputs, from its description or its author, and send inputs it accepts.",
+      "see": [
+        {
+          "title": "Controller: PipeCondition",
+          "href": "spec/mthds-format.md#controller-pipecondition"
+        }
+      ]
+    },
+    {
+      "code": "pipe.binding_failed",
+      "title": "A binding step could not bind its value",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The binding '{binding}' of pipe '{pipe}' could not follow '{segment}' in this run's value.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Correct the binding '{binding}' of pipe '{pipe}', or the structure it reads, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to fix the binding '{binding}' of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The controller holding the binding step."
+        },
+        "binding": {
+          "type": "identifier",
+          "description": "The name the step binds."
+        },
+        "segment": {
+          "type": "identifier",
+          "description": "The path segment the binding could not follow."
+        }
+      },
+      "meaning": "At run time a bound value contradicts the structure its concept declares, so the binding step cannot walk its path. The problem names the segment and never what the runtime found there, which is the run's own data.",
+      "what_to_do": "Check the step's `from` path against the value the earlier step produced, and correct the path or the concept.",
+      "see": [
+        {
+          "title": "Binding steps",
+          "href": "spec/mthds-format.md#binding-steps"
+        }
+      ]
+    },
+    {
+      "code": "pipe.input_unresolved",
+      "title": "A pipe could not read a value it needs",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' could not read '{variable}', which an earlier step should have produced.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make an earlier step produce '{variable}' for pipe '{pipe}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make an earlier step produce '{variable}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe that could not read its input."
+        },
+        "variable": {
+          "type": "identifier",
+          "description": "The input it could not read."
+        }
+      },
+      "meaning": "A nested pipe's input is absent, or of the wrong kind, because an earlier step did not produce it.",
+      "what_to_do": "Follow the variable back to the step that should store it, and check that the step runs and stores it under that name before the pipe reads it.",
+      "see": [
+        {
+          "title": "Working Memory",
+          "href": "language/working-memory.md"
+        }
+      ]
+    },
+    {
+      "code": "pipe.forced_input_absent",
+      "title": "A forced input was absent",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' forces '{variable}' with '!', and it was absent in this run.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the '!' on '{variable}' and handle its absence, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to handle the absence of '{variable}' in pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe forcing the input."
+        },
+        "variable": {
+          "type": "identifier",
+          "description": "The forced input."
+        }
+      },
+      "meaning": "An input the method forces with `!`, asserting that it is always present at that point, resolved absent at run time.",
+      "what_to_do": "Remove the `!` and guard the input where it is read, or make sure an earlier step always produces it.",
+      "see": [
+        {
+          "title": "Optionality",
+          "href": "language/optionality.md"
+        }
+      ]
+    },
+    {
+      "code": "pipe.prompt_empty",
+      "title": "A pipe's prompt is empty",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The {part} of pipe '{pipe}' rendered empty from these inputs.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give the inputs that the prompt of pipe '{pipe}' is written from, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose inputs leave the prompt of pipe '{pipe}' empty."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe whose prompt is empty."
+        },
+        "part": {
+          "type": "enum",
+          "values": [
+            "user_text",
+            "system_text",
+            "image_prompt"
+          ],
+          "description": "Which part of the prompt rendered empty."
+        }
+      },
+      "meaning": "The prompt rendered from the method's template and the inputs holds no text, usually because the inputs it is written from are empty.",
+      "what_to_do": "Check that the inputs the prompt reads hold text, and send them again."
+    },
+    {
+      "code": "pipe.stack_overflow",
+      "title": "The run nested pipes deeper than the limit",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The run nested pipes deeper than the limit of {limit}.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Find the pipes that call each other without end, and break the loop, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to stop the method's pipes from nesting without end."
+        }
+      },
+      "params": {
+        "limit": {
+          "type": "integer",
+          "description": "The depth the run passed."
+        }
+      },
+      "meaning": "The pipe stack reached the runtime's limit, usually through pipes that call each other in a loop.",
+      "what_to_do": "Look for a controller that calls itself, directly or through other pipes, and give the recursion an end."
+    },
+    {
+      "code": "model.unknown",
+      "title": "The method names a model that does not exist",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The method names the {model_type} model '{model}', which no catalog knows.",
+      "steps": {
+        "actor": {
+          "kind": "change_model",
+          "detail": "Name a model that exists in place of '{model}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to name a model that exists in place of '{model}'."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model reference the method gives."
+        },
+        "model_type": {
+          "type": "identifier",
+          "description": "The kind of model, such as an LLM or an image generator."
+        },
+        "suggestions": {
+          "type": "list",
+          "items": {
+            "type": "identifier"
+          },
+          "description": "The models the reference most likely meant, the likeliest first."
+        }
+      },
+      "meaning": "A model reference that no catalog the runtime reads knows.",
+      "what_to_do": "Look in `params.suggestions` for the model the reference most likely meant, or list the runner's models with `GET /models`, and correct the reference.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "model.unavailable",
+      "title": "This deployment serves no backend for the model",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 501,
+      "detail": "The {model_type} model '{model}' exists, but this deployment does not serve it (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Configure a backend for the model '{model}' on this deployment."
+        },
+        "other": {
+          "kind": "change_model",
+          "detail": "Use a model this deployment serves in place of '{model}', or ask whoever runs the runtime to serve it."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model the method names."
+        },
+        "model_type": {
+          "type": "identifier",
+          "description": "The kind of model."
+        },
+        "reason": {
+          "type": "enum",
+          "values": [
+            "not_served",
+            "not_allowed",
+            "unknown_at_provider",
+            "fallback_disabled",
+            "no_fallback_served"
+          ],
+          "description": "Why it is not served: no backend serves it, the deployment does not allow it, its provider does not know it, or the fallback that would serve it is disabled or served by no backend."
+        }
+      },
+      "meaning": "The model exists, but this deployment serves no backend for it, so the fix lies with whoever runs the runtime rather than with the method.",
+      "what_to_do": "If you run the runtime, configure a backend for the model. Otherwise, use a model the runner lists in `GET /models`.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "model.unspecified",
+      "title": "No model is named for this step",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The step names no {model_type} model, and the deployment names no default for that kind.",
+      "steps": {
+        "actor": {
+          "kind": "change_model",
+          "detail": "Name a {model_type} model on the step, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to name a model on the step."
+        }
+      },
+      "params": {
+        "model_type": {
+          "type": "identifier",
+          "description": "The kind of model the step needs."
+        }
+      },
+      "meaning": "The step names no model, and the deployment names no default for its kind.",
+      "what_to_do": "Set the step's model, such as a PipeLLM's `model`, to one the runner lists in `GET /models`.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "model.capability_unsupported",
+      "title": "The model cannot do what the step asks",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model '{model}' does not support {capability}, which the step needs.",
+      "steps": {
+        "actor": {
+          "kind": "change_model",
+          "detail": "Use a model that supports {capability}, or change what the step asks, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to use a model that supports {capability}."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model the step names."
+        },
+        "capability": {
+          "type": "identifier",
+          "description": "What the step asks that the model cannot do."
+        }
+      },
+      "meaning": "The model is served, but cannot take this kind of input, produce this kind of output or honour this setting.",
+      "what_to_do": "Pick a model that has the capability, such as one that reads images for a step that sends them, or change the step.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "model.context_exceeded",
+      "title": "The inputs exceed what the model can read",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The prompt for the model '{model}' reaches {count} against a {limit} of {max}.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Send smaller inputs, or fewer images, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose inputs exceed what the model '{model}' can read."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model."
+        },
+        "limit": {
+          "type": "enum",
+          "values": [
+            "context_window",
+            "prompt_images"
+          ],
+          "description": "Which bound the prompt passes: the context window, or the number of images."
+        },
+        "count": {
+          "type": "integer",
+          "description": "What the prompt reached."
+        },
+        "max": {
+          "type": "integer",
+          "description": "The bound."
+        }
+      },
+      "meaning": "The prompt built from the inputs passes the model's context window or the number of images it takes.",
+      "what_to_do": "Shorten the inputs, split a long document into parts, or send fewer images. The method's author can instead pick a model with a larger window."
+    },
+    {
+      "code": "model.output_truncated",
+      "title": "The answer was cut at the method's token cap",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model '{model}' stopped at the step's cap of {max_tokens} tokens, after {output_tokens} tokens.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Raise the step's max_tokens above {max_tokens}, or ask for a shorter answer, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to raise the step's token cap."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model."
+        },
+        "max_tokens": {
+          "type": "integer",
+          "description": "The cap the step sets."
+        },
+        "output_tokens": {
+          "type": "integer",
+          "description": "The tokens the model produced."
+        }
+      },
+      "meaning": "The model stopped at the step's `max_tokens` before finishing its answer.",
+      "what_to_do": "Raise the step's `max_tokens`, or change its prompt so that it asks for a shorter answer.",
+      "see": [
+        {
+          "title": "Model References",
+          "href": "language/model-references.md"
+        }
+      ]
+    },
+    {
+      "code": "model.output_schema_mismatch",
+      "title": "The model's structured output did not match its schema",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The model '{model}' gave an answer that does not fit the concept '{concept}', after the runtime asked again.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again, since another answer may fit."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Run the method again, since another answer may fit."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model."
+        },
+        "concept": {
+          "type": "identifier",
+          "description": "The concept the answer must fit."
+        }
+      },
+      "meaning": "The model's structured answer failed the output schema, after the runtime's own re-asks. Models answer differently from one call to the next, so a new run may succeed.",
+      "what_to_do": "Run the method again. If it keeps failing, the method's author can simplify the concept's structure or use a model that follows schemas more closely."
+    },
+    {
+      "code": "model.content_refused",
+      "title": "The provider refused the content",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model '{model}' or its provider refused the request's content on policy grounds.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Change the inputs so that they meet the provider's content policy, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose inputs the provider refused."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The model."
+        }
+      },
+      "meaning": "The model or its provider refused the content of the request on policy grounds.",
+      "what_to_do": "Read the provider's content policy and change the inputs that break it."
+    },
+    {
+      "code": "model.no_result",
+      "title": "The model found nothing for this request",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The model '{model}' returned no result for the query built from the inputs.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Broaden the inputs the query is built from, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose query found nothing."
+        }
+      },
+      "params": {
+        "model": {
+          "type": "identifier",
+          "description": "The search or fetch model."
+        }
+      },
+      "meaning": "A search or fetch model returned no result for the query built from the inputs.",
+      "what_to_do": "Broaden or correct the inputs the query is built from, such as a search term or a URL.",
+      "see": [
+        {
+          "title": "Operator: PipeSearch",
+          "href": "spec/mthds-format.md#operator-pipesearch"
+        }
+      ]
+    },
+    {
+      "code": "provider.rate_limited",
+      "title": "The provider is rate limiting this deployment",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 429,
+      "detail": "The provider '{provider}' is rate limiting this deployment's calls to the model '{model}'.",
+      "steps": {
+        "actor": {
+          "kind": "wait",
+          "detail": "Wait, then run the method again."
+        },
+        "other": {
+          "kind": "wait",
+          "detail": "Wait, then run the method again."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        },
+        "model": {
+          "type": "identifier",
+          "description": "The model called."
+        }
+      },
+      "meaning": "The inference provider refused a call for its rate, which is not a quota: it passes.",
+      "what_to_do": "Run the method again after `retry_after` seconds when the problem gives it."
+    },
+    {
+      "code": "provider.unavailable",
+      "title": "The provider is unavailable",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The provider '{provider}' is unavailable.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again, since the provider may be back."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Run the method again, since the provider may be back."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        }
+      },
+      "meaning": "The provider answered that it is overloaded or down, or the connection to it never opened.",
+      "what_to_do": "Run the method again after a while, and check the provider's status page if it keeps failing."
+    },
+    {
+      "code": "provider.timeout",
+      "title": "The provider did not answer in time",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 504,
+      "detail": "The provider '{provider}' did not answer in time.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        }
+      },
+      "meaning": "The provider timed out, or the runtime stopped waiting for it, on a call that is safe to repeat.",
+      "what_to_do": "Run the method again. If calls keep timing out, the inputs may be too large for the model to answer in time."
+    },
+    {
+      "code": "provider.failed",
+      "title": "The provider failed",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The provider '{provider}' failed with the HTTP status {status}.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        },
+        "status": {
+          "type": "integer",
+          "description": "The HTTP status the provider answered with."
+        }
+      },
+      "meaning": "The provider answered with a server error that no other `provider.` code describes.",
+      "what_to_do": "Run the method again after a while."
+    },
+    {
+      "code": "provider.response_invalid",
+      "title": "The provider's answer could not be used",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The provider '{provider}' gave an answer the runtime cannot use ({defect}).",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Run the method again."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        },
+        "defect": {
+          "type": "enum",
+          "values": [
+            "empty",
+            "malformed"
+          ],
+          "description": "Whether the answer was empty or unreadable."
+        }
+      },
+      "meaning": "The provider stopped normally but gave an empty or unreadable answer.",
+      "what_to_do": "Run the method again, since the next answer may be sound."
+    },
+    {
+      "code": "provider.credential_refused",
+      "title": "The provider refused this deployment's credential",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The provider '{provider}' refused this deployment's credential.",
+      "steps": {
+        "actor": {
+          "kind": "check_credentials",
+          "detail": "Check the credential this deployment holds for the provider '{provider}'."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        }
+      },
+      "meaning": "The provider refused the credential the deployment itself holds, which the caller can do nothing about.",
+      "what_to_do": "If you run the runtime, renew or correct its credential for the provider. Otherwise, report the problem to whoever runs it."
+    },
+    {
+      "code": "provider.quota_exhausted",
+      "title": "This deployment's provider account is out of quota",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "This deployment's account with the provider '{provider}' is out of quota.",
+      "steps": {
+        "actor": {
+          "kind": "check_account",
+          "detail": "Check this deployment's account with the provider '{provider}', and raise its quota or its credit."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        }
+      },
+      "meaning": "The provider refused a call because the deployment's own account with it is out of quota or of credit.",
+      "what_to_do": "If you run the runtime, top up or raise its account with the provider. Otherwise, report the problem to whoever runs it."
+    },
+    {
+      "code": "provider.outcome_unknown",
+      "title": "The provider call may have taken effect",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "A call to the model '{model}' of the provider '{provider}' failed after it was sent, so its work may exist and be billed.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Run the method again if a repeat of the work is acceptable, since a new run may bill that work again."
+        },
+        "other": {
+          "kind": "check_account",
+          "detail": "Check the account's usage before running the method again, since the work may have been billed."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider."
+        },
+        "model": {
+          "type": "identifier",
+          "description": "The model called."
+        }
+      },
+      "meaning": "The connection dropped, timed out or met a server error after a billed call that is not safe to repeat had been sent, so the work may exist and be billed. The runtime never repeats such a call within the run; read as the run's problem, a new run may succeed, and may bill that work again.",
+      "what_to_do": "Decide whether a repeat is acceptable. If it is, run the method again; if not, check the account's usage first."
+    },
+    {
+      "code": "run.not_found",
+      "title": "No such run",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 404,
+      "detail": "No run '{pipeline_run_id}' is visible to this caller.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Check the run id, then read the run again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose run id names no run it can read."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run id the request gives."
+        }
+      },
+      "meaning": "The run id names no run this caller can read: it never existed, it belongs to someone else, or its record is no longer kept.",
+      "what_to_do": "Check the run id against the one `/start` or `/execute` answered with, and the credential against the one that started the run.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.failed",
+      "title": "The run did not succeed",
+      "domain": "runtime",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run '{pipeline_run_id}' ended as '{run_status}', without success.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run's own problem in run_error to see why it did not succeed."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run's own problem in run_error to see why it did not succeed."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        },
+        "run_status": {
+          "type": "identifier",
+          "description": "The status the run ended with."
+        }
+      },
+      "meaning": "A read of a run that ended without success. This problem only says that the run failed; the run's own problem, with its own code and next step, rides `run_error`.",
+      "what_to_do": "Read `run_error` and act on its code: that problem says who must act and what to do.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.not_finished",
+      "title": "The run has not finished",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run '{pipeline_run_id}' has not finished yet.",
+      "steps": {
+        "actor": {
+          "kind": "wait",
+          "detail": "Wait, then read the run's results again."
+        },
+        "other": {
+          "kind": "wait",
+          "detail": "Wait, then read the run's results again."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        }
+      },
+      "meaning": "A read of a run's results before the run ended.",
+      "what_to_do": "Read the results again after `retry_after` seconds when the problem gives it, or follow the run's status until it ends.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.cancelled",
+      "title": "The run was cancelled by its caller",
+      "domain": "input",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run was cancelled by its caller before it ended.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Start the run again if its result is still wanted."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run to see when it was cancelled."
+        }
+      },
+      "params": {},
+      "meaning": "The run's own caller cancelled it before it ended. Nothing was wrong with the run, so a new one may succeed.",
+      "what_to_do": "Start a new run if the result is still wanted.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.timed_out",
+      "title": "The run passed its time limit",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The run did not end within the deployment's run limit of {timeout} seconds.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make the method do less work per run, so that it ends within {timeout} seconds."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to make the method end within the deployment's run limit."
+        }
+      },
+      "params": {
+        "timeout": {
+          "type": "seconds",
+          "description": "The deployment's run limit."
+        }
+      },
+      "meaning": "The run did not end within the deployment's run time limit, so the method's work must shrink to fit it.",
+      "what_to_do": "Split the method's work into smaller runs, or have it process fewer items per run.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.lost",
+      "title": "The run's outcome is lost",
+      "domain": "runtime",
+      "retry": "outcome_unknown",
+      "raised_as": "problem",
+      "status": 500,
+      "detail": "The runtime lost track of the run '{pipeline_run_id}', and its outcome is unknown.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' again later in case it reports how it ended, and start a new run only if repeating its work is acceptable."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        }
+      },
+      "meaning": "The run's execution can no longer be found, or never reported back, so the runtime holds no outcome for it. The run may have done its work, billed calls included, or may still be running, so a new run may repeat that work and is never started automatically.",
+      "what_to_do": "Read the run again later, since an execution that has not reported may still end, and check what the run would have produced and the account's usage. Start a new run only once a repeat of the run's work is acceptable. If runs keep being lost, report it to whoever runs the runtime.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.outcome_unknown",
+      "title": "The runtime cannot tell whether the run started or finished",
+      "domain": "runtime",
+      "retry": "outcome_unknown",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The run '{pipeline_run_id}' was sent on, and its answer was lost.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' to learn its outcome, and never send the request again automatically."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        }
+      },
+      "meaning": "The runtime sent the run on to be executed and lost the answer, so the run may have started, may have finished, or may never have begun.",
+      "what_to_do": "Read the run by its id to learn its outcome. A repeat of the request may start a second run, so it is never made automatically.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.already_ended",
+      "title": "The run has already ended",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run '{pipeline_run_id}' has already ended as '{run_status}', so it cannot be changed.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run's final outcome rather than change it."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run's final outcome rather than change it."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        },
+        "run_status": {
+          "type": "identifier",
+          "description": "The status it ended with."
+        }
+      },
+      "meaning": "A change, such as a cancellation, was asked of a run whose outcome is final.",
+      "what_to_do": "Read the run's outcome. To get a different one, start a new run.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.answer_not_kept",
+      "title": "The run's answer was not kept",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run '{pipeline_run_id}' under this idempotency key ended as '{run_status}', and its answer was not kept.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' rather than repeat the request."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' rather than repeat the request."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The first run."
+        },
+        "run_status": {
+          "type": "identifier",
+          "description": "The status it ended with."
+        }
+      },
+      "meaning": "A repeat, under the same idempotency key, of a synchronous run whose first run ended without an answer the runtime kept.",
+      "what_to_do": "Read the first run by its id. Sending the request again with a new key would start another run.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.results_not_stored",
+      "title": "The run's results were not stored",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 404,
+      "detail": "The run '{pipeline_run_id}' completed, and its results were delivered with its answer rather than stored.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the results from the answer the run was started with."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the results from the answer the run was started with."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        }
+      },
+      "meaning": "The run completed and its results were delivered inline in its answer, never stored, so there is nothing to read back.",
+      "what_to_do": "Keep the results from the answer that delivered them. A run whose results must be read back later is started the way the runtime stores them, such as with `/start`.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "run.terminated",
+      "title": "The run was stopped by an operator or an erasure",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 409,
+      "detail": "The run was stopped before it ended (ended by: {ended_by}).",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run's record to see when and why it was stopped."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime if the run was still wanted."
+        }
+      },
+      "params": {
+        "ended_by": {
+          "type": "enum",
+          "values": [
+            "operator",
+            "erasure"
+          ],
+          "description": "Whether whoever runs the runtime stopped the run, or an erasure purged it."
+        }
+      },
+      "meaning": "Whoever runs the runtime stopped the run, or an erasure purged it, before it ended. Such a run is never repeated automatically.",
+      "what_to_do": "Ask whoever runs the runtime why the run was stopped before starting it again.",
+      "see": [
+        {
+          "title": "HTTP Runner Protocol",
+          "href": "spec/protocol.md"
+        }
+      ]
+    },
+    {
+      "code": "security.input_url_refused",
+      "title": "A URL in the request was refused",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The URL of the input '{input}' points at a {target_class} target, which a security rule forbids (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Give the input '{input}' a URL on the public internet, or send the file itself, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose input '{input}' names a URL a security rule forbids."
+        }
+      },
+      "params": {
+        "input": {
+          "type": "identifier",
+          "description": "The input whose URL was refused."
+        },
+        "target_class": {
+          "type": "enum",
+          "values": [
+            "loopback",
+            "private",
+            "link_local",
+            "metadata",
+            "scheme"
+          ],
+          "description": "Where the URL points: a loopback, private or link-local address, a cloud metadata service, or a scheme the runtime does not fetch."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "The rule that refused it."
+        }
+      },
+      "meaning": "A URL the caller supplied points somewhere a security rule forbids the runtime to fetch, such as a private address.",
+      "what_to_do": "Send a URL that resolves to the public internet over https, or send the file's content itself."
+    },
+    {
+      "code": "security.method_url_refused",
+      "title": "A URL the method names was refused",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' names a URL that points at a {target_class} target, which a security rule forbids (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make pipe '{pipe}' name a URL on the public internet, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to change the URL pipe '{pipe}' names."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe naming the URL."
+        },
+        "target_class": {
+          "type": "enum",
+          "values": [
+            "loopback",
+            "private",
+            "link_local",
+            "metadata",
+            "scheme"
+          ],
+          "description": "Where the URL points."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "The rule that refused it."
+        }
+      },
+      "meaning": "A URL or a storage key that the method, or a template of it, names points somewhere a security rule forbids.",
+      "what_to_do": "Change the method so that every URL it fetches resolves to the public internet over https."
+    },
+    {
+      "code": "security.provider_url_refused",
+      "title": "A URL a provider returned was refused",
+      "domain": "runtime",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 502,
+      "detail": "The provider '{provider}' returned a URL that points at a private address, and the runtime did not fetch it.",
+      "steps": {
+        "actor": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "provider": {
+          "type": "identifier",
+          "description": "The provider whose answer held the URL."
+        }
+      },
+      "meaning": "A URL in a provider's answer points at a private address, so the runtime refused to fetch it.",
+      "what_to_do": "Report the problem to whoever runs the runtime, who can take it up with the provider."
+    },
+    {
+      "code": "security.input_path_refused",
+      "title": "A path the caller supplied was refused",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A path in the request could escape its root (rule: {rule}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Write every path of the request relative to its root, with forward slashes, then send the request again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Pass this to the caller, whose request holds a path that could escape its root."
+        }
+      },
+      "params": {
+        "rule": {
+          "type": "enum",
+          "values": [
+            "absolute",
+            "parent_segment",
+            "outside_root",
+            "backslash",
+            "colon",
+            "empty"
+          ],
+          "description": "The rule the path breaks: it is absolute, climbs with a parent segment, lands outside the root, holds a backslash or a colon, or is empty."
+        }
+      },
+      "meaning": "A path the caller supplied, such as a key of a request's `files`, could escape the root it belongs to.",
+      "what_to_do": "Write each path relative to its root, with forward slashes, no `..` segment, no colon and no leading slash.",
+      "see": [
+        {
+          "title": "Tree paths",
+          "href": "spec/method-tree.md#tree-paths"
+        }
+      ]
+    },
+    {
+      "code": "security.method_path_refused",
+      "title": "A path the method names was refused",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "Pipe '{pipe}' names the path '{file}', which would open a file outside the method on the runtime's disk.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Make pipe '{pipe}' name a file inside the method's tree, then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to change the path pipe '{pipe}' names."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe naming the path."
+        },
+        "file": {
+          "type": "identifier",
+          "description": "The path."
+        }
+      },
+      "meaning": "A runtime that opens files by path would open one outside the method on its own disk. A reference that only names no file of the tree is `method.resource_missing` instead.",
+      "what_to_do": "Point the reference at a file inside the method's tree, written relative to the referring file.",
+      "see": [
+        {
+          "title": "File references",
+          "href": "spec/method-tree.md#file-references"
+        }
+      ]
+    },
+    {
+      "code": "security.template_refused",
+      "title": "A template was refused by the template sandbox",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "A template of pipe '{pipe}' reached for '{name}', which the template sandbox forbids.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove '{name}' from the templates of pipe '{pipe}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove '{name}' from the templates of pipe '{pipe}'."
+        }
+      },
+      "params": {
+        "pipe": {
+          "type": "identifier",
+          "description": "The pipe whose template was refused."
+        },
+        "name": {
+          "type": "identifier",
+          "description": "The name or the call the template reached for."
+        }
+      },
+      "meaning": "A method's template reached for a private name or a call that the template sandbox forbids.",
+      "what_to_do": "Use only the pipe's inputs and the filters the template language offers in its templates."
+    },
+    {
+      "code": "security.schema_refused",
+      "title": "An output schema was refused",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The schema of the concept '{concept}' carries extensions or imports the runtime refuses to execute.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Remove the code-generation extensions and imports from the concept '{concept}', then run the method again."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to remove the extensions from the concept '{concept}'."
+        }
+      },
+      "params": {
+        "concept": {
+          "type": "identifier",
+          "description": "The concept whose schema was refused."
+        }
+      },
+      "meaning": "An output concept's schema carries code-generation extensions or imports that the runtime refuses to execute.",
+      "what_to_do": "Describe the concept with the concept structure language alone, without extensions that run code.",
+      "see": [
+        {
+          "title": "Concepts",
+          "href": "language/concepts.md"
+        }
+      ]
+    },
+    {
+      "code": "security.integrity_mismatch",
+      "title": "A dependency's content differs from its lock",
+      "domain": "method",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 422,
+      "detail": "The content of the dependency '{dependency}' differs from the hash its lock pins.",
+      "steps": {
+        "actor": {
+          "kind": "change_method",
+          "detail": "Check where the dependency '{dependency}' changed, then update its lock only if the change is trusted."
+        },
+        "other": {
+          "kind": "contact_owner",
+          "detail": "Ask the method's owner to check the dependency '{dependency}'."
+        }
+      },
+      "params": {
+        "dependency": {
+          "type": "identifier",
+          "description": "The dependency whose content differs."
+        }
+      },
+      "meaning": "A fetched dependency's content hashes to something other than the lock pins, so it changed since it was locked.",
+      "what_to_do": "Find out why the dependency's content changed, such as a moved tag. Update the lock only once the new content is trusted.",
+      "see": [
+        {
+          "title": "methods.lock Format",
+          "href": "spec/lock-format.md#verification"
+        }
+      ]
+    },
+    {
+      "code": "runtime.unexpected",
+      "title": "An unexpected error occurred",
+      "domain": "runtime",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 500,
+      "detail": "The runtime met an unexpected error.",
+      "steps": {
+        "actor": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {},
+      "meaning": "The catch-all: a fault of the runtime that no other code describes. It says nothing about the request, so repeating it is not advised.",
+      "what_to_do": "Report the problem to whoever runs the runtime, with its `pipeline_run_id` when it has one."
+    },
+    {
+      "code": "runtime.misconfigured",
+      "title": "The runtime is misconfigured",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 500,
+      "detail": "The runtime is misconfigured, so it cannot serve this request.",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Set or correct the configuration of '{component}', then restart the runtime."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "component": {
+          "type": "identifier",
+          "operator_only": true,
+          "description": "The part of the configuration that is unset or contradicts another."
+        }
+      },
+      "meaning": "A setting the runtime needs is unset, or contradicts another. Nobody can wait it out: whoever runs the runtime must fix it.",
+      "what_to_do": "If you run the runtime, read its logs for the component, and correct its configuration. Otherwise, report the problem to whoever runs it."
+    },
+    {
+      "code": "runtime.unavailable",
+      "title": "The runtime or a service it depends on is unavailable",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "problem",
+      "status": 503,
+      "detail": "The runtime, or a service it depends on, is unavailable.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Send the request again after a while."
+        },
+        "other": {
+          "kind": "wait",
+          "detail": "Wait, then send the request again."
+        }
+      },
+      "params": {
+        "dependency": {
+          "type": "identifier",
+          "operator_only": true,
+          "description": "The service that is down."
+        }
+      },
+      "meaning": "The runtime is overloaded or shutting down, or a service it depends on is down.",
+      "what_to_do": "Send the request again after `retry_after` seconds when the problem gives it."
+    },
+    {
+      "code": "runtime.unsupported",
+      "title": "This runtime cannot do what was asked",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "problem",
+      "status": 501,
+      "detail": "This runtime lacks {capability}, which the request needs.",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Enable {capability} on this runtime."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Send a request that does not need {capability}, or use a runtime that offers it."
+        }
+      },
+      "params": {
+        "capability": {
+          "type": "identifier",
+          "description": "The capability the request needs."
+        }
+      },
+      "meaning": "The deployment lacks a capability the request needs, such as the asynchronous execution `/start` relies on.",
+      "what_to_do": "Use a route or a form of the request that this runtime offers, such as `/execute` in place of `/start`, or a runtime that offers the capability."
+    },
+    {
+      "code": "client.unreachable",
+      "title": "The runtime could not be reached",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "client",
+      "detail": "The client could not connect to the runtime at {base_url}.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Check that the runtime at {base_url} is up and reachable, then try again."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Try again once the runtime at {base_url} is reachable."
+        }
+      },
+      "params": {
+        "base_url": {
+          "type": "identifier",
+          "description": "The base URL the client is configured with."
+        }
+      },
+      "meaning": "The client could not open a connection to the runtime.",
+      "what_to_do": "Check the configured base URL, the network and whether the runtime is up, then try again."
+    },
+    {
+      "code": "client.timeout",
+      "title": "The runtime did not answer in time",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "client",
+      "detail": "The runtime did not answer within {seconds} seconds.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Try the call again, or raise the client's time limit."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Try the call again."
+        }
+      },
+      "params": {
+        "seconds": {
+          "type": "seconds",
+          "description": "The client's time limit."
+        }
+      },
+      "meaning": "A call that creates nothing, such as a read, timed out. A call that may have created a run is `client.outcome_unknown` instead.",
+      "what_to_do": "Try the call again, or raise the client's time limit."
+    },
+    {
+      "code": "client.response_unreadable",
+      "title": "The runtime's answer could not be read",
+      "domain": "runtime",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The runtime answered with the HTTP status {status} and a body that is not a problem document the client can read.",
+      "steps": {
+        "actor": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime, with the status and the body."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "status": {
+          "type": "integer",
+          "description": "The HTTP status of the answer."
+        }
+      },
+      "meaning": "The answer is not a problem document, and no reading rule the client has reads it, such as an error page from a proxy in front of the runtime.",
+      "what_to_do": "Check what sits between the client and the runtime, such as a proxy, and report the answer to whoever runs the runtime."
+    },
+    {
+      "code": "client.outcome_unknown",
+      "title": "The call may have created a run",
+      "domain": "runtime",
+      "retry": "outcome_unknown",
+      "raised_as": "client",
+      "detail": "The connection was lost after a request that creates a run had left, so the run may exist.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run if its id is known, and otherwise leave the outcome unknown rather than send the request again automatically."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "optional": true,
+          "description": "The run, when the client learned its id before the connection was lost."
+        }
+      },
+      "meaning": "The connection dropped, the call timed out, or the caller stopped it, after a request that creates a run had left, so the run may exist.",
+      "what_to_do": "Read the run by its id when the client knows it. A client that knows no run to read leaves the outcome unknown and never repeats the request automatically, since a repeat may start a second run."
+    },
+    {
+      "code": "client.follow_failed",
+      "title": "Following a started run stopped",
+      "domain": "runtime",
+      "retry": "outcome_unknown",
+      "raised_as": "client",
+      "detail": "The client stopped following the run '{pipeline_run_id}', which may still be going.",
+      "steps": {
+        "actor": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' by its id rather than start it again."
+        },
+        "other": {
+          "kind": "read_run",
+          "detail": "Read the run '{pipeline_run_id}' by its id rather than start it again."
+        }
+      },
+      "params": {
+        "pipeline_run_id": {
+          "type": "identifier",
+          "description": "The run."
+        }
+      },
+      "meaning": "The runtime acknowledged the run, and following it then failed, so the run has started and may still be going or may have ended. The call that started it has taken effect, so it is never repeated automatically.",
+      "what_to_do": "Read the run by its id until it ends. Starting it again would run it twice."
+    },
+    {
+      "code": "client.not_configured",
+      "title": "The client has no usable configuration",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The client's setting '{setting}' is missing or unusable.",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Set '{setting}' in the client's configuration."
+        },
+        "other": {
+          "kind": "fix_configuration",
+          "detail": "Set '{setting}' in the client's configuration."
+        }
+      },
+      "params": {
+        "setting": {
+          "type": "identifier",
+          "description": "The setting that is missing or unusable, such as the base URL or the key."
+        }
+      },
+      "meaning": "No base URL or credential is set, or the one set is unusable.",
+      "what_to_do": "Set the setting `params.setting` names, through the client's configuration or its environment."
+    },
+    {
+      "code": "client.argument_invalid",
+      "title": "An argument was refused before sending",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The argument '{argument}' was refused before any request left (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Correct the argument '{argument}', then try again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Correct the argument '{argument}', then try again."
+        }
+      },
+      "params": {
+        "argument": {
+          "type": "identifier",
+          "description": "The argument refused."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "Why it was refused."
+        }
+      },
+      "meaning": "The client refused the arguments of a call, a command or a tool before any request left.",
+      "what_to_do": "Read the call's documentation for the argument and correct it."
+    },
+    {
+      "code": "client.file_unreadable",
+      "title": "A local file cannot be read",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The local file '{path}' cannot be read (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Check that '{path}' exists and is readable, then try again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Check that '{path}' exists and is readable, then try again."
+        }
+      },
+      "params": {
+        "path": {
+          "type": "caller_text",
+          "description": "The file's path."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "Why it cannot be read."
+        }
+      },
+      "meaning": "A local file the client was told to read cannot be read or decoded.",
+      "what_to_do": "Check the path, the file's permissions and its encoding, then try again."
+    },
+    {
+      "code": "client.write_failed",
+      "title": "A local file could not be written",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The client could not write '{path}' (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Make '{path}' writable, or choose another place to write, then try again."
+        },
+        "other": {
+          "kind": "fix_configuration",
+          "detail": "Make '{path}' writable, or choose another place to write, then try again."
+        }
+      },
+      "params": {
+        "path": {
+          "type": "caller_text",
+          "description": "The file or the directory."
+        },
+        "reason": {
+          "type": "identifier",
+          "description": "Why it could not be written."
+        }
+      },
+      "meaning": "The client could not write a file or a directory it was asked to produce.",
+      "what_to_do": "Check the directory's permissions and the free space, or write somewhere else."
+    },
+    {
+      "code": "client.target_exists",
+      "title": "The target already exists",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "'{path}' already holds something the client will not overwrite.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Choose another target, or remove what '{path}' holds, then try again."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Choose another target, or remove what '{path}' holds, then try again."
+        }
+      },
+      "params": {
+        "path": {
+          "type": "caller_text",
+          "description": "The target path."
+        }
+      },
+      "meaning": "The target path holds something the client will not overwrite.",
+      "what_to_do": "Choose another target, or remove what it holds if it is no longer needed."
+    },
+    {
+      "code": "client.workspace_busy",
+      "title": "Local files changed underneath the client",
+      "domain": "runtime",
+      "retry": "yes",
+      "raised_as": "client",
+      "detail": "Another process holds or changed '{path}', which this call read.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Try again once the other process is done with '{path}'."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Try again once the other process is done with '{path}'."
+        }
+      },
+      "params": {
+        "path": {
+          "type": "caller_text",
+          "description": "The file or the directory."
+        }
+      },
+      "meaning": "Another process holds the lock on, or wrote, the files the call read.",
+      "what_to_do": "Wait for the other process to finish, then try again."
+    },
+    {
+      "code": "client.output_mismatch",
+      "title": "An output does not match the generated types",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The output field '{field}' does not match the generated type of the concept '{concept}'.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Generate the types again from the method as it is now."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Generate the types again from the method as it is now."
+        }
+      },
+      "params": {
+        "field": {
+          "type": "identifier",
+          "description": "The output field."
+        },
+        "concept": {
+          "type": "identifier",
+          "description": "The concept whose generated type refuses it."
+        }
+      },
+      "meaning": "The caller's generated types refuse an output that the method declares, usually because the method changed after they were generated.",
+      "what_to_do": "Generate the types again from the current method."
+    },
+    {
+      "code": "client.link_refused",
+      "title": "A download link was refused",
+      "domain": "operator",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The client refused a download link the runtime's storage handed out (reason: {reason}).",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Make the runtime's storage hand out https links that need no redirect."
+        },
+        "other": {
+          "kind": "report",
+          "detail": "Report this to whoever runs the runtime."
+        }
+      },
+      "params": {
+        "reason": {
+          "type": "enum",
+          "values": [
+            "plain_http",
+            "unsupported_scheme",
+            "redirect"
+          ],
+          "description": "Why the link was refused: it is plain http, it uses another scheme, or it redirects."
+        }
+      },
+      "meaning": "The client's fetch policy refused a link that the runtime's storage handed out.",
+      "what_to_do": "If you run the runtime, configure its storage to hand out https links. Otherwise, report the problem to whoever runs it."
+    },
+    {
+      "code": "client.download_limit_exceeded",
+      "title": "A download passed the client's limit",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "A download passed the client's limit of {limit} bytes.",
+      "steps": {
+        "actor": {
+          "kind": "change_input",
+          "detail": "Raise the client's download limit, or download fewer files at once."
+        },
+        "other": {
+          "kind": "change_input",
+          "detail": "Raise the client's download limit, or download fewer files at once."
+        }
+      },
+      "params": {
+        "limit": {
+          "type": "bytes",
+          "description": "The client's limit."
+        }
+      },
+      "meaning": "A file, or the call's total, passed the client's own download cap.",
+      "what_to_do": "Raise the limit in the client's configuration, or download the files one at a time."
+    },
+    {
+      "code": "client.aborted",
+      "title": "The call was stopped by the caller",
+      "domain": "input",
+      "retry": "yes",
+      "raised_as": "client",
+      "detail": "The caller stopped the call before it finished, and the call created nothing.",
+      "steps": {
+        "actor": {
+          "kind": "retry",
+          "detail": "Make the call again if its result is still wanted."
+        },
+        "other": {
+          "kind": "retry",
+          "detail": "Make the call again if its result is still wanted."
+        }
+      },
+      "params": {},
+      "meaning": "The caller's abort signal stopped a call before it finished, where the call creates nothing, such as a read, or its request had not left yet. A call that creates a run and was stopped after its request left may have created the run, so it is `client.outcome_unknown` instead.",
+      "what_to_do": "Make the call again if its result is still wanted."
+    },
+    {
+      "code": "client.tool_missing",
+      "title": "A local tool the client needs is missing",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The program '{tool}', which the client needs, is missing or cannot be started.",
+      "steps": {
+        "actor": {
+          "kind": "fix_configuration",
+          "detail": "Install '{tool}' and put it on the PATH, then try again."
+        },
+        "other": {
+          "kind": "fix_configuration",
+          "detail": "Install '{tool}' and put it on the PATH, then try again."
+        }
+      },
+      "params": {
+        "tool": {
+          "type": "identifier",
+          "description": "The program."
+        }
+      },
+      "meaning": "A program the client needs, such as a runtime's command-line tool, git or uv, is missing, cannot be started, or failed to install.",
+      "what_to_do": "Install the program, check that it is on the PATH, and try again."
+    },
+    {
+      "code": "client.tool_outdated",
+      "title": "A local tool is too old",
+      "domain": "input",
+      "retry": "no",
+      "raised_as": "client",
+      "detail": "The program '{tool}' is at version {version}, older than the client requires.",
+      "steps": {
+        "actor": {
+          "kind": "upgrade",
+          "detail": "Upgrade '{tool}', then try again."
+        },
+        "other": {
+          "kind": "upgrade",
+          "detail": "Upgrade '{tool}', then try again."
+        }
+      },
+      "params": {
+        "tool": {
+          "type": "identifier",
+          "description": "The program or the engine."
+        },
+        "version": {
+          "type": "identifier",
+          "description": "The version found."
+        }
+      },
+      "meaning": "A program or an engine the client needs is older than it requires.",
+      "what_to_do": "Upgrade the program to the version the client documents, and try again."
+    }
+  ]
+}

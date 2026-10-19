@@ -17,12 +17,12 @@ YAML alike: both go through `openapi()`.
 Deliberately import-side-effect-free, mirroring `pipelex_api.exception_handlers`: no env var reads, no app
 construction, no router wiring. That is what lets a test build a production-faithful app —
 one that renders the error media type the way the real server does — without dragging in
-`pipelex_api.main`'s startup chain (`Pipelex.make`, `get_auth_dependency`, the `ERROR_DISCLOSURE`
+`pipelex_api.main`'s startup chain (`Pipelex.make`, `get_auth_dependency`, the `AUTH_MODE`
 fail-fast), so a misconfigured env var cannot crash collection of every module that needs the
 app class.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI
 from typing_extensions import override
@@ -65,6 +65,102 @@ def use_problem_json_media_type(schema: dict[str, Any]) -> None:
                     content[PROBLEM_JSON_MEDIA_TYPE] = json_content
 
 
+# Two families of models share their class names: the fix vocabulary of `pipelex.suggested_fix`, which the migration
+# ledger's entries carry, and the standard's, which a problem's `ProblemItem` carries (`file` where Pipelex's has
+# `source`, and a catch-all for an operation kind it does not list). Pydantic names both by their module when they meet,
+# which would rename the schemas a generated client binds to; this pass gives Pipelex's their own names back, and the
+# standard's the `Problem` prefix its other models carry.
+_SCHEMA_RENAMES_BY_PREFIX: dict[str, str] = {
+    "pipelex__suggested_fix__": "",
+    "mthds__protocol__problem__models__": "Problem",
+}
+
+# The standard's problem item, the root of the standard's models on the wire. Every schema it reaches is the standard's
+# and carries the `Problem` prefix, whether or not a Pipelex model of the same class name is published beside it, so a
+# schema's name does not depend on which other models a release happens to publish.
+_STANDARD_ROOT_SCHEMA = "ProblemItem"
+_STANDARD_SCHEMA_PREFIX = "Problem"
+
+_SCHEMA_REF_PREFIX = "#/components/schemas/"
+
+
+def _renamed_schema(name: str) -> str:
+    for prefix, replacement in _SCHEMA_RENAMES_BY_PREFIX.items():
+        if name.startswith(prefix):
+            return f"{replacement}{name.removeprefix(prefix)}"
+    return name
+
+
+def _with_renamed_refs(node: Any, *, renames: dict[str, str]) -> Any:
+    """``node`` with every schema reference to a renamed schema pointing at its new name."""
+    if isinstance(node, dict):
+        return {key: _with_renamed_refs(value, renames=renames) for key, value in cast("dict[str, Any]", node).items()}
+    if isinstance(node, list):
+        return [_with_renamed_refs(item, renames=renames) for item in cast("list[Any]", node)]
+    if isinstance(node, str) and node.startswith(_SCHEMA_REF_PREFIX):
+        name = node.removeprefix(_SCHEMA_REF_PREFIX)
+        return f"{_SCHEMA_REF_PREFIX}{renames.get(name, name)}"
+    return node
+
+
+def _referenced_schemas(node: Any) -> set[str]:
+    """The names of the schemas ``node`` references."""
+    if isinstance(node, dict):
+        return {name for value in cast("dict[str, Any]", node).values() for name in _referenced_schemas(value)}
+    if isinstance(node, list):
+        return {name for item in cast("list[Any]", node) for name in _referenced_schemas(item)}
+    if isinstance(node, str) and node.startswith(_SCHEMA_REF_PREFIX):
+        return {node.removeprefix(_SCHEMA_REF_PREFIX)}
+    return set()
+
+
+def _reached_schemas(*, schemas: dict[str, Any], root: str) -> set[str]:
+    """The schemas ``root`` reaches through its references, itself included."""
+    reached: set[str] = set()
+    pending = [root]
+    while pending:
+        name = pending.pop()
+        if name in reached or name not in schemas:
+            continue
+        reached.add(name)
+        pending.extend(_referenced_schemas(schemas[name]))
+    return reached
+
+
+def _apply_schema_renames(schema: dict[str, Any], *, renames: dict[str, str]) -> None:
+    """Rename schemas and every reference to them, in place, refusing a rename onto a name another schema holds."""
+    if not renames:
+        return
+    components: dict[str, Any] = schema.get("components", {})
+    schemas: dict[str, Any] = components.get("schemas", {})
+    taken = set(schemas) - set(renames)
+    clashes = sorted(new_name for new_name in renames.values() if new_name in taken)
+    if clashes:
+        msg = f"Renaming the fix schemas would overwrite the schemas {clashes}"
+        raise ValueError(msg)
+    renamed_schemas = {renames.get(name, name): value for name, value in schemas.items()}
+    components["schemas"] = dict(sorted(renamed_schemas.items()))
+    for key in list(schema):
+        schema[key] = _with_renamed_refs(schema[key], renames=renames)
+
+
+def name_shared_fix_schemas(schema: dict[str, Any]) -> None:
+    """Rename the module-qualified fix schemas Pydantic generates for the two fix families, in place.
+
+    The module-qualified names come back first, then every schema the standard's problem item reaches takes the
+    `Problem` prefix it lacks. Refuses a rename onto a name another schema already holds, which would merge two shapes
+    into one.
+    """
+    schemas: dict[str, Any] = schema.get("components", {}).get("schemas", {})
+    _apply_schema_renames(schema, renames={name: _renamed_schema(name) for name in schemas if _renamed_schema(name) != name})
+    schemas = schema.get("components", {}).get("schemas", {})
+    standard_schemas = _reached_schemas(schemas=schemas, root=_STANDARD_ROOT_SCHEMA)
+    _apply_schema_renames(
+        schema,
+        renames={name: f"{_STANDARD_SCHEMA_PREFIX}{name}" for name in standard_schemas if not name.startswith(_STANDARD_SCHEMA_PREFIX)},
+    )
+
+
 class PipelexFastAPI(FastAPI):
     """The app class. Stock FastAPI, extended only to publish errors as `application/problem+json`."""
 
@@ -80,4 +176,5 @@ class PipelexFastAPI(FastAPI):
             return self.openapi_schema
         schema = super().openapi()
         use_problem_json_media_type(schema)
+        name_shared_fix_schemas(schema)
         return schema

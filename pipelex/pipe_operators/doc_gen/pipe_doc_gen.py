@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import Field, PrivateAttr
 from typing_extensions import override
 
@@ -234,10 +235,23 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         return humanize(self.code)
 
     async def _render(
-        self, *, template: str, category: TemplateCategory, context: dict[str, Any], label: str, templating_style: TemplatingStyle | None = None
+        self,
+        *,
+        template: str,
+        category: TemplateCategory,
+        context: dict[str, Any],
+        label: str,
+        template_field: str,
+        templating_style: TemplatingStyle | None = None,
     ) -> str:
         return await render_doc_gen_template(
-            pipe_code=self.code, template=template, category=category, context=context, label=label, templating_style=templating_style
+            pipe_code=self.code,
+            template=template,
+            category=category,
+            context=context,
+            label=label,
+            template_field=template_field,
+            templating_style=templating_style,
         )
 
     async def compose(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> DocumentComposition:
@@ -257,6 +271,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 category=TemplateCategory.BASIC,
                 context=context,
                 label="filename",
+                template_field="filename",
                 templating_style=resolve_templating_style(authored=None),
             )
         # Stored under a name every `pipelex-storage://` reader serves, the hosted platform's included.
@@ -280,6 +295,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                         category=TemplateCategory.HTML,
                         context=context,
                         label="template",
+                        template_field="template",
                         templating_style=resolve_templating_style(authored=None),
                     )
                     return DocumentComposition(
@@ -341,7 +357,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         """
         if self.template_file is None or self.template_file_ref is None:
             msg = f"PipeDocGen '{self.code}' prints from a template file but names none in its method tree."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         return ComposedTemplateFile(
             file=self.template_file_ref,
             name=self.template_file,
@@ -363,7 +379,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         crate = get_library_manager().get_crate(library_id=library_id)
         if crate is None:
             msg = f"PipeDocGen '{self.code}' cannot name its template file's data: the library it runs in has no crate."
-            raise PipeDocGenRunError(msg)
+            raise PipeDocGenRunError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
         input_stuffs: dict[str, Stuff] = {}
         for input_name in self.inputs.variables:
             stuff = working_memory.get_optional_stuff(input_name)

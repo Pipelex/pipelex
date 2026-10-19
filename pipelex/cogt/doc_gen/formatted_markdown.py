@@ -87,4 +87,6 @@ def format_markdown(*, markdown: str) -> FormattedMarkdown:
             f"Formatting a Markdown text of {len(markdown):,} characters would spend more than the {own_budget.total:,} work units "
             "a conversion outside a template render may spend: its text, its tables or what they format into is too large."
         )
-        raise MarkdownFormattingBudgetError(msg) from exc
+        # The bound is the conversion's own budget; the input it formats and the size it would reach are known to the
+        # engine that called it, which reports the refusal as its own fill error.
+        raise MarkdownFormattingBudgetError(msg).with_params(limit=own_budget.total) from exc

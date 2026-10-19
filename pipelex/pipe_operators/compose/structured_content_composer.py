@@ -2,6 +2,7 @@ import datetime
 import inspect
 from typing import Any, NamedTuple, TypeAlias, cast, get_args, get_origin
 
+from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, ValidationError
 
 from pipelex.cogt.templating.template_rendering import render_template
@@ -21,12 +22,14 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValidationError,
     StructuredContentComposerValueError,
 )
+from pipelex.tools.jinja2.exceptions import Jinja2TemplateSecurityError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import find_private_path_segment
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.annotation_utils import unwrap_optional
 from pipelex.tools.typing.class_utils import are_classes_equivalent
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 NativeScalarValue: TypeAlias = str | float | int | bool | datetime.date | datetime.time
 """The native Python scalar types a content wrapper can be unwrapped into."""
@@ -94,7 +97,8 @@ class StructuredContentComposer:
         try:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
-            formatted_error = format_pydantic_validation_error(exc)
+            # The composed values are the run's data: the refusal names the fields, their reasons and their types, never the values.
+            formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=self.output_class)
             field_type_summary = self._build_field_type_summary(field_values)
             msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}\n{field_type_summary}"
             raise StructuredContentComposerValidationError(msg) from exc
@@ -172,12 +176,20 @@ class StructuredContentComposer:
                 return self._resolve_from_var(field_blueprint=field_blueprint, field_name=field_name)
 
             case ConstructFieldMethod.TEMPLATE:
-                rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
+                with locating_template_refusal(template_field=f"construct.{field_name}"):
+                    rendered_text = await self._resolve_template(field_blueprint=field_blueprint)
                 self.field_resolutions[field_name]["rendered"] = rendered_text
                 return rendered_text
 
             case ConstructFieldMethod.NESTED:
-                return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
+                try:
+                    return await self._resolve_nested(field_blueprint=field_blueprint, field_name=field_name)
+                except Jinja2TemplateSecurityError as exc:
+                    # The nested composer located the refusal on its own field: the path from this construct's root
+                    # runs through this field.
+                    if exc.template_field is not None and exc.template_field.startswith("construct."):
+                        exc.with_template_field(template_field=f"construct.{field_name}.{exc.template_field.removeprefix('construct.')}")
+                    raise
 
     def _resolve_from_var(self, field_blueprint: ConstructFieldBlueprint, *, field_name: str) -> Any:
         """Resolve a FROM_VAR field by getting value from working memory.
@@ -255,7 +267,7 @@ class StructuredContentComposer:
 
         if find_private_path_segment(path=key_attr):
             msg = f"list_to_dict_keyed_by names '{key_attr}', which starts with an underscore: it names a public field only"
-            raise StructuredContentComposerValueError(msg)
+            raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
         result: dict[str, Any] = {}
         for idx, item in enumerate(items):
@@ -266,7 +278,7 @@ class StructuredContentComposer:
                 key = item[key_attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Item at index {idx} does not have attribute '{key_attr}'"
-                raise StructuredContentComposerValueError(msg)
+                raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
             if not isinstance(key, str):
                 msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"  # pyright: ignore[reportUnknownArgumentType]
@@ -299,7 +311,7 @@ class StructuredContentComposer:
         # The blueprint refuses these at load; the walk below is raw `getattr`, so it refuses them again.
         if private_segment := find_private_path_segment(path=path):
             msg = f"Cannot resolve path '{path}': '{private_segment}' starts with an underscore, and a path reads public fields only"
-            raise StructuredContentComposerValueError(msg)
+            raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
         parts = path.split(".", 1)
         base_name = parts[0]
         attr_path = parts[1]
@@ -316,7 +328,7 @@ class StructuredContentComposer:
                 current_value = current_value[attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Cannot resolve path '{path}': attribute '{attr}' not found"
-                raise StructuredContentComposerValueError(msg)
+                raise StructuredContentComposerValueError(msg).with_error_code(CoreCode.METHOD_FIELD_PATH_UNRESOLVED)
 
         # Apply type conversion if the resolved value is a StuffContent
         if isinstance(current_value, StuffContent):
@@ -439,8 +451,9 @@ class StructuredContentComposer:
         elif isinstance(stuff_content, DateContent):
             if expected_type is datetime.date:
                 if stuff_content.time is not None:
+                    # The date is the run's data, so the message says what it carries, never its value.
                     msg = (
-                        f"Cannot copy a Date carrying a time of day ({stuff_content.rendered_plain()}) into a bare `date` field: "
+                        "Cannot copy a Date carrying a time of day into a bare `date` field: "
                         "it would silently drop the time and its UTC offset. Target a Date-typed field to keep the time."
                     )
                     raise StructuredContentComposerTypeError(msg)
@@ -550,7 +563,7 @@ class StructuredContentComposer:
                 content_dict = stuff_content.model_dump(exclude_none=False, serialize_as_any=True)
                 return expected_type.model_validate(content_dict)
             except ValidationError as exc:
-                formatted_error = format_pydantic_validation_error(exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=expected_type)
                 msg = f"Cannot convert {actual_type.__name__} to {expected_type.__name__}: classes are not compatible. {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
@@ -727,7 +740,7 @@ class StructuredContentComposer:
             try:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
-                formatted_error = format_pydantic_validation_error(exc)
+                formatted_error = format_validation_error_without_input(validation_error=exc, validated_type=expected_type)
                 msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 

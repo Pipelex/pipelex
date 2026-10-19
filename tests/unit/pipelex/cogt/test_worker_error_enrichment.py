@@ -4,7 +4,7 @@ A `CogtError` raised deep inside a provider plugin (LLMCompletionError,
 ImgGenGenerationError, ExtractJobFailureError, SearchJobFailureError) carries
 no model or provider of its own. Each worker family's public-method chokepoint
 fills `model_handle` / `backend_name` from the worker — where both are
-unambiguously known — so the eventual `ErrorReport` can attribute the failure.
+unambiguously known — so the operator's diagnostics on the eventual problem can attribute the failure.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import (
+    CogtError,
     ExtractJobFailureError,
     ImgGenGenerationError,
     InferenceErrorCategory,
@@ -29,12 +30,21 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.llm.llm_worker_abstract import LLMWorkerAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
+from pipelex.errors.problem import ProblemDiagnostics, ProblemView
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 WORKER_MODEL = "claude-sonnet-4"
 WORKER_PROVIDER = "anthropic"
+
+
+def _diagnostics_of(error: Exception) -> ProblemDiagnostics:
+    """The operator's diagnostics of a worker's error, which attribute the failure to its model and its provider."""
+    assert isinstance(error, CogtError)
+    diagnostics = error.to_problem(view=ProblemView.OPERATOR).diagnostics
+    assert diagnostics is not None
+    return diagnostics
 
 
 class _StubSchema(BaseModel):
@@ -163,10 +173,14 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(LLMCompletionError) as exc_info:
             await invocation
 
-        report = exc_info.value.to_error_report()
-        assert report.model == WORKER_MODEL
-        assert report.provider == WORKER_PROVIDER
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == WORKER_MODEL
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.name == WORKER_PROVIDER
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises a not-found failure built in the test, without the kind of model and the reason its raise site gives"
+    )
     async def test_llm_worker_does_not_overwrite_existing_model(self, mocker: MockerFixture) -> None:
         """An inner error that already set model_handle keeps its value; only the missing provider is filled."""
         inner_model = "preset-only-model"
@@ -176,10 +190,14 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(LLMModelNotFoundError) as exc_info:
             await worker.gen_text(llm_job=_make_llm_job(mocker))
 
-        report = exc_info.value.to_error_report()
-        assert report.model == inner_model
-        assert report.provider == WORKER_PROVIDER
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == inner_model
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.name == WORKER_PROVIDER
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a worker that does not know its provider leaves the provider unnamed, which is what the test checks"
+    )
     async def test_llm_worker_skips_unknown_provider(self, mocker: MockerFixture) -> None:
         """A worker that does not know its provider ('unknown' default) leaves provider unset."""
         error = LLMCompletionError("LLM worker failed", error_category=InferenceErrorCategory.TRANSIENT)
@@ -188,9 +206,9 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker.gen_text(llm_job=_make_llm_job(mocker))
 
-        report = exc_info.value.to_error_report()
-        assert report.model == WORKER_MODEL
-        assert report.provider is None
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == WORKER_MODEL
+        assert diagnostics.provider is None
 
     @pytest.mark.parametrize(
         "raised_error",
@@ -225,9 +243,10 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await invocation
 
-        report = exc_info.value.to_error_report()
-        assert report.model == WORKER_MODEL
-        assert report.provider == WORKER_PROVIDER
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == WORKER_MODEL
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.name == WORKER_PROVIDER
 
     async def test_extract_worker_enriches_error(self, mocker: MockerFixture) -> None:
         """extract_pages stamps model and provider onto a bare ExtractJobFailureError."""
@@ -237,9 +256,10 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(ExtractJobFailureError) as exc_info:
             await worker.extract_pages(extract_job=_make_extract_job(mocker))
 
-        report = exc_info.value.to_error_report()
-        assert report.model == WORKER_MODEL
-        assert report.provider == WORKER_PROVIDER
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == WORKER_MODEL
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.name == WORKER_PROVIDER
 
     @pytest.mark.parametrize("use_structured", [False, True])
     async def test_search_worker_enriches_error(self, mocker: MockerFixture, use_structured: bool) -> None:
@@ -255,6 +275,7 @@ class TestWorkerErrorEnrichment:
         with pytest.raises(SearchJobFailureError) as exc_info:
             await invocation
 
-        report = exc_info.value.to_error_report()
-        assert report.model == WORKER_MODEL
-        assert report.provider == WORKER_PROVIDER
+        diagnostics = _diagnostics_of(exc_info.value)
+        assert diagnostics.model == WORKER_MODEL
+        assert diagnostics.provider is not None
+        assert diagnostics.provider.name == WORKER_PROVIDER

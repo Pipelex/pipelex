@@ -91,7 +91,7 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
 
-    async def test_timeout_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_timeout_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
         sdk_exc = openai.APITimeoutError(request=request)
@@ -100,11 +100,11 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
 
-    async def test_connection_error_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_connection_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
         sdk_exc = openai.APIConnectionError(message="boom", request=request)
@@ -113,9 +113,9 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
 
-    async def test_server_error_is_transient(self, mocker: MockerFixture) -> None:
+    async def test_server_error_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
         worker = _make_worker(mocker)
         sdk_exc = openai.InternalServerError("server error", response=_make_response(500), body={"type": "server_error"})
         worker.openai_client.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -123,7 +123,7 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
 
@@ -224,8 +224,8 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         assert exc_info.value.provider_metadata is not None
         assert exc_info.value.provider_metadata.status_code == 409
 
-    async def test_generic_status_error_503_is_transient(self, mocker: MockerFixture) -> None:
-        """An unhandled 5xx APIStatusError is categorized TRANSIENT via the generic fallback."""
+    async def test_generic_status_error_503_is_an_unknown_outcome(self, mocker: MockerFixture) -> None:
+        """An unhandled 5xx APIStatusError on an image generation, which is billed and not idempotent, is an unknown outcome."""
         worker = _make_worker(mocker)
         sdk_exc = openai.APIStatusError("service unavailable", response=_make_response(503), body=None)
         worker.openai_client.chat.completions.create.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -233,7 +233,7 @@ class TestOpenAICompletionsImgGenWorkerErrorHandling:
         with pytest.raises(ImgGenGenerationError) as exc_info:
             await worker._gen_image(img_gen_job=_make_img_gen_job(mocker))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
+        assert exc_info.value.error_category is InferenceErrorCategory.AMBIGUOUS
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
         assert exc_info.value.provider_metadata is not None

@@ -17,12 +17,14 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
-from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.exception_handlers import ERROR_FRAMES_FIELD, register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import (
     UNRESOLVED_PACKAGE_MTHDS,
@@ -32,6 +34,7 @@ from tests.unit._constants import (
     VENDORED_PROBE_MANIFEST,
     VENDORED_PROBE_MTHDS,
 )
+from tests.unit._problems import assert_problem
 
 _PIPE_FUNC_PY = "def echo(working_memory):\n    return 'hi'\n"
 _TREE_NS = "pipelex_api.method_tree_request"
@@ -146,16 +149,17 @@ def _zip_b64_of_entries(entries: list[tuple[str, str]]) -> str:
     return base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
-def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> tuple[TestClient, dict[str, Any]]:
     """Wire an app whose ApiRunner is mocked and records what the run actually saw.
 
     The `snapshot` captures BOTH what the runner was asked to run — the
     `mthds_contents` and `pipe_code` passed to `execute`/`start` — and the
     `library_dirs` it was constructed with plus the files on disk at run time.
     Together they prove the tree was written whole and torn down after the request.
+    `as_operator` marks each request as the operator's, whose view carries a refusal's own message in `diagnostics`.
     """
     app = FastAPI()
-    app.include_router(pipeline_router, prefix="/v1")
+    app.include_router(pipeline_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
 
     snapshot: dict[str, Any] = {}
@@ -212,12 +216,9 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, dict[str, Any]]:
 
 
 def _assert_tree_refusal(response: Any, *, code: str, named: str) -> None:
-    assert response.status_code == 422, response.text
-    problem = response.json()
-    assert problem["error_type"] == "InvalidMethodFiles", response.text
-    assert problem["tree_refusal"]["code"] == code
-    assert named in problem["tree_refusal"]["names"]
-    assert repr(named) in problem["detail"] or f"'{named}'" in problem["detail"]
+    """The refusal of a tree breaking the method tree's rule: the refusal's code as the reason, and the path it names."""
+    problem = assert_problem(response, status=422, code="method.package_invalid")
+    assert problem["params"] == {"reason": code, "path": named}, problem
 
 
 class TestPipelineBundle:
@@ -249,16 +250,20 @@ class TestPipelineBundle:
         assert snapshot["pipe_code"] == "echo"
 
     def test_a_tree_with_no_entry_pipe_and_no_pipe_code_is_refused(self, mocker: MockerFixture):
-        client, snapshot = _build_client(mocker)
+        client, snapshot = _build_client(mocker, as_operator=True)
         files = {"a.mthds": VALID_MTHDS, "b.mthds": VALID_MTHDS.replace('domain = "smoke"', 'domain = "other"')}
 
         response = client.post("/v1/execute", json={"files": files, "inputs": {"text": "hi"}})
 
         assert response.status_code == 422, response.text
         problem = response.json()
-        assert problem["error_type"] == "MethodEntryError"
-        assert "'a.mthds'" in problem["detail"]
-        assert "'b.mthds'" in problem["detail"]
+        # Both bundles declare a main_pipe, so the run that names no pipe has several to start at, which it names.
+        assert problem["code"] == CoreCode.REQUEST_PIPE_UNSPECIFIED
+        assert problem["params"] == {"candidates": ["other.echo", "smoke.echo"]}
+        assert problem["domain"] == "input"
+        assert problem["diagnostics"]["error_class"] == "MethodEntryError"
+        assert "'a.mthds'" in problem["diagnostics"]["message"]
+        assert "'b.mthds'" in problem["diagnostics"]["message"]
         assert snapshot == {}, "the runner was reached"
 
     def test_no_bundle_passes_request_mthds_contents(self, mocker: MockerFixture):
@@ -272,11 +277,16 @@ class TestPipelineBundle:
     def test_python_bundle_forbidden_when_not_hosted(self, mocker: MockerFixture):
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=False)
         client, snapshot = _build_client(mocker)
+        log_spy = mocker.patch("pipelex_api.exception_handlers.log")
         response = client.post("/v1/execute", json={"files": {"main.mthds": VALID_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY}})
-        assert response.status_code == 403
-        assert response.headers["content-type"] == "application/problem+json"
-        assert response.json()["error_type"] == "CustomCodeRequiresSandbox"
+        problem = assert_problem(response, status=501, code="pipelex.deployment.custom_code_requires_sandbox")
+        assert problem["params"] == {"origin": "bundle"}
         assert snapshot == {}, "the runner was reached"
+        # A caller sending custom code to a deployment without a sandbox can do so at will: a warning without frames.
+        log_spy.error.assert_not_called()
+        fields = log_spy.warning.call_args.kwargs["fields"]
+        assert fields["error.code"] == "pipelex.deployment.custom_code_requires_sandbox"
+        assert ERROR_FRAMES_FIELD not in fields
 
     def test_python_bundle_is_written_with_its_tree_when_hosted(self, mocker: MockerFixture):
         mocker.patch(f"{_TREE_NS}.is_pipe_func_sandbox_hosted", return_value=True)
@@ -292,14 +302,13 @@ class TestPipelineBundle:
             "/v1/execute",
             json={"files": {"main.mthds": VALID_MTHDS}, "bundle_b64": _zip_b64({"main.mthds": VALID_MTHDS})},
         )
-        assert response.status_code == 422
-        assert response.json()["error_type"] == "InvalidBundle"
+        assert_problem(response, status=422, code="request.invalid", field="bundle_b64")
 
     def test_a_tree_holding_no_bundle_is_refused(self, mocker: MockerFixture):
         client, snapshot = _build_client(mocker)
         response = client.post("/v1/execute", json={"files": {"notes.txt": "x"}, "pipe_code": "smoke.echo", "inputs": {}})
-        assert response.status_code == 422, response.text
-        assert response.json()["error_type"] == "InvalidBundle"
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "no_bundle"}
         assert snapshot == {}, "the runner was reached"
 
     @pytest.mark.parametrize(
@@ -316,10 +325,7 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", content=raw_body, headers={"content-type": "application/json"})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert problem["tree_refusal"] == {"code": code, "names": [named]}
+        _assert_tree_refusal(response, code=code, named=named)
         assert snapshot == {}, "the runner was reached"
 
     def test_a_text_entry_that_is_not_utf8_text_is_refused(self, mocker: MockerFixture):
@@ -328,20 +334,20 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", content=raw_body, headers={"content-type": "application/json"})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert problem["tree_refusal"]["names"] == ["notes.txt"]
+        assert_problem(response, status=422, code="request.invalid", field="files")
         assert snapshot == {}, "the runner was reached"
 
     def test_bundle_and_mthds_contents_are_mutually_exclusive(self, mocker: MockerFixture):
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post(
             "/v1/execute",
             json={"files": {"main.mthds": VALID_MTHDS}, "mthds_contents": [VALID_MTHDS]},
         )
         assert response.status_code == 422
-        assert "mutually exclusive" in response.text
+        problem = response.json()
+        assert problem["code"] == CoreCode.REQUEST_INVALID
+        assert problem.get("params") == {"field": "mthds_contents"}
+        assert "mutually exclusive" in problem["diagnostics"]["message"]
 
     @pytest.mark.parametrize("transport", ["dependencies", "bundle_b64"])
     @pytest.mark.parametrize("path", ["/v1/execute", "/v1/start"])
@@ -376,10 +382,10 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert VENDORED_PROBE_ADDRESS in problem["detail"]
+        problem = assert_problem(response, status=422, code="pipelex.request.dependency_key_mismatch")
+        # The refusal names the key the request gave and the address the manifest declares, which the key must be.
+        assert problem["params"] == {"key": "github.com/invented/elsewhere/probe", "address": VENDORED_PROBE_ADDRESS}
+        assert problem["location"] == {"field": "dependencies"}
         assert snapshot == {}, "the runner was reached"
 
     def test_dependencies_without_files_are_refused(self, mocker: MockerFixture):
@@ -389,7 +395,10 @@ class TestPipelineBundle:
         response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
 
         assert response.status_code == 422, response.text
-        assert "dependencies" in response.json()["detail"]
+        problem = response.json()
+        assert problem["code"] == CoreCode.REQUEST_INVALID
+        assert problem.get("params") == {"field": "dependencies"}
+        assert problem["detail"] == "The request's field 'dependencies' does not match the route's schema."
         assert snapshot == {}, "the runner was reached"
 
     def test_a_bundle_shipping_no_package_gets_no_methods_dir(self, mocker: MockerFixture):
@@ -406,10 +415,8 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={"bundle_b64": _zip_b64(files), "inputs": {"text": "hi"}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert named in problem["detail"]
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"]["path"] == named.strip("'"), problem
         assert snapshot == {}, "the runner was reached"
 
     @pytest.mark.parametrize("shape", list(_REFUSED_ARCHIVE_PACKAGES))
@@ -419,10 +426,8 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={"bundle_b64": _zip_b64(files), "inputs": {"text": "hi"}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert named in problem["detail"]
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"]["path"] == f"{named}METHODS.toml", problem
         assert snapshot == {}, "the runner was reached"
 
     def test_an_archive_whose_only_bundles_are_shipped_packages_is_refused(self, mocker: MockerFixture):
@@ -431,9 +436,8 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={"bundle_b64": _zip_b64(files), "inputs": {"text": "hi"}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] in {"InvalidBundle", "InvalidMethodFiles"}
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "empty_tree"}
         assert snapshot == {}, "the runner was reached"
 
     @pytest.mark.parametrize("bundle", list(_DUPLICATE_IDENTITY_BUNDLES))
@@ -444,10 +448,8 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={"bundle_b64": _zip_b64(files), "inputs": {"text": "hi"}})
 
-        assert response.status_code == 422, response.text
-        problem = response.json()
-        assert problem["error_type"] == "InvalidMethodFiles"
-        assert VENDORED_PROBE_ADDRESS.casefold() in problem["detail"].casefold()
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"]["reason"] == "dependency_address_collision", problem
         assert snapshot == {}, "the runner was reached"
 
     @pytest.mark.parametrize("transport", ["files", "bundle_b64"])

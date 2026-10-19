@@ -3,6 +3,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -59,3 +60,20 @@ class TestWorkingMemoryBasic:
         WorkingMemory(root={key: stuff})
 
         warning_mock.assert_called_once_with("A stuff name starts with an underscore, which is reserved for params", fields={"stuff_name": "_draft"})
+
+    def test_a_nameless_stuff_is_refused_by_its_header_never_its_content(self):
+        """A stuff's own text carries its content, the run's data: the refusal names its code and its concept alone."""
+        content_text = "the run's own words, which no message carries"
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            content=TextContent(text=content_text),
+        ).model_copy(update={"stuff_name": None})
+
+        with pytest.raises(WorkingMemoryFactoryError) as single_refusal:
+            WorkingMemoryFactory.make_from_single_stuff(stuff)
+        with pytest.raises(WorkingMemoryFactoryError) as multiple_refusal:
+            WorkingMemoryFactory.make_from_multiple_stuffs([stuff])
+
+        for refusal in (single_refusal.value, multiple_refusal.value):
+            assert stuff.header in str(refusal)
+            assert content_text not in str(refusal)

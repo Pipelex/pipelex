@@ -15,26 +15,31 @@ because every assertion lands on a request-shape 422 raised during body parsing.
 from typing import Any
 
 import pytest
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from mthds.protocol.problem.registry import CoreCode
+from pipelex.errors.problem import ProblemView, make_problem
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pytest_mock import MockerFixture
 
 from pipelex_api.exception_handlers import register_exception_handlers
+from pipelex_api.problem_view import mark_operator_request
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 
 _BASE_PRECONDITION_FRAGMENT = "pipe_code and mthds_contents cannot both be empty"
 
 
-def _build_client(mocker: MockerFixture) -> tuple[TestClient, Any]:
+def _build_client(mocker: MockerFixture, *, as_operator: bool = False) -> tuple[TestClient, Any]:
     """Wire a FastAPI app whose pipeline runner is fully mocked; return (client, runner_mock).
 
     The whole runner comes back rather than just `execute`, because `/v1/start` dispatches
     through `runner.start`: a test that asserts only on `execute` pins nothing on that route.
+    `as_operator` marks each request as the operator's, whose view carries the refusal's own message
+    in `diagnostics`.
     """
     app = FastAPI()
-    app.include_router(pipeline_router, prefix="/v1")
+    app.include_router(pipeline_router, prefix="/v1", dependencies=[Depends(mark_operator_request)] if as_operator else [])
     register_exception_handlers(app)
 
     fake_execute_response = mocker.MagicMock()
@@ -57,6 +62,21 @@ def _build_client(mocker: MockerFixture) -> tuple[TestClient, Any]:
     return TestClient(app), fake_runner
 
 
+def _assert_request_refusal(response: Any, *, code: CoreCode, params: dict[str, Any]) -> dict[str, Any]:
+    """Assert a request-shape 422 under `code`, its caller sentences rendered from `params`, and return its body."""
+    assert response.status_code == 422, response.text
+    assert response.headers["content-type"] == "application/problem+json"
+    problem: dict[str, Any] = response.json()
+    caller_problem = make_problem(code=code, view=ProblemView.CALLER, params=params)
+    assert problem["code"] == code
+    assert problem["type"] == f"https://mthds.ai/errors/{code}"
+    assert problem["status"] == 422
+    assert problem["domain"] == "input"
+    assert problem.get("params") == params
+    assert problem["detail"] == caller_problem.detail
+    return problem
+
+
 class TestRunSourcePrecondition:
     """A run source is required; extension args never waive it, and they are named when they are all the body has."""
 
@@ -65,16 +85,17 @@ class TestRunSourcePrecondition:
         # The hosted catalog selector resolved on the platform and never crosses down to a
         # runner (Rule 3), so a body carrying it alone means a hosted client reached the
         # wrong deployment. The 422 must diagnose exactly that, by name.
-        client, runner = _build_client(mocker)
+        client, runner = _build_client(mocker, as_operator=True)
         response = client.post(route, json={"method_id": "mt_abc123"})
-        assert response.status_code == 422
-        assert response.headers["content-type"] == "application/problem+json"
-        problem = response.json()
-        assert problem["error_domain"] == "input"
-        detail = problem["detail"]
-        assert "`method_id`" in detail
-        assert "not handled by this deployment" in detail
-        assert "hosted API" in detail
+        # The runtime's own refusal of a field this runner does not take: `request.unsupported`, naming the field.
+        problem = _assert_request_refusal(
+            response, code=CoreCode.REQUEST_UNSUPPORTED, params={"field": "method_id", "reason": "hosted_only_extension"}
+        )
+        assert problem["diagnostics"]["error_class"] == "PipelexRequestError"
+        message = problem["diagnostics"]["message"]
+        assert "`method_id`" in message
+        assert "not handled by this deployment" in message
+        assert "hosted API" in message
         # The run never dispatched: this is a request-shape refusal, not a failed run.
         # Both dispatch methods are asserted because the two routes use different ones
         # (`/v1/execute` → `runner.execute`, `/v1/start` → `runner.start`).
@@ -82,35 +103,37 @@ class TestRunSourcePrecondition:
         runner.start.assert_not_awaited()
 
     def test_every_unhandled_key_is_named_sorted(self, mocker: MockerFixture):
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post("/v1/execute", json={"method_id": "mt_abc123", "future_arg": "x"})
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        assert "`future_arg`, `method_id`" in detail
+        # The caller's parameters name the first, the operator's message every one.
+        problem = _assert_request_refusal(
+            response, code=CoreCode.REQUEST_UNSUPPORTED, params={"field": "future_arg", "reason": "hosted_only_extension"}
+        )
+        assert "`future_arg`, `method_id`" in problem["diagnostics"]["message"]
 
     def test_empty_body_keeps_the_base_guidance(self, mocker: MockerFixture):
         # Nothing to name — the caller sent no extension at all, so the message stays the
         # one that explains what a run source IS.
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post("/v1/execute", json={})
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        assert _BASE_PRECONDITION_FRAGMENT in detail
-        assert "not handled by this deployment" not in detail
+        problem = _assert_request_refusal(response, code=CoreCode.REQUEST_INVALID, params={"field": "pipe_code"})
+        message = problem["diagnostics"]["message"]
+        assert _BASE_PRECONDITION_FRAGMENT in message
+        assert "not handled by this deployment" not in message
 
     def test_server_handled_extras_are_never_named_as_unhandled(self, mocker: MockerFixture):
         # `callback_urls` / `orchestration_mode` / `storage_scope` / `pipeline_run_id` ARE
         # handled here (`PipelineApiExtras`). A source-less body carrying only those is still
         # a 422, but naming them as unhandled would be a lie.
-        client, _ = _build_client(mocker)
+        client, _ = _build_client(mocker, as_operator=True)
         response = client.post(
             "/v1/start",
             json={"pipeline_run_id": "run-1", "callback_urls": ["https://example.com/hook"], "storage_scope": "tenant/run"},
         )
-        assert response.status_code == 422
-        detail = response.json()["detail"]
-        assert _BASE_PRECONDITION_FRAGMENT in detail
-        assert "not handled by this deployment" not in detail
+        problem = _assert_request_refusal(response, code=CoreCode.REQUEST_INVALID, params={"field": "pipe_code"})
+        message = problem["diagnostics"]["message"]
+        assert _BASE_PRECONDITION_FRAGMENT in message
+        assert "not handled by this deployment" not in message
 
     @pytest.mark.parametrize(
         ("label", "body"),

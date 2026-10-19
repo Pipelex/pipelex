@@ -1,6 +1,15 @@
-from pipelex.base_exceptions import ErrorDomain, PipelexError
+from typing import Any, ClassVar
+
+from mthds.protocol.problem.models import ProblemLocation
+from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
+
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
+from pipelex.errors.error_codes import ErrorCode
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.validation_error_types import PipeFactoryErrorType, PipeValidationErrorType
 
@@ -17,7 +26,16 @@ class PipeFactoryError(PipelexError):
         domain: The domain of the pipe
         missing_concept_code: The concept code that is missing (for MISSING_OUTPUT_CONCEPT errors)
         declared_concepts: List of concepts declared in the domain
+
+    An unknown concept carries ``method.concept_unresolved``; any other factory refusal carries the residual
+    ``method.schema_violation`` unless its raise site chooses a code, such as ``runtime.unexpected`` for a pipe
+    type whose factory pipelex failed to register.
     """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.METHOD_SCHEMA_VIOLATION,
+        others=(CoreCode.METHOD_CONCEPT_UNRESOLVED, CoreCode.RUNTIME_UNEXPECTED),
+    )
 
     def __init__(
         self,
@@ -34,10 +52,20 @@ class PipeFactoryError(PipelexError):
         self.missing_concept_code = missing_concept_code
         self.declared_concepts = declared_concepts or []
         super().__init__(message)
+        match error_type:
+            case PipeFactoryErrorType.UNKNOWN_CONCEPT:
+                self.with_error_code(CoreCode.METHOD_CONCEPT_UNRESOLVED)
+            case PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR:
+                pass
 
 
-class PipeVariableMultiplicityError(ValueError):
-    pass
+class PipeVariableMultiplicityError(PipelexError, ValueError):
+    """A concept spec whose multiplicity or presence marker does not parse.
+
+    A ``ValueError`` too, since pydantic validators raise it and pydantic wraps nothing else.
+    """
+
+    error_code = CoreCode.METHOD_SCHEMA_VIOLATION
 
 
 class PipeRunError(PipelexError):
@@ -47,12 +75,42 @@ class PipeRunError(PipelexError):
     the kernel layer subclasses it: `PipeRunInputsError` and `OptionalValueAbsentError` in
     `core.pipes.inputs.exceptions` derive from it, so filing the base with the machinery put a
     module of `pipe_run` — and its whole import chain — inside every kernel import closure.
+
+    A wrapper of an inference or a sub-pipe failure takes its cause's code; a raise site that finds the fault
+    itself chooses it among the codes below.
     """
 
-    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str):
+    error_code: ClassVar[ErrorCodeDeclaration] = InheritsCause(
+        fallback=CoreCode.RUNTIME_UNEXPECTED,
+        others=(
+            CoreCode.MODEL_OUTPUT_SCHEMA_MISMATCH,
+            CoreCode.PIPE_CONDITION_UNMATCHED,
+            CoreCode.PIPE_CONDITION_REFUSED,
+            CoreCode.PIPE_INPUT_UNRESOLVED,
+            CoreCode.METHOD_FUNCTION_INVALID,
+            CoreCode.METHOD_TEMPLATE_INVALID,
+            CoreCode.METHOD_PIPE_UNRESOLVED,
+            CoreCode.METHOD_SCHEMA_VIOLATION,
+            CoreCode.METHOD_WIRING_INVALID,
+            CoreCode.METHOD_NAME_CONFLICT,
+            CoreCode.METHOD_OPTIONAL_UNHANDLED,
+        ),
+    )
+
+    def __init__(self, message: str, run_mode: PipeRunMode, pipe_code: str, field: str | None = None):
         self.run_mode = run_mode
         self.pipe_code = pipe_code
+        # The field of the pipe the failure is located on, as the bundle writes it, when one field is at fault.
+        self.field = field
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"pipe": self.pipe_code}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code, field=self.field)
 
 
 class PipeOperatorModelChoiceError(PipelexError):
@@ -67,13 +125,16 @@ class PipeOperatorModelChoiceError(PipelexError):
     ``PipeLLM``), and the library load adds the file the pipe is declared in. Every pipe type that names
     a model raises this same error, so every one of them gives the same verdict item.
 
-    The message names the pipe and the field, then keeps the deck check's sentence and its suggestions,
-    so it is caller-facing copy: it names only the caller's own model reference and the deck's public
-    handles, and it must reach a hosted caller under STRICT disclosure.
+    The message names the pipe and the field, then keeps the deck check's sentence and its suggestions; the
+    problem gives the reference as written, the model type and the suggestions as parameters, and the pipe and
+    the field as its location.
+
+    It takes the code of the deck check's refusal it locates: ``model.unknown`` for a reference the deck
+    does not define, ``model.capability_unsupported`` for a bare handle the deck serves only as another
+    model type, and ``model.unknown`` when it has no such cause.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
+    error_code = InheritsCause(fallback=CoreCode.MODEL_UNKNOWN)
 
     def __init__(
         self,
@@ -101,6 +162,14 @@ class PipeOperatorModelChoiceError(PipelexError):
         # library load fills it from the crate's source map before the error leaves the load loop.
         self.source = source
         super().__init__(message)
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"model": self.model_choice, "model_type": self.model_type, "suggestions": self.suggestions, "pipe": self.pipe_code}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code, field=self.field_name, file=self.source)
 
     @classmethod
     def make_from_model_choice_not_found(
@@ -136,13 +205,11 @@ class PipeLoadRefusalError(PipelexError):
     ``error_type``, since the refusal has no closed code. Only an ``input``-domained refusal is wrapped: a
     fault of the configuration or of the runtime keeps its own identity and stays a no-verdict fault.
 
-    Its message is built only from caller-facing material, the caller's own pipe code and either the
-    refusal's message, when that message is caller-facing, or the refusal's title, so it is kept under
-    STRICT disclosure.
+    Its message names the pipe and gives the refusal's own message, for the operator; the caller reads the
+    sentence the refusal's code renders. It takes the code of the refusal it wraps.
     """
 
-    error_domain = ErrorDomain.INPUT
-    _authors_caller_facing_message = True
+    error_code = InheritsCause(fallback=CoreCode.METHOD_SCHEMA_VIOLATION)
 
     def __init__(self, message: str, *, pipe_code: str, domain_code: str, source: str | None):
         self.pipe_code = pipe_code
@@ -150,27 +217,143 @@ class PipeLoadRefusalError(PipelexError):
         self.source = source
         super().__init__(message)
 
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # Its own code is its fallback, taken only when the refusal it wraps carries none: the pipe's whole declaration.
+        return {"pipe": self.pipe_code, "field_path": f"pipe.{self.pipe_code}", "finding": "the pipe could not be built from its declaration"}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(pipe=self.pipe_code, file=self.source)
+
     @classmethod
     def make_from_refusal(cls, *, refusal: PipelexError, pipe_code: str, domain_code: str, source: str | None) -> "PipeLoadRefusalError":
-        """Locate a refusal on the pipe being built, keeping its message only when it is caller-facing."""
-        message = f"Pipe '{pipe_code}' could not be loaded: {caller_facing_refusal_text(refusal=refusal)}"
+        """Locate a refusal on the pipe being built."""
+        message = f"Pipe '{pipe_code}' could not be loaded: {refusal.message}"
         return cls(message, pipe_code=pipe_code, domain_code=domain_code, source=source)
 
 
-def caller_facing_refusal_text(*, refusal: PipelexError) -> str:
-    """The refusal's message when it was authored as caller-facing copy, otherwise its title.
+def caller_refusal(*, refusal: PipelexError, pipe_code: str | None = None) -> PipelexProblem:
+    """The problem a refusal makes for a caller, located at the pipe that met it when the refusal does not name it.
 
-    A validation verdict is caller-facing as a whole — ``ValidateBundleError`` keeps its message under
-    STRICT disclosure — so text taken from a refusal onto a verdict item must be caller-facing too: a
-    refusal whose message is internal is named by its title, which is always public.
+    Args:
+        refusal: The refusal.
+        pipe_code: The pipe that met the refusal, which names the pipe parameter of a code that declares one.
+
+    Returns:
+        The refusal's problem in the caller's view.
     """
-    report = refusal.to_error_report()
-    if report.caller_facing_message:
-        return report.message
-    return report.title
+    return refusal.to_problem(view=ProblemView.CALLER, failure_location=make_location(pipe=pipe_code))
 
 
-class PipeValidationError(ValueError):
+def refusal_detail(*, refusal: PipelexError, pipe_code: str | None = None) -> str:
+    """The sentence a refusal's code renders for a caller, the text an item of a verdict built from a raised refusal carries.
+
+    A verdict is read by the caller, so an item taken from a refusal never carries the refusal's own message,
+    which is the operator's diagnostics: it carries the code's ``detail``, rendered from the parameters a caller
+    may read, the pipe that met the refusal included when it is given.
+    """
+    return caller_refusal(refusal=refusal, pipe_code=pipe_code).detail
+
+
+def pipe_validation_error_code(*, error_type: PipeValidationErrorType | None) -> ErrorCode:
+    """The code of a pipe validation refusal of a type, ``method.schema_violation`` for one with no type."""
+    match error_type:
+        case PipeValidationErrorType.MISSING_INPUT_VARIABLE:
+            return CoreCode.METHOD_INPUT_UNDECLARED
+        case PipeValidationErrorType.EXTRANEOUS_INPUT_VARIABLE:
+            return CoreCode.METHOD_INPUT_UNUSED
+        case PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH:
+            return CoreCode.METHOD_INPUT_CONCEPT_MISMATCH
+        case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE:
+            return CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH
+        case PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
+            return CoreCode.METHOD_OUTPUT_MULTIPLICITY_MISMATCH
+        case PipeValidationErrorType.LLM_SETTING_REFUSED_BY_MODEL:
+            return CoreCode.MODEL_CAPABILITY_UNSUPPORTED
+        case PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX | PipeValidationErrorType.INVALID_INPUT_NAME:
+            return CoreCode.METHOD_IDENTIFIER_INVALID
+        case PipeValidationErrorType.UNKNOWN_PIPE_TYPE | PipeValidationErrorType.MISSING_PIPE_TYPE:
+            return CoreCode.METHOD_PIPE_TYPE_INVALID
+        case PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION | PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION:
+            return CoreCode.METHOD_NAME_CONFLICT
+        case PipeValidationErrorType.BINDING_STEP_INVALID:
+            return CoreCode.METHOD_BINDING_STEP_INVALID
+        case PipeValidationErrorType.BINDING_PATH_UNRESOLVED:
+            return CoreCode.METHOD_FIELD_PATH_UNRESOLVED
+        case PipeValidationErrorType.OPTIONAL_MARKER_INVALID:
+            return CoreCode.METHOD_OPTIONAL_MARKER_INVALID
+        case (
+            PipeValidationErrorType.OPTIONAL_NOT_HANDLED
+            | PipeValidationErrorType.OPTIONAL_OUTPUT_REQUIRED
+            | PipeValidationErrorType.OPTIONAL_INPUT_UNGUARDED
+            | PipeValidationErrorType.OPTIONAL_BRANCH_REQUIRED_FIELD
+        ):
+            return CoreCode.METHOD_OPTIONAL_UNHANDLED
+        case PipeValidationErrorType.TEMPLATE_PRIVATE_NAME:
+            return CoreCode.METHOD_TEMPLATE_PRIVATE_NAME
+        case PipeValidationErrorType.OPTIONAL_FORCE_REDUNDANT:
+            return CoreCode.METHOD_OPTIONAL_FORCE_REDUNDANT
+        case PipeValidationErrorType.INPUT_PRESENCE_VACUOUS:
+            return CoreCode.METHOD_INPUT_PRESENCE_VACUOUS
+        case PipeValidationErrorType.UNRESOLVED_CONCEPT:
+            return CoreCode.METHOD_CONCEPT_UNRESOLVED
+        case PipeValidationErrorType.UNRESOLVED_PIPE_DEPENDENCY:
+            return CoreCode.METHOD_PIPE_UNRESOLVED
+        case PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY:
+            return CoreCode.METHOD_DEPENDENCY_MISSING
+        case PipeValidationErrorType.UNEXPORTED_PIPE_DEPENDENCY:
+            return CoreCode.METHOD_PIPE_NOT_EXPORTED
+        case PipeValidationErrorType.UNKNOWN_MODEL:
+            return CoreCode.MODEL_UNKNOWN
+        case PipeValidationErrorType.PIPE_FUNC_FUNCTION_REFUSED:
+            return CoreCode.METHOD_FUNCTION_INVALID
+        case PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR | None:
+            return CoreCode.METHOD_SCHEMA_VIOLATION
+
+
+# The name a refusal gives a pipe's own output where its code names an input or an output: the field that declares it.
+PIPE_OUTPUT_NAME = "output"
+
+
+class PipeValidationError(PipelexError, ValueError):
+    """A pipe that breaks a rule of the language or of its pipe type, found when the bundle is validated.
+
+    Its code follows its ``error_type`` (:func:`pipe_validation_error_code`), and a raise site whose refusal the
+    type does not name chooses one of the codes the class declares. A ``ValueError`` too, since the blueprint
+    validators raise it and pydantic wraps nothing else.
+    """
+
+    error_code = ErrorCodeSet(
+        default=CoreCode.METHOD_SCHEMA_VIOLATION,
+        others=(
+            CoreCode.METHOD_INPUT_UNDECLARED,
+            CoreCode.METHOD_INPUT_UNUSED,
+            CoreCode.METHOD_INPUT_CONCEPT_MISMATCH,
+            CoreCode.METHOD_OUTPUT_CONCEPT_MISMATCH,
+            CoreCode.METHOD_OUTPUT_MULTIPLICITY_MISMATCH,
+            CoreCode.METHOD_IDENTIFIER_INVALID,
+            CoreCode.METHOD_PIPE_TYPE_INVALID,
+            CoreCode.METHOD_NAME_CONFLICT,
+            CoreCode.METHOD_BINDING_STEP_INVALID,
+            CoreCode.METHOD_FIELD_PATH_UNRESOLVED,
+            CoreCode.METHOD_OPTIONAL_MARKER_INVALID,
+            CoreCode.METHOD_OPTIONAL_UNHANDLED,
+            CoreCode.METHOD_TEMPLATE_PRIVATE_NAME,
+            CoreCode.METHOD_OPTIONAL_FORCE_REDUNDANT,
+            CoreCode.METHOD_INPUT_PRESENCE_VACUOUS,
+            CoreCode.METHOD_CONCEPT_UNRESOLVED,
+            CoreCode.METHOD_PIPE_UNRESOLVED,
+            CoreCode.METHOD_DEPENDENCY_MISSING,
+            CoreCode.METHOD_PIPE_NOT_EXPORTED,
+            CoreCode.METHOD_FUNCTION_INVALID,
+            CoreCode.METHOD_WIRING_INVALID,
+            CoreCode.MODEL_UNKNOWN,
+            CoreCode.MODEL_CAPABILITY_UNSUPPORTED,
+            CoreCode.RUNTIME_UNEXPECTED,
+        ),
+    )
+
     def __init__(
         self,
         message: str,
@@ -228,6 +411,12 @@ class PipeValidationError(ValueError):
         self.file_path = file_path
         self.explanation = explanation
         super().__init__(message)
+        self.with_error_code(pipe_validation_error_code(error_type=error_type))
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The facts every refusal of a pipe holds; its raise site gives the others its code requires with `with_params`.
+        return {"pipe": self.pipe_code, "variables": self.variable_names, "model": self.model_reference}
 
     def desc(self) -> str:
         msg = f"{self.error_type} • domain_code='{self.domain_code}'"

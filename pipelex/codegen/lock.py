@@ -42,6 +42,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.codegen.exceptions import CodegenError, CodegenLockError
 from pipelex.codegen.stamp import STAMPABLE_SUFFIXES
+from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.misc.exceptions import TomlError
 from pipelex.tools.misc.file_utils import load_text_from_path
 from pipelex.tools.misc.toml_utils import load_toml_from_content
@@ -213,7 +214,7 @@ def load_lock(lock_path: Path) -> CodegenLock | None:
         # ValidationError on a shape mismatch (UnicodeDecodeError is a ValueError subclass);
         # OSError = the lock exists but cannot be read.
         msg = f"Malformed or unsafe codegen lock at '{lock_path}': {exc}"
-        raise CodegenLockError(msg) from exc
+        raise CodegenLockError(msg).with_params(file=lock_path.name) from exc
 
 
 def _reject_unknown_lock_version(*, data: dict[str, Any], lock_path: Path) -> None:
@@ -239,4 +240,7 @@ def _reject_unknown_lock_version(*, data: dict[str, Any], lock_path: Path) -> No
     else:
         reason = f"lock_version {raw_version!r} is not a known codegen lock format version"
     msg = f"Unsupported codegen lock version at '{lock_path}': this build reads lock_version {CODEGEN_LOCK_VERSION}, but {reason}."
-    raise CodegenLockError(msg)
+    unsupported = CodegenLockError(msg).with_error_code(PipelexErrorCode.CODEGEN_LOCK_UNSUPPORTED)
+    if is_version_number:
+        unsupported.with_params(lock_version=raw_version)
+    raise unsupported

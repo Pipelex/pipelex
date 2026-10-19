@@ -15,14 +15,13 @@ one its latest attempt ran, and never a failed node beside a succeeded one.
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
-    ErrorSpec,
     GraphSpec,
     GraphSpecMode,
     GraphUsageSpec,
@@ -60,6 +59,9 @@ from pipelex.tracing.trace_events import (
 )
 from pipelex.tracing.usage_attribution import NodeUsages, attribute_usage, make_self_contained_spec
 
+if TYPE_CHECKING:
+    from pipelex.errors.problem import PipelexProblem
+
 
 class _AssemblerNodeData:
     """Internal mutable data structure for building a node from events.
@@ -94,7 +96,8 @@ class _AssemblerNodeData:
         self.skip_reason: str | None = None
         self.metrics: dict[str, float] = {}
         self.usage_spec: NodeUsageSpec | None = None
-        self.error: ErrorSpec | None = None
+        self.error: PipelexProblem | None = None
+        self.error_stack: str | None = None
         self.input_specs: list[IOSpec] = input_specs or []
         self.output_specs: list[IOSpec] = []
         self.execution_data: dict[str, Any] = {}
@@ -126,6 +129,7 @@ class _AssemblerNodeData:
             timing=timing,
             node_io=node_io,
             error=self.error,
+            error_stack=self.error_stack,
             metrics=self.metrics,
             usage=self.usage_spec,
             execution_data=self.execution_data,
@@ -400,6 +404,7 @@ class _AssemblerState:
         node_data.ended_at = event.ended_at
         node_data.status = NodeStatus.FAILED
         node_data.error = event.error
+        node_data.error_stack = event.error_stack
 
     def _handle_pipe_end_skipped(self, event: PipeEndSkippedEvent) -> None:
         node_data = self._nodes.get(event.node_id)
