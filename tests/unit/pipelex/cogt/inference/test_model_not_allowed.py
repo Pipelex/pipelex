@@ -307,6 +307,8 @@ class TestWhatItAnswersOverHTTP:
 
         assert problem.code == CoreCode.MODEL_UNAVAILABLE
         assert problem.domain == ProblemDomain.OPERATOR
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"model": _MODEL_NOT_ALLOWED_HANDLE, "model_type": "llm", "reason": "not_allowed"}
         assert error_code_spec(CoreCode.MODEL_UNAVAILABLE).status == 501
         assert unrecognized_problem.code == CoreCode.RUNTIME_UNEXPECTED
         assert unrecognized_problem.domain == ProblemDomain.RUNTIME

@@ -1,8 +1,13 @@
+from typing import Any
+
 from jinja2.exceptions import SecurityError as JinjaSecurityError
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import Self, override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.problem import make_location
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 
@@ -61,6 +66,13 @@ class Jinja2TemplateSecurityError(SecurityError):
     Pipelex's own templates. On a method's template it is `security.template_refused`, the default; on
     Pipelex's own, our template tripping our sandbox is our bug, `runtime.unexpected`.
 
+    The refused attribute or callable is a name the template's own source spells, as in ``{{ topic['_owner'] }}``, or a
+    value of the run's data, as in ``{{ topic[topic.text] }}``. The render gives it as ``refused_name`` only in the first
+    case, and the problem's ``name`` with it; in the second the problem carries no ``name``, the run's input never
+    reaching the caller, and its sentences say that the template looked the name up from the run's data
+    (`pipelex.errors.problem`). The pipe whose template it was locates it on the template's field, ``template_field``
+    (`locating_template_refusal`).
+
     A `SecurityError`, not a `ToolError`, in the family of `UriReadRefusedError`, `SsrfBlockedError` and
     `UnsafeSchemaError`, so that a host catching that family never absorbs it into a domain answer and never retries
     it. A type of its own, apart from `Jinja2TemplateRenderError`, so that a refusal reads apart from a template that
@@ -68,6 +80,32 @@ class Jinja2TemplateSecurityError(SecurityError):
     """
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_TEMPLATE_REFUSED, others=(CoreCode.RUNTIME_UNEXPECTED,))
+
+    def __init__(self, message: str, *, refused_name: str | None = None):
+        super().__init__(message)
+        # The attribute or the callable the template reached for, by its bare name, when the template's source spells it.
+        self.refused_name = refused_name
+        # The field of the pipe whose template was refused, such as `template` or `prompt`, which that pipe gives.
+        self.template_field: str | None = None
+
+    def with_template_field(self, *, template_field: str) -> Self:
+        """Name, where the pipe that rendered the template catches the refusal, the field its template is written in.
+
+        Returns:
+            This error, so that the catch site can re-raise it.
+        """
+        self.template_field = template_field
+        return self
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        if self.refused_name is None:
+            return {}
+        return {"name": self.refused_name}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(field=self.template_field)
 
 
 class Jinja2TemplateBudgetError(ToolError):
@@ -121,10 +159,13 @@ class SandboxRefusalError(JinjaSecurityError):
     method or function it called. A template reaching ``obj[key]``, ``obj | attr(key)`` or ``namespace({key: value})``
     takes that name from the run's data, so the refusal also carries the names its message quotes, ``named``, and its
     wording without them, ``anonymous_message``: the render reporting it keeps the message only when the template's own
-    source spells every name it quotes (`pipelex.tools.jinja2.jinja2_rendering`).
+    source spells every name it quotes (`pipelex.tools.jinja2.jinja2_rendering`). ``refused_name`` is the bare name of
+    the attribute or the callable it refused, which the render passes on as the ``name`` of `security.template_refused`
+    under the same rule, and withholds otherwise.
     """
 
-    def __init__(self, message: str, *, named: tuple[str, ...], anonymous_message: str):
+    def __init__(self, message: str, *, named: tuple[str, ...], anonymous_message: str, refused_name: str):
         super().__init__(message)
         self.named = named
         self.anonymous_message = anonymous_message
+        self.refused_name = refused_name

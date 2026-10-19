@@ -42,6 +42,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.libraries.bundle_resources import check_submitted_files
+from pipelex.libraries.pipe.pipe_suggestions import declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -190,6 +191,11 @@ def acquire_library(
                 if submitted_files:
                     check_submitted_files(blueprints=all_blueprints, submitted_files=submitted_files)
                     library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
+                if not library_dirs_are_callers:
+                    # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
+                    library_manager.get_library(library_id=library_id).pipe_library.set_caller_pipe_refs(
+                        pipe_refs=declared_pipe_refs(blueprints=all_blueprints)
+                    )
 
                 # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH), and record the file on this
                 # host each of the others was read from, so its steps read beside it as when its directory loads.

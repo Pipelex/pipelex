@@ -111,6 +111,9 @@ class TestFailurePanelsOnStderr:
         ],
     )
     @pytest.mark.parametrize("traceback_requested", [False, True])
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its failures in the test with a message alone, to check which stream their panels go to"
+    )
     def test_a_dedicated_panel_and_its_traceback_go_to_stderr(
         self,
         mocker: MockerFixture,

@@ -283,6 +283,9 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CONTACT_SUPPORT
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_provider_facts_are_serialized_in_the_operator_problem(self, mocker: MockerFixture) -> None:
         """The operator's problem carries what the provider answered, and the error advises its local reader what to do."""
         _patch_gen_object_dependencies(mocker)

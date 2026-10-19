@@ -45,7 +45,7 @@ Every parameter is present on every occurrence of the code.
 
 | Name | Type | Description |
 |---|---|---|
-| `scheme` | one of `local`, `s3`, `gcs`, `memory` | The kind of storage that failed. |
+| `scheme` | one of `local`, `s3`, `gcs`, `memory`, `plugin` | The kind of storage that failed: one Pipelex ships, or `plugin` for a storage plugin's own. |
 
 ## See also
 

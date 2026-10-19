@@ -40,7 +40,7 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, fixed
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.interpreter_hub import get_concept_library
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
-from pipelex.pipeline.exceptions import PipeIOContractError
+from pipelex.pipeline.exceptions import SCHEMA_UNRENDERABLE_FINDING, PipeIOContractError
 
 __all__ = [
     "IOMultiplicity",
@@ -129,7 +129,7 @@ def _render_output_schema(*, pipe: PipeAbstract, concept_provider: ConceptProvid
         return schema
     except (ConceptValueError, KeyError, PydanticUserError, PydanticUndefinedAnnotation) as exc:
         msg = f"Failed to render the JSON Schema for the output of pipe '{pipe.pipe_ref}' (concept '{pipe.output.concept.concept_ref}'): {exc}"
-        raise PipeIOContractError(message=msg) from exc
+        raise PipeIOContractError(message=msg).with_params(concept=pipe.output.concept.concept_ref, finding=SCHEMA_UNRENDERABLE_FINDING) from exc
 
 
 def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
@@ -185,7 +185,9 @@ def build_pipe_io_contracts(pipes: Sequence[PipeAbstract]) -> PipeIOContracts:
                         f"Failed to render the JSON Schema for input '{var_name}' of pipe "
                         f"'{pipe.pipe_ref}' (concept '{stuff_spec.concept.concept_ref}'): {exc}"
                     )
-                    raise PipeIOContractError(message=msg) from exc
+                    raise PipeIOContractError(message=msg).with_params(
+                        concept=stuff_spec.concept.concept_ref, finding=SCHEMA_UNRENDERABLE_FINDING
+                    ) from exc
                 schema_memo[memo_key] = json_schema
             input_multiplicity, input_item_count = make_io_multiplicity(multiplicity=stuff_spec.multiplicity)
             pipe_inputs[var_name] = PipeInputContract(

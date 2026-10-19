@@ -54,6 +54,7 @@ from pipelex.system.runtime import ProblemReaction
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
+from pipelex.tools.misc.string_utils import close_matches
 from pipelex.urls import URLs
 
 LLM_PRESET_DISABLED = "disabled"
@@ -198,10 +199,19 @@ class ModelDeckBlueprint(ConfigModel):
     judgment: JudgmentDeckBlueprint = Field(default_factory=JudgmentDeckBlueprint)
 
 
+# How near a handle must be to a name the deck does not hold to be offered in its place, as difflib's similarity
+# ratio, and how many are offered.
+CLOSE_HANDLE_CUTOFF = 0.5
+CLOSE_HANDLE_MAX_MATCHES = 5
+
+
 class ModelDeck(ConfigModel):
     model_deck_config: ModelDeckConfig
     # The models the deck serves, by model type and handle: a handle names one model per model type.
     inference_models: ModelSpecIndex = Field(default_factory=ModelSpecIndex.make_empty)
+    # Every handle a backend file of this deployment declares, enabled or not, with the model types it is declared as:
+    # what the catalogs the runtime reads know, which a model the deck does not serve may still be.
+    cataloged_handles: dict[str, list[ModelType]] = Field(default_factory=dict)
 
     # Track which model_handle fallback warnings have been logged to avoid duplicates
     _logged_fallback_warnings: set[str] = PrivateAttr(default_factory=set[str])
@@ -324,6 +334,28 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 return self.is_bare_handle_resolvable(name=reference.name, model_type=model_type)
 
+    def is_cataloged_but_unserved(self, *, name: str, model_type: ModelType) -> bool:
+        """Whether a catalog of this deployment knows a model of this name as this type, which the deck does not serve.
+
+        The model exists, declared by a backend that is not enabled or that the routing profile sends nothing to, so a
+        reference naming it is refused as a model this deployment does not serve (``model.unavailable``), whose fix is
+        the deployment's, rather than as one no catalog knows (``model.unknown``), whose fix is the reference's spelling.
+        """
+        if self.inference_models.get(model_type=model_type, handle=name) is not None:
+            return False
+        return model_type in self.cataloged_handles.get(name, [])
+
+    def close_handles(self, *, name: str, model_type: ModelType) -> list[str]:
+        """The handles the deck serves as this type nearest a name it does not, nearest first, each written as a reference.
+
+        The suggestions a refusal of an unknown model offers when it names a handle: an empty list when none is near.
+        """
+        candidates = self.inference_models.handles_of_type(model_type=model_type)
+        return [
+            write_model_handle(name=match)
+            for match in close_matches(name=name, candidates=candidates, cutoff=CLOSE_HANDLE_CUTOFF, max_matches=CLOSE_HANDLE_MAX_MATCHES)
+        ]
+
     def is_served_only_as_other_types(self, *, name: str, model_type: ModelType) -> bool:
         """Whether the deck serves a model of this name, but never as this model type.
 
@@ -336,9 +368,13 @@ class ModelDeck(ConfigModel):
     def unresolved_handle_sentence(self, *, name: str, model_type: ModelType) -> str:
         """The sentence refusing a bare handle that does not resolve for this model type.
 
-        It names the handle and the type the field needs. When the deck serves a model of that name
-        only as other types, it says so rather than calling the handle missing, without naming them.
+        It names the handle and the type the field needs. When a catalog of this deployment declares a
+        model of that name and type that no enabled backend serves, it says so; when the deck serves a
+        model of that name only as other types, it says so too, without naming them; otherwise it calls
+        the handle missing.
         """
+        if self.is_cataloged_but_unserved(name=name, model_type=model_type):
+            return f"Model handle '{name}' names {model_type.indefinite_description} no enabled backend of this deployment serves"
         if self.is_served_only_as_other_types(name=name, model_type=model_type):
             return f"Model handle '{name}' is served by the model deck, but not as {model_type.indefinite_description}"
         return f"Model handle '{name}' was not found in the model deck"
@@ -1135,7 +1171,9 @@ class ModelDeck(ConfigModel):
             f"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order) "
             "but none of the fallback models were found in the model deck"
         )
-        raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list)
+        raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list).with_params(
+            model=waterfall_name, model_type=model_type, reason=ModelUnavailableReason.NO_FALLBACK_SERVED
+        )
 
     def _resolve_alias(
         self,
@@ -1387,6 +1425,13 @@ class ModelDeck(ConfigModel):
                 # a backend that is not enabled) stays the deployment's fault, `model.unavailable`, and stays
                 # redacted, with no next step.
                 # The advice is the local CLI's tip; a problem's reader gets the code's own next step.
+                # A model a catalog of this deployment knows as that type, on a backend that is not enabled, exists:
+                # its refusal is the deployment's, `model.unavailable`, rather than a reference no catalog knows.
+                if self.is_cataloged_but_unserved(name=model_handle, model_type=model_type):
+                    unserved_msg = f"{self.unresolved_handle_sentence(name=model_handle, model_type=model_type)}."
+                    raise ModelNotFoundError(message=unserved_msg, model_handle=model_handle).with_params(
+                        model=model_handle, model_type=model_type, reason=ModelUnavailableReason.NOT_SERVED
+                    )
                 change_model = UserAction(
                     kind=UserActionKind.CHANGE_MODEL,
                     detail=f"Change the model '{model_handle}' to {model_type.indefinite_description} the model deck serves.",
@@ -1394,7 +1439,11 @@ class ModelDeck(ConfigModel):
                 raise (
                     ModelNotFoundError(message=msg, model_handle=model_handle, user_action=change_model)
                     .with_error_code(CoreCode.MODEL_UNKNOWN)
-                    .with_params(model=model_handle, model_type=model_type)
+                    .with_params(
+                        model=model_handle,
+                        model_type=model_type,
+                        suggestions=self.close_handles(name=model_handle, model_type=model_type),
+                    )
                 )
             raise ModelNotFoundError(message=msg, model_handle=model_handle).with_params(
                 model=model_handle, model_type=model_type, reason=ModelUnavailableReason.NOT_SERVED

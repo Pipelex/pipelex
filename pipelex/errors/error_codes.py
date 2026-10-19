@@ -47,6 +47,10 @@ class ErrorCodeSpec(BaseModel):
         type_uri: The code's documentation page: its registry's base URL, a slash, then the code.
         params_model: The generated model of the code's parameters.
         param_names: Every parameter the code declares.
+        required_params: The parameters a caller reads on every occurrence of the code: every one the registry marks
+            neither optional nor operator-only, the rule a conformance check holds a caller's problem to. A problem or
+            an item that lacks one is a fault of its raise site, which
+            :func:`pipelex.errors.problem.missing_required_params` names.
         operator_only_params: The parameters only whoever runs the runtime may read: they render into the
             operator's step and ride the operator's diagnostics, never a problem's ``params``.
     """
@@ -66,7 +70,13 @@ class ErrorCodeSpec(BaseModel):
     type_uri: str
     params_model: type[BaseModel]
     param_names: frozenset[str]
+    required_params: frozenset[str]
     operator_only_params: frozenset[str]
+
+    @property
+    def caller_param_names(self) -> frozenset[str]:
+        """The parameters a caller may read: every one the code declares but the operator-only ones."""
+        return self.param_names - self.operator_only_params
 
     @property
     def invites_retry(self) -> bool:
@@ -96,6 +106,7 @@ def _build_specs() -> dict[str, ErrorCodeSpec]:
             type_uri=f"{CORE_BASE_URL}/{core_code}",
             params_model=core_spec.params_model,
             param_names=frozenset(param.name for param in core_spec.params),
+            required_params=frozenset(param.name for param in core_spec.params if not param.optional and not param.operator_only),
             operator_only_params=frozenset(param.name for param in core_spec.params if param.operator_only),
         )
     for pipelex_code in PipelexErrorCode:
@@ -115,6 +126,9 @@ def _build_specs() -> dict[str, ErrorCodeSpec]:
             type_uri=f"{PIPELEX_ERROR_BASE_URL}/{pipelex_code}",
             params_model=params_model,
             param_names=frozenset(params_model.model_fields),
+            required_params=frozenset(
+                name for name, field in params_model.model_fields.items() if field.is_required() and name not in params_model.operator_only_params
+            ),
             operator_only_params=params_model.operator_only_params,
         )
     return specs

@@ -167,6 +167,9 @@ class TestErrorCategoryInfrastructure:
         assert problem.code == CoreCode.RUNTIME_UNEXPECTED
         assert problem.is_retryable is False
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_to_problem_with_all_cogt_fields(self) -> None:
         """The advice rides the error, never the problem, and a transient failure with no code reports a code that invites a retry."""
         err = LLMCompletionError(
@@ -184,6 +187,9 @@ class TestErrorCategoryInfrastructure:
         assert advice.detail == "Retry in a moment"
         assert "Retry in a moment" not in json.dumps(problem.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a not-found failure by hand, without the kind of model and the reason its raise site gives"
+    )
     def test_to_problem_with_model_handle(self) -> None:
         """The operator's diagnostics name the model of an error carrying a model_handle."""
         err = LLMModelNotFoundError(message="missing", model_handle="gpt-4o")
@@ -225,6 +231,9 @@ class TestErrorCategoryInfrastructure:
         assert "model" not in operator_wire["diagnostics"]
         assert "provider" not in operator_wire["diagnostics"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a not-found failure by hand, without the kind of model and the reason its raise site gives"
+    )
     def test_to_problem_to_wire_json_serializable(self) -> None:
         """to_wire() output can be serialized to JSON and read back as the same problem."""
         err = LLMModelNotFoundError(message="not found", model_handle="gpt-4o")
@@ -233,6 +242,9 @@ class TestErrorCategoryInfrastructure:
         assert deserialized == problem_wire
         assert PipelexProblem.model_validate(deserialized).to_wire() == problem_wire
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_from_exc_chain_preserved(self) -> None:
         """Exception cause chain is preserved with from exc."""
         original = ValueError("original error")

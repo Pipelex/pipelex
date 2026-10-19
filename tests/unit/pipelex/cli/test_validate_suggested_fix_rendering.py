@@ -73,6 +73,9 @@ class TestValidateSuggestedFixRendering:
         mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
         return recorded_console
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_fixable_error_renders_suggested_fix_line_and_actionable_footer(self, console: Console) -> None:
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="methods/demo.mthds")])
 
@@ -87,6 +90,9 @@ class TestValidateSuggestedFixRendering:
         # The actionable footer replaces the generic tip — two stacked 💡 tips would be noise.
         assert "💡 Tip:" not in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_footer_echoes_library_dirs(self, console: Console) -> None:
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="methods/demo.mthds")])
 
@@ -100,6 +106,9 @@ class TestValidateSuggestedFixRendering:
         output = console.export_text()
         assert "pipelex fix bundle methods/demo.mthds -L libs -L shared" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_footer_preserves_allow_signatures(self, console: Console) -> None:
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error()])
 
@@ -113,6 +122,9 @@ class TestValidateSuggestedFixRendering:
         output = console.export_text()
         assert "pipelex fix bundle methods/demo.mthds --allow-signatures" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_footer_shell_quotes_paths_with_spaces(self, console: Console) -> None:
         """A path with a space must stay one argument when the footer command is copy-pasted."""
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_fixable_pipe_error(source="my methods/demo.mthds")])
@@ -127,6 +139,9 @@ class TestValidateSuggestedFixRendering:
         output = console.export_text()
         assert "pipelex fix bundle 'my methods/demo.mthds' -L 'shared libs'" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_ambient_source_is_not_advertised_as_applicable(self, console: Console, tmp_path: Path, mocker: MockerFixture) -> None:
         bundle_path = tmp_path / "entry.mthds"
         ambient_dir = tmp_path / "ambient"
@@ -146,6 +161,9 @@ class TestValidateSuggestedFixRendering:
         assert "pipelex fix bundle" not in output
         assert "💡 Tip:" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_non_fixable_errors_keep_generic_tip_and_no_fix_line(self, console: Console) -> None:
         exc = ValidateBundleError(message="validation failed", pipe_validation_errors=[_non_fixable_pipe_error()])
 
@@ -157,6 +175,9 @@ class TestValidateSuggestedFixRendering:
         assert "can be fixed automatically" not in output
         assert "💡 Tip:" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_unsafe_fix_says_it_needs_confirmation_and_is_not_counted(self, console: Console) -> None:
         """A safe fix keeps the plain line; an unsafe one says so, and the automatic-fix footer counts only the safe one."""
         exc = ValidateBundleError(
@@ -188,6 +209,9 @@ class TestValidateSuggestedFixRendering:
         assert "pipelex fix bundle" not in output
         assert "💡 Tip:" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_fixable_count_sums_only_fixable_items(self, console: Console) -> None:
         exc = ValidateBundleError(
             message="validation failed",
@@ -222,6 +246,9 @@ class TestValidateSuggestedFixRendering:
         assert "concept 'MissingConcept' is not declared in domain 'demo'" in output
         assert "Declared Concepts: Idea, Report" in output
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors and its dry-run failure in the test, without the facts their raise sites give their items' codes"
+    )
     def test_dry_run_items_stay_visible_alongside_categorized_errors(self, console: Console) -> None:
         """A dry-run item renders beside the categorized errors, located on its pipe."""
         exc = ValidateBundleError(

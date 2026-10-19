@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple
 
-from mthds.protocol.problem.registry import CoreCode, ModelUnavailableReason
+from mthds.protocol.problem.registry import CoreCode, ModelContextExceededLimit, ModelUnavailableReason
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError, ProblemFacts, iter_cause_chain
@@ -283,12 +283,18 @@ class ModelChoiceNotFoundError(CogtError):
     Includes available options and migration hints in error message.
 
     The reference is the method's, so the fault is its author's: ``model.unknown`` for a reference the deck does not
-    define, and ``model.capability_unsupported`` for a bare handle the deck serves only as another model type, which
-    the deck chooses where it raises it. A reference the deck itself names, as a default or an override, is the
-    deployment's fault instead: the deck re-raises its miss as a ``ModelDeckChoiceUnresolvedError``.
+    define, with the deck's close matches as its ``suggestions``, and ``model.capability_unsupported`` for a bare handle
+    the deck serves only as another model type, which the deck chooses where it raises it. A bare handle a catalog of
+    this deployment declares as the type the step needs, on a backend that is not enabled, names a model that exists:
+    the deck chooses ``model.unavailable`` for it, with the reason ``not_served``, whose fix is the deployment's. A
+    reference the deck itself names, as a default or an override, is the deployment's fault too: the deck re-raises its
+    miss as a ``ModelDeckChoiceUnresolvedError``.
     """
 
-    error_code = ErrorCodeSet(default=CoreCode.MODEL_UNKNOWN, others=(CoreCode.MODEL_CAPABILITY_UNSUPPORTED,))
+    error_code = ErrorCodeSet(
+        default=CoreCode.MODEL_UNKNOWN,
+        others=(CoreCode.MODEL_CAPABILITY_UNSUPPORTED, CoreCode.MODEL_UNAVAILABLE),
+    )
     error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(
@@ -329,8 +335,16 @@ class ModelChoiceNotFoundError(CogtError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        suggestions = self.suggestions + self.cross_collection_suggestions
-        return {**super().problem_params(), "model": self.model_choice, "model_type": self.model_type, "suggestions": suggestions or None}
+        # Each of the class's codes reads its own: `model.unknown` the close matches, an empty list when the deck has
+        # none, `model.capability_unsupported` the use the step needs the model for, `model.unavailable` its reason.
+        return {
+            **super().problem_params(),
+            "model": self.model_choice,
+            "model_type": self.model_type,
+            "suggestions": self.suggestions + self.cross_collection_suggestions,
+            "capability": f"use as {self.model_type.indefinite_description}",
+            "reason": ModelUnavailableReason.NOT_SERVED,
+        }
 
 
 class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
@@ -374,11 +388,6 @@ class ModelDeckChoiceUnresolvedError(ModelChoiceNotFoundError):
                 self.with_error_code(CoreCode.MODEL_UNAVAILABLE)
             case ModelReferenceKind.PRESET | ModelReferenceKind.ALIAS | ModelReferenceKind.WATERFALL:
                 pass
-
-    @override
-    def problem_params(self) -> dict[str, Any]:
-        # The reason `model.unavailable` declares: no backend of this deployment serves the handle the deck names.
-        return {**super().problem_params(), "reason": ModelUnavailableReason.NOT_SERVED}
 
 
 class ModelDeckValidationError(CogtError):
@@ -703,12 +712,15 @@ class LLMCompletionTruncatedError(LLMCompletionError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
+        # At the context window the bound passed is known, and the counts are not: the stop signal carries neither the
+        # prompt's size nor the window's.
         return {
             **super().problem_params(),
             "pipe": self.pipe_code,
             "model": self.model_handle,
             "max_tokens": self.max_tokens,
             "output_tokens": self.output_tokens,
+            "limit": ModelContextExceededLimit.CONTEXT_WINDOW,
         }
 
 

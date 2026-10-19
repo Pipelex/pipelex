@@ -53,6 +53,10 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # so the item keeps the location its pydantic ``loc`` named (``pipe.<code>.<field>``).
     field_path: str | None = None
 
+    # The dot path of the failing field inside the table of the pipe ``pipe_code`` names, set when a blueprint-stage
+    # ``PipeValidationError`` names its field: ``input_item_name`` on a PipeBatch, or ``steps.0.batch_as`` on a step.
+    field_name: str | None = None
+
     # The 1-based position where a TOML syntax error was found, in the file ``source`` names or in
     # the submitted content when there is none.
     line: int | None = None
@@ -61,6 +65,16 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     # The bare codes of the concepts the validated bundle declares in ``domain_code``, set on an
     # ``unresolved_concept`` error so the author sees what the reference could have named.
     declared_concepts: list[str] | None = None
+
+    # The name an ``invalid_pipe_code_syntax`` error is about, as the method writes it: the declaration key, or the
+    # ``main_pipe`` value, which ``field_path`` (``main_pipe``) tells apart.
+    identifier_name: str | None = None
+
+    # The parameters of the item's code its raise site knows about this one item, by the registry's names, for an
+    # error no ``error_type`` classifies, which takes the code of the refusal it rides: they take precedence over the
+    # refusal's own, which describe its first fault. A refusal of several lines of a ``requirements.txt`` names each
+    # line's requirement here.
+    params: dict[str, Any] | None = None
 
     # The namespace-stripped bare code for a strippable same-domain over-qualified pipe code
     # (``strip-namespace`` enrichment). Present only when the fix planner can act; ``pipe_code``
@@ -159,6 +173,12 @@ class PipesAndConceptValidationErrorData(BaseModel):
     suggestions: list[str] | None = Field(
         default=None,
         description="The deck's close matches of the same kind, each spelled as a reference the field accepts",
+    )
+
+    # === The parameters of the item's code its raise site gave, by the registry's names ===
+    params: dict[str, Any] | None = Field(
+        default=None,
+        description="The parameters of the item's code the raise site knows beside the locators above, those a caller may read",
     )
 
 

@@ -9,6 +9,7 @@ from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
+from pipelex.test_extras.required_params_sweep import assert_problems_carried_required_params, spy_on_problem_warnings
 from pipelex.test_extras.shared_pytest_plugins import needs_inference_in_pipelex
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pytest import FixtureRequest
@@ -16,6 +17,19 @@ from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import get_api_config
 from tests.unit._constants import STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST
+
+
+@pytest.fixture(autouse=True)
+def problems_carry_their_required_params_fixture(request: FixtureRequest, mocker: MockerFixture) -> Generator[None, None, None]:
+    """Fail a test during which a problem or an item was built without a parameter its code requires.
+
+    The sweep of every code the runner emits (`pipelex.test_extras.required_params_sweep`), the library's unit tests
+    running the same one: a test that builds such a problem on purpose says so with the
+    `builds_problems_without_required_params` marker and its reason.
+    """
+    warn_spy = spy_on_problem_warnings(mocker=mocker)
+    yield
+    assert_problems_carried_required_params(warn_spy=warn_spy, keywords=request.keywords)
 
 
 @pytest.fixture(autouse=True, name="blob_storage")

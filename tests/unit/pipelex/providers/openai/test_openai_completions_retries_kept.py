@@ -68,6 +68,9 @@ class TestOpenAICompletionsRetriesKept:
 
         assert create.await_count == 3
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     async def test_a_rate_limited_text_call_stays_retryable(self, mocker: MockerFixture) -> None:
         """A provider failure on the text path is classified as before, its retryable category untouched by the stop check."""
         worker, create = make_worker(mocker, thinking_mode=ThinkingMode.NONE, response=text_completion())

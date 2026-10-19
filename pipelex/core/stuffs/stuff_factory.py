@@ -21,6 +21,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_content_factory import StuffContentFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.error_codes import error_code_spec
+from pipelex.errors.unsupported_reasons import REMOTE_TABLE_UNSUPPORTED_REASON
 from pipelex.runtime_hub import get_class_registry
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.tabular.csv_codec import is_tabular_path, list_content_from_csv
@@ -34,6 +35,15 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 # scheme is the caller's own text, as free as a url's host or path, since `urlsplit` takes whatever precedes the first
 # colon when letters, digits, `+`, `-` and `.` make it up: such a refusal names none.
 _NAMED_REMOTE_SCHEMES: frozenset[str] = frozenset({"http", "https", "s3", "gs", PIPELEX_STORAGE_SCHEME.removesuffix("://")})
+
+
+# The kind of file a table input is read as, the `file_type` of `input.file_unreadable`.
+_TABLE_FILE_TYPE = "csv"
+
+
+def _input_request_field(*, name: str | None) -> str:
+    """The request's field, as a dotted path, that gives a table input: `inputs.<name>`, or `inputs` for an unnamed one."""
+    return f"inputs.{name}" if name is not None else "inputs"
 
 
 class StuffBlueprint(BaseModel):
@@ -257,7 +267,12 @@ class StuffFactory:
                 f"'{concept.concept_ref}' has a url that could not be parsed. "
                 "Download the file locally and reference it by path."
             )
-            raise CsvError(msg) from exc
+            raise (
+                CsvError(msg)
+                .with_input(input_name=name)
+                .with_error_code(CoreCode.INPUT_FILE_UNREADABLE)
+                .with_params(file_type=_TABLE_FILE_TYPE, reason="the URL does not parse")
+            ) from exc
         # Detect the tabular suffix on the URL's PATH component only. A raw URL fed to ``Path`` keeps
         # any ``?query``/``#fragment`` inside ``.suffix`` (e.g. an S3 presigned ``...csv?X-Amz-...``),
         # which would hide the ``.csv`` and let a remote ref slip past the local-only guard below.
@@ -278,26 +293,39 @@ class StuffFactory:
                 f"'{concept.concept_ref}' points at a remote or non-local url{in_scheme}. "
                 "Download the file locally and reference it by path."
             )
-            raise CsvError(msg)
+            raise (
+                CsvError(msg)
+                .with_input(input_name=name)
+                .with_error_code(CoreCode.REQUEST_UNSUPPORTED)
+                .with_params(field=_input_request_field(name=name), reason=REMOTE_TABLE_UNSUPPORTED_REASON)
+            )
 
         try:
             row_model = concept_provider.get_structure_class(concept=concept)
         except ConceptValueError as exc:
-            # Keep the codec's typed-error boundary intact: an unregistered structure class is a
-            # caller-fixable input problem, not a raw ValueError that escapes into core/runner.
+            # Keep the codec's typed-error boundary intact: an unregistered structure class is no fault of the caller's
+            # table but of the method's concept, which cannot be built, and never a raw ValueError escaping into the runner.
             msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
-            raise CsvError(msg) from exc
+            raise (
+                CsvError(msg)
+                .with_input(input_name=name)
+                .with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
+                .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
+            ) from exc
         authorize_uri_read(
             uri=url,
             read_scope=read_scope,
             position=f"the table given for input '{name}'" if name is not None else "a table given as an input",
+            input_name=name,
         )
         try:
             return list_content_from_csv(Path(resolved.path), row_model=row_model, input_name=name)
         except CsvError as exc:
-            # The codec names the file by the input it was given as, and the code's sentences name it as well.
-            if name is not None and "input" in error_code_spec(exc.resolve_error_code()).param_names:
-                exc.with_params(input=name)
+            # The codec names the file by the input it was given as, and the problem names and locates it as well: the input,
+            # and, for a code naming the field at fault, the input itself when the codec located the fault nowhere inside it.
+            exc.with_input(input_name=name)
+            if name is not None and "field" in error_code_spec(exc.resolve_error_code()).param_names and exc.given_params.get("field") is None:
+                exc.with_params(field=name)
             raise
 
     @classmethod

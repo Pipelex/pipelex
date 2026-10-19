@@ -1,6 +1,7 @@
 import shlex
 import sys
 from collections.abc import Callable
+from importlib.metadata import PackageNotFoundError
 from pathlib import Path
 
 import pytest
@@ -134,6 +135,35 @@ class TestMethodRequirementsCheck:
         assert [item.line for item in items] == [2, 3]
         assert all(item.source == "requirements.txt" for item in items)
 
+    def test_an_unmet_extra_names_the_distribution_it_needs(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """The distribution an extra needs is the one named: missing is `not_found`, held at a refused version `no_matching_version`."""
+        installed: dict[str, tuple[str, list[str]]] = {
+            "fastlib": ("1.4", ['turbo>=2; extra == "speed"', 'unrelated; extra == "other"']),
+            "turbo": ("1.5", []),
+        }
+
+        def fake_distribution(distribution_name: str) -> object:
+            normalized = distribution_name.lower().replace("_", "-")
+            if normalized not in installed:
+                raise PackageNotFoundError(distribution_name)
+            version, requires = installed[normalized]
+            return mocker.Mock(version=version, requires=requires)
+
+        mocker.patch("pipelex.libraries.package_environments.distribution", side_effect=fake_distribution)
+        _method(directory=tmp_path, requirements="fastlib[speed]>=1\nfastlib[other]\n")
+
+        with pytest.raises(MethodRequirementsNotMetError) as exc_info:
+            ensure_method_requirements_met(trees=[list_method_tree(tmp_path)], names_host_paths=True)
+
+        assert [item.params for item in exc_info.value.blueprint_validation_errors] == [
+            {"kind": "requirement", "name": "turbo", "reason": "no_matching_version"},
+            {"kind": "requirement", "name": "unrelated", "reason": "not_found"},
+        ]
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"kind": "requirement", "name": "turbo", "reason": "no_matching_version"}
+
     def test_where_host_paths_may_not_be_named_the_refusal_names_none(self, mocker: MockerFixture, tmp_path: Path) -> None:
         mocker.patch(
             f"{_MODULE}.resolve_pipe_func_package_environment",
@@ -253,6 +283,9 @@ class TestMethodRequirementsCheck:
         refusal = refusal_info.value.to_problem(view=ProblemView.CALLER)
         assert refusal.code == CoreCode.METHOD_DEPENDENCY_MISSING
         assert refusal.domain == ProblemDomain.METHOD
+        # The refusal names the first requirement, as one of several unmet requirements names the first.
+        assert refusal.params is not None
+        assert refusal.params.as_wire() == {"kind": "requirement", "name": "pandas", "reason": "no_matching_version"}
         (item,) = verdict_info.value.validation_error_items()
         assert (item.source, item.line) == ("requirements.txt", None)
         assert item.message == f"The requirements are refused by the Daytona sandbox: {reason}"

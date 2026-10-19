@@ -235,10 +235,23 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         return humanize(self.code)
 
     async def _render(
-        self, *, template: str, category: TemplateCategory, context: dict[str, Any], label: str, templating_style: TemplatingStyle | None = None
+        self,
+        *,
+        template: str,
+        category: TemplateCategory,
+        context: dict[str, Any],
+        label: str,
+        template_field: str,
+        templating_style: TemplatingStyle | None = None,
     ) -> str:
         return await render_doc_gen_template(
-            pipe_code=self.code, template=template, category=category, context=context, label=label, templating_style=templating_style
+            pipe_code=self.code,
+            template=template,
+            category=category,
+            context=context,
+            label=label,
+            template_field=template_field,
+            templating_style=templating_style,
         )
 
     async def compose(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> DocumentComposition:
@@ -258,6 +271,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 category=TemplateCategory.BASIC,
                 context=context,
                 label="filename",
+                template_field="filename",
                 templating_style=resolve_templating_style(authored=None),
             )
         # Stored under a name every `pipelex-storage://` reader serves, the hosted platform's included.
@@ -281,6 +295,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                         category=TemplateCategory.HTML,
                         context=context,
                         label="template",
+                        template_field="template",
                         templating_style=resolve_templating_style(authored=None),
                     )
                     return DocumentComposition(

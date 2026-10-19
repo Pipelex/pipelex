@@ -15,7 +15,7 @@ from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigil
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenUndefinedValueError
 from pipelex.tools.jinja2.exceptions import Jinja2TemplateInvalidError, Jinja2TemplateRenderError
-from pipelex.tools.jinja2.jinja2_rendering import template_line_of, undefined_variable_name
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal, template_line_of, undefined_variable_name
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -27,22 +27,28 @@ async def render_doc_gen_template(
     category: TemplateCategory,
     context: dict[str, Any],
     label: str,
+    template_field: str,
     templating_style: TemplatingStyle | None = None,
 ) -> str:
     """A template of the step `pipe_code` rendered with `context`, every value it reads required to exist.
 
+    `template_field` is the field of the step the template is written in, `filename`, `template` or `template_file`,
+    which a refusal of the template sandbox is located on.
+
     Raises:
         PipeDocGenUndefinedValueError: The template reads a value that does not exist.
         PipeDocGenRunError: The template could not be rendered for another reason.
+        Jinja2TemplateSecurityError: The template sandbox refused what the template reached for.
     """
     try:
-        return await render_template(
-            template=template,
-            category=category,
-            context=context,
-            templating_style=templating_style,
-            is_undefined_strict=True,
-        )
+        with locating_template_refusal(template_field=template_field):
+            return await render_template(
+                template=template,
+                category=category,
+                context=context,
+                templating_style=templating_style,
+                is_undefined_strict=True,
+            )
     except Jinja2TemplateInvalidError as exc:
         if not exc.template_owner.is_method:
             # One of Pipelex's own templates, reached from the method's render: ours, kept as it is.

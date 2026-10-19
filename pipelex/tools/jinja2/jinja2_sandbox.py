@@ -23,10 +23,11 @@ forge content, such as an image pointing at another organisation's storage key.
   pydantic methods, `Stuff` and content methods, classes, free functions and class methods, every
   method that changes a list, a dict or a set in place, and the few that produce bytes.
 - **Refusing.** A refusal raises `jinja2.exceptions.SecurityError` at the point of access, as the
-  `SandboxRefusalError` that words it with the names it quotes and without them, which the render
-  functions turn into `Jinja2TemplateSecurityError`, a Pipelex `SecurityError` like the runtime's
-  other policy refusals, quoting a name only where the template spells it. Jinja's stock sandbox
-  returns an undefined value that prints as nothing, which would send a prompt with a hole in it.
+  `SandboxRefusalError` that words it with the names it quotes and without them and carries the bare
+  name it refused, which the render functions turn into `Jinja2TemplateSecurityError`, a Pipelex
+  `SecurityError` like the runtime's other policy refusals, quoting and passing a name on only where
+  the template spells it. Jinja's stock sandbox returns an undefined value that prints as nothing,
+  which would send a prompt with a hole in it.
 - **Spending.** What a template may reach says nothing about what it may spend, so every render also
   spends from one budget (`jinja2_render_budget.py`), charged by the hooks of this class, by wrappers
   around every filter and test, and by a rewrite of the parsed template for what no hook reaches
@@ -111,7 +112,12 @@ def _refuse_callable_in_namespace(*, name: str, value: object) -> None:
         callable_description = _describe_callable(obj=value)
         msg = f"A template may not store {callable_description.text} in a namespace, as '{name}': a namespace holds data only."
         anonymous_msg = f"A template may not store {callable_description.anonymous_text} in a namespace: a namespace holds data only."
-        raise SandboxRefusalError(msg, named=(name, *callable_description.named), anonymous_message=anonymous_msg)
+        raise SandboxRefusalError(
+            msg,
+            named=(name, *callable_description.named),
+            anonymous_message=anonymous_msg,
+            refused_name=_callable_name(obj=value),
+        )
 
 
 class DataNamespace(Namespace):
@@ -208,6 +214,18 @@ def _is_declared_template_method(*, obj: object) -> bool:
     if surface is None or obj.__name__ not in surface.callable_names:
         return False
     return inspect.getattr_static(type(bound_to), obj.__name__, _MISSING) is obj.__func__
+
+
+def _callable_name(*, obj: object) -> str:
+    """The bare name of a refused callable, as a template reaches for it: a method's, a function's, a macro's or a class's name.
+
+    A callable value of another kind, which has no name of its own, is named by its class, a name of code.
+    """
+    if isinstance(obj, (types.BuiltinMethodType, types.MethodType, types.FunctionType, type)):
+        return obj.__name__
+    if isinstance(obj, Macro):
+        return obj.name
+    return type(obj).__name__
 
 
 class _CallableDescription(NamedTuple):
@@ -349,7 +367,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
         type_name = type(obj).__name__
         msg = f"A template may not read '{attribute}' on a '{type_name}' value."
         anonymous_msg = f"A template may not read an unsafe name on a '{type_name}' value."
-        raise SandboxRefusalError(msg, named=(attribute,), anonymous_message=anonymous_msg)
+        raise SandboxRefusalError(msg, named=(attribute,), anonymous_message=anonymous_msg, refused_name=attribute)
 
     @override
     def wrap_str_format(self, value: Any) -> Callable[..., str] | None:
@@ -368,7 +386,7 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
             anonymous_msg = (
                 f"A template may not call {callable_description.anonymous_text}: templates read data and call methods of plain values only."
             )
-            raise SandboxRefusalError(msg, named=callable_description.named, anonymous_message=anonymous_msg)
+            raise SandboxRefusalError(msg, named=callable_description.named, anonymous_message=anonymous_msg, refused_name=_callable_name(obj=obj))
         # A callable the sandbox lets a template call is a method of code, a plain value's or one a type declares, or the
         # template's own macro, so the budget's message names it, but only where the template spells its name: one read
         # by `obj[key]` or `obj | attr(key)` is named by a value of the run's data.

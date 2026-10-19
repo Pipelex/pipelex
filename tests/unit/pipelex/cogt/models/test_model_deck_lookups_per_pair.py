@@ -57,5 +57,5 @@ class TestLookupsPerPair:
         assert caller.code == CoreCode.MODEL_UNKNOWN
         assert caller.next_step.kind == StepKind.CHANGE_MODEL
         assert caller.params is not None
-        assert caller.params.as_wire() == {"model": "verdict", "model_type": ModelType.LLM}
+        assert caller.params.as_wire() == {"model": "verdict", "model_type": ModelType.LLM, "suggestions": []}
         assert "judgment" not in str(caller.to_wire())

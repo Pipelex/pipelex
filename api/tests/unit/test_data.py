@@ -83,3 +83,134 @@ def rate_limited_failure() -> LLMCompletionError:
     ).with_error_code(CoreCode.PROVIDER_RATE_LIMITED)
     failure.fill_model_and_provider(ProblemTestData.RATE_LIMIT_MODEL, backend_name=ProblemTestData.RATE_LIMIT_BACKEND)
     return failure
+
+
+class RequiredParamsTestData:
+    """The methods and trees whose refusals the acceptance of the error contract found without a required parameter."""
+
+    BUNDLE_PATH = "bundle.mthds"
+
+    # A model the vendored inference tree catalogs in `anthropic.toml`, whose backend `backends.toml` disables.
+    UNSERVED_MODEL = "claude-4.5-haiku"
+    UNSERVED_MODEL_MTHDS = f"""\
+domain = "smoke"
+main_pipe = "echo"
+
+[pipe.echo]
+type = "PipeLLM"
+description = "Echo"
+inputs = {{ text = "Text" }}
+output = "Text"
+model = "{UNSERVED_MODEL}"
+prompt = "@text"
+"""
+
+    # A model reference one letter away from a handle the deck serves, so the refusal has a suggestion to offer.
+    NEAR_MODEL = "gpt-4o-mimi"
+    NEAR_MODEL_SUGGESTION = "gpt-4o-mini"
+    NEAR_MODEL_MTHDS = f"""\
+domain = "smoke"
+main_pipe = "echo"
+
+[pipe.echo]
+type = "PipeLLM"
+description = "Echo"
+inputs = {{ text = "Text" }}
+output = "Text"
+model = "{NEAR_MODEL}"
+prompt = "@text"
+"""
+
+    ECHO_MTHDS = """\
+domain = "smoke"
+main_pipe = "echo"
+
+[pipe.echo]
+type = "PipeLLM"
+description = "Echo"
+inputs = { text = "Text" }
+output = "Text"
+prompt = "@text"
+"""
+
+    UNKNOWN_CONCEPT_MTHDS = """\
+domain = "smoke"
+main_pipe = "make_thing"
+
+[concept.Thing]
+description = "A thing"
+
+[pipe.make_thing]
+type = "PipeLLM"
+description = "Make a thing"
+inputs = { text = "Text" }
+output = "Thingg"
+prompt = "@text"
+"""
+
+    TEMPLATE_REFUSED_MTHDS = """\
+domain = "smoke"
+main_pipe = "say"
+
+[pipe.say]
+type = "PipeCompose"
+description = "Say"
+inputs = { text = "Text" }
+output = "Text"
+template = "Talk about {{ text['_owner'] }}"
+"""
+
+    NATIVE_REDECLARATION_MTHDS = """\
+domain = "smoke"
+main_pipe = "echo"
+
+[concept.Rating]
+description = "A rating, declared again"
+
+[pipe.echo]
+type = "PipeLLM"
+description = "Echo"
+inputs = { text = "Text" }
+output = "Text"
+prompt = "@text"
+"""
+
+    DUPLICATE_BUNDLES: ClassVar[dict[str, str]] = {
+        "first/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the first bundle declares it"\n',
+        "second/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the second bundle declares it"\n',
+    }
+    # The same collision in a method a run can start: the first bundle names its main pipe.
+    DUPLICATE_RUNNABLE_BUNDLES: ClassVar[dict[str, str]] = {
+        "first/declares.mthds": (
+            'domain = "dup"\nmain_pipe = "echo"\n\n[concept]\nDoc = "A document, as the first bundle declares it"\n\n'
+            '[pipe.echo]\ntype = "PipeCompose"\ndescription = "Echo"\ninputs = { text = "Text" }\noutput = "Text"\ntemplate = "{{ text }}"\n'
+        ),
+        "second/declares.mthds": 'domain = "dup"\n\n[concept]\nDoc = "A document, as the second bundle declares it"\n',
+    }
+
+    DEPENDENCY_REPOSITORY_ADDRESS = "github.com/invented/probe-lib"
+    DEPENDENCY_ADDRESS = f"{DEPENDENCY_REPOSITORY_ADDRESS}/probe"
+    DEPENDENCY_TREE: ClassVar[dict[str, str]] = {
+        "METHODS.toml": (
+            "[package]\n"
+            'name = "probe"\n'
+            f'address = "{DEPENDENCY_REPOSITORY_ADDRESS}"\n'
+            'version = "0.1.0"\n'
+            'description = "An invented package a request ships beside its method"\n'
+        ),
+        "probe.mthds": (
+            'domain = "probe_dep"\n\n[pipe.entry]\ntype = "PipeLLM"\ndescription = "Entry"\ninputs = { text = "Text" }\n'
+            'output = "Text"\nprompt = "@text"\n'
+        ),
+    }
+    CALLER_MTHDS = f"""\
+domain = "caller"
+main_pipe = "call_probe"
+
+[pipe.call_probe]
+type = "PipeSequence"
+description = "Call the probe"
+inputs = {{ text = "Text" }}
+output = "Text"
+steps = [{{ pipe = "{DEPENDENCY_ADDRESS}->probe_dep.entry", result = "out" }}]
+"""

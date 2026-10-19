@@ -8,6 +8,7 @@ from typing_extensions import override
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.system.exceptions import ToolError
 
 
@@ -91,10 +92,12 @@ class RemoteFileFetchError(ToolError):
     ``input.url_unreachable``; a file a provider's answer pointed at is
     ``provider.response_invalid``, which the provider's raise site chooses.
 
-    The URL's host, and the input it belongs to, are facts the error holds, not parameters its raise
-    site gives: a catch site can choose another code for it, and the problem takes each fact only for
-    a code that declares it, so ``provider.response_invalid``, which declares neither, is given no
-    parameter it would refuse. The fetch does not know the input; a catch site that does, such as an
+    The URL's host, what went wrong, and the input it belongs to are facts the error holds, not parameters
+    its raise site gives: a catch site can choose another code for it, and the problem takes each fact only
+    for a code that declares it, so ``input.url_unreachable`` takes the host, ``input.file_unreadable`` the
+    reason, and ``provider.response_invalid``, which declares none of them, is given no parameter it would
+    refuse. The reason says what the server or the network answered, an HTTP status or the class of the
+    request's failure, never the URL. The fetch does not know the input; a catch site that does, such as an
     extract worker, names it with :meth:`with_input`.
     """
 
@@ -107,10 +110,12 @@ class RemoteFileFetchError(ToolError):
         detail="Check that the URL serves the file to a plain HTTP client, or upload the file and reference it instead.",
     )
 
-    def __init__(self, message: str, *, host: str | None = None):
+    def __init__(self, message: str, *, host: str | None = None, reason: str | None = None):
         super().__init__(message)
         # The host of the URL that could not be fetched, `None` when the URL names none the parser can read.
         self.host = host
+        # What the server or the network answered, such as `the server answered HTTP 404`, never naming the URL.
+        self.reason = reason
         # The input the URL belongs to, as a caller writes it, which the catch site that knows it gives.
         self.input_name: str | None = None
 
@@ -125,13 +130,17 @@ class RemoteFileFetchError(ToolError):
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        return {"host": self.host, "input": self.input_name}
+        return {"host": self.host, "reason": self.reason, "input": self.input_name}
 
 
 class SemVerError(ToolError):
     """Raised when a version or a version constraint a method package declares does not parse."""
 
     error_code = CoreCode.METHOD_PACKAGE_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": MethodPackageReason.VERSION_INVALID}
 
 
 class UrlSyntaxError(ToolError, ValueError):

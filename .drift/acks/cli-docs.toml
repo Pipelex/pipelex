@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:a5eac44da480191d2c8bf158ba86b12fc8a595e196c4bbd1c50a5675d3e5431f"
-reviewed_by = "Claude Opus 5.5"
-reviewed_at = "2026-10-18T18:28:35Z"
-rationale = "clean-pass: the merge of the base's review fixes (a lone bundle file's tree listed before it is read, a file error in that listing as client.file_unreadable, init's pipelex.config.file_missing, an OSError naming no file as runtime.unexpected, a coded 403 read as auth.forbidden only under the platform's authorization codes) into this branch's caller-view refusals on a runner; run bundle's listing refusal goes through agent_error_method_refusal, and docs/tools/cli/agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md carry both sides."
+digest = "sha256:e2503f6e69a587a26fd9c9c8e856e158b359b2cbbc5285f680e1c427ea5486f4"
+reviewed_by = "Louis Choquel"
+reviewed_at = "2026-10-19T11:41:17Z"
+rationale = "clean-pass: merging #1458's head (Runner-problem-params, 9578055b3) into this branch, whose own _run_hosted.py and bundle_cmd.py changes are the triggers, keeps both edits to docs/tools/cli/agent-cli.md, #1458's validate-bundle verdict paragraph and this branch's run-on-a-runner paragraph, which touch different passages; pipelex/cli/agent_cli/CLAUDE.md, which #1458 did not change, still describes the hosted caller-view refusals as this branch wrote them, and nothing else under docs/tools/cli/ is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -132,7 +132,7 @@ rationale = "clean-pass: the merge of the base's review fixes (a lone bundle fil
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
 "pipelex/cli/error_handlers.py" = "blob:b0bbfbb058ef764de90c7f1ba09093a7616f43c6"
 "pipelex/cli/exceptions.py" = "blob:5c66f20b0a06c8ae8c20b94f92e2c30b78f5b6c5"
-"pipelex/cli/installed_methods.py" = "blob:1de9b36e7717786fe0454af69011e05ef50610ba"
+"pipelex/cli/installed_methods.py" = "blob:7e7f289d50ca6bc446b6891cbc846dc4a8cee6e2"
 "pipelex/cli/judged_target.py" = "blob:8d3f3b3359992feeeca2bd4acd1d404262cbaf87"
 "pipelex/cli/method_resolver.py" = "blob:54fe2e6036b637c2e298f18bbfd10cfc616ef4a8"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"

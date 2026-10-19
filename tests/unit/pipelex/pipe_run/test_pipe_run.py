@@ -168,6 +168,57 @@ class TestPipeRun:
         assert record_fields["error.code"] == "runtime.unexpected"
         assert failure_record.exc_info is None
 
+    async def test_a_refusal_the_delivery_raises_logs_its_security_event_once(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A webhook the SSRF guard refuses at fire time fails a run that completed: the run that raised it logs its event."""
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(return_value=mocker.MagicMock())
+        refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock(side_effect=refusal)
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(
+                user_id="pytest", pipeline_run_id="plr-webhook-refused", storage_scope="test/scope", read_scope=None, extras={"org_id": "org_abc"}
+            )
+        )
+
+        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        (event,) = [record for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
+        event_fields = vars(event)
+        assert event_fields["error.code"] == CoreCode.SECURITY_INPUT_URL_REFUSED
+        assert event_fields["security.target_class"] == SecurityTargetClass.PRIVATE
+        assert event_fields["pipeline_run_id"] == "plr-webhook-refused"
+        assert event_fields["run.extras.org_id"] == "org_abc"
+        assert not emit_security_event(error=refusal)
+
+    @pytest.mark.builds_problems_without_required_params(
+        reason="raises SSRF refusals built in the test, without the input and the rule their raise sites name"
+    )
+    async def test_a_run_refused_then_its_webhook_refused_logs_both_refusals(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
+        """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two refusals of one code, two events."""
+        input_refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
+        webhook_refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(
+            SecurityTargetClass.LOOPBACK
+        )
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=input_refusal)
+        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
+        mock_executor.return_value.execute = mocker.AsyncMock(side_effect=webhook_refusal)
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-both-refused", storage_scope="test/scope", read_scope=None)
+        )
+
+        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError) as exc_info:
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
+
+        assert exc_info.value is webhook_refusal
+        events = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
+        assert [event["security.target_class"] for event in events] == [SecurityTargetClass.PRIVATE, SecurityTargetClass.LOOPBACK]
+        assert [event["error.code"] for event in events] == [CoreCode.SECURITY_INPUT_URL_REFUSED] * 2
+
     async def test_the_failure_line_carries_the_code_and_never_the_exception_s_text(
         self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -229,54 +280,6 @@ class TestPipeRun:
         assert {key: record_fields[key] for key in expected_fields} == expected_fields
         assert "error.message" not in record_fields
         assert secret not in str(record_fields)
-
-    async def test_a_refusal_the_delivery_raises_logs_its_security_event_once(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
-        """A webhook the SSRF guard refuses at fire time fails a run that completed: the run that raised it logs its event."""
-        mock_router = mocker.AsyncMock()
-        mock_router.run = mocker.AsyncMock(return_value=mocker.MagicMock())
-        refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
-        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
-        mock_executor.return_value.execute = mocker.AsyncMock(side_effect=refusal)
-        mock_job = mocker.MagicMock()
-        mock_job.job_metadata = JobMetadata(
-            run_metadata=RunMetadata(
-                user_id="pytest", pipeline_run_id="plr-webhook-refused", storage_scope="test/scope", read_scope=None, extras={"org_id": "org_abc"}
-            )
-        )
-
-        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError):
-            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
-
-        (event,) = [record for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
-        event_fields = vars(event)
-        assert event_fields["error.code"] == CoreCode.SECURITY_INPUT_URL_REFUSED
-        assert event_fields["security.target_class"] == SecurityTargetClass.PRIVATE
-        assert event_fields["pipeline_run_id"] == "plr-webhook-refused"
-        assert event_fields["run.extras.org_id"] == "org_abc"
-        assert not emit_security_event(error=refusal)
-
-    async def test_a_run_refused_then_its_webhook_refused_logs_both_refusals(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
-        """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two refusals of one code, two events."""
-        input_refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
-        webhook_refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(
-            SecurityTargetClass.LOOPBACK
-        )
-        mock_router = mocker.AsyncMock()
-        mock_router.run = mocker.AsyncMock(side_effect=input_refusal)
-        mock_executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor")
-        mock_executor.return_value.execute = mocker.AsyncMock(side_effect=webhook_refusal)
-        mock_job = mocker.MagicMock()
-        mock_job.job_metadata = JobMetadata(
-            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-both-refused", storage_scope="test/scope", read_scope=None)
-        )
-
-        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError) as exc_info:
-            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
-
-        assert exc_info.value is webhook_refusal
-        events = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
-        assert [event["security.target_class"] for event in events] == [SecurityTargetClass.PRIVATE, SecurityTargetClass.LOOPBACK]
-        assert [event["error.code"] for event in events] == [CoreCode.SECURITY_INPUT_URL_REFUSED] * 2
 
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""

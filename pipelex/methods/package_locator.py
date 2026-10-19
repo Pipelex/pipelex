@@ -22,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.methods.exceptions import MethodPackageAmbiguityError, MethodPackageNotFoundError, MethodPackageTooLargeError
 from pipelex.methods.fetch_limits import MAX_MANIFEST_FILE_BYTES, MAX_SCANNED_MANIFESTS
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 _SKIPPED_DIR_NAMES = {".git"}
@@ -134,7 +135,7 @@ def scan_packages_in_clone(*, clone_root: Path) -> PackageScan:
         manifest_count += 1
         if manifest_count > MAX_SCANNED_MANIFESTS:
             msg = f"The fetched repository contains more than {MAX_SCANNED_MANIFESTS} {MANIFEST_FILENAME} manifests; refusing to scan further."
-            raise MethodPackageTooLargeError(msg)
+            raise MethodPackageTooLargeError(msg).with_params(reason=MethodPackageReason.TOO_MANY_MANIFESTS, limit=MAX_SCANNED_MANIFESTS)
         relative_path = manifest_path.relative_to(clone_root).as_posix()
         manifest_read = _read_manifest_text(manifest_path=manifest_path)
         if manifest_read.text is None:

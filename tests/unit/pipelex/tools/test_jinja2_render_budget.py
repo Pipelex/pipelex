@@ -602,6 +602,10 @@ class TestRenderBudget:
         text = "word " * 2400
         assert _render("{{ doc | striptags }}", doc=_text_content(text)) == _render("{{ text | striptags }}", text=text)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="renders outside any pipe, whose failure location names the pipe; the render knows neither the budget operation's kind nor the input "
+        "a Pipelex template displays"
+    )
     def test_budget_error_is_the_method_s_or_the_input_s(self) -> None:
         """A method's template past its budget is the method's to fix; a Pipelex template's, the caller's input."""
         method_fault = Jinja2TemplateBudgetError("refused by the render budget").to_problem(view=ProblemView.CALLER)

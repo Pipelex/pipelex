@@ -2,6 +2,7 @@ import ast
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex_sdk.error_models import RunErrorReport
 from pipelex_sdk.errors import ApiResponseError, RunFailedError
@@ -175,6 +176,9 @@ class TestAgentOutputDrift:
                     offenders.append(f"{source_file.relative_to(package_dir)}:{getattr(node, 'lineno', 0)} writes '{member}'")
         assert not offenders, f"These lines write a member of the envelope the problem replaced: {offenders}"
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the hosted plane's former-shape refusal names none of its code's parameters; the agent reads its status and own code alone"
+    )
     def test_no_reported_problem_carries_a_member_its_reader_does_not_declare(self) -> None:
         """The document a run on a runner reports holds only the members the standard and Pipelex declare, at every level.
 

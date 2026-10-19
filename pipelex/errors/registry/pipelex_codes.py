@@ -35,6 +35,7 @@ class PipelexErrorCode(StrEnum):
     CATALOG_SELECTOR_INVALID = "pipelex.catalog.selector_invalid"
     CATALOG_LINK_CONFLICT = "pipelex.catalog.link_conflict"
     RUN_ALREADY_EXISTS = "pipelex.run.already_exists"
+    REQUEST_DEPENDENCY_KEY_MISMATCH = "pipelex.request.dependency_key_mismatch"
     STORAGE_URI_INVALID = "pipelex.storage.uri_invalid"
     STORAGE_NOT_FOUND = "pipelex.storage.not_found"
     STORAGE_DAMAGED = "pipelex.storage.damaged"
@@ -353,6 +354,23 @@ class RunAlreadyExistsParams(PipelexErrorParams):
     pipeline_run_id: str
 
 
+class RequestDependencyKeyMismatchParams(PipelexErrorParams):
+    """The parameters of `pipelex.request.dependency_key_mismatch`.
+
+    A dependency is keyed by another address than its manifest declares.
+
+    Attributes:
+        key: The key the request gives the dependency in `dependencies`.
+        address: The full address the dependency's manifest declares, its repository address followed by its
+            package name, which its key must be.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH
+
+    key: str
+    address: str
+
+
 class StorageUriInvalidParams(PipelexErrorParams):
     """The parameters of `pipelex.storage.uri_invalid`.
 
@@ -368,12 +386,13 @@ class StorageNotFoundParams(PipelexErrorParams):
     A stored file is gone.
 
     Attributes:
-        scheme: The kind of storage that no longer holds the file.
+        scheme: The kind of storage that no longer holds the file: one Pipelex ships, or `plugin` for a
+            storage plugin's own.
     """
 
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_NOT_FOUND
 
-    scheme: Literal["local", "s3", "gcs", "memory"]
+    scheme: Literal["local", "s3", "gcs", "memory", "plugin"]
 
 
 class StorageDamagedParams(PipelexErrorParams):
@@ -382,12 +401,13 @@ class StorageDamagedParams(PipelexErrorParams):
     A stored file is damaged.
 
     Attributes:
-        scheme: The kind of storage that holds the damaged file.
+        scheme: The kind of storage that holds the damaged file: one Pipelex ships, or `plugin` for a storage
+            plugin's own.
     """
 
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_DAMAGED
 
-    scheme: Literal["local", "s3", "gcs", "memory"]
+    scheme: Literal["local", "s3", "gcs", "memory", "plugin"]
 
 
 class StorageUnavailableParams(PipelexErrorParams):
@@ -396,12 +416,12 @@ class StorageUnavailableParams(PipelexErrorParams):
     Storage is unavailable.
 
     Attributes:
-        scheme: The kind of storage that failed.
+        scheme: The kind of storage that failed: one Pipelex ships, or `plugin` for a storage plugin's own.
     """
 
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.STORAGE_UNAVAILABLE
 
-    scheme: Literal["local", "s3", "gcs", "memory"]
+    scheme: Literal["local", "s3", "gcs", "memory", "plugin"]
 
 
 class StorageNotConfiguredParams(PipelexErrorParams):
@@ -988,6 +1008,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.CATALOG_SELECTOR_INVALID: CatalogSelectorInvalidParams,
     PipelexErrorCode.CATALOG_LINK_CONFLICT: CatalogLinkConflictParams,
     PipelexErrorCode.RUN_ALREADY_EXISTS: RunAlreadyExistsParams,
+    PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: RequestDependencyKeyMismatchParams,
     PipelexErrorCode.STORAGE_URI_INVALID: StorageUriInvalidParams,
     PipelexErrorCode.STORAGE_NOT_FOUND: StorageNotFoundParams,
     PipelexErrorCode.STORAGE_DAMAGED: StorageDamagedParams,
@@ -1269,6 +1290,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Start the run with another id, or with none so that the runner assigns one.",
         other_step="change_input",
         other_step_detail="Pass this to the caller, who chose the run id '{pipeline_run_id}', which is already taken.",
+    ),
+    PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: PipelexErrorEntry(
+        title="A dependency is keyed by another address than its manifest declares",
+        domain="input",
+        retry="no",
+        status=422,
+        detail="The dependency keyed '{key}' declares the address '{address}', which must be its key.",
+        actor_step="change_input",
+        actor_step_detail="Key the dependency by '{address}', the address its manifest declares, then send the request again.",
+        other_step="change_input",
+        other_step_detail="Pass this to the caller, who must key the dependency '{key}' by '{address}'.",
     ),
     PipelexErrorCode.STORAGE_URI_INVALID: PipelexErrorEntry(
         title="The storage address is malformed",

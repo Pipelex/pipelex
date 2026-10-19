@@ -106,7 +106,7 @@ For the hosted API, the Daytona sandbox plugin states the package set of the Day
 | Error | Code | When |
 | --- | --- | --- |
 | `MethodRequirementsFileError` | `method.package_invalid` | The file holds a line the standard refuses, naming each, or is not UTF-8 text. |
-| `MethodRequirementsNotMetError` | `method.dependency_missing` | The environment does not meet a requirement, naming each and why, or the deployment refuses the requirements with its own reason, no environment it can build holding them. |
+| `MethodRequirementsNotMetError` | `method.dependency_missing` | The environment does not meet a requirement, naming each and why, or the deployment refuses the requirements with its own reason, no environment it can build holding them. For a requirement not met, its `name` is the distribution that fails the requirement: the one required, or one an extra of it needs, with the `reason` `not_found` when it is missing and `no_matching_version` when the version held is one the requirement refuses. |
 | `HostLibraryRequirementsError` | `pipelex.config.invalid` | A method of a host's own library directories, loaded beside a caller's bundles, is refused for its requirements. |
 | `PipeFuncPackageSetUnstatedError` | `runtime.misconfigured` | A sandbox-hosted deployment states no package set for its execution mode. |
 

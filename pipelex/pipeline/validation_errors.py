@@ -28,6 +28,7 @@ from mthds.protocol.problem.registry import (
     MethodDependencyMissingReason,
     MethodHintInvalidReason,
     MethodIdentifierInvalidIdentifierKind,
+    MethodNameConflictConflict,
 )
 from pydantic import BaseModel, ConfigDict
 
@@ -44,6 +45,7 @@ from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import make_location, make_problem_item
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipeline.fixes.planner import plan_fix_for_blueprint_validation_error, plan_fix_for_pipe_validation_error
+from pipelex.tools.misc.string_utils import close_matches
 from pipelex.validation_error_types import (
     HintLintErrorType,
     PipeFactoryErrorType,
@@ -110,8 +112,11 @@ def build_validation_error_items(
                 domain_code=blueprint_error.domain_code,
                 source=blueprint_error.source,
                 field_path=blueprint_error.field_path,
+                field_name=blueprint_error.field_name,
                 variable_names=blueprint_error.variable_names or None,
                 declared_concepts=blueprint_error.declared_concepts or None,
+                identifier_name=blueprint_error.identifier_name,
+                params=blueprint_error.params,
                 line=blueprint_error.line,
                 column=blueprint_error.column,
                 message=blueprint_error.message,
@@ -149,6 +154,7 @@ def build_validation_error_items(
                 model_reference=pipe_error.model_reference,
                 model_type=pipe_error.model_type,
                 suggestions=pipe_error.suggestions or None,
+                params=pipe_error.params,
                 message=pipe_error.message,
                 suggested_fix=plan_fix_for_pipe_validation_error(pipe_error),
             )
@@ -265,11 +271,12 @@ def warning_problem_items(*, warnings: list[ValidationErrorItem]) -> list[Proble
 
 
 # The identifier an item of these types is about, and where the item holds it: an input name among its variable names, a pipe
-# code as its pipe. A main_pipe the item does not name, or a pipe code only its message quotes, gives no identifier facts.
+# code as its identifier name, else as its pipe. A pipe code item whose field path is `main_pipe` is about the main pipe.
 _IDENTIFIER_KINDS: dict[PipeValidationErrorType, MethodIdentifierInvalidIdentifierKind] = {
     PipeValidationErrorType.INVALID_INPUT_NAME: MethodIdentifierInvalidIdentifierKind.INPUT_NAME,
     PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX: MethodIdentifierInvalidIdentifierKind.PIPE_CODE,
 }
+_MAIN_PIPE_FIELD_PATH = "main_pipe"
 
 
 def _identifier_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
@@ -279,11 +286,13 @@ def _identifier_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     identifier_kind = _IDENTIFIER_KINDS.get(item.error_type)
     if identifier_kind is None:
         return {}
+    if identifier_kind == MethodIdentifierInvalidIdentifierKind.PIPE_CODE and item.field_path == _MAIN_PIPE_FIELD_PATH:
+        identifier_kind = MethodIdentifierInvalidIdentifierKind.MAIN_PIPE
     match identifier_kind:
         case MethodIdentifierInvalidIdentifierKind.INPUT_NAME:
-            name = item.variable_names[0] if item.variable_names else None
+            name = item.identifier_name or (item.variable_names[0] if item.variable_names else None)
         case MethodIdentifierInvalidIdentifierKind.PIPE_CODE | MethodIdentifierInvalidIdentifierKind.MAIN_PIPE:
-            name = item.pipe_code
+            name = item.identifier_name or item.pipe_code
     if name is None:
         return {}
     return {"identifier_kind": identifier_kind, "name": name}
@@ -306,19 +315,70 @@ def _dependency_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
 _PACKAGE_DEPENDENCY_TYPES: frozenset[PipeValidationErrorType] = frozenset({PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY})
 
 
+# How near a declared concept must be to an unresolved one to be offered in its place, as difflib's similarity ratio,
+# and how many are offered.
+_CLOSE_CONCEPT_CUTOFF = 0.6
+_CLOSE_CONCEPT_MAX_MATCHES = 5
+
+
+def _concept_suggestions(*, item: ValidationErrorItem) -> list[str] | None:
+    """The concepts the bundle declares nearest the one an unresolved-concept item names, nearest first; ``None`` for another item."""
+    is_unresolved_concept = item.error_type in {PipeValidationErrorType.UNRESOLVED_CONCEPT, PipeFactoryErrorType.UNKNOWN_CONCEPT}
+    # A concept-owned reference locates the concept that holds it and names the one it misses in its own parameters.
+    concept = (item.params or {}).get("concept") or item.missing_concept_code or item.concept_code
+    if not is_unresolved_concept or concept is None:
+        return None
+    local_code = concept.rsplit(".", 1)[-1]
+    return close_matches(
+        name=local_code, candidates=item.declared_concepts or [], cutoff=_CLOSE_CONCEPT_CUTOFF, max_matches=_CLOSE_CONCEPT_MAX_MATCHES
+    )
+
+
+# What the name of a `method.name_conflict` item collides with, by the type of the item; a name declared twice across a
+# method's bundles is an item no type classifies, which takes the refusal's own parameters.
+_NAME_CONFLICTS: dict[PipeValidationErrorType, MethodNameConflictConflict] = {
+    PipeValidationErrorType.NATIVE_CONCEPT_REDECLARATION: MethodNameConflictConflict.NATIVE_CONCEPT,
+    PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION: MethodNameConflictConflict.BATCH_ITEM,
+}
+
+
+# The name conflicts no declaration makes: a batch item named as its list or as another input of its pipe is a name that
+# pipe uses twice, located on the pipe and on the field it collides on, as any other item about a pipe is.
+_PIPE_NAME_CONFLICTS: frozenset[PipeValidationErrorType] = frozenset({PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION})
+
+
+def _name_conflict_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
+    """The name and the conflict of a name-conflict item: the concept a bundle redeclares, or the batch item's name."""
+    conflict = _NAME_CONFLICTS.get(item.error_type) if isinstance(item.error_type, PipeValidationErrorType) else None
+    if conflict is None:
+        return {}
+    name: str | None
+    match conflict:
+        case MethodNameConflictConflict.NATIVE_CONCEPT:
+            name = item.concept_code
+        case MethodNameConflictConflict.BATCH_ITEM:
+            name = item.variable_names[0] if item.variable_names else None
+        case MethodNameConflictConflict.DUPLICATE_DECLARATION | MethodNameConflictConflict.RESERVED_DOMAIN:
+            name = None
+    return {"name": name, "conflict": conflict}
+
+
 def _item_facts(*, item: ValidationErrorItem) -> dict[str, Any]:
     """The facts a validation item holds, by the names the registry gives the parameters that carry them."""
     facts: dict[str, Any] = {
         **_identifier_facts(item=item),
         **_dependency_facts(item=item),
         **_hint_facts(item=item),
+        **_name_conflict_facts(item=item),
         "template": item.template_file,
         "pipe": item.pipe_code,
         "concept": item.missing_concept_code or item.concept_code,
         "variables": item.variable_names,
+        # The one input an item names, for a code about a single input.
+        "input": item.variable_names[0] if item.variable_names and len(item.variable_names) == 1 else None,
         "model": item.model_reference,
         "model_type": item.model_type,
-        "suggestions": item.suggestions,
+        "suggestions": item.suggestions if item.suggestions is not None else _concept_suggestions(item=item),
         "field_path": item.field_path or _declaration_path(item=item),
         "missing": item.missing_pipe_code,
         "finding": item.message,
@@ -341,30 +401,42 @@ def problem_item_of(*, item: ValidationErrorItem, code: ErrorCode, params: dict[
     Args:
         item: The validation item.
         code: Its code: :func:`validation_item_code`'s, or the dry-run failure's own.
-        params: Parameters known beside the item, such as those a dry-run failure was rendered from, which take
-            precedence over the item's own.
+        params: Parameters known beside the item, such as those a dry-run failure was rendered from or those of the
+            refusal an unclassified item takes its code from, which take precedence over the facts its locators give;
+            the parameters the item itself holds (``item.params``) take precedence over both.
 
     Returns:
         The problem item, its sentence rendered from the code's template.
     """
     spec = error_code_spec(code)
-    facts = {**_item_facts(item=item), **(params or {})}
+    facts = {**_item_facts(item=item), **(params or {}), **(item.params or {})}
     item_params = {name: value for name, value in facts.items() if name in spec.param_names}
+    if "suggestions" in spec.required_params:
+        # A stage that offers close matches leaves the list out when it found none, which the code reads as an empty one.
+        item_params.setdefault("suggestions", [])
     return make_problem_item(
         code=code,
         params=item_params,
-        location=_item_location(item=item),
+        location=_item_location(item=item, code=code),
         suggestions=item.suggestions,
         suggested_fix=_problem_fix(item=item),
     )
 
 
-def _item_location(*, item: ValidationErrorItem) -> ProblemLocation | None:
-    """Where in the method a validation item is: the declaration a hint lint is on, else the pipe, field and file it names."""
+def _item_location(*, item: ValidationErrorItem, code: ErrorCode) -> ProblemLocation | None:
+    """Where in the method a validation item is: the declaration a hint lint is on, the declaration a name conflict
+    collides on, else the pipe, field and file it names.
+    """
     if isinstance(item.error_type, HintLintErrorType):
         return _hint_location(item=item)
     line = item.line if item.line is not None and item.line >= 1 else None
     column = item.column if item.column is not None and item.column >= 1 else None
+    if code == CoreCode.METHOD_NAME_CONFLICT and item.error_type not in _PIPE_NAME_CONFLICTS:
+        # A declaration's name conflict, a duplicate declaration or a native concept's redeclaration, is located on the
+        # declaration that collides, by its path from the bundle's root, such as `concept.Rating` or `pipe.compute_score`,
+        # which a caller edits. A `field` beside no `pipe` reads from the bundle's root, so the location names no `pipe` a
+        # reader would join that path to.
+        return make_location(field=item.field_path or _declaration_path(item=item), file=item.source, line=line, column=column)
     return make_location(pipe=item.pipe_code, field=item.field_name or item.field_path or None, file=item.source, line=line, column=column)
 
 

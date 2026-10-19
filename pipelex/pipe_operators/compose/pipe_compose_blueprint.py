@@ -70,6 +70,19 @@ class PipeComposeBlueprint(PipeBlueprint):
         return self.template
 
     @property
+    def template_field(self) -> str | None:
+        """The key of the pipe's table that holds the template's source.
+
+        It is `template`, or `template.template` when the template is a table of its own; None in construct mode, whose
+        fields each hold their own (`construct.<path>`).
+        """
+        if self.template is None:
+            return None
+        if isinstance(self.template, TemplateBlueprint):
+            return "template.template"
+        return "template"
+
+    @property
     def template_category(self) -> TemplateCategory:
         """Get the template category (only relevant in template mode)."""
         if isinstance(self.template, TemplateBlueprint):

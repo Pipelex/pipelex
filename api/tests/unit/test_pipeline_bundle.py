@@ -382,7 +382,10 @@ class TestPipelineBundle:
 
         response = client.post("/v1/execute", json={**body, "inputs": {"text": "hi"}})
 
-        assert_problem(response, status=422, code="request.invalid", field="dependencies")
+        problem = assert_problem(response, status=422, code="pipelex.request.dependency_key_mismatch")
+        # The refusal names the key the request gave and the address the manifest declares, which the key must be.
+        assert problem["params"] == {"key": "github.com/invented/elsewhere/probe", "address": VENDORED_PROBE_ADDRESS}
+        assert problem["location"] == {"field": "dependencies"}
         assert snapshot == {}, "the runner was reached"
 
     def test_dependencies_without_files_are_refused(self, mocker: MockerFixture):

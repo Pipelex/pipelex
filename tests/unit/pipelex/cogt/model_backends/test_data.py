@@ -17,6 +17,26 @@ enabled = true
 api_key = "${{{ABSENT_VAR}}}"
 """
 
+    # A served backend beside one switched off, whose file declares a model this deployment knows but does not serve.
+    BACKENDS_TOML_WITH_A_DISABLED_BACKEND = """
+[acme]
+enabled = true
+api_key = "sk-not-a-real-key"
+
+[dormant]
+enabled = false
+api_key = "sk-not-a-real-key"
+"""
+
+    DISABLED_MODEL_SPECS_TOML = """
+[defaults]
+model_type = "llm"
+sdk = "openai_responses"
+
+["dormant-one"]
+model_id = "dormant-one"
+"""
+
     MODEL_SPECS_TOML = """
 [defaults]
 model_type = "llm"

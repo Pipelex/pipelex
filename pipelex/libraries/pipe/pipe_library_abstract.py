@@ -29,8 +29,14 @@ class PipeLibraryAbstract(ABC):
     """
 
     @abstractmethod
-    def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
-        """Resolve an in-body pipe reference, raising when it is not known."""
+    def get_required_pipe(self, pipe_code: str, *, referring_pipe_code: str | None = None) -> PipeAbstract:
+        """Resolve an in-body pipe reference, raising when it is not known.
+
+        Args:
+            pipe_code: The reference, as the referring pipe's body writes it.
+            referring_pipe_code: The pipe whose body writes the reference, which the refusal names as its `pipe`; none
+                for a reference no pipe writes, such as a bundle's `main_pipe`.
+        """
 
     @property
     @abstractmethod
@@ -75,6 +81,13 @@ class PipeLibraryAbstract(ABC):
     @abstractmethod
     def get_own_pipes(self) -> list[PipeAbstract]:
         """The library's own pipes, without the aliased entries its dependency packages contributed."""
+
+    @abstractmethod
+    def selectable_own_pipe_refs(self) -> list[str]:
+        """The refs of the own pipes a refusal may offer its caller in place of one that names nothing.
+
+        Every own pipe, unless the caller's bundles were loaded beside a host's library directories: then only theirs.
+        """
 
     @abstractmethod
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:

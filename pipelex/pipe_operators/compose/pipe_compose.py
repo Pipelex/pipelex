@@ -27,6 +27,7 @@ from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.jinja2.exceptions import Jinja2DetectVariablesError
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -43,6 +44,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
 
     # Template mode fields (used when template is provided)
     template: str | None = None
+    # The key of the pipe's table holding the template's source, which a refusal its render meets is located on:
+    # `template.template` when the template is a table of its own. None in construct mode, whose fields each locate their
+    # own refusals (`construct.<path>`), and on a pipe built without its blueprint, whose template is the plain string.
+    template_field: str | None = None
     templating_style: TemplatingStyle | None = None
     category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
@@ -164,6 +169,10 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
                 required_concept_codes=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+            ).with_params(
+                declared=self.output.concept.concept_ref,
+                expected=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
+                pipe_type=self.type,
             )
 
     @override
@@ -210,17 +219,18 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        compose_result = await run_compose_template(
-            memory=working_memory,
-            template=self.template,
-            category=self.category,
-            concept=self.output.concept,
-            output_class=structure_class,
-            templating_style=resolve_templating_style(authored=self.templating_style),
-            runtime_params=pipe_run_params.params,
-            extra_context=self.extra_context,
-            result_name=output_name,
-        )
+        with locating_template_refusal(template_field=self.template_field or "template"):
+            compose_result = await run_compose_template(
+                memory=working_memory,
+                template=self.template,
+                category=self.category,
+                concept=self.output.concept,
+                output_class=structure_class,
+                templating_style=resolve_templating_style(authored=self.templating_style),
+                runtime_params=pipe_run_params.params,
+                extra_context=self.extra_context,
+                result_name=output_name,
+            )
         working_memory = compose_result.memory
 
         # Capture execution data for the graph tracer

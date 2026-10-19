@@ -61,14 +61,20 @@ class TestExtractFetchFailure:
     @pytest.mark.parametrize(
         ("input_name", "expected_params", "expected_detail"),
         [
-            (
+            pytest.param(
                 "scans[2]",
                 {"input": "scans[2]", "host": "example.com"},
                 "The URL of the input 'scans[2]', on 'example.com', did not answer or answered with an error.",
+                id="named_input",
             ),
-            (None, {"host": "example.com"}, "An input's URL could not be fetched"),
+            pytest.param(
+                None,
+                {"host": "example.com"},
+                "An input's URL could not be fetched",
+                id="unnamed_input",
+                marks=pytest.mark.builds_problems_without_required_params(reason="a URL no input gave names no input"),
+            ),
         ],
-        ids=["named_input", "unnamed_input"],
     )
     async def test_the_input_whose_url_could_not_be_fetched_is_named(
         self, input_name: str | None, expected_params: dict[str, str], expected_detail: str

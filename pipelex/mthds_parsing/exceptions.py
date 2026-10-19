@@ -24,22 +24,20 @@ class NativeConceptRedeclarationError(PipelexError, ValueError):
 
 
 class InvalidPipeCodeSyntaxError(PipelexError, ValueError):
-    """A same-domain over-qualified pipe code the fix planner can strip back to its bare form.
+    """A pipe code that breaks the naming rules, as a ``[pipe."<code>"]`` declaration key or as the ``main_pipe`` value.
 
-    Raised (in place of a bare ``ValueError``) only at the two snake_case-enforcing raise sites —
-    a ``[pipe."<domain>.<code>"]`` declaration key and a ``main_pipe = "<domain>.<code>"`` value —
-    and only when the code is safely strippable: the prefix equals the bundle's own ``domain``, the
-    bare tail is itself a valid snake_case code, and (for a declaration) no bare code already
-    occupies that key. Subclasses ``ValueError`` so a ``mode="before"`` field validator can raise
-    it and pydantic keeps it in ``ctx["error"]`` for the categorizer to unwrap structurally —
-    carrying the ``stripped_code`` (and, for a declaration, the ``offending_code`` to rename from)
-    that the ``strip-namespace`` planner needs. Genuinely malformed codes and cross-package dotted
-    refs stay bare ``ValueError``s → uncategorized-as-fixable, so they are never stripped.
+    Raised at the two snake_case-enforcing raise sites, carrying the ``offending_code`` as the method writes it, which
+    the item names. Subclasses ``ValueError`` so a ``mode="before"`` field validator can raise it and pydantic keeps it
+    in ``ctx["error"]`` for the categorizer to unwrap structurally. When the code is a same-domain over-qualified one
+    the fix planner can strip back to its bare form (the prefix equals the bundle's own ``domain``, the bare tail is
+    itself a valid snake_case code, and, for a declaration, no bare code already occupies that key), it also carries
+    the ``stripped_code`` the ``strip-namespace`` planner needs; a genuinely malformed code or a cross-package dotted
+    ref carries none, so it is never stripped.
     """
 
     error_code = CoreCode.METHOD_IDENTIFIER_INVALID
 
-    def __init__(self, message: str, offending_code: str, stripped_code: str):
+    def __init__(self, message: str, offending_code: str, stripped_code: str | None = None):
         self.offending_code = offending_code
         self.stripped_code = stripped_code
         super().__init__(message)

@@ -62,6 +62,9 @@ class TestRefusalVerdictArms:
         assert problem_item.code == CoreCode.METHOD_SCHEMA_VIOLATION
         assert "registry slot 7" not in str(problem.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a refusal with no parameters, to check that its item is named by its code's title"
+    )
     def test_an_input_refusal_with_no_parameters_is_named_by_its_title(self) -> None:
         _, items = _verdict_items(_InternalInputRefusalError("internal detail: registry slot 7 is stale"))
 
@@ -145,6 +148,7 @@ class TestRefusalVerdictArms:
         assert raised.value is wrapper
         assert wrapper.resolve_error_code() == CoreCode.SECURITY_TEMPLATE_REFUSED
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds dry-run failures in the test, without the parameters a sweep records")
     def test_a_sweep_with_a_security_refusal_among_its_failures_is_no_verdict(self) -> None:
         """One method fault beside one security refusal: the sweep answers the refusal's code, never an invalid verdict."""
         sweep = DryRunError(

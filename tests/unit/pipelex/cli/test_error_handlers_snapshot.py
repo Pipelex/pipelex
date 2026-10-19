@@ -107,6 +107,9 @@ class TestErrorHandlersSnapshot:
         output = self._render(mocker, lambda: handle_model_choice_error(exc, context=ErrorContext.PIPE_RUN))
         assert output == EXPECTED_MODEL_CHOICE_PANEL
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a causeless model availability failure and a message-only verdict, neither with its raise site's facts"
+    )
     def test_model_availability_error_panel_snapshot(self, mocker: MockerFixture) -> None:
         """handle_model_availability_error renders the panel with its conditional fields."""
         exc = PipeOperatorModelAvailabilityError(

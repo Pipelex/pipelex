@@ -63,7 +63,7 @@ def failure_diagnostics(*, cause: BaseException | None) -> ProblemDiagnostics | 
     if cause is None:
         return None
     if isinstance(cause, PipelexError):
-        return cause.to_problem(view=ProblemView.OPERATOR).diagnostics
+        return cause.operator_diagnostics()
     return foreign_failure_diagnostics(error=cause)
 
 

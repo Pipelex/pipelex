@@ -102,6 +102,9 @@ class TestAnthropicStructuredClamp:
 
         assert "was lowered" not in exc_info.value.message
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="calls the worker below its public method, whose enrichment names the model and the provider"
+    )
     @pytest.mark.parametrize("is_wrapped", [True, False])
     async def test_a_timeout_of_the_lowered_call_says_the_limit_was_lowered(self, mocker: MockerFixture, is_wrapped: bool) -> None:
         """The note is added to the error the call raises, whose class and retryable category stay as they were."""

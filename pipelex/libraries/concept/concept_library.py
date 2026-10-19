@@ -1,7 +1,7 @@
 from typing import Any, Callable, Self, cast
 
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
@@ -107,7 +107,11 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     def add_new_concept(self, concept: Concept):
         if concept.concept_ref in self.root:
             msg = f"Concept '{concept.concept_ref}' already exists in the library"
-            raise ConceptLibraryError(msg).with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+            raise (
+                ConceptLibraryError(msg)
+                .with_error_code(CoreCode.METHOD_NAME_CONFLICT)
+                .with_params(name=concept.concept_ref, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+            )
         self.root[concept.concept_ref] = concept
         self._mark_changed()
 

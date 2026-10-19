@@ -80,6 +80,9 @@ class TestValidateBundleErrorFormat:
         assert captured.out == ""
         return captured.err
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_markdown_renders_the_items_and_a_fix_aware_footer(
         self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
@@ -103,6 +106,9 @@ class TestValidateBundleErrorFormat:
         with pytest.raises(json.JSONDecodeError):
             json.loads(markdown)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_markdown_says_an_unsafe_fix_needs_confirmation(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
         """A safe fix keeps the plain 💡 line; an unsafe one says it is unsafe, and the footer counts only the safe one."""
         bundle_path = tmp_path / "bundle.mthds"
@@ -124,6 +130,9 @@ class TestValidateBundleErrorFormat:
         assert "(`rename-model`, safe)" not in markdown
         assert "💡 1 of these errors can be fixed automatically" in markdown
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_markdown_no_fix_footer_when_nothing_fixable(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
         """With no suggested fix, the footer points at the messages instead of naming a fix command."""
         item = ValidationErrorItem(category=ValidationErrorCategory.BLUEPRINT_VALIDATION, message="something is wrong")
@@ -133,6 +142,9 @@ class TestValidateBundleErrorFormat:
         assert "no automatic fix" in markdown
         assert "pipelex-agent fix bundle" not in markdown
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="a message-only verdict's residual item names no declaration, so it carries no field path"
+    )
     def test_json_is_the_method_s_problem_with_the_verdict_beside_it(self, capsys: pytest.CaptureFixture[str], tmp_path: Path) -> None:
         """In JSON the verdict is the problem a hook branches on: its code and errors, with is_valid and the bundle beside them."""
         set_agent_cli_error_format(CliOutputFormat.JSON)

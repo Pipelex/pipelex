@@ -33,10 +33,14 @@ def undecodable_mthds_error(*, error: UnicodeDecodeError, source: str | None) ->
     """
     line, column = _decode_error_position(error)
     msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
-    return MthdsParserError(
-        msg,
-        validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
-    ).with_error_code(CoreCode.METHOD_SYNTAX)
+    return (
+        MthdsParserError(
+            msg,
+            validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
+        )
+        .with_error_code(CoreCode.METHOD_SYNTAX)
+        .with_params(finding=msg)
+    )
 
 
 def decode_mthds_text(*, content: bytes, source: str | None) -> str:
@@ -110,18 +114,22 @@ class MthdsParser(BaseModel):
                 toml_message = toml_message.replace(str(bundle_path), mthds_source)
             msg = f"TOML syntax error at line {exc.lineno}, column {exc.colno}: {toml_message}"
             source = str(bundle_path) if bundle_path is not None and mthds_source is None else mthds_source
-            raise MthdsParserError(
-                msg,
-                validation_errors=[
-                    PipelexBundleBlueprintValidationErrorData(
-                        source=source,
-                        message=msg,
-                        # tomli counts both from 1, as the item's locators do.
-                        line=exc.lineno,
-                        column=exc.colno,
-                    )
-                ],
-            ).with_error_code(CoreCode.METHOD_SYNTAX) from exc
+            raise (
+                MthdsParserError(
+                    msg,
+                    validation_errors=[
+                        PipelexBundleBlueprintValidationErrorData(
+                            source=source,
+                            message=msg,
+                            # tomli counts both from 1, as the item's locators do.
+                            line=exc.lineno,
+                            column=exc.colno,
+                        )
+                    ],
+                )
+                .with_error_code(CoreCode.METHOD_SYNTAX)
+                .with_params(finding=msg)
+            ) from exc
         except UnicodeDecodeError as exc:
             # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
             source = mthds_source if mthds_source is not None else str(bundle_path)

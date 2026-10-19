@@ -153,6 +153,9 @@ class TestFixFormat:
         assert parsed["is_runnable"] is False
         assert parsed["pending_signatures"] == ["fix_format.pending_pipe"]
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_still_invalid_emits_json_error(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         bundle_path = tmp_path / "bundle.mthds"
         bundle_path.write_text('domain = "fix_format"\n', encoding="utf-8")
@@ -206,6 +209,9 @@ class TestFixFormat:
         assert item["params"] == {"finding": "Expected a value"}
         assert "remaining_error_codes" not in parsed
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its validation errors in the test, without the facts their raise sites give their items' codes"
+    )
     def test_still_invalid_markdown_renders_prose(self, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Default (markdown) still-invalid renders the remaining errors as prose on stderr, not a JSON dump."""
         bundle_path = tmp_path / "bundle.mthds"

@@ -84,7 +84,7 @@ class TestRunRefusals:
                 {
                     "code": CoreCode.METHOD_CONCEPT_UNRESOLVED,
                     "detail": "The method names the concept 'Summry', which no library declares.",
-                    "params": {"concept": "Summry"},
+                    "params": {"concept": "Summry", "suggestions": []},
                     "location": {"pipe": "echo", "field": "output"},
                 },
             ),
@@ -93,7 +93,7 @@ class TestRunRefusals:
                 {
                     "code": CoreCode.MODEL_UNKNOWN,
                     "detail": "The method names the llm model 'no-such-model-in-any-deck', which no catalog knows.",
-                    "params": {"model": "no-such-model-in-any-deck", "model_type": "llm"},
+                    "params": {"model": "no-such-model-in-any-deck", "model_type": "llm", "suggestions": []},
                     "location": {"pipe": "echo", "field": "model"},
                 },
             ),

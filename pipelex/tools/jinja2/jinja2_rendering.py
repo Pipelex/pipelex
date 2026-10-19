@@ -1,5 +1,7 @@
 import re
-from collections.abc import Awaitable, Callable
+import string
+from collections.abc import Awaitable, Callable, Generator
+from contextlib import contextmanager
 from typing import Any, NamedTuple, Protocol, TypeVar
 
 from jinja2 import nodes
@@ -13,7 +15,7 @@ from jinja2.exceptions import (
     TemplateSyntaxError,
     UndefinedError,
 )
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.system.exceptions import ToolError
@@ -57,9 +59,13 @@ def _add_to_templating_context(
     templating_context: dict[str, Any], *, jinja2_context_key: Jinja2ContextKey, value: Any, template_owner: TemplateOwner
 ) -> None:
     if jinja2_context_key in templating_context:
-        # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default.
+        # On a method's template, a method variable named like the reserved key: `method.name_conflict`, the default,
+        # which names the key; on Pipelex's own, `runtime.unexpected`, which declares no parameter.
         msg = f"Jinja2 context key '{jinja2_context_key}' already in templating_context"
-        raise _coded_by_owner(error=Jinja2StuffError(msg), template_owner=template_owner)
+        refusal = Jinja2StuffError(msg)
+        if template_owner == TemplateOwner.METHOD:
+            refusal = refusal.with_params(name=jinja2_context_key, conflict=MethodNameConflictConflict.DUPLICATE_DECLARATION)
+        raise _coded_by_owner(error=refusal, template_owner=template_owner)
     templating_context[jinja2_context_key] = value
 
 
@@ -154,13 +160,74 @@ class SpelledNames(NamedTuple):
 
     ``references`` are the names it reads, stores or reaches as a variable or an attribute: a variable (``invoice``), an
     attribute (``.total``), a key written as a literal (``['total']``, ``attr('total')``, ``{'total': ...}``), a
-    keyword's name (``namespace(total=...)``), a namespace's attribute it sets and a macro's name. ``filters_and_tests``
+    keyword's name (``namespace(total=...)``), a namespace's attribute it sets, a macro's name, and a name a replacement
+    field of a format string reads, where the literal is the string a ``.format`` or ``.format_map`` call formats
+    (``'{0.total}'.format(invoice)``), which the sandboxed formatter reads as an attribute or a key. ``filters_and_tests``
     are the filters and tests it applies. A name the template reaches through a value, ``notes[patient_id]``, is none of
-    them: that name is a value of the run's data.
+    them: that name is a value of the run's data. Nor is a word any other string literal holds, ``mode == 'debug'``, which
+    no access reads.
     """
 
     references: frozenset[str]
     filters_and_tests: frozenset[str]
+
+
+# The methods of a string that format it, reading its replacement fields as attributes and keys of their arguments.
+_FORMAT_METHODS = frozenset({"format", "format_map"})
+
+# A part of a replacement field's name after its first: an attribute (`.total`) or a key (`[total]`), as `str.format` reads it.
+_FORMAT_FIELD_PART_PATTERN = re.compile(r"\.(?P<attribute>[^.\[]*)|\[(?P<key>[^\]]*)\]")
+
+
+# How deep the scan follows replacement fields nested in format specs: `string.Formatter`, which the sandbox's formatter
+# extends, reads a field of the string (depth 0), of its spec (1) and of that spec's spec (2), then refuses to go deeper.
+_FORMAT_SPEC_MAX_DEPTH = 2
+
+
+def _format_string_names(*, format_string: str) -> set[str]:
+    """The names the replacement fields of a `str.format` string read: argument names, attributes and keys, nested fields included.
+
+    The scan runs while a refusal is being built, outside the render's own error handling, so it walks the nested specs
+    without recursion and never past `_FORMAT_SPEC_MAX_DEPTH`. A string nested deeper, or one that does not parse as a
+    format string, counts nothing at all, so a name only it writes is withheld rather than named: the refusal comes out
+    as itself, whatever the literal holds.
+    """
+    names: set[str] = set()
+    pending: list[tuple[str, int]] = [(format_string, 0)]
+    while pending:
+        text, depth = pending.pop()
+        if depth > _FORMAT_SPEC_MAX_DEPTH:
+            return set()
+        try:
+            parsed_fields = list(string.Formatter().parse(text))
+        except ValueError:
+            return set()
+        for _, field_name, format_spec, _ in parsed_fields:
+            if field_name is None:
+                continue
+            argument_name = re.split(r"[.\[]", field_name, maxsplit=1)[0]
+            if argument_name and not argument_name.isdigit():
+                names.add(argument_name)
+            for part in _FORMAT_FIELD_PART_PATTERN.finditer(field_name[len(argument_name) :]):
+                name = part.group("attribute") if part.group("attribute") is not None else part.group("key")
+                if name and not name.isdigit():
+                    names.add(name)
+            if format_spec:
+                pending.append((format_spec, depth + 1))
+    return names
+
+
+def _formatted_literal(*, call: nodes.Call) -> str | None:
+    """The string literal a call formats, ``'{0.x}'.format(v)`` or ``'{0.x}' | attr('format')`` called, else ``None``."""
+    match call.node:
+        case nodes.Getattr(node=nodes.Const(value=str() as format_string), attr=str() as method) if method in _FORMAT_METHODS:
+            return format_string
+        case nodes.Filter(name="attr", node=nodes.Const(value=str() as format_string), args=[nodes.Const(value=str() as method)]) if (
+            method in _FORMAT_METHODS
+        ):
+            return format_string
+        case _:
+            return None
 
 
 def template_spelled_names(*, template_source: str) -> SpelledNames:
@@ -176,9 +243,24 @@ def template_spelled_names(*, template_source: str) -> SpelledNames:
         return SpelledNames(references=frozenset(), filters_and_tests=frozenset())
     references: set[str] = set()
     filters_and_tests: set[str] = set()
-    spelling_nodes = (nodes.Name, nodes.Getattr, nodes.NSRef, nodes.Keyword, nodes.Getitem, nodes.Pair, nodes.Macro, nodes.Filter, nodes.Test)
+    spelling_nodes = (
+        nodes.Name,
+        nodes.Getattr,
+        nodes.NSRef,
+        nodes.Keyword,
+        nodes.Getitem,
+        nodes.Pair,
+        nodes.Macro,
+        nodes.Filter,
+        nodes.Test,
+        nodes.Call,
+    )
     for node in parsed_template.find_all(spelling_nodes):
         match node:
+            case nodes.Call():
+                format_string = _formatted_literal(call=node)
+                if format_string is not None:
+                    references |= _format_string_names(format_string=format_string)
             case nodes.Name(name=str() as name) | nodes.Macro(name=str() as name):
                 references.add(name)
             case nodes.Getattr(attr=str() as attribute) | nodes.NSRef(attr=str() as attribute):
@@ -228,28 +310,42 @@ def _describe_render_error(*, description: str, render_error: BaseException) -> 
 
 
 def _spells_every_name(*, named: tuple[str, ...], template_source: str) -> bool:
-    """Whether the parsed template spells every name a refusal quotes (see ``template_spelled_names``)."""
+    """Whether the parsed template spells every name a refusal quotes, the sandbox's and the budget's alike.
+
+    A name spelled as a variable, an attribute or a literal key is the template's own (see ``template_spelled_names``), and
+    so is one a replacement field reads in the format string a ``.format`` or ``.format_map`` call formats, such as the
+    ``_x`` of ``{{ '{0._x}'.format(v) }}``: the template's own literal holds it, so naming it leaks nothing of the run's
+    data. No other text of the template counts, a word another string literal holds (``mode == 'debug _x'``) or the plain
+    text outside its expressions, so a key the data chose that the template happens to write elsewhere is still withheld.
+    """
     if not named:
         return True
     spelled_references = template_spelled_names(template_source=template_source).references
     return all(name in spelled_references for name in named)
 
 
-def _make_security_error_msg(*, security_error: SecurityError, template_source: str) -> str:
-    """The sandbox's refusal, worded with the names it quotes where the template spells them all, without them otherwise.
+def _make_security_refusal(*, security_error: SecurityError, template_source: str) -> Jinja2TemplateSecurityError:
+    """The sandbox's refusal, worded with the names it quotes and naming what it refused only where the template writes them all.
 
     A refusal names what the template reached for, which a template reading ``obj[key]``, ``obj | attr(key)`` or
     storing ``namespace({key: value})`` takes from the run's data: the sandbox words each refusal twice
-    (``SandboxRefusalError``), and the wording with the names is kept only when the parsed template spells every one.
-    A refusal worded by Jinja2 itself, not by the sandbox, is written as a fixed description.
+    (``SandboxRefusalError``), and the wording with the names, and the refused name passed on as the problem's ``name``,
+    are kept only when the parsed template spells every name the refusal quotes (``_spells_every_name``), a format
+    string it formats included, such as the ``_x`` of ``{{ '{0._x}'.format(v) }}``. Otherwise the refusal carries
+    neither, so the run's input reaches no message and no problem. A refusal worded by Jinja2 itself, not by the sandbox, is written as a
+    fixed description and names nothing.
     """
+    refused_name: str | None = None
     if isinstance(security_error, SandboxRefusalError):
-        is_spelled = _spells_every_name(named=security_error.named, template_source=template_source)
-        refusal = (security_error.message or "") if is_spelled else security_error.anonymous_message
+        if _spells_every_name(named=security_error.named, template_source=template_source):
+            refusal = security_error.message or ""
+            refused_name = security_error.refused_name
+        else:
+            refusal = security_error.anonymous_message
     else:
         description = "the template reached for an attribute, a method or a call the sandbox does not allow"
         refusal = _describe_render_error(description=description, render_error=security_error)
-    return f"Jinja2 render — refused by the template sandbox: {refusal}"
+    return Jinja2TemplateSecurityError(f"Jinja2 render — refused by the template sandbox: {refusal}", refused_name=refused_name)
 
 
 # A template nesting macro calls or recursive loops deep enough reaches Python's recursion limit before
@@ -261,8 +357,8 @@ def _make_budget_error_msg(*, budget_error: RenderBudgetExceededError, template_
     """The budget's refusal, which names the operation and its size, never the template source or a value.
 
     A refused call names the callable it called, which a template reading it by ``obj[key]`` or ``obj | attr(key)`` names
-    by a value of the run's data: as for the sandbox's refusals, the wording with the names is kept only when the parsed
-    template spells every one (``RenderBudgetExceededError``).
+    by a value of the run's data: by the sandbox's own rule (``_spells_every_name``), the wording with the names is kept
+    only when the parsed template spells every one (``RenderBudgetExceededError``).
     """
     is_spelled = _spells_every_name(named=budget_error.named, template_source=template_source)
     refusal = (budget_error.message or "") if is_spelled else budget_error.anonymous_message
@@ -380,8 +476,9 @@ def _make_render_failure(
     (``'dict object' has no attribute '<the key>'``) or a type error's operands.
     """
     if isinstance(render_error, SecurityError):
-        security_msg = _make_security_error_msg(security_error=render_error, template_source=template_source)
-        return _coded_by_owner(error=Jinja2TemplateSecurityError(security_msg), template_owner=template_owner)
+        return _coded_by_owner(
+            error=_make_security_refusal(security_error=render_error, template_source=template_source), template_owner=template_owner
+        )
     if isinstance(render_error, (RenderBudgetExceededError, RecursionError)):
         budget_msg = (
             _make_budget_error_msg(budget_error=render_error, template_source=template_source)
@@ -423,6 +520,26 @@ def _make_render_failure(
         return _make_data_render_error(msg=msg, template_owner=template_owner)
     msg = f"Jinja2 render — {type(render_error).__name__} is not a failure the render translates"
     raise PipelexUnexpectedError(msg) from render_error
+
+
+@contextmanager
+def locating_template_refusal(*, template_field: str) -> Generator[None]:
+    """Locate a refusal of the template sandbox the block raises on ``template_field``, the field the template is written in.
+
+    The render knows the template's source, never which field of which pipe wrote it, so the code that renders a pipe's
+    template wraps the render, naming the field as the method writes it: ``template``, ``prompt``, ``system_prompt``,
+    ``expression`` or ``construct.<field>``. A refusal that already names a field keeps it, the innermost site knowing
+    best.
+
+    Raises:
+        Jinja2TemplateSecurityError: What the block raised, located on the field.
+    """
+    try:
+        yield
+    except Jinja2TemplateSecurityError as exc:
+        if exc.template_field is None:
+            exc.with_template_field(template_field=template_field)
+        raise
 
 
 def _render_template_sync(

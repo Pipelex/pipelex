@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.protocol.problem.registry import MethodDependencyMissingKind, MethodDependencyMissingReason
 from packaging.markers import Marker, UndefinedComparison, UndefinedEnvironmentName
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
@@ -47,7 +48,11 @@ from pipelex.core.method_trees.requirements_file import (
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
 from pipelex.libraries.method_trees import list_library_dir_trees, listing_identity, reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
+from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageRefusal
+
+# The parameters of `method.package_invalid` for a `requirements.txt` the standard refuses or that cannot be read.
+_REQUIREMENTS_INVALID_PARAMS: dict[str, str] = {"reason": MethodPackageReason.REQUIREMENTS_INVALID, "path": REQUIREMENTS_FILE_NAME}
 
 PYTHON_SUFFIX = ".py"
 
@@ -74,11 +79,21 @@ _QUOTED_MARKER_VALUE = re.compile(r"\"[^\"]*\"|'[^']*'")
 _MARKER_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 
+class UnmetDistribution(NamedTuple):
+    """Why a requirement is not met, and the distribution that fails it: the one required, or one an extra of it needs."""
+
+    reason: str
+    distribution_name: str
+    missing_reason: MethodDependencyMissingReason
+
+
 class UnmetRequirement(NamedTuple):
-    """A requirement the environment does not meet, with why."""
+    """A requirement the environment does not meet, with why, and the distribution that fails it."""
 
     requirement_line: RequirementLine
     reason: str
+    distribution_name: str
+    missing_reason: MethodDependencyMissingReason
 
 
 def marker_variables_of(*, marker: Marker) -> set[str]:
@@ -104,17 +119,31 @@ def _unmet_reason(
     requirement: Requirement,
     environment: PythonPackageEnvironment,
     followed_extras: set[tuple[str, str]],
-) -> str | None:
-    """Why the environment does not meet a requirement whose marker it already judged true, or None when it does."""
+) -> UnmetDistribution | None:
+    """Why the environment does not meet a requirement whose marker it already judged true, or None when it does.
+
+    The distribution that fails it is the one required, missing or held at a version the requirement does not accept,
+    or one that an extra of it needs, followed down the extras.
+    """
     installed_version = environment.version_of(distribution_name=requirement.name)
     if installed_version is None:
-        return f"{requirement.name} is missing"
+        return UnmetDistribution(
+            reason=f"{requirement.name} is missing", distribution_name=requirement.name, missing_reason=MethodDependencyMissingReason.NOT_FOUND
+        )
     try:
         version = Version(installed_version)
     except InvalidVersion:
-        return f"{requirement.name} {installed_version} is there, a version no specifier can be compared with"
+        return UnmetDistribution(
+            reason=f"{requirement.name} {installed_version} is there, a version no specifier can be compared with",
+            distribution_name=requirement.name,
+            missing_reason=MethodDependencyMissingReason.NO_MATCHING_VERSION,
+        )
     if not requirement.specifier.contains(version, prereleases=True):
-        return f"{requirement.name} {installed_version} is there"
+        return UnmetDistribution(
+            reason=f"{requirement.name} {installed_version} is there",
+            distribution_name=requirement.name,
+            missing_reason=MethodDependencyMissingReason.NO_MATCHING_VERSION,
+        )
     for extra in sorted(requirement.extras):
         extra_reason = _unmet_extra_reason(distribution_name=requirement.name, extra=extra, environment=environment, followed_extras=followed_extras)
         if extra_reason is not None:
@@ -128,11 +157,13 @@ def _unmet_extra_reason(
     extra: str,
     environment: PythonPackageEnvironment,
     followed_extras: set[tuple[str, str]],
-) -> str | None:
+) -> UnmetDistribution | None:
     """Why the environment does not meet what an extra of a distribution it holds needs, or None when it does.
 
     An extra needs each requirement of the distribution's metadata whose marker holds with the extra and not without
-    it. Each extra is followed once, so extras that name one another end.
+    it. Each extra is followed once, so extras that name one another end. The distribution that fails is the one the
+    extra needs; when the environment does not state what the extra needs, it is the distribution holding the extra,
+    which is there in a form that cannot be shown to serve the requirement.
     """
     key = (canonicalize_name(distribution_name), canonicalize_name(extra))
     if key in followed_extras:
@@ -140,9 +171,13 @@ def _unmet_extra_reason(
     followed_extras.add(key)
     dependencies = environment.dependencies_of(distribution_name=distribution_name)
     if dependencies is None:
-        return (
-            f"{environment.description} does not state what the extra '{extra}' of {distribution_name} needs; "
-            "list the packages it needs in requirements.txt instead"
+        return UnmetDistribution(
+            reason=(
+                f"{environment.description} does not state what the extra '{extra}' of {distribution_name} needs; "
+                "list the packages it needs in requirements.txt instead"
+            ),
+            distribution_name=distribution_name,
+            missing_reason=MethodDependencyMissingReason.NO_MATCHING_VERSION,
         )
     for dependency_text in dependencies:
         try:
@@ -159,9 +194,11 @@ def _unmet_extra_reason(
             continue
         if not needed_by_extra or needed_anyway:
             continue
-        dependency_reason = _unmet_reason(requirement=dependency, environment=environment, followed_extras=followed_extras)
-        if dependency_reason is not None:
-            return f"the extra '{extra}' of {distribution_name} needs '{dependency_text}', and {dependency_reason}"
+        dependency_unmet = _unmet_reason(requirement=dependency, environment=environment, followed_extras=followed_extras)
+        if dependency_unmet is not None:
+            return dependency_unmet._replace(
+                reason=f"the extra '{extra}' of {distribution_name} needs '{dependency_text}', and {dependency_unmet.reason}"
+            )
     return None
 
 
@@ -169,9 +206,16 @@ def unmet_requirements(*, requirements: Iterable[RequirementLine], environment: 
     """The requirements the environment does not meet, in the order given, each with why."""
     unmet: list[UnmetRequirement] = []
     for requirement_line in requirements:
-        reason = _requirement_line_unmet_reason(requirement_line=requirement_line, environment=environment)
-        if reason is not None:
-            unmet.append(UnmetRequirement(requirement_line=requirement_line, reason=reason))
+        unmet_distribution = _requirement_line_unmet_reason(requirement_line=requirement_line, environment=environment)
+        if unmet_distribution is not None:
+            unmet.append(
+                UnmetRequirement(
+                    requirement_line=requirement_line,
+                    reason=unmet_distribution.reason,
+                    distribution_name=unmet_distribution.distribution_name,
+                    missing_reason=unmet_distribution.missing_reason,
+                )
+            )
     return unmet
 
 
@@ -202,18 +246,34 @@ def _is_marker_false(*, marker: Marker, marker_environment: Mapping[str, str]) -
         return False
 
 
-def _requirement_line_unmet_reason(*, requirement_line: RequirementLine, environment: PythonPackageEnvironment) -> str | None:
-    marker = requirement_line.requirement.marker
+def _requirement_line_unmet_reason(*, requirement_line: RequirementLine, environment: PythonPackageEnvironment) -> UnmetDistribution | None:
+    requirement = requirement_line.requirement
+    marker = requirement.marker
     if marker is not None:
         unstated = sorted(marker_variables_of(marker=marker) - set(environment.marker_environment) - {"extra"})
         if unstated:
-            return f"its marker reads {', '.join(unstated)}, which {environment.description} does not state"
+            return _unjudged_requirement(
+                reason=f"its marker reads {', '.join(unstated)}, which {environment.description} does not state",
+                requirement=requirement,
+                environment=environment,
+            )
         try:
             if not _evaluate_marker(marker=marker, marker_environment=environment.marker_environment, extra=""):
                 return None
         except (UndefinedComparison, UndefinedEnvironmentName, InvalidVersion) as exc:
-            return f"its marker cannot be evaluated: {exc}"
-    return _unmet_reason(requirement=requirement_line.requirement, environment=environment, followed_extras=set())
+            return _unjudged_requirement(reason=f"its marker cannot be evaluated: {exc}", requirement=requirement, environment=environment)
+    return _unmet_reason(requirement=requirement, environment=environment, followed_extras=set())
+
+
+def _unjudged_requirement(*, reason: str, requirement: Requirement, environment: PythonPackageEnvironment) -> UnmetDistribution:
+    """A requirement whose marker the environment cannot judge, failed by the distribution it requires.
+
+    The distribution is missing (`not_found`), or held in a form the requirement cannot be shown to accept
+    (`no_matching_version`).
+    """
+    is_installed = environment.version_of(distribution_name=requirement.name) is not None
+    missing_reason = MethodDependencyMissingReason.NO_MATCHING_VERSION if is_installed else MethodDependencyMissingReason.NOT_FOUND
+    return UnmetDistribution(reason=reason, distribution_name=requirement.name, missing_reason=missing_reason)
 
 
 def holds_requirements_to_check(*, tree: MethodTree) -> bool:
@@ -252,10 +312,27 @@ def _read_requirements_text(*, judged: JudgedMethod) -> str:
         return location.read_bytes().decode("utf-8")
     except UnicodeDecodeError as exc:
         msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that is not UTF-8 text, so they cannot be read."
-        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
+        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
+            **_REQUIREMENTS_INVALID_PARAMS
+        ) from exc
     except OSError as exc:
         msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that cannot be read: {exc.strerror or type(exc).__name__}."
-        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]) from exc
+        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
+            **_REQUIREMENTS_INVALID_PARAMS
+        ) from exc
+
+
+def _unmet_requirement_params(*, unmet_requirement: UnmetRequirement) -> dict[str, str]:
+    """The parameters of `method.dependency_missing` for a requirement the environment does not meet.
+
+    They name the distribution that fails it: the one required, or one an extra of it needs, which is missing
+    (`not_found`) or held at a version the requirement does not accept (`no_matching_version`).
+    """
+    return {
+        "kind": MethodDependencyMissingKind.REQUIREMENT,
+        "name": unmet_requirement.distribution_name,
+        "reason": unmet_requirement.missing_reason,
+    }
 
 
 def _raise_refused_lines(*, judged: JudgedMethod, refused_lines: list[RefusedRequirementsLine]) -> None:
@@ -280,7 +357,7 @@ def _raise_refused_lines(*, judged: JudgedMethod, refused_lines: list[RefusedReq
         f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} holding lines the MTHDS standard "
         f"refuses, where each line is blank, a comment, or exactly one PEP 508 requirement: {'; '.join(line_texts)}."
     )
-    raise MethodRequirementsFileError(msg, items=items)
+    raise MethodRequirementsFileError(msg, items=items).with_params(**_REQUIREMENTS_INVALID_PARAMS)
 
 
 def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environment: PythonPackageEnvironment) -> None:
@@ -300,6 +377,7 @@ def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environ
                 source=judged.requirements_source,
                 line=requirement_line.line_number,
                 message=f"The requirement '{requirement_line.text}' is not met by {environment.description}: {unmet_requirement.reason}.",
+                params=_unmet_requirement_params(unmet_requirement=unmet_requirement),
             )
         )
     advice = environment.advice(requirement_texts=[unmet_requirement.requirement_line.text for unmet_requirement in unmet])
@@ -307,15 +385,24 @@ def _raise_unmet(*, judged: JudgedMethod, unmet: list[UnmetRequirement], environ
         f"{judged.method_name} needs Python packages that {environment.description} "
         f"does not have, as its {REQUIREMENTS_FILE_NAME} declares: {'; '.join(line_texts)}. {advice}"
     )
-    raise MethodRequirementsNotMetError(msg, items=items)
+    raise MethodRequirementsNotMetError(msg, items=items).with_params(**_unmet_requirement_params(unmet_requirement=unmet[0]))
 
 
-def _refused_by_deployment_error(*, judged: JudgedMethod, refusal: PipeFuncPackageRefusal) -> MethodRequirementsNotMetError:
+def _refused_by_deployment_error(
+    *, judged: JudgedMethod, refusal: PipeFuncPackageRefusal, requirements: Sequence[RequirementLine]
+) -> MethodRequirementsNotMetError:
     """The refusal of a method whose requirements the deployment cannot hold in any environment, carrying its reason.
 
     The deployment's reason is about the requirements together, such as a conflict its resolver found among them, so the
-    one item it rides on names the file and no line.
+    one item it rides on names the file and no line. `method.dependency_missing` names one distribution, as a refusal
+    of several unmet requirements names the first of them: the first requirement the file declares, with the `reason`
+    `no_matching_version`, since no set of versions the deployment can build satisfies the requirements.
     """
+    params = {
+        "kind": MethodDependencyMissingKind.REQUIREMENT,
+        "name": requirements[0].requirement.name,
+        "reason": MethodDependencyMissingReason.NO_MATCHING_VERSION,
+    }
     msg = (
         f"{judged.method_name} needs Python packages that {refusal.environment} cannot offer, "
         f"as its {REQUIREMENTS_FILE_NAME} declares: {refusal.reason}"
@@ -323,8 +410,9 @@ def _refused_by_deployment_error(*, judged: JudgedMethod, refusal: PipeFuncPacka
     item = PipelexBundleBlueprintValidationErrorData(
         source=judged.requirements_source,
         message=f"The requirements are refused by {refusal.environment}: {refusal.reason}",
+        params=params,
     )
-    return MethodRequirementsNotMetError(msg, items=[item])
+    return MethodRequirementsNotMetError(msg, items=[item]).with_params(**params)
 
 
 def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool) -> None:
@@ -356,7 +444,7 @@ def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_
             continue
         environment = resolve_pipe_func_package_environment(requirements=parsed.requirements, names_host_paths=names_host_paths)
         if isinstance(environment, PipeFuncPackageRefusal):
-            raise _refused_by_deployment_error(judged=judged, refusal=environment)
+            raise _refused_by_deployment_error(judged=judged, refusal=environment, requirements=parsed.requirements)
         unmet = unmet_requirements(requirements=parsed.requirements, environment=environment)
         if unmet:
             _raise_unmet(judged=judged, unmet=unmet, environment=environment)

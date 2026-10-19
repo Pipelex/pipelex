@@ -58,7 +58,7 @@ async def build_inputs_for_pipe(
             main_pipe_ref = select_primary_blueprint(blueprints).main_pipe_ref
             if not main_pipe_ref:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
-                raise MethodEntryError(msg)
+                raise MethodEntryError(msg).with_params(candidates=[])
             pipe_code = main_pipe_ref
     elif bundle_path:
         # allow_signatures=True: see the mthds_contents branch — rendering inputs tolerates placeholders.
@@ -68,7 +68,7 @@ async def build_inputs_for_pipe(
             main_pipe_code = bundle_blueprint.main_pipe
             if not main_pipe_code:
                 msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code."
-                raise MethodEntryError(msg)
+                raise MethodEntryError(msg).with_params(candidates=[])
             pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=main_pipe_code)
     else:
         # No bundle - initialize the library manually
@@ -81,7 +81,7 @@ async def build_inputs_for_pipe(
 
     if not pipe_code:
         msg = "No pipe code specified"
-        raise MethodEntryError(msg)
+        raise MethodEntryError(msg).with_params(candidates=[])
 
     the_pipe = get_required_entry_pipe(pipe_code=pipe_code)
     # The envelope names the pipe that was resolved, always domain-qualified, never the selector

@@ -48,6 +48,7 @@ _PIPELINE_EXEC_ERROR = PipelineExecutionError(
 class TestClassLevelMetadata:
     """Key exceptions self-describe their code, their advice and their error_category at the class level."""
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check the code it decides")
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_code", "expected_domain"),
         [
@@ -72,6 +73,7 @@ class TestClassLevelMetadata:
         assert problem.code == expected_code
         assert problem.domain == expected_domain
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check the advice it carries")
     @pytest.mark.parametrize(
         ("_topic", "exc", "expected_detail"),
         [
@@ -122,6 +124,7 @@ class TestClassLevelMetadata:
         assert exc.error_category is expected_category
         assert find_inference_error_category_in_chain(exc) is expected_category
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check where the message goes")
     @pytest.mark.parametrize(
         ("_topic", "exc"),
         [

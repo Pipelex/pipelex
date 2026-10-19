@@ -24,6 +24,7 @@ NOT_AN_IMAGE_MESSAGE = (
 
 
 class TestPipelineInputFormatErrors:
+    @pytest.mark.builds_problems_without_required_params(reason="builds each class with a message alone, to check the code and advice of the family")
     @pytest.mark.parametrize("error_class", [PipelineInputNotAnImageError, PipelineInputFormatUnsupportedError])
     def test_the_family_is_an_input_content_error_the_caller_can_fix(self, error_class: type[PipelineInputFormatError]):
         error = error_class(NOT_AN_IMAGE_MESSAGE)

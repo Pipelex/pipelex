@@ -359,8 +359,14 @@ def get_own_pipes() -> list[PipeAbstract]:
     return get_interpreter_hub().get_required_pipe_library().get_own_pipes()
 
 
-def get_required_pipe(pipe_code: str) -> PipeAbstract:
-    return get_interpreter_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code)
+def get_selectable_own_pipe_refs() -> list[str]:
+    """The refs of the current library's own pipes a refusal may offer its caller (see `PipeLibraryAbstract.selectable_own_pipe_refs`)."""
+    return get_interpreter_hub().get_required_pipe_library().selectable_own_pipe_refs()
+
+
+def get_required_pipe(pipe_code: str, *, referring_pipe_code: str | None = None) -> PipeAbstract:
+    """The pipe a reference names, refused naming the reference and, when one writes it, the referring pipe."""
+    return get_interpreter_hub().get_required_pipe_library().get_required_pipe(pipe_code=pipe_code, referring_pipe_code=referring_pipe_code)
 
 
 def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:

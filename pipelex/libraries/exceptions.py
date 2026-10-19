@@ -1,11 +1,15 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
+from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeLimitError, TreeSourceError
+from mthds.method_tree.vocabulary import TreeLimitKind
 from mthds.protocol.problem.registry import CoreCode
+from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.exceptions import PipelexBundleBlueprintValidationErrorData, PipesAndConceptValidationErrorData
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.methods.package_reason import MethodPackageReason
 
 
 class LibraryError(PipelexError):
@@ -20,6 +24,24 @@ class LibraryError(PipelexError):
         default=CoreCode.RUNTIME_UNEXPECTED,
         others=(CoreCode.REQUEST_INVALID, CoreCode.METHOD_CONCEPT_UNRESOLVED, PipelexErrorCode.CONFIG_INVALID),
     )
+
+    def __init__(
+        self,
+        message: str,
+        blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
+        pipe_concept_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
+    ):
+        """Initialize a library error, with the structured items a validation verdict built from it lists.
+
+        Args:
+            message: Error message
+            blueprint_validation_errors: Blueprint validation errors (from PipelexBundleBlueprint validation), or the
+                faults of a refusal that locates each in a bundle, such as both declarations of a name declared twice
+            pipe_concept_validation_errors: Pipe/Concept validation errors (from Pipe/Concept validation)
+        """
+        self.blueprint_validation_errors = blueprint_validation_errors or []
+        self.pipe_concept_validation_errors = pipe_concept_validation_errors or []
+        super().__init__(message)
 
 
 class CrateNormalizationError(LibraryError):
@@ -63,23 +85,6 @@ class LibraryLoadingError(LibraryError):
         ),
     )
 
-    def __init__(
-        self,
-        message: str,
-        blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] | None = None,
-        pipe_concept_validation_errors: list[PipesAndConceptValidationErrorData] | None = None,
-    ):
-        """Initialize LibraryLoadingError.
-
-        Args:
-            message: Error message
-            blueprint_validation_errors: Blueprint validation errors (from PipelexBundleBlueprint validation)
-            pipe_concept_validation_errors: Pipe/Concept validation errors (from Pipe/Concept validation)
-        """
-        self.blueprint_validation_errors = blueprint_validation_errors or []
-        self.pipe_concept_validation_errors = pipe_concept_validation_errors or []
-        super().__init__(message)
-
 
 class MethodTreeLoadError(LibraryLoadingError):
     """Raised when a method tree a load reads from this host's disk cannot be listed.
@@ -89,9 +94,34 @@ class MethodTreeLoadError(LibraryLoadingError):
     out), it passed a limit this machine lists trees under, or a directory or a file of it could not be read. The
     tree is the caller's own method, so the message, which names the tree's root and the files by their tree paths,
     is theirs to read, and the same load is refused again until the tree changes.
+
+    Its ``reason`` is read from the listing's refusal it was raised from: the standard's refusal code, the limit the
+    tree passed with that limit, or ``tree_unreadable``. A raise site with no such cause gives its own.
     """
 
     error_code = CoreCode.METHOD_PACKAGE_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        cause = self.__cause__
+        if isinstance(cause, MethodTreeRefusedError):
+            return {"reason": cause.refusal.code}
+        if isinstance(cause, TreeLimitError):
+            return {"reason": _tree_limit_reason(kind=cause.kind), "limit": cause.limit}
+        if isinstance(cause, TreeSourceError):
+            return {"reason": MethodPackageReason.TREE_UNREADABLE}
+        return {}
+
+
+def _tree_limit_reason(*, kind: TreeLimitKind) -> MethodPackageReason:
+    """The reason of the limit of a method tree a listing stopped at."""
+    match kind:
+        case TreeLimitKind.FILE_COUNT:
+            return MethodPackageReason.TOO_MANY_FILES
+        case TreeLimitKind.TOTAL_BYTES:
+            return MethodPackageReason.TREE_TOO_LARGE
+        case TreeLimitKind.FILE_BYTES:
+            return MethodPackageReason.FILE_TOO_LARGE
 
 
 class EmptyMethodTreeError(MethodTreeLoadError):

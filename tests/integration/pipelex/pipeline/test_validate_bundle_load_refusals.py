@@ -32,6 +32,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_deck import ModelDeck
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.errors.error_codes import PipelexErrorCode, error_code_spec
@@ -76,6 +77,9 @@ output      = "Image"
 model       = "nano-banana-9"
 prompt      = "A painted wooden harbour board announcing the tide times, morning light"
 """
+
+# A model a catalog of the deployment declares on a backend it does not enable, which the session deck does not serve.
+_SWITCHED_OFF_HANDLE = "switched-off-model"
 
 # An LLM the session deck serves, named in an image-generation pipe.
 _LLM_HANDLE_SERVED = "gpt-5.6-luna"
@@ -383,6 +387,24 @@ class TestValidateBundleLoadRefusals:
             await validate_bundle(mthds_file_path=bundle_path, library_dirs=[bundle_path.parent])
 
         assert raised.value is fault
+
+    async def test_a_model_no_enabled_backend_serves_is_no_verdict(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A model a catalog of this deployment knows but no enabled backend serves leaves the method sound: no verdict, the operator's code."""
+
+        def _switched_off(_deck: ModelDeck, *, name: str, model_type: ModelType) -> bool:
+            return name == _SWITCHED_OFF_HANDLE and model_type == ModelType.LLM
+
+        mocker.patch.object(ModelDeck, "is_cataloged_but_unserved", autospec=True, side_effect=_switched_off)
+        bundle_path = _write_bundle(directory=tmp_path, content=_llm_bundle(model_line=f'model       = "{_SWITCHED_OFF_HANDLE}"'))
+
+        with pytest.raises(PipelexError) as raised:
+            await validate_bundle(mthds_file_path=bundle_path, library_dirs=[bundle_path.parent])
+
+        assert not isinstance(raised.value, ValidateBundleError)
+        caller = raised.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.MODEL_UNAVAILABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"model": _SWITCHED_OFF_HANDLE, "model_type": "llm", "reason": "not_served"}
 
     async def test_run_setup_refuses_the_unknown_model_naming_the_pipe(self) -> None:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False, mock_inputs=True)

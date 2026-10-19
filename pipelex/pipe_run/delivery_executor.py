@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+    from pipelex.tools.storage.storage_provider_abstract import StorageKind
 
 
 class ResultFile(NamedTuple):
@@ -454,8 +455,10 @@ class DeliveryExecutor:
         appears in the key; it stays a parameter because the failure below
         names it.
         """
+        storage_kind: StorageKind | None = None
         try:
             storage_provider = get_storage_provider()
+            storage_kind = storage_provider.storage_kind
             prefix: str = storage.key_prefix or ""
             base_key: str = f"{storage_scope}/{prefix}results"
 
@@ -474,7 +477,12 @@ class DeliveryExecutor:
         except Exception as exc:
             # Delivery boundary: any failure across result-file generation or storage is converted to StorageDeliveryError. Re-raises, never swallows.
             msg = f"Storage delivery failed for pipeline_run_id={pipeline_run_id}"
-            raise StorageDeliveryError(msg) from exc
+            # The storage's kind is what `pipelex.storage.unavailable`, the fallback of an uncoded cause, names; a coded
+            # cause that names its own keeps it.
+            delivery_error = StorageDeliveryError(msg)
+            if storage_kind is not None:
+                delivery_error = delivery_error.with_params(scheme=storage_kind)
+            raise delivery_error from exc
 
     # ---- Webhooks ----
 

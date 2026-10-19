@@ -170,6 +170,7 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
                 category=TemplateCategory.HTML,
                 context=context,
                 label=f"template file '{template_file.name}'",
+                template_field="template_file",
                 templating_style=resolve_templating_style(authored=None),
             )
 

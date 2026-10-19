@@ -3,10 +3,10 @@ from collections.abc import Collection
 from typing import Any, ClassVar, NamedTuple, Self, TypeVar, cast
 
 from mthds.protocol.problem.models import ProblemItem, ProblemLocation
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, MethodNameConflictConflict
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError, ValidationErrorItem
+from pipelex.base_exceptions import PipelexError, ValidationErrorItem, iter_pipelex_cause_chain
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.core.exceptions import (
     DryRunFailureErrorData,
@@ -16,7 +16,7 @@ from pipelex.core.exceptions import (
 )
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet, InheritsCause
 from pipelex.errors.error_codes import ErrorCode, code_is_method_domain
-from pipelex.errors.problem import PipelexProblem, ProblemView
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run.exceptions import find_failure_location
 from pipelex.pipe_run.located_failure import failure_location_of, locate_failure_message, located_problem, located_root_fault
@@ -217,17 +217,29 @@ class _FileWithholding(NamedTuple):
         names, reads the placeholder too.
         """
         withheld: list[_SourcedErrorData] = []
-        for error in errors:
+        for error in self._without_withheld_restatements(errors=errors):
             update: dict[str, Any] = {
                 "source": None if error.source in self.names else error.source,
                 "message": self.withheld_text(text=error.message),
             }
             if isinstance(error, PipesAndConceptValidationErrorData) and error.field_path in self.names:
                 update["field_path"] = ""
-            if isinstance(error, DryRunFailureErrorData) and error.params:
+            if error.params:
                 update["params"] = self.withheld_params(params=error.params)
             withheld.append(error.model_copy(update=update))
         return withheld
+
+    def _without_withheld_restatements(self, *, errors: list[_SourcedErrorData]) -> list[_SourcedErrorData]:
+        """The errors without those located in a withheld file that restate a name conflict another error locates elsewhere.
+
+        A name declared twice is one error per file declaring it (``duplicate_ref_items``). When one of those files is
+        withheld, its error would be located nowhere and name the other declaration, which the error located in the
+        caller's own file already names: the caller reads that one alone.
+        """
+        located_conflicts = {
+            conflict_name for error in errors if error.source not in self.names and (conflict_name := _duplicate_declaration_name(error=error))
+        }
+        return [error for error in errors if error.source not in self.names or _duplicate_declaration_name(error=error) not in located_conflicts]
 
     def withheld_params(self, *, params: dict[str, Any]) -> dict[str, Any]:
         """Parameters reading the placeholder where a text of them named a withheld file."""
@@ -246,6 +258,18 @@ class _FileWithholding(NamedTuple):
         if isinstance(value, dict):
             return {key: self._withheld_value(value=item) for key, item in cast("dict[str, Any]", value).items()}
         return value
+
+
+def _duplicate_declaration_name(*, error: _SourcedErrorData) -> str | None:
+    """The name an error reports declared twice, when it is a ``method.name_conflict`` of a duplicate declaration."""
+    if not error.params:
+        return None
+    match error.params.get("conflict"):
+        case MethodNameConflictConflict.DUPLICATE_DECLARATION:
+            name = error.params.get("name")
+            return name if isinstance(name, str) else None
+        case _:
+            return None
 
 
 def withhold_names_in_text(*, text: str, names: Collection[str], placeholder: str) -> str:
@@ -346,8 +370,9 @@ class ValidateBundleError(PipelexError):
         An item whose ``source`` is one of ``withheld_files`` carries no ``source``, an item whose ``field_path``
         is one carries none either, and every message, the
         items' and the verdict's own, reads ``placeholder`` where it named one of them standing on its own,
-        never inside a longer name. Everything else is kept, the items' locators included, so it is the same
-        answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
+        never inside a longer name. An item of a withheld file restating a name conflict an item located elsewhere
+        reports is left out, as it would be located nowhere. Everything else is kept, the items' locators included, so it
+        is the same answer about the same bundle. Every channel the constructor takes is carried here: a channel added to
         it must be added here too, which ``test_validate_bundle_error_withholding`` pins. So is what the raise site chose
         after building it: the code it chose (:meth:`with_error_code`), and the parameters and items it gave
         (:meth:`with_params`, :meth:`with_items`), withheld as the messages are. The new verdict keeps the withholding,
@@ -435,19 +460,22 @@ class ValidateBundleError(PipelexError):
         """Each of :meth:`validation_error_items` with its code: a dry run's the failure's, any other its type's.
 
         An item no stage classified takes the code of the refusal this verdict was built from when that refusal is
-        the method's, and ``method.schema_violation`` otherwise, or when that code is ``method.invalid``: the verdict's
-        own umbrella, whose sentence says nothing of the item.
+        the method's, and ``method.schema_violation`` otherwise. A refusal under ``method.invalid``, the verdict's own
+        umbrella, whose sentence says nothing of the item, is read through to the error it was raised from: a library
+        that could not load a bundle forwards the parser's refusal of its syntax that way.
         """
         residual_code: ErrorCode = CoreCode.METHOD_SCHEMA_VIOLATION
         # The parameters the refusal's code renders from, as a caller reads them, which an item taking its code keeps.
         residual_params: dict[str, Any] | None = None
         cause = self.__cause__
-        if isinstance(cause, PipelexError):
-            cause_code = cause.resolve_error_code()
-            if code_is_method_domain(code=cause_code) and cause_code not in _VERDICT_UMBRELLA_CODES:
-                residual_code = cause_code
-                cause_params = cause.to_problem(view=ProblemView.CALLER).params
-                residual_params = cause_params.as_wire() if cause_params is not None else None
+        for refusal in iter_pipelex_cause_chain(cause) if cause is not None else ():
+            refusal_code = refusal.resolve_error_code()
+            if refusal_code in _VERDICT_UMBRELLA_CODES:
+                continue
+            if code_is_method_domain(code=refusal_code):
+                residual_code = refusal_code
+                residual_params = refusal.caller_params() or None
+            break
         dry_run_failures = iter(self.dry_run_failures)
         coded_items: list[tuple[ValidationErrorItem, ValidationItemCode]] = []
         for item in self.validation_error_items():
@@ -464,6 +492,16 @@ class ValidateBundleError(PipelexError):
                 item_code = validation_item_code(item=item, residual_code=residual_code)
             coded_items.append((item, ValidationItemCode(code=item_code, params=item_params)))
         return coded_items
+
+
+class TreePythonSyntaxError(PipelexError):
+    """A Python file of a method's tree that is not UTF-8 text or does not parse, found when the tree is validated.
+
+    It is the cause of the invalid verdict the validation raises, one item per such file, so each item takes its code,
+    ``method.syntax``, with its own ``finding``; the error's own parameters describe the first file.
+    """
+
+    error_code = CoreCode.METHOD_SYNTAX
 
 
 class HostLibraryLoadRefusalError(PipelexError):
@@ -493,6 +531,11 @@ class PipeIOContractError(PipelexError):
     """
 
     error_code = CoreCode.METHOD_CONCEPT_INVALID
+
+
+# The finding of `method.concept_invalid` for a concept whose structure has no JSON Schema: what the caller can act on,
+# where the operator's message names the schema generator's own error.
+SCHEMA_UNRENDERABLE_FINDING = "its structure cannot be described as a JSON Schema"
 
 
 class PipelineInputContentError(PipelexError):
@@ -527,6 +570,33 @@ class PipelineInputContentError(PipelexError):
             "Provide a valid url on every Image/Document input (https://, data:, pipelex-storage://, or an existing local file when running locally)."
         ),
     )
+
+    def __init__(self, message: str, *, input_name: str | None = None, field: str | None = None):
+        """The refusal of a file input, named by the run input it belongs to and the path down to it.
+
+        Args:
+            message: The operator's diagnostics.
+            input_name: The run input the file belongs to, the root of its path: `documents`. It is the problem's
+                `input` and `location.input`.
+            field: The dotted path from that input down to what is refused, the input included: `documents[1]`, or
+                `documents[1].url` for its url. It is `location.field`, and the `field` of a code that declares one.
+        """
+        super().__init__(message)
+        self.input_name = input_name
+        self.field = field
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if self.input_name is not None:
+            params["input"] = self.input_name
+        if self.field is not None:
+            params["field"] = self.field
+        return params
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=self.field)
 
 
 class PipelineInputUrlInvalidError(PipelineInputContentError):

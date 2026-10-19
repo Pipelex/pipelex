@@ -74,7 +74,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=the_single_input.concept.concept_ref,
-            )
+            ).with_params(input=next(iter(self.inputs.root)), declared=the_single_input.concept.concept_ref, expected=[text_concept.concept_ref])
 
     @override
     def validate_output_static(self):
@@ -95,7 +95,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-            )
+            ).with_params(declared=self.output.concept.concept_ref, pipe_type=self.type)
 
         # A reference the deck does not define is refused when the pipe is built, so it is not looked up again here
         try:

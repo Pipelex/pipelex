@@ -482,7 +482,7 @@ class PipeAbstract(ABC, BaseModel):
                         variable_names=[var_name],
                         expected_inputs=self._expected_inputs_for_fix(the_needed_inputs),
                         declared_inputs=self._declared_inputs_for_fix(),
-                    )
+                    ).with_params(input=var_name, declared=declared_ref, expected=[required_ref])
 
         # Check that all declared inputs are actually needed
         for input_name in self.inputs.variables:

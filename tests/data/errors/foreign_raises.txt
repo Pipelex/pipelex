@@ -8,7 +8,8 @@
 # - validator: a builtin raised in a helper only pydantic validators call, which pydantic wraps;
 # - private: a private class caught in the module that defines it, which no reader sees;
 # - carrier: a class a library or protocol expects by type (the import system's ImportError, httpx's transport
-#   errors, the standard's method tree refusal its callers translate) that the scan cannot recognise by its name alone;
+#   errors, the standard's method tree refusal its callers translate, the Jinja2 SecurityError the template sandbox
+#   stops a render with) that the scan cannot recognise by its name alone;
 # - tooling: developer or release code outside the exempt directories, which only the development CLI calls;
 # - caught: a builtin raised in a module that must import nothing of Pipelex, which its every caller catches by type.
 #

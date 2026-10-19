@@ -19,12 +19,15 @@ from pipelex.errors.error_code_declaration import ErrorCodeDeclaration
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.problem import (
     MAX_PROBLEM_TEXT_LENGTH,
+    MISSING_REQUIRED_PARAMS_MESSAGE,
     TRUNCATION_MARKER,
     UNKNOWN_CODE_ITEM_DETAIL,
     PipelexProblem,
     ProblemView,
     caller_view_of,
+    make_location,
     make_problem,
+    make_problem_item,
     problem_metadata,
 )
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -171,6 +174,9 @@ class TestProblemViews:
         assert caller.params.as_wire() == {"pipe": "summarize", "template": "prompt", "finding": "unexpected '}'"}
         assert "the raise site's own words" not in str(caller.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds a problem lacking its parameters, to check that its sentence falls back on the title"
+    )
     def test_a_template_missing_a_parameter_falls_back_on_the_title(self, caplog: pytest.LogCaptureFixture) -> None:
         """Rendering is total: a missing parameter costs the sentence, never the problem, and the raise site is logged."""
         error = _TemplateRefusalError("no parameters given")
@@ -184,6 +190,34 @@ class TestProblemViews:
         assert caller.next_step.detail
         assert any(record.getMessage() == "A problem's sentence could not be rendered from its template" for record in caplog.records)
 
+    def test_a_withheld_name_reads_its_own_sentences_in_every_view(self, caplog: pytest.LogCaptureFixture) -> None:
+        """A template refusal without its `name` says what happened without it, in each view and in the caller view of the operator's.
+
+        The name is withheld by rule, which no raise site is at fault for, so nothing is logged about the parameter it
+        lacks, and no sentence falls back on the title or the generic step.
+        """
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            operator = make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.OPERATOR, params={"pipe": "say"})
+            caller = make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.CALLER, params={"pipe": "say"})
+            item = make_problem_item(code=CoreCode.SECURITY_TEMPLATE_REFUSED, params={"pipe": "say"})
+
+        detail = "A template of pipe 'say' looked a name up from the run's data, and the template sandbox refused that name."
+        step = "Change the templates of pipe 'say' so that the run's data no longer chooses the names they look up, then run the method again."
+        assert operator.detail == caller.detail == item.detail == detail
+        assert operator.next_step.detail == caller.next_step.detail == caller_view_of(problem=operator).next_step.detail == step
+        messages = [record.getMessage() for record in caplog.records]
+        assert "A problem lacks a parameter its code requires" not in messages
+        assert "A problem's sentence could not be rendered from its template" not in messages
+
+    @pytest.mark.builds_problems_without_required_params(reason="builds a template refusal lacking its pipe, to check that it is still logged")
+    def test_a_withheld_code_still_logs_another_parameter_it_lacks(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Only the parameter withheld by rule goes unreported: a refusal lacking its `pipe` is still a raise site to fix."""
+        with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
+            make_problem(code=CoreCode.SECURITY_TEMPLATE_REFUSED, view=ProblemView.CALLER, params={})
+
+        lacking = [getattr(record, "params", None) for record in caplog.records if record.getMessage() == MISSING_REQUIRED_PARAMS_MESSAGE]
+        assert lacking == [["pipe"]]
+
     def test_an_undeclared_or_mistyped_parameter_is_dropped(self, caplog: pytest.LogCaptureFixture) -> None:
         error = _TemplateRefusalError("refused").with_params(pipe="summarize", template="prompt", finding="bad", undeclared="secret value")
 
@@ -195,6 +229,9 @@ class TestProblemViews:
         assert "secret value" not in str(caller.to_wire())
         assert any(record.getMessage() == "An error gives a parameter its code does not declare" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds every code's problem with no parameter, to check that none holds a null member"
+    )
     @pytest.mark.parametrize("view", list(ProblemView))
     def test_no_problem_holds_a_null_member(self, view: ProblemView) -> None:
         """Every code, in every view, with no parameter given: no member at any depth is written as null."""
@@ -270,6 +307,7 @@ class TestProblemViews:
         assert caller.next_step.detail == "Report this to whoever runs the runtime."
         assert "sk-" not in str(caller.to_wire())
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds every code's problem with no parameter, to check the steps alone")
     def test_no_step_points_at_text_a_caller_cannot_see(self) -> None:
         """Every step of every code stands alone: none sends its reader to an error message the view may not show."""
         for code in _all_codes():
@@ -302,6 +340,7 @@ class TestProblemViews:
         assert operator.diagnostics.provider is not None
         assert operator.diagnostics.provider.message == ProblemViewsTestData.GATEWAY_PROVIDER_TEXT
 
+    @pytest.mark.builds_problems_without_required_params(reason="builds problems with a retry delay alone, to check which delays are kept")
     def test_an_unusable_retry_delay_is_left_out(self) -> None:
         for delay in (float("inf"), float("nan"), -1.0):
             problem = make_problem(code=CoreCode.PROVIDER_RATE_LIMITED, view=ProblemView.CALLER, retry_after=delay)
@@ -310,6 +349,9 @@ class TestProblemViews:
         # A code whose verdict is not `yes` never carries a delay.
         assert make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, retry_after=3.5).retry_after is None
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="gives parameters the code refuses as a whole, which are dropped, to check that they are"
+    )
     def test_a_parameter_set_refused_as_a_whole_is_dropped(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
         """A refusal naming no parameter, a model-level one, drops them all: the error is reported, never replaced."""
         spec = error_code_spec(CoreCode.METHOD_TEMPLATE_INVALID).model_copy(
@@ -321,10 +363,13 @@ class TestProblemViews:
             problem = make_problem(code=CoreCode.METHOD_TEMPLATE_INVALID, view=ProblemView.CALLER, params={"pipe": "summarize", "template": "x"})
 
         assert problem.code == CoreCode.METHOD_TEMPLATE_INVALID
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
         assert problem.detail == spec.title
         assert any(record.getMessage() == "An error gives parameters its code refuses as a whole" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(reason="gives a parameter the wire refuses, which is dropped, to check that it is")
     def test_a_parameter_the_wire_refuses_is_dropped(self, mocker: MockerFixture) -> None:
         """A value the code's model takes but the problem's own `params` model refuses never fails the problem."""
         spec = error_code_spec(CoreCode.REQUEST_BLOBS_MISSING).model_copy(update={"params_model": _LaxBlobsParams})
@@ -333,7 +378,9 @@ class TestProblemViews:
         problem = make_problem(code=CoreCode.REQUEST_BLOBS_MISSING, view=ProblemView.CALLER, params={"missing_blobs": ["not-a-sha256"]})
 
         assert problem.code == CoreCode.REQUEST_BLOBS_MISSING
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
 
     @pytest.mark.parametrize(
         ("wire", "expected_kind", "expected_detail"),
@@ -460,6 +507,9 @@ class TestProblemViews:
                 assert built.errors is not None
                 assert built.errors[0].as_wire() == ProblemViewsTestData.UNKNOWN_CODE_ITEM
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="gives a required parameter a value the wire refuses, which is dropped, to check that it is"
+    )
     @pytest.mark.parametrize(
         "unreadable",
         [
@@ -482,6 +532,7 @@ class TestProblemViews:
         assert problem.params.as_wire() == {"pipe": "summarize"}
         assert any(record.getMessage() == "An error gives a parameter of the wrong type for its code" for record in caplog.records)
 
+    @pytest.mark.builds_problems_without_required_params(reason="gives a parameter the wire refuses, which is dropped, to check that it is")
     @pytest.mark.parametrize(
         ("code", "params"),
         [
@@ -495,8 +546,44 @@ class TestProblemViews:
         with caplog.at_level(logging.WARNING, logger="pipelex.errors.problem"):
             problem = make_problem(code=code, view=ProblemView.CALLER, params=params)
 
-        assert problem.params is None
+        # The code declares parameters, so the member is present, holding none of those refused.
+        assert problem.params is not None
+        assert problem.params.as_wire() == {}
         assert problem.detail == error_code_spec(code).title
         assert "inf" not in problem.detail
         json.dumps(problem.to_wire(), allow_nan=False)
         assert any(record.getMessage() == "An error gives a parameter of the wrong type for its code" for record in caplog.records)
+
+    def test_a_lone_item_restating_its_problem_is_folded_into_it(self) -> None:
+        """One fault carries no list: the item's parameters and location become the problem's."""
+        item = make_problem_item(
+            code=CoreCode.MODEL_UNKNOWN,
+            params={"model": "gpt-5.1", "model_type": "llm", "suggestions": []},
+            location=make_location(pipe="write", field="model"),
+        )
+
+        problem = make_problem(code=CoreCode.MODEL_UNKNOWN, view=ProblemView.CALLER, errors=[item])
+
+        assert problem.errors is None
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"model": "gpt-5.1", "model_type": "llm", "suggestions": []}
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "write", "field": "model"}
+
+    def test_a_lone_item_carrying_suggestions_or_a_fix_stays_listed(self) -> None:
+        """A problem has no member for an item's suggestions or its fix: the item gives the problem its facts and stays listed."""
+        item = make_problem_item(
+            code=CoreCode.MODEL_UNKNOWN,
+            params={"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5"]},
+            location=make_location(pipe="write", field="model"),
+            suggestions=["gpt-5"],
+            suggested_fix=ProblemViewsTestData.RENAME_MODEL_FIX,
+        )
+
+        wire = make_problem(code=CoreCode.MODEL_UNKNOWN, view=ProblemView.CALLER, errors=[item]).to_wire()
+
+        assert wire["params"] == {"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5"]}
+        assert wire["location"] == {"pipe": "write", "field": "model"}
+        (listed,) = wire["errors"]
+        assert listed["suggestions"] == ["gpt-5"]
+        assert listed["suggested_fix"] == ProblemViewsTestData.RENAME_MODEL_FIX

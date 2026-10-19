@@ -1,5 +1,7 @@
+import difflib
 import re
 import unicodedata
+from collections.abc import Iterable
 from typing import Any
 
 
@@ -489,3 +491,18 @@ def matches_wildcard_pattern(text: str, *, pattern: str) -> bool:
     else:
         # Exact match
         return text == pattern
+
+
+def close_matches(*, name: str, candidates: Iterable[str], cutoff: float, max_matches: int) -> list[str]:
+    """The candidates nearest a name, nearest first, as a refusal offers what its caller most likely meant.
+
+    Args:
+        name: The name that matched nothing.
+        candidates: The names that may be offered.
+        cutoff: How near a candidate must be to be offered, as difflib's similarity ratio, between 0 and 1.
+        max_matches: How many candidates are offered at most.
+
+    Returns:
+        The candidates offered, nearest first; an empty list when none is near.
+    """
+    return difflib.get_close_matches(name, list(candidates), n=max_matches, cutoff=cutoff)

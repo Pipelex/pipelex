@@ -716,6 +716,9 @@ class TestGraphSpecAssembler:
         assert [node.node_id for node in result.nodes] == [outcome]
         assert [edge for edge in result.edges if edge.kind == EdgeKind.SELECTED_OUTCOME] == []
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds an inference failure by hand, below the worker that names its model and provider"
+    )
     def test_partial_failure(self) -> None:
         """Child fails with error, parent has no end event → FAILED + CANCELED."""
         parent = _node_id(_WF_A, 0)

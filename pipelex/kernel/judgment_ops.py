@@ -16,6 +16,7 @@ A step asks one question, `run_judgment`, whose verdict native is the result, or
 judging model, every question answered independently over the same evidence.
 """
 
+from collections.abc import Mapping
 from functools import partial
 from typing import NamedTuple
 
@@ -55,6 +56,7 @@ from pipelex.kernel.memory_ops import store_result
 from pipelex.kernel.prompt_assembly import UserPromptContent, assemble_user_prompt
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
@@ -176,6 +178,7 @@ async def run_judgment(
             memory=memory,
             prompt_content=prompt_content,
             questions={JUDGMENT_QUESTION_KEY: question},
+            question_fields={JUDGMENT_QUESTION_KEY: "question"},
             judgment_setting=judgment_setting,
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
@@ -242,6 +245,7 @@ async def run_multi_judgment(
             memory=memory,
             prompt_content=prompt_content,
             questions={question_name: asked_question.question for question_name, asked_question in questions.items()},
+            question_fields={question_name: f"questions.{question_name}.question" for question_name in questions},
             judgment_setting=judgment_setting,
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
@@ -318,24 +322,31 @@ async def _ask_judgment(
     memory: WorkingMemory,
     prompt_content: UserPromptContent,
     questions: dict[str, JudgmentQuestion],
+    question_fields: Mapping[str, str],
     judgment_setting: JudgmentSetting,
     job_metadata: JobMetadata,
     cogt_run_params: CogtRunParams,
     templating_style: TemplatingStyle,
 ) -> _AskedJudgment:
-    """One request to the judging model: the evidence assembled, every question rendered as a `BASIC` template, all sent in one job."""
+    """One request to the judging model: the evidence assembled, every question rendered as a `BASIC` template, all sent in one job.
+
+    ``question_fields`` names, by the key of each question, the field of the step its template is written in, such as
+    ``question`` or ``questions.urgent.question``, which a refusal of the template sandbox is located on.
+    """
     with job_metadata.log_context():
-        assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
+        with locating_template_refusal(template_field="prompt"):
+            assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
         judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
         context = memory.generate_context()
         asked_questions: dict[str, JudgmentQuestion] = {}
         for question_key, question in questions.items():
-            rendered_question = await render_template(
-                template=question.instructions,
-                category=TemplateCategory.BASIC,
-                context=context,
-                templating_style=templating_style,
-            )
+            with locating_template_refusal(template_field=question_fields[question_key]):
+                rendered_question = await render_template(
+                    template=question.instructions,
+                    category=TemplateCategory.BASIC,
+                    context=context,
+                    templating_style=templating_style,
+                )
             asked_questions[question_key] = question.model_copy(update={"instructions": rendered_question})
         judgment_assignment = JudgmentAssignment(
             job_metadata=job_metadata,

@@ -1,11 +1,13 @@
 from enum import StrEnum
 from typing import Any
 
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.problem import make_location
 from pipelex.errors.security_target import SecurityTargetClass
 
 
@@ -53,9 +55,14 @@ class UriReadRefusedError(SecurityError):
 
     error_code = ErrorCodeSet(default=CoreCode.SECURITY_INPUT_URL_REFUSED, others=(CoreCode.SECURITY_METHOD_URL_REFUSED,))
 
-    def __init__(self, message: str, *, reason: UriReadRefusalReason):
+    def __init__(self, message: str, *, reason: UriReadRefusalReason, input_name: str | None = None, field: str | None = None):
         super().__init__(message)
         self.reason = reason
+        # The run input whose file the URL is, when the caller gave it: the `input` of `security.input_url_refused`, the
+        # root of the file's path. The path down to the file, the input included, such as `documents[1]`, is the
+        # location's `field`.
+        self.input_name = input_name
+        self.field = field
         # The reason is the class of destination refused, so the security event names it without the raise site saying so.
         self.with_security_target_class(reason.target_class)
 
@@ -64,4 +71,11 @@ class UriReadRefusedError(SecurityError):
         # The problem's `target_class` is a value the registry lists, which the code's sentence reads as a word ("points
         # at a private target"): `scheme` for a local path, and `private` for another tenant's key, which the registry
         # lists no value for. The security event names the finer class the refusal states, `foreign_storage_key`.
-        return {"reason": self.reason.desc, "target_class": self.reason.target_class.listed_target_class}
+        params: dict[str, Any] = {"reason": self.reason.desc, "target_class": self.reason.target_class.listed_target_class}
+        if self.input_name is not None:
+            params["input"] = self.input_name
+        return params
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name, field=self.field)

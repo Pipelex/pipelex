@@ -409,6 +409,9 @@ class TestRunHostedRefusal:
         assert problem["next_step"] == {"kind": "upgrade", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]}
         _assert_no_retired_member(problem=problem)
 
+    @pytest.mark.builds_problems_without_required_params(
+        reason="the hosted plane's former-shape refusal names none of its code's parameters; the agent reads its status and own code alone"
+    )
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize(
         ("status", "body", "headers", "expected"),
@@ -439,6 +442,7 @@ class TestRunHostedRefusal:
                     "status": 403,
                     "detail": "Your role in this organization does not allow running methods.",
                     "code": "auth.forbidden",
+                    "params": {},
                     "domain": "account",
                     "retry": "no",
                     "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
@@ -455,6 +459,7 @@ class TestRunHostedRefusal:
                     "status": 403,
                     "detail": "This route is served to a web session only.",
                     "code": "auth.forbidden",
+                    "params": {},
                     "domain": "account",
                     "retry": "no",
                     "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
@@ -501,6 +506,7 @@ class TestRunHostedRefusal:
                     "status": 404,
                     "detail": "No run run_9 is visible to this key.",
                     "code": "run.not_found",
+                    "params": {},
                     "domain": "input",
                     "retry": "no",
                     "next_step": {"kind": "change_input", "detail": "Check the run id, then read the run again."},
@@ -516,6 +522,7 @@ class TestRunHostedRefusal:
                     "status": 404,
                     "detail": "The method mt_7 has no published version 3.",
                     "code": "method.not_found",
+                    "params": {},
                     "domain": "input",
                     "retry": "no",
                     "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]},
@@ -531,6 +538,7 @@ class TestRunHostedRefusal:
                     "status": 429,
                     "detail": "Too many runs started in the last minute.",
                     "code": "account.rate_limited",
+                    "params": {},
                     "domain": "account",
                     "retry": "yes",
                     "retry_after": 30,
@@ -548,6 +556,7 @@ class TestRunHostedRefusal:
                     "status": 429,
                     "detail": "Too many runs started in the last minute.",
                     "code": "account.rate_limited",
+                    "params": {},
                     "domain": "account",
                     "retry": "yes",
                     "retry_after": 12,

@@ -70,6 +70,9 @@ class TestAgentErrorFormat:
         assert "Traceback" not in err
 
     @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    @pytest.mark.builds_problems_without_required_params(
+        reason="builds its verdict's items in the test, without an unresolved pipe's candidates or a residual's field path"
+    )
     def test_both_formats_list_the_one_problem_s_errors(self, capsys: pytest.CaptureFixture[str], error_format: CliOutputFormat) -> None:
         """A wrapper adding a fault of its own above a verdict: both formats list the verdict's item and the wrapper's."""
         set_agent_cli_error_format(error_format)

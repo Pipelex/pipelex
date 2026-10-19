@@ -86,7 +86,8 @@ class TestMethodEntry:
                 },
                 "none of its bundles declares a main_pipe ('a.mthds', 'b/b.mthds')",
                 CoreCode.REQUEST_PIPE_UNSPECIFIED,
-                None,
+                # With no main pipe declared anywhere, every pipe the method declares is one to choose from.
+                {"candidates": ["entry_a.first", "entry_b.second"]},
             ),
             (
                 {
@@ -107,7 +108,7 @@ class TestMethodEntry:
                     "Its bundles: 'a.mthds'."
                 ),
                 CoreCode.REQUEST_PIPE_UNSPECIFIED,
-                None,
+                {"candidates": ["entry_a.first"]},
             ),
             (
                 {
@@ -116,7 +117,8 @@ class TestMethodEntry:
                 },
                 "declares the main_pipe 'missing', exported by 'entry_a', which none of its bundles defines in that domain: 'a.mthds'.",
                 CoreCode.METHOD_PIPE_UNRESOLVED,
-                {"missing": "missing"},
+                # The declaration holding the reference stands for the pipe, and no declared pipe is near the one missing.
+                {"pipe": "main_pipe", "missing": "missing", "candidates": []},
             ),
             (
                 {
@@ -156,7 +158,7 @@ class TestMethodEntry:
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == expected_code
         assert problem.domain != ProblemDomain.OPERATOR
-        # The refusal gives the parameters its sentences name: the pipes to choose from, the missing one, the ambiguous one.
+        # The refusal gives every parameter its code requires: the pipes to choose from, the missing one, the ambiguous one.
         assert problem.to_wire().get("params") == expected_params
 
     def test_a_manifest_that_does_not_validate_is_an_entry_refusal(self, tmp_path: Path) -> None:
