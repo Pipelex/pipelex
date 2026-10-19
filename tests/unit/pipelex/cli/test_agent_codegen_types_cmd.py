@@ -100,18 +100,17 @@ class TestAgentCodegenTypesCmd:
 
         assert exc_info.value.exit_code == 1
         error = json.loads(capsys.readouterr().err)
-        assert error["error"] is True
-        assert error["error_type"] == "LibraryLoadingError"
+        assert error["diagnostics"]["error_class"] == "LibraryLoadingError"
         assert "duplicate pipe" in error["message"]
 
     @pytest.mark.builds_problems_without_required_params(
         reason="hands the command an error built in the test, without the method reference its raise site names"
     )
     @pytest.mark.parametrize(
-        ("raised", "expected_error_type"),
+        ("raised", "expected_code"),
         [
-            (FileNotFoundError("the library directory does not exist."), "FileNotFoundError"),
-            (BundleClosureEmptyError("no .mthds bundles found in the closure."), "BundleClosureEmptyError"),
+            (FileNotFoundError("the library directory does not exist."), "client.file_unreadable"),
+            (BundleClosureEmptyError("no .mthds bundles found in the closure."), "method.not_found"),
         ],
     )
     def test_unassembled_closure_is_no_verdict_exit_2(
@@ -120,7 +119,7 @@ class TestAgentCodegenTypesCmd:
         tmp_path: Path,
         capsys: pytest.CaptureFixture[str],
         raised: Exception,
-        expected_error_type: str,
+        expected_code: str,
     ) -> None:
         self._neutralize_boot(mocker)
         mocker.patch(f"{CMD_MODULE}.load_normalized_crate", side_effect=raised)
@@ -137,7 +136,7 @@ class TestAgentCodegenTypesCmd:
 
         assert exc_info.value.exit_code == 2
         error = json.loads(capsys.readouterr().err)
-        assert error["error_type"] == expected_error_type
+        assert error["code"] == expected_code
 
     def test_boot_loads_model_specs_for_offline_validation(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Like the bare CLI, the agent mirror boots offline but WITH model specs: library validation

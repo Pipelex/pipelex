@@ -5,7 +5,7 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, set_agent_cli_error_format
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success_formatted, use_agent_cli_error_format
 from pipelex.migration.exceptions import FunctionNamesMigrationError
 from pipelex.migration.function_names import FunctionNamesMigration, migrate_function_names_in_directory
 from pipelex.migration.function_names_render import format_function_names_markdown
@@ -37,16 +37,16 @@ def fix_function_names_cmd(
     ] = CliOutputFormat.MARKDOWN,
     error_format: Annotated[
         CliOutputFormat | None,
-        typer.Option("--error-format", help="Error output format (defaults to --format value): markdown or json"),
+        typer.Option("--error-format", help="Error output format: markdown or json (defaults to the program's --error-format, then to --format)"),
     ] = None,
 ) -> None:
     """Rewrite every flat PipeFunc function_name of a method as its import path; branch on `is_complete`."""
-    set_agent_cli_error_format(error_format or output_format)
+    use_agent_cli_error_format(error_format=error_format, output_format=output_format)
     directory = Path(path)
     try:
         migration = migrate_function_names_in_directory(directory=directory, is_dry_run=dry_run)
     except FunctionNamesMigrationError as exc:
-        agent_error(exc.message, error_type=type(exc).__name__, cause=exc, exit_code=2)
+        agent_error(exc.message, cause=exc, exit_code=2)
     agent_success_formatted(
         _payload(migration=migration, directory=directory, is_dry_run=dry_run),
         markdown_renderer=lambda _payload_dict: format_function_names_markdown(migration=migration, directory=path, is_dry_run=dry_run),

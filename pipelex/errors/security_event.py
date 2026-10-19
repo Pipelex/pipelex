@@ -40,7 +40,7 @@ from pipelex.errors.error_code_declaration import InheritsCause
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.errors.security_target import SecurityTargetClass, SecurityTargetKind
-from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
+from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD
 from pipelex.tools.log.log import log
 from pipelex.tools.log.log_context import PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD
 
@@ -57,9 +57,6 @@ SECURITY_EVENT_NAME = "pipelex.security.refusal"
 
 #: The field naming the kind of record, the OpenTelemetry semantic-convention key for a log event's name.
 EVENT_NAME_FIELD = "event.name"
-
-#: The field carrying the refusal's registry code.
-ERROR_CODE_FIELD = "error.code"
 
 #: The field carrying the code's domain, who caused the refusal.
 ERROR_DOMAIN_FIELD = "error.domain"

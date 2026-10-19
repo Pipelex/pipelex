@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from pathlib import Path
 
 import tomli
 import tomlkit
@@ -58,7 +58,7 @@ def load_toml_from_bytes(*, data: bytes, source: str | Path) -> dict[str, Any]:
         return tomli.loads(data.decode())
     except tomli.TOMLDecodeError as exc:
         msg = f"TOML parsing error in file '{source}': {exc.msg}"
-        raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
+        raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno, path=Path(source)) from exc
 
 
 def load_toml_from_path_if_exists(path: str | Path) -> dict[str, Any] | None:

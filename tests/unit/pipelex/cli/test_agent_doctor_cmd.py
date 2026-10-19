@@ -504,7 +504,7 @@ class TestAgentDoctorCmd:
         assert any("ANTHROPIC_API_KEY" in action for action in parsed["recommended_actions"])
 
     def test_unexpected_error_produces_json_error(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """If a health check raises an unexpected exception, agent_error JSON should be produced."""
+        """If a health check raises an unexpected exception, its problem is printed as JSON."""
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_config_files",
             side_effect=RuntimeError("unexpected kaboom"),
@@ -515,7 +515,8 @@ class TestAgentDoctorCmd:
         assert exc_info.value.exit_code == 1
 
         parsed = json.loads(capsys.readouterr().err)
-        assert parsed["error"] is True
+        assert parsed["code"] == "runtime.unexpected"
+        assert parsed["diagnostics"]["error_class"] == "RuntimeError"
         assert "unexpected kaboom" in parsed["message"]
 
     def test_broken_config_skips_bootstrap_and_preserves_partial_report(

@@ -2,13 +2,13 @@
 
 Proves that a deterministic worker failure propagates through the whole
 pipeline — worker error -> pipe operator -> router -> runner ->
-PipelineExecutionError -> agent_error() -> stderr — and surfaces correct
-structured output in both JSON and markdown.
+PipelineExecutionError -> agent_error() -> stderr — and surfaces as the
+worker's problem, located at the failing pipe, in both JSON and markdown.
 
 The LLM worker is mocked to raise a transient LLMCompletionError; every
 wrapping layer below the CLI runs for real, so this catches wiring
-regressions no per-worker test can (a wrapper dropping error_category, a
-field agent_error() forgets to forward, a degraded error_source chain).
+regressions no per-worker test can (a wrapper hiding the worker's code,
+a lost location, a lost model or provider, a degraded cause chain).
 """
 
 from __future__ import annotations
@@ -76,71 +76,47 @@ class TestRunErrorChain:
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """The JSON error payload carries the worker's category, retryability, model, and source chain."""
+        """The JSON problem is the worker's: its code and retry verdict, located at the pipe, with the model, provider and chain."""
         self._invoke_failing_run(mocker, CliOutputFormat.JSON)
 
         captured = capsys.readouterr()
         assert captured.out == ""
         payload = json.loads(captured.err)
 
-        assert payload["error"] is True
-        assert payload["error_type"] == "PipelineExecutionError"
-        assert payload["message"]
-        # error_category / retryable / model / provider originate on the worker's
-        # LLMCompletionError and must survive every wrapping layer.
-        assert payload["error_category"] == "transient"
-        assert payload["retryable"] is True
-        assert payload["hint"] == WORKER_ADVICE
-        assert payload["error_domain"] == "runtime"
-        assert payload["model"] == WORKER_MODEL
-        assert payload["provider"] == WORKER_PROVIDER
-        assert payload["pipe_code"] == "greet"
-        assert payload["pipe_stack"] == ["greet"]
-        # The cause fields name the root fault, not the router wrapper right under the run error.
-        assert payload["cause_type"] == "LLMCompletionError"
-        assert payload["cause_message"] == WORKER_ERROR_MESSAGE
+        # The code, the domain and the verdict originate on the worker's LLMCompletionError and survive every wrapping layer.
+        assert payload["code"] == "provider.unavailable"
+        assert payload["domain"] == "runtime"
+        assert payload["retry"] == "yes"
+        assert payload["location"] == {"pipe": "greet", "path": ["greet"]}
         assert payload["message"] == f"Pipe 'greet' failed: {WORKER_ERROR_MESSAGE}"
-
-        # error_source is the cause chain, outermost first: runner -> router -> pipe operator -> worker.
-        error_source: list[str] = payload["error_source"]
-        assert isinstance(error_source, list)
-        joined_source = "\n".join(error_source)
-        runner_frame = joined_source.index("PipelineExecutionError")
-        router_frame = joined_source.index("PipeRouterError")
-        operator_frame = joined_source.index("PipeRunError")
-        worker_frame = joined_source.index("LLMCompletionError")
-        assert runner_frame < router_frame < operator_frame < worker_frame
+        diagnostics = payload["diagnostics"]
+        assert diagnostics["error_class"] == "LLMCompletionError"
+        assert diagnostics["model"] == WORKER_MODEL
+        assert diagnostics["provider"]["name"] == WORKER_PROVIDER
+        for retired in ("error", "error_type", "error_category", "retryable", "hint", "error_source", "cause_type", "pipe_stack"):
+            assert retired not in payload
 
     def test_run_error_chain_markdown(
         self,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """The markdown error output carries the error type, message, hint, and structured details — but no source frames.
-
-        ``error_source`` (the internal Python stack chain — ``PipeRouterError``,
-        ``LLMCompletionError``, etc.) is deliberately stripped from markdown. It's
-        noise for an LLM trying to fix a `.mthds` file. The JSON test above is what
-        pins the wrapping-chain contract.
-        """
+        """The markdown problem names the fault, the next step, the worker's advice, the place, the model and provider — no source frames."""
         self._invoke_failing_run(mocker, CliOutputFormat.MARKDOWN)
 
         captured = capsys.readouterr()
         assert captured.out == ""
         markdown = captured.err
 
-        assert markdown.startswith("# Error: PipelineExecutionError")
+        assert markdown.startswith("## ")
         assert WORKER_ERROR_MESSAGE in markdown
-        assert "💡" in markdown  # hint callout
-        assert WORKER_ADVICE in markdown
-        assert "error_category" in markdown
-        assert "transient" in markdown
-        # The whole stack-trace section is gone. The stack-frame format from
-        # _build_error_source is "<ExceptionType> @ <file>:<line> (in <func>)" —
-        # check the section header and the frame format are both absent.
-        # Note: structured cause fields like ``cause_type`` may legitimately
-        # surface exception names under ``## Details``; that's not a stack frame.
-        assert "## Error source" not in markdown
+        assert "**Next step** (`retry`)" in markdown
+        assert f"💡 {WORKER_ADVICE}" in markdown
+        assert "- Code: `provider.unavailable` (domain runtime, retry yes)" in markdown
+        assert "- Location: pipe 'greet', path greet" in markdown
+        assert f"- Model: `{WORKER_MODEL}`" in markdown
+        assert f"- Provider: `{WORKER_PROVIDER}`" in markdown
+        # No stack frame reaches the agent: the frame format "<ExceptionType> @ <file>:<line> (in <func>)" is absent.
         assert " @ pipelex/" not in markdown
         assert "(in " not in markdown
         with pytest.raises(json.JSONDecodeError):

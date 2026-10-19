@@ -28,14 +28,6 @@ rationale = "Verb-object: iterates the Pipelex part of the exception's cause cha
 param = "exc"
 rationale = "Verb-object: iterates the chain a traceback of the exception prints; single operand, as iter_cause_chain."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_agent_error_json"]
-param = "message"
-rationale = "Builds the error JSON around the message; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::_assemble_error_payload"]
-param = "message"
-rationale = "Assembles the error payload around the message; single operand."
-
 ["pipelex/cli/agent_cli/commands/agent_output.py::_build_error_source"]
 param = "exc"
 rationale = "Derives from the exc; single operand."
@@ -44,21 +36,25 @@ rationale = "Derives from the exc; single operand."
 param = "payload"
 rationale = "Renders the payload; single operand."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::_render_validate_bundle_markdown"]
-param = "items"
-rationale = "Verb-object: renders the validation error items; the rest is context."
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_argument_error"]
+param = "message"
+rationale = "Refuses an argument with the command's message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error"]
 param = "message"
 rationale = "Emits an agent error for the message; single operand."
 
-["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_markdown"]
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_hosted_envelope"]
 param = "message"
-rationale = "Renders the message; single operand."
+rationale = "Emits a hosted run's legacy error envelope for the message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_error_validate_bundle"]
 param = "exc"
 rationale = "Error handler: the exc is the single operand handled."
+
+["pipelex/cli/agent_cli/commands/agent_output.py::agent_file_error"]
+param = "message"
+rationale = "Refuses a local file with the command's message; single operand, as agent_error."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success"]
 param = "result"
@@ -67,10 +63,6 @@ rationale = "Emits the success result payload; single operand."
 ["pipelex/cli/agent_cli/commands/agent_output.py::agent_success_formatted"]
 param = "result"
 rationale = "Emits the formatted success result; single operand."
-
-["pipelex/cli/agent_cli/commands/agent_output.py::extract_validation_errors"]
-param = "exc"
-rationale = "Extracts from the exc; single operand."
 
 ["pipelex/cli/agent_cli/commands/agent_output.py::set_agent_cli_error_format"]
 param = "error_format"
@@ -4488,9 +4480,9 @@ rationale = "Verb-object: formats the fix payload; bundle_path is context."
 param = "result"
 rationale = "Positional-Callable protocol shape: markdown renderer over the result dict."
 
-["pipelex/pipeline/fixes/fix_render.py::format_fix_still_invalid_markdown"]
+["pipelex/pipeline/fixes/fix_render.py::format_fix_progress_markdown"]
 param = "result"
-rationale = "Verb-object: formats the fix result; bundle_path is context."
+rationale = "Verb-object: formats the fix result's progress; bundle_path is context."
 
 ["pipelex/pipeline/fixes/planner.py::_plan_match_sequence_output"]
 param = "error_data"

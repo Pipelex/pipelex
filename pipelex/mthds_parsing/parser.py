@@ -25,6 +25,36 @@ def _decode_error_position(exc: UnicodeDecodeError) -> tuple[int, int]:
     return before.count("\n") + 1, len(before) - line_start + 1
 
 
+def undecodable_mthds_error(*, error: UnicodeDecodeError, source: str | None) -> MthdsParserError:
+    """The refusal of an MTHDS file that is not UTF-8 text: ``method.syntax``, located at its first byte that does not decode.
+
+    TOML is UTF-8 text, so such a file does not parse: it is the method's syntax fault, which every command reports as
+    ``validate`` does, and never a file this machine cannot read.
+    """
+    line, column = _decode_error_position(error)
+    msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
+    return (
+        MthdsParserError(
+            msg,
+            validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
+        )
+        .with_error_code(CoreCode.METHOD_SYNTAX)
+        .with_params(finding=msg)
+    )
+
+
+def decode_mthds_text(*, content: bytes, source: str | None) -> str:
+    """The text of an MTHDS file read as bytes, decoded as the parser decodes a file it reads itself.
+
+    Raises:
+        MthdsParserError: The bytes are not UTF-8 text (:func:`undecodable_mthds_error`).
+    """
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise undecodable_mthds_error(error=exc, source=source) from exc
+
+
 class MthdsParser(BaseModel):
     """MTHDS -> PipelexBundleBlueprint"""
 
@@ -103,16 +133,7 @@ class MthdsParser(BaseModel):
         except UnicodeDecodeError as exc:
             # tomli reads a file as bytes and decodes them as UTF-8, so a file of a tree that is not text fails here.
             source = mthds_source if mthds_source is not None else str(bundle_path)
-            line, column = _decode_error_position(exc)
-            msg = f"The MTHDS file is not UTF-8 text: the byte at line {line}, column {column} does not decode."
-            raise (
-                MthdsParserError(
-                    msg,
-                    validation_errors=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg, line=line, column=column)],
-                )
-                .with_error_code(CoreCode.METHOD_SYNTAX)
-                .with_params(finding=msg)
-            ) from exc
+            raise undecodable_mthds_error(error=exc, source=source) from exc
 
         if not blueprint_dict:
             msg = "Could not make 'PipelexBundleBlueprint': no blueprint found in the MTHDS file"
