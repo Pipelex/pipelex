@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from pydantic import BaseModel
@@ -19,6 +19,9 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_ji
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.jinja2.template_owner import TemplateOwner
 from pipelex.tools.jinja2.template_surface import TemplateSurface
+
+if TYPE_CHECKING:
+    from pipelex.base_exceptions import PipelexError
 
 # A value of the run's data, which no message, parameter or diagnostic carries.
 _PAYLOAD = "confidential-patient-diagnosis"
@@ -48,10 +51,13 @@ _BUDGET_REFUSAL_PREFIX = (
 )
 
 
-async def _render_failure(*, template_source: str, context: dict[str, Any], is_async: bool) -> ToolError:
-    """The error rendering `template_source` raises, through the synchronous or the asynchronous render."""
+async def _render_failure(*, template_source: str, context: dict[str, Any], is_async: bool) -> PipelexError:
+    """The error rendering `template_source` raises, through the synchronous or the asynchronous render.
+
+    A refusal of the sandbox is a `SecurityError`, every other render failure a `ToolError`.
+    """
     if is_async:
-        with pytest.raises(ToolError) as async_exc_info:
+        with pytest.raises((ToolError, Jinja2TemplateSecurityError)) as async_exc_info:
             await render_jinja2_async(
                 template_source=template_source,
                 template_category=TemplateCategory.BASIC,
@@ -59,7 +65,7 @@ async def _render_failure(*, template_source: str, context: dict[str, Any], is_a
                 template_owner=TemplateOwner.METHOD,
             )
         return async_exc_info.value
-    with pytest.raises(ToolError) as sync_exc_info:
+    with pytest.raises((ToolError, Jinja2TemplateSecurityError)) as sync_exc_info:
         render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.BASIC,
@@ -157,7 +163,7 @@ class TestJinja2RenderFailureText:
         topic: str,
         template_source: str,
         context: dict[str, Any],
-        expected_error: type[ToolError],
+        expected_error: type[PipelexError],
         expected_message: str,
         is_async: bool,
     ) -> None:
