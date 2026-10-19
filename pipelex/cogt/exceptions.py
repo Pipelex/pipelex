@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
@@ -536,7 +536,8 @@ class LLMCompletionError(CogtError):
 
     The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
     one: ``provider.response_invalid`` for an answer with no usable text, ``runtime.unexpected`` for a structured
-    generation that failed with no cause to read. A worker wrapping a coded error in it takes that error's code.
+    generation that failed with no cause to read. A worker wrapping a coded error in it takes that error's code. A
+    text or a structured output cut short or refused is one of its subclasses, which carries its own code.
     """
 
     error_code: ClassVar[ErrorCodeDeclaration] = _inference_failure_declaration(fallback=CoreCode.RUNTIME_UNEXPECTED)
@@ -551,20 +552,48 @@ class CompletionTruncationLimit(StrEnum):
     CONTEXT_WINDOW = "context_window"
 
 
+class CompletionOutputKind(StrEnum):
+    """What a completion was writing when it stopped, which its error names: a text, or a structured output."""
+
+    TEXT = "text"
+    STRUCTURED = "structured"
+
+    @property
+    def desc(self) -> str:
+        """The words an error names this output by."""
+        match self:
+            case CompletionOutputKind.TEXT:
+                return "text"
+            case CompletionOutputKind.STRUCTURED:
+                return "structured output"
+
+
+class MaxTokensCeiling(NamedTuple):
+    """A max_tokens a worker sent below the one it was given, to fit its call's timeout, so a higher one is lowered too."""
+
+    # The max_tokens the call was given: the pipe's setting, or the model's default
+    requested_max_tokens: int
+    # The call's timeout, which the max_tokens sent fits
+    timeout_seconds: int
+
+
 class LLMCompletionTruncatedError(LLMCompletionError):
-    """A text completion stopped before the model finished it: it hit its output limit, or its context window.
+    """A completion stopped before the model finished it: it hit its output limit, or its context window.
 
     A worker raises it when its provider's stop signal says the text was cut (see
-    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result. It
-    is not retryable: the same request stops at the same limit. Its code follows the limit hit:
-    ``model.output_truncated`` at the output limit, the method's token cap, and ``model.context_exceeded`` at the
-    context window, which the inputs filled. Which remedy applies depends on the limit hit, carried as
-    `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter input, or, when the
-    request sent no `max_tokens` and the provider's default cut the text, a `max_tokens` set on the pipe up to
-    the model's limit, a lower reasoning effort or a shorter input; at the context window, which the input and
-    the output filled together, a shorter input, less thinking or a model with a larger window, never a higher
-    `max_tokens`. The message names only the pipe, the model's deck handle, the provider's stop value and the
-    token counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
+    `pipelex.cogt.llm.completion_stop`), instead of handing back the partial or empty text as a result, and when
+    instructor reports a structured output cut at its output limit with its `IncompleteOutputException`; its
+    `output_kind` says which of the two was cut. It is not retryable: the same request stops at the same limit.
+    Its code follows the limit hit: ``model.output_truncated`` at the output limit, the method's token cap, and
+    ``model.context_exceeded`` at the context window, which the inputs filled. Which remedy applies depends on the
+    limit hit, carried as `truncation_limit`: at the output limit, a higher `max_tokens` on the pipe or a shorter
+    input, or, when the request sent no `max_tokens` and the provider's default cut the text, a `max_tokens` set on
+    the pipe up to the model's limit, a lower reasoning effort or a shorter input, or, when the worker sent a
+    `max_tokens` lowered to fit its call's timeout (`max_tokens_ceiling`), a lower reasoning effort or a smaller
+    output, since a higher `max_tokens` is lowered the same way; at the context window, which the input and the
+    output filled together, a shorter input, less thinking or a model with a larger window, never a higher
+    `max_tokens`. The message names only the pipe, the model's deck handle, the provider's stop value and the token
+    counts, never the partial text or the provider's body, so it is kept verbatim for the caller.
     """
 
     error_code = ErrorCodeSet(default=CoreCode.MODEL_OUTPUT_TRUNCATED, others=(CoreCode.MODEL_CONTEXT_EXCEEDED,))
@@ -577,11 +606,28 @@ class LLMCompletionTruncatedError(LLMCompletionError):
         model_handle: str,
         stop_reason: str,
         truncation_limit: CompletionTruncationLimit,
+        output_kind: CompletionOutputKind,
         pipe_code: str | None = None,
         max_tokens: int | None = None,
         output_tokens: int | None = None,
+        max_tokens_ceiling: MaxTokensCeiling | None = None,
     ):
-        subject = f"the text of pipe '{pipe_code}'" if pipe_code else "its text"
+        """Build the error, its message and its next step from the facts of the cut.
+
+        Args:
+            model_handle: The model's deck handle.
+            stop_reason: The provider's stop value.
+            truncation_limit: The limit the completion hit.
+            output_kind: Whether a text or a structured output was cut.
+            pipe_code: The pipe whose output it was, None when the job names none.
+            max_tokens: The output limit the request sent, None when it sent none.
+            output_tokens: The output tokens the provider counted, None when it gave no count.
+            max_tokens_ceiling: Set when the worker sent a lower max_tokens than it was given, to fit its call's
+                timeout: a higher max_tokens is then lowered the same way, so the next step names what else lifts the
+                limit. Read at the output limit only.
+        """
+        output_desc = output_kind.desc
+        subject = f"the {output_desc} of pipe '{pipe_code}'" if pipe_code else f"its {output_desc}"
         details = [f"stop reason '{stop_reason}'"]
         if output_tokens is not None:
             details.append(f"{output_tokens} output tokens used")
@@ -589,10 +635,23 @@ class LLMCompletionTruncatedError(LLMCompletionError):
             details.append(f"max_tokens set to {max_tokens}")
         what_happened: str
         next_step: str
+        # A fact the next step rests on, said between the cut and the next step
+        lowered_fact: str | None = None
         match truncation_limit:
             case CompletionTruncationLimit.MAX_TOKENS:
                 what_happened = "was cut off"
-                if max_tokens is not None:
+                if max_tokens is not None and max_tokens_ceiling is not None:
+                    # The worker held the limit below the one it was given, so a higher one would be held the same way
+                    lowered_fact = (
+                        f"Its max_tokens was lowered from {max_tokens_ceiling.requested_max_tokens} to {max_tokens} "
+                        f"to fit the call's {max_tokens_ceiling.timeout_seconds}-second timeout."
+                    )
+                    next_step = (
+                        "Lower the pipe's reasoning effort, or ask it for a smaller output, since a higher max_tokens is lowered the same way."
+                        if pipe_code
+                        else "Lower the reasoning effort, or ask for a smaller output, since a higher max_tokens is lowered the same way."
+                    )
+                elif max_tokens is not None:
                     next_step = "Raise the pipe's max_tokens, or shorten its input." if pipe_code else "Raise max_tokens, or shorten the input."
                 else:
                     # The request left the limit to the provider's default, so there is no max_tokens of the pipe's to raise
@@ -609,10 +668,13 @@ class LLMCompletionTruncatedError(LLMCompletionError):
                     if pipe_code
                     else "Shorten the input, lower the reasoning effort, or choose a model with a larger context window."
                 )
-        message = (
-            f"The model '{model_handle}' {what_happened} before it finished {subject} ({', '.join(details)}), so the text is incomplete. {next_step}"
-        )
-        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        sentences = [
+            f"The model '{model_handle}' {what_happened} before it finished {subject} ({', '.join(details)}), so the {output_desc} is incomplete."
+        ]
+        if lowered_fact is not None:
+            sentences.append(lowered_fact)
+        sentences.append(next_step)
+        super().__init__(" ".join(sentences), user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
         match truncation_limit:
             case CompletionTruncationLimit.MAX_TOKENS:
                 self.with_error_code(CoreCode.MODEL_OUTPUT_TRUNCATED)
@@ -621,9 +683,11 @@ class LLMCompletionTruncatedError(LLMCompletionError):
         self.model_handle = model_handle
         self.stop_reason = stop_reason
         self.truncation_limit = truncation_limit
+        self.output_kind = output_kind
         self.pipe_code = pipe_code
         self.max_tokens = max_tokens
         self.output_tokens = output_tokens
+        self.max_tokens_ceiling = max_tokens_ceiling
 
 
 class LLMCompletionRefusedError(LLMCompletionError):
@@ -737,12 +801,38 @@ class ImgGenGenerationError(CogtError):
     """An image generation that failed: a provider's failure the classification read, or an answer that cannot be used.
 
     The Render step constructs it with the code its classification picked, and a worker raising it directly chooses
-    one: ``provider.response_invalid`` for an answer with no usable image, ``provider.outcome_unknown`` for a call
-    that failed after it was sent, which may have generated, and billed, the image. With no code chosen and no coded
-    cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
+    one: ``provider.response_invalid`` for an answer with no usable image, ``model.content_refused`` for an answer
+    whose finish or block reason says the provider refused the request on policy grounds, ``provider.outcome_unknown``
+    for a call that failed after it was sent, which may have generated, and billed, the image. With no code chosen and
+    no coded cause, it is ``provider.outcome_unknown``, since an image generation is a call no one may blindly repeat.
     """
 
-    error_code = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
+    error_code: ClassVar[ErrorCodeDeclaration] = _inference_failure_declaration(fallback=CoreCode.PROVIDER_OUTCOME_UNKNOWN)
+
+
+class ImgGenOutputTruncatedError(ImgGenGenerationError):
+    """An image generation the model's output token limit cut before it produced the image.
+
+    A worker raises it when its provider's answer, a success all the same, says its output stopped at that limit and
+    holds no image (a Gemini candidate whose finish reason is `MAX_TOKENS`), instead of reading it as an empty answer.
+    It is ``model.output_truncated``, and not retryable: the same request stops at the same limit. The worker sends no
+    output limit of its own, so the limit is the model's, which the image and the model's thinking share, and the
+    next step is a simpler prompt or another model, never a setting of the pipe's. The message names only the model's
+    deck handle and the provider's stop value, so it is kept verbatim for the caller.
+    """
+
+    error_code = CoreCode.MODEL_OUTPUT_TRUNCATED
+    error_category = InferenceErrorCategory.CONTENT
+    _authors_caller_facing_message = True
+
+    def __init__(self, *, model_handle: str, stop_reason: str):
+        next_step = "Simplify the image prompt, or choose another image model."
+        message = (
+            f"The model '{model_handle}' reached its output token limit before it generated the image (finish reason '{stop_reason}'). {next_step}"
+        )
+        super().__init__(message, user_action=UserAction(kind=UserActionKind.CHANGE_INPUT, detail=next_step))
+        self.model_handle = model_handle
+        self.stop_reason = stop_reason
 
 
 class ExtractCapabilityError(CogtError):

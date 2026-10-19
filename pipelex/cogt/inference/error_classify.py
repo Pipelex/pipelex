@@ -247,6 +247,22 @@ def _classify_server_error(*, status_code: int, family: InferenceErrorFamily) ->
     )
 
 
+def _bad_request_error_code(*, metadata: SDKErrorEnvelope) -> ErrorCode:
+    """The code of a provider 400, which says what the provider refused when it says it, and is ours otherwise.
+
+    Inputs over what the model can read are the caller's to shorten, and a content-policy signal is the caller's
+    material refused. A 400 nothing recognises is most likely a request of ours the provider could not take. Every
+    family reads the context-window signal: ``model.context_exceeded`` means the inputs exceed what the model can read,
+    whether the model writes text, generates images or reads documents, as an image model whose prompt images exceed
+    its limit already reports, so the code stays the same and the Render step words the advice for the family.
+    """
+    if metadata.is_context_window_exceeded:
+        return CoreCode.MODEL_CONTEXT_EXCEEDED
+    if metadata.is_content_policy_violation:
+        return CoreCode.MODEL_CONTENT_REFUSED
+    return CoreCode.RUNTIME_UNEXPECTED
+
+
 def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErrorFamily) -> ClassificationResult:
     """Classify an inference SDK error from its structured metadata.
 
@@ -346,23 +362,30 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
         )
 
     if status_code == 400:
-        # A 400 nothing recognises is most likely a request of ours the provider could not take; only a
-        # content-policy signal says the caller's material was refused.
         return ClassificationResult(
             category=InferenceErrorCategory.CONTENT,
             user_action_kind=UserActionKind.CHANGE_INPUT,
-            error_code=CoreCode.MODEL_CONTENT_REFUSED if metadata.is_content_policy_violation else CoreCode.RUNTIME_UNEXPECTED,
+            error_code=_bad_request_error_code(metadata=metadata),
         )
 
     if status_code >= 500:
         return _classify_server_error(status_code=status_code, family=family)
 
     if status_code >= 400:
-        # Unrecognized 4xx (e.g. 405, 409, 422) — 5xx is handled above. A safety/content
-        # policy rejection routed as 422 (FAL surfaces these here, signalled by
-        # ``provider_error_code = "ContentPolicyViolation"``) is rejected content, not a
-        # configuration issue — keep it CONTENT so downstream reporting and retry policy
-        # treat it as bad input.
+        # Unrecognized 4xx (e.g. 405, 409, 413, 422) — 5xx is handled above. A refusal of the
+        # caller's material may arrive on another status than 400, and is read as the 400 arm
+        # reads it: inputs over what the model can read, which a gateway may answer 422 or 413,
+        # and a safety/content policy rejection routed as 422 (FAL surfaces these here, signalled
+        # by ``provider_error_code = "ContentPolicyViolation"``). Each is rejected content, not a
+        # configuration issue — keep it CONTENT so downstream reporting and retry policy treat it
+        # as bad input. The context-window signal comes first, as on a 400, and a 413 that
+        # carries none keeps its payload-size reading below.
+        if metadata.is_context_window_exceeded:
+            return ClassificationResult(
+                category=InferenceErrorCategory.CONTENT,
+                user_action_kind=UserActionKind.CHANGE_INPUT,
+                error_code=CoreCode.MODEL_CONTEXT_EXCEEDED,
+            )
         if metadata.is_content_policy_violation:
             return ClassificationResult(
                 category=InferenceErrorCategory.CONTENT,

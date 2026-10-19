@@ -14,7 +14,7 @@ from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, MaxTokensCeiling, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
     UserAction,
     UserActionKind,
@@ -158,8 +158,9 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         A max_tokens the pipe's setting asked for and the call lowers is said at warning level, since the call then
         sends less than the method wrote. The model's own default lowered is said at debug level: a model whose
         default exceeds what the timeout allows has it lowered on every structured call, by design. Either way, an
-        error the call raises for a failure the lowered limit can explain, an output that failed validation or came
-        back incomplete, or a timeout, says the limit was lowered and to what (see `_with_note`).
+        error the call raises for a failure the lowered limit can explain, an output that failed validation or a
+        timeout, says the limit was lowered and to what (see `_with_note`). An output cut at the lowered limit says it
+        itself, in a truncation whose next step does not ask for a higher max_tokens (see `MaxTokensCeiling`).
 
         Args:
             is_caller_setting: Whether the requested max_tokens is the pipe's setting rather than the model's default.
@@ -192,9 +193,10 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         """Whether a lowered max_tokens can explain the failure that ended a structured call.
 
         A lower limit can cut the structured output short, which instructor reports, once its re-asks are spent, as
-        an output that failed validation or came back incomplete; and the limit is lowered to fit the call's
-        timeout, so a timeout concerns it too. A failure the API or the network answered for its own reason, a rate
-        limit, an authentication failure, an overload, a server error or a lost connection, has nothing to do with it.
+        an output that failed validation; and the limit is lowered to fit the call's timeout, so a timeout concerns
+        it too. An output instructor reports cut at the limit is a truncation that names the lowered limit itself. A
+        failure the API or the network answered for its own reason, a rate limit, an authentication failure, an
+        overload, a server error or a lost connection, has nothing to do with it.
 
         Args:
             failure: The exception that ended the call, None when instructor's wrapper carries none.
@@ -491,7 +493,7 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
         sends_temperature = self.inference_model.accepts_temperature and not thinking_params.suppress_temperature
 
         # Deferred import: avoid pulling heavy SDK at module-load time
-        from instructor.core import InstructorRetryException  # ruff: ignore[import-outside-top-level]
+        from instructor.core import IncompleteOutputException, InstructorRetryException  # ruff: ignore[import-outside-top-level]
 
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
@@ -539,6 +541,21 @@ class AnthropicLLMWorker(LLMWorkerAbstract):
                 ),
             ).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
             raise self._with_note(error=fallback_error, note=lowered_max_tokens_note, failure=None) from instructor_exc
+        except IncompleteOutputException as incomplete_exc:
+            # instructor found the answer stopped at `max_tokens`. When the timeout lowered that limit, a higher one is
+            # lowered the same way, so the error says so and words its next step for it, in its message and its action,
+            # rather than taking the note after a next step that asks for a higher max_tokens
+            max_tokens_ceiling = (
+                MaxTokensCeiling(requested_max_tokens=requested_max_tokens, timeout_seconds=timeout_seconds)
+                if effective_max_tokens < requested_max_tokens
+                else None
+            )
+            raise self._incomplete_output_error(
+                llm_job=llm_job,
+                last_completion=incomplete_exc.last_completion,
+                max_tokens=effective_max_tokens,
+                max_tokens_ceiling=max_tokens_ceiling,
+            ) from incomplete_exc
         except (APIStatusError, APIConnectionError) as sdk_exc:
             metadata = extract_anthropic_metadata(sdk_exc)
             classification = classify_inference_error(metadata, family=InferenceErrorFamily.LLM)
