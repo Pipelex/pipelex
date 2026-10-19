@@ -1156,15 +1156,16 @@ class TestDeliveryExecutor:
         mock_client = mocker.AsyncMock()
         mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
-        mock_client.post = mocker.AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        # The transport's text can quote the caller's webhook URL, a credential in its path included.
+        mock_client.post = mocker.AsyncMock(side_effect=httpx.ConnectError("Connection refused by https://down.example.com/hook/token-4f9a"))
         mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
 
         executor = DeliveryExecutor()
         assignment = DeliveryAssignment(
-            webhooks=[WebhookTarget(url="https://down.example.com")],
+            webhooks=[WebhookTarget(url="https://down.example.com/hook/token-4f9a")],
         )
 
-        with pytest.raises(WebhookDeliveryError):
+        with pytest.raises(WebhookDeliveryError) as exc_info:
             await executor.execute(
                 pipe_output=None,
                 storage_scope="test-user",
@@ -1172,3 +1173,5 @@ class TestDeliveryExecutor:
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
             )
+
+        assert str(exc_info.value) == "Webhook delivery failed for pipeline_run_id=plr-err: ConnectError"

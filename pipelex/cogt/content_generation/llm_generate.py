@@ -1,6 +1,6 @@
 from typing import cast
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment
 from pipelex.cogt.content_generation.dry_mock import (
@@ -57,6 +57,28 @@ async def llm_gen_object(object_assignment: ObjectAssignment, *, object_class: t
     return generated_object
 
 
+def make_object_list_schema(*, item_class: type[BaseModel], item_class_name: str) -> type[BaseModel]:
+    """The model a list of objects is generated as, ``ListOf<item>``, whose ``items`` are the objects.
+
+    Its title is its name from the start, not only its ``__name__``: ``instructor`` validates the model's answer with a
+    subclass named after the wrapper, and a refusal of that answer is located by this class's schema only when both
+    validators carry the same title (``pipelex.tools.typing.pydantic_utils.located_validation_errors``).
+    """
+    list_schema_name = f"ListOf{item_class_name}"
+
+    class ListSchema(BaseModel):
+        model_config = ConfigDict(title=list_schema_name)
+
+        items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]
+
+    ListSchema.__name__ = list_schema_name
+    if item_class.__doc__:
+        ListSchema.__doc__ = f"List wrapper for {item_class_name}.\n\nItem description:\n{item_class.__doc__}"
+    else:
+        ListSchema.__doc__ = f"A list of {item_class_name}."
+    return ListSchema
+
+
 async def llm_gen_object_list(object_assignment: ObjectAssignment, *, object_class: type[BaseModel] | None = None) -> list[BaseModel]:
     """Generate a list of structured objects. ``object_class`` is the caller's live item class when there is one.
 
@@ -75,22 +97,14 @@ async def llm_gen_object_list(object_assignment: ObjectAssignment, *, object_cla
     )
     item_class_name = object_assignment.object_class_name
     item_class = resolve_object_class(object_assignment=object_assignment, object_class=object_class)
-
-    class ListSchema(BaseModel):
-        items: list[item_class]  # type: ignore[valid-type] # pyright: ignore[reportInvalidTypeForm]
-
-    ListSchema.__name__ = f"ListOf{item_class_name}"
-
-    if item_class.__doc__:
-        ListSchema.__doc__ = f"List wrapper for {item_class_name}.\n\nItem description:\n{item_class.__doc__}"
-    else:
-        ListSchema.__doc__ = f"A list of {item_class_name}."
+    list_schema = make_object_list_schema(item_class=item_class, item_class_name=item_class_name)
 
     dump_prompt(llm_prompt=llm_job.llm_prompt)
-    wrapped_list: ListSchema = await llm_worker.gen_object(
+    wrapped_list = await llm_worker.gen_object(
         llm_job=llm_job,
-        schema=ListSchema,
+        schema=list_schema,
     )
     dump_response_from_text_gen(response=wrapped_list)
-    generated_list: list[BaseModel] = cast("list[BaseModel]", wrapped_list.items)  # pyright: ignore[reportUnknownMemberType]
+    # The wrapper's one field, which `make_object_list_schema` declares.
+    generated_list: list[BaseModel] = cast("list[BaseModel]", wrapped_list.items)  # type: ignore[attr-defined] # pyright: ignore[reportAttributeAccessIssue,reportUnknownMemberType]
     return generated_list

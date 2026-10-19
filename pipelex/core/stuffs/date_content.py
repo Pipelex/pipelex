@@ -10,6 +10,7 @@ from pipelex.core.stuffs.iso_temporal import parse_iso_date, parse_iso_time
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import require_rich_for_rendering
 from pipelex.tools.misc.string_utils import is_numeric_string
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
@@ -48,10 +49,10 @@ class DateContent(StuffContent):
         #    UTC offset — exactly the fidelity loss DT3 forbids ("no silent midnight").
         if isinstance(value, datetime.datetime):
             msg = "A Date takes a calendar date and a separate time of day, not a datetime; put the date in `date` and the time and offset in `time`."
-            raise ValueError(msg)  # ruff: ignore[type-check-without-type-error] — must be ValueError so pydantic wraps it into a ValidationError
+            raise InputFreeValueError(msg)
         if isinstance(value, (int, float)) or (isinstance(value, str) and is_numeric_string(value)):  # bool is an int subclass
             msg = "A Date's date/time must be an ISO 8601 string or a date/time object, never a number (no epoch-seconds)."
-            raise ValueError(msg)
+            raise InputFreeValueError(msg)
         # A datetime-shaped STRING on the `date` field would be truncated to the calendar date (silently
         # so at midnight), dropping the stated time and offset — the same DT3 loss as a datetime object.
         # The `time` field legitimately carries ':' (e.g. "15:40:00"), so this narrows to `date`.
@@ -60,7 +61,7 @@ class DateContent(StuffContent):
                 "A Date's `date` field takes a calendar date alone; a string carrying a time "
                 "(e.g. '2026-07-07T00:00:00') would drop it — put the time and offset in `time` instead."
             )
-            raise ValueError(msg)
+            raise InputFreeValueError(msg)
         # Parsing the ISO string here — rather than leaving it to the field's own validation — is what
         # keeps this model usable under the strict validation instructor applies to every LLM response:
         # a mode="before" validator forfeits pydantic's strict-JSON acceptance of ISO strings, because

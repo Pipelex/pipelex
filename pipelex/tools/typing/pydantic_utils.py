@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, TypeAlias, TypeVar, cast, get_args
+from weakref import WeakKeyDictionary
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, TypeAdapter, ValidationError
+from pydantic_core import PydanticKnownError, SchemaError, SchemaValidator
+from pydantic_core.core_schema import CoreSchema, ErrorType
 from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
+    from pydantic_core import ErrorDetails
     from rich.repr import Result as RichReprResult
 
 BaseModelTypeVar = TypeVar("BaseModelTypeVar", bound=BaseModel)
@@ -163,6 +168,11 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
 def format_pydantic_validation_error(exc: ValidationError) -> str:
     """Format a Pydantic ValidationError into a readable string with detailed error information.
 
+    The text quotes the values pydantic refused, an invalid enum value or a literal it did not expect, so it is for a
+    document whose author reads it: the caller's own method or the operator's configuration. A run's data, its inputs,
+    a model's answer or a value a pipe built, is never refused through it: `format_validation_error_without_input`
+    renders that refusal without the data.
+
     Args:
         exc: The Pydantic ValidationError exception
 
@@ -171,6 +181,424 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
     """
     return analyze_pydantic_validation_error(exc).error_msg
+
+
+#: The keys of a pydantic error's context whose values come from the schema, never from the input: the bounds a field
+#: declares, the values, tags, schemes or version it expects, a discriminator's name, a pattern, and the class or the kind
+#: of collection it validates into. A context holding any other key, the input's own tag, its length, or a parser's or
+#: a validator's ``error`` text, which can quote the input, keeps its message out of the rendering.
+SCHEMA_CONTEXT_KEYS = frozenset(
+    {
+        "gt",
+        "ge",
+        "lt",
+        "le",
+        "multiple_of",
+        "min_length",
+        "max_length",
+        "max_digits",
+        "decimal_places",
+        "whole_digits",
+        "expected",
+        "expected_tags",
+        "expected_schemes",
+        "expected_version",
+        "discriminator",
+        "pattern",
+        "class_name",
+        "class",
+        "field_type",
+        "method_name",
+        "tz_expected",
+        "encoding",
+    }
+)
+
+#: The error type of a key the model forbids, whose last location component is that key, as the caller sent it.
+EXTRA_FORBIDDEN_ERROR_TYPE = "extra_forbidden"
+
+#: The error type pydantic gives a validator's ``ValueError``, whose message is the validator's own text.
+VALUE_ERROR_TYPE = "value_error"
+
+#: Every error type pydantic itself knows how to word.
+_PYDANTIC_ERROR_TYPES: frozenset[str] = frozenset(get_args(ErrorType))
+
+
+def _pydantic_own_reason(*, error: ErrorDetails) -> str | None:
+    """The error's message when nothing in it came from the input, or ``None`` when any of it may have.
+
+    A validator's ``InputFreeValueError`` keeps its message, which declares it holds nothing of the value. Any other
+    type pydantic does not know is a ``PydanticCustomError``'s, whose message the validator wrote. A known type is
+    kept only when every key of its context is in ``SCHEMA_CONTEXT_KEYS``, so that its template is filled from the
+    schema alone, and when its message is exactly the one pydantic renders for it, which a ``PydanticCustomError``
+    reusing a built-in type's name with a message of its own is not.
+    """
+    error_type = error["type"]
+    context = error.get("ctx")
+    if error_type == VALUE_ERROR_TYPE and context is not None and isinstance(context.get("error"), InputFreeValueError):
+        # A validator's refusal that declares its message holds nothing of the value: pydantic's "Value error, " prefix
+        # and the validator's own sentence.
+        return error["msg"]
+    if error_type not in _PYDANTIC_ERROR_TYPES:
+        # A type pydantic does not know, and so a `PydanticCustomError`'s, worded by the validator.
+        return None
+    if context is not None and not SCHEMA_CONTEXT_KEYS.issuperset(context):
+        # A value of the context may come from the input, or be a validator's or a parser's own text.
+        return None
+    try:
+        own_message = PydanticKnownError(cast("ErrorType", error_type), context).message()
+    except (KeyError, TypeError, ValueError):
+        # Not with the context its template needs: the message is not pydantic's.
+        return None
+    if own_message != error["msg"]:
+        return None
+    return own_message
+
+
+def refusal_reason_without_input(*, error: ErrorDetails) -> str:
+    """One error's reason, never anything of the input it refused: pydantic's own message, or else the error's type."""
+    return _pydantic_own_reason(error=error) or error["type"]
+
+
+#: What a location writes in place of a component the schema does not name: a key of a dict, a key the model does not
+#: declare, or anything below a point the schema no longer describes. Such a key is the caller's own text, the run's data.
+PAYLOAD_KEY_PLACEHOLDER = "<key>"
+
+#: The component pydantic appends to a dict key's location when it refuses the key itself, rather than its value.
+_DICT_KEY_MARKER = "[key]"
+
+#: The schemas that wrap one inner schema without adding a component to a location.
+_WRAPPING_SCHEMA_TYPES = frozenset({"default", "nullable", "function-after", "function-before", "function-wrap", "json", "model", "dataclass"})
+
+#: The schemas whose components are positions, which say where an item is and nothing of what it holds.
+_SEQUENCE_SCHEMA_TYPES = frozenset({"list", "set", "frozenset", "generator"})
+
+#: The schemas whose components are the names of their fields.
+_FIELDS_SCHEMA_TYPES = frozenset({"model-fields", "typed-dict"})
+
+#: What a tagged union's walk finds when no tag of the schema is the location's component.
+_NO_TAG = object()
+
+
+def _schema_node(*, value: object) -> dict[str, Any] | None:
+    """A core schema node, or ``None`` when ``value`` is not one, which leaves the walk where the schema stops."""
+    if isinstance(value, dict):
+        return cast("dict[str, Any]", value)
+    return None
+
+
+def _schema_nodes(*, value: object) -> list[dict[str, Any]]:
+    """The schema nodes a list holds, every other item left out."""
+    if not isinstance(value, list):
+        return []
+    nodes: list[dict[str, Any]] = []
+    for item in cast("list[object]", value):
+        if (node := _schema_node(value=item)) is not None:
+            nodes.append(node)
+    return nodes
+
+
+#: The labels pydantic gives the union choices of a validated type's schema, by the identity of each choice's node. A
+#: label is read off a validator built for the choice, which compiles the choice and every definition the schema holds,
+#: so it is built once per node: the nodes belong to the validated type's schema, which lives as long as the type, and
+#: an entry goes with the type.
+_UNION_CHOICE_LABELS: WeakKeyDictionary[object, dict[int, str | None]] = WeakKeyDictionary()
+
+
+def _union_choice(
+    *, choice: object, definitions: dict[str, dict[str, Any]], choice_labels: dict[int, str | None]
+) -> tuple[dict[str, Any] | None, str | None]:
+    """A union's choice and the label pydantic gives it in a location, read off the validator it builds for it.
+
+    A choice is a schema, or a schema and its own label. The label is ``None`` when no validator can be built for the
+    choice alone, so no location component is taken for it. A label found once is kept in ``choice_labels``, by the
+    choice node's identity, so it is not compiled again.
+    """
+    if isinstance(choice, tuple):
+        choice_schema, choice_label = cast("tuple[object, object]", choice)
+        return _schema_node(value=choice_schema), choice_label if isinstance(choice_label, str) else None
+    node = _schema_node(value=choice)
+    if node is None:
+        return None, None
+    node_id = id(node)
+    if node_id in choice_labels:
+        return node, choice_labels[node_id]
+    label: str | None
+    try:
+        validator = SchemaValidator(cast("CoreSchema", {"type": "definitions", "schema": node, "definitions": list(definitions.values())}))
+    except SchemaError:
+        label = None
+    else:
+        label = validator.title
+    choice_labels[node_id] = label
+    return node, label
+
+
+def _unwrapped_schema(*, schema: dict[str, Any] | None, definitions: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    """The schema that names the next component of a location, through every schema that adds none.
+
+    It follows a definition reference, and collects the definitions a ``definitions`` schema holds, into
+    ``definitions``. ``None`` when the schema is unknown, a reference to no definition, or a schema that can hold
+    another under no name of its own, such as a chain of validators.
+    """
+    current = schema
+    while current is not None:
+        schema_type = current.get("type")
+        if schema_type == "definitions":
+            for definition in _schema_nodes(value=current.get("definitions")):
+                if isinstance(ref := definition.get("ref"), str):
+                    definitions[ref] = definition
+            current = _schema_node(value=current.get("schema"))
+        elif schema_type == "definition-ref":
+            schema_ref = current.get("schema_ref")
+            current = definitions.get(schema_ref) if isinstance(schema_ref, str) else None
+        elif schema_type == "lax-or-strict":
+            current = _schema_node(value=current.get("lax_schema"))
+        elif schema_type == "json-or-python":
+            current = _schema_node(value=current.get("python_schema"))
+        elif schema_type in _WRAPPING_SCHEMA_TYPES and "schema" in current:
+            current = _schema_node(value=current["schema"])
+        else:
+            return current
+    return None
+
+
+def _field_paths(*, fields: object) -> list[tuple[tuple[str | int, ...], dict[str, Any] | None]]:
+    """Each field's location paths, its name and its validation aliases, with the schema of its value."""
+    named_fields: list[tuple[str, dict[str, Any]]] = []
+    if isinstance(fields, dict):
+        for name, field in cast("dict[str, object]", fields).items():
+            if (field_node := _schema_node(value=field)) is not None:
+                named_fields.append((name, field_node))
+    else:
+        for field_node in _schema_nodes(value=fields):
+            if isinstance(field_name := field_node.get("name"), str):
+                named_fields.append((field_name, field_node))
+    paths: list[tuple[tuple[str | int, ...], dict[str, Any] | None]] = []
+    for name, field_node in named_fields:
+        value_schema = _schema_node(value=field_node.get("schema"))
+        paths.append(((name,), value_schema))
+        alias: object = field_node.get("validation_alias")
+        if isinstance(alias, str):
+            paths.append(((alias,), value_schema))
+        elif isinstance(alias, list):
+            alias_parts = cast("list[object]", alias)
+            # An `AliasChoices` is a list of paths, an `AliasPath` a single one.
+            alias_paths = alias_parts if alias_parts and all(isinstance(alias_part, list) for alias_part in alias_parts) else [alias_parts]
+            for alias_path in alias_paths:
+                path_components = [component for component in cast("list[object]", alias_path) if isinstance(component, (str, int))]
+                paths.append((tuple(path_components), value_schema))
+    return paths
+
+
+def _schema_location_parts(*, schema: dict[str, Any], location: Sequence[str | int], choice_labels: dict[int, str | None]) -> list[str]:
+    """The components of a location, each one the schema names written as it is and every other one as the placeholder.
+
+    The walk follows the schema the location descends through: a field's name or alias, a position in a sequence, a
+    union's choice and a tagged union's tag are the schema's own and are kept. A dict's key, and a key a model does not
+    declare, are the caller's and are replaced; so is every component below a point the walk cannot follow, since it
+    cannot tell what that component is. ``choice_labels`` holds the labels of the schema's union choices found so far.
+    """
+    definitions: dict[str, dict[str, Any]] = {}
+    parts: list[str] = []
+    current: dict[str, Any] | None = schema
+    index = 0
+    while index < len(location):
+        component = location[index]
+        current = _unwrapped_schema(schema=current, definitions=definitions)
+        schema_type = current.get("type") if current is not None else None
+        if current is not None and (schema_type in _FIELDS_SCHEMA_TYPES or schema_type == "dataclass-args"):
+            remaining = tuple(location[index:])
+            matches = [
+                (path, value_schema) for path, value_schema in _field_paths(fields=current.get("fields")) if path and remaining[: len(path)] == path
+            ]
+            if matches:
+                path, value_schema = max(matches, key=lambda match: len(match[0]))
+                parts.extend(str(path_component) for path_component in path)
+                current = value_schema
+                index += len(path)
+                continue
+            # A key the model does not declare: the caller's own text.
+            parts.append(PAYLOAD_KEY_PLACEHOLDER)
+            current = _schema_node(value=current.get("extras_schema"))
+        elif current is not None and schema_type in _SEQUENCE_SCHEMA_TYPES and isinstance(component, int):
+            parts.append(str(component))
+            current = _schema_node(value=current.get("items_schema"))
+        elif current is not None and schema_type == "tuple" and isinstance(component, int):
+            items_schema = _schema_nodes(value=current.get("items_schema"))
+            variadic_index = current.get("variadic_item_index")
+            parts.append(str(component))
+            item_index = variadic_index if isinstance(variadic_index, int) and component >= variadic_index else component
+            current = items_schema[item_index] if item_index < len(items_schema) else None
+        elif current is not None and schema_type == "dict":
+            # A dict's key is the caller's own text; a refusal of the key itself is marked after it.
+            parts.append(PAYLOAD_KEY_PLACEHOLDER)
+            if index + 1 < len(location) and location[index + 1] == _DICT_KEY_MARKER:
+                parts.append(_DICT_KEY_MARKER)
+                current = _schema_node(value=current.get("keys_schema"))
+                index += 1
+            else:
+                current = _schema_node(value=current.get("values_schema"))
+        elif current is not None and schema_type == "union":
+            raw_choices = current.get("choices")
+            choices = cast("list[object]", raw_choices) if isinstance(raw_choices, list) else []
+            matched_choice: dict[str, Any] | None = None
+            is_matched = False
+            for choice in choices:
+                choice_node, choice_label = _union_choice(choice=choice, definitions=definitions, choice_labels=choice_labels)
+                if choice_label is not None and choice_label == component:
+                    matched_choice = choice_node
+                    is_matched = True
+                    break
+            parts.append(str(component) if is_matched else PAYLOAD_KEY_PLACEHOLDER)
+            current = matched_choice
+        elif current is not None and schema_type == "tagged-union":
+            raw_tagged_choices = current.get("choices")
+            tagged_choices = cast("dict[object, object]", raw_tagged_choices) if isinstance(raw_tagged_choices, dict) else {}
+            matched_tag: object = next((choice_tag for choice_tag in tagged_choices if str(choice_tag) == str(component)), _NO_TAG)
+            if matched_tag is _NO_TAG:
+                parts.append(PAYLOAD_KEY_PLACEHOLDER)
+                current = None
+            else:
+                parts.append(str(component))
+                current = _schema_node(value=tagged_choices[matched_tag])
+        else:
+            # A point the schema does not describe: nothing below it can be told apart from the caller's own text.
+            parts.append(PAYLOAD_KEY_PLACEHOLDER)
+            current = None
+        index += 1
+    return parts
+
+
+#: What validated an input, and so whose schema names a refusal's locations: a model, or a ``TypeAdapter`` over a type
+#: that is not one, such as a union of models.
+ValidatedType: TypeAlias = type[BaseModel] | TypeAdapter[Any]
+
+
+class LocatedValidationError(NamedTuple):
+    """One error of a ``ValidationError``, read without its input, and its location as far as it may be written."""
+
+    error: ErrorDetails
+    location: str | None
+
+
+def _validator_title_and_schema(*, validated_type: ValidatedType) -> tuple[str | None, dict[str, Any]]:
+    """The title the validator of ``validated_type`` gives its errors, and the core schema it validates with."""
+    if isinstance(validated_type, TypeAdapter):
+        return getattr(validated_type.validator, "title", None), cast("dict[str, Any]", validated_type.core_schema)
+    return getattr(validated_type.__pydantic_validator__, "title", None), cast("dict[str, Any]", validated_type.__pydantic_core_schema__)
+
+
+def located_validation_errors(
+    *, validation_error: ValidationError, validated_type: ValidatedType | None, is_authored_input: bool = False
+) -> list[LocatedValidationError]:
+    """Each error of a ``ValidationError``, without its input, with its dotted location as far as it may be written.
+
+    A location quotes the keys the input holds where it is a dict, or where it adds a key the model does not declare, and
+    those keys are the run's data: a dict's key, ``entries.confidential-diagnosis.score``, is written
+    ``entries.<key>.score``. Only the components the schema names are written as they are (see
+    ``_schema_location_parts``), so a location needs the type the error came from. Without it, or when the error's
+    title is not the type's, so that it came from another model, no location is given. An input that is no run's data,
+    a method author's own document or a value Pipelex built for itself such as a dry run's mock, is located as pydantic
+    gives it, whatever validated it. Every formatter of a location reads it here, and the errors are read once.
+
+    Args:
+        validation_error: The error whose errors are wanted.
+        validated_type: The model, or the ``TypeAdapter``, whose validation raised it, or ``None`` when it is not known.
+        is_authored_input: Whether the validated input is a method author's own document or a value Pipelex built for
+            itself, never a run's data, so that its keys are the author's or Pipelex's own and are written.
+
+    Returns:
+        One entry per error, in the order of its errors, its location ``None`` for an error at the root or when the type
+        is not known.
+    """
+    errors = validation_error.errors(include_url=False, include_input=False)
+    if is_authored_input:
+        return [LocatedValidationError(error=error, location=".".join(str(part) for part in error["loc"]) or None) for error in errors]
+    if validated_type is None:
+        return [LocatedValidationError(error=error, location=None) for error in errors]
+    validator_title, schema = _validator_title_and_schema(validated_type=validated_type)
+    if validator_title != validation_error.title:
+        return [LocatedValidationError(error=error, location=None) for error in errors]
+    choice_labels = _UNION_CHOICE_LABELS.setdefault(validated_type, {})
+    return [
+        LocatedValidationError(
+            error=error, location=".".join(_schema_location_parts(schema=schema, location=error["loc"], choice_labels=choice_labels)) or None
+        )
+        for error in errors
+    ]
+
+
+def validation_error_locations(
+    *, validation_error: ValidationError, validated_type: ValidatedType | None, is_authored_input: bool = False
+) -> list[str | None]:
+    """Each error's dotted location, in the order of its errors, as far as it may be written (see ``located_validation_errors``).
+
+    Args:
+        validation_error: The error whose locations are wanted.
+        validated_type: The model, or the ``TypeAdapter``, whose validation raised it, or ``None`` when it is not known.
+        is_authored_input: Whether the validated input is a method author's own document or a value Pipelex built for
+            itself, whose locations are written as pydantic gives them.
+
+    Returns:
+        One location per error, ``None`` for an error at the root or when the type is not known.
+    """
+    located_errors = located_validation_errors(validation_error=validation_error, validated_type=validated_type, is_authored_input=is_authored_input)
+    return [located_error.location for located_error in located_errors]
+
+
+def format_validation_error_without_input(
+    *, validation_error: ValidationError, validated_type: ValidatedType | None = None, is_authored_input: bool = False
+) -> str:
+    """Each error of a ``ValidationError`` as its location and its reason, never the input it refused.
+
+    A ``ValidationError``'s own text, and the analysis `format_pydantic_validation_error` gives, quote the values pydantic
+    refused, which on a run's data are its inputs, a model's answer or a value a pipe built, and no message, log line or
+    view carries those. The reason is pydantic's own message, or the error's type where the message may hold something
+    of the input, since a validator's text, or one of pydantic's templates, can quote the very value it rejected; a
+    validator that raises ``InputFreeValueError`` declares its text holds none of it, and keeps it. The location names
+    only what the validated type's schema names (see ``located_validation_errors``), so a caller that knows the type
+    passes it, and without it each error is given by its reason alone; a caller refusing an author's own document, or a
+    value Pipelex built for itself, says so and has its locations written as they are.
+
+    Args:
+        validation_error: The error to write.
+        validated_type: The model, or the ``TypeAdapter``, whose validation raised it, when the caller knows it.
+        is_authored_input: Whether the validated input is a method author's own document or a value Pipelex built for
+            itself, never a run's data.
+
+    Returns:
+        The errors, ``; ``-separated in the order they come, each written once, or the error's title when it holds none.
+    """
+    located_errors = located_validation_errors(validation_error=validation_error, validated_type=validated_type, is_authored_input=is_authored_input)
+    # A dict preserves the order of first appearance, and finds a repeat in constant time: a refused list of many items
+    # gives many errors of the same location and reason.
+    located_reasons: dict[str, None] = {}
+    for located_error in located_errors:
+        reason = refusal_reason_without_input(error=located_error.error)
+        located_reasons.setdefault(f"{located_error.location}: {reason}" if located_error.location else reason, None)
+    return "; ".join(located_reasons) or validation_error.title
+
+
+def describe_exception_without_input(*, exc: BaseException, validated_type: ValidatedType | None = None, is_authored_input: bool = False) -> str:
+    """The text of an exception, a ``ValidationError``'s written without the input it refused.
+
+    Every other exception's text is kept as it is: a raise site of Pipelex writes no run's data into its message. A
+    caller describing a foreign exception, whose text can carry anything, names it by its class instead.
+
+    Args:
+        exc: The exception to describe.
+        validated_type: The model, or the ``TypeAdapter``, whose validation raised it, when it is a ``ValidationError``
+            and the caller knows it, which lets its locations be written (see ``format_validation_error_without_input``).
+        is_authored_input: Whether the validated input is a method author's own document or a value Pipelex built for
+            itself, never a run's data, whose locations are written as they are.
+
+    Returns:
+        The exception's text.
+    """
+    if isinstance(exc, ValidationError):
+        return format_validation_error_without_input(validation_error=exc, validated_type=validated_type, is_authored_input=is_authored_input)
+    return str(exc)
 
 
 def convert_strenum_to_str(

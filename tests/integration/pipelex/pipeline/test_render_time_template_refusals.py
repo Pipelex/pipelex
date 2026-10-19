@@ -27,7 +27,8 @@ from tests.integration.pipelex.pipeline.test_data import RenderTimeTemplateTestD
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-_UNKNOWN_FILTER_FAULT = f"No filter named '{RenderTimeTemplateTestData.UNKNOWN_FILTER}' found."
+# The filter is named, since the template applies it by that name, with the template's line, never Jinja2's own text.
+_UNKNOWN_FILTER_FAULT = f"No filter named '{RenderTimeTemplateTestData.UNKNOWN_FILTER}' at line 1."
 
 
 def _llm_bundle(*, prompt_field: str) -> str:
