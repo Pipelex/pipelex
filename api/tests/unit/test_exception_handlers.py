@@ -556,7 +556,8 @@ class TestExceptionHandlers:
         assert "error_type" not in body
         if as_operator:
             assert body["diagnostics"]["error_class"] == "PipelexUnexpectedError"
-            assert body["diagnostics"]["message"] == f"RuntimeError: {_UNEXPECTED_MESSAGE}"
+            # The operator reads the class alone: a foreign exception's text can carry anything of the run's data.
+            assert body["diagnostics"]["message"] == "RuntimeError"
             assert body["diagnostics"]["causes"] == [{"error_class": "RuntimeError"}]
         else:
             assert "diagnostics" not in body
@@ -609,12 +610,12 @@ class TestExceptionHandlers:
     def test_unmapped_transport_error_falls_back_to_catch_all_500(self):
         # Without the orchestrator plugin's mapper (the agnostic base), the same bare transport error has no dedicated
         # handler and collapses to the catch-all `runtime.unexpected` — whose diagnostics still tell the operator which
-        # transport class failed and why.
+        # transport class failed, and never its text, which can carry anything.
         response = _build_client(raise_server_exceptions=False, as_operator=True).get("/synthetic-transport-error")
         assert response.status_code == 500
         body = response.json()
         assert body["code"] == CoreCode.RUNTIME_UNEXPECTED
-        assert body["diagnostics"]["message"] == f"_SyntheticTransportError: {_TRANSPORT_MESSAGE}"
+        assert body["diagnostics"]["message"] == "_SyntheticTransportError"
 
     def test_handler_of_handlers_catches_a_corrupt_problem(self):
         # When building the problem itself raises, the failure escapes the PipelexError handler; ServerErrorMiddleware
@@ -624,7 +625,7 @@ class TestExceptionHandlers:
         assert response.status_code == 500
         body = response.json()
         assert body["code"] == CoreCode.RUNTIME_UNEXPECTED
-        assert body["diagnostics"]["message"] == "RuntimeError: problem_facts is deliberately broken"
+        assert body["diagnostics"]["message"] == "RuntimeError"
 
     @pytest.mark.parametrize(
         ("method", "path", "json_body", "expected_status"),

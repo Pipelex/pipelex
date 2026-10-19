@@ -23,6 +23,7 @@ from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.runtime_hub import get_class_registry
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 
 
 def _validate_as_known_class(*, item_class: type[StuffContent], raw_item: StuffContent | dict[str, Any]) -> StuffContent:
@@ -245,8 +246,13 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
 
     raw_root = working_memory_raw.get("root", {})
     for stuff_name, stuff_dict in raw_root.items():
+        # The class the content is validated into, once its concept is known, whose schema locates a refusal.
+        structure_class: type[StuffContent] | None = None
         try:
             concept = resolve_stuff_concept(concept_ref=stuff_dict["concept"], stuff_name=stuff_name, concept_provider=concept_provider)
+            registered_class = get_class_registry().get_class(name=concept.structure_class_name)
+            if registered_class is not None and issubclass(registered_class, StuffContent):
+                structure_class = registered_class
             content = hydrate_content(concept=concept, raw_content=stuff_dict["content"])
             stuff = Stuff(
                 stuff_code=stuff_dict["stuff_code"],
@@ -258,7 +264,9 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
             msg = f"Failed to hydrate stuff '{stuff_name}': missing key {exc} in raw dict"
             raise PipeJobError(msg) from exc
         except (ValidationError, KajsonException) as exc:
-            msg = f"Failed to hydrate stuff '{stuff_name}': {exc}"
+            # The content is the run's data: a ValidationError is written by its reasons, never its values, each located
+            # as far as the schema of the class the content is validated into names it.
+            msg = f"Failed to hydrate stuff '{stuff_name}': {describe_exception_without_input(exc=exc, validated_type=structure_class)}"
             raise PipeJobError(msg) from exc
         working_memory.root[stuff_name] = stuff
 
@@ -269,7 +277,7 @@ def hydrate_working_memory(working_memory_raw: dict[str, Any]) -> WorkingMemory:
         try:
             working_memory.absences[absence_name] = AbsenceRecord.model_validate(absence_raw)
         except ValidationError as exc:
-            msg = f"Failed to hydrate absence record '{absence_name}': {exc}"
+            msg = f"Failed to hydrate absence record '{absence_name}': {describe_exception_without_input(exc=exc, validated_type=AbsenceRecord)}"
             raise PipeJobError(msg) from exc
 
     return working_memory

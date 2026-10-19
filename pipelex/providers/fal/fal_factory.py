@@ -7,6 +7,7 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, InferenceErrorCategor
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.tools.typing.pydantic_utils import describe_exception_without_input
 
 
 class FalFactory:
@@ -51,7 +52,8 @@ class FalFactory:
                 )
                 generated_image_list.append(generated_image)
         except (KeyError, TypeError, ValidationError) as exc:
-            msg = f"Failed to parse image data from fal response: {exc}"
+            # The response is the provider's answer, the run's data: a ValidationError is written without its values.
+            msg = f"Failed to parse image data from fal response: {describe_exception_without_input(exc=exc)}"
             raise ImgGenGenerationError(
                 msg,
                 error_category=InferenceErrorCategory.UNKNOWN,

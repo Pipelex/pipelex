@@ -5672,25 +5672,9 @@ rationale = "Transforms the templating_context; single operand."
 param = "template_source"
 rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_non_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_make_type_error_msg"]
-param = "template_source"
-rationale = "Factory from source: builds the result from the template_source; single operand."
-
 ["pipelex/tools/jinja2/jinja2_rendering.py::_prepare_templating_context"]
 param = "templating_context"
 rationale = "Jinja op on the templating_context; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_async"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
-
-["pipelex/tools/jinja2/jinja2_rendering.py::_render_template_sync"]
-param = "template_source"
-rationale = "Jinja op on the template_source; single operand (context keyword-only)."
 
 ["pipelex/tools/jinja2/jinja2_rendering.py::render_jinja2_async"]
 param = "template_source"
@@ -6595,10 +6579,6 @@ rationale = "Transforms the value; single operand."
 ["pipelex/tools/tabular/csv_codec.py::_validate_header"]
 param = "header"
 rationale = "Validates/checks the header; single operand."
-
-["pipelex/tools/tabular/csv_codec.py::_validation_error_label"]
-param = "error"
-rationale = "Validates/checks the error; single operand."
 
 ["pipelex/tools/tabular/csv_codec.py::assert_supported_table_suffix"]
 param = "path"

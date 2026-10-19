@@ -8,6 +8,7 @@ from typing_extensions import override
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.pretty import require_rich_for_rendering
+from pipelex.tools.typing.validation_exceptions import InputFreeValueError
 
 if TYPE_CHECKING:
     from pipelex.tools.misc.pretty import PrettyPrintable
@@ -23,11 +24,12 @@ class JSONContent(StuffContent):
         # A ValueError, never a TypeError: pydantic turns only the former into a ValidationError, so a
         # dict holding a value that is not JSON is reported like any other invalid content. NaN and the
         # infinities are refused too, since JSON cannot hold them and serialization would turn them into null.
+        # The encoder's complaint names a type, a circular reference or an out-of-range float, never the value.
         try:
             json.dumps(value, allow_nan=False)
         except (TypeError, ValueError) as exc:
             msg = f"json_obj is not valid JSON: {exc}"
-            raise ValueError(msg) from exc
+            raise InputFreeValueError(msg) from exc
         return value
 
     @override

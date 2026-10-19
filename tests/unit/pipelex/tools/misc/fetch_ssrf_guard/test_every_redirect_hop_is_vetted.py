@@ -28,7 +28,8 @@ class TestEveryRedirectHopIsVetted:
     async def test_a_redirect_to_a_private_destination_is_refused(self, mocker: MockerFixture, loopback_server: LoopbackServer) -> None:
         treat_only_the_localhost_name_as_private(mocker)
 
-        with pytest.raises(SsrfBlockedError, match="localhost"):
+        # The refusal names no host, which is the run's data: the server's hits show the first hop was served.
+        with pytest.raises(SsrfBlockedError, match="Refusing to connect"):
             await fetch_file_from_url_httpx(url=loopback_url(loopback_server, path=REDIRECT_TO_LOCALHOST_PATH))
 
         assert loopback_server.hits == [REDIRECT_TO_LOCALHOST_PATH]

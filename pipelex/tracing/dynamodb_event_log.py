@@ -33,7 +33,7 @@ from pipelex import log
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.execution_chain import execution_chain_digest
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 from pipelex.tracing.event_log_protocol import EventLogProtocol, deduplicate_and_order_events
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSchemaMismatchError, EventLogSetupError
 from pipelex.tracing.trace_events import AnyTraceEvent, TraceEvent, json_invalid_message
@@ -223,7 +223,10 @@ class DynamoDBEventLog(EventLogProtocol):
                     continue
                 refused_count += 1
                 if first_refusal is None:
-                    first_refusal = f"PK={item.get('PK')} SK={item.get('SK')}: {format_pydantic_validation_error(exc)}"
+                    # The refusal is written by its reasons, located by the event models' schema, never the traced
+                    # values it quotes, which are the run's data.
+                    refusal = format_validation_error_without_input(validation_error=exc, validated_type=_any_trace_event_adapter)
+                    first_refusal = f"PK={item.get('PK')} SK={item.get('SK')}: {refusal}"
                 continue
             events.append(event)
 

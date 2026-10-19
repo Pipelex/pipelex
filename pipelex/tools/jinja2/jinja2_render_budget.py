@@ -34,7 +34,7 @@ import sys
 from collections.abc import AsyncIterator, Iterator, Sized
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Final, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Final, Generic, NamedTuple, TypeVar, cast
 
 from jinja2.exceptions import TemplateError
 from jinja2.runtime import LoopContext, Undefined
@@ -105,7 +105,41 @@ class RenderBudgetExceededError(TemplateError):
 
     Raised from the hook that caught the overdraft, and turned into `Jinja2TemplateBudgetError` by the
     render functions. It derives from nothing a filter or Jinja's runtime catches on the way.
+
+    Its message names the refused operation, and a call by the method it called, which a template reaching it by
+    `obj[key]` or `obj | attr(key)` names by a value of the run's data: `named` holds the names the message quotes and
+    `anonymous_message` words it without them, and the render reporting the overdraft keeps the message only when the
+    template's own source spells every name, as it does for the sandbox's `SandboxRefusalError`.
     """
+
+    def __init__(self, message: str, *, named: tuple[str, ...] = (), anonymous_message: str | None = None) -> None:
+        super().__init__(message)
+        self.named = named
+        self.anonymous_message = anonymous_message or message
+
+
+class DescribedOperation(NamedTuple):
+    """An operation the budget may refuse, described with the names it quotes, `text`, and without them, `anonymous_text`.
+
+    A call is described by the callable it calls, whose name is the template's own when it reads it with a dot, but a
+    value of the run's data when it reads it by `obj[key]` or `obj | attr(key)`: `named` holds the names `text` quotes.
+    """
+
+    text: str
+    anonymous_text: str
+    named: tuple[str, ...]
+
+
+def describe_operation(*, operation: str | Callable[[], str | DescribedOperation]) -> DescribedOperation:
+    """The operation a hook charges, its description built only now if the hook gave a function building it.
+
+    A fixed description, such as `the operator '*'` or `the filter 'join'`, quotes no name a value supplied, so it reads
+    the same with and without its names.
+    """
+    described = operation() if callable(operation) else operation
+    if isinstance(described, DescribedOperation):
+        return described
+    return DescribedOperation(text=described, anonymous_text=described, named=())
 
 
 class RenderBudget:
@@ -117,24 +151,24 @@ class RenderBudget:
         self.total = total
         self.remaining = total
 
-    def charge(self, *, units: int, operation: str | Callable[[], str]) -> None:
+    def charge(self, *, units: int, operation: str | Callable[[], str | DescribedOperation]) -> None:
         """Spend `units`, or refuse the operation if they are more than what is left."""
         if units > self.remaining:
             self._refuse(units=units, operation=operation)
         self.remaining -= units
 
-    def afford(self, *, units: int, operation: str | Callable[[], str]) -> None:
+    def afford(self, *, units: int, operation: str | Callable[[], str | DescribedOperation]) -> None:
         """Refuse the operation if its estimate is more than what is left, without spending anything."""
         if units > self.remaining:
             self._refuse(units=units, operation=operation)
 
-    def _refuse(self, *, units: int, operation: str | Callable[[], str]) -> None:
-        described = operation() if callable(operation) else operation
-        msg = (
-            f"Rendering the template would spend more than its budget of {self.total:,} work units: "
-            f"{described} needs about {units:,}, and {self.remaining:,} are left."
-        )
-        raise RenderBudgetExceededError(msg)
+    def _refuse(self, *, units: int, operation: str | Callable[[], str | DescribedOperation]) -> None:
+        described = describe_operation(operation=operation)
+        preamble = f"Rendering the template would spend more than its budget of {self.total:,} work units"
+        overdraft = f"needs about {units:,}, and {self.remaining:,} are left."
+        msg = f"{preamble}: {described.text} {overdraft}"
+        anonymous_msg = f"{preamble}: {described.anonymous_text} {overdraft}"
+        raise RenderBudgetExceededError(msg, named=described.named, anonymous_message=anonymous_msg)
 
 
 _ACTIVE_RENDER_BUDGET: Final[ContextVar[RenderBudget | None]] = ContextVar("pipelex_active_render_budget", default=None)

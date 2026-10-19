@@ -58,12 +58,13 @@ class TestTagFilterValidation:
         with pytest.raises(Jinja2ContextError, match="undefined"):
             await tag(context, value=Undefined())
 
-    async def test_tag_raises_on_undefined_with_tag_name(self, mocker: MockerFixture) -> None:
-        """Test tag raises error for undefined value with tag name in message."""
+    async def test_tag_raises_on_undefined_with_tag_name_and_never_names_it(self, mocker: MockerFixture) -> None:
+        """The tag name a template hands the filter can be the run's data: the refusal of an undefined value never names it."""
         context = self._make_context(mocker, tag_style=TagStyle.TICKS)
 
-        with pytest.raises(Jinja2ContextError, match="tag_name 'my_tag'"):
-            await tag(context, value=Undefined(), tag_name="my_tag")
+        with pytest.raises(Jinja2ContextError, match="Cannot use tag filter on undefined value") as exc_info:
+            await tag(context, value=Undefined(), tag_name="jane.doe@acme.example")
+        assert "jane.doe@acme.example" not in str(exc_info.value)
 
     async def test_tag_with_string_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts plain string input."""

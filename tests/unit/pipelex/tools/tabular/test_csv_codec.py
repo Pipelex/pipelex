@@ -404,6 +404,48 @@ class TestCsvCodec:
         assert "SUPERSECRET_TOKEN_xyz" not in message
         assert "value" in message  # the field is still named so the author can locate it
 
+    @pytest.mark.parametrize(
+        ("topic", "content", "row_model", "expected_error", "expected_in_message"),
+        [
+            ("a cell that does not coerce", "value\noops\n", IntRow, CsvCoercionError, "row 2 of the CSV file"),
+            (
+                "a column the concept does not declare",
+                "value,confidential-patient-diagnosis\n1,2\n",
+                IntRow,
+                CsvColumnError,
+                "Column(s) 2 of the CSV file",
+            ),
+            ("a repeated column", "value,value\n1,2\n", IntRow, CsvColumnError, "Column 2 of the CSV file repeats"),
+            ("a file that does not decode", b"value\n\xe9\n", IntRow, CsvReadError, "invalid continuation byte"),
+            ("a file that does not exist", None, IntRow, CsvReadError, "No such file or directory"),
+        ],
+    )
+    def test_a_refusal_never_names_the_file_s_path_nor_its_own_text(
+        self,
+        tmp_path: Path,
+        topic: str,
+        content: str | bytes | None,
+        row_model: type[StructuredContent],
+        expected_error: type[Exception],
+        expected_in_message: str,
+    ) -> None:
+        """The file is the caller's input: its path, a header cell the concept does not declare and its bytes are the run's data."""
+        input_dir = tmp_path / "confidential-patient-folder"
+        input_dir.mkdir()
+        path = input_dir / "confidential-patient-diagnosis.csv"
+        if isinstance(content, str):
+            path.write_text(content, encoding="utf-8")
+        elif isinstance(content, bytes):
+            path.write_bytes(content)
+
+        with pytest.raises(expected_error) as exc_info:
+            list_content_from_csv(path, row_model=row_model)
+
+        message = str(exc_info.value)
+        assert expected_in_message in message, topic
+        assert "confidential" not in message, topic
+        assert "\\xe9" not in message, topic
+
     def test_string_literal_and_str_enum_round_trip_on_read(self, tmp_path: Path) -> None:
         # The read-side coercion of accepted string Literal / StrEnum cells (flat_field_names accepts
         # them; this confirms the cell actually coerces to the member through list_content_from_csv).
