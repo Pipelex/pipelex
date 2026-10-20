@@ -1,12 +1,15 @@
 import asyncio
-from collections.abc import Generator
+from collections.abc import Generator, Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from mthds.method_tree.models import MethodTree
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
+from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage
 from pipelex.methods.method_ref import MethodRef
@@ -99,6 +102,32 @@ def _build_client(mocker: MockerFixture, *, tmp_path: Path) -> TestClient:
 
 
 class TestLoadsOffTheEventLoop:
+    @pytest.mark.parametrize(
+        ("route", "body"),
+        [
+            ("/v1/validate", {"files": {"main.mthds": _ECHO_MTHDS}}),
+            ("/v1/execute", {"files": {"main.mthds": _ECHO_MTHDS}, "inputs": {"data": "hello"}}),
+        ],
+    )
+    def test_the_request_tree_is_written_off_the_event_loop_and_removed(self, mocker: MockerFixture, tmp_path: Path, route: str, body: dict[str, Any]):
+        """The tree a request sends is written to disk in a worker thread, and its directory is gone once the route answers."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        writes: list[tuple[Path, bool]] = []
+
+        def write_after_noting_the_thread(*, contents: Mapping[str, bytes], destination: Path, expected_digest: str) -> MethodTree:
+            writes.append((destination, _runs_an_event_loop()))
+            return write_method_tree(contents=contents, destination=destination, expected_digest=expected_digest)
+
+        mocker.patch("pipelex_api.method_tree_request.write_method_tree", side_effect=write_after_noting_the_thread)
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        ((method_dir, written_on_a_loop),) = writes
+        assert written_on_a_loop is False
+        assert not method_dir.parent.exists()
+        assert WRITTEN_METHOD_TREES.tree_written_at(directory=method_dir) is None
+
     def test_a_validation_asks_the_package_offer_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path, recording_offer: _RecordingOffer):
         """The runner's check of the served method asks the factory first, then the in-process validator's load does."""
         client = _build_client(mocker, tmp_path=tmp_path)

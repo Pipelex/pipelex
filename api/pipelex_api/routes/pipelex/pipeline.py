@@ -52,7 +52,7 @@ from pipelex_api.method_tree_request import (
     select_tree_entry,
     tree_documents_of,
     with_resources,
-    written_method,
+    written_method_async,
 )
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import (
@@ -874,7 +874,7 @@ async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store
 async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) -> AsyncGenerator[_ResolvedRunSource, None]:
     """Resolve the request's run source: a method tree (`files`, `bundle_b64` or a `method_ref`), or the inline contents.
 
-    A method tree is written into a temporary directory and held as written, then handed to the runner as its one
+    A method tree is written into a temporary directory in a worker thread and held as written, then handed to the runner as its one
     library directory, the caller's own, with the dependency trees it carries as `methods_dirs`: the load reads the
     tree whole, its `.mthds` files as the method's bundles and every other file as one a step may read, such as a
     `PipeDocGen` template or a `PipeFunc` module, and names each by its tree path. A refusal while loading it is the
@@ -912,7 +912,7 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
         )
         return
     pipe_code = run_request.pipe_code or select_tree_entry(tree=request_method.tree, method_label=method_label).pipe_ref
-    with written_method(request_method=request_method) as written:
+    async with written_method_async(request_method=request_method) as written:
         yield _ResolvedRunSource(
             mthds_contents=None,
             library_dirs=[str(written.method_dir)],

@@ -5,12 +5,15 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents
+from mthds.method_tree.models import MethodTree
 from pytest_mock import MockerFixture
 
 from pipelex.interpreter_hub import get_current_library_id_or_none, get_library_manager
+from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.pipeline.execution_seams import acquire_library_async
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.plugins.pipe_func_package_offer_registry import (
     PipeFuncPackageOffer,
     PipeFuncPackageOfferRegistry,
@@ -107,6 +110,24 @@ class TestMethodLoadsOffTheEventLoop:
         result = await validate_bundle(method_dir=held_tree)
 
         assert [pipe.code for pipe in result.pipes] == ["echo"]
+        assert set(recording_offer.calls_on_a_loop) == {False}
+
+    async def test_the_in_process_validator_reads_the_tree_entry_for_its_graph_off_the_event_loop(
+        self, mocker: MockerFixture, held_tree: Path, recording_offer: _RecordingOffer
+    ) -> None:
+        """Beside the load, the validator lists the tree once more to find the entry pipe its graph draws, off the loop too."""
+        listings_on_a_loop: list[bool] = []
+
+        def list_after_noting_the_thread(*, handed_over: Path) -> MethodTree:
+            listings_on_a_loop.append(_runs_an_event_loop())
+            return list_local_method_tree(handed_over=handed_over)
+
+        mocker.patch("pipelex.pipeline.validate_in_process.list_local_method_tree", side_effect=list_after_noting_the_thread)
+
+        report = await validate_bundles_in_process(method_dir=held_tree)
+
+        assert report.graph_spec is not None
+        assert listings_on_a_loop == [False]
         assert set(recording_offer.calls_on_a_loop) == {False}
 
     async def test_an_asynchronous_acquisition_loads_off_the_event_loop_and_leaves_the_library_current(

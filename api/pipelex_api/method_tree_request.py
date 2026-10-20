@@ -36,8 +36,8 @@ import base64
 import json
 import shutil
 import tempfile
-from collections.abc import Generator, Mapping
-from contextlib import ExitStack, contextmanager
+from collections.abc import AsyncGenerator, Generator, Mapping
+from contextlib import ExitStack, asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any, NamedTuple, NoReturn, cast
 
@@ -63,6 +63,7 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.method_entry import EntryCandidate, MethodEntry, select_entry
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
@@ -778,6 +779,29 @@ class WrittenMethod(NamedTuple):
     tree: MethodTree
 
 
+def _write_method(*, request_method: RequestMethod, releases: ExitStack) -> WrittenMethod:
+    """Write a method's trees into a temporary directory and hold each as written, each release pushed on `releases`.
+
+    The removal of the directory is pushed before anything is written, and each holding as soon as it is taken, so
+    closing `releases` undoes exactly what was done, however far the writing got. Blocking work.
+    """
+    temp_dir = Path(tempfile.mkdtemp(prefix="pipelex-method-"))
+    releases.callback(shutil.rmtree, temp_dir, ignore_errors=True)
+    method_dir = temp_dir / "tree"
+    written = write_method_tree(contents=request_method.tree.contents, destination=method_dir, expected_digest=request_method.tree.tree.digest)
+    releases.enter_context(WRITTEN_METHOD_TREES.holding(tree=written))
+    methods_dirs: list[Path] = []
+    for index_dependency, (address, dependency) in enumerate(request_method.dependencies.items()):
+        methods_dir = temp_dir / f"methods-{index_dependency}"
+        dependency_dir = methods_dir / dependency_dir_name(address=address)
+        dependency_written = write_method_tree(contents=dependency.contents, destination=dependency_dir, expected_digest=dependency.tree.digest)
+        releases.enter_context(WRITTEN_METHOD_TREES.holding(tree=dependency_written))
+        if dependency.has_python and is_pipe_func_sandbox_hosted():
+            ensure_no_structured_content_python(package_dir=dependency_dir, package_address=address)
+        methods_dirs.append(methods_dir)
+    return WrittenMethod(method_dir=method_dir, methods_dirs=methods_dirs or None, tree=written)
+
+
 @contextmanager
 def written_method(*, request_method: RequestMethod) -> Generator[WrittenMethod, None, None]:
     """Write a method's trees into a temporary directory, hold each as written, and remove them all on the way out.
@@ -786,20 +810,25 @@ def written_method(*, request_method: RequestMethod) -> Generator[WrittenMethod,
     `<name>/` in a methods directory of its own, the layout the engine's `methods_dirs` take, so two dependencies sharing
     a name never meet. On a sandbox-hosted deployment, a dependency tree declaring a Python structure class is refused,
     naming it by its address, as a fetched package is (`MethodStructuresRefusedError`, a 422).
+
+    Writing and removing the files is blocking work, done on the calling thread: asynchronous code uses
+    `written_method_async`.
     """
-    with ExitStack() as stack:
-        temp_dir = Path(tempfile.mkdtemp(prefix="pipelex-method-"))
-        stack.callback(shutil.rmtree, temp_dir, ignore_errors=True)
-        method_dir = temp_dir / "tree"
-        written = write_method_tree(contents=request_method.tree.contents, destination=method_dir, expected_digest=request_method.tree.tree.digest)
-        stack.enter_context(WRITTEN_METHOD_TREES.holding(tree=written))
-        methods_dirs: list[Path] = []
-        for index_dependency, (address, dependency) in enumerate(request_method.dependencies.items()):
-            methods_dir = temp_dir / f"methods-{index_dependency}"
-            dependency_dir = methods_dir / dependency_dir_name(address=address)
-            dependency_written = write_method_tree(contents=dependency.contents, destination=dependency_dir, expected_digest=dependency.tree.digest)
-            stack.enter_context(WRITTEN_METHOD_TREES.holding(tree=dependency_written))
-            if dependency.has_python and is_pipe_func_sandbox_hosted():
-                ensure_no_structured_content_python(package_dir=dependency_dir, package_address=address)
-            methods_dirs.append(methods_dir)
-        yield WrittenMethod(method_dir=method_dir, methods_dirs=methods_dirs or None, tree=written)
+    with ExitStack() as releases:
+        yield _write_method(request_method=request_method, releases=releases)
+
+
+@asynccontextmanager
+async def written_method_async(*, request_method: RequestMethod) -> AsyncGenerator[WrittenMethod, None]:
+    """`written_method` for asynchronous code: the trees are written, and removed, in a worker thread, off the event loop.
+
+    The directory is removed and its trees released whatever happens, a refusal while writing, a failure of the block
+    and a cancellation included. `run_in_worker_thread` lets a cancellation through only once its thread has ended, so
+    the removal never runs while the writing is still at work, and a cancellation repeated during the removal waits for
+    it too.
+    """
+    releases = ExitStack()
+    try:
+        yield await run_in_worker_thread(_write_method, request_method=request_method, releases=releases)
+    finally:
+        await run_in_worker_thread(releases.close)

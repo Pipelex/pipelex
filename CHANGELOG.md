@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- **Method loads leave the event loop**: every method load pipelex reaches from asynchronous code, a run's, a validation's and those of the commands that run a loop, runs in a worker thread, where it ran on the event loop, so listing and hashing a method's files, a sandbox's judgment of its `requirements.txt` and a fetch of a package it calls by address no longer hold up the other requests or activities the loop serves. `/v1/validate` of a method tree calling a package nothing shipped still resolves it as a run does, from the methods installed on the server and by a fetch on a miss, so its verdict matches the run's, and the fetch now runs off the event loop.
+- **Method loads leave the event loop**: every method load pipelex reaches from asynchronous code, a run's, a validation's and those of the commands that run a loop, runs in a worker thread, where it ran on the event loop, so listing and hashing a method's files, a sandbox's judgment of its `requirements.txt` and a fetch of a package it calls by address no longer hold up the other requests or activities the loop serves; the API server's run routes and `/v1/validate` also write a request's method tree to disk and remove it in a worker thread, and the in-process validator reads a tree's entry pipe for its graph there too. `/v1/validate` of a method tree calling a package nothing shipped still resolves it as a run does, from the methods installed on the server and by a fetch on a miss, so its verdict matches the run's, and the fetch now runs off the event loop.
 
 ## [v0.90.0] - 2026-10-19
 

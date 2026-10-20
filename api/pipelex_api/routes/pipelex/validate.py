@@ -21,7 +21,7 @@ from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.exception_handlers import problem_response
 from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method
+from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method_async
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
 from pipelex_api.problem_view import problem_view_of
@@ -429,7 +429,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         entry = _optional_tree_entry(request_method=request_method, method_label=method_label)
         tree_default_pipe_ref = entry.pipe_ref if entry is not None else None
         default_pipe_ref_known = True
-        with written_method(request_method=request_method) as written:
+        async with written_method_async(request_method=request_method) as written:
             verdict = await ApiRunner(
                 library_dirs=[str(written.method_dir)],
                 library_dirs_are_callers=True,
