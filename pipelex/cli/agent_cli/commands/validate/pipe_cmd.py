@@ -60,7 +60,10 @@ def validate_pipe_cmd(
     """Validate a pipe by code, or all pipes, and output the results.
 
     Default output is markdown; use --format json for structured JSON.
-    Results go to stdout on success, errors to stderr with exit code 1.
+    Results go to stdout on success, and a failure's problem to stderr. Exit codes: 0 when the pipe or library is
+    valid; 1 on the invalid verdict, on a library not runnable under --all without --allow-signatures, and when
+    Pipelex fails to boot; 2 when no verdict could be produced: a command line that does not parse, a missing or
+    ambiguous pipe code, a model no enabled backend serves, an unexpected failure.
 
     Examples:
         pipelex-agent validate pipe my_pipe

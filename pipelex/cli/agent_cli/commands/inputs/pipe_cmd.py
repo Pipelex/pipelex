@@ -52,7 +52,8 @@ def inputs_pipe_cmd(
     """Generate an example inputs template for a pipe by code.
 
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown; a
+    command line that does not parse exits 2.
 
     Examples:
         pipelex-agent inputs pipe my_pipe
