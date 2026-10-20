@@ -64,19 +64,27 @@ curl http://localhost:8081/health
 
 ### 3. Run your first pipeline
 
-Send an inline MTHDS bundle and inputs to `/v1/execute`:
+Send a method and its inputs to `/v1/execute`. The method travels in `files`, a map from each file's path in the method's folder to that file's content; here the method is a single `.mthds` file:
 
 ```bash
 curl -s http://localhost:8081/v1/execute \
   -H "Content-Type: application/json" \
   -d '{
-    "pipe_code": "summarize",
-    "mthds_contents": ["domain = \"hello\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize the input text in one sentence\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize in one sentence:\\n@text\"\n"],
+    "files": {
+      "summarize.mthds": "domain = \"hello\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize the input text in one sentence\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize in one sentence:\\n@text\"\n"
+    },
     "inputs": { "text": "Pipelex turns plain-language pipeline definitions into reproducible AI workflows that run as HTTP endpoints." }
   }'
 ```
 
-The response contains `state: "COMPLETED"` and the result under `pipe_output.working_memory.root.<main_stuff_name>.content`. See **[Pipe Run →](pipe-run.md)** for every input shape (text, structured objects, `Document`, `Image`, …) and the full `/execute` and `/start` reference.
+The response contains `state: "COMPLETED"` and the result under `pipe_output.working_memory.root.<main_stuff_name>.content`. The run starts at the method's `main_pipe`, and `pipe_code` names another pipe of the method to start at.
+
+`files` carries the whole method, not only its bundles: a `PipeDocGen` step's template, a `PipeFunc`'s Python module or a `METHODS.toml` travels beside the `.mthds` files, each at its path in the method's folder. A text file is sent as its text, a file that is not text as `{"base64": "..."}`, and, since this server keeps a blob store (`blob_store: true` on `GET /v1/version`), any file the server already holds can be sent as `{"sha256": "...", "size": n}`: `POST /v1/blobs/missing` names the files it lacks and where to upload each, so a method that has not changed is not uploaded again. See [Sending a method as a tree](pipe-run.md#sending-a-method-as-a-tree) and [Sending files by hash](pipe-run.md#sending-files-by-hash).
+
+!!! note "`mthds_contents` is being retired"
+    Earlier examples sent the method as `mthds_contents`, a JSON array of `.mthds` texts. The server still accepts it, with `bundle_b64` and `resources`, but a later release refuses all three, so send the method in `files`.
+
+See **[Pipe Run →](pipe-run.md)** for every input shape (text, structured objects, `Document`, `Image`, …) and the full `/execute` and `/start` reference.
 
 ### 4. Customize the configuration
 
