@@ -22,36 +22,33 @@ class GraphFormat(StrEnum):
     BOTH = "both"
 
 
-async def render_graph_from_spec(
-    graph_spec: GraphSpec,
+async def render_graph_outputs(
     *,
+    graph_spec: GraphSpec,
     graph_config: GraphConfig,
     include_mermaidflow: bool,
     include_reactflow: bool,
-    output_dir: Path,
     pipe_code: str = "",
     title: str | None = None,
     direction: FlowchartDirection | None = None,
     include_subgraphs: bool = True,
-) -> dict[str, Path]:
-    """Render graph outputs from a graph spec and save to output_dir.
+) -> GraphOutputs:
+    """Render the HTML viewers of a graph spec in memory, writing nothing.
 
-    Builds a render config from the provided graph config with format selection,
-    generates graph outputs, and saves them to the output directory.
+    A caller that saves them into a folder of its own making renders first, so a render that fails leaves no folder.
 
     Args:
         graph_spec: The graph spec produced by pipeline execution.
         graph_config: The base graph configuration.
         include_mermaidflow: Whether to generate Mermaid HTML output.
         include_reactflow: Whether to generate ReactFlow HTML output.
-        output_dir: Directory where graph files will be saved.
         pipe_code: The pipe code, used to derive the HTML page title.
         title: Explicit title for the graph page (takes precedence over pipe_code).
         direction: Flowchart direction override.
         include_subgraphs: Whether to include controller subgraphs in Mermaid output.
 
     Returns:
-        Dict mapping output format keys to saved file paths.
+        The rendered outputs, the viewers selected and nothing else.
     """
     render_graph_config = graph_config.model_copy(
         update={
@@ -71,7 +68,7 @@ async def render_graph_from_spec(
         }
     )
 
-    graph_outputs: GraphOutputs = await generate_graph_outputs(
+    return await generate_graph_outputs(
         graph_spec=graph_spec,
         graph_config=render_graph_config,
         pipe_code=pipe_code,
@@ -80,4 +77,45 @@ async def render_graph_from_spec(
         include_subgraphs=include_subgraphs,
     )
 
+
+async def render_graph_from_spec(
+    graph_spec: GraphSpec,
+    *,
+    graph_config: GraphConfig,
+    include_mermaidflow: bool,
+    include_reactflow: bool,
+    output_dir: Path,
+    pipe_code: str = "",
+    title: str | None = None,
+    direction: FlowchartDirection | None = None,
+    include_subgraphs: bool = True,
+) -> dict[str, Path]:
+    """Render graph outputs from a graph spec and save to output_dir.
+
+    Renders the selected viewers with `render_graph_outputs`, then saves them to the output directory.
+
+    Args:
+        graph_spec: The graph spec produced by pipeline execution.
+        graph_config: The base graph configuration.
+        include_mermaidflow: Whether to generate Mermaid HTML output.
+        include_reactflow: Whether to generate ReactFlow HTML output.
+        output_dir: Directory where graph files will be saved.
+        pipe_code: The pipe code, used to derive the HTML page title.
+        title: Explicit title for the graph page (takes precedence over pipe_code).
+        direction: Flowchart direction override.
+        include_subgraphs: Whether to include controller subgraphs in Mermaid output.
+
+    Returns:
+        Dict mapping output format keys to saved file paths.
+    """
+    graph_outputs = await render_graph_outputs(
+        graph_spec=graph_spec,
+        graph_config=graph_config,
+        include_mermaidflow=include_mermaidflow,
+        include_reactflow=include_reactflow,
+        pipe_code=pipe_code,
+        title=title,
+        direction=direction,
+        include_subgraphs=include_subgraphs,
+    )
     return save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
