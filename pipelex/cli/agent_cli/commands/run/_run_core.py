@@ -74,9 +74,10 @@ async def run_pipeline_core(
         inputs_base_dir: Directory bare relative file paths in ``inputs`` resolve against (Smart
             Inputs D3) — the inputs file's parent when file-loaded, else ``None``.
         output_dir_override: Directory the run's output folder (output JSON, graph files) is created under,
-            overriding the default, `results/` beside the bundle. The caller passes one when the bundle lives
-            in a directory that will not survive the process — a fetched method's ephemeral clone — or when a
-            folder run named its pipe and has no entry bundle to write beside.
+            overriding the default, `results/` beside the bundle. `run bundle` always passes the one
+            `bundle_run_outputs_dir` settles for its target, which `validate bundle --graph` shares; `run method`
+            passes one when the bundle lives in a directory that will not survive the process, a fetched method's
+            ephemeral clone.
         method_tree: The method tree the run reads, when the command listed one: its digest is recorded as
             ``method_tree_digest`` beside the run's other side effects, on disk and under ``with_memory``.
 

@@ -26,7 +26,7 @@ A tree holds the regular files under its root, except those its membership rule 
 
 A symbolic link anywhere in the tree refuses the whole tree: a tree holds regular files only, so replace the link with the file it names, or keep it out with a `.gitignore` pattern.
 
-The tree's `.gitignore` files are what keeps a run's outputs out of the method: every folder `pipelex run` creates for its outputs holds a `.gitignore` ignoring everything in it, so a run started from the method's own folder leaves its tree, and its digest, as they were.
+The tree's `.gitignore` files are what keeps a run's outputs out of the method: every folder `pipelex run` creates for its outputs holds a `.gitignore` ignoring everything in it, and so does the folder `pipelex-agent validate bundle --graph` writes its flowchart into, so a run or a validation started from the method's own folder leaves its tree, and its digest, as they were.
 
 ## File references
 

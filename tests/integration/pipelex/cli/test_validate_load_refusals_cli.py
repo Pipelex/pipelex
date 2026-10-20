@@ -29,11 +29,9 @@ from pipelex.cli.commands.validate._validate_core import (
     _validate_pipe_or_bundle,  # pyright: ignore[reportPrivateUsage]
     do_validate_all_libraries_and_dry_run,
 )
-from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.test_extras.mthds_corpus.loader import get_entry
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
     from pathlib import Path
 
     from pytest_mock import MockerFixture
@@ -63,20 +61,6 @@ def console(mocker: MockerFixture) -> Console:
     recorded_console = Console(width=200, record=True, color_system=None)
     mocker.patch("pipelex.cli.error_handlers.get_error_console", return_value=recorded_console)
     return recorded_console
-
-
-@pytest.fixture
-def restore_current_library() -> Iterator[None]:
-    """The pipe and --all paths leave their library open and current (the command's teardown owns it)."""
-    outer_library_id = get_current_library_id_or_none()
-    yield
-    current_library_id = get_current_library_id_or_none()
-    if current_library_id is not None and current_library_id != outer_library_id:
-        get_library_manager().teardown(library_id=current_library_id)
-    if outer_library_id is not None:
-        set_current_library(library_id=outer_library_id)
-    else:
-        clear_current_library()
 
 
 @pytest.fixture
