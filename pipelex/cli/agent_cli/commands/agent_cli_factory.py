@@ -162,7 +162,7 @@ def apply_agent_cli_output_discipline() -> None:
         hub.set_console_print_target(target=ConsoleTarget.STDERR)
 
 
-def report_agent_init_failure(*, error: Exception) -> NoReturn:
+def report_agent_init_failure(*, error: Exception, exit_code: int = 1) -> NoReturn:
     """Report a failure to initialize Pipelex, or to read the configuration it boots from, as its problem.
 
     The one account of a failed boot, given whether the boot raised it or a step reading this machine's configuration
@@ -171,11 +171,18 @@ def report_agent_init_failure(*, error: Exception) -> NoReturn:
     included, reports its own code, its next step, its advice and, when the migration history explains it, the pending
     migration in its diagnostics. A failure whose chain gives no advice is tipped with the boot's recovery path, its
     problem still its own.
+
+    Args:
+        error: What the boot, or the read of its configuration, raised.
+        exit_code: The exit code, 1 by default, which a failed boot gives. ``validate bundle`` and ``fix bundle`` pass
+            2 for a configuration refused before the boot, since that refusal gives no verdict on the method, as the
+            0/1/2 policy reserves 2 for and as the human ``pipelex validate bundle`` and ``pipelex fix bundle`` exit.
     """
     if isinstance(error, ModelDeckPresetValidationError):
         agent_error(
             error.message,
             cause=error,
+            exit_code=exit_code,
             fallback_tip=AGENT_BOOT_RECOVERY_TIP,
             preset_id=error.preset_id,
             model_type=str(error.model_type),
@@ -183,8 +190,8 @@ def report_agent_init_failure(*, error: Exception) -> NoReturn:
             enabled_backends=sorted(error.enabled_backends),
         )
     if isinstance(error, PipelexError):
-        agent_error(error.message, cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
-    agent_error(f"Pipelex initialization failed: {error}", cause=error, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+        agent_error(error.message, cause=error, exit_code=exit_code, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
+    agent_error(f"Pipelex initialization failed: {error}", cause=error, exit_code=exit_code, fallback_tip=AGENT_BOOT_RECOVERY_TIP)
 
 
 def make_pipelex_for_agent_cli(*, library_dirs: list[str] | list[Path] | None = None, needs_inference: bool = True) -> Pipelex:

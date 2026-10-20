@@ -1,7 +1,8 @@
 """Unit tests for resolve_bundle_target: shared path resolution for the agent CLI's validate and fix bundle commands.
 
-Pins that ``~`` is expanded for both the ``path`` argument and each ``--library-dir`` entry, and that a folder is read
-whole, as its method tree, whatever its bundles declare of where the method starts.
+Pins that ``~`` is expanded for both the ``path`` argument and each ``--library-dir`` entry, that a folder is read
+whole, as its method tree, whatever its bundles declare of where the method starts, and that what gives no verdict on
+the folder exits 2.
 """
 
 import json
@@ -9,7 +10,9 @@ from pathlib import Path
 
 import pytest
 import typer
+from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.bundle_path_resolver import resolve_bundle_target
 from pipelex.pipeline.exceptions import ValidateBundleError
 from tests.helpers.method_folders import MethodFolderShape, write_method_folder
@@ -75,6 +78,22 @@ class TestResolveBundleTarget:
         assert problem["code"] == "method.invalid"
         assert problem["diagnostics"]["error_class"] == "EmptyMethodTreeError"
         assert problem["message"] == f"The folder '{tmp_path}' holds no .mthds bundle."
+
+    def test_a_configuration_that_does_not_validate_before_the_boot_exits_2(
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Listing the tree reads its limits from the configuration: its refusal is the failed boot's problem, no verdict."""
+        mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
+
+        with pytest.raises(typer.Exit) as exc_info:
+            resolve_bundle_target(str(tmp_path), library_dir=None)
+
+        assert exc_info.value.exit_code == 2
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "pipelex.config.invalid"
+        assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
+        assert problem["message"] == "the configuration is out of date"
 
     def test_a_folder_whose_tree_is_refused_raises_the_verdict_for_the_command(self, tmp_path: Path) -> None:
         """A symbolic link in the tree is the invalid verdict, which each command renders as its surface does."""

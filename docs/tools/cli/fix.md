@@ -57,7 +57,7 @@ pipelex fix bundle my_bundle.mthds --select match-sequence-output
 
 - `0` - The bundle is valid after the run (fixed, or already valid)
 - `1` - Negative verdict: the bundle is still invalid, or valid but not runnable (pending `PipeSignature` placeholders without `--allow-signatures`)
-- `2` - No verdict: bad path, a folder holding no `.mthds` bundle, invalid rule filter, or an unexpected failure
+- `2` - No verdict: bad path, a folder holding no `.mthds` bundle, a configuration that does not validate, read before Pipelex starts for the limits a folder's tree is listed under, invalid rule filter, or an unexpected failure
 
 ## What Gets Fixed
 
