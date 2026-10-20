@@ -35,7 +35,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
 from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
-from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME
+from pipelex.cli.commands.run._run_output_folder import bundle_run_outputs_dir
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
@@ -149,9 +149,8 @@ def run_bundle_cmd(
 
     # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
     method_tree: MethodTree | None = None
-    # Where a folder run that named its pipe writes its output folders: `results/` in the folder, which has no entry
-    # bundle to write beside.
-    output_dir_override: Path | None = None
+    # The bundle defining a folder's entry pipe, which the run's output folders are made beside.
+    entry_bundle_file: Path | None = None
     # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
     # hosted API starts at the same pipe when two domains of the files it is sent define the same code.
     hosted_pipe_code: str | None = pipe
@@ -171,9 +170,8 @@ def run_bundle_cmd(
         pipe_code = folder_run.pipe_code
         if folder_run.entry is not None and folder_run.entry_bundle_file is not None:
             bundle_path = str(folder_run.entry_bundle_file)
+            entry_bundle_file = folder_run.entry_bundle_file
             hosted_pipe_code = folder_run.entry.pipe_ref
-        else:
-            output_dir_override = target_path / RUN_RESULTS_DIR_NAME
 
         # Hand the directory to parse_cli_inputs as the lowest-priority inputs source: it probes
         # for inputs.json / inputs.toml (and applies the ambiguity rule) only after --inputs and
@@ -195,6 +193,9 @@ def run_bundle_cmd(
             argument=path,
             reason="not a .mthds file or a directory",
         )
+
+    # Where the run's output folders go on this machine, settled by the one function `validate bundle --graph` asks too.
+    output_dir_override = bundle_run_outputs_dir(target_path=target_path, pipe_override=pipe, entry_bundle_file=entry_bundle_file)
 
     # Load MTHDS content from bundle
     mthds_content: str | None = None

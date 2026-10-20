@@ -85,7 +85,7 @@ pipelex-agent validate method <NAME> [OPTIONS]
 For `bundle`, additional options are available:
 
 - `--pipe` - Require a specific pipe in the bundle, and dry-run only that pipe; for a method's folder, the whole tree is still validated
-- `--graph`, `-g` - Generate an execution graph visualization
+- `--graph`, `-g` - Draw the method's flowchart from a dry run and save it in a new output folder kept out of the method's tree (see [Graph Visualization](#graph-visualization))
 - `--graph-format`, `-f` - Graph output format (`mermaidflow`, `reactflow`, or `both`)
 - `--direction` - Graph layout direction
 
@@ -263,5 +263,7 @@ A configuration that does not validate names, in the next step's sentence, the s
 ## Graph Visualization
 
 Graph visualization is available through the `validate bundle` subcommand with the `--graph` flag, and through `run` subcommands where it is enabled by default. Use `--no-graph` on `run` to disable it.
+
+`validate bundle --graph` writes its flowchart, the ReactFlow viewer `dry_run.html`, and the Mermaid viewer `mermaidflow.html` with `--graph-format mermaidflow` or `both`, into a new numbered folder, `<pipe_code>_output_<NN>/`, under the `results/` directory a `run bundle` of the same target writes its outputs to: beside the bundle file named, beside the bundle defining a folder's entry pipe, or in the folder's own `results/` when `--pipe` names the pipe, whichever bundle defines it. The folder is made the way a run's is, holding a `.gitignore` ignoring everything in it, so validating a method never adds a file to its tree nor changes its digest, and each validation gets a folder of its own. The envelope names each file it wrote in `graph_files` (`reactflow_html`, `mermaidflow_html`) and the folder in `graph_output_dir`, and the Markdown lists the files under `## Graph files`: open the path the command reports rather than looking for the viewer in a fixed place.
 
 A `run` writes its outputs into a new numbered folder, `results/<pipe_code>_output_<NN>/` beside its bundle, or under `mthds-wip/` when it ran no bundle file; a folder run that named its pipe writes under the folder's `results/`, and a fetched method under `results/` in the working directory. The folder holds a `.gitignore` ignoring everything in it, so no output ever joins the method tree and the next run reads the same tree, with the same `method_tree_digest`. With the graph on, that folder holds the ReactFlow viewer (`dry_run.html` or `live_run.html`) and the graph itself: `graphspec.json` on a dry run, `live_run_graph.json` on a live run. Beside the graph, under their canonical names whatever the graph file is called, sit the three files that describe its data: `pipe_io_contracts.json`, `input_form.json` and `output_form.json`, the same artifacts `validate` reports under those names, keyed by namespaced `pipe_ref`. A graph viewer resolves them from the graph file's directory, not from its name. With `--with-memory`, the JSON envelope's `graph_files` object names every one of these paths (`graph_html`, `graph_spec` on a live run, `pipe_io_contracts`, `input_form`, `output_form`).

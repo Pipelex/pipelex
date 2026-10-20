@@ -1,7 +1,9 @@
 """The folder a `pipelex run` writes its outputs to, kept out of every method tree, and the record of the tree it ran.
 
 A run writes its outputs to a new numbered folder, `<label>_output_<NN>`, under `--output-dir` for `pipelex run`, and
-under `results/` beside the bundle it ran for `pipelex-agent run`. That folder often
+under `results/` beside the bundle it ran for `pipelex-agent run`; `pipelex-agent validate bundle --graph` writes its
+graph files to such a folder too, under the directory a `run bundle` of the same target writes to, which
+`bundle_run_outputs_dir` settles for both commands. That folder often
 lies inside a method's folder, the working directory being the method's, so the run writes a `.gitignore` holding `*`
 into it: the membership rule honours the tree's `.gitignore` files as git does (`mthds/docs/spec/method-tree.md`), so
 none of a run's outputs, nor the `.gitignore` itself, ever joins the tree, and a second run of the method reads the
@@ -19,9 +21,9 @@ from mthds.method_tree.models import MethodTree
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 
 RUN_OUTPUT_GITIGNORE_NAME = ".gitignore"
-RUN_OUTPUT_GITIGNORE_CONTENT = "# Written by pipelex run: a run's outputs are never part of a method.\n*\n"
+RUN_OUTPUT_GITIGNORE_CONTENT = "# Written by pipelex: what a run or a validation writes here is never part of a method.\n*\n"
 METHOD_TREE_RECORD_NAME = "method_tree.json"
-#: The directory `pipelex-agent run` creates its output folders under, beside the bundle it ran.
+#: The directory `pipelex-agent run` creates its output folders under, beside the bundle it ran, as `validate bundle --graph` does.
 RUN_RESULTS_DIR_NAME = "results"
 
 
@@ -32,6 +34,21 @@ def run_output_label(*, pipe_ref: str) -> str:
     `pipe_code`, as a pipe named by its bare code does.
     """
     return pipe_ref.rsplit("->", 1)[-1].rsplit(".", 1)[-1]
+
+
+def bundle_run_outputs_dir(*, target_path: Path, pipe_override: str | None, entry_bundle_file: Path | None) -> Path:
+    """The directory `pipelex-agent run bundle <target_path>` makes its output folders under, on this machine.
+
+    A bundle file's run writes under `results/` beside the file. A folder's run writes under `results/` beside the bundle
+    defining the pipe it starts at, `entry_bundle_file`, when no pipe was named, and under the folder's own `results/`
+    when `pipe_override` names one, whichever bundle defines it. `pipelex-agent validate bundle --graph` asks this same
+    function about the same target, so a validation's flowchart lands where a run of that target writes its outputs.
+    """
+    if not target_path.is_dir():
+        return target_path.parent / RUN_RESULTS_DIR_NAME
+    if pipe_override or entry_bundle_file is None:
+        return target_path / RUN_RESULTS_DIR_NAME
+    return entry_bundle_file.parent / RUN_RESULTS_DIR_NAME
 
 
 def make_run_output_folder(*, output_dir: Path, label: str) -> Path:
