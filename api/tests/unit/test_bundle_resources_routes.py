@@ -521,6 +521,37 @@ class TestBundleResourcesRoutes:
         else:
             _assert_the_verdict_names_the_missing_file(verdict=verdict, file="logo.png", reason="not_in_tree")
 
+    def test_the_valid_verdict_of_a_tree_names_the_files_each_step_reads(self, mocker: MockerFixture) -> None:
+        """Per step, the files of the tree it reads by tree path and use; per file, the steps reading it; a carried file in neither."""
+        _stub_the_document_engine(mocker)
+        html_mthds = _INVOICE_MTHDS.replace('format        = "docx"', 'format        = "pdf"').replace(_TEMPLATE_PATH, "templates/invoice.html")
+        files: dict[str, Any] = {
+            "invoicing.mthds": html_mthds,
+            "templates/invoice.html": '<img src="logo.png" alt="Acme"><h1>{{ invoice.number }}</h1>',
+            "templates/logo.png": {"base64": _b64(b"\x89PNG\r\n\x1a\n a logo")},
+            "README.md": "# Invoicing, read by people and by no step\n",
+        }
+
+        response = _build_client().post("/v1/validate", json={"files": files, "render": ["markdown"]})
+
+        assert response.status_code == 200, response.text
+        verdict = response.json()
+        assert verdict["is_valid"] is True, response.text
+        assert verdict["tree_files_read"] == {
+            "invoicing.print_invoice": [
+                {"tree_path": "templates/invoice.html", "use": "template"},
+                {"tree_path": "templates/logo.png", "use": "template_asset"},
+            ]
+        }
+        assert verdict["tree_file_readers"] == {
+            "templates/invoice.html": ["invoicing.print_invoice"],
+            "templates/logo.png": ["invoicing.print_invoice"],
+        }
+        assert (
+            "- `invoicing.print_invoice` reads `templates/invoice.html` (template), `templates/logo.png` (template asset)"
+            in verdict["rendered_markdown"]
+        )
+
     def test_two_bundles_of_a_method_each_read_the_file_beside_them(self, mocker: MockerFixture) -> None:
         """A step names its file from its bundle's own tree path, so two bundles shipping a template each under one relative path both run."""
         _stub_the_document_engine(mocker)
