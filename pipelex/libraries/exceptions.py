@@ -124,6 +124,23 @@ def _tree_limit_reason(*, kind: TreeLimitKind) -> MethodPackageReason:
             return MethodPackageReason.FILE_TOO_LARGE
 
 
+class MethodTreeChangedError(MethodTreeLoadError):
+    """Raised when a file of a method tree on this host's disk is not the file the tree's listing hashed when it is read.
+
+    A run lists each tree once and records its digest, then reads the tree's files: the load its bundles, its
+    `requirements.txt` and its Python, the run the files its steps name. Each read is checked against the hash the
+    listing recorded, so a file edited, replaced or removed in between is refused rather than read as part of a tree it
+    no longer belongs to. Its ``reason`` is ``tree_changed`` and its ``path`` the file's tree path, given where it is
+    raised. Running again lists the tree as it now stands.
+    """
+
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": MethodPackageReason.TREE_CHANGED}
+
+
 class EmptyMethodTreeError(MethodTreeLoadError):
     """Raised when a folder handed over as a method holds no bundle.
 

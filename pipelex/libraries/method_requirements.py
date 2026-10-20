@@ -16,8 +16,12 @@ never installs anything:
   A deployment that cannot hold a tree's requirements in any environment refuses them with its own reason, which the
   method's refusal carries.
 - A tree is judged once per run: the run's listing (`pipelex.libraries.method_tree_listing`) keeps each tree a check
-  found met, so the later steps of a load, or a load after a server's check of the same request, ask nothing more. A
-  refused tree is never kept, and is judged again by the next check that reads it.
+  found met, with the execution mode and the plugin factory it was judged against, so the later steps of a load, a load
+  after a server's check of the same request, or a dependency package loaded again ask nothing more while those are
+  unchanged, and two loads judging the tree at once ask once. A refused tree is never kept, and is judged again by the
+  next check that reads it.
+- The `requirements.txt` judged is read against the hash the tree's listing recorded, so the file judged is the file the
+  run's digest names.
 - A requirement whose marker is false in that environment is not needed there and is not checked. One is met when the
   environment holds a distribution of its name at a version its specifier contains, pre-releases included, and, for
   each extra it names, when what the extra needs is met in turn.
@@ -29,6 +33,7 @@ the caller. A dependency package is named by its address, and a server checking 
 directory of its own names no path on the host at all (`ensure_served_method_requirements_met`).
 """
 
+import functools
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
@@ -50,8 +55,12 @@ from pipelex.core.method_trees.requirements_file import (
 )
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
 from pipelex.libraries.method_tree_listing import MethodTreeListing
-from pipelex.libraries.method_trees import listing_identity, reporting_host_library_tree_faults
-from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
+from pipelex.libraries.method_trees import listing_identity, read_tree_file_as_listed, reporting_host_library_tree_faults
+from pipelex.libraries.package_environments import (
+    PythonPackageEnvironment,
+    current_pipe_func_environment_source,
+    resolve_pipe_func_package_environment,
+)
 from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageRefusal
 
@@ -305,22 +314,18 @@ def _judged_method(*, tree: MethodTree, names_host_paths: bool) -> JudgedMethod:
 
 
 def _read_requirements_text(*, judged: JudgedMethod) -> str:
-    """The text of a tree's `requirements.txt`.
+    """The text of a tree's `requirements.txt`, read against the hash the tree's listing recorded.
 
     Raises:
-        MethodRequirementsFileError: The file cannot be read, or is not UTF-8 text.
+        MethodRequirementsFileError: The file is not UTF-8 text.
+        MethodTreeChangedError: The file is no longer the one the tree's listing hashed, or can no longer be read.
     """
-    location = judged.tree.file_location(REQUIREMENTS_FILE_NAME)
     source = judged.requirements_source
+    data = read_tree_file_as_listed(tree=judged.tree, tree_path=REQUIREMENTS_FILE_NAME)
     try:
-        return location.read_bytes().decode("utf-8")
+        return data.decode("utf-8")
     except UnicodeDecodeError as exc:
         msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that is not UTF-8 text, so they cannot be read."
-        raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
-            **_REQUIREMENTS_INVALID_PARAMS
-        ) from exc
-    except OSError as exc:
-        msg = f"{judged.method_name} declares its packages in a {REQUIREMENTS_FILE_NAME} that cannot be read: {exc.strerror or type(exc).__name__}."
         raise MethodRequirementsFileError(msg, items=[PipelexBundleBlueprintValidationErrorData(source=source, message=msg)]).with_params(
             **_REQUIREMENTS_INVALID_PARAMS
         ) from exc
@@ -425,27 +430,33 @@ def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_
     Each tree is judged once however often it is given, in the order given, against the environment stated for its own
     requirements: in a sandbox-hosted mode, the plugin providing the mode is asked for each tree declaring requirements,
     so trees judged together never share an environment stated for another's. Methods declaring none never read it. A
-    tree `tree_listing` holds as met, which an earlier check of the run judged, is not judged again, and each tree found
-    met is kept there for the run's later checks.
+    tree `tree_listing` holds as met against the current execution mode and factory, which an earlier check of the run
+    judged, is not judged again, each tree found met is kept there for the run's later checks, and a tree two checks
+    judge at once is judged by one of them (`MethodTreeListing.judge_requirements_once`).
 
     Raises:
-        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or is not UTF-8 text.
+        MethodTreeChangedError: A tree's `requirements.txt` is no longer the file its tree's listing hashed.
         MethodRequirementsNotMetError: The environment does not meet a tree's requirements, or the deployment refuses
             them with its own reason, no environment of its holding them.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
             set for them.
     """
     judged_trees: set[tuple[str, str, bool]] = set()
+    environment_source = current_pipe_func_environment_source() if tree_listing is not None else None
     for judged in judged_methods:
         tree_identity = listing_identity(tree=judged.tree)
         if tree_identity in judged_trees:
             continue
         judged_trees.add(tree_identity)
-        if tree_listing is not None and tree_listing.meets_requirements(tree=judged.tree):
+        if tree_listing is None:
+            _ensure_judged_method_met(judged=judged, names_host_paths=names_host_paths)
             continue
-        _ensure_judged_method_met(judged=judged, names_host_paths=names_host_paths)
-        if tree_listing is not None:
-            tree_listing.record_requirements_met(tree=judged.tree)
+        tree_listing.judge_requirements_once(
+            tree=judged.tree,
+            judged_against=environment_source,
+            judge=functools.partial(_ensure_judged_method_met, judged=judged, names_host_paths=names_host_paths),
+        )
 
 
 def _ensure_judged_method_met(*, judged: JudgedMethod, names_host_paths: bool) -> None:
@@ -454,7 +465,8 @@ def _ensure_judged_method_met(*, judged: JudgedMethod, names_host_paths: bool) -
     A tree with nothing to check, holding no requirements or no Python, meets them.
 
     Raises:
-        MethodRequirementsFileError: The tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsFileError: The tree's `requirements.txt` holds a line the standard refuses, or is not UTF-8 text.
+        MethodTreeChangedError: The tree's `requirements.txt` is no longer the file its listing hashed.
         MethodRequirementsNotMetError: The environment does not meet the tree's requirements, or the deployment refuses
             them with its own reason.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
@@ -484,12 +496,14 @@ def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_pa
         trees: The method trees a load reads, each checked when it lies on disk, declares requirements and holds Python.
         names_host_paths: Whether a refusal may name the method's root and this interpreter by their paths on this host,
             as a load's may: its refusal is the caller's own disk's, or the host's fault, withheld from the caller.
-        tree_listing: The run's listing of its method trees, which keeps each tree a check of the run found met: such a
-            tree is not judged again, so the package-offer factory is asked once per tree in a run, whose verdict does
-            not depend on how a refusal names the method. None judges every tree given.
+        tree_listing: The run's listing of its method trees, which keeps each tree a check of the run found met with the
+            execution mode and factory it was judged against: such a tree is not judged again against them, so the
+            package-offer factory is asked once per tree in a run, whose verdict does not depend on how a refusal names
+            the method. None judges every tree given.
 
     Raises:
-        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or is not UTF-8 text.
+        MethodTreeChangedError: A tree's `requirements.txt` is no longer the file its tree's listing hashed.
         MethodRequirementsNotMetError: The environment does not meet a tree's requirements, or the deployment refuses
             them with its own reason.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
@@ -502,14 +516,16 @@ def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_pa
     )
 
 
-def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -> None:
+def ensure_package_requirements_met(*, tree: MethodTree, package_address: str, tree_listing: MethodTreeListing | None = None) -> None:
     """Refuse a dependency package whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
 
     The package is named by its address and its file by `<address>/requirements.txt`, never by the directory it was
-    installed or fetched into, as its bundles are, since the package is the caller's dependency wherever it loads.
+    installed or fetched into, as its bundles are, since the package is the caller's dependency wherever it loads. A
+    package `tree_listing` holds as met is not judged again, as a method's tree is not (`ensure_method_requirements_met`).
 
     Raises:
-        MethodRequirementsFileError: The package's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsFileError: The package's `requirements.txt` holds a line the standard refuses, or is not UTF-8 text.
+        MethodTreeChangedError: The package's `requirements.txt` is no longer the file its tree's listing hashed.
         MethodRequirementsNotMetError: The environment does not meet the package's requirements, or the deployment
             refuses them with its own reason.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
@@ -520,7 +536,7 @@ def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -
         method_name=f"The method package '{package_address}'",
         requirements_source=f"{package_address}/{REQUIREMENTS_FILE_NAME}",
     )
-    _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False, tree_listing=None)
+    _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False, tree_listing=tree_listing)
 
 
 def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_listing: MethodTreeListing | None = None) -> None:
@@ -539,7 +555,8 @@ def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_
 
     Raises:
         HostLibraryTreeError: A tree of the directories could not be listed.
-        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or is not UTF-8 text.
+        MethodTreeChangedError: A tree's `requirements.txt` is no longer the file its tree's listing hashed.
         MethodRequirementsNotMetError: The environment does not meet a tree's requirements, or the deployment refuses
             them with its own reason.
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package

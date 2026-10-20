@@ -19,7 +19,7 @@ import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from importlib.metadata import PackageNotFoundError, distribution
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from packaging.markers import default_environment
 from packaging.utils import canonicalize_name
@@ -30,7 +30,12 @@ from pipelex.config import get_config, get_pipe_func_execution_mode, is_pipe_fun
 from pipelex.core.method_trees.requirements_file import RequirementLine
 from pipelex.interpreter_hub import get_pipe_func_package_offer_registry
 from pipelex.libraries.exceptions import PipeFuncPackageSetUnstatedError
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
+from pipelex.plugins.pipe_func_package_offer_registry import (
+    PipeFuncPackageOffer,
+    PipeFuncPackageOfferFactoryFn,
+    PipeFuncPackageOfferRequest,
+    PipeFuncPackageRefusal,
+)
 from pipelex.tools.misc.async_utils import is_event_loop_running_on_this_thread
 
 
@@ -143,6 +148,28 @@ class OfferedPackageEnvironment(PythonPackageEnvironment):
             f"PipeFunc steps on this deployment run with the packages of {self._offer.environment} and no others, "
             "so require versions it holds, or remove the requirements it cannot meet."
         )
+
+
+class PipeFuncEnvironmentSource(NamedTuple):
+    """What a requirements verdict is judged against, beside the tree: the PipeFunc execution mode, and the factory stating its packages.
+
+    Two verdicts judged against equal sources are one: a run keeps a tree's met verdict for the checks after it only
+    while they judge against the same mode and the same factory, compared as `==` compares them, by identity for a
+    function or a plain object.
+    """
+
+    execution_mode: str
+    offer_factory: PipeFuncPackageOfferFactoryFn | None
+
+
+def current_pipe_func_environment_source() -> PipeFuncEnvironmentSource:
+    """The source a check judges requirements against now: this interpreter in the `direct` mode, else the mode's registered factory."""
+    execution_mode = get_pipe_func_execution_mode()
+    if not is_pipe_func_sandbox_hosted():
+        return PipeFuncEnvironmentSource(execution_mode=execution_mode, offer_factory=None)
+    return PipeFuncEnvironmentSource(
+        execution_mode=execution_mode, offer_factory=get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
+    )
 
 
 def resolve_pipe_func_package_environment(

@@ -27,7 +27,7 @@ from pipelex.interpreter_hub import (
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_tree_listing import MethodTreeListing
-from pipelex.libraries.method_trees import library_bundle_files_of
+from pipelex.libraries.method_trees import LibraryBundleFile, library_bundle_files_of, read_tree_bundle_as_listed, read_tree_file_as_listed
 from pipelex.libraries.pipe.exceptions import EntryPipeNotFoundError
 from pipelex.libraries.pipe.pipe_suggestions import close_pipe_refs, declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
@@ -363,7 +363,7 @@ def _ensure_tree_python_parses(*, tree: MethodTree) -> None:
         if not tree_path.endswith(PYTHON_SUFFIX):
             continue
         try:
-            source = tree.file_location(tree_path).read_bytes().decode("utf-8")
+            source = read_tree_file_as_listed(tree=tree, tree_path=tree_path).decode("utf-8")
         except UnicodeDecodeError:
             items.append(
                 _tree_python_item(tree_path=tree_path, finding="not UTF-8 text", message=f"The Python file '{tree_path}' is not UTF-8 text.")
@@ -475,10 +475,19 @@ def _load_bundle_file(
     """
     library_manager = get_library_manager()
     library = library_manager.get_library(library_id=library_id)
-    blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
-    if mthds_file_path.resolve() not in library.loaded_mthds_paths:
-        # File not yet loaded - load it from the blueprint
-        return blueprint, library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint], tree_listing=tree_listing)
+    with tree_listing.loading():
+        # A bundle file this machine will not let the command read is the file's refusal (`OSError`), given before its
+        # tree is listed, whose listing would refuse the tree instead.
+        with mthds_file_path.open("rb"):
+            pass
+        # The bundle is parsed from the bytes its tree's listing hashed, the tree the load reads it in.
+        tree_bundle = tree_listing.lone_file_bundle(bundle_file=mthds_file_path)
+        bundle_data = read_tree_bundle_as_listed(tree_bundle=tree_bundle)
+        blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path, bundle_data=bundle_data)
+        blueprint.place_in_tree(tree_bundle=tree_bundle)
+        if mthds_file_path.resolve() not in library.loaded_mthds_paths:
+            # File not yet loaded - load it from the blueprint
+            return blueprint, library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint], tree_listing=tree_listing)
     # File already loaded - get existing pipes from library by their refs. A bundle's `[pipe.<code>]` keys are bare and
     # belong to the bundle's own domain, so they are qualified here rather than searched for: the library is keyed by
     # qualified ref.
@@ -504,14 +513,16 @@ def _load_method_dir(
     Returns:
         The method's tree, and the pipes the load built, those of the directories beside it included.
     """
-    tree = tree_listing.method_tree(handed_over=method_dir)
-    _ensure_tree_python_parses(tree=tree)
-    loaded_pipes = get_library_manager().load_libraries(
-        library_id=library_id,
-        library_dirs=[method_dir, *dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)],
-        methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
-        tree_listing=tree_listing,
-    )
+    # One load from the listing to the pipes: a tree listed before it is read again once, as the load takes it.
+    with tree_listing.loading():
+        tree = tree_listing.method_tree(handed_over=method_dir)
+        _ensure_tree_python_parses(tree=tree)
+        loaded_pipes = get_library_manager().load_libraries(
+            library_id=library_id,
+            library_dirs=[method_dir, *dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)],
+            methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
+            tree_listing=tree_listing,
+        )
     return tree, loaded_pipes
 
 
@@ -573,7 +584,7 @@ async def _validate_method_dir(
     )
 
 
-def _list_directory_bundle_files(*, directory: Path, tree_listing: MethodTreeListing) -> list[Path]:
+def _list_directory_bundle_files(*, directory: Path, tree_listing: MethodTreeListing) -> list[LibraryBundleFile]:
     """The bundle files a load of the directory reads, listed through the listing the load takes its trees from.
 
     Blocking work, run in the method-load pool.
@@ -581,19 +592,28 @@ def _list_directory_bundle_files(*, directory: Path, tree_listing: MethodTreeLis
     Raises:
         MethodTreeLoadError: A tree could not be listed.
     """
-    library_trees = tree_listing.library_dir_trees(library_dirs=[directory])
-    return [bundle_file.path for bundle_file in library_bundle_files_of(library_trees=library_trees)]
+    # Listed for the load that follows, which parses and loads them from this listing.
+    with tree_listing.loading():
+        library_trees = tree_listing.library_dir_trees(library_dirs=[directory])
+    return library_bundle_files_of(library_trees=library_trees)
 
 
 def _load_directory(
-    *, directory: Path, mthds_files: list[Path], library_id: str, tree_listing: MethodTreeListing
+    *, directory: Path, mthds_files: list[LibraryBundleFile], library_id: str, tree_listing: MethodTreeListing
 ) -> tuple[list[PipelexBundleBlueprint], list[PipeAbstract]]:
     """Parse a directory's bundles and load the directory: blocking work, run in the method-load pool.
+
+    Each bundle is parsed from the bytes its tree's listing hashed, as the load reads it.
 
     Returns:
         The blueprint of each bundle of the directory, and the pipes the load built.
     """
-    blueprints = [MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file) for mthds_file in mthds_files]
+    blueprints = [
+        MthdsParser.make_pipelex_bundle_blueprint(
+            bundle_path=mthds_file.path, bundle_data=read_tree_bundle_as_listed(tree_bundle=mthds_file.tree_bundle)
+        )
+        for mthds_file in mthds_files
+    ]
     loaded_pipes = get_library_manager().load_libraries(library_id=library_id, library_dirs=[Path(directory)], tree_listing=tree_listing)
     return blueprints, loaded_pipes
 

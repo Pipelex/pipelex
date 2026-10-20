@@ -82,7 +82,7 @@ pipelex run bundle <PATH> [OPTIONS]
 
 Runs a method from a bundle file (`.mthds`) or a method's folder, read through its [method tree](../../building-methods/method-trees.md). A folder is the method rooted at the nearest `METHODS.toml` at or above it, else at the folder itself, and with no `--pipe` the run starts at the manifest's `main_pipe`, or, with no manifest, at the one `main_pipe` its bundles declare; none or several is refused with `Failed to run:` and a message naming each bundle by its path in the tree, which is no verdict on the method, since only the pipe to start at is missing: pass `--pipe`. An inputs file (`inputs.json` or `inputs.toml`) in the folder is auto-detected when `--inputs` is not passed (see [Auto-detection and ambiguity](#auto-detection-and-ambiguity)). A bundle file named alone starts at its own `main_pipe`, and with no `METHODS.toml` at or above its folder its method is that one file, so a step naming a file beside it, such as a `template_file`, is refused: run the folder instead, or add a `METHODS.toml`.
 
-The run prints the digest of the tree it read with its recap, listed once, before its bundle is read, and loaded from that same listing, and records the tree as `method_tree.json` in its output folder (see [The results directory](#the-results-directory)).
+The run prints the digest of the tree it read with its recap, listed once, before its bundle is read, and loaded from that same listing, and records the tree as `method_tree.json` in its output folder (see [The results directory](#the-results-directory)). A file of the tree edited after that listing is refused as an invalid method naming the file, rather than loaded.
 
 **Arguments:**
 

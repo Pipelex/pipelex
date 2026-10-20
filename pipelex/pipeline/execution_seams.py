@@ -45,6 +45,7 @@ from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.libraries.bundle_resources import check_submitted_files
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_tree_listing import MethodTreeListing
+from pipelex.libraries.method_trees import ensure_bundle_text_as_listed
 from pipelex.libraries.pipe.pipe_suggestions import declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -68,6 +69,7 @@ from pipelex.system.storage_scope import validate_read_scope, validate_storage_s
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
+    from pipelex.core.method_trees.tree_bundle import TreeBundle
     from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.system.trace_context import TraceContext
 
@@ -282,7 +284,7 @@ def _load_acquired_library(
         host_library_withholding: AbstractContextManager[None] = (
             nullcontext() if library_dirs_are_callers else withholding_host_library_files(library_dirs=effective_dirs, caller_contents=mthds_contents)
         )
-        with host_library_withholding, translate_to_validate_bundle_error():
+        with host_library_withholding, translate_to_validate_bundle_error(), listing.loading():
             # The file on this host each content was read from, where the caller names one that exists: that bundle
             # is the file's, whose steps find the files they name in its method tree. Every other content belongs to
             # no tree, and its steps read only the files submitted with it, so its blueprint validates under that rule.
@@ -310,12 +312,23 @@ def _load_acquired_library(
             if bundle_uris:
                 current_library = library_manager.get_library(library_id=library_id)
                 blueprints_to_load = []
-                for blueprint, uri, resolved_uri, host_bundle_file in zip(all_blueprints, bundle_uris, resolved_uris, host_bundle_files, strict=True):
+                for blueprint, content, uri, resolved_uri, host_bundle_file in zip(
+                    all_blueprints, mthds_contents, bundle_uris, resolved_uris, host_bundle_files, strict=True
+                ):
+                    # A content read from a file on this host was read before this load, at a moment of its reader's:
+                    # it is the bundle the run loads only when it is the text of the file the run's listing hashed, the
+                    # file a library directory's load read when that load read it.
                     if resolved_uri in current_library.loaded_mthds_paths:
+                        loaded_tree_bundle = _loaded_tree_bundle(library_id=library_id, bundle_file=resolved_uri)
+                        if host_bundle_file is not None and loaded_tree_bundle is not None:
+                            ensure_bundle_text_as_listed(tree_bundle=loaded_tree_bundle, mthds_content=content)
                         log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
                     else:
                         if host_bundle_file is not None:
+                            tree_bundle = listing.lone_file_bundle(bundle_file=host_bundle_file)
+                            ensure_bundle_text_as_listed(tree_bundle=tree_bundle, mthds_content=content)
                             blueprint.mark_read_from_host_file(bundle_file=host_bundle_file)
+                            blueprint.place_in_tree(tree_bundle=tree_bundle)
                         blueprints_to_load.append(blueprint)
 
             if blueprints_to_load:
@@ -327,6 +340,20 @@ def _load_acquired_library(
         # the same code — via the one shared selection rule (first declaring main_pipe, else first).
         qualified_main_pipe = select_primary_blueprint(all_blueprints).main_pipe_ref
     return qualified_main_pipe
+
+
+def _loaded_tree_bundle(*, library_id: str, bundle_file: Path) -> "TreeBundle | None":
+    """The bundle a load of the library read from `bundle_file`, resolved, as a member of its tree, or None when none did."""
+    for blueprint in get_library_manager().get_accumulated_blueprints(library_id):
+        tree_bundle = blueprint.tree_bundle
+        if tree_bundle is None or tree_bundle.tree_path is None:
+            continue
+        try:
+            if tree_bundle.location.resolve() == bundle_file:
+                return tree_bundle
+        except (OSError, RuntimeError):
+            continue
+    return None
 
 
 def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None) -> str:

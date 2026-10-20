@@ -20,13 +20,22 @@ stops before hashing any file once a tree passes one, so a directory handed over
 
 A directory a host wrote a tree out as, and holds in `WRITTEN_METHOD_TREES`, is never listed: every listing of it returns
 the tree as written, so the membership rule is not applied twice (`pipelex.libraries.written_trees`).
+
+A listing hashes every file of the tree, and a file read from a listed tree afterwards is read against that hash
+(`read_tree_file_as_listed`, `ensure_tree_files_as_listed`): a file edited, replaced or removed since the listing is
+refused with `MethodTreeChangedError`, so a load never parses, and a run never reads, bytes other than those the tree's
+digest names.
 """
 
+import io
+import os
+import stat
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from pathlib import Path
-from typing import NamedTuple
+from typing import NamedTuple, Protocol
 
+from mthds.method_tree.digest import sha256_hex
 from mthds.method_tree.discovery import (
     BUNDLE_SUFFIX,
     DEFAULT_DIRECTORY_NAMES,
@@ -37,16 +46,18 @@ from mthds.method_tree.discovery import (
     holds_manifest,
     holds_venv_marker,
     kind_of_exact_name,
+    on_disk_name,
     read_directory,
 )
 from mthds.method_tree.exceptions import MethodTreeRefusedError, TreeLimitError, TreeSourceError
 from mthds.method_tree.gitignore import PatternList
-from mthds.method_tree.lister import list_method_tree, list_method_tree_at_root
-from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.lister import hash_file, list_method_tree, list_method_tree_at_root
+from mthds.method_tree.models import MethodTree, TreeFile, TreeLimits
 from mthds.method_tree.tree_path import nfc
 from mthds.method_tree.vocabulary import ExclusionRule, TreeRefusalCode
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.method_trees.method_file_store import HeldFile
 from pipelex.core.method_trees.tree_bundle import TreeBundle
 from pipelex.hosted.execution import get_or_load_pipelex_config
@@ -55,6 +66,7 @@ from pipelex.libraries.exceptions import (
     HostLibraryRequirementsError,
     HostLibraryTreeError,
     MethodRequirementsError,
+    MethodTreeChangedError,
     MethodTreeLoadError,
 )
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
@@ -234,18 +246,6 @@ def tree_bundles_of(*, tree: MethodTree) -> list[TreeBundle]:
     return [TreeBundle(tree=tree, tree_path=tree_path) for tree_path in tree.tree_paths if tree_path.endswith(BUNDLE_SUFFIX)]
 
 
-def tree_bundle_of_lone_file(*, bundle_file: Path, limits: TreeLimits | None = None) -> TreeBundle:
-    """A bundle file this host read, named alone, as the member of its method tree.
-
-    Its tree is rooted at the nearest `METHODS.toml` at or above its folder, else it is the one-file tree of the file,
-    from which a reference to any other file is refused.
-
-    Raises:
-        MethodTreeLoadError: The tree could not be listed, or the membership rule keeps the file out of it.
-    """
-    return lone_file_member(tree=list_local_method_tree(handed_over=bundle_file, limits=limits), bundle_file=bundle_file)
-
-
 def lone_file_member(*, tree: MethodTree, bundle_file: Path) -> TreeBundle:
     """A bundle file named alone as the member of the tree its listing returned, the entry that listing named for it.
 
@@ -256,6 +256,162 @@ def lone_file_member(*, tree: MethodTree, bundle_file: Path) -> TreeBundle:
         msg = f"Listing the method tree of the bundle file '{bundle_file}' named no entry for it."
         raise MethodTreeLoadError(msg).with_params(reason=TreeRefusalCode.LONE_FILE_EXCLUDED)
     return TreeBundle(tree=tree, tree_path=tree.entry)
+
+
+class HandedOverLocation(NamedTuple):
+    """Where a path handed over as a method lies, read as the standard's lister reads it before it lists anything.
+
+    A directory, a symbolic link naming one included, is named by its resolved path, and its tree is rooted at `root`.
+    A `.mthds` file named alone is named by its folder resolved and its own name as the folder holds it, never followed,
+    so a symbolic link named alone is a location of its own, which its listing refuses; its tree is rooted at `root`, its
+    nearest `METHODS.toml`, or is its one-file tree when `root` is None.
+    """
+
+    directory: Path | None
+    lone_file: Path | None
+    root: Path | None
+
+
+def locate_handed_over(*, handed_over: Path) -> HandedOverLocation | None:
+    """Where a path handed over as a method lies, as `list_method_tree` reads it, or None when that reading fails.
+
+    None is for a path the lister refuses before listing anything, one that does not exist or a file not named `.mthds`
+    say: the caller lists it, and the lister gives the refusal.
+    """
+    try:
+        status = os.lstat(handed_over)
+        if stat.S_ISDIR(status.st_mode) or (stat.S_ISLNK(status.st_mode) and handed_over.is_dir()):
+            directory = handed_over.resolve(strict=True)
+            return HandedOverLocation(directory=directory, lone_file=None, root=find_manifest_directory(directory) or directory)
+        parent = handed_over.absolute().parent.resolve(strict=True)
+        lone_file = parent / on_disk_name(parent, handed_over.name)
+        if not lone_file.name.endswith(BUNDLE_SUFFIX):
+            return None
+        return HandedOverLocation(directory=None, lone_file=lone_file, root=find_manifest_directory(parent))
+    except (OSError, RuntimeError, TreeSourceError):
+        return None
+
+
+def lone_file_tree_path(*, root: Path, lone_file: Path) -> str | None:
+    """The tree path of a lone file in the tree rooted at `root`, each name taken as the file system holds it, as the lister takes it.
+
+    None when a name on the way cannot be read, for the caller to list the file and get the lister's own refusal.
+    """
+    current = root
+    held_names: list[str] = []
+    try:
+        for part in lone_file.relative_to(root).parts:
+            raw_name = on_disk_name(current, part)
+            held_names.append(nfc(raw_name))
+            current /= raw_name
+    except (ValueError, TreeSourceError):
+        return None
+    return "/".join(held_names)
+
+
+def _tree_label(*, tree: MethodTree) -> str:
+    """How a message names a tree: by its root on this host, except a tree a host wrote out, whose root is the host's."""
+    if tree.directory is None or WRITTEN_METHOD_TREES.holds_tree(tree=tree):
+        return "the method tree"
+    return f"the method tree at '{tree.directory}'"
+
+
+def _changed_file_error(*, tree: MethodTree, tree_path: str, finding: str) -> MethodTreeChangedError:
+    msg = (
+        f"The file '{tree_path}' of {_tree_label(tree=tree)} {finding} since the tree was listed, so it is not the file the "
+        "run listed and validated. Run again once the method's files stop changing."
+    )
+    return MethodTreeChangedError(msg).with_params(path=tree_path)
+
+
+def _listed_file(*, tree: MethodTree, tree_path: str) -> TreeFile:
+    """The listing's record of the file at `tree_path`.
+
+    Raises:
+        MethodTreeChangedError: The listing holds no such file.
+    """
+    for tree_file in tree.files:
+        if tree_file.path == tree_path:
+            return tree_file
+    raise _changed_file_error(tree=tree, tree_path=tree_path, finding="is not a file of the tree as listed, or was added")
+
+
+def read_tree_file_as_listed(*, tree: MethodTree, tree_path: str) -> bytes:
+    """The bytes of a file of a tree listed from this host's disk, read now, refused unless they are the bytes its listing hashed.
+
+    Raises:
+        MethodTreeChangedError: The file is no longer there or cannot be read, or its bytes are not the ones listed.
+    """
+    listed = _listed_file(tree=tree, tree_path=tree_path)
+    try:
+        data = tree.file_location(tree_path).read_bytes()
+    except OSError as exc:
+        raise _changed_file_error(tree=tree, tree_path=tree_path, finding="was removed or became unreadable") from exc
+    if len(data) != listed.size or sha256_hex(data) != listed.sha256:
+        raise _changed_file_error(tree=tree, tree_path=tree_path, finding="changed")
+    return data
+
+
+def read_tree_bundle_as_listed(*, tree_bundle: TreeBundle) -> bytes:
+    """The bytes of a bundle file of a listed tree, refused unless they are the bytes its listing hashed (`read_tree_file_as_listed`).
+
+    Raises:
+        MethodTreeChangedError: The bundle's file is no longer there or cannot be read, or its bytes are not the ones listed.
+        PipelexUnexpectedError: The bundle is the one parsed from a string at a tree's root, which is no file of it.
+    """
+    if tree_bundle.tree_path is None:
+        msg = "A bundle parsed from a string has no file of its method tree to read"
+        raise PipelexUnexpectedError(msg)
+    return read_tree_file_as_listed(tree=tree_bundle.tree, tree_path=tree_bundle.tree_path)
+
+
+def decoded_as_text_file(*, data: bytes) -> str:
+    """A file's bytes decoded as UTF-8 text is read from a file, each line ending made a newline (`Path.read_text`).
+
+    Raises:
+        UnicodeDecodeError: The bytes are not UTF-8.
+    """
+    return io.TextIOWrapper(io.BytesIO(data), encoding="utf-8").read()
+
+
+def ensure_bundle_text_as_listed(*, tree_bundle: TreeBundle, mthds_content: str) -> None:
+    """Refuse the text a caller read from a bundle file of a listed tree unless it is the text of the file the listing hashed.
+
+    A caller that read the bundle's text itself, such as a CLI reading the bundle file it runs, read it at a moment of its
+    own, before or after the tree's listing: the text is the bundle's only when it is the listed file's, decoded as the
+    caller decoded it, with its line endings kept, or each made a newline as a text read makes them.
+
+    Raises:
+        MethodTreeChangedError: The bundle's file is no longer the one the listing hashed, or the text is not its text.
+    """
+    if tree_bundle.tree_path is None:
+        return
+    data = read_tree_file_as_listed(tree=tree_bundle.tree, tree_path=tree_bundle.tree_path)
+    try:
+        listed_text = data.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise _changed_file_error(tree=tree_bundle.tree, tree_path=tree_bundle.tree_path, finding="was read as text other than its own") from exc
+    if mthds_content not in {listed_text, decoded_as_text_file(data=data)}:
+        raise _changed_file_error(tree=tree_bundle.tree, tree_path=tree_bundle.tree_path, finding="changed")
+
+
+def ensure_tree_files_as_listed(*, tree: MethodTree) -> None:
+    """Read every file of a tree listed from this host's disk again, refusing the tree unless each is the file its listing hashed.
+
+    A tree read from a map of file entries holds no file on this host, and is never read here.
+
+    Raises:
+        MethodTreeChangedError: A file is no longer there or cannot be read, or its bytes are not the ones listed.
+    """
+    if tree.directory is None:
+        return
+    for tree_file in tree.files:
+        try:
+            current = hash_file(tree.file_location(tree_file.path), tree_path=tree_file.path)
+        except TreeSourceError as exc:
+            raise _changed_file_error(tree=tree, tree_path=tree_file.path, finding="was removed or became unreadable") from exc
+        if current.size != tree_file.size or current.sha256 != tree_file.sha256:
+            raise _changed_file_error(tree=tree, tree_path=tree_file.path, finding="changed")
 
 
 def _is_empty_tree(*, refusal_error: MethodTreeRefusedError) -> bool:
@@ -440,7 +596,19 @@ def _library_trees(*, tree: MethodTree, limits: TreeLimits) -> list[MethodTree]:
     return trees
 
 
-def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -> list[MethodTree]:
+class LibraryDirTreeLister(Protocol):
+    """Lists the tree a library directory is rooted in, or None when it is empty, as `list_library_dir_tree` does."""
+
+    def __call__(self, *, library_dir: Path, limits: TreeLimits) -> MethodTree | None: ...
+
+
+class LibraryTreesLister(Protocol):
+    """Lists the trees a library directory holds, its own first, as `list_library_trees` does."""
+
+    def __call__(self, *, library_dir: Path, limits: TreeLimits) -> list[MethodTree]: ...
+
+
+def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None, own_tree_of: LibraryDirTreeLister | None = None) -> list[MethodTree]:
     """The method trees a library directory holds: its own, then those of the packages and repositories nested in it.
 
     A directory that does not exist holds none. One whose own tree the membership rule leaves empty, such as a
@@ -449,6 +617,8 @@ def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -
     Args:
         library_dir: The library directory.
         limits: The limits to list each tree under, read from the configuration when not given.
+        own_tree_of: How the tree the directory is rooted in is listed, such as through a run's listing, which holds it
+            for every step of the run; `list_library_dir_tree` when not given.
 
     Raises:
         MethodTreeLoadError: A tree could not be listed.
@@ -457,7 +627,7 @@ def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -
         log.debug(f"A library directory that does not exist was skipped: {library_dir}")
         return []
     active_limits = limits or local_tree_limits()
-    own_tree = list_library_dir_tree(library_dir=library_dir, limits=active_limits)
+    own_tree = (own_tree_of or list_library_dir_tree)(library_dir=library_dir, limits=active_limits)
     return library_trees_from(library_dir=library_dir, own_tree=own_tree, limits=active_limits)
 
 
@@ -496,17 +666,16 @@ def list_library_dir_tree(*, library_dir: Path, limits: TreeLimits | None = None
 def library_trees_from(*, library_dir: Path, own_tree: MethodTree | None, limits: TreeLimits) -> list[MethodTree]:
     """The method trees a library directory holds, from the tree it is rooted in, as `list_library_dir_tree` listed it.
 
-    That tree comes first, then the tree of each package and repository nested in it, and theirs, depth first; a tree a
-    host wrote out holds no nested tree. A directory whose own tree is empty (`own_tree` None) holds the trees nested in
-    it.
+    That tree comes first, then the tree of each package and repository nested in it, and theirs, depth first. A tree a
+    host wrote out holds no nested tree, since reading it back as written keeps nothing out: so the answer depends on the
+    tree alone, never on whether its writer still holds it. A directory whose own tree is empty (`own_tree` None) holds
+    the trees nested in it.
 
     Raises:
         MethodTreeLoadError: A nested tree could not be listed.
     """
     if own_tree is None:
         return _trees_nested_in_empty_directory(directory=library_dir.resolve(), limits=limits)
-    if WRITTEN_METHOD_TREES.holds_tree(tree=own_tree):
-        return [own_tree]
     return _library_trees(tree=own_tree, limits=limits)
 
 
@@ -535,7 +704,9 @@ class LibraryTree(NamedTuple):
     tree: MethodTree
 
 
-def list_library_dir_trees(*, library_dirs: Iterable[Path], limits: TreeLimits | None = None) -> list[LibraryTree]:
+def list_library_dir_trees(
+    *, library_dirs: Iterable[Path], limits: TreeLimits | None = None, trees_of: LibraryTreesLister | None = None
+) -> list[LibraryTree]:
     """The method trees of the library directories, in the order the directories are given, each directory's own first.
 
     A tree holding no bundle is listed too, such as one holding only the Python a server received beside a method's
@@ -544,6 +715,7 @@ def list_library_dir_trees(*, library_dirs: Iterable[Path], limits: TreeLimits |
     Args:
         library_dirs: The library directories.
         limits: The limits to list each tree under, read from the configuration once when not given.
+        trees_of: How a directory's trees are listed, such as through a run's listing; `list_library_trees` when not given.
 
     Raises:
         MethodTreeLoadError: A tree could not be listed.
@@ -551,7 +723,7 @@ def list_library_dir_trees(*, library_dirs: Iterable[Path], limits: TreeLimits |
     active_limits = limits or local_tree_limits()
     library_trees: list[LibraryTree] = []
     for library_dir in library_dirs:
-        for tree in list_library_trees(library_dir=library_dir, limits=active_limits):
+        for tree in (trees_of or list_library_trees)(library_dir=library_dir, limits=active_limits):
             library_trees.append(LibraryTree(library_dir=library_dir, tree=tree))
     return library_trees
 
@@ -633,7 +805,10 @@ def tree_python_sources(*, tree: MethodTree, library_dir: Path | None) -> dict[s
     A file outside the library directory, or of a tree that no library directory holds, such as the tree of a bundle file
     named alone, is keyed by its tree path: the key names the file to a caller, never by a path of this host. These are
     the sources a sandbox-hosted load scans for structure classes without importing them, so a file that is not UTF-8
-    text is read with replacement characters.
+    text is read with replacement characters. Each is read against the hash its listing recorded.
+
+    Raises:
+        MethodTreeChangedError: A Python file is not the one the tree's listing hashed.
     """
     if tree.directory is None:
         return {}
@@ -645,7 +820,7 @@ def tree_python_sources(*, tree: MethodTree, library_dir: Path | None) -> dict[s
         key = tree_path
         if spelling is not None and tree_path.startswith(spelling[0]):
             key = f"{spelling[1]}{tree_path.removeprefix(spelling[0])}"
-        sources[key] = tree.file_location(tree_path).read_bytes().decode("utf-8", errors="replace")
+        sources[key] = read_tree_file_as_listed(tree=tree, tree_path=tree_path).decode("utf-8", errors="replace")
     return sources
 
 

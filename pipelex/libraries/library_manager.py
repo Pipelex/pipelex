@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, ForwardRef, Literal, get_args, get_origin
 
 from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
-from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.models import MethodTree
 from mthds.method_tree.tree_path import path_collisions, tree_path_violation
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
@@ -59,10 +59,10 @@ from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.libraries.method_trees import (
     LibraryBundleFile,
     LibraryTree,
+    decoded_as_text_file,
     library_bundle_files_of,
-    list_package_method_tree,
     listing_identity,
-    local_tree_limits,
+    read_tree_bundle_as_listed,
     submitted_tree_files,
     tree_bundles_of,
     tree_python_sources,
@@ -141,16 +141,17 @@ def find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint]) 
     return result
 
 
-def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_address: str) -> PipelexBundleBlueprint:
+def _parse_dependency_bundle(*, tree_bundle: TreeBundle, bundle_source: str, package_address: str) -> PipelexBundleBlueprint:
     """Parse one bundle of a dependency package under its caller-facing source, refusing the load when it does not parse.
 
     The bundle is parsed from its text under ``bundle_source`` rather than from its path, so the blueprint, every item
     a parse failure gives and every message the parser writes name the bundle by the package's address and its path
     inside the package: parsing from the path would put the host's path into a TOML error's message and into the
-    blueprint's own messages. A file discovery has just listed that cannot be read is the host's fault and propagates.
+    blueprint's own messages. Its bytes are read against the hash the package's listing recorded, and decoded as a text
+    file is read, each line ending made a newline (`decoded_as_text_file`).
 
     Args:
-        mthds_path: The bundle's file on this host.
+        tree_bundle: The bundle as a member of the package's tree.
         bundle_source: The bundle's caller-facing name, ``<package_address>/<path inside the package>``.
         package_address: The package's address, which the refusal's summary names.
 
@@ -160,9 +161,11 @@ def _parse_dependency_bundle(*, mthds_path: Path, bundle_source: str, package_ad
     Raises:
         MthdsParserError: The bundle is not UTF-8 or does not parse; each item carries ``bundle_source`` as its source,
             and the summary names the bundle and the package.
+        MethodTreeChangedError: The bundle is no longer the file the package's listing hashed.
     """
+    data = read_tree_bundle_as_listed(tree_bundle=tree_bundle)
     try:
-        mthds_content = mthds_path.read_text(encoding="utf-8")
+        mthds_content = decoded_as_text_file(data=data)
     except UnicodeDecodeError as exc:
         msg = f"Bundle '{bundle_source}' of method package '{package_address}' is not valid UTF-8."
         raise (
@@ -710,20 +713,21 @@ class LibraryManager(LibraryManagerAbstract):
             msg = f"Trying to load a library that does not exist: '{library_id}'"
             raise LibraryError(msg)
 
+        # Every bundle is read as a member of its method tree: each library directory's tree and the trees nested in it,
+        # then the tree of each file named alone. A file the membership rule keeps out is never read. Each tree is taken
+        # from the run's listing, which lists it, under this machine's limits read once, only when nobody listed it yet:
+        # the tree loaded is the tree the run listed, its digest the one the run records. A tree the run listed before
+        # this load is read again as the load begins, and refused when a file of it changed since (`loading`).
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
         # Bind the target library as current for the whole load: class registration and the
         # blueprint loads beneath resolve through the ambient current library, so a load into
         # a non-current library must not read the caller's binding.
-        with scoped_current_library(library_id=library_id):
+        with scoped_current_library(library_id=library_id), listing.loading():
             if not library_dirs:
                 library_dirs = []
 
             all_dirs: list[Path] = []
             all_dirs.extend(library_dirs)
-            # Every bundle is read as a member of its method tree: each library directory's tree and the trees nested
-            # in it, then the tree of each file named alone. A file the membership rule keeps out is never read. Each
-            # tree is taken from the run's listing, which lists it, under this machine's limits read once, only when
-            # nobody listed it yet: the tree loaded is the tree the run listed, its digest the one the run records.
-            listing = tree_listing if tree_listing is not None else MethodTreeListing()
             library_trees = listing.library_dir_trees(library_dirs=library_dirs)
             all_bundle_files: list[LibraryBundleFile] = library_bundle_files_of(library_trees=library_trees)
             for library_file_path in library_file_paths or []:
@@ -1071,14 +1075,18 @@ class LibraryManager(LibraryManagerAbstract):
         # Bind the target library as current for the whole load: the factories beneath
         # (concept resolution, class-registry access) resolve through the ambient current
         # library, so a load into a non-current library must not read the caller's binding.
-        with scoped_current_library(library_id=library_id), sharing_module_name_checks():
-            listing = tree_listing if tree_listing is not None else MethodTreeListing()
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
+        with scoped_current_library(library_id=library_id), sharing_module_name_checks(), listing.loading():
             # A bundle read from a file on this host that no loader placed in a method tree, such as a bundle file a CLI
             # names alone, is read as a member of its own file's tree, taken from the run's listing: the steps of every
-            # bundle read from this host's disk read only the files of their tree.
+            # bundle read from this host's disk read only the files of their tree. A tree a caller placed a bundle in
+            # before the load is read again, once per run, as a tree the listing hands to the load is: a file of it
+            # changed since its listing is refused here, before anything of it is imported or built.
             for blueprint in blueprints:
                 if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None:
                     blueprint.place_in_tree(tree_bundle=listing.lone_file_bundle(bundle_file=blueprint.host_bundle_file))
+                elif blueprint.tree_bundle is not None:
+                    listing.ensure_unchanged(tree=blueprint.tree_bundle.tree)
             # Every bundle read from this host's disk loads under its tree's requirements.txt, judged once per run: a tree
             # the run's listing holds as met, such as one `load_libraries` judged just before this load, is not judged
             # again, while a refused tree, or a blueprint an earlier load placed under another listing, is judged again
@@ -1110,6 +1118,7 @@ class LibraryManager(LibraryManagerAbstract):
                 blueprints=blueprints,
                 methods_dirs=methods_dirs,
                 address_dependency_sources=address_dependency_sources,
+                tree_listing=listing,
             )
 
             # Build the crate (merges, qualifies, detects duplicates)
@@ -1362,12 +1371,14 @@ class LibraryManager(LibraryManagerAbstract):
                 else str(mthds_file_path)
             )
             bundle_sources.append(bundle_source)
+            # The bundle's bytes are read against the hash its tree's listing recorded, so the bundle parsed is the one the
+            # run's digest names: a file changed since the listing is refused rather than parsed.
+            bundle_data = read_tree_bundle_as_listed(tree_bundle=bundle_file.tree_bundle)
             try:
-                blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path, mthds_source=bundle_source)
+                blueprint = MthdsParser.make_pipelex_bundle_blueprint(
+                    bundle_path=mthds_file_path, bundle_data=bundle_data, mthds_source=bundle_source
+                )
                 blueprint.place_in_tree(tree_bundle=bundle_file.tree_bundle)
-            except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find MTHDS bundle at '{bundle_source}'"
-                raise LibraryLoadingError(msg).with_error_code(CoreCode.METHOD_NOT_FOUND) from file_not_found_error
             except MthdsParserError as parser_error:
                 # Forward BLUEPRINT validation errors from interpreter
                 msg = f"Could not load MTHDS bundle from '{bundle_source}' because of: {parser_error.message}"
@@ -1395,6 +1406,7 @@ class LibraryManager(LibraryManagerAbstract):
                     library_id=library_id,
                     manifest=manifest,
                     package_root=package_root,
+                    tree_listing=tree_listing,
                 )
 
         # Store resolved absolute paths for duplicate detection in the library
@@ -1570,6 +1582,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         manifest: MethodsManifest,
         package_root: Path,
+        tree_listing: MethodTreeListing | None,
     ) -> None:
         """Load dependency packages into the library.
 
@@ -1581,6 +1594,7 @@ class LibraryManager(LibraryManagerAbstract):
             library_id: The library to load into
             manifest: The consuming package's manifest
             package_root: The root directory of the consuming package
+            tree_listing: The run's listing, which lists each package's tree once and judges its requirements once
         """
         try:
             resolved_deps = resolve_all_dependencies(manifest=manifest, package_root=package_root)
@@ -1590,15 +1604,15 @@ class LibraryManager(LibraryManagerAbstract):
 
         library = self.get_library(library_id=library_id)
 
-        # This machine's limits are read once for every package of the manifest.
-        tree_limits = local_tree_limits()
+        # One listing for every package of the manifest, which reads this machine's limits once.
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
         for resolved_dep in resolved_deps:
             self._load_single_dependency(
                 library=library,
                 library_id=library_id,
                 resolved_dep=resolved_dep,
                 package_address=resolved_dep.address,
-                tree_limits=tree_limits,
+                tree_listing=listing,
             )
 
         # Wire concept resolver after all deps are loaded so cross-package
@@ -1612,7 +1626,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_id: str,
         resolved_dep: ResolvedDependency,
         package_address: str,
-        tree_limits: TreeLimits | None = None,
+        tree_listing: MethodTreeListing | None = None,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1634,7 +1648,9 @@ class LibraryManager(LibraryManagerAbstract):
             library_id: The id the manager holds the main library under, which holds the package's tree for its runs
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
-            tree_limits: The limits the package's tree is listed under, read from the configuration when not given
+            tree_listing: The run's listing, which lists the package's tree once per run and keeps its requirements
+                verdict, so a package loaded again in the run is neither hashed nor judged again; None lists it for
+                this load alone
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
@@ -1648,17 +1664,19 @@ class LibraryManager(LibraryManagerAbstract):
         dep_blueprints: list[PipelexBundleBlueprint] = []
         # Each bundle as the member of the package's tree, by its caller-facing source, for the pipes reading a file it names.
         tree_bundles_by_source: dict[str, TreeBundle] = {}
-        # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
-        package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
+        # Listed under the package's address: a refusal never names the directory it was installed or fetched into. The
+        # run's listing lists it once and keeps its verdict, so the package is hashed and judged once per run.
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
+        package_tree = listing.package_tree(root=resolved_dep.package_root, package_address=package_address)
         # The package's own requirements.txt is judged before any of its bundles loads, as the consumer's tree is.
-        ensure_package_requirements_met(tree=package_tree, package_address=package_address)
+        ensure_package_requirements_met(tree=package_tree, package_address=package_address, tree_listing=listing)
         # Held for the consumer's runs, which read a file of the package's tree, such as one of its steps' template
         # files, by the tree's digest.
         LOCAL_METHOD_FILES.hold_tree(holder=library_id, tree=package_tree)
         for tree_bundle in tree_bundles_of(tree=package_tree):
             # The package's address and the bundle's tree path: never the host's path to the package.
             bundle_source = f"{package_address}/{tree_bundle.tree_path}"
-            blueprint = _parse_dependency_bundle(mthds_path=tree_bundle.location, bundle_source=bundle_source, package_address=package_address)
+            blueprint = _parse_dependency_bundle(tree_bundle=tree_bundle, bundle_source=bundle_source, package_address=package_address)
             blueprint.place_in_tree(tree_bundle=tree_bundle)
             tree_bundles_by_source[bundle_source] = tree_bundle
             dep_blueprints.append(blueprint)
@@ -1834,6 +1852,7 @@ class LibraryManager(LibraryManagerAbstract):
         blueprints: list[PipelexBundleBlueprint],
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: MethodTreeListing | None = None,
     ) -> None:
         """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
 
@@ -1863,6 +1882,7 @@ class LibraryManager(LibraryManagerAbstract):
             blueprints: The parsed bundle blueprints to scan
             methods_dirs: The load's own methods directories, searched before everything else and never written
             address_dependency_sources: Whether an address ``methods_dirs`` do not answer may be looked up on this host
+            tree_listing: The run's listing, which lists each package's tree once and judges its requirements once
 
         Raises:
             LibraryLoadingError: One or more referenced packages could not be resolved.
@@ -1901,6 +1921,7 @@ class LibraryManager(LibraryManagerAbstract):
                     extra_search_dirs=extra_search_dirs,
                     methods_dirs=methods_dirs,
                     address_dependency_sources=address_dependency_sources,
+                    tree_listing=tree_listing,
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError, MethodDependencyNotShippedError) as exc:
                 # The item carries the sentence its code renders; the host's log keeps the whole cause chain, git's raw output
@@ -1937,6 +1958,7 @@ class LibraryManager(LibraryManagerAbstract):
         extra_search_dirs: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: MethodTreeListing | None = None,
     ) -> None:
         """Load a method package on demand using its full address, fetching it on a miss.
 
@@ -1954,6 +1976,7 @@ class LibraryManager(LibraryManagerAbstract):
             methods_dirs: The load's own methods directories, searched before everything else and never written
             address_dependency_sources: ``SHIPPED`` refuses an address ``methods_dirs`` do not answer, reading nothing
                 installed on this host and fetching nothing; ``ANYWHERE`` falls back to the installed methods and a fetch
+            tree_listing: The run's listing, which lists the package's tree once and judges its requirements once
 
         Raises:
             MethodRefError: The address resolves to no vendored or installed method and could not be
@@ -1987,6 +2010,7 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_dep=resolved_dep,
             # The address the lookup matched (the manifest's address and the method's name), never a tag.
             package_address=f"{installed.manifest.address}/{installed.name}",
+            tree_listing=tree_listing,
         )
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

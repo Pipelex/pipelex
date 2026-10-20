@@ -9,7 +9,9 @@ from pytest_mock import MockerFixture
 
 from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, list_method_folder, resolve_method_folder_run
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.exceptions import MethodTreeChangedError
 from pipelex.libraries.method_tree_listing import MethodTreeListing
+from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.execution_seams import acquire_library_async
 from pipelex.pipeline.fixes.fix_loop import fix_method_folder
 from pipelex.pipeline.validate_bundle import validate_bundle
@@ -26,6 +28,8 @@ inputs = { data = "Text" }
 output = "Text"
 template = "$data"
 """
+
+_MANIFEST = '[package]\naddress = "github.com/pipelex-tests/one-listing"\nversion = "1.0.0"\ndescription = "A listed method"\n'
 
 
 class _ListedPaths:
@@ -60,6 +64,18 @@ def method_dir_fixture(tmp_path: Path) -> Path:
     method_dir.mkdir()
     (method_dir / "main.mthds").write_text(_ECHO_MTHDS, encoding="utf-8")
     return method_dir
+
+
+@pytest.fixture(name="rooted_method")
+def rooted_method_fixture(tmp_path: Path) -> Path:
+    """A method rooted at its `METHODS.toml`, whose bundle file holds the template its steps would read, returned as the bundle file."""
+    method_dir = tmp_path / "rooted"
+    (method_dir / "templates").mkdir(parents=True)
+    (method_dir / "METHODS.toml").write_text(_MANIFEST, encoding="utf-8")
+    (method_dir / "templates" / "letter.md").write_text("Dear $data,\n", encoding="utf-8")
+    bundle_file = method_dir / "main.mthds"
+    bundle_file.write_text(_ECHO_MTHDS, encoding="utf-8")
+    return bundle_file
 
 
 @pytest.fixture(name="outer_library")
@@ -159,3 +175,53 @@ class TestOneListingPerRun:
 
         assert result.is_valid is True
         assert listed_paths.under(directory=method_dir) == [method_dir]
+
+    async def test_a_bundle_edited_after_its_command_listed_it_is_refused_before_the_run_loads_it(self, method_dir: Path) -> None:
+        """The run's digest names the tree the command listed: a bundle edited since is refused, never loaded in its place."""
+        tree_listing = MethodTreeListing()
+        folder_run = resolve_method_folder_run(directory=method_dir, pipe_override=None, tree_listing=tree_listing)
+        entry_file = folder_run.entry_bundle_file
+        assert entry_file is not None
+        content_read = entry_file.read_text(encoding="utf-8")
+        entry_file.write_text(_ECHO_MTHDS.replace("Echo the data", "Echo the edited data"), encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await acquire_library_async(
+                "one-listing-edited-bundle",
+                library_dirs=[str(method_dir)],
+                library_dirs_are_callers=True,
+                mthds_contents=[content_read],
+                bundle_uris=[str(entry_file)],
+                tree_listing=tree_listing,
+            )
+
+        assert isinstance(exc_info.value.__cause__, MethodTreeChangedError)
+        assert "'main.mthds'" in exc_info.value.message
+
+    async def test_a_template_edited_after_its_command_listed_the_bundle_is_refused_before_the_run_loads_it(self, rooted_method: Path) -> None:
+        """A file the bundle's steps read is part of the listed tree: edited after the listing, the run refuses the tree."""
+        tree_listing = MethodTreeListing()
+        list_bundle_file_tree(bundle_file=rooted_method, tree_listing=tree_listing)
+        (rooted_method.parent / "templates" / "letter.md").write_text("Dear $data, edited\n", encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await acquire_library_async(
+                "one-listing-edited-template",
+                mthds_contents=[rooted_method.read_text(encoding="utf-8")],
+                bundle_uris=[str(rooted_method)],
+                tree_listing=tree_listing,
+            )
+
+        assert isinstance(exc_info.value.__cause__, MethodTreeChangedError)
+        assert "'templates/letter.md'" in exc_info.value.message
+
+    async def test_validating_a_bundle_whose_template_changed_since_its_listing_refuses_it(self, rooted_method: Path) -> None:
+        tree_listing = MethodTreeListing()
+        list_bundle_file_tree(bundle_file=rooted_method, tree_listing=tree_listing)
+        (rooted_method.parent / "templates" / "letter.md").write_text("Dear $data, edited\n", encoding="utf-8")
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_file_path=rooted_method, library_dirs=[], tree_listing=tree_listing)
+
+        assert isinstance(exc_info.value.__cause__, MethodTreeChangedError)
+        assert "'templates/letter.md'" in exc_info.value.message
