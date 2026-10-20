@@ -1,8 +1,9 @@
 """Build a runnable Postman request from a Pipelex MTHDS bundle and push it live.
 
 Mirrors ``pipelex run bundle <path>`` resolution: given a bundle directory (or a
-single ``.mthds`` file), it finds the main bundle file, extracts ``main_pipe``,
-loads the sibling ``inputs.json``, and inserts a ready-to-run request into the
+single ``.mthds`` file), it finds the main bundle file, extracts ``main_pipe``
+(sent as ``pipe_code``, qualified by that bundle's domain unless ``--pipe``
+names one), loads the sibling ``inputs.json``, and inserts a ready-to-run request into the
 live "Pipelex FastAPI" Postman collection under ``Bundles/<bundle>/``.
 
 The method travels in every body as ``files``, the MTHDS standard's map of file
@@ -13,8 +14,11 @@ judged by the membership rule the runner and every MTHDS client apply
 (``mthds/docs/spec/method-tree.md``): its root is the nearest directory at or
 above the bundle holding ``METHODS.toml``, else the directory handed over, else,
 for a ``.mthds`` file named alone, the one-file tree of that file; dotfiles,
-``.gitignore``d files, virtual environments, nested packages and a run's
-``inputs.json`` stay out. A body built here never uses the by-hash entry
+``.gitignore``d files, virtual environments and nested packages stay out. The
+script itself drops a run's inputs file, any file named ``inputs.json`` or
+``inputs.toml`` at any depth, as the standard's run-inputs default does, since
+the ``mthds`` lister pinned here still lists it: the sibling ``inputs.json``
+travels as ``inputs`` and never as a file of the tree. A body built here never uses the by-hash entry
 (``{"sha256", "size"}``), which only resolves once the bytes are uploaded to the
 runner's blob store, so a Postman query or a curl command stays self-contained.
 The listing stops at the runner's own limits on a tree a request sends.
@@ -61,16 +65,21 @@ from mthds.method_tree.file_entry import encode_file_map
 from mthds.method_tree.lister import list_method_tree
 from mthds.method_tree.models import MethodTree, TreeLimits
 from mthds.method_tree.tree_path import nfc
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
 
 from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES, MAX_METHOD_TREE_FILES, MAX_METHOD_TREE_TOTAL_BYTES
 
 # One file of a method tree as a body carries it: its UTF-8 text, or {"base64": ...} for other bytes.
 FileEntry = str | dict[str, str | int]
 
+# A run's inputs file, which the standard's run-inputs default keeps out of every tree at any depth
+# (`mthds/docs/spec/method-tree.md`, "Run Inputs Files"): a file named exactly so, letter case included.
+# A directory of either name excludes nothing.
+RUN_INPUTS_FILE_NAMES = frozenset({DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME})
+
 DEFAULT_COLLECTION_UID = "35082494-559c5753-885c-409a-af63-7647fe28d301"
 POSTMAN_API_BASE = "https://api.getpostman.com"
 DEFAULT_BUNDLE_FILE_NAME = "bundle.mthds"
-DEFAULT_INPUTS_FILE_NAME = "inputs.json"
 MTHDS_EXTENSION = ".mthds"
 TOP_FOLDER_NAME = "Bundles"
 
@@ -196,8 +205,19 @@ def tree_path_of(tree: MethodTree, file_path: Path) -> str | None:
     return tree_path if tree_path in tree.members else None
 
 
+def is_run_inputs_file(tree_path: str) -> bool:
+    """Whether a file of a tree is a run's inputs file, which the standard's run-inputs default keeps out of every tree."""
+    return tree_path.rsplit("/", 1)[-1] in RUN_INPUTS_FILE_NAMES
+
+
 def build_files_map(tree: MethodTree) -> dict[str, FileEntry]:
-    """The ``files`` a body carries: every file of the tree under its tree path, inline.
+    """The ``files`` a body carries: every file of the tree under its tree path, inline, but a run's inputs file.
+
+    The ``mthds`` lister pinned here still lists a file named ``inputs.json`` or
+    ``inputs.toml``, which the standard keeps out of every tree and a runner
+    applying the rule refuses as a key, so it is dropped here: a run's inputs
+    travel as ``inputs``, never as a file of the method. Once the lister applies
+    the rule itself, no such file reaches this loop.
 
     ``mthds`` encodes each file: its text when its bytes are UTF-8, else
     ``{"base64": ...}``. No file is sent by hash, since a hash entry resolves
@@ -206,6 +226,8 @@ def build_files_map(tree: MethodTree) -> dict[str, FileEntry]:
     """
     contents: dict[str, bytes] = {}
     for tree_path in tree.tree_paths:
+        if is_run_inputs_file(tree_path):
+            continue
         location = tree.file_location(tree_path)
         try:
             contents[tree_path] = location.read_bytes()
@@ -236,6 +258,18 @@ def parse_bundle_meta(text: str) -> tuple[str | None, str | None]:
         main_match.group(1) if main_match else None,
         domain_match.group(1) if domain_match else None,
     )
+
+
+def qualified_main_pipe(main_pipe: str | None, domain: str | None) -> str | None:
+    """The main bundle's ``main_pipe`` as the pipe ref ``domain.pipe_code``, or bare when the bundle declares no domain.
+
+    The body carries the whole method tree, so a bare code would be ambiguous
+    as soon as another bundle of the tree declares a pipe of the same code; the
+    domain-qualified ref names the main bundle's pipe whatever its siblings hold.
+    """
+    if not main_pipe or not domain:
+        return main_pipe
+    return f"{domain}.{main_pipe}"
 
 
 # --- inputs ----------------------------------------------------------------
@@ -538,7 +572,13 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Resolve a Pipelex MTHDS bundle and either push a Postman query, emit curl, or run it.")
     parser.add_argument("bundle", help="Path to a bundle directory or a .mthds file")
     parser.add_argument("--inputs", help="Override inputs JSON path (default: auto-detect inputs.json in a directory)")
-    parser.add_argument("--pipe", help="Override main_pipe (sets pipe_code). Ignored by --endpoint validate.")
+    parser.add_argument(
+        "--pipe",
+        help=(
+            "Override main_pipe (sets pipe_code, sent exactly as given: qualify it as domain.pipe_code when another "
+            "bundle of the tree declares the same code). Ignored by every endpoint but execute/start."
+        ),
+    )
     parser.add_argument(
         "--callback-url",
         action="append",
@@ -649,8 +689,11 @@ def main(argv: list[str] | None = None) -> None:
     tree_root_label = f"{tree.directory} (the one-file tree of {main_tree_path})" if tree.is_one_file else f"{tree.directory}"
 
     # `pipe_code` is required only by the run endpoints — /validate derives
-    # everything it needs from the method's files and takes no pipe_code.
-    pipe_code = args.pipe or main_pipe
+    # everything it needs from the method's files and takes no pipe_code. An
+    # explicit --pipe is sent exactly as given; the inferred one is qualified with
+    # the main bundle's domain, since the whole tree travels and another of its
+    # bundles may declare a pipe of the same bare code.
+    pipe_code = args.pipe or qualified_main_pipe(main_pipe, domain)
     if needs_pipe and not pipe_code:
         fail(f"could not determine main_pipe from '{main_file}'. Declare main_pipe in the bundle, or pass --pipe <pipe_code>.")
 
@@ -775,7 +818,7 @@ def main(argv: list[str] | None = None) -> None:
             return (
                 f"Run the `{subfolder_name}` bundle (mirrors `pipelex run bundle`). Triggers REAL inference.\n\n"
                 f"{source_lines}"
-                f"- main_pipe: `{pipe_code}`\n"
+                f"- pipe_code: `{pipe_code}`\n"
                 f"- inputs: {inputs_path or 'none'}\n"
                 f"{callback_note}\n{trailer}"
             )

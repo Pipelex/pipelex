@@ -56,7 +56,7 @@ Every route carries the method the same way: `files`, the MTHDS standard's map o
 
 ```json
 {
-  "pipe_code": "<the bundle's main_pipe>",
+  "pipe_code": "greeting.greet",
   "inputs": { "...": "inputs.json copied verbatim" },
   "files": {
     "bundle.mthds": "domain = \"greeting\"\nmain_pipe = \"greet\"\n...",
@@ -71,11 +71,14 @@ Every route carries the method the same way: `files`, the MTHDS standard's map o
 What travels is **every file of the method's tree**, listed by the `mthds` package's own lister, so it is judged by the same membership rule the runner and every MTHDS client apply (the standard's `method-tree.md`):
 
 - **The root** is the nearest directory at or above the bundle holding `METHODS.toml`, else the directory you point at. A `.mthds` file named alone with no `METHODS.toml` above it travels as the one-file tree of that file, nothing beside it.
-- **What stays out**: every path segment starting with a dot (`.git/`, `.venv/`, `.env`, `.mthds/`), `__pycache__` and `node_modules`, virtual environments, nested repositories and nested packages, the tree's own `.gitignore`d files and the manifest's `[package] exclude` patterns, and whatever else the installed `mthds` keeps out, such as a run's `inputs.json` once it applies the standard's rule for it.
+- **What stays out**: every path segment starting with a dot (`.git/`, `.venv/`, `.env`, `.mthds/`), `__pycache__` and `node_modules`, virtual environments, nested repositories and nested packages, the tree's own `.gitignore`d files and the manifest's `[package] exclude` patterns.
+- **A run's inputs file never travels as a file.** The standard keeps every file named `inputs.json` or `inputs.toml`, at any depth, out of every tree, and a runner applying that rule refuses such a key. The `mthds` lister pinned here still lists it, so the script drops it from `files` itself: the sibling `inputs.json` travels as `inputs` on execute/start and nowhere else.
 - **Never by hash.** The standard's third entry form, `{"sha256", "size"}`, names bytes the runner already holds in its blob store, which only an upload (`POST /v1/blobs/missing`, then `PUT /v1/blobs/{sha256}`) puts there. A Postman query or a curl command never uploads, so every file travels inline.
 - **No retired fields.** The skill never sends `mthds_contents`, `mthds_sources`, `bundle_b64` or `resources`.
 
 The listing stops at the runner's own limits on a tree a request sends (the `MAX_METHOD_TREE_*` limits of `pipelex_api.limits`), so pointing the skill at a large directory by mistake fails in moments. The script also refuses a main bundle the membership rule keeps out of the tree, such as a `.gitignore`d one, since the `pipe_code` read from it would name a pipe the runner never receives.
+
+The `pipe_code` the script infers is the main bundle's `main_pipe` **qualified by that bundle's domain** (`greeting.greet`, not `greet`): the whole tree travels, so a sibling bundle declaring a pipe of the same code would make a bare code ambiguous, which the runner refuses. An explicit `--pipe` is sent exactly as given.
 
 ## Validate = the API's dry-run
 
@@ -170,7 +173,7 @@ Useful options (apply across modes):
 | `--allow-signatures` | (validate only) Tolerate unimplemented pipe signatures. Default strict. |
 | `--render <fmt>` | (validate only) Opt-in server-side view, e.g. `--render markdown` → response carries `rendered_markdown` (what a skill-driven validate sends). Omit for the lean structured body a hook reads. Repeatable. |
 | `--inputs <path>` | Inputs JSON lives elsewhere, or you point at a `.mthds` file directly (file mode does not auto-detect inputs). execute/start only. |
-| `--pipe <pipe_code>` | The bundle has no `main_pipe`, or you want a different pipe. Used by execute/start (as `pipe_code`); ignored by validate/resolve/codegen. |
+| `--pipe <pipe_code>` | The bundle has no `main_pipe`, or you want a different pipe. Used by execute/start (as `pipe_code`, exactly as given, so write `domain.pipe_code` when another bundle of the tree declares the same code); ignored by validate/resolve/codegen. |
 | `--callback-url <url>` | (start only) Webhook the async result is POSTed to. Repeatable. Falls back to `CALLBACK_URL` in env/`.env`. |
 | `--base-url` / `--token` | Target server + bearer for `--run`/`--curl`. |
 | `--name <folder>` | Override the per-bundle Postman subfolder name. |
@@ -188,8 +191,8 @@ Useful options (apply across modes):
 
 - **Directory** → the main bundle is `bundle.mthds` if present, else the single `*.mthds` in the dir. Multiple `.mthds` and no `bundle.mthds` is ambiguous → ask the user to pass the file directly. The sibling `inputs.json` is auto-detected. The directory's whole method tree is sent as `files`, its bundles in subdirectories included, so multi-file methods resolve.
 - **`.mthds` file** → the main bundle is that file, and the tree it belongs to is sent: the package's tree when a `METHODS.toml` sits at or above its directory, else that one file. Inputs only come from `--inputs`.
-- **`pipe_code`** (run routes) comes from the main bundle's `main_pipe` (override with `--pipe`).
-- **`inputs`** is the inputs.json content copied verbatim — exactly what the API receives, same as the CLI.
+- **`pipe_code`** (run routes) is the main bundle's `main_pipe`, qualified by its domain (override with `--pipe`, sent as given).
+- **`inputs`** is the inputs.json content copied verbatim — exactly what the API receives, same as the CLI. The file itself is never one of the `files`.
 
 ## Important: file/document inputs are out of scope
 

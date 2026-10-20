@@ -48,6 +48,18 @@ output = "Text"
 template = "Hello $text"
 """
 
+# A sibling bundle of another domain declaring a pipe of the same bare code as the main bundle's `main_pipe`.
+_OTHER_MTHDS = """\
+domain = "other"
+
+[pipe.greet]
+type = "PipeCompose"
+description = "Greet otherwise"
+inputs = { text = "Text" }
+output = "Text"
+template = "Farewell $text"
+"""
+
 _CARD_HTML = "<p>Hello, {{ text }}</p>\n"
 _ICON = b"\x89PNG\r\n\x1a\n not text"
 _MANIFEST = """\
@@ -59,12 +71,17 @@ description = "A package whose root is above the bundle's directory."
 """
 _README = "# Greeting\n"
 _INPUTS = {"text": "world"}
+_INPUTS_TOML = 'text = "world"\n'
+_EXAMPLE_INPUTS = '{"text": "an example for people to read"}\n'
 _CALLBACK_URL = "https://example.com/hook"
 
-# The tree of `bundle_dir`: its text inline, its binary file in Base64, and nothing the membership rule keeps out.
+# The tree of `bundle_dir`: its text inline, its binary file in Base64, and nothing the membership rule keeps out, a
+# run's inputs file at any depth included, while example inputs under another name are an ordinary member.
 _EXPECTED_FILES: dict[str, Any] = {
     "assets/icon.png": {"base64": base64.b64encode(_ICON).decode("ascii")},
     "bundle.mthds": _GREET_MTHDS,
+    "examples/greeting-inputs.json": _EXAMPLE_INPUTS,
+    "other.mthds": _OTHER_MTHDS,
     "templates/card.html": _CARD_HTML,
 }
 
@@ -73,11 +90,15 @@ _REQUEST_BODY_MARKER = "--- request body ("
 
 @pytest.fixture(name="bundle_dir")
 def bundle_dir_fixture(tmp_path: Path) -> Path:
-    """A method's directory holding a bundle, a template and a binary file, beside files the membership rule keeps out."""
+    """A method's directory: two bundles, a template, a binary file and the run's inputs, beside files the membership rule keeps out."""
     bundle_dir = tmp_path / "greeting"
-    for subdirectory in ("templates", "assets", "drafts", "__pycache__"):
+    for subdirectory in ("templates", "assets", "examples", "drafts", "__pycache__"):
         (bundle_dir / subdirectory).mkdir(parents=True)
     (bundle_dir / "bundle.mthds").write_text(_GREET_MTHDS, encoding="utf-8")
+    (bundle_dir / "other.mthds").write_text(_OTHER_MTHDS, encoding="utf-8")
+    (bundle_dir / "inputs.json").write_text(json.dumps(_INPUTS), encoding="utf-8")
+    (bundle_dir / "examples" / "inputs.toml").write_text(_INPUTS_TOML, encoding="utf-8")
+    (bundle_dir / "examples" / "greeting-inputs.json").write_text(_EXAMPLE_INPUTS, encoding="utf-8")
     (bundle_dir / "templates" / "card.html").write_text(_CARD_HTML, encoding="utf-8")
     (bundle_dir / "assets" / "icon.png").write_bytes(_ICON)
     (bundle_dir / ".gitignore").write_text("drafts/\n", encoding="utf-8")
@@ -85,14 +106,6 @@ def bundle_dir_fixture(tmp_path: Path) -> Path:
     (bundle_dir / ".secret").write_text("kept out by its dot\n", encoding="utf-8")
     (bundle_dir / "__pycache__" / "cache.pyc").write_bytes(b"\x00")
     return bundle_dir
-
-
-@pytest.fixture(name="run_inputs")
-def run_inputs_fixture(tmp_path: Path) -> Path:
-    """A run's inputs, outside the method's directory, so they are no file of its tree whatever the membership rule says of them."""
-    run_inputs = tmp_path / "run-inputs.json"
-    run_inputs.write_text(json.dumps(_INPUTS), encoding="utf-8")
-    return run_inputs
 
 
 def _previewed_body_text(capsys: pytest.CaptureFixture[str], *args: str) -> str:
@@ -118,7 +131,7 @@ def _build_client(mocker: MockerFixture) -> TestClient:
 
 class TestPostmanBundleScript:
     def test_the_files_are_every_file_of_the_method_tree_inline(self, bundle_dir: Path) -> None:
-        """Text travels as text, other bytes in Base64, and a dotfile, a `.gitignore`d file or a cache never travels."""
+        """Text travels as text, other bytes in Base64; a dotfile, a `.gitignore`d file, a cache or a run's inputs file never travels."""
         files = postman_script.build_files_map(postman_script.list_bundle_tree(bundle_dir))
 
         assert files == _EXPECTED_FILES
@@ -144,10 +157,10 @@ class TestPostmanBundleScript:
     @pytest.mark.parametrize(
         ("endpoint_args", "expected_fields"),
         [
-            (["--endpoint", "execute"], {"pipe_code": "greet", "inputs": _INPUTS}),
+            (["--endpoint", "execute"], {"pipe_code": "greeting.greet", "inputs": _INPUTS}),
             (
                 ["--endpoint", "start", "--callback-url", _CALLBACK_URL],
-                {"pipe_code": "greet", "inputs": _INPUTS, "callback_urls": [_CALLBACK_URL]},
+                {"pipe_code": "greeting.greet", "inputs": _INPUTS, "callback_urls": [_CALLBACK_URL]},
             ),
             (["--endpoint", "validate", "--render", "markdown"], {"allow_signatures": False, "render": ["markdown"]}),
             (["--endpoint", "resolve"], {}),
@@ -158,19 +171,43 @@ class TestPostmanBundleScript:
         self,
         capsys: pytest.CaptureFixture[str],
         bundle_dir: Path,
-        run_inputs: Path,
         endpoint_args: list[str],
         expected_fields: dict[str, Any],
     ) -> None:
-        """No `mthds_contents`, `mthds_sources`, `bundle_b64` or `resources`, and the whole method last, after what a reader edits."""
-        body = json.loads(_previewed_body_text(capsys, str(bundle_dir), "--inputs", str(run_inputs), *endpoint_args))
+        """No `mthds_contents`, `mthds_sources`, `bundle_b64` or `resources`, and the whole method last, after what a reader edits.
+
+        The sibling `inputs.json` the script reads as the run's inputs, and the `inputs.toml` deeper in the tree, are in no
+        endpoint's `files`, whether or not the `mthds` lister keeps them out itself.
+        """
+        body = json.loads(_previewed_body_text(capsys, str(bundle_dir), *endpoint_args))
 
         assert body == {**expected_fields, "files": _EXPECTED_FILES}
+        assert "inputs.json" not in body["files"]
+        assert "examples/inputs.toml" not in body["files"]
         assert list(body)[-1] == "files"
 
+    @pytest.mark.parametrize(
+        ("pipe_args", "expected_pipe_code"),
+        [
+            ([], "greeting.greet"),
+            (["--pipe", "greet"], "greet"),
+            (["--pipe", "other.greet"], "other.greet"),
+        ],
+    )
+    def test_the_inferred_pipe_code_is_qualified_and_an_explicit_one_is_sent_as_given(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        bundle_dir: Path,
+        pipe_args: list[str],
+        expected_pipe_code: str,
+    ) -> None:
+        """The tree carries `other.greet` beside `greeting.greet`, so the main bundle's `main_pipe` travels qualified by its domain."""
+        body = json.loads(_previewed_body_text(capsys, str(bundle_dir), "--endpoint", "execute", *pipe_args))
+
+        assert body["pipe_code"] == expected_pipe_code
+
     def test_the_runner_runs_the_execute_body(self, capsys: pytest.CaptureFixture[str], mocker: MockerFixture, bundle_dir: Path) -> None:
-        """The sibling `inputs.json` is found, and the runner runs the body exactly as the preview prints it."""
-        (bundle_dir / "inputs.json").write_text(json.dumps(_INPUTS), encoding="utf-8")
+        """The sibling `inputs.json` is found, and the runner runs the main bundle's pipe, not its sibling's namesake."""
         body_text = _previewed_body_text(capsys, str(bundle_dir), "--endpoint", "execute")
         assert json.loads(body_text)["inputs"] == _INPUTS
 
