@@ -73,7 +73,8 @@ from pipelex.libraries.visibility_utils import make_visibility_checker
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodDependencyNotShippedError, MethodFetchDisabledError
-from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method
+from pipelex.methods.fetch_on_miss import find_vendored_method, reference_address, resolve_address_based_method
+from pipelex.methods.method_lock import FetchedDependency, ensure_fetched_tree_locked
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
@@ -1597,6 +1598,7 @@ class LibraryManager(LibraryManagerAbstract):
         resolved_dep: ResolvedDependency,
         package_address: str,
         tree_limits: TreeLimits | None = None,
+        fetched_dependency: FetchedDependency | None = None,
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1619,11 +1621,17 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
             tree_limits: The limits the package's tree is listed under, read from the configuration when not given
+            fetched_dependency: When the package is a copy this runtime fetched, the dependency to check against the
+                locks of the methods calling it, before any of its files is read; None for a package shipped or
+                installed otherwise, which no lock is checked against here
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
             MethodRequirementsError: The package's requirements.txt holds a line the standard refuses, or names
                 packages its PipeFunc environment does not hold, named by the package's address.
+            MethodLockMismatchError: The package is a fetched copy whose tree digest differs from the one a calling
+                method's lock records for its address.
+            MethodLockInvalidError: A calling method's lock, needed to check the fetched copy, cannot be read.
         """
         alias = resolved_dep.alias
 
@@ -1634,6 +1642,10 @@ class LibraryManager(LibraryManagerAbstract):
         tree_bundles_by_source: dict[str, TreeBundle] = {}
         # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
         package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
+        if fetched_dependency is not None:
+            # The tree this load lists, and so loads, is the one checked: a fetched copy that is not the tree its callers'
+            # locks record is refused before any of its files is read.
+            ensure_fetched_tree_locked(dependency=fetched_dependency, tree_digest=package_tree.digest)
         # The package's own requirements.txt is judged before any of its bundles loads, as the consumer's tree is.
         ensure_package_requirements_met(tree=package_tree, package_address=package_address)
         # Held for the consumer's runs, which read a file of the package's tree, such as one of its steps' template
@@ -1835,8 +1847,9 @@ class LibraryManager(LibraryManagerAbstract):
 
         A package that cannot be resolved is the caller's to fix, since the reference is part of their bundle: every
         address is tried, then the load is refused with one ``unresolved_package_dependency`` item per address that
-        failed, located on the first pipe naming it. A failure of the host's own store (``MethodInstallError``) and the
-        refusal of a package's Python structures (``MethodStructuresRefusedError``) propagate as they are.
+        failed, located on the first pipe naming it. A failure of the host's own store (``MethodInstallError``), the
+        refusal of a package's Python structures (``MethodStructuresRefusedError``) and the refusal of a fetched copy
+        its callers' locks do not record (``MethodLockMismatchError``, ``MethodLockInvalidError``) propagate as they are.
 
         Also searches for .mthds/methods/ directories relative to the bundle
         source path, walking up ancestor directories to find installed methods
@@ -1855,12 +1868,18 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Each address-based alias, with the first reference naming it and the bundle that makes it, in bundle order.
         first_references: dict[str, tuple[LocatedPipeReference, PipelexBundleBlueprint]] = {}
+        # The trees of the bundles calling each alias, whose locks a copy of it this runtime fetched is checked against.
+        caller_trees: dict[str, list[MethodTree]] = {}
         for blueprint in blueprints:
             for reference in blueprint.collect_located_pipe_references():
-                if QualifiedRef.has_cross_package_prefix(reference.pipe_ref):
-                    alias, _remainder = QualifiedRef.split_cross_package_ref(reference.pipe_ref)
-                    if QualifiedRef.is_address_based_alias(alias) and alias not in first_references:
-                        first_references[alias] = (reference, blueprint)
+                if not QualifiedRef.has_cross_package_prefix(reference.pipe_ref):
+                    continue
+                alias, _remainder = QualifiedRef.split_cross_package_ref(reference.pipe_ref)
+                if not QualifiedRef.is_address_based_alias(alias):
+                    continue
+                first_references.setdefault(alias, (reference, blueprint))
+                if blueprint.tree_bundle is not None:
+                    caller_trees.setdefault(alias, []).append(blueprint.tree_bundle.tree)
 
         if not first_references:
             return
@@ -1885,6 +1904,7 @@ class LibraryManager(LibraryManagerAbstract):
                     extra_search_dirs=extra_search_dirs,
                     methods_dirs=methods_dirs,
                     address_dependency_sources=address_dependency_sources,
+                    caller_trees=tuple(caller_trees.get(full_address, [])),
                 )
             except (MethodFetchDisabledError, MethodDependencyFetchError, MethodDependencyNotShippedError) as exc:
                 # The item carries the sentence its code renders; the host's log keeps the whole cause chain, git's raw output
@@ -1921,6 +1941,7 @@ class LibraryManager(LibraryManagerAbstract):
         extra_search_dirs: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        caller_trees: tuple[MethodTree, ...] = (),
     ) -> None:
         """Load a method package on demand using its full address, fetching it on a miss.
 
@@ -1938,12 +1959,17 @@ class LibraryManager(LibraryManagerAbstract):
             methods_dirs: The load's own methods directories, searched before everything else and never written
             address_dependency_sources: ``SHIPPED`` refuses an address ``methods_dirs`` do not answer, reading nothing
                 installed on this host and fetching nothing; ``ANYWHERE`` falls back to the installed methods and a fetch
+            caller_trees: The trees of the bundles calling the package, whose locks a copy this runtime fetched, for
+                this load or an earlier one, is checked against
 
         Raises:
             MethodRefError: The address resolves to no vendored or installed method and could not be
                 fetched — fetch-on-miss disabled, an unfetchable address, a failed fetch,
                 or a failed install. Never a silent pass.
             MethodDependencyNotShippedError: Under ``SHIPPED``, no package of ``methods_dirs`` answers the address.
+            MethodLockMismatchError: The package is a copy this runtime fetched, and a calling method's lock records
+                another tree digest for its address.
+            MethodLockInvalidError: A calling method's lock, needed to check a fetched copy, cannot be read.
         """
         vendored = find_vendored_method(full_address=full_address, methods_dirs=methods_dirs) if methods_dirs else None
         match address_dependency_sources:
@@ -1955,6 +1981,18 @@ class LibraryManager(LibraryManagerAbstract):
                 installed = vendored or resolve_address_based_method(full_address=full_address, extra_search_dirs=extra_search_dirs)
 
         exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
+
+        # A copy this runtime fetched, for this load or for an earlier one whose install recorded the fetch's provenance, is
+        # checked against the locks of the methods calling it. A shipped copy travels with the lock, from the same author,
+        # and a copy another installer wrote, such as `mthds install`, which checks the lock itself, is not this runtime's
+        # fetch: neither is checked here.
+        fetched_dependency: FetchedDependency | None = None
+        if vendored is None and installed.provenance is not None:
+            fetched_dependency = FetchedDependency(
+                address=reference_address(full_address=full_address),
+                version=installed.manifest.version,
+                caller_trees=caller_trees,
+            )
 
         resolved_dep = ResolvedDependency(
             alias=full_address,
@@ -1971,6 +2009,7 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_dep=resolved_dep,
             # The address the lookup matched (the manifest's address and the method's name), never a tag.
             package_address=f"{installed.manifest.address}/{installed.name}",
+            fetched_dependency=fetched_dependency,
         )
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

@@ -306,6 +306,8 @@ Two shipped packages a reference could not tell apart, whose manifests declare t
 
 The validation of a method sent as a tree, or fetched by `method_ref`, loads its shipped packages too, so `/validate` resolves a dependency the run would resolve.
 
+**A package the server fetches is checked against the method's `methods.lock`.** When the method, sent as `files` or in a `bundle_b64` archive or fetched by `method_ref`, carries a `methods.lock` at the root of its tree, a package it calls by address that the server fetches on a miss, or finds installed by an earlier fetch of its own, must have the tree digest the lock records for that address. A different digest refuses the run with a `422` `security.integrity_mismatch`, whose `dependency` names the address, and the operator's `diagnostics` name the digest and version the lock records and the version and digest that were fetched; `/validate` answers the same `422`, as a security refusal is never a verdict, and the deployment logs the refusal's security event. A lock naming another version than the one fetched refuses the run as well, since the version is part of the package's tree, and the server never fetches the locked version in place of the reference. A lock that does not name the address, or no lock, checks nothing, and a package shipped with the request is not checked, as it travels with the lock. A lock the server cannot read, such as one written before tree digests that records a `hash`, refuses a run that fetched a package with a `422` verdict whose item is `method.package_invalid` with the reason `lock_invalid` and the `path` `methods.lock`. See [Include by Address: Fetch-on-Miss](../building-methods/packages.md#include-by-address-fetch-on-miss).
+
 ---
 
 ## Running a method by address (`method_ref`)
@@ -339,6 +341,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 | More than one package matches | 422 | `method.ambiguous` |
 | Package exceeds the fetched-package ceilings, or contains a symlink (file or directory) | 422 | `method.package_invalid` |
 | Package declares Python structure classes | 422 | `pipelex.deployment.python_structures_refused` |
+| A package it calls, fetched by the server, differs from the tree digest its `methods.lock` records | 422 | `security.integrity_mismatch` |
 | Package ships `.py` on a non-sandbox deployment | 501 | `pipelex.deployment.custom_code_requires_sandbox` |
 
 **The clone cache.** Fetched repositories are cached on local disk **keyed by resolved commit SHA** — never by tag. Each request first resolves the reference to its current SHA with a cheap `git ls-remote` (no clone); a cached SHA is reused, a new one (a moved tag, an advanced HEAD) triggers a fresh clone. The cache is per server instance and bounded by count, total bytes, and age, oldest first; a clone a request is still reading is never evicted, though it counts toward the bounds. That protection holds within one process, so a deployment running several worker processes gives each its own `METHOD_CACHE_DIR`.

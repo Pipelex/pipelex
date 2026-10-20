@@ -502,3 +502,60 @@ steps       = [
   { from = "filing.invoice.supplier.name", result = "supplier_name" },
 ]
 """
+
+
+class FetchedDependencyLockTestData:
+    """A calling method, the package it calls by address and fetches on a miss, and the locks it could carry; nothing here is real."""
+
+    DEP_ALIAS: ClassVar[str] = "github.com/pipelex-tests/fom-lock-methods/scoring"
+
+    DEP_MANIFEST: ClassVar[str] = """[package]
+name        = "scoring"
+address     = "github.com/pipelex-tests/fom-lock-methods"
+version     = "0.1.0"
+description = "An invented scoring package a locked method fetches"
+
+[exports.fom_lock_scoring]
+pipes = ["compute"]
+"""
+
+    DEP_BUNDLE: ClassVar[str] = """domain      = "fom_lock_scoring"
+description = "An invented scoring package"
+
+[pipe.compute]
+type        = "PipeLLM"
+description = "Compute a score"
+inputs      = { item = "Text" }
+output      = "Text"
+prompt      = "Score: $item"
+"""
+
+    CALLER_MANIFEST: ClassVar[str] = """[package]
+address     = "github.com/pipelex-tests/locked-caller"
+version     = "1.0.0"
+description = "An invented method whose lock pins what it fetches"
+"""
+
+    @classmethod
+    def caller_calling(cls, *, pipe_ref: str) -> str:
+        """The calling method's bundle, whose single step names `pipe_ref`."""
+        return f"""domain      = "fom_lock_caller"
+description = "A method calling a fetched package"
+
+[pipe.go]
+type        = "PipeSequence"
+description = "Call the fetched package"
+inputs      = {{ item = "Text" }}
+output      = "Text"
+steps       = [{{ pipe = "{pipe_ref}", result = "score" }}]
+"""
+
+    @classmethod
+    def lock_naming(cls, *, address: str, digest: str) -> str:
+        """A `methods.lock` holding one entry, for `address` at the package's version with the tree digest `digest`."""
+        return f'["{address}"]\nversion = "0.1.0"\ndigest  = "{digest}"\nsource  = "https://github.com/pipelex-tests/fom-lock-methods.git"\n'
+
+    @classmethod
+    def legacy_lock_naming(cls, *, address: str) -> str:
+        """A `methods.lock` written before tree digests, its entry recording a `hash`."""
+        return f'["{address}"]\nversion = "0.1.0"\nhash    = "sha256:{"c" * 64}"\nsource  = "https://github.com/pipelex-tests/fom-lock-methods.git"\n'

@@ -61,6 +61,11 @@ def _lookup_address(*, full_address: str) -> _LookupAddress:
     return _LookupAddress(address=ref.address, ref=ref, parse_error=None)
 
 
+def reference_address(*, full_address: str) -> str:
+    """The address an address-based reference names, any ``@<tag>`` stripped: how the stores and a method's lock key a package."""
+    return _lookup_address(full_address=full_address).address
+
+
 def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> InstalledMethod | None:
     """Look an address-based reference up among the packages a load was handed, and nowhere else.
 
