@@ -8,8 +8,8 @@ Pipelex refuses a method whose requirements are not met when it loads, naming ea
 never installs anything:
 
 - A tree is checked when it holds `requirements.txt` at its root and holds Python, a `.py` file anywhere in it: a tree
-  with no Python has nothing that could import a package. The check runs before any of the tree's Python is imported
-  or captured, and before any of its pipes is built.
+  with no Python has nothing that could import a package. The check runs before any of the tree's Python is imported,
+  or scanned for structure classes on a sandbox-hosted deployment, and before any of its pipes is built.
 - The environment is the one the PipeFunc steps run in (`pipelex/libraries/package_environments.py`): this interpreter
   in the `direct` execution mode, and in a sandbox-hosted mode the packages the deployment states its sandbox offers
   for the tree's requirements, asked for each tree, so trees judged together each get the offer stated for their own.
