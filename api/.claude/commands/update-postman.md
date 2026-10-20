@@ -130,8 +130,9 @@ For **unchanged endpoints**, do NOT touch them.
 - All examples must be **self-contained** and **copy-pasteable**
 - Response bodies must match **actual API responses** (from step 6)
 - Read `api/postman/sample-bundles/` for `.mthds` files and their `.inputs.json` companions
+- Send each method as `files`, a map from each file's tree path to its content: for a sample bundle, `{"<name>.mthds": "<its text>"}`. Build the body of a method that has a directory of its own with the `postman-bundle` skill's script in preview mode (`--dry-run`), which lists every file of the method's tree by the standard's membership rule
 
-#### Pipe type diversity — for endpoints accepting `mthds_contents`:
+#### Pipe type diversity — for endpoints accepting a method's `files`:
 1. **PipeLLM** — text analysis, summarization, Q&A
 2. **PipeExtract** — structured data extraction
 3. **PipeSequence** — multi-step pipeline
@@ -298,4 +299,4 @@ Changes appear in Postman desktop immediately (auto-sync).
 - **Always `source ~/.zshrc 2>/dev/null`** before any command using `$POSTMAN_API_KEY`
 - The Postman API expects `{"collection": {...}}` envelope — the fetched JSON already has this structure, so just modify `data['collection']` and write `data` back
 - Enum values are lowercase: `schema`, `json`, `python` — NOT uppercase
-- `mthds_contents` is always `list[str]`, even for a single file
+- A method travels as `files`, a JSON object mapping each file's tree path to its UTF-8 text, or to `{"base64": "..."}` for a file whose bytes are not UTF-8, even for a method of one file. Never write the by-hash entry `{"sha256": ..., "size": ...}` into a collection request: it resolves only once the bytes are uploaded to the runner (`POST /v1/blobs/missing`, then `PUT /v1/blobs/{sha256}`), which a saved request never does. Never send `mthds_contents`, `mthds_sources`, `bundle_b64` or `resources`
