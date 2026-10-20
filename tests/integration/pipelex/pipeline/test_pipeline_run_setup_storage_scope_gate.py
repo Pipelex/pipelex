@@ -53,7 +53,7 @@ class TestPipelineRunSetupStorageScopeGate:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         pipeline_manager = mocker.spy(pipeline_run_setup_module, "get_pipeline_manager")
         telemetry_manager = mocker.spy(pipeline_run_setup_module, "get_telemetry_manager")
-        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library")
+        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library_async")
 
         with pytest.raises(ValueError, match="storage_scope"):
             await pipeline_run_setup(
@@ -80,7 +80,7 @@ class TestPipelineRunSetupStorageScopeGate:
         """
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         telemetry_manager = mocker.spy(pipeline_run_setup_module, "get_telemetry_manager")
-        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library")
+        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library_async")
 
         with pytest.raises(ValueError, match="storage_scope"):
             await pipeline_run_setup(

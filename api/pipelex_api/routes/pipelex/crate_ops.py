@@ -22,7 +22,6 @@ worker thread (`project_resolved_method`), never on the event loop: a slow resol
 requests, and the current library, a context variable, is bound, read and cleared in that one thread's context.
 """
 
-import asyncio
 from collections.abc import Callable
 from enum import StrEnum
 from typing import Literal, NamedTuple, NoReturn, TypeVar
@@ -34,6 +33,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, get_required_entry_pipe
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.pipe.exceptions import EntryPipeAmbiguousError, EntryPipeNotFoundError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_suggestions import MAIN_PIPE_DECLARATION
 from pipelex.methods.method_ref import looks_like_method_ref
@@ -160,11 +160,11 @@ async def project_resolved_method(
     """Resolve the method the request names into its normalized crate, and return what `project` makes of it.
 
     The method is read as `/validate` reads it (`select_request_method`), then written out as a run writes it and loaded
-    alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread.
-    `project` runs in that thread with the freshly opened library loaded and current, so it can read live pipes, and the
-    written tree held; both are released when it returns or raises. A method that does not resolve returns its invalid
-    verdict instead, the `ValidateBundleError` carrying the structured validation items, with `project` never called and
-    nothing left loaded.
+    alone as the caller's own library directory, its dependency trees as the packages it ships, in a worker thread of the
+    method-load pool (`run_method_load`). `project` runs in that thread with the freshly opened library loaded and
+    current, so it can read live pipes, and the written tree held; both are released when it returns or raises. A
+    method that does not resolve returns its invalid verdict instead, the `ValidateBundleError` carrying the structured
+    validation items, with `project` never called and nothing left loaded.
 
     Raises (as problem documents): a 422 `request.unsupported` for a registry-form `method_ref`; the refusals of
     `select_request_method`; the address-form fetch and location failures (`MethodRefError` subclasses); and whatever
@@ -184,7 +184,7 @@ async def project_resolved_method(
     selected = await select_request_method(
         request=request, method_ref=request_data.method_ref, resources=request_data.resources, read_scope=request_data.read_scope
     )
-    return await asyncio.to_thread(
+    return await run_method_load(
         _project_written_method,
         request_method=selected.request_method,
         method_label=selected.method_label,

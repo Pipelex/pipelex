@@ -150,7 +150,7 @@ class TestReadScopeRoutes:
     async def test_a_mismatched_host_registers_no_run(self, mocker: MockerFixture, storage_scope: str, match: str) -> None:
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
         pipeline_manager = mocker.spy(pipeline_run_setup_module, "get_pipeline_manager")
-        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library")
+        acquire_library = mocker.spy(pipeline_run_setup_module, "acquire_library_async")
 
         with pytest.raises(ValueError, match=match):
             await pipeline_run_setup(

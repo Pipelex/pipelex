@@ -25,11 +25,13 @@ from packaging.markers import default_environment
 from packaging.utils import canonicalize_name
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config, get_pipe_func_execution_mode, is_pipe_func_sandbox_hosted
 from pipelex.core.method_trees.requirements_file import RequirementLine
 from pipelex.interpreter_hub import get_pipe_func_package_offer_registry
 from pipelex.libraries.exceptions import PipeFuncPackageSetUnstatedError
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
+from pipelex.tools.misc.async_utils import is_event_loop_running_on_this_thread
 
 
 class PythonPackageEnvironment(Protocol):
@@ -160,6 +162,8 @@ def resolve_pipe_func_package_environment(
     Raises:
         PipeFuncPackageSetUnstatedError: The mode runs PipeFunc steps out of this process and no plugin states, or the
             stating plugin could not state, the packages found there.
+        PipelexUnexpectedError: The factory would be called on a thread running an event loop, which its contract
+            forbids: the load reaching it was called on the loop rather than through `run_method_load`.
     """
     if not is_pipe_func_sandbox_hosted():
         return InterpreterPackageEnvironment(names_host_paths=names_host_paths)
@@ -167,6 +171,16 @@ def resolve_pipe_func_package_environment(
     offer_factory = get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
     if offer_factory is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=False)
+    if is_event_loop_running_on_this_thread():
+        # The factory's contract: it is never called on a thread running an event loop, so it may block. A load reached
+        # from asynchronous code runs in the method-load pool (`run_method_load`); one called on the loop itself is a host
+        # wired wrongly, refused here rather than let the factory hold up every task the loop serves.
+        msg = (
+            f"The package-offer factory of the PipeFunc execution mode '{execution_mode}' was about to be called on a thread "
+            "running an event loop: a method load reached from asynchronous code must run off the loop, through "
+            "`run_method_load` (pipelex.libraries.method_load_threads)."
+        )
+        raise PipelexUnexpectedError(msg)
     answer = offer_factory(PipeFuncPackageOfferRequest(pipe_func_config=get_config().interpreter.pipe_func, requirements=tuple(requirements)))
     if answer is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=True)

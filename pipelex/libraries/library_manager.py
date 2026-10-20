@@ -94,6 +94,7 @@ from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.exceptions import SemVerError
 from pipelex.tools.misc.semver import parse_constraint, parse_version, version_satisfies
+from pipelex.tools.typing.module_inspector import MODULE_IMPORT_LOCK
 from pipelex.validation_error_types import PipeValidationErrorType
 
 if TYPE_CHECKING:
@@ -767,7 +768,8 @@ class LibraryManager(LibraryManagerAbstract):
 
             # Import modules and register in global registries
             # Import from user directories
-            if is_pipe_func_sandbox_hosted():
+            sandbox_hosted = is_pipe_func_sandbox_hosted()
+            if sandbox_hosted:
                 # Sandbox-hosted mode imports no Python from a library directory, whatever its origin (an
                 # inline bundle, a stored method, a host directory): importing a file runs its module-level
                 # code in this process. A structure class cannot travel to a sandbox: it would have to be
@@ -779,21 +781,24 @@ class LibraryManager(LibraryManagerAbstract):
                 ensure_no_structured_content_in_library_sources(
                     sources_by_dir=_python_sources_by_tree(library_trees=library_trees, bundle_files=all_bundle_files),
                 )
-            else:
-                for library_dir in all_dirs:
-                    # Only import files that contain StructuredContent subclasses (uses AST pre-check), so
-                    # concepts declared as `structure = "ClassName"` resolve that class from the registry.
-                    # A PipeFunc's function is not imported here: its step imports it by its import path when
-                    # it first runs.
-                    ClassRegistryUtils.import_modules_in_folder(
-                        folder_path=library_dir,
-                        base_class_names=[StructuredContent.__name__],
-                    )
+            # Loads run in parallel worker threads, so the imports and the class discovery that reads them hold the import
+            # lock together: no other load's import is half executed while the discovery reads `sys.modules`.
+            with MODULE_IMPORT_LOCK:
+                if not sandbox_hosted:
+                    for library_dir in all_dirs:
+                        # Only import files that contain StructuredContent subclasses (uses AST pre-check), so
+                        # concepts declared as `structure = "ClassName"` resolve that class from the registry.
+                        # A PipeFunc's function is not imported here: its step imports it by its import path when
+                        # it first runs.
+                        ClassRegistryUtils.import_modules_in_folder(
+                            folder_path=library_dir,
+                            base_class_names=[StructuredContent.__name__],
+                        )
 
-            # Auto-discover and register all StructuredContent classes from sys.modules
-            num_registered = ClassRegistryUtils.auto_register_all_subclasses(
-                base_class=StructuredContent,
-            )
+                # Auto-discover and register all StructuredContent classes from sys.modules
+                num_registered = ClassRegistryUtils.auto_register_all_subclasses(
+                    base_class=StructuredContent,
+                )
             log.verbose("Auto-registered the StructuredContent classes of the loaded modules", fields={"class_count": num_registered})
 
             # Load MTHDS files into the specific library

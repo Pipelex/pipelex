@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_machinery.rendering.input_renderer import build_concept_comments, no_inputs_message, render_inputs
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
@@ -77,7 +78,8 @@ async def build_inputs_for_pipe(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dirs)
         if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            # In a worker thread, off the event loop, as every load reached from asynchronous code.
+            await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
     if not pipe_code:
         msg = "No pipe code specified"
