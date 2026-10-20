@@ -18,6 +18,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
+from pipelex.libraries.method_tree_listing import MethodTreeListing, scoped_tree_listing
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -352,6 +353,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
+        tree_listing: MethodTreeListing | None = None,
         requested_orchestration_mode: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a method synchronously, dispatching by the resolved `orchestration_mode`.
@@ -375,6 +377,9 @@ class ApiRunner(PipelexMTHDSProtocol):
         `RunMetadata.request_id` for log correlation, so it reaches the job a worker is handed.
         `requested_orchestration_mode` is the optional per-request backend override
         (`PipelineApiExtras.orchestration_mode`).
+
+        The method's trees are listed once for the request: the check of its requirements lists them through
+        `tree_listing`, or a listing of its own when none is given, and the run loads them from that same listing.
         """
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
@@ -383,7 +388,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
             raise _missing_orchestrator_error(mode=orchestration_mode, api_config=api_config)
-        await self._ensure_served_method_requirements_met()
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
+        await self._ensure_served_method_requirements_met(tree_listing=listing)
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
@@ -400,6 +406,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             extra=extra,
             delivery_assignment=delivery_assignment,
             request_id=request_id,
+            tree_listing=listing,
         )
 
     @override
@@ -473,7 +480,10 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
             raise AsyncExecutionNotEnabledError(msg)
-        await self._ensure_served_method_requirements_met()
+        # The method's trees are listed once for the request: the requirements check lists them, and the job's load
+        # takes them from the same listing.
+        tree_listing = MethodTreeListing()
+        await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
@@ -507,6 +517,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             submitted_files=self.submitted_files,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
+            tree_listing=tree_listing,
         )
 
         delivery_assignment = DeliveryAssignment(
@@ -555,13 +566,15 @@ class ApiRunner(PipelexMTHDSProtocol):
             crate_fingerprint=pipe_job.job_metadata.run_metadata.crate_fingerprint,
         )
 
-    async def _ensure_served_method_requirements_met(self) -> None:
+    async def _ensure_served_method_requirements_met(self, *, tree_listing: MethodTreeListing) -> None:
         """Refuse the request's method when its requirements.txt is not met, before anything loads or is dispatched.
 
         This runner's `library_dirs` are the directories it wrote the request's method tree into, the caller's own,
         whose load reports a requirements refusal as the caller's too; judging it here first refuses the run before
         any library opens or any run is registered, naming no path on this host. The tree is held as written, so its
-        listing is the tree the request sent. The listing reads and hashes files, so it runs off the event loop, in the method-load pool.
+        listing is the tree the request sent. The listing reads and hashes files, so it runs off the event loop, in the method-load pool,
+        and it is made through `tree_listing`, which the caller hands to the request's load, so the load reads the trees
+        checked here without listing them again.
 
         Raises:
             MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
@@ -574,7 +587,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
         # In the method-load pool, whose cancellation waits for the check to end: the directories it lists are removed
         # when the request's scope exits, which a client disconnect can make happen while the check still hashes them.
-        await run_method_load(ensure_served_method_requirements_met, library_dirs=library_dirs)
+        await run_method_load(ensure_served_method_requirements_met, library_dirs=library_dirs, tree_listing=tree_listing)
 
     async def validate_verdict(
         self,
@@ -624,6 +637,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         arm hands the method's trees to its worker through. The route builds a validating runner with the
         `read_scope` its request names, `None` when it names none, and never with the caller's id a run
         would fall back to: nothing lists or erases what a validation would leave under that prefix.
+
+        The method's trees are listed once for the request: the requirements check lists them, and the validation is
+        called with that listing in scope (`scoped_tree_listing`), which the in-process validator loads the trees from,
+        while a validator dispatching to a worker never reads it.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (422) here, before any validator dispatch / library load. Mirrors start().
@@ -638,31 +655,35 @@ class ApiRunner(PipelexMTHDSProtocol):
         # worker a method tree's validation is dispatched to never reads these directories: it receives the method's
         # trees through its method file store and judges their requirements again as it loads them. A refusal is the
         # method's invalid verdict, as a run of it is refused before its files load.
+        tree_listing = MethodTreeListing()
         try:
             with translate_to_validate_bundle_error():
-                await self._ensure_served_method_requirements_met()
+                await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
         except ValidateBundleError as invalid_method:
             return BundleValidationFailure(
                 problem=invalid_method.to_problem(view=ProblemView.OPERATOR),
                 validation_errors=invalid_method.validation_error_items(),
             )
-        verdict = await validator.validate_bundles(
-            mthds_contents=mthds_contents,
-            mthds_sources=mthds_sources,
-            allow_signatures=allow_signatures,
-            # A method directory is the whole method: no library directory loads beside it.
-            library_dirs=None if method_dir is not None else library_dirs,
-            method_dir=method_dir,
-            methods_dirs=self.methods_dirs if method_dir is not None else None,
-            # A validation is not a run, but its dry runs and its `pipe_dry_run` event are still
-            # done for the caller this runner was built for — the user and groups a run would state.
-            caller_identity=self.caller_identity,
-            graph_pipe_code=graph_pipe_code,
-            # The files submitted with the contents, which the validation's dry run reads, the template check included.
-            submitted_files=self.submitted_files,
-            # The scope the host named, under which a dispatched validator's worker reads the method's trees.
-            read_scope=self.read_scope,
-        )
+        # The validator seam takes no listing: the one the requirements check made is in scope around the call, so the
+        # in-process validator loads the trees it checked without listing them again.
+        with scoped_tree_listing(tree_listing=tree_listing):
+            verdict = await validator.validate_bundles(
+                mthds_contents=mthds_contents,
+                mthds_sources=mthds_sources,
+                allow_signatures=allow_signatures,
+                # A method directory is the whole method: no library directory loads beside it.
+                library_dirs=None if method_dir is not None else library_dirs,
+                method_dir=method_dir,
+                methods_dirs=self.methods_dirs if method_dir is not None else None,
+                # A validation is not a run, but its dry runs and its `pipe_dry_run` event are still
+                # done for the caller this runner was built for — the user and groups a run would state.
+                caller_identity=self.caller_identity,
+                graph_pipe_code=graph_pipe_code,
+                # The files submitted with the contents, which the validation's dry run reads, the template check included.
+                submitted_files=self.submitted_files,
+                # The scope the host named, under which a dispatched validator's worker reads the method's trees.
+                read_scope=self.read_scope,
+            )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
         # PipelexValidationReport. Recover the precise type here — the single narrowing point — so

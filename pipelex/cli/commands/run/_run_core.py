@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.stuffs.stuff_content import StuffContent
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
 
 COMMAND = "run"
 _WORKING_MEMORY_FILENAME = "working_memory.json"
@@ -168,6 +169,7 @@ def _resolve_row_model_for_empty_result(
     bundle_path: str | None,
     mthds_content: str | None,
     library_dir: list[str] | None,
+    tree_listing: MethodTreeListing | None,
 ) -> type[StuffContent]:
     """Resolve the CSV row model for a run that produced no rows, by reloading its bundle.
 
@@ -175,14 +177,16 @@ def _resolve_row_model_for_empty_result(
     run's own library — which owned the ClassRegistry holding its generated structure classes — is
     torn down by the time ``--save-csv`` runs. Reloading the same bundle into a throwaway library
     regenerates the declared concept's structure class under the same name and fields, which is what
-    the header needs. The load inputs are the ones handed to the runner just above, so the two see
-    the same bundle. The library is torn down again immediately; only the resolved class survives.
+    the header needs. The load inputs are the ones handed to the runner just above, and so is the run's
+    tree listing, so the two load the same trees without listing them again. The library is torn
+    down again immediately; only the resolved class survives.
     """
     library_id, _main_pipe = acquire_library(
         library_id="",
         library_dirs=library_dir,
         mthds_contents=[mthds_content] if mthds_content else None,
         bundle_uris=[bundle_path] if bundle_path else None,
+        tree_listing=tree_listing,
     )
     try:
         return get_concept_library().get_structure_class(concept=concept)
@@ -211,11 +215,14 @@ async def _execute_run(
     dynamic_output_concept_ref: str | None = None,
     save_csv: str | None = None,
     method_tree: MethodTree | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> None:
     """Core async execution logic for running a pipe.
 
     Shared between the ``method``, ``pipe`` and ``bundle`` subcommands. ``method_tree`` is the method tree the run
-    reads, when the command listed one, recorded as ``method_tree.json`` in the run's output folder.
+    reads, when the command listed one, recorded as ``method_tree.json`` in the run's output folder, and
+    ``tree_listing`` the listing the command listed it through, which the run loads its trees from, so the tree recorded
+    is the tree loaded.
     """
     # Fail fast on an unusable --save-csv target BEFORE running the pipeline, so a bad path (empty,
     # or an unsupported suffix like .xlsx) doesn't waste a full inference run. The output-shape and
@@ -294,6 +301,7 @@ async def _execute_run(
                 mthds_contents=[mthds_content] if mthds_content else None,
                 inputs=pipeline_inputs,
                 dynamic_output_concept_ref=dynamic_output_concept_ref,
+                tree_listing=tree_listing,
             )
         pipe_output = response.pipe_output
     except ValidateBundleError as exc:
@@ -471,6 +479,7 @@ async def _execute_run(
                     bundle_path=bundle_path,
                     mthds_content=mthds_content,
                     library_dir=library_dir,
+                    tree_listing=tree_listing,
                 )
             # Validate the row flatness BEFORE touching the filesystem, so a non-flat output leaves no
             # directory behind (the suffix was already validated up front).
@@ -540,12 +549,14 @@ def execute_run(
     dynamic_output_concept_ref: str | None = None,
     save_csv: str | None = None,
     method_tree: MethodTree | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
     Shared between the ``method``, ``pipe`` and ``bundle`` subcommands, for a run that executes on this machine. It
     prints the deck staleness notice, which the root callback leaves to it: only a local run reads the deck.
     ``inputs`` is ``--inputs`` as given, or the inputs file ``run bundle`` auto-detected (see ``load_run_inputs``).
+    ``tree_listing`` is the listing the command listed ``method_tree`` through, which the run loads its trees from.
     """
     warn_if_deck_stale()
     # A dry run makes no inference call, so it must not demand credentials: `needs_inference=False`
@@ -585,6 +596,7 @@ def execute_run(
                     dynamic_output_concept_ref=dynamic_output_concept_ref,
                     save_csv=save_csv,
                     method_tree=method_tree,
+                    tree_listing=tree_listing,
                 )
             )
 

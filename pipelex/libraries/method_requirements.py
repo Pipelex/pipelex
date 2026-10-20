@@ -31,7 +31,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import NamedTuple
 
-from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.models import MethodTree
 from mthds.protocol.problem.registry import MethodDependencyMissingKind, MethodDependencyMissingReason
 from packaging.markers import Marker, UndefinedComparison, UndefinedEnvironmentName
 from packaging.requirements import InvalidRequirement, Requirement
@@ -46,7 +46,8 @@ from pipelex.core.method_trees.requirements_file import (
     parse_requirements_text,
 )
 from pipelex.libraries.exceptions import MethodRequirementsFileError, MethodRequirementsNotMetError
-from pipelex.libraries.method_trees import list_library_dir_trees, listing_identity, reporting_host_library_tree_faults
+from pipelex.libraries.method_tree_listing import MethodTreeListing
+from pipelex.libraries.method_trees import listing_identity, reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import PythonPackageEnvironment, resolve_pipe_func_package_environment
 from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageRefusal
@@ -494,7 +495,7 @@ def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -
     _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False)
 
 
-def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], limits: TreeLimits | None = None) -> None:
+def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_listing: MethodTreeListing | None = None) -> None:
     """Check the requirements of a caller's method a server holds in directories of its own, as loading them would, without loading them.
 
     For a server that hands the method to a loader elsewhere, such as a validator whose worker receives the method's
@@ -504,6 +505,10 @@ def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], limit
     host's fault, as a load of a host's library directories reports it, and a refusal names no path on the host, the
     directories' and this interpreter's included.
 
+    The trees are listed through `tree_listing`, which the server hands to the load of the same request, so the method
+    loaded is the one checked here and its files are listed and hashed once (`pipelex.libraries.method_tree_listing`).
+    None lists them for this check alone.
+
     Raises:
         HostLibraryTreeError: A tree of the directories could not be listed.
         MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
@@ -512,6 +517,7 @@ def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], limit
         PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
             set for them.
     """
+    listing = tree_listing if tree_listing is not None else MethodTreeListing()
     with reporting_host_library_tree_faults():
-        library_trees = list_library_dir_trees(library_dirs=library_dirs, limits=limits)
+        library_trees = listing.library_dir_trees(library_dirs=library_dirs)
     ensure_method_requirements_met(trees=[library_tree.tree for library_tree in library_trees], names_host_paths=False)

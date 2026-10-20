@@ -6,10 +6,11 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from mthds.method_tree.models import MethodTree
+from mthds.method_tree.models import MethodTree, TreeLimits
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
 from pipelex.libraries.method_load_threads import METHOD_LOAD_THREADS
+from pipelex.libraries.method_trees import list_library_dir_tree, list_local_method_tree
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage
@@ -147,6 +148,39 @@ class TestLoadsOffTheEventLoop:
         assert response.status_code == 200, response.text
         assert len(recording_offer.thread_names) > 1, recording_offer.thread_names
         assert all(_in_the_method_load_pool(thread_name) for thread_name in recording_offer.thread_names), recording_offer.thread_names
+
+    @pytest.mark.parametrize(
+        ("route", "body"),
+        [
+            ("/v1/validate", {"files": _TREE_WITH_REQUIREMENTS}),
+            ("/v1/execute", {"files": _TREE_WITH_REQUIREMENTS, "inputs": {"data": "hello"}}),
+        ],
+        ids=["validate", "execute"],
+    )
+    def test_a_request_lists_each_tree_of_its_method_once(
+        self, mocker: MockerFixture, tmp_path: Path, recording_offer: _RecordingOffer, route: str, body: dict[str, Any]
+    ):
+        """The runner's check of the served method lists its trees, and the validation or the run loads them from that listing."""
+        client = _build_client(mocker, tmp_path=tmp_path)
+        listed: list[Path] = []
+
+        def list_directory_after_noting_it(*, library_dir: Path, limits: TreeLimits | None = None) -> MethodTree | None:
+            listed.append(library_dir.resolve())
+            return list_library_dir_tree(library_dir=library_dir, limits=limits)
+
+        def list_handed_over_after_noting_it(*, handed_over: Path, limits: TreeLimits | None = None) -> MethodTree:
+            listed.append(handed_over.resolve())
+            return list_local_method_tree(handed_over=handed_over, limits=limits)
+
+        mocker.patch("pipelex.libraries.method_tree_listing.list_library_dir_tree", side_effect=list_directory_after_noting_it)
+        mocker.patch("pipelex.libraries.method_tree_listing.list_local_method_tree", side_effect=list_handed_over_after_noting_it)
+
+        response = client.post(route, json=body)
+
+        assert response.status_code == 200, response.text
+        assert recording_offer.thread_names, "the check never judged the method"
+        assert listed, "the request listed no tree"
+        assert len(listed) == len(set(listed)), listed
 
     def test_a_validation_fetches_an_unshipped_dependency_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path):
         """A tree calling a package nothing shipped resolves as its run would, by a fetch on a miss, in a worker thread."""

@@ -15,6 +15,7 @@ from pipelex.cli.commands.run._run_output_folder import run_output_label
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError, AutoDetectedInputsFileError
 from pipelex.cli.error_handlers import handle_pre_boot_config_error, handle_validate_bundle_error
 from pipelex.hosted.exceptions import HostedRunSourceError
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 
@@ -149,15 +150,17 @@ def run_bundle_cmd(
     run_inputs: str | DetectedInputsFile | None = inputs
     target_path = Path(path)
 
-    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
+    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own. It is listed
+    # once, through the listing the run's load takes it from.
     method_tree: MethodTree
+    tree_listing = MethodTreeListing()
     # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
     # hosted API starts at the same pipe when two domains of the files it is sent define the same code.
     hosted_pipe_code: str | None = pipe
     if target_path.is_dir():
         # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
         try:
-            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
+            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe, tree_listing=tree_listing)
         except ValidateBundleError as exc:
             handle_validate_bundle_error(exc, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None)
         except MethodEntryError as entry_exc:
@@ -197,7 +200,7 @@ def run_bundle_cmd(
     elif is_pipelex_file(target_path):
         bundle_path = path
         try:
-            method_tree = list_bundle_file_tree(bundle_file=target_path)
+            method_tree = list_bundle_file_tree(bundle_file=target_path, tree_listing=tree_listing)
         except ValidateBundleError as exc:
             handle_validate_bundle_error(
                 exc, bundle_path=target_path, library_dirs=[Path(one_dir) for one_dir in library_dir] if library_dir else None
@@ -276,4 +279,5 @@ def run_bundle_cmd(
         dynamic_output_concept_ref=dynamic_output_concept_ref,
         save_csv=save_csv,
         method_tree=method_tree,
+        tree_listing=tree_listing,
     )

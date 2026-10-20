@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from mthds.method_tree.models import MethodTree
 
     from pipelex.libraries.library import Library
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
 
 
 class LibraryManagerAbstract(ABC):
@@ -169,6 +170,7 @@ class LibraryManagerAbstract(ABC):
         blueprints: list[PipelexBundleBlueprint],
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: "MethodTreeListing | None" = None,
     ) -> list[PipeAbstract]:
         """Load the blueprints into the library, resolving their address-based dependencies.
 
@@ -179,6 +181,8 @@ class LibraryManagerAbstract(ABC):
                 for an address-based dependency before the installed stores and fetch-on-miss, and never written
             address_dependency_sources: ``SHIPPED`` searches ``methods_dirs`` alone, reading nothing installed on this host
                 and fetching nothing; ``ANYWHERE`` falls back to the installed stores and fetch-on-miss
+            tree_listing: The run's listing of the method trees it reads, which places a bundle read from a file named
+                alone in the tree the run listed for that file rather than listing it again; None lists it for this load
         """
 
     @abstractmethod
@@ -198,5 +202,17 @@ class LibraryManagerAbstract(ABC):
         library_file_paths: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: "MethodTreeListing | None" = None,
     ) -> list[PipeAbstract]:
-        pass
+        """Load the bundles of the library directories' method trees, and of the bundle files named alone, into the library.
+
+        Args:
+            library_id: The library to load into
+            library_dirs: The library directories, each loaded as its own method tree and the trees nested in it
+            library_file_paths: Bundle files named alone, each loaded as the member of its own file's tree
+            methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone
+            address_dependency_sources: Where a package the bundles call by address may be found
+            tree_listing: The run's listing of the method trees it reads, such as the one a CLI made when it resolved
+                the folder it runs: every tree is taken from it, and listed through it when nobody listed it yet, so
+                the run lists each tree once. None lists the trees for this load alone
+        """

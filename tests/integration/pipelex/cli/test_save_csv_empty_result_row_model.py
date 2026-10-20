@@ -54,6 +54,7 @@ class TestSaveCsvEmptyResultRowModel:
             bundle_path=None,
             mthds_content=_FLAT_ROW_MTHDS,
             library_dir=None,
+            tree_listing=None,
         )
 
         assert flat_field_names(row_model) == ["name", "country"], "The header a zero-row CSV would carry"

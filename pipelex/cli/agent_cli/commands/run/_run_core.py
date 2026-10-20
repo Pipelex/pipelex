@@ -26,6 +26,7 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 if TYPE_CHECKING:
     from mthds.method_tree.models import MethodTree
 
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -56,6 +57,7 @@ async def run_pipeline_core(
     inputs_base_dir: Path | None = None,
     output_dir_override: Path | None = None,
     method_tree: MethodTree | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -79,6 +81,8 @@ async def run_pipeline_core(
             folder run named its pipe and has no entry bundle to write beside.
         method_tree: The method tree the run reads, when the command listed one: its digest is recorded as
             ``method_tree_digest`` beside the run's other side effects, on disk and under ``with_memory``.
+        tree_listing: The listing the command listed ``method_tree`` through, which the run loads its trees from, so
+            the digest recorded is the digest of the tree the run loaded. None lists the trees for the run.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -117,6 +121,7 @@ async def run_pipeline_core(
             pipe_code=pipe_code,
             mthds_contents=mthds_contents,
             inputs=inputs,
+            tree_listing=tree_listing,
         )
     pipe_output = response.pipe_output
 

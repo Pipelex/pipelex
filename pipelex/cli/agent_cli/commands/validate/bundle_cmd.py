@@ -153,7 +153,11 @@ def validate_bundle_cmd(
             # The whole method, every pipe of it, or only the pipe named while the whole tree loads
             result = asyncio.run(
                 validate_method_folder_core(
-                    method_dir=target.method_dir, library_dirs=library_dirs, allow_signatures=allow_signatures, pipe_code=pipe
+                    method_dir=target.method_dir,
+                    library_dirs=library_dirs,
+                    allow_signatures=allow_signatures,
+                    pipe_code=pipe,
+                    tree_listing=target.tree_listing,
                 )
             )
         elif pipe:

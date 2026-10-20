@@ -243,7 +243,15 @@ def tree_bundle_of_lone_file(*, bundle_file: Path, limits: TreeLimits | None = N
     Raises:
         MethodTreeLoadError: The tree could not be listed, or the membership rule keeps the file out of it.
     """
-    tree = list_local_method_tree(handed_over=bundle_file, limits=limits)
+    return lone_file_member(tree=list_local_method_tree(handed_over=bundle_file, limits=limits), bundle_file=bundle_file)
+
+
+def lone_file_member(*, tree: MethodTree, bundle_file: Path) -> TreeBundle:
+    """A bundle file named alone as the member of the tree its listing returned, the entry that listing named for it.
+
+    Raises:
+        MethodTreeLoadError: The listing named no entry for the file: the membership rule keeps it out of its tree.
+    """
     if tree.entry is None:
         msg = f"Listing the method tree of the bundle file '{bundle_file}' named no entry for it."
         raise MethodTreeLoadError(msg).with_params(reason=TreeRefusalCode.LONE_FILE_EXCLUDED)
@@ -448,22 +456,58 @@ def list_library_trees(*, library_dir: Path, limits: TreeLimits | None = None) -
     if not library_dir.exists():
         log.debug(f"A library directory that does not exist was skipped: {library_dir}")
         return []
+    active_limits = limits or local_tree_limits()
+    own_tree = list_library_dir_tree(library_dir=library_dir, limits=active_limits)
+    return library_trees_from(library_dir=library_dir, own_tree=own_tree, limits=active_limits)
+
+
+def list_library_dir_tree(*, library_dir: Path, limits: TreeLimits | None = None) -> MethodTree | None:
+    """The method tree a library directory is rooted in, or None when the membership rule leaves it empty.
+
+    The tree is rooted at the nearest `METHODS.toml` at or above the directory, else at the directory itself, as
+    `list_local_method_tree` roots it, so a successful listing of either is the same tree; a directory a host wrote a
+    tree out as returns the tree as written. An empty tree is no fault here: a library directory may hold nothing but
+    nested methods, which `library_trees_from` finds.
+
+    Args:
+        library_dir: The library directory, which exists.
+        limits: The limits to list the tree under, read from the configuration when not given.
+
+    Raises:
+        MethodTreeLoadError: The standard refused the tree for a reason other than its being empty, it passed a limit,
+            or it could not be read.
+    """
     written = WRITTEN_METHOD_TREES.tree_written_at(directory=library_dir)
     if written is not None:
-        return [written]
-    active_limits = limits or local_tree_limits()
+        return written
     try:
-        tree = list_method_tree(library_dir, limits=active_limits)
+        return list_method_tree(library_dir, limits=limits or local_tree_limits())
     except MethodTreeRefusedError as exc:
         if _is_empty_tree(refusal_error=exc):
-            return _trees_nested_in_empty_directory(directory=library_dir.resolve(), limits=active_limits)
+            return None
         raise MethodTreeLoadError(exc.message) from exc
     except TreeLimitError as exc:
         msg = f"{exc.message} {LIMITS_ADVICE}"
         raise MethodTreeLoadError(msg) from exc
     except TreeSourceError as exc:
         raise MethodTreeLoadError(exc.message) from exc
-    return _library_trees(tree=tree, limits=active_limits)
+
+
+def library_trees_from(*, library_dir: Path, own_tree: MethodTree | None, limits: TreeLimits) -> list[MethodTree]:
+    """The method trees a library directory holds, from the tree it is rooted in, as `list_library_dir_tree` listed it.
+
+    That tree comes first, then the tree of each package and repository nested in it, and theirs, depth first; a tree a
+    host wrote out holds no nested tree. A directory whose own tree is empty (`own_tree` None) holds the trees nested in
+    it.
+
+    Raises:
+        MethodTreeLoadError: A nested tree could not be listed.
+    """
+    if own_tree is None:
+        return _trees_nested_in_empty_directory(directory=library_dir.resolve(), limits=limits)
+    if WRITTEN_METHOD_TREES.holds_tree(tree=own_tree):
+        return [own_tree]
+    return _library_trees(tree=own_tree, limits=limits)
 
 
 class LibraryBundleFile(NamedTuple):

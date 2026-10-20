@@ -17,6 +17,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
 from pipelex.cli.commands.bundle_path_resolver import resolve_build_bundle_target, resolve_bundle_target
 from pipelex.cli.judged_target import JudgedBundleTarget
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.exceptions import MethodEntryError, ValidateBundleError
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
 
@@ -26,7 +27,8 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 _HINT = "  To fix a bundle, pass a .mthds file or directory: pipelex fix bundle <path>"
-_METHOD_TREES_MODULE = "pipelex.libraries.method_trees"
+# The module a command's listing reads this machine's tree limits through.
+_TREE_LISTING_MODULE = "pipelex.libraries.method_tree_listing"
 
 
 def _run_refusal(*, directory: Path) -> str:
@@ -37,7 +39,7 @@ def _run_refusal(*, directory: Path) -> str:
     sentence and whose cause is that same `MethodEntryError`, the one a `build` command reports as it is.
     """
     with pytest.raises((MethodEntryError, ValidateBundleError)) as exc_info:
-        resolve_method_folder_run(directory=directory, pipe_override=None)
+        resolve_method_folder_run(directory=directory, pipe_override=None, tree_listing=MethodTreeListing())
     refusal = exc_info.value
     if isinstance(refusal, ValidateBundleError):
         assert isinstance(refusal.__cause__, MethodEntryError)
@@ -52,7 +54,9 @@ class TestHumanBundlePathResolver:
 
         target = resolve_bundle_target(str(bundle_file), library_dir=None, command="fix", not_a_bundle_hint=_HINT)
 
-        assert target == JudgedBundleTarget(bundle_path=bundle_file, method_dir=None, method_tree=None, library_dirs=None)
+        assert target == JudgedBundleTarget(
+            bundle_path=bundle_file, method_dir=None, method_tree=None, library_dirs=None, tree_listing=target.tree_listing
+        )
         assert target.judged_path == bundle_file
 
     def test_tilde_in_path_is_expanded(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -136,7 +140,7 @@ class TestHumanBundlePathResolver:
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Listing the tree reads its limits from the configuration: a refusal there is no traceback."""
-        mocker.patch(f"{_METHOD_TREES_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        mocker.patch(f"{_TREE_LISTING_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -148,7 +152,7 @@ class TestHumanBundlePathResolver:
     def test_a_build_command_reports_a_configuration_that_does_not_validate_before_the_boot(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        mocker.patch(f"{_METHOD_TREES_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        mocker.patch(f"{_TREE_LISTING_MODULE}.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
         with pytest.raises(typer.Exit) as exc_info:

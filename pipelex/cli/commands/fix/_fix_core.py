@@ -21,6 +21,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.cli.judged_target import fix_judged_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.libraries.method_trees import method_tree_root
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -243,13 +244,15 @@ def _run_fix_preview(
     with tempfile.TemporaryDirectory(prefix="pipelex-fix-preview-") as sandbox_root:
         sandbox = mirror_bundle_for_preview(target.bundle_path, library_dirs=_mirrored_dirs(target=target), sandbox_root=Path(sandbox_root))
         # The target in the sandbox: a method's folder is found inside its tree root's copy, and the directories it
-        # loads with are the copies of the ones it loads with for real, so the copy is spelled as the original is.
+        # loads with are the copies of the ones it loads with for real, so the copy is spelled as the original is. The
+        # copies are other files than those the target's listing listed, so the sandbox's loads list them anew.
         sandbox_target = target._replace(
             bundle_path=sandbox.entry_path,
             method_dir=sandbox.to_copy(original=target.method_dir) if target.method_dir is not None else None,
             library_dirs=[sandbox.to_copy(original=library_dir) for library_dir in target.library_dirs]
             if target.method_dir is not None and target.library_dirs is not None
             else sandbox.library_dirs,
+            tree_listing=MethodTreeListing(),
         )
         result = asyncio.run(
             fix_judged_target(

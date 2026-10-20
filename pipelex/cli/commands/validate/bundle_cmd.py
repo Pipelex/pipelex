@@ -79,4 +79,5 @@ def validate_bundle_cmd(
         telemetry_command_label=f"{COMMAND} bundle",
         allow_signatures=allow_signatures,
         orchestrator=orchestrator,
+        tree_listing=target.tree_listing,
     )

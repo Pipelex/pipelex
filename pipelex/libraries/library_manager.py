@@ -55,16 +55,15 @@ from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.method_requirements import ensure_method_requirements_met, ensure_package_requirements_met
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.libraries.method_trees import (
     LibraryBundleFile,
     LibraryTree,
     library_bundle_files_of,
-    list_library_dir_trees,
     list_package_method_tree,
     listing_identity,
     local_tree_limits,
     submitted_tree_files,
-    tree_bundle_of_lone_file,
     tree_bundles_of,
     tree_python_sources,
 )
@@ -700,6 +699,7 @@ class LibraryManager(LibraryManagerAbstract):
         library_file_paths: list[Path] | None = None,
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: MethodTreeListing | None = None,
     ) -> list[PipeAbstract]:
         # `methods_dirs` are laid out like `.mthds/methods/` and hold the packages a caller ships with the method these
         # directories hold, searched first for an address-based reference of their bundles and never written.
@@ -720,15 +720,16 @@ class LibraryManager(LibraryManagerAbstract):
             all_dirs: list[Path] = []
             all_dirs.extend(library_dirs)
             # Every bundle is read as a member of its method tree: each library directory's tree and the trees nested
-            # in it, then the tree of each file named alone. A file the membership rule keeps out is never read.
-            # This machine's limits are read once for the whole load.
-            tree_limits = local_tree_limits()
-            library_trees = list_library_dir_trees(library_dirs=library_dirs, limits=tree_limits)
+            # in it, then the tree of each file named alone. A file the membership rule keeps out is never read. Each
+            # tree is taken from the run's listing, which lists it, under this machine's limits read once, only when
+            # nobody listed it yet: the tree loaded is the tree the run listed, its digest the one the run records.
+            listing = tree_listing if tree_listing is not None else MethodTreeListing()
+            library_trees = listing.library_dir_trees(library_dirs=library_dirs)
             all_bundle_files: list[LibraryBundleFile] = library_bundle_files_of(library_trees=library_trees)
             for library_file_path in library_file_paths or []:
                 all_bundle_files.append(
                     LibraryBundleFile(
-                        tree_bundle=tree_bundle_of_lone_file(bundle_file=library_file_path, limits=tree_limits),
+                        tree_bundle=listing.lone_file_bundle(bundle_file=library_file_path),
                         path=library_file_path,
                     )
                 )
@@ -810,6 +811,7 @@ class LibraryManager(LibraryManagerAbstract):
                 bundle_files=bundle_files,
                 methods_dirs=methods_dirs,
                 address_dependency_sources=address_dependency_sources,
+                tree_listing=listing,
             )
 
     @override
@@ -1041,6 +1043,7 @@ class LibraryManager(LibraryManagerAbstract):
         blueprints: list[PipelexBundleBlueprint],
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: MethodTreeListing | None = None,
     ) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 
@@ -1055,6 +1058,9 @@ class LibraryManager(LibraryManagerAbstract):
                 package found there is never installed anywhere.
             address_dependency_sources: Whether a reference ``methods_dirs`` do not answer is looked up among the methods
                 installed on this host and fetched on a miss (``ANYWHERE``), or refused (``SHIPPED``).
+            tree_listing: The run's listing of the method trees it reads: a bundle read from a file named alone is placed
+                in the tree the run listed for that file, such as the bundle file a CLI runs, rather than in a second
+                listing of it. None lists such a file's tree for this load alone.
 
         Returns:
             List of all pipes that were loaded
@@ -1063,17 +1069,13 @@ class LibraryManager(LibraryManagerAbstract):
         # (concept resolution, class-registry access) resolve through the ambient current
         # library, so a load into a non-current library must not read the caller's binding.
         with scoped_current_library(library_id=library_id), sharing_module_name_checks():
+            listing = tree_listing if tree_listing is not None else MethodTreeListing()
             # A bundle read from a file on this host that no loader placed in a method tree, such as a bundle file a CLI
-            # names alone, is read as a member of its own file's tree: the steps of every bundle read from this host's
-            # disk read only the files of their tree.
-            unplaced_host_blueprints = [
-                blueprint for blueprint in blueprints if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None
-            ]
-            if unplaced_host_blueprints:
-                tree_limits = local_tree_limits()
-                for blueprint in unplaced_host_blueprints:
-                    if blueprint.host_bundle_file is not None:
-                        blueprint.place_in_tree(tree_bundle=tree_bundle_of_lone_file(bundle_file=blueprint.host_bundle_file, limits=tree_limits))
+            # names alone, is read as a member of its own file's tree, taken from the run's listing: the steps of every
+            # bundle read from this host's disk read only the files of their tree.
+            for blueprint in blueprints:
+                if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None:
+                    blueprint.place_in_tree(tree_bundle=listing.lone_file_bundle(bundle_file=blueprint.host_bundle_file))
             # Every bundle read from this host's disk loads under its tree's requirements.txt, on every load: a blueprint
             # placed by an earlier load, a refused one included, is judged again rather than taken as judged.
             ensure_method_requirements_met(
@@ -1325,6 +1327,7 @@ class LibraryManager(LibraryManagerAbstract):
         bundle_files: list[LibraryBundleFile],
         methods_dirs: list[Path] | None = None,
         address_dependency_sources: AddressDependencySources = AddressDependencySources.ANYWHERE,
+        tree_listing: MethodTreeListing | None = None,
     ) -> list[PipeAbstract]:
         """Load MTHDS files into a specific library.
 
@@ -1338,6 +1341,7 @@ class LibraryManager(LibraryManagerAbstract):
             bundle_files: The bundle files to load, each the member of its method tree
             methods_dirs: Directories laid out like ``.mthds/methods/`` holding packages for this load alone
             address_dependency_sources: Where a package the bundles call by address may be found (``load_libraries``)
+            tree_listing: The listing the bundle files' trees were taken from, which the blueprint load goes on with
         """
         valid_mthds_paths = [bundle_file.path for bundle_file in bundle_files]
         blueprints: list[PipelexBundleBlueprint] = []
@@ -1402,6 +1406,7 @@ class LibraryManager(LibraryManagerAbstract):
                 blueprints=blueprints,
                 methods_dirs=methods_dirs,
                 address_dependency_sources=address_dependency_sources,
+                tree_listing=tree_listing,
             )
         except ValidationError as validation_error:
             # Categorize before wrapping. `translate_to_validate_bundle_error` has its own

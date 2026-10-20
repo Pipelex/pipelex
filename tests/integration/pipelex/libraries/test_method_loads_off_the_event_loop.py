@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents
-from mthds.method_tree.models import MethodTree
+from mthds.method_tree.models import MethodTree, TreeLimits
 from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
@@ -116,17 +116,17 @@ class TestMethodLoadsOffTheEventLoop:
         assert [pipe.code for pipe in result.pipes] == ["echo"]
         assert _all_in_the_method_load_pool(recording_offer.thread_names), recording_offer.thread_names
 
-    async def test_the_in_process_validator_reads_the_tree_entry_for_its_graph_off_the_event_loop(
+    async def test_the_in_process_validator_lists_the_tree_once_off_the_event_loop_and_draws_its_graph_from_it(
         self, mocker: MockerFixture, held_tree: Path, recording_offer: _RecordingOffer
     ) -> None:
-        """Beside the load, the validator lists the tree once more to find the entry pipe its graph draws, off the loop too."""
+        """The validation lists the tree off the loop, and the entry pipe its graph draws is read from that same listing."""
         listing_threads: list[str] = []
 
-        def list_after_noting_the_thread(*, handed_over: Path) -> MethodTree:
+        def list_after_noting_the_thread(*, handed_over: Path, limits: TreeLimits | None = None) -> MethodTree:
             listing_threads.append(threading.current_thread().name)
-            return list_local_method_tree(handed_over=handed_over)
+            return list_local_method_tree(handed_over=handed_over, limits=limits)
 
-        mocker.patch("pipelex.pipeline.validate_in_process.list_local_method_tree", side_effect=list_after_noting_the_thread)
+        mocker.patch("pipelex.libraries.method_tree_listing.list_local_method_tree", side_effect=list_after_noting_the_thread)
 
         report = await validate_bundles_in_process(method_dir=held_tree)
 

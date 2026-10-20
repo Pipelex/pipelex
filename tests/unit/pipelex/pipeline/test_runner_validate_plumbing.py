@@ -99,6 +99,7 @@ class TestRunnerValidatePlumbing:
             submitted_files=submitted_files,
             method_dir=None,
             methods_dirs=None,
+            tree_listing=mocker.ANY,
         )
 
     async def test_no_library_dirs_passes_none_and_strict_default(self, mocker: MockerFixture) -> None:
@@ -118,6 +119,7 @@ class TestRunnerValidatePlumbing:
             submitted_files=None,
             method_dir=None,
             methods_dirs=None,
+            tree_listing=mocker.ANY,
         )
 
     async def test_validation_runs_with_the_protocols_caller_in_scope(self, mocker: MockerFixture) -> None:

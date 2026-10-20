@@ -146,7 +146,7 @@ class TestAgentRunBundleListsTheTreeFirst:
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """`run bundle` lists a bundle file's tree before reading it, so a file past the limits is refused, never read whole."""
-        mocker.patch("pipelex.libraries.method_trees.local_tree_limits", return_value=TreeLimits(max_file_bytes=16))
+        mocker.patch("pipelex.libraries.method_tree_listing.local_tree_limits", return_value=TreeLimits(max_file_bytes=16))
         bundle_file = tmp_path / "run.mthds"
         bundle_file.write_text(_BUNDLE, encoding="utf-8")
 
