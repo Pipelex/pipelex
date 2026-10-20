@@ -56,6 +56,7 @@ from pipelex.cli.installed_methods import PROVENANCE_FILENAME
 from pipelex.config import is_pipe_func_sandbox_hosted
 from pipelex.core.bundle_resources.bundle_resource import SUBMITTED_FILES_FIELD, root_escape_of
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.package_reason import MethodPackageReason
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources, ensure_no_structured_content_python
@@ -63,7 +64,6 @@ from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.method_entry import EntryCandidate, MethodEntry, select_entry
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 from pipelex_api.blob_store import RunnerBlobStore
 from pipelex_api.bundle import decode_bundle_archive
@@ -820,15 +820,15 @@ def written_method(*, request_method: RequestMethod) -> Generator[WrittenMethod,
 
 @asynccontextmanager
 async def written_method_async(*, request_method: RequestMethod) -> AsyncGenerator[WrittenMethod, None]:
-    """`written_method` for asynchronous code: the trees are written, and removed, in a worker thread, off the event loop.
+    """`written_method` for asynchronous code: the trees are written, and removed, in the method-load pool, off the event loop.
 
     The directory is removed and its trees released whatever happens, a refusal while writing, a failure of the block
-    and a cancellation included. `run_in_worker_thread` lets a cancellation through only once its thread has ended, so
-    the removal never runs while the writing is still at work, and a cancellation repeated during the removal waits for
-    it too.
+    and a cancellation included. `run_method_load` lets a cancellation through only once its call has ended, or at once
+    when no thread has taken the call yet, so the removal never runs while the writing is still at work, and a
+    cancellation repeated during the removal waits for it too.
     """
     releases = ExitStack()
     try:
-        yield await run_in_worker_thread(_write_method, request_method=request_method, releases=releases)
+        yield await run_method_load(_write_method, request_method=request_method, releases=releases)
     finally:
-        await run_in_worker_thread(releases.close)
+        await run_method_load(releases.close)

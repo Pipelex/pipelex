@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
@@ -44,7 +45,6 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
 from pipelex.tools.log.error_fields import error_fields
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
@@ -209,7 +209,7 @@ async def _validate_bundles_in_scope(
         )
         validation_report.count_warnings(count=len(warnings))
         # A method tree's entry pipe is read from its files on this host's disk: blocking work, done in a worker thread.
-        graph_target_ref = await run_in_worker_thread(
+        graph_target_ref = await run_method_load(
             _graph_target_ref, graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints
         )
         # The graph arm dry-runs its target once more, and finds again what the sweep found, which `warnings`

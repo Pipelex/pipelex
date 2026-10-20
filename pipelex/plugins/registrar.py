@@ -491,9 +491,9 @@ class PluginRegistrar:
         the pipe_func config and one method's requirements, each time a method declaring requirements loads, never
         here. It answers the offer meeting them, such as an environment built for them, a ``PipeFuncPackageRefusal``
         carrying its reason when no environment of the mode holds them, or ``None`` when it cannot state the offer; a
-        mode with no offer, or a ``None`` answer, meets no requirement. The call is synchronous and made on a worker
-        thread, never on a thread running an event loop, so a factory may block and must not use the event loop; it
-        caches its answers by the requirements. Fail-loud on a duplicate mode, naming both plugins.
+        mode with no offer, or a ``None`` answer, meets no requirement. The call is synchronous and never made on a
+        thread running an event loop, which pipelex enforces, so a factory may block and must not use an event loop of
+        its caller's; it caches its answers by the requirements. Fail-loud on a duplicate mode, naming both plugins.
         """
         self._require_interpreter_layer(capability=f"pipe_func package offer {mode}")
         self._add(

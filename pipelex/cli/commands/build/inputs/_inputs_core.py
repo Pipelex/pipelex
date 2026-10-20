@@ -14,6 +14,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipe_machinery.rendering.input_renderer import InputsTemplateFormat, NoInputsRequiredError, render_inputs, render_inputs_toml
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -23,7 +24,6 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
     save_text_to_path,
@@ -84,7 +84,7 @@ async def _generate_inputs_core(
         effective_dirs, _ = resolve_library_dirs(library_dir)
         if effective_dirs:
             # In a worker thread, off the event loop, as every load reached from asynchronous code.
-            await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
+            await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
         if not pipe_code:
             typer.secho("Failed to build inputs: no pipe code specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)

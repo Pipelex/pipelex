@@ -37,6 +37,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -51,7 +52,6 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
@@ -465,7 +465,7 @@ async def _execute_run(
                 csv_row_model = type(csv_list_content.items[0])
             else:
                 # The reload is a whole library load, opened, read and torn down in a worker thread, off the event loop.
-                csv_row_model = await run_in_worker_thread(
+                csv_row_model = await run_method_load(
                     _resolve_row_model_for_empty_result,
                     concept=csv_main_stuff.concept,
                     bundle_path=bundle_path,

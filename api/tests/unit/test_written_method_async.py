@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 from mthds.method_tree.models import MethodTree
+from pipelex.libraries.method_load_threads import METHOD_LOAD_THREADS
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pytest_mock import MockerFixture
 
@@ -28,24 +29,20 @@ template = "$data"
 _REQUEST_METHOD = RequestMethod(tree=RequestTree.make_from_contents(contents={"main.mthds": _ECHO_MTHDS}), dependencies={})
 
 
-def _runs_an_event_loop() -> bool:
-    """Whether the calling thread is running an event loop."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return False
-    return True
+def _in_the_method_load_pool(thread_name: str) -> bool:
+    """Whether a call ran in a thread of the method-load pool, which runs no event loop."""
+    return thread_name.startswith(METHOD_LOAD_THREADS.name)
 
 
 class _RecordingWrite:
-    """`write_method_tree`, noting each destination and whether its thread runs an event loop, then writing for real.
+    """`write_method_tree`, noting each destination and the thread it ran on, then writing for real.
 
     Once ``hold`` is called, a write signals ``started`` and blocks until ``release`` is set, as a large tree's does.
     """
 
     def __init__(self) -> None:
         self.destinations: list[Path] = []
-        self.writes_on_a_loop: list[bool] = []
+        self.writing_threads: list[str] = []
         self.started = threading.Event()
         self.release = threading.Event()
         self.release.set()
@@ -55,7 +52,7 @@ class _RecordingWrite:
 
     def __call__(self, *, contents: Mapping[str, bytes], destination: Path, expected_digest: str) -> MethodTree:
         self.destinations.append(destination)
-        self.writes_on_a_loop.append(_runs_an_event_loop())
+        self.writing_threads.append(threading.current_thread().name)
         self.started.set()
         if not self.release.wait(timeout=_SIGNAL_TIMEOUT_SECONDS):
             msg = "the held write was never released"
@@ -85,7 +82,8 @@ class TestWrittenMethodAsync:
             assert WRITTEN_METHOD_TREES.tree_written_at(directory=written.method_dir) is written.tree
 
         assert recording_write.destinations == [written.method_dir]
-        assert recording_write.writes_on_a_loop == [False]
+        assert len(recording_write.writing_threads) == 1
+        assert _in_the_method_load_pool(recording_write.writing_threads[0]), recording_write.writing_threads
         _assert_removed_and_released(method_dir=written.method_dir)
 
     async def test_a_failing_block_still_removes_the_tree(self, recording_write: _RecordingWrite) -> None:  # noqa: ARG002
@@ -142,5 +140,6 @@ class TestWrittenMethodAsync:
         with pytest.raises(asyncio.CancelledError):
             await holder
 
-        assert recording_write.writes_on_a_loop == [False]
+        assert len(recording_write.writing_threads) == 1
+        assert _in_the_method_load_pool(recording_write.writing_threads[0]), recording_write.writing_threads
         _assert_removed_and_released(method_dir=method_dir)

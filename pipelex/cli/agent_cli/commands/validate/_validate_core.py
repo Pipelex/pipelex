@@ -14,6 +14,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
@@ -23,7 +24,6 @@ from pipelex.pipeline.tree_files_read import tree_files_envelope_fields
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -249,7 +249,7 @@ async def validate_pipe_core(
                 # A refusal of the libraries while loading them is the invalid verdict, through the shared
                 # bundle-loading cascade, as on `validate bundle`. The load runs in a worker thread, off the event loop.
                 with translate_to_validate_bundle_error():
-                    await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
+                    await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
             # The entry-pipe lookup stays outside the cascade: a code naming no pipe is no verdict. A pipe whose
             # dry run fails is the invalid verdict, one located dry_run item per failing pipe, as on `validate bundle`.

@@ -43,6 +43,7 @@ from pipelex.interpreter_hub import (
 )
 from pipelex.kernel.memory_ops import shape_inputs
 from pipelex.libraries.bundle_resources import check_submitted_files
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.pipe.pipe_suggestions import declared_pipe_refs
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
@@ -63,7 +64,6 @@ from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
-from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ async def acquire_library_async(
     """
     _ensure_submitted_files_accompany_contents(mthds_contents=mthds_contents, submitted_files=submitted_files)
     with _acquiring_library(library_id=library_id) as acquired_id:
-        qualified_main_pipe = await run_in_worker_thread(
+        qualified_main_pipe = await run_method_load(
             _load_acquired_library,
             library_id=acquired_id,
             library_dirs=library_dirs,

@@ -3820,6 +3820,10 @@ rationale = "Verb-object: scans the given dirs; single operand."
 param = "traversable"
 rationale = "Nested helper: scans the traversable; single operand."
 
+["pipelex/libraries/method_load_threads.py::run_method_load"]
+param = "func"
+rationale = "Verb-object: runs the given load callable in the method-load pool, forwarding its own arguments as asyncio.to_thread does; positional-only, so no keyword of the callable is shadowed."
+
 ["pipelex/libraries/pipe/pipe_library.py::PipeLibrary.pretty_list_pipes._format_concept_code"]
 param = "concept_code"
 rationale = "Nested helper: formats the concept code; single operand."
@@ -5832,6 +5836,10 @@ rationale = "Jinja op on the mermaid_code; single operand (context keyword-only)
 param = "node_id"
 rationale = "Transforms the node_id; single operand."
 
+["pipelex/tools/misc/async_utils.py::WorkerThreads.run"]
+param = "func"
+rationale = "Verb-object: runs the given callable in one of the pool's threads, forwarding its own arguments as asyncio.to_thread does; positional-only, so no keyword of the callable is shadowed."
+
 ["pipelex/tools/misc/async_utils.py::_invoke"]
 param = "factory"
 rationale = "Operates on the factory; single operand (qualifiers keyword-only)."
@@ -5839,10 +5847,6 @@ rationale = "Operates on the factory; single operand (qualifiers keyword-only)."
 ["pipelex/tools/misc/async_utils.py::gather_bounded"]
 param = "task_factories"
 rationale = "Operates on the task_factories; single operand (qualifiers keyword-only)."
-
-["pipelex/tools/misc/async_utils.py::run_in_worker_thread"]
-param = "func"
-rationale = "Verb-object: runs the given callable in a worker thread, forwarding its own arguments as asyncio.to_thread does; positional-only, so no keyword of the callable is shadowed."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher._looks_like_base64"]
 param = "value"

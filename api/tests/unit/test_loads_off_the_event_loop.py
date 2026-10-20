@@ -1,4 +1,4 @@
-import asyncio
+import threading
 from collections.abc import Generator, Mapping
 from pathlib import Path
 from typing import Any
@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from mthds.method_tree.models import MethodTree
 from mthds.protocol.problem.registry import CoreCode
 from pipelex.config import get_config
+from pipelex.libraries.method_load_threads import METHOD_LOAD_THREADS
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
 from pipelex.methods.exceptions import MethodFetchError
 from pipelex.methods.fetching import FetchedMethodPackage
@@ -48,23 +49,19 @@ _TREE_WITH_REQUIREMENTS = {
 }
 
 
-def _runs_an_event_loop() -> bool:
-    """Whether the calling thread is running an event loop."""
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return False
-    return True
+def _in_the_method_load_pool(thread_name: str) -> bool:
+    """Whether a call ran in a thread of the method-load pool, which runs no event loop."""
+    return thread_name.startswith(METHOD_LOAD_THREADS.name)
 
 
 class _RecordingOffer:
     """The package-offer factory of the neutral `sandbox` mode, noting, at each call, whether its thread runs an event loop."""
 
     def __init__(self) -> None:
-        self.calls_on_a_loop: list[bool] = []
+        self.thread_names: list[str] = []
 
     def __call__(self, request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:  # noqa: ARG002
-        self.calls_on_a_loop.append(_runs_an_event_loop())
+        self.thread_names.append(threading.current_thread().name)
         return PipeFuncPackageOffer(
             environment="the sandbox under test",
             distributions={"pandas": "2.2.3"},
@@ -114,10 +111,10 @@ class TestLoadsOffTheEventLoop:
     ):
         """The tree a request sends is written to disk in a worker thread, and its directory is gone once the route answers."""
         client = _build_client(mocker, tmp_path=tmp_path)
-        writes: list[tuple[Path, bool]] = []
+        writes: list[tuple[Path, str]] = []
 
         def write_after_noting_the_thread(*, contents: Mapping[str, bytes], destination: Path, expected_digest: str) -> MethodTree:
-            writes.append((destination, _runs_an_event_loop()))
+            writes.append((destination, threading.current_thread().name))
             return write_method_tree(contents=contents, destination=destination, expected_digest=expected_digest)
 
         mocker.patch("pipelex_api.method_tree_request.write_method_tree", side_effect=write_after_noting_the_thread)
@@ -125,8 +122,8 @@ class TestLoadsOffTheEventLoop:
         response = client.post(route, json=body)
 
         assert response.status_code == 200, response.text
-        ((method_dir, written_on_a_loop),) = writes
-        assert written_on_a_loop is False
+        ((method_dir, writing_thread),) = writes
+        assert _in_the_method_load_pool(writing_thread), writing_thread
         assert not method_dir.parent.exists()
         assert WRITTEN_METHOD_TREES.tree_written_at(directory=method_dir) is None
 
@@ -138,8 +135,8 @@ class TestLoadsOffTheEventLoop:
 
         assert response.status_code == 200, response.text
         assert response.json()["is_valid"] is True, response.text
-        assert len(recording_offer.calls_on_a_loop) > 1, recording_offer.calls_on_a_loop
-        assert True not in recording_offer.calls_on_a_loop
+        assert len(recording_offer.thread_names) > 1, recording_offer.thread_names
+        assert all(_in_the_method_load_pool(thread_name) for thread_name in recording_offer.thread_names), recording_offer.thread_names
 
     def test_a_run_asks_the_package_offer_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path, recording_offer: _RecordingOffer):
         """The runner's check of the served method asks the factory first, then the run's own load does."""
@@ -148,17 +145,17 @@ class TestLoadsOffTheEventLoop:
         response = client.post("/v1/execute", json={"files": _TREE_WITH_REQUIREMENTS, "inputs": {"data": "hello"}})
 
         assert response.status_code == 200, response.text
-        assert len(recording_offer.calls_on_a_loop) > 1, recording_offer.calls_on_a_loop
-        assert True not in recording_offer.calls_on_a_loop
+        assert len(recording_offer.thread_names) > 1, recording_offer.thread_names
+        assert all(_in_the_method_load_pool(thread_name) for thread_name in recording_offer.thread_names), recording_offer.thread_names
 
     def test_a_validation_fetches_an_unshipped_dependency_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path):
         """A tree calling a package nothing shipped resolves as its run would, by a fetch on a miss, in a worker thread."""
         client = _build_client(mocker, tmp_path=tmp_path)
         mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
-        fetches_on_a_loop: list[bool] = []
+        fetching_threads: list[str] = []
 
         def fail_the_fetch_after_noting_the_thread(*, ref: MethodRef, dest_dir: Path, refuse_structures: bool) -> FetchedMethodPackage:  # noqa: ARG001
-            fetches_on_a_loop.append(_runs_an_event_loop())
+            fetching_threads.append(threading.current_thread().name)
             msg = "The clone failed."
             raise MethodFetchError(msg).for_method_ref(method_ref=ref.ref_str)
 
@@ -173,4 +170,5 @@ class TestLoadsOffTheEventLoop:
         assert [(item["code"], item["params"]["name"]) for item in verdict["errors"]] == [
             (CoreCode.METHOD_DEPENDENCY_MISSING, VENDORED_PROBE_ADDRESS)
         ], verdict
-        assert fetches_on_a_loop == [False]
+        assert len(fetching_threads) == 1
+        assert _in_the_method_load_pool(fetching_threads[0]), fetching_threads
