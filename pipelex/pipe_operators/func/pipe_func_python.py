@@ -5,9 +5,11 @@ A `function_name` is an import path from an import root, which is one of three p
 - **The method tree** the step's bundle was read as a member of, on this host's disk (`mthds/docs/spec/method-tree.md`,
   "Python Modules"). The module is located among the tree's files with `mthds`' `locate_function`, and imported under
   the process's hold on the tree's Python (`pipelex.core.method_trees.tree_python`).
-- **The Python submitted with a bundle parsed from a content string**, which a sandbox-hosted deployment captures from
-  its library directories and sends to the sandbox with the call. Nothing imports it in this process: the step is
-  validated from the captured text.
+- **The Python submitted with a bundle parsed from a content string**, on a sandbox-hosted deployment: the files
+  submitted with the content strings and those of a library directory holding no bundle make one tree the library
+  assembles, at whose root the bundle sits. Nothing imports them in this process: the step is validated from the text
+  of the tree's Python, read from the local method file store, and a call names the tree by its digest, for whoever
+  runs the call to read its files through the method file store and hand them to the sandbox.
 - **This process's own import path**, for a bundle parsed from a content string in `direct` mode, such as a bundle a
   program builds in memory beside its own modules. The module is located through the import system's finders without
   importing it, then imported as any module of the program is.

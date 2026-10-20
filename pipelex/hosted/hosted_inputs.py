@@ -260,8 +260,8 @@ def _address_dependency_refusal(*, refusal: ApiResponseError) -> HostedLocalFile
     An in-memory resolution answers that refusal with its problem, coded `request.unsupported` and giving the reason
     `ADDRESS_DEPENDENCY_UNSUPPORTED_REASON`: the request is what it cannot serve, not the method, which the run route
     fetches the dependency of. The tree resolution behind pipe-io answers a call into a package nothing shipped with its
-    invalid verdict instead (`_unshipped_dependency_refusal`). The refusal's own advice, to send the dependency's contents, is meant for the API's
-    callers, so the error leaves it out.
+    invalid verdict instead (`_unshipped_dependency_refusal`). The refusal's own advice, to send the package's files in
+    `dependencies`, is meant for the API's callers, so the error leaves it out.
 
     The error does not name the dependency, because the problem does not carry it: `request.unsupported` declares only
     `field` and `reason`, and the sentence naming the dependency's address is the server's message, which reaches its
@@ -283,7 +283,7 @@ def _unshipped_dependency_refusal(*, report: CrateInvalidReport) -> HostedLocalF
     nothing shipped with its invalid verdict, whose item is coded `method.dependency_missing` with the `kind` `package`,
     the `reason` `not_found` and the package's address as its `name`. The run route fetches such a dependency, so the method is not at fault. The
     error names the dependency from the item's code and parameters, never from its message, and leaves out the
-    verdict's advice, to send the dependency's contents, which is meant for the API's callers.
+    verdict's advice, to send the package's files in `dependencies`, which is meant for the API's callers.
     """
     package = _missing_package(report=report)
     if package is None:
