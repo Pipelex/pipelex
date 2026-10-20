@@ -109,7 +109,9 @@ class TestLoadsOffTheEventLoop:
             ("/v1/execute", {"files": {"main.mthds": _ECHO_MTHDS}, "inputs": {"data": "hello"}}),
         ],
     )
-    def test_the_request_tree_is_written_off_the_event_loop_and_removed(self, mocker: MockerFixture, tmp_path: Path, route: str, body: dict[str, Any]):
+    def test_the_request_tree_is_written_off_the_event_loop_and_removed(
+        self, mocker: MockerFixture, tmp_path: Path, route: str, body: dict[str, Any]
+    ):
         """The tree a request sends is written to disk in a worker thread, and its directory is gone once the route answers."""
         client = _build_client(mocker, tmp_path=tmp_path)
         writes: list[tuple[Path, bool]] = []

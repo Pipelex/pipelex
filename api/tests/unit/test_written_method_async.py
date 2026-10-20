@@ -90,11 +90,15 @@ class TestWrittenMethodAsync:
 
     async def test_a_failing_block_still_removes_the_tree(self, recording_write: _RecordingWrite) -> None:  # noqa: ARG002
         method_dirs: list[Path] = []
-        with pytest.raises(ValueError, match="the block failed"):
+
+        async def fail_inside_the_block() -> None:
             async with written_method_async(request_method=_REQUEST_METHOD) as written:
                 method_dirs.append(written.method_dir)
                 msg = "the block failed"
                 raise ValueError(msg)
+
+        with pytest.raises(ValueError, match="the block failed"):
+            await fail_inside_the_block()
 
         (method_dir,) = method_dirs
         _assert_removed_and_released(method_dir=method_dir)
