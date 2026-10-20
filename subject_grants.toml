@@ -4396,6 +4396,10 @@ rationale = "Projects the sweep's per-pipe status map into warning items; reads 
 param = "library_id"
 rationale = "Verb-object: acquires the library named by the id; single operand."
 
+["pipelex/pipeline/execution_seams.py::acquire_library_async"]
+param = "library_id"
+rationale = "Verb-object: acquires the library named by the id; single operand, the same call shape as acquire_library."
+
 ["pipelex/pipeline/execution_seams.py::load_libraries_and_activate"]
 param = "library_dirs"
 rationale = "Verb-object: loads the given library dirs; options stay keyword."
@@ -5835,6 +5839,10 @@ rationale = "Operates on the factory; single operand (qualifiers keyword-only)."
 ["pipelex/tools/misc/async_utils.py::gather_bounded"]
 param = "task_factories"
 rationale = "Operates on the task_factories; single operand (qualifiers keyword-only)."
+
+["pipelex/tools/misc/async_utils.py::run_in_worker_thread"]
+param = "func"
+rationale = "Verb-object: runs the given callable in a worker thread, forwarding its own arguments as asyncio.to_thread does; positional-only, so no keyword of the callable is shadowed."
 
 ["pipelex/tools/misc/attribute_utils.py::AttributePolisher._looks_like_base64"]
 param = "value"

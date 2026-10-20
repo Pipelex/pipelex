@@ -13,6 +13,7 @@ from pipelex.pipe_machinery.rendering.input_renderer import build_concept_commen
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -77,7 +78,8 @@ async def build_inputs_for_pipe(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dirs)
         if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            # In a worker thread, off the event loop, as every load reached from asynchronous code.
+            await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
     if not pipe_code:
         msg = "No pipe code specified"

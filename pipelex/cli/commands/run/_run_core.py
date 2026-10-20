@@ -51,6 +51,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsMethodSource
 from pipelex.system.usage_stats.usage_stats_runs import method_source_scope
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.exceptions import JsonTypeError, TomlError
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.package_utils import get_package_version
@@ -463,7 +464,9 @@ async def _execute_run(
             if csv_list_content.items:
                 csv_row_model = type(csv_list_content.items[0])
             else:
-                csv_row_model = _resolve_row_model_for_empty_result(
+                # The reload is a whole library load, opened, read and torn down in a worker thread, off the event loop.
+                csv_row_model = await run_in_worker_thread(
+                    _resolve_row_model_for_empty_result,
                     concept=csv_main_stuff.concept,
                     bundle_path=bundle_path,
                     mthds_content=mthds_content,

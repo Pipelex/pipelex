@@ -11,7 +11,8 @@ Two pure-ish building blocks composed by both the single-run wrapper
   bundle while it loads is the ``ValidateBundleError`` verdict, as on the
   validate path. Returns the ``library_id`` plus the bundle's qualified
   ``main_pipe`` (when an ``mthds_contents`` bundle declares one), leaving pipe
-  resolution to the caller.
+  resolution to the caller. :func:`acquire_library_async` is its twin for
+  asynchronous code, which loads in a worker thread, never on the event loop.
 - :func:`prepare_pipe_job` — build a :class:`PipeJob` against an already-open
   library: working memory (user inputs, mock inputs, file-input preparation),
   run params, job metadata, and the library crate. **Pure**: no pipeline-manager
@@ -19,8 +20,8 @@ Two pure-ish building blocks composed by both the single-run wrapper
   library mutation.
 """
 
-from collections.abc import Mapping, Sequence
-from contextlib import AbstractContextManager, nullcontext
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -62,6 +63,7 @@ from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import validate_read_scope, validate_storage_scope, validate_storage_scope_within_read_scope
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.file_utils import reject_bare_str_or_path
 
 if TYPE_CHECKING:
@@ -139,10 +141,75 @@ def acquire_library(
     Returns the ``library_id`` and the bundle's qualified ``main_pipe`` ref
     (``domain.pipe_code``) when an ``mthds_contents`` bundle declares one, else
     ``None``. Pipe resolution is the caller's responsibility.
+
+    The load runs on the calling thread, so asynchronous code calls :func:`acquire_library_async` instead.
     """
+    _ensure_submitted_files_accompany_contents(mthds_contents=mthds_contents, submitted_files=submitted_files)
+    with _acquiring_library(library_id=library_id) as acquired_id:
+        qualified_main_pipe = _load_acquired_library(
+            library_id=acquired_id,
+            library_dirs=library_dirs,
+            mthds_contents=mthds_contents,
+            bundle_uris=bundle_uris,
+            library_dirs_are_callers=library_dirs_are_callers,
+            methods_dirs=methods_dirs,
+            submitted_files=submitted_files,
+        )
+    return acquired_id, qualified_main_pipe
+
+
+async def acquire_library_async(
+    library_id: str,
+    *,
+    library_dirs: list[str] | None = None,
+    mthds_contents: list[str] | None = None,
+    bundle_uris: list[str] | None = None,
+    library_dirs_are_callers: bool = False,
+    methods_dirs: list[Path] | None = None,
+    submitted_files: Mapping[str, bytes] | None = None,
+) -> tuple[str, str | None]:
+    """:func:`acquire_library` for asynchronous code: the same library, loaded in a worker thread, off the event loop.
+
+    A load is blocking work that can take long: it reads and hashes the method's files, judges its ``requirements.txt``
+    through the package-offer factory of the deployment's PipeFunc sandbox, which may resolve the requirements, and
+    reads the methods installed on this host or fetches a package the bundles call by address. On the event loop, it
+    would hold up every other request or activity it serves for as long as it takes.
+
+    The library is opened and made current here, in the caller's context, where it stays current on success, and the
+    loads run in the worker thread, which reads that binding from its copy of the context. Their refusals are translated
+    there, while the library is still open and current, as :func:`acquire_library` translates them. On a failure, a
+    cancellation included, the caller's outer current library is restored and the library torn down, once the worker
+    thread has ended.
+    """
+    _ensure_submitted_files_accompany_contents(mthds_contents=mthds_contents, submitted_files=submitted_files)
+    with _acquiring_library(library_id=library_id) as acquired_id:
+        qualified_main_pipe = await run_in_worker_thread(
+            _load_acquired_library,
+            library_id=acquired_id,
+            library_dirs=library_dirs,
+            mthds_contents=mthds_contents,
+            bundle_uris=bundle_uris,
+            library_dirs_are_callers=library_dirs_are_callers,
+            methods_dirs=methods_dirs,
+            submitted_files=submitted_files,
+        )
+    return acquired_id, qualified_main_pipe
+
+
+def _ensure_submitted_files_accompany_contents(*, mthds_contents: list[str] | None, submitted_files: Mapping[str, bytes] | None) -> None:
     if submitted_files and not mthds_contents:
         msg = "submitted_files accompany mthds_contents: a bundle loaded from a directory reads the files of its method tree"
         raise PipelexUnexpectedError(msg)
+
+
+@contextmanager
+def _acquiring_library(*, library_id: str) -> Generator[str, None, None]:
+    """Open the library and make it current for the block, which loads it; on any failure, restore and tear it down.
+
+    Yields the id the library was opened under. A failure of the block, ``BaseException`` such as
+    ``asyncio.CancelledError`` included, restores the caller's outer current library and tears the library down before
+    it propagates, so a failed load never leaks a ``Library``. On success the library is left open and current.
+    """
     library_manager = get_library_manager()
     prev_library_id = get_current_library_id_or_none()
     # Adopt the canonical id open_library keyed the Library under: when given a falsy library_id it
@@ -152,76 +219,8 @@ def acquire_library(
     success = False
     try:
         set_current_library(library_id=library_id)
-
-        effective_dirs, source_label = resolve_library_dirs(library_dirs)
-        if effective_dirs:
-            effective_dirs_desc = ", ".join(str(dir_path) for dir_path in effective_dirs)
-            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}): {effective_dirs_desc}")
-            # The caller's directories refuse as their invalid bundle; a host's report a tree it cannot list, or a method
-            # that refuses to load, as its own fault.
-            library_dirs_translation: AbstractContextManager[None] = (
-                translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_faults()
-            )
-            with library_dirs_translation:
-                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, methods_dirs=methods_dirs)
-        else:
-            log.verbose(f"No library directories to load ({source_label})")
-
-        qualified_main_pipe: str | None = None
-        if mthds_contents:
-            # Beside a host's library directories, the verdict names none of their files, which are paths on the host.
-            host_library_withholding: AbstractContextManager[None] = (
-                nullcontext()
-                if library_dirs_are_callers
-                else withholding_host_library_files(library_dirs=effective_dirs, caller_contents=mthds_contents)
-            )
-            with host_library_withholding, translate_to_validate_bundle_error():
-                # The file on this host each content was read from, where the caller names one that exists: that bundle
-                # is the file's, whose steps find the files they name in its method tree. Every other content belongs to
-                # no tree, and its steps read only the files submitted with it, so its blueprint validates under that rule.
-                resolved_uris = _resolved_bundle_uris(bundle_uris=bundle_uris or [])
-                host_bundle_files: list[Path | None] = [uri if uri.is_file() else None for uri in resolved_uris] or [None] * len(mthds_contents)
-                all_blueprints = [
-                    MthdsParser.make_pipelex_bundle_blueprint(
-                        mthds_content=content,
-                        file_origin=BundleFileOrigin.SUBMITTED_FILES if host_bundle_file is None else BundleFileOrigin.METHOD_TREE,
-                    )
-                    for content, host_bundle_file in zip(mthds_contents, host_bundle_files, strict=True)
-                ]
-                if submitted_files:
-                    check_submitted_files(blueprints=all_blueprints, submitted_files=submitted_files)
-                    library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
-                if not library_dirs_are_callers:
-                    # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
-                    library_manager.get_library(library_id=library_id).pipe_library.set_caller_pipe_refs(
-                        pipe_refs=declared_pipe_refs(blueprints=all_blueprints)
-                    )
-
-                # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH), and record the file on this
-                # host each of the others was read from, so its steps read beside it as when its directory loads.
-                blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
-                if bundle_uris:
-                    current_library = library_manager.get_library(library_id=library_id)
-                    blueprints_to_load = []
-                    for blueprint, uri, resolved_uri, host_bundle_file in zip(
-                        all_blueprints, bundle_uris, resolved_uris, host_bundle_files, strict=True
-                    ):
-                        if resolved_uri in current_library.loaded_mthds_paths:
-                            log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
-                        else:
-                            if host_bundle_file is not None:
-                                blueprint.mark_read_from_host_file(bundle_file=host_bundle_file)
-                            blueprints_to_load.append(blueprint)
-
-                if blueprints_to_load:
-                    library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load, methods_dirs=methods_dirs)
-
-            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
-            # the same code — via the one shared selection rule (first declaring main_pipe, else first).
-            qualified_main_pipe = select_primary_blueprint(all_blueprints).main_pipe_ref
-
+        yield library_id
         success = True
-        return library_id, qualified_main_pipe
     finally:
         if not success:
             # Restore the caller's outer current-library FIRST so the safety guarantee holds even when
@@ -231,6 +230,87 @@ def acquire_library(
             else:
                 clear_current_library()
             library_manager.teardown(library_id=library_id)
+
+
+def _load_acquired_library(
+    *,
+    library_id: str,
+    library_dirs: list[str] | None,
+    mthds_contents: list[str] | None,
+    bundle_uris: list[str] | None,
+    library_dirs_are_callers: bool,
+    methods_dirs: list[Path] | None,
+    submitted_files: Mapping[str, bytes] | None,
+) -> str | None:
+    """Load the directories and the contents into the library :func:`acquire_library` opened and made current.
+
+    Blocking work, run on the calling thread by :func:`acquire_library` and in a worker thread by
+    :func:`acquire_library_async`. Returns the bundle's qualified ``main_pipe``, or ``None``.
+    """
+    library_manager = get_library_manager()
+    effective_dirs, source_label = resolve_library_dirs(library_dirs)
+    if effective_dirs:
+        effective_dirs_desc = ", ".join(str(dir_path) for dir_path in effective_dirs)
+        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}): {effective_dirs_desc}")
+        # The caller's directories refuse as their invalid bundle; a host's report a tree it cannot list, or a method
+        # that refuses to load, as its own fault.
+        library_dirs_translation: AbstractContextManager[None] = (
+            translate_to_validate_bundle_error() if library_dirs_are_callers else reporting_host_library_faults()
+        )
+        with library_dirs_translation:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs, methods_dirs=methods_dirs)
+    else:
+        log.verbose(f"No library directories to load ({source_label})")
+
+    qualified_main_pipe: str | None = None
+    if mthds_contents:
+        # Beside a host's library directories, the verdict names none of their files, which are paths on the host.
+        host_library_withholding: AbstractContextManager[None] = (
+            nullcontext() if library_dirs_are_callers else withholding_host_library_files(library_dirs=effective_dirs, caller_contents=mthds_contents)
+        )
+        with host_library_withholding, translate_to_validate_bundle_error():
+            # The file on this host each content was read from, where the caller names one that exists: that bundle
+            # is the file's, whose steps find the files they name in its method tree. Every other content belongs to
+            # no tree, and its steps read only the files submitted with it, so its blueprint validates under that rule.
+            resolved_uris = _resolved_bundle_uris(bundle_uris=bundle_uris or [])
+            host_bundle_files: list[Path | None] = [uri if uri.is_file() else None for uri in resolved_uris] or [None] * len(mthds_contents)
+            all_blueprints = [
+                MthdsParser.make_pipelex_bundle_blueprint(
+                    mthds_content=content,
+                    file_origin=BundleFileOrigin.SUBMITTED_FILES if host_bundle_file is None else BundleFileOrigin.METHOD_TREE,
+                )
+                for content, host_bundle_file in zip(mthds_contents, host_bundle_files, strict=True)
+            ]
+            if submitted_files:
+                check_submitted_files(blueprints=all_blueprints, submitted_files=submitted_files)
+                library_manager.add_submitted_files(library_id=library_id, submitted_files=submitted_files)
+            if not library_dirs_are_callers:
+                # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
+                library_manager.get_library(library_id=library_id).pipe_library.set_caller_pipe_refs(
+                    pipe_refs=declared_pipe_refs(blueprints=all_blueprints)
+                )
+
+            # Filter out blueprints whose URIs are already loaded (e.g. via PIPELEXPATH), and record the file on this
+            # host each of the others was read from, so its steps read beside it as when its directory loads.
+            blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
+            if bundle_uris:
+                current_library = library_manager.get_library(library_id=library_id)
+                blueprints_to_load = []
+                for blueprint, uri, resolved_uri, host_bundle_file in zip(all_blueprints, bundle_uris, resolved_uris, host_bundle_files, strict=True):
+                    if resolved_uri in current_library.loaded_mthds_paths:
+                        log.verbose(f"Bundle '{uri}' was skipped, already loaded from library directories")
+                    else:
+                        if host_bundle_file is not None:
+                            blueprint.mark_read_from_host_file(bundle_file=host_bundle_file)
+                        blueprints_to_load.append(blueprint)
+
+            if blueprints_to_load:
+                library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load, methods_dirs=methods_dirs)
+
+        # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with
+        # the same code — via the one shared selection rule (first declaring main_pipe, else first).
+        qualified_main_pipe = select_primary_blueprint(all_blueprints).main_pipe_ref
+    return qualified_main_pipe
 
 
 def load_libraries_and_activate(library_dirs: Sequence[str | Path] | None = None) -> str:

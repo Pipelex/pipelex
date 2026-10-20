@@ -1,8 +1,36 @@
 import asyncio
+import contextlib
 from collections.abc import Awaitable, Callable, Sequence
-from typing import TypeVar, cast
+from typing import ParamSpec, TypeVar, cast
 
 _T = TypeVar("_T")
+_P = ParamSpec("_P")
+
+
+async def run_in_worker_thread(func: Callable[_P, _T], /, *args: _P.args, **kwargs: _P.kwargs) -> _T:
+    """Run a blocking call in a worker thread and return its result, so the event loop serves other work meanwhile.
+
+    The call runs as ``asyncio.to_thread`` runs it, in a copy of the caller's context, so it reads the caller's context
+    variables, such as the current library, the caller's identity or the log context. What the call sets in them stays
+    in that copy: a binding the caller reads afterwards is one the caller makes itself.
+
+    A thread cannot be interrupted, so when the awaiting task is cancelled the call still runs to its end, and this
+    waits for that end before letting the cancellation through. The caller's own cleanup, such as tearing down the
+    library the call was loading into, therefore never runs while the call is still writing into what it cleans up.
+    The call's result or error is then dropped, since no caller is left to take it.
+    """
+    worker = asyncio.ensure_future(asyncio.to_thread(func, *args, **kwargs))
+    try:
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        while not worker.done():
+            # A cancellation repeated while the call ends changes nothing: the call cannot be stopped either way.
+            with contextlib.suppress(asyncio.CancelledError):
+                await asyncio.wait({worker})
+        if not worker.cancelled():
+            # Retrieving the dropped error keeps asyncio from logging it as never retrieved.
+            worker.exception()
+        raise
 
 
 async def _invoke(factory: Callable[[], Awaitable[_T]]) -> _T:

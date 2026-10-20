@@ -65,7 +65,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.exceptions import withhold_names_in_text
-from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
+from pipelex.pipeline.execution_seams import acquire_library_async, prepare_pipe_job
 from pipelex.pipeline.pipeline_factory import PipelineFactory
 from pipelex.pipeline.validate_bundle_translation import HOST_LIBRARY_FILE_PLACEHOLDER
 from pipelex.runtime_hub import get_telemetry_manager, scoped_content_generator
@@ -286,14 +286,15 @@ class BundleValidator:
         CLIs) own their library and use :meth:`validate_pipes` instead.
         """
         prev_library_id = get_current_library_id_or_none()
-        acquired_id, _ = acquire_library(
+        # Loaded in a worker thread, off the event loop, and left current in this context for the sweep.
+        acquired_id, _ = await acquire_library_async(
             library_id=library_id,
             library_dirs=library_dirs,
             mthds_contents=mthds_contents,
             bundle_uris=bundle_uris,
         )
         try:
-            # acquire_library left the freshly-acquired library current, so the inner sweep over the
+            # acquire_library_async left the freshly-acquired library current, so the inner sweep over the
             # current library targets exactly acquired_id (it filters signatures in strict mode itself).
             return await self.validate_current_library(allow_signatures=allow_signatures, caller_identity=caller_identity)
         finally:

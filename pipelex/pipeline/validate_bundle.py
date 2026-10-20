@@ -1,5 +1,4 @@
 import ast
-import asyncio
 from collections.abc import Mapping
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
@@ -41,6 +40,7 @@ from pipelex.pipeline.validate_bundle_translation import (
     withholding_host_library_files,
 )
 from pipelex.system.caller_identity import CallerIdentity
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 
 PYTHON_SUFFIX = ".py"
 
@@ -172,6 +172,13 @@ async def validate_bundle(
     ``collect_dry_run_warnings`` is for a caller that puts what the dry runs find without failing in a
     verdict of its own, as the validate surfaces do (see ``BundleValidator.validate_pipes``); any other
     caller, a fix loop or a builder, leaves it ``False`` and the dry runs log what they find.
+
+    **Every load runs in a worker thread, never on the event loop.** A load is blocking work that can take long: it
+    lists and hashes the method's files, judges a ``requirements.txt`` through the package-offer factory of the
+    deployment's PipeFunc sandbox, which may resolve the requirements, and resolves a package the bundles call by its
+    address as a run does, among the packages shipped in ``methods_dirs``, then the methods installed on this host,
+    then by a fetch on a miss when fetch-on-miss is on. The library is opened and made current here, in the caller's
+    context, and each load reads that binding from the worker thread's copy of it; the dry runs stay on the loop.
     """
     provided_params = sum(
         [
@@ -225,7 +232,6 @@ async def validate_bundle(
         set_current_library(library_id=library_id)
 
         if method_dir is not None:
-            await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
             result = await _validate_method_dir(
                 method_dir=method_dir,
                 methods_dirs=methods_dirs,
@@ -260,15 +266,13 @@ async def validate_bundle(
         else:
             host_library_withholding = nullcontext()
             host_library_tree_faults = nullcontext()
-        await asyncio.sleep(0)  # Yield to event loop (keeps function async-compatible)
+        # Every load below runs in a worker thread, off the event loop (see `validate_bundle`), its refusals translated
+        # here, while the library is still open and current.
         with host_library_withholding, translate_to_validate_bundle_error():
             if effective_dirs:
                 log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
                 with host_library_tree_faults:
-                    library_manager.load_libraries(
-                        library_id=library_id,
-                        library_dirs=effective_dirs,
-                    )
+                    await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
             else:
                 log.verbose(f"No library directories to load ({source_label})")
             if mthds_contents is not None:
@@ -286,7 +290,7 @@ async def validate_bundle(
                 if not library_dirs_are_callers:
                     # A refusal the caller reads offers the pipes of the bundles it sent, never the host's.
                     library.pipe_library.set_caller_pipe_refs(pipe_refs=declared_pipe_refs(blueprints=loaded_blueprints))
-                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
+                loaded_pipes = await run_in_worker_thread(library_manager.load_from_blueprints, library_id=library_id, blueprints=loaded_blueprints)
                 dry_run_results = await BundleValidator().validate_pipes(
                     pipes=_pipes_to_dry_run(loaded_pipes, dry_run_pipe_codes=dry_run_pipe_codes),
                     library_id=library_id,
@@ -312,7 +316,7 @@ async def validate_bundle(
 
                 if mthds_file_path.resolve() not in library.loaded_mthds_paths:
                     # File not yet loaded - load it from the blueprint
-                    loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+                    loaded_pipes = await run_in_worker_thread(library_manager.load_from_blueprints, library_id=library_id, blueprints=[blueprint])
                 else:
                     # File already loaded - get existing pipes from library by their refs. A bundle's
                     # `[pipe.<code>]` keys are bare and belong to the bundle's own domain, so they are
@@ -434,6 +438,32 @@ def dirs_beside_method(*, method_dir: Path, library_dirs: Sequence[Path] | None)
     return [library_dir for library_dir in library_dirs or [] if library_dir.resolve() != resolved_method_dir]
 
 
+def _load_method_dir(
+    *,
+    method_dir: Path,
+    methods_dirs: Sequence[Path] | None,
+    library_dirs: Sequence[Path] | None,
+    library_id: str,
+) -> tuple[MethodTree, list[PipeAbstract]]:
+    """List the method's tree, check its Python parses, and load it with the caller's directories beside it.
+
+    Blocking work, run in a worker thread by ``_validate_method_dir``. The tree's packages called by address resolve as
+    a run resolves them: the packages shipped in ``methods_dirs`` first, then the methods installed on this host and a
+    fetch on a miss, so the verdict is the one the run of the same method meets.
+
+    Returns:
+        The method's tree, and the pipes the load built, those of the directories beside it included.
+    """
+    tree = list_local_method_tree(handed_over=method_dir)
+    _ensure_tree_python_parses(tree=tree)
+    loaded_pipes = get_library_manager().load_libraries(
+        library_id=library_id,
+        library_dirs=[method_dir, *dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)],
+        methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
+    )
+    return tree, loaded_pipes
+
+
 async def _validate_method_dir(
     *,
     method_dir: Path,
@@ -452,14 +482,16 @@ async def _validate_method_dir(
     """
     library_manager = get_library_manager()
     library = library_manager.get_library(library_id=library_id)
-    beside_dirs = dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)
     with translate_to_validate_bundle_error():
-        tree = list_local_method_tree(handed_over=method_dir)
-        _ensure_tree_python_parses(tree=tree)
-        loaded_pipes = library_manager.load_libraries(
+        # Listing the tree, reading its Python and loading it are blocking work, which a fetch on a miss, or the
+        # package-offer factory of the deployment's PipeFunc sandbox, can make long: it runs in a worker thread, off the
+        # event loop, its refusals translated here, while the library is still open and current.
+        tree, loaded_pipes = await run_in_worker_thread(
+            _load_method_dir,
+            method_dir=method_dir,
+            methods_dirs=methods_dirs,
+            library_dirs=library_dirs,
             library_id=library_id,
-            library_dirs=[method_dir, *beside_dirs],
-            methods_dirs=list(methods_dirs) if methods_dirs is not None else None,
         )
         blueprints = library_manager.get_accumulated_blueprints(library_id)
         # Only the tree's own bundles are the method. The directories beside it, and the packages nested in it that the
@@ -505,7 +537,7 @@ async def validate_bundles_from_directory(directory: Path, *, allow_signatures: 
                 blueprint = MthdsParser.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
                 all_blueprints.append(blueprint)
 
-            loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
+            loaded_pipes = await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=[Path(directory)])
             dry_run_results = await BundleValidator().validate_pipes(pipes=loaded_pipes, library_id=library_id, allow_signatures=allow_signatures)
             result = ValidateBundleResult(
                 blueprints=all_blueprints,

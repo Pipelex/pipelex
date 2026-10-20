@@ -90,12 +90,18 @@ class PipeFuncPackageOfferRequest(NamedTuple):
 # packages at all. The requirements arrive with their markers unevaluated: the factory evaluates them against the marker
 # environment of the place it would offer, and a refusal rests only on those whose markers hold there, never on one the
 # place does not need (``requirements_needed_in``). Called synchronously, once for each method tree declaring
-# requirements each time a check judges it, never at registration, from whatever thread runs the load, which may be
-# running an event loop. It is therefore
-# synchronous, and caching its answers by the requirements is the plugin's job: a factory whose answer takes time to
-# compute, such as one resolving the requirements with a resolver, bounds the work with a timeout of its own and caches
-# by the requirements' texts, so only a process's first check of a requirement set pays for it. A fault of its own,
-# such as a resolver it cannot reach, is raised as an error of the plugin's, never answered as a refusal.
+# requirements each time a check judges it, never at registration.
+#
+# Its threading contract: a factory is called on a worker thread, never on a thread running an event loop. Every method
+# load pipelex reaches from asynchronous code, such as a validation or a run on the API server or in a worker's
+# activity, runs in a worker thread (`run_in_worker_thread`, `acquire_library_async`), a synchronous caller, such as a
+# CLI command, runs no event loop on its thread, and a host calling a load itself from asynchronous code moves it off
+# the loop the same way. A factory may therefore block for as long as its work takes, and must not use the event
+# loop: none runs on its thread, and the one its caller's code runs on belongs to another thread. Caching its answers
+# by the requirements is still the plugin's job: a factory whose answer takes time to compute, such as one resolving
+# the requirements with a resolver, bounds the work with a timeout of its own and caches by the requirements' texts, so
+# only a process's first check of a requirement set pays for it. A fault of its own, such as a resolver it cannot
+# reach, is raised as an error of the plugin's, never answered as a refusal.
 PipeFuncPackageOfferFactoryFn: TypeAlias = Callable[[PipeFuncPackageOfferRequest], PipeFuncPackageOffer | PipeFuncPackageRefusal | None]
 
 

@@ -38,6 +38,7 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 from pipelex.runtime_hub import get_console, get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import count_with_noun
 
@@ -243,8 +244,9 @@ async def _validate_pipe_or_bundle(
                 # other invalid bundle. The entry-pipe lookup between them stays outside it: a code that names
                 # no pipe, or several, is an unresolvable target — no verdict, handled by execute_validate.
                 if effective_dirs:
+                    # In a worker thread, off the event loop, as every load reached from asynchronous code.
                     with translate_to_validate_bundle_error():
-                        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                        await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
                 pipe = get_required_entry_pipe(pipe_code=pipe_code)
                 validation_report.describe(pipes=get_own_pipes())

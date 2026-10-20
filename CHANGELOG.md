@@ -5,6 +5,11 @@
 ### Changed
 
 - **The API server's examples send a method in `files`**: the server's README and the API Server pages send a method to `/v1/execute` and `/v1/validate` in `files`, a map from each file's path in the method's folder to its content, where they sent `mthds_contents`. The reference pages and the OpenAPI artifact now say that `mthds_contents`, with `bundle_b64`, `resources` and `/v1/validate`'s `mthds_sources`, is being retired and will be refused by a later release, so a client sends `files` now.
+- **A PipeFunc package-offer factory is called on a worker thread**: the factory a plugin registers with `PluginRegistrar.add_pipe_func_package_offer` is called on a worker thread, never on a thread running an event loop, so it may block for as long as its work takes and must not use the event loop; its signature is unchanged, and so is the plugin API version. A host calling a load itself from asynchronous code moves it off the loop the same way, with `run_in_worker_thread` (`pipelex.tools.misc.async_utils`), which runs a blocking call in a worker thread in a copy of the caller's context and, when its caller is cancelled, lets the cancellation through only once the call has ended, or with `acquire_library_async` (`pipelex.pipeline.execution_seams`), the twin of `acquire_library` that loads in a worker thread.
+
+### Fixed
+
+- **Method loads leave the event loop**: every method load pipelex reaches from asynchronous code, a run's, a validation's and those of the commands that run a loop, runs in a worker thread, where it ran on the event loop, so listing and hashing a method's files, a sandbox's judgment of its `requirements.txt` and a fetch of a package it calls by address no longer hold up the other requests or activities the loop serves. `/v1/validate` of a method tree calling a package nothing shipped still resolves it as a run does, from the methods installed on the server and by a fetch on a miss, so its verdict matches the run's, and the fetch now runs off the event loop.
 
 ## [v0.90.0] - 2026-10-19
 

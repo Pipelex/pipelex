@@ -26,7 +26,7 @@ from pipelex.pipe_run.pipe_run_params import (
     VariableMultiplicity,
 )
 from pipelex.pipeline.exceptions import PipeExecutionError
-from pipelex.pipeline.execution_seams import acquire_library, prepare_pipe_job
+from pipelex.pipeline.execution_seams import acquire_library_async, prepare_pipe_job
 from pipelex.runtime_hub import (
     get_event_log_override,
     get_otel_tracer,
@@ -328,8 +328,9 @@ async def pipeline_run_setup(
     event_log: EventLogProtocol | None = None
     success = False
     try:
-        # Seam 1: open the library and load dirs + blueprints. Owns its own load-failure teardown.
-        library_id, qualified_main_pipe = acquire_library(
+        # Seam 1: open the library and load dirs + blueprints, in a worker thread, off the event loop. Owns its own
+        # load-failure teardown, and leaves the library current in this context.
+        library_id, qualified_main_pipe = await acquire_library_async(
             library_id=library_id,
             library_dirs=library_dirs,
             mthds_contents=mthds_contents,

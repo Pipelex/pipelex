@@ -23,6 +23,7 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.runtime_hub import get_telemetry_manager
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
+from pipelex.tools.misc.async_utils import run_in_worker_thread
 from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
     save_text_to_path,
@@ -81,7 +82,8 @@ async def _generate_output_core(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dir)
         if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            # In a worker thread, off the event loop, as every load reached from asynchronous code.
+            await run_in_worker_thread(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
         if not pipe_code:
             typer.secho("Failed to build output: no pipe code specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
