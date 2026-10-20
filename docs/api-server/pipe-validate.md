@@ -1,6 +1,6 @@
 # Pipe Validate
 
-Validate MTHDS content by parsing, loading, and dry-running pipes without executing them.
+Validate a method by parsing, loading, and dry-running its pipes without executing them.
 
 **Endpoint:** `POST /v1/validate`
 
@@ -10,20 +10,24 @@ Validate MTHDS content by parsing, loading, and dry-running pipes without execut
 
 ```json
 {
-  "mthds_contents": ["domain = \"my_domain\"\ndescription = \"My domain\"\nmain_pipe = \"my_pipe\"\n\n[concept.MyResult]\ndescription = \"A result\"\n\n[pipe.my_pipe]\ntype = \"PipeLLM\"\ndescription = \"Process input\"\ninputs = { text = \"native.Text\" }\noutput = \"MyResult\""]
+  "files": {
+    "my_domain.mthds": "domain = \"my_domain\"\ndescription = \"My domain\"\nmain_pipe = \"my_pipe\"\n\n[concept.MyResult]\ndescription = \"A result\"\n\n[pipe.my_pipe]\ntype = \"PipeLLM\"\ndescription = \"Process input\"\ninputs = { text = \"native.Text\" }\noutput = \"MyResult\""
+  }
 }
 ```
 
+The method to validate is sent in `files`, a map from each file's path in the method's folder to that file's content, exactly as a run sends it, or named by its address in `method_ref`. The older `mthds_contents`, an array of `.mthds` texts, is still accepted, but it is being retired together with `mthds_sources` and `resources`, which serve it, and a later release refuses them.
+
 **Request Fields:**
 
-- `mthds_contents` (list[str], optional): MTHDS contents to validate (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref` must be provided
-- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree, each value the file's text, `{"base64": "…"}` or `{"sha256": "…", "size": n}`, read as on a run — see [Validating a method tree](#validating-a-method-tree). Exactly one of `mthds_contents` / `files` / `method_ref`
+- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree, each value the file's text, `{"base64": "…"}` or `{"sha256": "…", "size": n}`, read as on a run — see [Validating a method tree](#validating-a-method-tree). Exactly one of `files` / `method_ref` / `mthds_contents` must be provided
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address, as on a [run](pipe-run.md#sending-the-method-packages-the-method-calls). Accompanies `files`
-- `method_ref` (string, optional): **Pipelex-API extension.** Validate a published method by address — `github.com/<owner>/<repo>` plus an optional package selector and `@<tag>` — resolved by this server through the same fetch path as a [`method_ref` run](pipe-run.md#running-a-method-by-address-method_ref): the repository is fetched at the tag, the package located by manifest identity, and its tree read from the commit's git objects and validated as a tree sent in `files` is — see [Validating a method tree](#validating-a-method-tree). Exactly one of `mthds_contents` / `files` / `method_ref`; `mthds_sources` cannot accompany it. A package holding Python and a `requirements.txt` has its requirements checked on this server against the packages the deployment's PipeFunc sandbox offers for them before anything is validated, and a requirement the sandbox does not meet, or a line the standard refuses, makes the verdict `is_valid: false` with one item per line, whose `source` is `requirements.txt` and whose `line` is the line's number; a deployment refusing the requirements with its own explanation, no environment it can build holding them, makes it `is_valid: false` with one item on `requirements.txt` and no line
+- `method_ref` (string, optional): **Pipelex-API extension.** Validate a published method by address — `github.com/<owner>/<repo>` plus an optional package selector and `@<tag>` — resolved by this server through the same fetch path as a [`method_ref` run](pipe-run.md#running-a-method-by-address-method_ref): the repository is fetched at the tag, the package located by manifest identity, and its tree read from the commit's git objects and validated as a tree sent in `files` is — see [Validating a method tree](#validating-a-method-tree). Exactly one of `files` / `method_ref` / `mthds_contents`; `mthds_sources` cannot accompany it. A package holding Python and a `requirements.txt` has its requirements checked on this server against the packages the deployment's PipeFunc sandbox offers for them before anything is validated, and a requirement the sandbox does not meet, or a line the standard refuses, makes the verdict `is_valid: false` with one item per line, whose `source` is `requirements.txt` and whose `line` is the line's number; a deployment refusing the requirements with its own explanation, no environment it can build holding them, makes it `is_valid: false` with one item on `requirements.txt` and no line
+- `mthds_contents` (list[str], optional): **Being retired: send the method in `files`.** MTHDS contents to validate (always an array, even for a single file). Exactly one of `files` / `method_ref` / `mthds_contents` must be provided. Still accepted until a later release refuses it
 - `read_scope` (string, optional): **Pipelex-API extension.** The scope the validation reads the method under, as a run's `read_scope`, which a multi-tenant host sends for the organization it serves; [a `jwt` caller may send only a scope under its own id](pipe-run.md#host-supplied-run-context-storage_scope-and-analytics_groups), else a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller`. A hash entry of `files` resolves in that scope's blob store — see [Sending files by hash](pipe-run.md#sending-files-by-hash) — and the runner hands the scope to its validator, so a validation dispatched to a worker can hand it the method through that store — see [Where validation runs](#where-validation-runs). Omitted, a hash entry resolves in the caller's own id's store, but only a validation carrying it records the tree it read in the blob store, and the validator is handed no scope, so a dry run without one leaves nothing stored
 - `allow_signatures` (boolean, optional, default `false`): controls only the **sweep mechanics** for `PipeSignature` placeholders — whether signature pipes are mock-run during the dry-run sweep and therefore listed in `validated_pipes`. It does **not** change the verdict: an unimplemented signature is never a rejection, it is a *runnability fact* reported via `pending_signatures` + `is_runnable` in both modes
-- `mthds_sources` (list[str] | null, optional): per-file sources, parallel to `mthds_contents` — see [Sourcing submitted files](#sourcing-submitted-files). When present it must match `mthds_contents` in length (a mismatch is a 422 request error), and it accompanies `mthds_contents` alone, since a tree's files are named by their tree paths
-- `resources` (object | null, optional): **Pipelex-API extension.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or `files`, whose tree each file joins; beside `method_ref` it is a 422
+- `mthds_sources` (list[str] | null, optional): **Being retired with `mthds_contents`: the files of a method sent in `files` are named by their tree paths.** Per-file sources, parallel to `mthds_contents` — see [Sourcing submitted files](#sourcing-submitted-files). When present it must match `mthds_contents` in length (a mismatch is a 422 request error), and it accompanies `mthds_contents` alone, since a tree's files are named by their tree paths
+- `resources` (object | null, optional): **Pipelex-API extension, being retired with `mthds_contents`: put the files in the method's tree, in `files`.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or `files`, whose tree each file joins; beside `method_ref` it is a 422
 - `render` (list[str], optional, default `[]`): opt-in *rendered text* to attach to the verdict — see [Opt-in extras](#opt-in-extras-render-and-views)
 - `views` (list[str], optional, default `[]`): opt-in *structured views* to attach to the verdict — see [Opt-in extras](#opt-in-extras-render-and-views)
 - `orchestration_mode` (string | null, optional): per-request backend override for the validation dispatch — see [Where validation runs](#where-validation-runs). Honored only when the deployment allows it; a forbidden override is a 422 `pipelex.deployment.orchestration_override_forbidden`
@@ -76,7 +80,7 @@ The 200 body is one of two arms, discriminated on the mandatory `is_valid` field
 
 **Response Fields (wire extras, valid arm only, this server only):**
 
-- `mthds_contents` (list[str]): echo of the validated request contents
+- `mthds_contents` (list[str]): the text of the validated bundles: the `.mthds` files of a method sent in `files` or fetched by `method_ref`, in tree path order, or the request's own `mthds_contents`
 - `message` (string): status message
 - `default_pipe_ref` (string, optional): the qualified `domain.pipe_code` a caller gets by **omitting** the pipe selector — the pipe a selector-less run of this same request would execute; absent when no entry pipe is determined. See [The effective entry pipe](#the-effective-entry-pipe) below
 
@@ -157,7 +161,9 @@ Neither axis is part of the verdict contract: a machine consumer branches on the
 
 ## Sourcing submitted files
 
-The submit path carries bundle text, not file paths, so by default the runtime cannot tell the client which file an error belongs to — an item's `location` carries no `file`. Send `mthds_sources` parallel to `mthds_contents` to fix this: each source is the logical identity of that content (e.g. the file's path relative to the submitted directory), and the runtime threads it onto the corresponding `blueprint.source`. The source then rides back on both arms — `bundle_blueprint.source` on the valid arm, and `errors[].location.file` on the invalid arm — so a multi-file editor client can map a cross-file diagnostic to the file that owns it. Omit `mthds_sources` (or send `null`) and behavior is exactly as before. The list, when present, must be the same length as `mthds_contents`; a mismatch is a request-shape 422 (it is the caller's wiring bug, caught before the validation sweep runs). A source is a label for diagnostics and nothing more: even one naming a real file on the server is never a directory the server reads from, so a step's template file comes from [`resources`](#sending-the-files-the-steps-read-resources) alone, and an address-based reference is not searched for above it.
+A method sent in `files` needs no sources: each of its bundles is named by its tree path, which is the `location.file` of every item it owns. This section concerns `mthds_contents`, which is being retired, and `mthds_sources` goes with it.
+
+The `mthds_contents` path carries bundle text, not file paths, so by default the runtime cannot tell the client which file an error belongs to — an item's `location` carries no `file`. Send `mthds_sources` parallel to `mthds_contents` to fix this: each source is the logical identity of that content (e.g. the file's path relative to the submitted directory), and the runtime threads it onto the corresponding `blueprint.source`. The source then rides back on both arms — `bundle_blueprint.source` on the valid arm, and `errors[].location.file` on the invalid arm — so a multi-file editor client can map a cross-file diagnostic to the file that owns it. Omit `mthds_sources` (or send `null`) and behavior is exactly as before. The list, when present, must be the same length as `mthds_contents`; a mismatch is a request-shape 422 (it is the caller's wiring bug, caught before the validation sweep runs). A source is a label for diagnostics and nothing more: even one naming a real file on the server is never a directory the server reads from, so a step's template file comes from [`resources`](#sending-the-files-the-steps-read-resources) alone, and an address-based reference is not searched for above it.
 
 ## Validating a method tree
 
@@ -170,7 +176,18 @@ A method sent in `files`, or fetched by `method_ref`, is validated whole, as it 
 
 ## Sending the files the steps read (`resources`)
 
-A bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, is sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-method).
+A method sent in `files` carries the files its steps read in its own tree, each at its path beside the bundle whose step names it, so it needs no `resources`:
+
+```json
+{
+  "files": {
+    "invoicing.mthds": "domain = \"invoicing\"\n...\n[pipe.print_invoice]\ntype = \"PipeDocGen\"\n...\nformat = \"docx\"\ntemplate_file = \"templates/invoice.docx\"",
+    "templates/invoice.docx": {"base64": "UEsDBBQABgAIAAAAIQ..."}
+  }
+}
+```
+
+`resources` is being retired with `mthds_contents`, and a later release refuses both. Until then, a bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, can be sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-method).
 
 ```json
 {
@@ -205,7 +222,7 @@ A validation is not a run, but it still emits telemetry: the sweep's `pipe_dry_r
 
 Only conditions where the endpoint could not produce a verdict are non-2xx, rendered as [RFC 9457 problem documents](error-responses.md):
 
-- **422** — a malformed request body (`request.malformed`), an `mthds_sources` / `mthds_contents` length mismatch, more or fewer than one of `mthds_contents` / `files` / `method_ref`, or a malformed `analytics_groups` (`request.invalid`, naming the field), or a per-request `orchestration_mode` override the deployment does not allow (`pipelex.deployment.orchestration_override_forbidden`) — request-shape errors caught before the runtime.
+- **422** — a malformed request body (`request.malformed`), an `mthds_sources` / `mthds_contents` length mismatch, more or fewer than one of `files` / `method_ref` / `mthds_contents`, or a malformed `analytics_groups` (`request.invalid`, naming the field), or a per-request `orchestration_mode` override the deployment does not allow (`pipelex.deployment.orchestration_override_forbidden`) — request-shape errors caught before the runtime.
 - **422** on a method tree — a key the tree's rule refuses (`method.package_invalid`, or `security.input_path_refused`), a malformed entry (`request.invalid`), a hash entry the runner does not hold (`request.blobs_missing`), or a tree past its limits (`method.package_invalid`) — see [Validating a method tree](#validating-a-method-tree).
 - **422** and **413** on `resources` — a path that cannot name a file inside the bundle (`security.input_path_refused`, or `request.invalid`), a file no step names (`request.invalid`), files that cannot make one tree (`request.invalid`), too many files (`request.invalid`), a file or a request over its size limit (`request.too_large`), or a value that is not base64 (`request.malformed`) — see [Sending the files the steps read](#sending-the-files-the-steps-read-resources).
 - **401** — unauthenticated (`auth.missing_credential`, `auth.invalid_credential`, `auth.credential_expired`).

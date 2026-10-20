@@ -116,7 +116,7 @@ Each item is one fault:
 | `code` | The registry code of the fault: the code its type maps to, such as `method.input_undeclared` for an input a pipe reads but does not declare, `model.unknown` for a model the deck does not define, `method.syntax` for a TOML syntax error or `method.dependency_missing` for a package the method calls and no one supplied. A `dry_run` item's code is its failure's own, and an item no stage classified takes `method.schema_violation`, or the code of the refusal behind it. |
 | `detail` | The code's sentence, rendered from the item's parameters, or the code's title when the item lacks a parameter the sentence names. A program branches on `code`, never on a sentence. |
 | `params` | Every parameter the item's code requires, by the registry's names: the facts its locators give, such as the `pipe`, the `variables` it reads, the `concept` or `model` it names, the `model_type` and a `finding` quoting the validation's own account, and those the check that found the fault knows, such as the concept a pipe declares and those that would fit, the `name` and the kind of `conflict` of a name declared twice, or the declared concepts nearest one that resolves to nothing. |
-| `location` | Where the fault is: the `pipe`, the `field` within the bundle, and the `file` with its 1-based `line` and `column` when the parser stopped there. A name two bundles declare is one item per bundle, each located on its own `file`. On the in-memory submit path the `file` is the matching `mthds_sources[i]` (see [Sourcing submitted files](pipe-validate.md)), so it is absent when the caller sent no sources. Beside a server's own library directories, an item never names one of their files, nor a template file one of their `PipeDocGen` steps names. |
+| `location` | Where the fault is: the `pipe`, the `field` within the bundle, and the `file` with its 1-based `line` and `column` when the parser stopped there. A name two bundles declare is one item per bundle, each located on its own `file`. For a method sent in `files` or fetched by `method_ref`, the `file` is the bundle's tree path. On the `mthds_contents` path, which is being retired, the `file` is the matching `mthds_sources[i]` (see [Sourcing submitted files](pipe-validate.md#sourcing-submitted-files)), so it is absent when the caller sent no sources. Beside a server's own library directories, an item never names one of their files, nor a template file one of their `PipeDocGen` steps names. |
 | `suggestions` | On a `model.unknown` item, the deck's close matches of the kind the pipe needs. |
 | `suggested_fix` | A structured, deterministic fix for this fault — present only when the fix planner derived one. See [Suggested fixes](#suggested-fixes). |
 
@@ -294,8 +294,9 @@ When opening an issue, include the `request_id` from the response (or response h
 ```http
 POST /v1/execute
 {
-  "mthds_contents": ["domain = \"summaries\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize a text\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize $text in the style of $tone.\"\n"],
-  "mthds_sources": ["summaries.mthds"]
+  "files": {
+    "summaries.mthds": "domain = \"summaries\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize a text\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize $text in the style of $tone.\"\n"
+  }
 }
 ```
 

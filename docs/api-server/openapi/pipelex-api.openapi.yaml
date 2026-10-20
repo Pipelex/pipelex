@@ -259,6 +259,9 @@ paths:
                     type: array
                   - type: 'null'
                   title: Mthds Contents
+                  description: 'Being retired, and refused by a later release: send the method in `files`. The method''s `.mthds`
+                    files as raw strings, always an array, even for a single file; with no `pipe_code`, a file must declare
+                    `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and `method_ref`.'
                 inputs:
                   anyOf:
                   - additionalProperties:
@@ -297,11 +300,12 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
-                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
-                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
-                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
-                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method''s
+                    folder, read as a map of its entries, so the archive''s names are judged by the method tree''s rule as
+                    the keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner''s installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired
+                    with `mthds_contents`, and refused by a later release: send the method in `files`.'
                 files:
                   anyOf:
                   - additionalProperties:
@@ -374,7 +378,8 @@ paths:
                     the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
                     sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
                     The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
-                    with the run, each being read where a step uses it.'
+                    with the run, each being read where a step uses it. Being retired with `mthds_contents`, and refused by
+                    a later release: send these files in the method''s tree, in `files`.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -610,6 +615,9 @@ paths:
                     type: array
                   - type: 'null'
                   title: Mthds Contents
+                  description: 'Being retired, and refused by a later release: send the method in `files`. The method''s `.mthds`
+                    files as raw strings, always an array, even for a single file; with no `pipe_code`, a file must declare
+                    `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and `method_ref`.'
                 inputs:
                   anyOf:
                   - additionalProperties:
@@ -648,11 +656,12 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
-                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
-                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
-                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
-                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method''s
+                    folder, read as a map of its entries, so the archive''s names are judged by the method tree''s rule as
+                    the keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner''s installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired
+                    with `mthds_contents`, and refused by a later release: send the method in `files`.'
                 files:
                   anyOf:
                   - additionalProperties:
@@ -725,7 +734,8 @@ paths:
                     the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
                     sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
                     The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
-                    with the run, each being read where a step uses it.'
+                    with the run, each being read where a step uses it. Being retired with `mthds_contents`, and refused by
+                    a later release: send these files in the method''s tree, in `files`.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -915,14 +925,14 @@ paths:
         \ diagnostics is a backend, configuration or runtime\n  fault, and its problem is answered as every raised failure's\
         \ is.\n- **Either arm:** a member with no value is absent rather than `null`, at the arm's top level and in its\n\
         \  problem items; the structured artifacts of the valid arm keep their own serialization.\n- **No verdict (non-2xx):**\
-        \ a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither of `mthds_contents` / `method_ref`\
-        \ is a request-shape **422**, and so is a forbidden\n  `orchestration_mode` override; a host-wiring programmer error\
-        \ or a genuine orchestrator fault is a\n  **5xx**; auth is **401/403**. A `method_ref` **resolution failure** is also\
-        \ a no-verdict condition —\n  never an `is_valid: false`: each answers the status its code declares, such as a **422**\
-        \ for a\n  malformed reference, a **502** for a failed fetch, a **404** for no matching package in the\n  repository\
-        \ and a **422** for the method's Python structure classes, and the custom-code sandbox gate\n  a **501**. All are\
-        \ `application/problem+json` documents carrying a registry `code`, rendered by the\n  global handlers in `pipelex_api.exception_handlers`\
-        \ — routes never shape them."
+        \ a malformed request body, an `mthds_sources` length mismatch, or\n  more or fewer than one of `files` / `method_ref`\
+        \ / `mthds_contents` is a request-shape **422**, and so is a forbidden\n  `orchestration_mode` override; a host-wiring\
+        \ programmer error or a genuine orchestrator fault is a\n  **5xx**; auth is **401/403**. A `method_ref` **resolution\
+        \ failure** is also a no-verdict condition —\n  never an `is_valid: false`: each answers the status its code declares,\
+        \ such as a **422** for a\n  malformed reference, a **502** for a failed fetch, a **404** for no matching package\
+        \ in the\n  repository and a **422** for the method's Python structure classes, and the custom-code sandbox gate\n\
+        \  a **501**. All are `application/problem+json` documents carrying a registry `code`, rendered by the\n  global handlers\
+        \ in `pipelex_api.exception_handlers` — routes never shape them."
       operationId: validate_mthds_v1_validate_post
       requestBody:
         content:
@@ -2170,7 +2180,8 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
         read_scope:
           anyOf:
           - type: string
@@ -4296,7 +4307,8 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
         read_scope:
           anyOf:
           - type: string
@@ -5901,7 +5913,8 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
         read_scope:
           anyOf:
           - type: string
@@ -8962,8 +8975,8 @@ components:
             minItems: 1
           - type: 'null'
           title: Mthds Contents
-          description: MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` /
-            `files` / `method_ref`.
+          description: 'Being retired, and refused by a later release: send the method in `files`. MTHDS contents to load
+            (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref`.'
         files:
           anyOf:
           - additionalProperties:
@@ -9029,9 +9042,10 @@ components:
             type: array
           - type: 'null'
           title: Mthds Sources
-          description: Optional per-file sources, parallel to `mthds_contents`. When provided, each entry is threaded onto
-            the corresponding bundle's `source` so server-side validation errors carry a `source` pointing at the owning file.
-            Must match `mthds_contents` in length when present.
+          description: 'Being retired with `mthds_contents`, and refused by a later release: the bundles of a method sent
+            in `files` are named by their tree paths. Optional per-file sources, parallel to `mthds_contents`. When provided,
+            each entry is threaded onto the corresponding bundle''s `source` so server-side validation errors carry a `source`
+            pointing at the owning file. Must match `mthds_contents` in length when present.'
         resources:
           anyOf:
           - additionalProperties:
@@ -9048,7 +9062,8 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
         render:
           items:
             type: string
@@ -9092,7 +9107,13 @@ components:
             is handed no scope, so a dry run without one leaves nothing stored.'
       type: object
       title: ValidateRequest
-      description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.
+      description: 'The method to validate, in `files`, by `method_ref` or as `mthds_contents`, plus `allow_signatures` and
+        optional per-file sources.
+
+
+        `mthds_contents`, and the `mthds_sources` and `resources` that serve it, are being retired: a later release
+
+        refuses them, and a method is sent in `files`, whose bundles are named by their tree paths.
 
 
         `mthds_sources`, when provided, pairs each `mthds_contents[i]` with a logical source (e.g. the

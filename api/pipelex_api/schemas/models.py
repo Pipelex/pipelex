@@ -99,8 +99,12 @@ RESOURCES_FIELD_DESCRIPTION = (
     f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
     f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, "
     "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which the run "
-    "names by its digest: no file's bytes travel with the run, each being read where a step uses it."
+    "names by its digest: no file's bytes travel with the run, each being read where a step uses it. Being retired with "
+    "`mthds_contents`, and refused by a later release: send these files in the method's tree, in `files`."
 )
+
+MTHDS_CONTENTS_RETIRING_NOTE = "Being retired, and refused by a later release: send the method in `files`."
+"""Opens the description of every request field that takes a method's bundles as `mthds_contents`."""
 
 
 class RunRequest(BaseModel):
@@ -124,7 +128,8 @@ class RunRequest(BaseModel):
 
     Attributes:
         pipe_code: Code of the pipe to execute.
-        mthds_contents: List of MTHDS bundle contents to load.
+        mthds_contents: List of MTHDS bundle contents to load. Being retired, with `bundle_b64`
+            and `resources`, in favor of `files`.
         inputs: Inputs in PipelineInputs format, as plain JSON — Pydantic validation is
             skipped to preserve the flexible format (strings, lists, objects); the runtime
             shapes each value against the entry pipe's declared input.
@@ -154,7 +159,14 @@ class RunRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     pipe_code: str | None = None
-    mthds_contents: list[str] | None = None
+    mthds_contents: list[str] | None = Field(
+        default=None,
+        description=(
+            f"{MTHDS_CONTENTS_RETIRING_NOTE} The method's `.mthds` files as raw strings, always an array, even for a single "
+            "file; with no `pipe_code`, a file must declare `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and "
+            "`method_ref`."
+        ),
+    )
     inputs: Annotated[PipelineInputs | None, SkipValidation] = None
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
@@ -166,7 +178,8 @@ class RunRequest(BaseModel):
             "map of its entries, so the archive's names are judged by the method tree's rule as the keys of `files` are. "
             "The method packages it calls by address may travel with it under `.mthds/methods/<name>/`, each with its "
             "`METHODS.toml`; they are searched before the runner's installed copies, for this run alone. "
-            "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment."
+            "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired "
+            "with `mthds_contents`, and refused by a later release: send the method in `files`."
         ),
     )
     # Documents the wire only: the map is read from the request's raw JSON text (`pipelex_api.method_tree_request`),
@@ -735,7 +748,10 @@ class MthdsContentsRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=MAX_MTHDS_FILES_PER_REQUEST,
-        description="MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref`.",
+        description=(
+            f"{MTHDS_CONTENTS_RETIRING_NOTE} MTHDS contents to load (always an array, even for a single file). "
+            "Exactly one of `mthds_contents` / `files` / `method_ref`."
+        ),
     )
     # Documents the wire only: the route reads the map from the request's raw JSON text, never from this field.
     files: Annotated[dict[str, FileEntry] | None, SkipValidation] = Field(
