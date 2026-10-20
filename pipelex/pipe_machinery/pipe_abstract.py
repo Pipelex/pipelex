@@ -15,6 +15,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, WorkingMemory
+from pipelex.core.method_trees.tree_file_reads import TreeFileRead
 from pipelex.core.pipes.exceptions import PipeValidationError
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError, PipeRunInputsError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, NamedStuffSpec
@@ -200,6 +201,14 @@ class PipeAbstract(ABC, BaseModel):
         override this to return the codes of pipes they orchestrate.
         """
         return set()
+
+    def tree_files_read(self) -> list[TreeFileRead]:
+        """The files of its method tree this pipe reads itself, each by its tree path, as its building and validation resolved them.
+
+        None by default: a controller reads no file, its steps do. A `PipeDocGen` reads its template and the files its
+        HTML template names, and a `PipeFunc` the module of its function, when it lies in the step's tree.
+        """
+        return []
 
     @property
     def concept_dependencies(self) -> list[Concept]:

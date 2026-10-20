@@ -61,6 +61,10 @@ The 200 body is one of two arms, discriminated on the mandatory `is_valid` field
   ],
   "pending_signatures": [],
   "is_runnable": true,
+  "tree_files_read": {
+    "my_domain.my_pipe": []
+  },
+  "tree_file_readers": {},
   "mthds_contents": ["..."],
   "message": "MTHDS content validated successfully",
   "default_pipe_ref": "my_domain.my_pipe"
@@ -77,6 +81,8 @@ The 200 body is one of two arms, discriminated on the mandatory `is_valid` field
 - `warnings` (list): advisory findings that never flip `is_valid`, each a problem item with the same shape as an item of the invalid arm's `errors`, so one parser reads both. Four families, always in this order: the useless-`!` lint (`method.optional_force_redundant`), the entry-pipe vacuous-presence lint (`method.input_presence_vacuous`), the intent-hint lints (`method.hint_invalid`, whose `reason` is `unknown_key`, `unknown_intent` or `inapplicable_intent`, whose `hint` names the hint, and whose `location` names the declaration the hint is on: `field` `concept.<Concept>` for a concept, `concept.<Concept>.structure.<field>` for a field of its structure, `pipe` and `input` for a pipe's input), and the warnings a `PipeDocGen` step's template check found in its office template file during the dry run (`pipelex.docgen.template_warning`, whose `template` names the file and `finding` says what the check found, located at the step by its `pipe`). A member an item does not have is absent, never `null`. Empty when there is nothing to report
 - `pending_signatures` (list[str]): namespaced refs of pipes still declared as signatures (contract-only pipes — `inputs`/`output` with no `type` and no implementation) in the assembled library — what remains to implement
 - `is_runnable` (boolean): `pending_signatures` is empty — whether the validated library is complete enough to run
+- `tree_files_read` (object): per step, the files of the method's tree it reads, keyed by the same namespaced `pipe_ref` as `pipe_io_contracts`. Each entry is a list of `{tree_path, use}` items, `tree_path` being the file's path from the root of the method's tree with forward slashes, never a path on the server, and `use` one of `template` (a `PipeDocGen` step's `template_file`), `template_asset` (a file an HTML template names by a literal relative URL, such as an image, a stylesheet or a font, or a file a stylesheet it names refers to) and `python_module` (the module holding a `PipeFunc` step's function, `module.py` or a package's `__init__.py`). A step that reads no file, a controller or a step whose template is written inline with no asset, has an empty list, and so does a `PipeFunc` whose function is found on the runtime's import path rather than in the tree. See [Validating a method tree](#validating-a-method-tree)
+- `tree_file_readers` (object): the same facts read the other way, keyed by tree path in sorted order, each listing the `pipe_ref`s of the steps that read that file. A file of the tree that no step reads, the bundles themselves, a README or a package's `__init__.py` beside its modules, has no entry
 
 **Response Fields (wire extras, valid arm only, this server only):**
 
@@ -173,6 +179,7 @@ A method sent in `files`, or fetched by `method_ref`, is validated whole, as it 
 - **The default pipe and the graph follow the tree's entry pipe.** `default_pipe_ref` is the pipe the protocol's rule names, the `main_pipe` of the root `METHODS.toml` or the one `main_pipe` its bundles declare, and the graph is drawn from it. A tree with no entry pipe validates with neither `default_pipe_ref` nor `graph_spec`.
 - **Refusals of the tree itself produce no verdict**: a key the tree's rule refuses is a **422** `method.package_invalid` naming the rule as its `reason`, or `security.input_path_refused` for a key leaving the tree's root, a malformed entry a **422** `request.invalid`, a hash the runner does not hold a **422** `request.blobs_missing`, and a tree past its limits a **422** `method.package_invalid` naming the limit, as on a [run](pipe-run.md#sending-a-method-as-a-tree).
 - **The `mthds_contents` echo** holds the text of the tree's own bundles.
+- **The report names the files each step reads.** `tree_files_read` lists, for each step, the files of the tree it reads, each by its tree path and its use, and `tree_file_readers` lists, for each such file, the steps that read it, so an editor can show which step uses which file and warn before a file a step reads is renamed or removed. The paths are derived from what each step already names, a `PipeDocGen` step's `template_file` and the literal relative URLs of its HTML template, and a `PipeFunc` step's `function_name` located in the tree, with no reference syntax of their own. A file sent in `resources` is named by its key, collapsed as the key is.
 
 ## Sending the files the steps read (`resources`)
 

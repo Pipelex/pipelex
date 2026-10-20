@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **The validation report names the files each step reads**: `PipelexValidationReport`, and so the valid verdict of `/v1/validate`, carries `tree_files_read`, mapping each validated pipe's `pipe_ref` to the files of the method's tree it reads, each a `TreeFileRead` with its `tree_path` and its `use` (`template` for a `PipeDocGen` step's `template_file`, `template_asset` for a file its HTML template names by a literal relative URL, `python_module` for the module holding a `PipeFunc` step's function), an empty list for a pipe reading none, and `tree_file_readers`, mapping each of those files to the pipes that read it. `pipelex-agent validate bundle` and `validate method` carry both in their envelope, and the Markdown of a valid verdict lists them in a "Files the steps read" section.
+
 ### Changed
 
 - **The API server's examples send a method in `files`**: the server's README and the API Server pages send a method to `/v1/execute` and `/v1/validate` in `files`, a map from each file's path in the method's folder to its content, where they sent `mthds_contents`. The reference pages and the OpenAPI artifact now say that `mthds_contents`, with `bundle_b64`, `resources` and `/v1/validate`'s `mthds_sources`, is being retired and will be refused by a later release, so a client sends `files` now.

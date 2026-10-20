@@ -17,6 +17,7 @@ from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.method_trees.tree_bundle import MethodFileRef, TreeBundleRef
+from pipelex.core.method_trees.tree_file_reads import TreeFileRead, TreeFileUse
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -92,10 +93,31 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     # step built from a crate by digest alone, which reads no file, and which a validation refuses rather than pass
     # unchecked (`validate_inputs_with_library`).
     _template_file_text: str | None = PrivateAttr(default=None)
+    # The images, stylesheets and fonts of its method tree the step's HTML template names by literal relative URLs, by
+    # tree path, as the load resolved them when it checked the template in a tree this process holds. Empty for a step
+    # built from a crate by digest alone, whose URLs resolve at print, and for a template naming no file.
+    _template_asset_tree_paths: list[str] = PrivateAttr(default_factory=list)
 
     def hold_template_file_text(self, *, template_file_text: str) -> None:
         """Keep the text of the step's HTML template file, read at load, for the load's checks."""
         self._template_file_text = template_file_text
+
+    def hold_template_asset_tree_paths(self, *, asset_tree_paths: list[str]) -> None:
+        """Keep the files of the tree the step's HTML template names by literal relative URLs, as the load resolved them."""
+        self._template_asset_tree_paths = list(asset_tree_paths)
+
+    @override
+    def tree_files_read(self) -> list[TreeFileRead]:
+        """The step's template file, then the images, stylesheets and fonts its HTML template names by literal relative URLs.
+
+        A URL the template computes from the run's inputs names a file only once the step prints, so it is not here.
+        """
+        files_read: list[TreeFileRead] = []
+        if self.template_file_ref is not None:
+            files_read.append(TreeFileRead(tree_path=self.template_file_ref.tree_path, use=TreeFileUse.TEMPLATE))
+        for asset_tree_path in self._template_asset_tree_paths:
+            files_read.append(TreeFileRead(tree_path=asset_tree_path, use=TreeFileUse.TEMPLATE_ASSET))
+        return files_read
 
     @property
     def template_file_text(self) -> str | None:
