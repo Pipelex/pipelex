@@ -13,6 +13,7 @@ from pipelex.fix_ops.file_transaction import (
     commit_file_updates,
     read_file_snapshot,
 )
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.fixes.fix_loop import (
     _bind_fixes_to_snapshots,  # pyright: ignore[reportPrivateUsage]
     _snapshot_loaded_sources,  # pyright: ignore[reportPrivateUsage]
@@ -28,7 +29,7 @@ class TestFixFileTransaction:
         second_target.write_text("second\n", encoding="utf-8")
         source_link = tmp_path / "library.mthds"
         source_link.symlink_to(first_target)
-        snapshots = _snapshot_loaded_sources(entry_source_path=source_link, effective_dirs=[])
+        snapshots = _snapshot_loaded_sources(entry_source_path=source_link, effective_dirs=[], tree_listing=MethodTreeListing())
         fix = SuggestedFix(fix_code="test", description="test", safety=FixSafety.SAFE, source=str(source_link), ops=[])
         source_link.unlink()
         source_link.symlink_to(second_target)

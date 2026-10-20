@@ -83,7 +83,7 @@ class TestResolveBundleTarget:
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Listing the tree reads its limits from the configuration: its refusal is the failed boot's problem, no verdict."""
-        mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        mocker.patch("pipelex.libraries.method_tree_listing.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
         with pytest.raises(typer.Exit) as exc_info:

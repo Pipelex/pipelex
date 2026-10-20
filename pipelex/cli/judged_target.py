@@ -3,6 +3,9 @@
 Both commands read their `path` argument the same way (`pipelex.cli.bundle_target_resolution`, `FolderReading.WHOLE_TREE`):
 a `.mthds` file is judged as a bundle file, a folder as its whole method tree. `fix` must patch exactly what `validate`
 judged, so the two CLIs share the target this module defines, the path it names, and the dispatch to the fix loop.
+
+The target carries the listing its folder's tree was listed through (`pipelex.libraries.method_tree_listing`), which the
+validation or the fix loop's first validation loads the tree from, so a command lists the tree it judges once.
 """
 
 from collections.abc import Sequence
@@ -13,6 +16,7 @@ from mthds.method_tree.models import MethodTree
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.bundle_target_resolution import BundleTargetResolutionError, FolderReading, resolve_bundle_target_core
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult, fix_bundle_file, fix_method_folder
 
 
@@ -27,6 +31,8 @@ class JudgedBundleTarget(NamedTuple):
     method_tree: MethodTree | None
     #: The folder, then the `-L` directories, `~` expanded; None for a file named with no `-L`.
     library_dirs: list[Path] | None
+    #: The listing the folder's tree was listed through, which the command's load takes it from.
+    tree_listing: MethodTreeListing
 
     @property
     def judged_path(self) -> Path:
@@ -63,6 +69,7 @@ def resolve_judged_target(*, path: str, library_dir: list[str] | None) -> Judged
         method_dir=result.method_dir,
         method_tree=result.method_tree,
         library_dirs=result.library_dirs,
+        tree_listing=result.tree_listing,
     )
 
 
@@ -98,6 +105,7 @@ async def fix_judged_target(
             max_iterations=max_iterations,
             select_codes=select_codes,
             ignore_codes=ignore_codes,
+            tree_listing=target.tree_listing,
         )
     return await fix_bundle_file(
         target.judged_path,
@@ -107,4 +115,5 @@ async def fix_judged_target(
         max_iterations=max_iterations,
         select_codes=select_codes,
         ignore_codes=ignore_codes,
+        tree_listing=target.tree_listing,
     )

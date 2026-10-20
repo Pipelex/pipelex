@@ -28,6 +28,8 @@ from pipelex.pipeline.validate_bundle_translation import translate_to_validate_b
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
+
 
 async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> dict[str, Any]:
     """Validate all pipes in all libraries.
@@ -164,6 +166,7 @@ async def validate_method_folder_core(
     library_dirs: list[Path] | None,
     allow_signatures: bool,
     pipe_code: str | None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> dict[str, Any]:
     """Validate a method's folder whole: every bundle of its method tree, as the MTHDS protocol's validation judges a method.
 
@@ -176,6 +179,8 @@ async def validate_method_folder_core(
         library_dirs: The folder and the ``-L`` directories, the caller's own.
         allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
         pipe_code: The one pipe to dry-run, or None for every pipe of the method.
+        tree_listing: The listing the command resolved the folder through, which the validation loads its tree from, so
+            the tree is listed once; None lists it for the validation.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization, ``bundle_path`` naming the folder.
@@ -192,6 +197,7 @@ async def validate_method_folder_core(
             allow_signatures=allow_signatures,
             dry_run_pipe_codes=[pipe_code] if pipe_code else None,
             collect_dry_run_warnings=True,
+            tree_listing=tree_listing,
         )
         warnings = collect_advisory_warnings(
             pipes=result.pipes,

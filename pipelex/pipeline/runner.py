@@ -52,6 +52,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -266,6 +267,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         extra: dict[str, Any] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
+        tree_listing: MethodTreeListing | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
@@ -309,6 +311,16 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             extension. It must be one to 128 ASCII letters, digits, ``_``
             or ``-`` (``validate_request_id``): any other value is the host's
             bug, refused with a ``RunParameterError`` before the run is set up.
+        tree_listing:
+            The listing of the method trees this run reads, when the caller
+            listed them before the run, such as a CLI that resolved the
+            folder or the bundle file it runs, or a server that checked the
+            requirements of the method it holds: the run loads each tree from
+            it rather than listing it again, so one listing serves the whole
+            run and the tree whose digest the run records is the tree it
+            loaded. A listing serves one run: pass a new one to each
+            ``execute``, since the files may change between two runs.
+            ``None`` lists the trees for this run.
 
         Returns:
         -------
@@ -367,6 +379,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 methods_dirs=self.methods_dirs,
                 submitted_files=self.submitted_files,
                 request_id=request_id,
+                tree_listing=tree_listing,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             with method_source_scope(source=self._method_source(mthds_contents=mthds_contents)):

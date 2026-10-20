@@ -39,6 +39,7 @@ from pipelex.cli.commands.run._run_output_folder import bundle_run_outputs_dir
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
 from pipelex.hosted.run_config import RunExecution  # ruff: ignore[typing-only-first-party-import] - typer reads the --runner annotation at runtime
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.mthds_parsing.parser import MthdsParser, decode_mthds_text
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -147,8 +148,10 @@ def run_bundle_cmd(
     auto_inputs_dir: Path | None = None
     target_path = Path(path)
 
-    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own.
+    # The method tree the run reads, whose digest the run records: the folder's, or the bundle file's own. It is listed
+    # once, through the listing the run's load takes it from.
     method_tree: MethodTree | None = None
+    tree_listing = MethodTreeListing()
     # The bundle defining a folder's entry pipe, which the run's output folders are made beside.
     entry_bundle_file: Path | None = None
     # The pipe a hosted run names: `--pipe`, else the main pipe the local run starts at, qualified by its domain, so the
@@ -157,7 +160,7 @@ def run_bundle_cmd(
     if target_path.is_dir():
         # Directory mode: the method rooted at or above the folder, started where the protocol's rule says
         try:
-            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe)
+            folder_run = resolve_method_folder_run(directory=target_path, pipe_override=pipe, tree_listing=tree_listing)
         except ValidateBundleError as exc:
             agent_error_method_refusal(error=exc, message=exc.message, execution=execution)
         except MethodEntryError as exc:
@@ -205,7 +208,7 @@ def run_bundle_cmd(
             # before the file is read, since the listing refuses a symbolic link, a special file such as a FIFO and a
             # file past this machine's limits without reading it.
             try:
-                method_tree = list_bundle_file_tree(bundle_file=target_path)
+                method_tree = list_bundle_file_tree(bundle_file=target_path, tree_listing=tree_listing)
             except ValidateBundleError as exc:
                 # A file this machine would not let the listing read is the file the command was handed
                 # (`client.file_unreadable`), never a fault of the method.
@@ -285,6 +288,7 @@ def run_bundle_cmd(
                 inputs_base_dir=parsed_inputs.inputs_base_dir,
                 output_dir_override=output_dir_override,
                 method_tree=method_tree,
+                tree_listing=tree_listing,
             )
         )
         agent_success_formatted(

@@ -27,7 +27,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.libraries.method_load_threads import run_method_load
-from pipelex.libraries.method_trees import list_local_method_tree
+from pipelex.libraries.method_tree_listing import MethodTreeListing, get_scoped_tree_listing
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
 from pipelex.pipe_run.dry_run_warning_collector import collecting_dry_run_warnings
@@ -50,19 +50,22 @@ if TYPE_CHECKING:
     from pipelex.graph.graphspec import GraphSpec
 
 
-def _graph_target_ref(*, graph_pipe_code: str | None, method_dir: Path | None, blueprints: list[PipelexBundleBlueprint]) -> str | None:
+def _graph_target_ref(
+    *, graph_pipe_code: str | None, method_dir: Path | None, blueprints: list[PipelexBundleBlueprint], tree_listing: MethodTreeListing
+) -> str | None:
     """The pipe the graph arm draws: the explicit target, else a method tree's entry pipe, else the batch's `main_pipe`.
 
     A method tree starts at its entry pipe by the MTHDS protocol's rule (`select_method_entry`), so its graph is that
-    pipe's, and a tree with no entry pipe, which a run naming no pipe refuses, gets no graph. Listing and reading the tree
-    is blocking work, so `validate_bundles_in_process` runs this in a worker thread.
+    pipe's, and a tree with no entry pipe, which a run naming no pipe refuses, gets no graph. The tree is the one the
+    validation loaded, taken from its listing; reading it is blocking work, so `validate_bundles_in_process` runs this
+    in a worker thread.
     """
     if graph_pipe_code is not None:
         return graph_pipe_code
     if method_dir is None:
         return select_primary_blueprint(blueprints).main_pipe_ref
     try:
-        return select_method_entry(tree=list_local_method_tree(handed_over=method_dir)).pipe_ref
+        return select_method_entry(tree=tree_listing.method_tree(handed_over=method_dir)).pipe_ref
     except MethodEntryError:
         return None
 
@@ -80,6 +83,7 @@ async def validate_bundles_in_process(
     submitted_files: Mapping[str, bytes] | None = None,
     method_dir: Path | None = None,
     methods_dirs: Sequence[Path] | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -119,6 +123,10 @@ async def validate_bundles_in_process(
         method_dir: The directory of the caller's method tree, validated whole in place of `mthds_contents`, such as
             the tree a host wrote out for a request (see `validate_bundle`).
         methods_dirs: Directories laid out like `.mthds/methods/` holding the packages shipped with `method_dir`.
+        tree_listing: The listing the caller already listed the method's trees through: the validation and its graph
+            arm take every tree from it, so each is listed once (`pipelex.libraries.method_tree_listing`). None takes
+            the listing a host put in scope (`scoped_tree_listing`), such as the API server around its validator once
+            it has checked the method's requirements, else lists the trees for this validation.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
@@ -138,6 +146,7 @@ async def validate_bundles_in_process(
             submitted_files=submitted_files,
             method_dir=method_dir,
             methods_dirs=methods_dirs,
+            tree_listing=tree_listing or get_scoped_tree_listing() or MethodTreeListing(),
             validation_report=validation_report,
         )
 
@@ -154,6 +163,7 @@ async def _validate_bundles_in_scope(
     submitted_files: Mapping[str, bytes] | None,
     method_dir: Path | None,
     methods_dirs: Sequence[Path] | None,
+    tree_listing: MethodTreeListing,
     validation_report: MethodValidationReport,
 ) -> PipelexValidationReport:
     """The body of :func:`validate_bundles_in_process`, run inside the caller's scope and timed by `validation_report`."""
@@ -184,6 +194,7 @@ async def _validate_bundles_in_scope(
             submitted_files=submitted_files,
             method_dir=method_dir,
             methods_dirs=methods_dirs,
+            tree_listing=tree_listing,
         )
         # Capture the validation library id ONCE, right after validate_bundle leaves it
         # current — the graph arm and the finally must target the SAME library even if
@@ -210,7 +221,7 @@ async def _validate_bundles_in_scope(
         validation_report.count_warnings(count=len(warnings))
         # A method tree's entry pipe is read from its files on this host's disk: blocking work, done in a worker thread.
         graph_target_ref = await run_method_load(
-            _graph_target_ref, graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints
+            _graph_target_ref, graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints, tree_listing=tree_listing
         )
         # The graph arm dry-runs its target once more, and finds again what the sweep found, which `warnings`
         # already carries: it is collected and dropped here rather than logged as if nothing reported it.

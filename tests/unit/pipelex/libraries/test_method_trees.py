@@ -18,7 +18,6 @@ from pipelex.libraries.method_trees import (
     list_package_method_tree,
     reporting_host_library_tree_faults,
     submitted_tree_files,
-    tree_bundle_of_lone_file,
     tree_python_sources,
 )
 from pipelex.methods.package_reason import MethodPackageReason
@@ -109,22 +108,6 @@ class TestMethodTrees:
         assert caller.code == CoreCode.METHOD_PACKAGE_INVALID
         assert caller.params is not None
         assert caller.params.as_wire() == {"reason": MethodPackageReason.TOO_MANY_FILES, "limit": 1}
-
-    def test_a_bundle_file_named_alone_is_rooted_at_the_manifest_above_it_else_alone(self, tmp_path: Path) -> None:
-        """Named alone, a bundle reads the files of the method a METHODS.toml above it roots, and with none only itself."""
-        lone = _touch(directory=tmp_path, tree_path="loose/lone.mthds")
-        _touch(directory=tmp_path, tree_path="loose/notes.md")
-        _touch(directory=tmp_path, tree_path="method/METHODS.toml", content=_MANIFEST)
-        rooted = _touch(directory=tmp_path, tree_path="method/bundles/main.mthds")
-
-        lone_bundle = tree_bundle_of_lone_file(bundle_file=lone)
-        rooted_bundle = tree_bundle_of_lone_file(bundle_file=rooted)
-
-        assert lone_bundle.tree.is_one_file
-        assert lone_bundle.tree.tree_paths == ["lone.mthds"]
-        assert not rooted_bundle.tree.is_one_file
-        assert rooted_bundle.tree_path == "bundles/main.mthds"
-        assert rooted_bundle.tree.tree_paths == ["METHODS.toml", "bundles/main.mthds"]
 
     def test_a_library_directory_holding_only_nested_methods_loads_them_all(self, tmp_path: Path) -> None:
         """Its own tree is empty, yet the packages and repositories nested in it load, and those nested in an empty one of them."""

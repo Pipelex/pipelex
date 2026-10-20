@@ -21,6 +21,7 @@ from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.libraries.exceptions import MethodRequirementsNotMetError
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
@@ -256,7 +257,7 @@ class TestMethodRequirementsRefusal:
         """The check lists and hashes the method's files, so it runs in a worker thread, never on the loop serving requests."""
         threads_holding_a_loop: list[bool] = []
 
-        def refuse_after_noting_the_thread(*, library_dirs: Sequence[Path]) -> None:  # noqa: ARG001
+        def refuse_after_noting_the_thread(*, library_dirs: Sequence[Path], tree_listing: MethodTreeListing) -> None:  # noqa: ARG001
             try:
                 asyncio.get_running_loop()
             except RuntimeError:

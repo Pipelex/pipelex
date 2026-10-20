@@ -20,6 +20,7 @@ from pipelex.interpreter_hub import (
     get_selectable_own_pipe_refs,
     set_current_library,
 )
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_params import (
     FORCE_DRY_RUN_MODE_ENV_KEY,
@@ -82,6 +83,7 @@ async def pipeline_run_setup(
     library_dirs_are_callers: bool = False,
     methods_dirs: list[Path] | None = None,
     submitted_files: Mapping[str, bytes] | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -195,6 +197,12 @@ async def pipeline_run_setup(
         step's ``template_file``, keyed by canonical bundle-relative path. The run library holds them as the
         files of the tree the contents sit at the root of, and the job's crate names that tree by its digest,
         carrying none of their bytes: the step that uses one reads it through the method file store. See
+        :func:`acquire_library`.
+    tree_listing:
+        The run's listing of the method trees it reads, made by a caller that listed them before the run, such as a CLI
+        that resolved the folder or the bundle file it runs, or a server that checked the requirements of the method it
+        holds. The run loads each tree from it rather than listing it again, so the tree whose digest the run records,
+        ``RunMetadata.method_tree_digest``, is the tree it loaded. ``None`` lists the trees for this run. See
         :func:`acquire_library`.
 
     Returns:
@@ -338,6 +346,7 @@ async def pipeline_run_setup(
             library_dirs_are_callers=library_dirs_are_callers,
             methods_dirs=methods_dirs,
             submitted_files=submitted_files,
+            tree_listing=tree_listing,
         )
         library_acquired = True
 

@@ -11,7 +11,7 @@ from pipelex.mthds_parsing.exceptions import BundleElaboratorError, MthdsParserE
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.mthds_parsing.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
 from pipelex.tools.misc.exceptions import TomlError
-from pipelex.tools.misc.toml_utils import load_toml_from_content, load_toml_from_path
+from pipelex.tools.misc.toml_utils import load_toml_from_bytes, load_toml_from_content, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -63,6 +63,7 @@ class MthdsParser(BaseModel):
         cls,
         bundle_path: Path | None = None,
         *,
+        bundle_data: bytes | None = None,
         mthds_content: str | None = None,
         mthds_source: str | None = None,
         file_origin: BundleFileOrigin = BundleFileOrigin.METHOD_TREE,
@@ -79,7 +80,9 @@ class MthdsParser(BaseModel):
         categorizer reads off that dict — mirroring the real file path the disk
         path already records, and overriding any ``source`` the bundle text
         itself declared. With ``bundle_path``, it names the file in place of its path on
-        this host, as a host names a file of a tree it wrote out for a caller by its tree path.
+        this host, as a host names a file of a tree it wrote out for a caller by its tree path. ``bundle_data`` is the
+        file's bytes when the caller read them already, such as a loader that read them against the hash its method
+        tree's listing recorded: they are parsed in place of a read of ``bundle_path``, which still names the file.
 
         ``file_origin`` says where the bundle's steps find the files they name, and so the rule a file
         reference, such as a ``PipeDocGen`` step's ``template_file``, is held to when the blueprint validates.
@@ -93,7 +96,11 @@ class MthdsParser(BaseModel):
         validation_context: BundleValidationContext
         try:
             if bundle_path is not None:
-                blueprint_dict = load_toml_from_path(path=str(bundle_path))
+                blueprint_dict = (
+                    load_toml_from_bytes(data=bundle_data, source=bundle_path)
+                    if bundle_data is not None
+                    else load_toml_from_path(path=str(bundle_path))
+                )
                 blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = mthds_source if mthds_source is not None else str(bundle_path)
                 validation_context = BundleValidationContext(file_origin=BundleFileOrigin.METHOD_TREE)
             elif mthds_content is not None:

@@ -15,6 +15,7 @@ from pipelex.cli.agent_cli.commands.inputs.bundle_cmd import inputs_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.cli.bundle_target_resolution import resolve_method_folder_run
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 from tests.helpers.method_folders import NAMED_PIPE, MethodFolderShape, write_method_folder
@@ -37,7 +38,7 @@ _VALID_RESULT: dict[str, Any] = {"success": True, "is_valid": True, "is_runnable
 def _run_refusal(*, directory: Path) -> str:
     """The message `run bundle` refuses the folder with: no single pipe to start at is the run's own refusal, no verdict."""
     with pytest.raises(MethodEntryError) as exc_info:
-        resolve_method_folder_run(directory=directory, pipe_override=None)
+        resolve_method_folder_run(directory=directory, pipe_override=None, tree_listing=MethodTreeListing())
     return exc_info.value.message
 
 
@@ -231,7 +232,7 @@ class TestAgentFolderEntryCommands:
         `validate` and `fix` exit 2 on it, no verdict, as the human `pipelex validate bundle` and `fix bundle` do;
         `inputs` and `run` exit 1, as a failed boot does.
         """
-        mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
+        mocker.patch("pipelex.libraries.method_tree_listing.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
         with pytest.raises(typer.Exit) as exc_info:

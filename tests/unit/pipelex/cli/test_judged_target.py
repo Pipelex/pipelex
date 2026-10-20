@@ -5,6 +5,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.cli.judged_target import JudgedBundleTarget, fix_judged_target
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.fixes.fix_loop import FixBundleResult
 
 _MODULE = "pipelex.cli.judged_target"
@@ -22,12 +23,14 @@ class TestJudgedTarget:
         ids=["bundle_file", "method_folder"],
     )
     async def test_the_judged_path_is_the_folder_else_the_file(self, bundle_path: Path | None, method_dir: Path | None, expected: Path) -> None:
-        target = JudgedBundleTarget(bundle_path=bundle_path, method_dir=method_dir, method_tree=None, library_dirs=None)
+        target = JudgedBundleTarget(
+            bundle_path=bundle_path, method_dir=method_dir, method_tree=None, library_dirs=None, tree_listing=MethodTreeListing()
+        )
 
         assert target.judged_path == expected
 
     async def test_a_target_naming_neither_is_unexpected(self) -> None:
-        target = JudgedBundleTarget(bundle_path=None, method_dir=None, method_tree=None, library_dirs=None)
+        target = JudgedBundleTarget(bundle_path=None, method_dir=None, method_tree=None, library_dirs=None, tree_listing=MethodTreeListing())
 
         with pytest.raises(PipelexUnexpectedError, match="neither a bundle file nor a method's folder"):
             _ = target.judged_path
@@ -37,7 +40,9 @@ class TestJudgedTarget:
         file_fix = mocker.patch(f"{_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=_RESULT))
         method_dir = Path("my_method")
         library_dirs = [method_dir, Path("libs")]
-        target = JudgedBundleTarget(bundle_path=None, method_dir=method_dir, method_tree=None, library_dirs=library_dirs)
+        target = JudgedBundleTarget(
+            bundle_path=None, method_dir=method_dir, method_tree=None, library_dirs=library_dirs, tree_listing=MethodTreeListing()
+        )
 
         result = await fix_judged_target(
             target=target, writable_library_dirs=None, allow_signatures=True, max_iterations=4, select_codes=None, ignore_codes=("strip-namespace",)
@@ -52,6 +57,7 @@ class TestJudgedTarget:
             max_iterations=4,
             select_codes=None,
             ignore_codes=("strip-namespace",),
+            tree_listing=target.tree_listing,
         )
         file_fix.assert_not_called()
 
@@ -60,7 +66,7 @@ class TestJudgedTarget:
         file_fix = mocker.patch(f"{_MODULE}.fix_bundle_file", new=mocker.AsyncMock(return_value=_RESULT))
         bundle_path = Path("my_bundle.mthds")
         writable = [Path("copy")]
-        target = JudgedBundleTarget(bundle_path=bundle_path, method_dir=None, method_tree=None, library_dirs=None)
+        target = JudgedBundleTarget(bundle_path=bundle_path, method_dir=None, method_tree=None, library_dirs=None, tree_listing=MethodTreeListing())
 
         await fix_judged_target(
             target=target, writable_library_dirs=writable, allow_signatures=False, max_iterations=None, select_codes=None, ignore_codes=None
@@ -74,5 +80,6 @@ class TestJudgedTarget:
             max_iterations=None,
             select_codes=None,
             ignore_codes=None,
+            tree_listing=target.tree_listing,
         )
         folder_fix.assert_not_called()
