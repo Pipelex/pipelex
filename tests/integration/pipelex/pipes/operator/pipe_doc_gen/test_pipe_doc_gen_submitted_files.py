@@ -19,7 +19,6 @@ from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.doc_gen.template_file_stage import DocGenTemplateFileStage
 from pipelex.pipeline.exceptions import ValidateBundleError
-from pipelex.pipeline.resolve_bundle import resolve_crate_from_contents
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -57,12 +56,10 @@ def _bundle_file_climbing_in_its_method_tree(*, method_dir: Path) -> Path:
 
 
 async def _load_from_content(*, load: str, content: str, submitted_files: dict[str, bytes] | None) -> None:
-    """Validate the content, resolve its crate or run it, as the runner's routes do with a bundle sent as a string."""
+    """Validate the content or run it, as the runner's routes do with a bundle sent as a string."""
     match load:
         case "validate":
             await validate_bundle(mthds_contents=[content], submitted_files=submitted_files)
-        case "resolve":
-            resolve_crate_from_contents(mthds_contents=[content], submitted_files=submitted_files)
         case _:
             await PipelexMTHDSProtocol(submitted_files=submitted_files).execute(mthds_contents=[content], inputs=PipeDocGenTestData.INVOICE_INPUTS)
 
@@ -120,7 +117,7 @@ class TestPipeDocGenSubmittedFiles:
 
     @pytest.mark.usefixtures("stub_engines")
     @pytest.mark.parametrize("template_file", ["../invoice.docx", "templates/../invoice.docx"], ids=["leaves_the_bundle", "dot_dot_inside"])
-    @pytest.mark.parametrize("load", ["validate", "resolve", "run"])
+    @pytest.mark.parametrize("load", ["validate", "run"])
     @pytest.mark.parametrize("sends_a_file", [False, True], ids=["sends_nothing", "sends_a_file"])
     async def test_a_template_file_no_submitted_file_could_be_keyed_by_is_a_blueprint_item_at_the_step(
         self, template_file: str, load: str, sends_a_file: bool

@@ -1,7 +1,7 @@
 """Pin: a pydantic ValidationError surfacing through the shared helper produces a clean summary.
 
 The shared bundle-loading cascade ``translate_to_validate_bundle_error`` serves every entry point
-(``validate_bundle*``, ``resolve_crate_from_contents``). A pydantic ``ValidationError`` raised
+(``validate_bundle*``, ``resolve_crate_from_method_dir``). A pydantic ``ValidationError`` raised
 during model construction surfaces as a single ``ValidateBundleError`` whose top-line ``message``
 must NOT leak the pydantic repr (``Value errors: '<field>': Value error, …``) nor the old
 ``Could not load blueprints/concepts because of:`` framing prefix that rode on it. Instead the

@@ -8,8 +8,8 @@ Pipelex refuses a method whose requirements are not met when it loads, naming ea
 never installs anything:
 
 - A tree is checked when it holds `requirements.txt` at its root and holds Python, a `.py` file anywhere in it: a tree
-  with no Python has nothing that could import a package. The check runs before any of the tree's Python is imported
-  or captured, and before any of its pipes is built.
+  with no Python has nothing that could import a package. The check runs before any of the tree's Python is imported,
+  or scanned for structure classes on a sandbox-hosted deployment, and before any of its pipes is built.
 - The environment is the one the PipeFunc steps run in (`pipelex/libraries/package_environments.py`): this interpreter
   in the `direct` execution mode, and in a sandbox-hosted mode the packages the deployment states its sandbox offers
   for the tree's requirements, asked for each tree, so trees judged together each get the offer stated for their own.
@@ -497,9 +497,10 @@ def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -
 def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], limits: TreeLimits | None = None) -> None:
     """Check the requirements of a caller's method a server holds in directories of its own, as loading them would, without loading them.
 
-    For a server that hands the directories to a loader elsewhere, such as a validator on a worker that never reads
-    them, or that loads them as its own library directories, so the refusal is the caller's and comes from the place
-    that knows the method's files. The directories are the server's: a tree of them that cannot be listed is the
+    For a server that hands the method to a loader elsewhere, such as a validator whose worker receives the method's
+    trees through its own method file store rather than these directories, or that loads them as its own library
+    directories, so the refusal is the caller's and comes, before anything loads or is dispatched, from the process that
+    holds the method's files. The directories are the server's: a tree of them that cannot be listed is the
     host's fault, as a load of a host's library directories reports it, and a refusal names no path on the host, the
     directories' and this interpreter's included.
 

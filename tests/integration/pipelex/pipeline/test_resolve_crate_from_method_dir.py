@@ -50,6 +50,8 @@ class TestResolveCrateFromMethodDir:
         try:
             assert crate.fingerprint
             assert crate.mthds_version == MTHDS_STANDARD_VERSION
+            assert "pipeline.Report" in crate.concepts
+            assert "pipeline.Score" in crate.concepts
             assert "pipeline.run_pipeline" in crate.pipes
             assert "pipeline.compute_score" in crate.pipes
             assert "native.Text" in crate.concepts, "referenced natives must be materialized into the normalized crate"
@@ -82,6 +84,7 @@ class TestResolveCrateFromMethodDir:
         open_library_spy = mocker.spy(library_manager, "open_library")
         teardown_spy = mocker.spy(library_manager, "teardown")
         current_before = get_current_library_id_or_none()
+        teardown_calls_before = teardown_spy.call_count
         with _written_tree(destination=tmp_path / "method", files=files) as method_dir, pytest.raises(ValidateBundleError) as exc_info:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
@@ -96,6 +99,7 @@ class TestResolveCrateFromMethodDir:
         else:
             assert "holds no .mthds bundle" in exc_info.value.message
         opened_library_id, _ = open_library_spy.spy_return
+        assert teardown_spy.call_count == teardown_calls_before + 1
         assert teardown_spy.call_args_list[-1].kwargs["library_id"] == opened_library_id
         assert get_current_library_id_or_none() == current_before
 
@@ -133,14 +137,16 @@ class TestResolveCrateFromMethodDir:
             resolve_crate_from_method_dir(method_dir=method_dir)
 
         discovery.assert_not_called()
-        # The unresolved dependency `/v1/validate` reports, located on the pipe calling it, in the words of the contents
-        # core's refusal.
+        # The unresolved dependency `/v1/validate` reports, located on the pipe calling it, in the words of
+        # `unshipped_address_dependency_message`.
         validation_errors = exc_info.value.validation_error_items()
         assert len(validation_errors) == 1, validation_errors
         item = validation_errors[0]
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
         assert item.source == "host.mthds"
         assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message
+        # Its advice is what the caller of a crate route can do: send the package's files beside the method's.
+        assert "`dependencies`" in item.message
         # A hosted run tells it apart by the problem item's code and parameters, the package it names included.
         problem_errors = exc_info.value.to_problem(view=ProblemView.CALLER).errors
         assert problem_errors is not None

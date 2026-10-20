@@ -734,9 +734,10 @@ class LibraryManager(LibraryManagerAbstract):
                 )
 
             # A method declaring Python packages in its requirements.txt is refused here when the environment its
-            # PipeFunc steps run in does not meet them: before any of its Python is imported or captured, and before
-            # any of its pipes is built. Every listed tree counts, one holding no bundle included, such as the Python a
-            # server received beside a method's bundles. A refusal may name host paths: these are the caller's own
+            # PipeFunc steps run in does not meet them: before any of its Python is imported, or scanned for structure
+            # classes on a sandbox-hosted deployment, and before any of its pipes is built. Every listed tree counts, one
+            # holding no bundle included, such as a library directory whose files are submitted beside the bundles parsed
+            # from content strings (below). A refusal may name host paths: these are the caller's own
             # directories, or the host's, whose refusal `reporting_host_library_tree_faults` withholds as its own fault.
             ensure_method_requirements_met(
                 trees=[
@@ -772,9 +773,10 @@ class LibraryManager(LibraryManagerAbstract):
                 # inline bundle, a stored method, a host directory): importing a file runs its module-level
                 # code in this process. A structure class cannot travel to a sandbox: it would have to be
                 # imported here to back a concept, so the load is refused, naming each file and class, before
-                # any file is kept. Every tree the load lists is scanned, a package or repository nested in a
+                # any bundle is parsed. Every tree the load lists is scanned, a package or repository nested in a
                 # library directory included. The refusal is a static scan, which a dynamically built class
-                # escapes; such a file then travels as source and still never executes here.
+                # escapes; such a file then stays a file of its tree, which reaches a sandbox only among the files
+                # of a PipeFunc call, and still never executes here.
                 ensure_no_structured_content_in_library_sources(
                     sources_by_dir=_python_sources_by_tree(library_trees=library_trees, bundle_files=all_bundle_files),
                 )
@@ -1408,7 +1410,8 @@ class LibraryManager(LibraryManagerAbstract):
             # forwards structured data and has none to forward — so every pipe/concept error a
             # pydantic validator raises during the merge arrived on the wire as one untyped residual.
             # That is the whole reason `optional_input_unguarded` and `optional_output_required` were
-            # reachable through `resolve_crate_from_contents` but not through a library directory.
+            # reachable through bundles loaded from content strings, whose `load_from_blueprints` runs
+            # straight inside the cascade, but not through a library directory.
             raise LibraryLoadingError(
                 message=(
                     f"Could not load blueprints from {bundle_sources} because of: "

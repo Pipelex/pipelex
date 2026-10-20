@@ -2,7 +2,7 @@
 
 Every surface that loads a bundle and must answer with a verdict wraps its load in
 :func:`translate_to_validate_bundle_error`: ``validate_bundle`` and ``validate_bundles_from_directory``,
-``resolve_crate_from_contents``, the library loads of the ``validate`` commands, and the run path's
+``resolve_crate_from_method_dir``, the library loads of the ``validate`` commands, and the run path's
 ``acquire_library``, so a run refuses an invalid bundle with the same located items ``validate`` gives.
 It lives in its own module, rather than beside ``validate_bundle``, because the run path's seams sit
 below the validation service in the import graph (``validate_bundle`` → ``bundle_validator`` →
@@ -86,7 +86,7 @@ def translate_to_validate_bundle_error() -> Generator[None, None, None]:
 
     Single source of truth for the bundle-loading error cascade, shared by the
     bundle-loading entry points: ``validate_bundle``, ``validate_bundles_from_directory``,
-    ``pipelex.pipeline.resolve_bundle.resolve_crate_from_contents``, the library loads and
+    ``pipelex.pipeline.resolve_bundle.resolve_crate_from_method_dir``, the library loads and
     dry-run sweeps of the ``validate pipe`` / ``validate --all`` commands, and the run path's
     ``pipelex.pipeline.execution_seams.acquire_library``, so running an invalid bundle is refused with
     the same items validating it gives.

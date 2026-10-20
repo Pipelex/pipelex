@@ -634,8 +634,10 @@ class ApiRunner(PipelexMTHDSProtocol):
             raise _missing_bundle_validator_error(mode=orchestration_mode, api_config=api_config)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
-        # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
-        # refusal is the method's invalid verdict, as a run of it is refused before its files load.
+        # its PipeFunc steps run with, before any dispatch, so a refusal reaches the caller whichever validator runs. A
+        # worker a method tree's validation is dispatched to never reads these directories: it receives the method's
+        # trees through its method file store and judges their requirements again as it loads them. A refusal is the
+        # method's invalid verdict, as a run of it is refused before its files load.
         try:
             with translate_to_validate_bundle_error():
                 await self._ensure_served_method_requirements_met()
