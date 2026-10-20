@@ -1405,7 +1405,8 @@ class LibraryManager(LibraryManagerAbstract):
             # forwards structured data and has none to forward — so every pipe/concept error a
             # pydantic validator raises during the merge arrived on the wire as one untyped residual.
             # That is the whole reason `optional_input_unguarded` and `optional_output_required` were
-            # reachable through `resolve_crate_from_contents` but not through a library directory.
+            # reachable through bundles loaded from content strings, whose `load_from_blueprints` runs
+            # straight inside the cascade, but not through a library directory.
             raise LibraryLoadingError(
                 message=(
                     f"Could not load blueprints from {bundle_sources} because of: "

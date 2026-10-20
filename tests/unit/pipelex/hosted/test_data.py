@@ -120,8 +120,9 @@ class HostedPipeIoVerdicts:
 class HostedPipeIoRefusals:
     """`POST /v1/pipe-io` refusals, as the runner answers them in the caller's view."""
 
-    # A method calling a published method by address: the crate core behind pipe-io loads no address-based dependency,
-    # which `/v1/start` fetches and runs. Built from `resolve_crate_from_contents`'s refusal on 2026-10-17.
+    # A method calling a published method by address, refused by a runner older than 0.89.0, whose pipe-io resolved the
+    # method from content strings and loaded no address-based dependency, which `/v1/start` fetches and runs. Built from
+    # that runner's refusal on 2026-10-17.
     ADDRESS_DEPENDENCY: ClassVar[str] = (
         '{"type": "https://mthds.ai/errors/request.unsupported", "title": "The request uses a form this runtime does not accept", '
         '"status": 422, "detail": "This runtime does not accept the form the request\'s field \'files\' uses (reason: '

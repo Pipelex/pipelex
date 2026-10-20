@@ -15,6 +15,10 @@
 
 - **Where a method's Python travels, in the docs**: the PipeFunc Requirements, PipeFunc and run pages say that the API server receives a method as a tree holding its bundles and its Python together and judges its `requirements.txt` from the tree's listing, that the runner never imports a method's Python, that a run's crate names each step's method tree by its digest and carries none of its files, that a `PipeFunc` call's files are read through the method file store the worker's host installs, and that a worker a method tree's validation is dispatched to checks the method's requirements again, where they said the server received a method's Python apart from its bundles, the Python was captured as text, the crate carried the method's Python sources and the worker never checked anything.
 
+### Removed
+
+- **`resolve_crate_from_contents` (Breaking)**: `pipelex.pipeline.resolve_bundle` no longer resolves a crate from bundle contents held as strings. A host resolves a method as `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io` do, by writing its tree out and calling `resolve_crate_from_method_dir`, with the packages it ships in `methods_dirs`; a call into a package nothing shipped is then an `unresolved_package_dependency` item of the invalid verdict, never the `request.unsupported` refusal with the reason `address_based_dependency`, which no resolution of this release gives.
+
 ## [v0.90.0] - 2026-10-19
 
 ### Added

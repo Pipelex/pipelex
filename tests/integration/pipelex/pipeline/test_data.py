@@ -880,7 +880,7 @@ prompt = "Count the items in $note"
 
 
 class ResolveBundleTestData:
-    """Bundles the host-facing resolve cores are pinned with."""
+    """Bundles the host-facing resolve core is pinned with."""
 
     MAIN_MTHDS: ClassVar[str] = """\
 domain = "pipeline"
