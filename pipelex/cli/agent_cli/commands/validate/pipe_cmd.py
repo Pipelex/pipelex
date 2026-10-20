@@ -62,8 +62,9 @@ def validate_pipe_cmd(
     Default output is markdown; use --format json for structured JSON.
     Results go to stdout on success, and a failure's problem to stderr. Exit codes: 0 when the pipe or library is
     valid; 1 on the invalid verdict, on a library not runnable under --all without --allow-signatures, and when
-    Pipelex fails to boot; 2 when no verdict could be produced: a command line that does not parse, a missing or
-    ambiguous pipe code, a model no enabled backend serves, an unexpected failure.
+    Pipelex fails to boot; 2 when no verdict could be produced: a command line that does not parse, an argument it
+    refuses (no pipe code without --all, --all with a pipe code, a path where a pipe code is expected), a pipe code
+    not found or ambiguous, a model no enabled backend serves, an unexpected failure.
 
     Examples:
         pipelex-agent validate pipe my_pipe

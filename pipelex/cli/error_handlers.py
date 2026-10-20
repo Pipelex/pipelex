@@ -532,9 +532,9 @@ def handle_pre_boot_config_error(*, exc: PipelexConfigError, command: str, exit_
         command: The human command name, as the command's other failures name it (e.g. ``"validate"``).
         exit_code: The exit code the command gives this refusal. ``validate`` and ``fix`` give 2, since it gives no
             verdict on the method, as the 0/1/2 policy reserves 2 for, and the agent CLI's ``validate bundle`` and
-            ``fix bundle`` give the same; ``run`` and ``build`` give 1, as they give their other failures. The same
-            configuration reached at the boot itself, as a bundle file reaches it, keeps the boot's own exit code, 1,
-            which L-260930-8873aa settles.
+            ``fix bundle`` give the same; ``run`` and ``build`` give 1, as they give their other failures. ``validate``
+            and ``fix`` do not list a lone ``.mthds`` file before the boot, so for a file the same configuration
+            surfaces only at the boot, which exits 1.
     """
     print_traceback_if_requested(console=get_error_console())
     typer.secho(f"Failed to {command}: {exc.message}", fg=typer.colors.RED, err=True)

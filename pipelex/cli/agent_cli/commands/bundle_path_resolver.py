@@ -25,9 +25,8 @@ def resolve_bundle_target(path: str, *, library_dir: list[str] | None) -> Judged
     A folder holding no bundle, its problem the error's own, and a path that is neither a ``.mthds`` file nor a
     directory, ``client.argument_invalid``, produce no verdict: exit 2 via ``agent_error``. So does a configuration
     that does not validate, read for the tree's limits before the boot: it is reported with the problem of the failed
-    boot it would have been, and exits 2, as ``pipelex validate bundle`` and ``pipelex fix bundle`` exit on it. The
-    same configuration reached at the boot itself, as a bundle file reaches it, keeps the boot's own exit code, 1,
-    which L-260930-8873aa settles.
+    boot it would have been, and exits 2, as ``pipelex validate bundle`` and ``pipelex fix bundle`` exit on it. A lone
+    ``.mthds`` file is not listed before the boot, so the same configuration surfaces only at the boot, which exits 1.
 
     Both ``path`` and each ``library_dir`` entry have ``~`` expanded before resolution, so home-relative inputs behave
     like every other CLI path argument.

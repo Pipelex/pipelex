@@ -61,9 +61,9 @@ def resolve_bundle_target(
     No verdict is produced, exit 2 with a red message on stderr, for a folder holding no bundle, for a path that is
     neither a ``.mthds`` file nor a directory, and for a configuration that does not validate, read for the tree's
     limits before the boot, which ``pipelex-agent validate bundle`` and ``pipelex-agent fix bundle`` refuse with the
-    same exit code. The same configuration reached at the boot itself, as a bundle file reaches it, keeps the boot's
-    own exit code, 1, which L-260930-8873aa settles. A folder whose tree is refused is the invalid verdict, which each
-    command reports as its own: ``validate`` as an invalid bundle, ``fix`` as a fix that fails.
+    same exit code. A lone ``.mthds`` file is not listed before the boot, so the same configuration surfaces only at
+    the boot, which exits 1. A folder whose tree is refused is the invalid verdict, which each command reports as its
+    own: ``validate`` as an invalid bundle, ``fix`` as a fix that fails.
 
     Both ``path`` and each ``library_dir`` entry have ``~`` expanded before resolution, so home-relative inputs behave
     like every other CLI path argument.
