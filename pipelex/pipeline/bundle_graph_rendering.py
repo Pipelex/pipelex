@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from pipelex.config import get_config
-from pipelex.graph.graph_rendering import GraphFormat, render_graph_from_spec
+from pipelex.graph.graph_factory import save_graph_outputs_to_dir
+from pipelex.graph.graph_rendering import GraphFormat, render_graph_outputs
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -91,8 +92,8 @@ async def generate_graph_for_bundle(
 ) -> dict[str, Any]:
     """Generate graph visualization for a bundle via dry-run pipeline execution.
 
-    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing, then renders the graph HTML files and
-    saves them in the folder `make_output_folder` makes for the pipe the dry run drew. The bundle's own folder is
+    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing, then renders the graph HTML files and,
+    once they have rendered, saves them in the folder `make_output_folder` makes for the pipe the dry run drew. The bundle's own folder is
     usually inside a method's tree, so the files are never written there unasked: a file added to the tree would change
     the digest of the method the graph was drawn from.
 
@@ -133,16 +134,17 @@ async def generate_graph_for_bundle(
             include_mermaidflow = True
             include_reactflow = True
 
-    output_dir = make_output_folder(pipe_code=resolved_pipe_code)
-    saved_files = await render_graph_from_spec(
+    graph_outputs = await render_graph_outputs(
         graph_spec=graph_spec,
         graph_config=execution_config.graph,
         include_mermaidflow=include_mermaidflow,
         include_reactflow=include_reactflow,
-        output_dir=output_dir,
         pipe_code=resolved_pipe_code,
         direction=direction,
     )
+    # The folder is made once the graph has rendered, so a render that fails leaves no empty numbered folder behind.
+    output_dir = make_output_folder(pipe_code=resolved_pipe_code)
+    saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
     # Rename reactflow.html to the requested filename
     reactflow_path = saved_files.get("reactflow_html")
