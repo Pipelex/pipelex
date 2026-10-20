@@ -195,8 +195,10 @@ tstop: temporal-stop
 # Resolve an MTHDS bundle the same way `pipelex run bundle <path>` does and send
 # it to the API as a request — run it directly, dry-run validate it, resolve it
 # to its normalized crate, project typed codegen artifacts, emit curl, push a
-# Postman query, or just print the body. Runs the skill's helper script with OUR
-# venv python.
+# Postman query, or just print the body. The method travels as `files`, every
+# file of its tree. Runs the skill's helper script with OUR venv python, which
+# the targets install first: the script lists the tree with the `mthds` package
+# and reads the runner's tree limits from `pipelex_api`.
 #
 #   make bundle-run      BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
 #   make bundle-validate BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard
@@ -225,7 +227,7 @@ BUNDLE_RUN_OPTS = $(if $(BASE_URL),--base-url $(BASE_URL)) $(if $(TOKEN),--token
 check-bundle-arg:
 	@test -n "$(BUNDLE)" || { echo "ERROR: set BUNDLE=<bundle dir or .mthds file>, e.g. make bundle-run BUNDLE=../../pipelex-demos/mthds-wip/fashion_moodboard"; exit 1; }
 
-bundle-run: env check-bundle-arg
+bundle-run: install check-bundle-arg
 	$(call PRINT_TITLE,"Running bundle against the API")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --run $(BUNDLE_RUN_OPTS) $(BUNDLE_OPTS)
 
@@ -233,32 +235,32 @@ bundle-run: env check-bundle-arg
 # pass ENDPOINT here). NAME/ALLOW_SIGNATURES/RENDER/BASE_URL/TOKEN/ARGS still
 # apply (RENDER=markdown reproduces a skill-driven validate); PIPE/INPUTS are
 # intentionally omitted — the validate endpoint ignores them.
-bundle-validate: env check-bundle-arg
+bundle-validate: install check-bundle-arg
 	$(call PRINT_TITLE,"Validating bundle via the API - dry-run with no inference")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --run --endpoint validate $(if $(ALLOW_SIGNATURES),--allow-signatures) $(if $(RENDER),--render $(RENDER)) $(if $(NAME),--name $(NAME)) $(BUNDLE_RUN_OPTS) $(ARGS)
 
 # Resolve the bundle's closure to its normalized library crate via /v1/resolve —
 # no inference, no dry-run sweep, no cost. PIPE/INPUTS are intentionally
 # omitted — the crate routes take neither.
-bundle-resolve: env check-bundle-arg
+bundle-resolve: install check-bundle-arg
 	$(call PRINT_TITLE,"Resolving bundle to its normalized crate via the API")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --run --endpoint resolve $(if $(NAME),--name $(NAME)) $(BUNDLE_RUN_OPTS) $(ARGS)
 
 # Project typed artifacts + codegen.lock via /v1/codegen — no inference, no
 # cost. TARGET is required: ts-zod | python-pydantic | python-structures.
-bundle-codegen: env check-bundle-arg
+bundle-codegen: install check-bundle-arg
 	@test -n "$(TARGET)" || { echo "ERROR: set TARGET=<ts-zod|python-pydantic|python-structures>, e.g. make bundle-codegen BUNDLE=... TARGET=ts-zod"; exit 1; }
 	$(call PRINT_TITLE,"Generating typed artifacts via the API codegen route")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --run --endpoint codegen --target $(TARGET) $(if $(NAME),--name $(NAME)) $(BUNDLE_RUN_OPTS) $(ARGS)
 
-bundle-curl: env check-bundle-arg
+bundle-curl: install check-bundle-arg
 	$(call PRINT_TITLE,"Emitting curl for bundle")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --curl $(BUNDLE_RUN_OPTS) $(BUNDLE_OPTS)
 
-bundle-postman: env check-bundle-arg
+bundle-postman: install check-bundle-arg
 	$(call PRINT_TITLE,"Pushing Postman query for bundle")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) $(BUNDLE_OPTS)
 
-bundle-dry: env check-bundle-arg
+bundle-dry: install check-bundle-arg
 	$(call PRINT_TITLE,"Bundle request body - dry run only")
 	$(VENV_PYTHON) $(BUNDLE_SCRIPT) $(BUNDLE) --dry-run $(BUNDLE_OPTS)

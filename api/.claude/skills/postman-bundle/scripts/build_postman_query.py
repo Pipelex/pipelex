@@ -1,10 +1,30 @@
-#!/usr/bin/env python3
 """Build a runnable Postman request from a Pipelex MTHDS bundle and push it live.
 
 Mirrors ``pipelex run bundle <path>`` resolution: given a bundle directory (or a
-single ``.mthds`` file), it finds the bundle file(s), extracts ``main_pipe``,
-loads the sibling ``inputs.json``, and inserts a ready-to-run request into the
+single ``.mthds`` file), it finds the main bundle file, extracts ``main_pipe``
+(sent as ``pipe_code``, qualified by that bundle's domain unless ``--pipe``
+names one), loads the sibling ``inputs.json``, and inserts a ready-to-run request into the
 live "Pipelex FastAPI" Postman collection under ``Bundles/<bundle>/``.
+
+The method travels in every body as ``files``, the MTHDS standard's map of file
+entries: each file of the method tree the bundle belongs to, keyed by its tree
+path, its value the file's UTF-8 text, or ``{"base64": ...}`` for a file that is
+not UTF-8. The tree is listed by the ``mthds`` package's own lister, so it is
+judged by the membership rule the runner and every MTHDS client apply
+(``mthds/docs/spec/method-tree.md``): its root is the nearest directory at or
+above the bundle holding ``METHODS.toml``, else the directory handed over, else,
+for a ``.mthds`` file named alone, the one-file tree of that file; dotfiles,
+``.gitignore``d files, virtual environments and nested packages stay out. The
+script itself drops a run's inputs file, any file named ``inputs.json`` or
+``inputs.toml`` at any depth, as the standard's run-inputs default does, since
+the ``mthds`` lister pinned here still lists it: the sibling ``inputs.json``
+travels as ``inputs`` and never as a file of the tree. A body built here never uses the by-hash entry
+(``{"sha256", "size"}``), which only resolves once the bytes are uploaded to the
+runner's blob store, so a Postman query or a curl command stays self-contained.
+The listing stops at the runner's own limits on a tree a request sends.
+
+Run it with the server's environment (``make bundle-*`` from ``api/``, or
+``.venv/bin/python`` there): it imports ``mthds`` and ``pipelex_api.limits``.
 
 Requests are generated per bundle (configurable via ``--endpoint``):
 ``Execute (sync)`` -> ``POST /v1/execute``, ``Start (async)`` ->
@@ -21,9 +41,9 @@ request fails fast (asking for one) if none is found.
 
 File/document inputs are NOT uploaded. Any local (non-http) ``url`` in
 inputs.json is copied verbatim and reported so you can swap in a real URL before
-running. Run this against a self-contained bundle (concepts/structures declared
-inline in the .mthds) — the API only receives the inline mthds_contents, not the
-directory, so sibling Python structure classes are not available.
+running. A tree holding a ``.py`` file runs only on a sandbox-hosted runner
+(elsewhere a 501), and a Python structure class is refused everywhere, so keep
+concepts and structures declared in the ``.mthds``.
 """
 
 from __future__ import annotations
@@ -34,30 +54,42 @@ import os
 import re
 import sys
 import tempfile
+import tomllib
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, NoReturn, cast
+from typing import Any, NamedTuple, NoReturn, cast
 
-try:
-    import tomllib
-except ModuleNotFoundError:  # Python < 3.11 — fall back to regex extraction.
-    tomllib = None  # type: ignore[assignment]
+from mthds.method_tree.exceptions import MethodTreeError
+from mthds.method_tree.file_entry import encode_file_map
+from mthds.method_tree.lister import list_method_tree
+from mthds.method_tree.models import MethodTree, TreeLimits
+from mthds.method_tree.tree_path import nfc
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
+
+from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES, MAX_METHOD_TREE_FILES, MAX_METHOD_TREE_TOTAL_BYTES
+
+# One file of a method tree as a body carries it: its UTF-8 text, or {"base64": ...} for other bytes.
+FileEntry = str | dict[str, str | int]
+
+# A run's inputs file, which the standard's run-inputs default keeps out of every tree at any depth
+# (`mthds/docs/spec/method-tree.md`, "Run Inputs Files"): a file named exactly so, letter case included.
+# A directory of either name excludes nothing.
+RUN_INPUTS_FILE_NAMES = frozenset({DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME})
 
 DEFAULT_COLLECTION_UID = "35082494-559c5753-885c-409a-af63-7647fe28d301"
 POSTMAN_API_BASE = "https://api.getpostman.com"
 DEFAULT_BUNDLE_FILE_NAME = "bundle.mthds"
-DEFAULT_INPUTS_FILE_NAME = "inputs.json"
 MTHDS_EXTENSION = ".mthds"
 TOP_FOLDER_NAME = "Bundles"
 
 # name -> (request display name, URL path segments, body kind)
-# Body kind selects the request shape:
-#   "run"          -> {pipe_code, mthds_contents, inputs} for the sync /execute
+# Body kind selects the request shape; every one carries the method as `files`:
+#   "run"          -> {pipe_code, inputs, files} for the sync /execute
 #   "start"        -> the same plus {callback_urls} for the async /start
-#   "validate"     -> {mthds_contents, allow_signatures [, mthds_sources, render]}
-#   "resolve"      -> {files: [{content, source}]} — the crate envelope
-#   "codegen"      -> the crate envelope plus {kind, target}
+#   "validate"     -> {allow_signatures [, render], files}
+#   "resolve"      -> {files}
+#   "codegen"      -> {kind, target, files}
 # Only "run"/"start" trigger inference; every other kind is a free
 # parse/load/dry-run on the server.
 ENDPOINTS: dict[str, tuple[str, list[str], str]] = {
@@ -70,7 +102,7 @@ ENDPOINTS: dict[str, tuple[str, list[str], str]] = {
 
 # Which endpoints need what. execute/start run a specific pipe with real inputs;
 # validate and the crate routes (resolve/codegen) derive everything from the
-# bundle text.
+# method's files.
 PIPE_CODE_ENDPOINTS = {"execute", "start"}
 INPUTS_ENDPOINTS = {"execute", "start"}
 SIGNATURE_ENDPOINTS = {"validate"}
@@ -87,13 +119,23 @@ def fail(msg: str) -> NoReturn:
 # --- bundle resolution (mirrors `pipelex run bundle`) ---------------------
 
 
-def resolve_bundle(raw_path: str, inputs_override: str | None) -> tuple[Path, list[Path], Path | None]:
-    """Resolve a bundle path into (main_file, all_mthds_files, inputs_path).
+class ResolvedBundle(NamedTuple):
+    """What a bundle path resolves to: the path handed over, its main bundle file, and the inputs file to send."""
+
+    handed_over: Path
+    main_file: Path
+    inputs_path: Path | None
+
+
+def resolve_bundle(raw_path: str, inputs_override: str | None) -> ResolvedBundle:
+    """Resolve a bundle path into the path handed over, its main bundle file, and its inputs file.
 
     Directory mode auto-detects ``bundle.mthds`` (or the single ``*.mthds``) and
     a sibling ``inputs.json``, exactly like the CLI. File mode takes the .mthds
     as-is and only uses ``--inputs`` if given (the CLI does not auto-detect
-    inputs in file mode).
+    inputs in file mode). The main bundle file gives ``main_pipe`` and the
+    domain; what the request sends is the method tree of the path handed over
+    (``list_bundle_tree``).
     """
     target = Path(raw_path).expanduser()
 
@@ -114,10 +156,6 @@ def resolve_bundle(raw_path: str, inputs_override: str | None) -> tuple[Path, li
                 )
             main_file = mthds_files[0]
 
-        # Send every .mthds in the directory (main first), mirroring how the CLI
-        # adds the directory as a library dir so sibling bundles resolve.
-        all_mthds = [main_file] + [path for path in sorted(target.glob(f"*{MTHDS_EXTENSION}")) if path != main_file]
-
         inputs_path: Path | None = None
         if inputs_override:
             inputs_path = Path(inputs_override).expanduser()
@@ -125,38 +163,113 @@ def resolve_bundle(raw_path: str, inputs_override: str | None) -> tuple[Path, li
             candidate = target / DEFAULT_INPUTS_FILE_NAME
             if candidate.is_file():
                 inputs_path = candidate
-        return main_file, all_mthds, inputs_path
+        return ResolvedBundle(handed_over=target, main_file=main_file, inputs_path=inputs_path)
 
     if target.is_file() and target.suffix == MTHDS_EXTENSION:
         inputs_path = Path(inputs_override).expanduser() if inputs_override else None
-        return target, [target], inputs_path
+        return ResolvedBundle(handed_over=target, main_file=target, inputs_path=inputs_path)
 
     fail(f"'{raw_path}' is not a {MTHDS_EXTENSION} file or directory")
+
+
+# --- the method tree, sent as `files` ----------------------------------------
+
+
+def list_bundle_tree(handed_over: Path) -> MethodTree:
+    """List the method tree of a bundle directory or a ``.mthds`` file, as the runner and every MTHDS client list it.
+
+    The listing is ``mthds``'s own, so its root and its membership rule are the
+    standard's, and it stops before reading any file once the tree passes one of
+    the runner's limits on a tree a request sends.
+    """
+    limits = TreeLimits(
+        max_files=MAX_METHOD_TREE_FILES,
+        max_total_bytes=MAX_METHOD_TREE_TOTAL_BYTES,
+        max_file_bytes=MAX_METHOD_TREE_FILE_BYTES,
+    )
+    try:
+        return list_method_tree(handed_over, limits=limits)
+    except MethodTreeError as exc:
+        fail(f"cannot list the method tree of '{handed_over}': {exc.message}")
+
+
+def tree_path_of(tree: MethodTree, file_path: Path) -> str | None:
+    """The tree path of a file on disk in a tree listed from disk, or None when the tree does not hold it."""
+    if tree.directory is None:
+        return None
+    try:
+        relative = file_path.resolve().relative_to(tree.directory)
+    except ValueError:
+        return None
+    tree_path = nfc(relative.as_posix())
+    return tree_path if tree_path in tree.members else None
+
+
+def is_run_inputs_file(tree_path: str) -> bool:
+    """Whether a file of a tree is a run's inputs file, which the standard's run-inputs default keeps out of every tree."""
+    return tree_path.rsplit("/", 1)[-1] in RUN_INPUTS_FILE_NAMES
+
+
+def build_files_map(tree: MethodTree) -> dict[str, FileEntry]:
+    """The ``files`` a body carries: every file of the tree under its tree path, inline, but a run's inputs file.
+
+    The ``mthds`` lister pinned here still lists a file named ``inputs.json`` or
+    ``inputs.toml``, which the standard keeps out of every tree and a runner
+    applying the rule refuses as a key, so it is dropped here: a run's inputs
+    travel as ``inputs``, never as a file of the method. Once the lister applies
+    the rule itself, no such file reaches this loop.
+
+    ``mthds`` encodes each file: its text when its bytes are UTF-8, else
+    ``{"base64": ...}``. No file is sent by hash, since a hash entry resolves
+    only in a runner's blob store, which a Postman query or a curl command never
+    uploads to.
+    """
+    contents: dict[str, bytes] = {}
+    for tree_path in tree.tree_paths:
+        if is_run_inputs_file(tree_path):
+            continue
+        location = tree.file_location(tree_path)
+        try:
+            contents[tree_path] = location.read_bytes()
+        except OSError as exc:
+            fail(f"cannot read '{location}' to send it as '{tree_path}': {exc}")
+    return encode_file_map(contents)
 
 
 def parse_bundle_meta(text: str) -> tuple[str | None, str | None]:
     """Extract (main_pipe, domain) from a .mthds bundle.
 
-    Uses tomllib when available (the .mthds top level is valid TOML), falling
-    back to a line-anchored regex so a non-standard bundle still yields a guess.
+    Uses tomllib (the .mthds top level is valid TOML), falling back to a
+    line-anchored regex so a non-standard bundle still yields a guess.
     """
-    if tomllib is not None:
-        try:
-            data = tomllib.loads(text)
-            main_pipe = data.get("main_pipe")
-            domain = data.get("domain")
-            return (
-                main_pipe if isinstance(main_pipe, str) else None,
-                domain if isinstance(domain, str) else None,
-            )
-        except tomllib.TOMLDecodeError:
-            pass
+    try:
+        data = tomllib.loads(text)
+        main_pipe = data.get("main_pipe")
+        domain = data.get("domain")
+        return (
+            main_pipe if isinstance(main_pipe, str) else None,
+            domain if isinstance(domain, str) else None,
+        )
+    except tomllib.TOMLDecodeError:
+        pass
     main_match = re.search(r'(?m)^\s*main_pipe\s*=\s*"([^"]+)"', text)
     domain_match = re.search(r'(?m)^\s*domain\s*=\s*"([^"]+)"', text)
     return (
         main_match.group(1) if main_match else None,
         domain_match.group(1) if domain_match else None,
     )
+
+
+def qualified_main_pipe(main_pipe: str | None, domain: str | None) -> str | None:
+    """The main bundle's ``main_pipe`` as the pipe ref ``domain.pipe_code``, or bare when the bundle declares no domain.
+
+    The body carries the whole method tree, so a bare code would be ambiguous
+    as soon as another bundle of the tree declares a pipe of the same code; the
+    domain-qualified ref names the main bundle's pipe whatever its siblings hold.
+    """
+    if not main_pipe or not domain:
+        return main_pipe
+    return f"{domain}.{main_pipe}"
 
 
 # --- inputs ----------------------------------------------------------------
@@ -253,86 +366,83 @@ def read_dotenv_value(key: str) -> str | None:
 # --- Postman request construction -----------------------------------------
 
 
+# Every body puts `files` last: it holds the whole method, so the fields a reader
+# tweaks in Postman (pipe_code, inputs, callback_urls, render) stay on top.
+
+
 def build_run_body(
     pipe_code: str | None,
-    mthds_contents: list[str],
+    files: dict[str, FileEntry],
     inputs: Any,
     callback_urls: list[str] | None = None,
 ) -> str:
-    """Body for /execute and /start: pipe_code + mthds_contents + inputs.
+    """Body for /execute and /start: pipe_code + inputs + the method's files.
 
-    The async /start adds ``callback_urls`` — the webhook(s) the runner
-    POSTs the finished result to. It is omitted for the sync /execute.
+    ``pipe_code`` names the pipe to run; without it the runner starts at the
+    ``main_pipe`` of the tree's root ``METHODS.toml``, else at the one
+    ``main_pipe`` its bundles declare. The async /start adds ``callback_urls`` —
+    the webhook(s) the runner POSTs the finished result to. It is omitted for the
+    sync /execute.
     """
     body: dict[str, Any] = {}
     if pipe_code:
         body["pipe_code"] = pipe_code
-    body["mthds_contents"] = mthds_contents
     if inputs is not None:
         body["inputs"] = inputs
     if callback_urls:
         body["callback_urls"] = callback_urls
+    body["files"] = files
     return json.dumps(body, indent=2, ensure_ascii=False)
 
 
 def build_validate_body(
-    mthds_contents: list[str],
+    files: dict[str, FileEntry],
     allow_signatures: bool,
     *,
-    mthds_sources: list[str] | None = None,
     render: list[str] | None = None,
 ) -> str:
-    """Body for /validate — the skill-faithful wire shape.
+    """Body for /validate.
 
     The endpoint takes no ``pipe_code`` and no ``inputs`` — it parses, loads, and
     dry-runs every pipe with mock inputs and zero inference, so it needs only the
-    bundle text. This mirrors exactly what ``mthds-agent validate bundle <file>``
-    sends through ``--runner api`` (see ``mthds-js`` ``MthdsApiClient.validate``):
+    method's files. Each file is named by its tree path, which is what a
+    server-side ``errors[].location.file`` names.
 
-    - ``mthds_contents`` — always.
     - ``allow_signatures`` — always present (real clients send the bool verbatim;
       ``false`` is the strict default).
-    - ``mthds_sources`` — when provided, parallel to ``mthds_contents``; each entry
-      names the owning file so server-side ``errors[].location.file`` resolves.
     - ``render`` — the opt-in Pipelex-API presentation hint (e.g. ``["markdown"]``).
       A **skill** validates with the default Markdown view, so it sends
       ``render: ["markdown"]`` and reads the ``rendered_markdown`` the 200 carries; a
       **hook** validates with ``--format json`` and omits ``render`` (lean structured
       body). Pass ``--render markdown`` to reproduce the skill flow.
+    - ``files`` — always.
     """
-    body: dict[str, Any] = {
-        "mthds_contents": mthds_contents,
-        "allow_signatures": allow_signatures,
-    }
-    if mthds_sources:
-        body["mthds_sources"] = mthds_sources
+    body: dict[str, Any] = {"allow_signatures": allow_signatures}
     if render:
         body["render"] = render
+    body["files"] = files
     return json.dumps(body, indent=2, ensure_ascii=False)
 
 
 def build_crate_body(
-    mthds_contents: list[str],
-    mthds_sources: list[str],
+    files: dict[str, FileEntry],
     *,
     codegen_kind: str | None = None,
     codegen_target: str | None = None,
 ) -> str:
-    """Body for /resolve and /codegen — the crate routes' ``files[]`` envelope.
+    """Body for /resolve and /codegen: the method's files, and nothing else for /resolve.
 
-    Unlike validate's parallel ``mthds_contents[]``/``mthds_sources[]`` lists, the
-    crate routes pair each content with its source in one ``{content, source}``
-    entry (the shape the codegen spec pins). No ``pipe_code``, no ``inputs`` —
-    the closure is the whole request. /codegen adds the two projection axes:
-    ``kind`` (only ``types`` is served — an inputs template is projected client-side) and
-    ``target`` (``ts-zod`` | ``python-pydantic`` | ``python-structures``).
+    No ``pipe_code``, no ``inputs`` — the closure is the whole request. /codegen
+    adds the two projection axes: ``kind`` (only ``types`` is served — an inputs
+    template is projected client-side) and ``target`` (``ts-zod`` |
+    ``python-pydantic`` | ``python-structures``).
     """
     body: dict[str, Any] = {}
     if codegen_kind:
         body["kind"] = codegen_kind
     if codegen_target:
         body["target"] = codegen_target
-    body["files"] = [{"content": content, "source": source} for content, source in zip(mthds_contents, mthds_sources)]
+    body["files"] = files
     return json.dumps(body, indent=2, ensure_ascii=False)
 
 
@@ -458,13 +568,17 @@ def pretty_json(text: str) -> str:
 # --- main ------------------------------------------------------------------
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Resolve a Pipelex MTHDS bundle and either push a Postman query, emit curl, or run it."
-    )
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Resolve a Pipelex MTHDS bundle and either push a Postman query, emit curl, or run it.")
     parser.add_argument("bundle", help="Path to a bundle directory or a .mthds file")
     parser.add_argument("--inputs", help="Override inputs JSON path (default: auto-detect inputs.json in a directory)")
-    parser.add_argument("--pipe", help="Override main_pipe (sets pipe_code). Ignored by --endpoint validate.")
+    parser.add_argument(
+        "--pipe",
+        help=(
+            "Override main_pipe (sets pipe_code, sent exactly as given: qualify it as domain.pipe_code when another "
+            "bundle of the tree declares the same code). Ignored by every endpoint but execute/start."
+        ),
+    )
     parser.add_argument(
         "--callback-url",
         action="append",
@@ -523,7 +637,7 @@ def main() -> None:
     # Only used by --run / --curl.
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"API base URL for --run/--curl (default: {DEFAULT_BASE_URL})")
     parser.add_argument("--token", help="Bearer token for --run/--curl (omit when the server runs AUTH_MODE=none)")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if sum([args.dry_run, args.curl, args.run]) > 1:
         fail("choose at most one of --dry-run, --curl, --run.")
@@ -554,18 +668,34 @@ def main() -> None:
     if "codegen" in active_keys and not args.target:
         fail(f"--endpoint codegen requires --target <{'|'.join(CODEGEN_TARGETS)}>.")
 
-    main_file, all_mthds, inputs_path = resolve_bundle(args.bundle, args.inputs)
+    bundle = resolve_bundle(args.bundle, args.inputs)
+    main_file = bundle.main_file
+    inputs_path = bundle.inputs_path
     main_text = main_file.read_text(encoding="utf-8")
     main_pipe, domain = parse_bundle_meta(main_text)
 
-    # `pipe_code` is required only by the run endpoints — /validate derives
-    # everything it needs from the bundle text and takes no pipe_code.
-    pipe_code = args.pipe or main_pipe
-    if needs_pipe and not pipe_code:
+    # The method travels as its whole tree. The main bundle must be one of its
+    # files, or the pipe_code taken from it would name a pipe the runner never
+    # receives.
+    tree = list_bundle_tree(bundle.handed_over)
+    main_tree_path = tree_path_of(tree, main_file)
+    if main_tree_path is None:
         fail(
-            f"could not determine main_pipe from '{main_file}'. Declare main_pipe in the bundle, "
-            "or pass --pipe <pipe_code>."
+            f"the membership rule keeps '{main_file}' out of the method tree rooted at '{tree.directory}', so the "
+            "runner would never receive it. Check the tree's .gitignore files and the [package] exclude patterns of "
+            "its METHODS.toml."
         )
+    files = build_files_map(tree)
+    tree_root_label = f"{tree.directory} (the one-file tree of {main_tree_path})" if tree.is_one_file else f"{tree.directory}"
+
+    # `pipe_code` is required only by the run endpoints — /validate derives
+    # everything it needs from the method's files and takes no pipe_code. An
+    # explicit --pipe is sent exactly as given; the inferred one is qualified with
+    # the main bundle's domain, since the whole tree travels and another of its
+    # bundles may declare a pipe of the same bare code.
+    pipe_code = args.pipe or qualified_main_pipe(main_pipe, domain)
+    if needs_pipe and not pipe_code:
+        fail(f"could not determine main_pipe from '{main_file}'. Declare main_pipe in the bundle, or pass --pipe <pipe_code>.")
 
     # callback_urls belongs to the async /start endpoint only. In the Postman
     # push it is always the {{callback_url}} collection variable — switchable
@@ -586,8 +716,6 @@ def main() -> None:
                     "have one, ask the user for a callback URL (e.g. a https://webhook.site/... endpoint)."
                 )
 
-    mthds_contents = [path.read_text(encoding="utf-8") for path in all_mthds]
-
     # inputs (and their local-url warnings) matter only to the run endpoints;
     # every other endpoint ignores them, so don't load or warn otherwise.
     inputs: Any = None
@@ -597,13 +725,9 @@ def main() -> None:
 
     subfolder_name = args.name or domain or main_file.stem
 
-    # Per-file sources, parallel to mthds_contents. /validate sends them as the
-    # `mthds_sources` list; the crate routes pair them into `files[].source`.
-    # Either way, server-side diagnostics name the owning file. `render` is the
-    # opt-in presentation hint on /validate: a skill validates with the default
-    # Markdown view (`--render markdown`), a hook omits it and reads the
-    # structured body.
-    mthds_sources = [path.name for path in all_mthds]
+    # `render` is the opt-in presentation hint on /validate: a skill validates
+    # with the default Markdown view (`--render markdown`), a hook omits it and
+    # reads the structured body.
     render_formats: list[str] = []
     for raw_format in cast("list[str]", args.render or []):
         normalized = raw_format.strip().lower()
@@ -614,23 +738,20 @@ def main() -> None:
     # execute/start which share the run-request shape via "run"/"start").
     bodies: dict[str, str] = {}
     if needs_run:
-        bodies["run"] = build_run_body(pipe_code, mthds_contents, inputs)
+        bodies["run"] = build_run_body(pipe_code, files, inputs)
     if needs_start:
-        bodies["start"] = build_run_body(pipe_code, mthds_contents, inputs, callback_urls=callback_urls)
+        bodies["start"] = build_run_body(pipe_code, files, inputs, callback_urls=callback_urls)
     if needs_validate:
-        bodies["validate"] = build_validate_body(
-            mthds_contents,
-            args.allow_signatures,
-            mthds_sources=mthds_sources,
-            render=render_formats or None,
-        )
+        bodies["validate"] = build_validate_body(files, args.allow_signatures, render=render_formats or None)
     if "resolve" in active_keys:
-        bodies["resolve"] = build_crate_body(mthds_contents, mthds_sources)
+        bodies["resolve"] = build_crate_body(files)
     if "codegen" in active_keys:
-        bodies["codegen"] = build_crate_body(mthds_contents, mthds_sources, codegen_kind="types", codegen_target=args.target)
+        bodies["codegen"] = build_crate_body(files, codegen_kind="types", codegen_target=args.target)
 
+    file_labels = [f"{tree_path} (base64)" if isinstance(entry, dict) else tree_path for tree_path, entry in files.items()]
     print(f"Bundle:      {main_file}")
-    print(f"mthds files: {', '.join(path.name for path in all_mthds)}")
+    print(f"tree root:   {tree_root_label}")
+    print(f"files:       {', '.join(file_labels)}")
     if needs_pipe:
         print(f"pipe_code:   {pipe_code}")
     if needs_inputs:
@@ -641,10 +762,10 @@ def main() -> None:
         print(f"signatures:  allow_signatures={args.allow_signatures}")
     if needs_validate:
         render_note = ", ".join(render_formats) or "none (structured-only, hook-style)"
-        print(f"validate:    POST /v1/validate (no inference) — sources: {', '.join(mthds_sources)}")
+        print("validate:    POST /v1/validate (no inference)")
         print(f"  render:    {render_note}")
     if needs_crate:
-        print(f"crate:       files[] envelope — sources: {', '.join(mthds_sources)} (no inference)")
+        print("crate:       the method's files, nothing else (no inference)")
     if "codegen" in active_keys:
         print(f"codegen:     kind=types target={args.target}")
     if local_url_warnings:
@@ -683,11 +804,8 @@ def main() -> None:
 
     # mode == "postman"
     assert api_key is not None  # guaranteed above for the postman path
-    trailer = (
-        "Generated by the postman-bundle skill. Set `base_url` and `auth_token` in your "
-        "Postman environment before running."
-    )
-    source_lines = f"- Source: `{main_file}`\n- .mthds files sent: {len(mthds_contents)}\n"
+    trailer = "Generated by the postman-bundle skill. Set `base_url` and `auth_token` in your Postman environment before running."
+    source_lines = f"- Source: `{main_file}`\n- Method tree: `{tree_root_label}`, sent as `files`: {', '.join(file_labels)}\n"
 
     def describe(key: str) -> str:
         """Per-endpoint Postman request description (shown in the collection)."""
@@ -700,7 +818,7 @@ def main() -> None:
             return (
                 f"Run the `{subfolder_name}` bundle (mirrors `pipelex run bundle`). Triggers REAL inference.\n\n"
                 f"{source_lines}"
-                f"- main_pipe: `{pipe_code}`\n"
+                f"- pipe_code: `{pipe_code}`\n"
                 f"- inputs: {inputs_path or 'none'}\n"
                 f"{callback_note}\n{trailer}"
             )
@@ -714,7 +832,6 @@ def main() -> None:
                 f"Validate (dry-run) the `{subfolder_name}` bundle — parse, load, and dry-run every pipe "
                 "with NO inference (free, no LLM cost).\n\n"
                 f"{source_lines}"
-                f"- mthds_sources: `{mthds_sources}`\n"
                 f"- allow_signatures: {args.allow_signatures}\n"
                 f"{render_line}\n"
                 "Takes no pipe_code and no inputs. 200 discriminated on `is_valid`: the bundle blueprint, "
