@@ -20,6 +20,18 @@ BUNDLE_GRAPH_RENDERING_MODULE = "pipelex.pipeline.bundle_graph_rendering"
 BUNDLE_CONTENT = 'domain = "test_domain"\nmain_pipe = "test_pipe"\n'
 
 
+class _FolderMaker:
+    """Hands back one folder, whatever pipe the graph draws, and records the pipes it was asked to make a folder for."""
+
+    def __init__(self, *, folder: Path) -> None:
+        self.folder = folder
+        self.pipes_drawn: list[str] = []
+
+    def __call__(self, *, pipe_code: str) -> Path:
+        self.pipes_drawn.append(pipe_code)
+        return self.folder
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestGenerateGraphForBundle:
     """Tests for generate_graph_for_bundle format dispatch, rename branch, and return shape."""
@@ -89,6 +101,7 @@ class TestGenerateGraphForBundle:
         await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=graph_format,
+            make_output_folder=_FolderMaker(folder=tmp_path),
         )
 
         render_kwargs = mocks["mock_render"].call_args.kwargs
@@ -111,6 +124,7 @@ class TestGenerateGraphForBundle:
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             graph_name="../../evil.html",
         )
 
@@ -132,6 +146,7 @@ class TestGenerateGraphForBundle:
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.MERMAIDFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             graph_name="renamed.html",
         )
 
@@ -153,16 +168,18 @@ class TestGenerateGraphForBundle:
         direction: FlowchartDirection | None,
         expected_direction: str | None,
     ) -> None:
-        """The result should carry the bundle parent dir, dry-run pipe_code, and stringified direction."""
+        """The result should carry the folder the graph was written to, dry-run pipe_code, and stringified direction."""
         mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+        graph_folder = tmp_path / "results" / "pipe_code_output_01"
 
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.BOTH,
+            make_output_folder=_FolderMaker(folder=graph_folder),
             direction=direction,
         )
 
-        assert result["graph_output_dir"] == str(tmp_path)
+        assert result["graph_output_dir"] == str(graph_folder)
         assert result["pipe_code"] == "pipe_code"
         assert result["direction"] == expected_direction
 
@@ -177,8 +194,27 @@ class TestGenerateGraphForBundle:
         await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             pipe_code="other_pipe",
         )
 
         mocks["mock_dry_run"].assert_awaited_once()
         assert mocks["mock_dry_run"].call_args.kwargs["pipe_code"] == "other_pipe"
+
+    async def test_the_graph_is_written_to_the_folder_made_for_the_pipe_drawn(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """The folder is made once the dry run has settled the pipe, never the bundle's own folder, and the renderer writes there."""
+        mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+        folder_maker = _FolderMaker(folder=tmp_path / "elsewhere")
+
+        await generate_graph_for_bundle(
+            bundle_path=mocks["bundle_path"],
+            graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=folder_maker,
+        )
+
+        assert folder_maker.pipes_drawn == ["pipe_code"]
+        assert mocks["mock_render"].call_args.kwargs["output_dir"] == tmp_path / "elsewhere"

@@ -7,13 +7,23 @@ see ``docs/contribute/hub-layering.md``.
 """
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from pipelex.config import get_config
 from pipelex.graph.graph_rendering import GraphFormat, render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
+
+
+class GraphOutputFolderMaker(Protocol):
+    """Makes the folder a bundle's graph files are written into, once the dry run has settled the pipe the graph draws.
+
+    Where that folder lies is the caller's decision, never this module's: the agent CLI makes a new numbered folder
+    beside the bundle, holding a `.gitignore` that keeps it out of every method tree, as a run's output folder does.
+    """
+
+    def __call__(self, *, pipe_code: str) -> Path: ...
 
 
 def _sanitize_graph_name(graph_name: str) -> str:
@@ -73,6 +83,7 @@ async def generate_graph_for_bundle(
     bundle_path: Path,
     *,
     graph_format: GraphFormat,
+    make_output_folder: GraphOutputFolderMaker,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     direction: FlowchartDirection | None = None,
@@ -80,19 +91,22 @@ async def generate_graph_for_bundle(
 ) -> dict[str, Any]:
     """Generate graph visualization for a bundle via dry-run pipeline execution.
 
-    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing,
-    then renders and saves graph HTML files alongside the bundle.
+    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing, then renders the graph HTML files and
+    saves them in the folder `make_output_folder` makes for the pipe the dry run drew. The bundle's own folder is
+    usually inside a method's tree, so the files are never written there unasked: a file added to the tree would change
+    the digest of the method the graph was drawn from.
 
     Args:
         bundle_path: Path to the .mthds bundle file.
         graph_format: Which graph format(s) to generate.
+        make_output_folder: Makes the folder the graph files are written into, given the pipe the graph draws.
         library_dirs: Optional library directories for pipe resolution.
         pipe_code: Optional explicit pipe target for graph generation.
         direction: Flowchart layout direction (default: None, uses TB).
         graph_name: Filename for the generated HTML graph (default: "dry_run.html").
 
     Returns:
-        Dictionary with graph_files, graph_output_dir, and direction.
+        Dictionary with graph_files (each file's path), graph_output_dir (the folder made), pipe_code, and direction.
 
     Raises:
         MthdsParserError: If bundle parsing fails or main_pipe is missing.
@@ -119,7 +133,7 @@ async def generate_graph_for_bundle(
             include_mermaidflow = True
             include_reactflow = True
 
-    output_dir = bundle_path.parent
+    output_dir = make_output_folder(pipe_code=resolved_pipe_code)
     saved_files = await render_graph_from_spec(
         graph_spec=graph_spec,
         graph_config=execution_config.graph,

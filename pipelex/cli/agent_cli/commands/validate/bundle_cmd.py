@@ -24,13 +24,14 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_pipe_in_bundle_core,
 )
 from pipelex.cli.bundle_target_resolution import locate_folder_pipe
+from pipelex.cli.commands.run._run_output_folder import RUN_RESULTS_DIR_NAME, make_run_output_folder, run_output_label
 from pipelex.cli.judged_target import JudgedBundleTarget
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.bundle_graph_rendering import generate_graph_for_bundle, generate_view_for_bundle
+from pipelex.pipeline.bundle_graph_rendering import GraphOutputFolderMaker, generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.pipeline.exceptions import MethodEntryError, PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -65,6 +66,20 @@ def _graph_target(*, target: JudgedBundleTarget, pipe: str | None) -> _GraphTarg
     return _GraphTarget(bundle_path=target.method_tree.file_location(entry.tree_path), pipe_code=entry.pipe_ref)
 
 
+def _graph_output_folder_maker(*, bundle_path: Path) -> GraphOutputFolderMaker:
+    """Where `--graph` writes its files: a new numbered folder, `results/<pipe_code>_output_<NN>/` beside the bundle drawn.
+
+    That is where a run of the same bundle writes its outputs, and the folder is made the same way, holding a
+    `.gitignore` that ignores everything in it, so the viewer and its graph files never join the method tree they were
+    drawn from: validating a method leaves its tree, and its digest, as they were. The envelope names each file's path.
+    """
+
+    def make_output_folder(*, pipe_code: str) -> Path:
+        return make_run_output_folder(output_dir=bundle_path.parent / RUN_RESULTS_DIR_NAME, label=run_output_label(pipe_ref=pipe_code))
+
+    return make_output_folder
+
+
 def validate_bundle_cmd(
     path: Annotated[
         str,
@@ -76,7 +91,12 @@ def validate_bundle_cmd(
     ] = None,
     graph: Annotated[
         bool,
-        typer.Option("--graph", "-g", help="On successful bundle validation, save graph HTML files and include their paths in the JSON output"),
+        typer.Option(
+            "--graph",
+            "-g",
+            help="On successful bundle validation, save graph HTML files in a new results/<pipe_code>_output_<NN>/ folder beside "
+            "the bundle drawn, kept out of the method tree, and include their paths in the output",
+        ),
     ] = False,
     graph_format: Annotated[
         GraphFormat,
@@ -176,6 +196,7 @@ def validate_bundle_cmd(
                     generate_graph_for_bundle(
                         bundle_path=graph_target.bundle_path,
                         graph_format=graph_format,
+                        make_output_folder=_graph_output_folder_maker(bundle_path=graph_target.bundle_path),
                         library_dirs=library_dir_strings,
                         pipe_code=graph_target.pipe_code,
                         direction=direction,

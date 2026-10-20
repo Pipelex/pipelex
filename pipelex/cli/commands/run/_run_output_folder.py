@@ -1,7 +1,8 @@
 """The folder a `pipelex run` writes its outputs to, kept out of every method tree, and the record of the tree it ran.
 
 A run writes its outputs to a new numbered folder, `<label>_output_<NN>`, under `--output-dir` for `pipelex run`, and
-under `results/` beside the bundle it ran for `pipelex-agent run`. That folder often
+under `results/` beside the bundle it ran for `pipelex-agent run`; `pipelex-agent validate bundle --graph` writes its
+graph files to such a folder too, under `results/` beside the bundle it drew. That folder often
 lies inside a method's folder, the working directory being the method's, so the run writes a `.gitignore` holding `*`
 into it: the membership rule honours the tree's `.gitignore` files as git does (`mthds/docs/spec/method-tree.md`), so
 none of a run's outputs, nor the `.gitignore` itself, ever joins the tree, and a second run of the method reads the
@@ -19,9 +20,9 @@ from mthds.method_tree.models import MethodTree
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 
 RUN_OUTPUT_GITIGNORE_NAME = ".gitignore"
-RUN_OUTPUT_GITIGNORE_CONTENT = "# Written by pipelex run: a run's outputs are never part of a method.\n*\n"
+RUN_OUTPUT_GITIGNORE_CONTENT = "# Written by pipelex: what a run or a validation writes here is never part of a method.\n*\n"
 METHOD_TREE_RECORD_NAME = "method_tree.json"
-#: The directory `pipelex-agent run` creates its output folders under, beside the bundle it ran.
+#: The directory `pipelex-agent run` creates its output folders under, beside the bundle it ran, as `validate bundle --graph` does.
 RUN_RESULTS_DIR_NAME = "results"
 
 
