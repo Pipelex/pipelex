@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.core.method_trees.method_file_store import HeldFile, tree_of_held_files
-from pipelex.pipe_operators.doc_gen.template_asset_check import find_template_asset_refusal, literal_template_urls, stylesheet_urls
+from pipelex.pipe_operators.doc_gen.template_asset_check import check_template_assets, literal_template_urls, stylesheet_urls
 
 _FILES = {
     "METHODS.toml": b'[package]\naddress = "github.com/acme/letters"\n',
@@ -47,11 +47,38 @@ class TestTemplateAssetCheck:
     def test_images_stylesheets_and_the_urls_they_name_pass(self) -> None:
         template = '<link rel="stylesheet" href="../styles/print.css"><img src="logo.png?v=2"><img src="https://cdn.example.com/x.png">'
 
-        refusal = find_template_asset_refusal(
+        refusal = check_template_assets(
+            template=template, template_label="the template file", holder="templates/letter.html", tree=_TREE, read_file=_read_file
+        ).refusal
+
+        assert refusal is None
+
+    def test_the_check_names_each_file_the_urls_reach_once_by_tree_path(self) -> None:
+        """The template's own URLs first, then each stylesheet's, as the check reaches them; an external URL names no file."""
+        template = (
+            '<link rel="stylesheet" href="../styles/print.css"><img src="logo.png?v=2"><img src="./logo.png">'
+            '<img src="https://cdn.example.com/x.png"><img src="data:image/png;base64,iVBORw0KGgo=">'
+        )
+
+        asset_check = check_template_assets(
             template=template, template_label="the template file", holder="templates/letter.html", tree=_TREE, read_file=_read_file
         )
 
-        assert refusal is None
+        assert asset_check.refusal is None
+        assert asset_check.asset_tree_paths == ["styles/print.css", "templates/logo.png", "fonts/brand.woff2", "styles/base.css", "images/band.png"]
+
+    def test_a_refused_url_keeps_the_files_reached_before_it(self) -> None:
+        asset_check = check_template_assets(
+            template='<img src="logo.png"><img src="missing.png">',
+            template_label="the template",
+            holder="templates/letter.html",
+            tree=_TREE,
+            read_file=_read_file,
+        )
+
+        assert asset_check.refusal is not None
+        assert asset_check.refusal.reference == "missing.png"
+        assert asset_check.asset_tree_paths == ["templates/logo.png"]
 
     @pytest.mark.parametrize(
         ("template", "reference", "holder_label", "reason"),
@@ -72,9 +99,9 @@ class TestTemplateAssetCheck:
         ],
     )
     def test_a_literal_url_naming_no_asset_of_the_tree_is_refused(self, template: str, reference: str, holder_label: str, reason: str) -> None:
-        refusal = find_template_asset_refusal(
+        refusal = check_template_assets(
             template=template, template_label="the template", holder="templates/letter.html", tree=_TREE, read_file=_read_file
-        )
+        ).refusal
 
         assert refusal is not None
         assert (refusal.reference, refusal.holder_label) == (reference, holder_label)
@@ -83,13 +110,13 @@ class TestTemplateAssetCheck:
     def test_a_url_of_a_linked_stylesheet_is_checked_against_the_stylesheet(self) -> None:
         files = {**_FILES, "styles/base.css": b"body { background: url(../images/missing.png); }\n"}
 
-        refusal = find_template_asset_refusal(
+        refusal = check_template_assets(
             template='<link rel="stylesheet" href="../styles/print.css">',
             template_label="the template",
             holder="templates/letter.html",
             tree=_TREE,
             read_file=files.get,
-        )
+        ).refusal
 
         assert refusal is not None
         assert refusal.reference == "../images/missing.png"
@@ -97,13 +124,13 @@ class TestTemplateAssetCheck:
         assert "'images/missing.png', which is not a file" in refusal.reason
 
     def test_an_inline_template_of_bundles_from_strings_resolves_from_the_root(self) -> None:
-        refusal = find_template_asset_refusal(
+        refusal = check_template_assets(
             template='<img src="templates/logo.png"><img src="../logo.png">',
             template_label="the template",
             holder=None,
             tree=_TREE,
             read_file=_read_file,
-        )
+        ).refusal
 
         assert refusal is not None
         assert refusal.reference == "../logo.png"
@@ -112,9 +139,9 @@ class TestTemplateAssetCheck:
     def test_a_bundle_named_alone_is_told_to_hand_over_its_folder(self) -> None:
         one_file_tree = tree_of_held_files(files={"letters.mthds": HeldFile.of_bytes(data=b"x")}).model_copy(update={"is_one_file": True})
 
-        refusal = find_template_asset_refusal(
+        refusal = check_template_assets(
             template='<img src="logo.png">', template_label="the template", holder="letters.mthds", tree=one_file_tree, read_file=_read_file
-        )
+        ).refusal
 
         assert refusal is not None
         assert "Hand over the method's directory instead" in refusal.reason

@@ -24,6 +24,7 @@ import shlex
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from pipelex.core.method_trees.tree_file_reads import TreeFileRead
 from pipelex.errors.error_codes import error_code_spec, parse_error_code
 from pipelex.interpreter_hub import resolve_library_dirs
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
@@ -47,7 +48,8 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
     also merge ``graph_files`` / ``graphspec`` into the result — those are
     surfaced too so markdown mode does not silently drop them — or, for a
     method's folder with no single pipe to draw, ``graph_unavailable``, the
-    reason no graph was drawn.
+    reason no graph was drawn. ``tree_files_read``, when a step reads files of
+    the method's tree, lists them under each such step.
 
     Args:
         result: The JSON-mode result dict for the validation.
@@ -110,6 +112,8 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
         for warning in warnings:
             lines.append(f"- **{warning.get('error_type') or warning.get('category')}** — {warning.get('message')}")
 
+    lines += _tree_files_read_lines(tree_files_read=result.get("tree_files_read") or {})
+
     graph_files = result.get("graph_files")
     if isinstance(graph_files, dict):
         lines += ["", "## Graph files", ""]
@@ -124,6 +128,26 @@ def format_validate_markdown(result: dict[str, Any]) -> str:
         lines += ["", "## Graph", "", str(graph_unavailable)]
 
     return "\n".join(lines)
+
+
+def _tree_files_read_lines(*, tree_files_read: dict[str, list[dict[str, Any]]]) -> list[str]:
+    """The section naming, for each step that reads files of the method's tree, those files and what it reads each as.
+
+    Nothing when no step reads a file of the tree, or the result carries no `tree_files_read`: the steps that read none
+    are left out, since a file of the tree no step names is read by none.
+    """
+    reading_steps = {pipe_ref: files_read for pipe_ref, files_read in tree_files_read.items() if files_read}
+    if not reading_steps:
+        return []
+    lines = ["", "## Files the steps read", ""]
+    for pipe_ref, files_read in reading_steps.items():
+        described = ", ".join(_described_file_read(file_read=TreeFileRead.model_validate(file_read)) for file_read in files_read)
+        lines.append(f"- `{pipe_ref}` reads {described}")
+    return lines
+
+
+def _described_file_read(*, file_read: TreeFileRead) -> str:
+    return f"`{file_read.tree_path}` ({file_read.use.label})"
 
 
 def render_invalid_verdict_markdown(*, items: Sequence[ProblemItem], message: str) -> str:
