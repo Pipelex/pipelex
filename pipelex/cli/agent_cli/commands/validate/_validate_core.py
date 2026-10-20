@@ -19,6 +19,7 @@ from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
 from pipelex.pipeline.execution_seams import acquire_library_async
+from pipelex.pipeline.tree_files_read import tree_files_envelope_fields
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
@@ -152,6 +153,8 @@ async def validate_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }
 
 
@@ -207,6 +210,8 @@ async def validate_method_folder_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }
 
 
@@ -342,4 +347,6 @@ async def validate_pipe_in_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }

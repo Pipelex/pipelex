@@ -38,6 +38,7 @@ from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.input_form import qualify_current_library_crate
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry, build_liftable_pipes
 from pipelex.pipeline.method_entry import select_method_entry
+from pipelex.pipeline.tree_files_read import TreeFilesRead, build_tree_files_read
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
@@ -197,6 +198,8 @@ async def _validate_bundles_in_scope(
         # One taint walk per validate pass — both report projections read the same analyses.
         taint_analyses = collect_controller_taint_analyses(result.pipes)
         liftable_pipes: list[LiftablePipeEntry] = build_liftable_pipes(taint_analyses)
+        # The files of the method's tree each pipe reads, as building and validating it resolved them.
+        tree_files_read: TreeFilesRead = build_tree_files_read(pipes=result.pipes)
         warnings: list[ValidationErrorItem] = build_advisory_warnings(
             taint_analyses=taint_analyses,
             input_form=artifacts.input_form,
@@ -249,6 +252,7 @@ async def _validate_bundles_in_scope(
         liftable_pipes=liftable_pipes,
         dry_run_result=result.dry_run_result,
         pending_signatures=result.pending_signatures,
+        tree_files_read=tree_files_read,
         graph_spec=graph_spec,
         warnings=warnings,
     )

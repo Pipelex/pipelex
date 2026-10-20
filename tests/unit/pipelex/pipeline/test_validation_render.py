@@ -109,6 +109,48 @@ class TestValidationRender:
         assert markdown.startswith("# Validation passed")
         assert markdown.endswith(f"## Graph\n\n{reason}")
 
+    def test_names_the_files_each_step_reads_under_the_steps_that_read_any(self):
+        """Each step reading files of the method's tree is listed with them and their use; a step reading none is not."""
+        result: dict[str, Any] = {
+            "success": True,
+            "bundle_path": "/fake/method",
+            "validated_pipes": [{"pipe_ref": "invoicing.print_invoice", "status": "SUCCESS"}],
+            "total_pipes": 3,
+            "tree_files_read": {
+                "invoicing.print_invoice": [
+                    {"tree_path": "templates/invoice.html", "use": "template"},
+                    {"tree_path": "templates/logo.png", "use": "template_asset"},
+                ],
+                "invoicing.compute_totals": [{"tree_path": "funcs/totals.py", "use": "python_module"}],
+                "invoicing.summarize": [],
+            },
+            "tree_file_readers": {
+                "funcs/totals.py": ["invoicing.compute_totals"],
+                "templates/invoice.html": ["invoicing.print_invoice"],
+                "templates/logo.png": ["invoicing.print_invoice"],
+            },
+        }
+
+        markdown = format_validate_markdown(result)
+
+        assert "## Files the steps read" in markdown
+        assert "- `invoicing.print_invoice` reads `templates/invoice.html` (template), `templates/logo.png` (template asset)" in markdown
+        assert "- `invoicing.compute_totals` reads `funcs/totals.py` (Python module)" in markdown
+        assert "invoicing.summarize" not in markdown
+
+    @pytest.mark.parametrize(
+        "tree_files_read",
+        [pytest.param(None, id="absent"), pytest.param({"invoicing.summarize": []}, id="no_step_reads_a_file")],
+    )
+    def test_omits_the_files_section_when_no_step_reads_a_file(self, tree_files_read: dict[str, Any] | None):
+        result: dict[str, Any] = {"success": True, "validated_pipes": [], "total_pipes": 1}
+        if tree_files_read is not None:
+            result["tree_files_read"] = tree_files_read
+
+        markdown = format_validate_markdown(result)
+
+        assert "Files the steps read" not in markdown
+
     def test_omits_runnability_verdict_when_key_absent(self):
         """The `validate all` / `validate pipe` shape omits the `pending_signatures` key entirely —
         so no runnability verdict (positive or negative) leaks onto those non-bundle surfaces.

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:144561e0a83cc312d84ea1b489fb0a29018805de012bfae714f6d2f46a7383f9"
+digest = "sha256:8ec8824eac3be4f38b226e30a382755e33073a1fbb71bb66641c7f4fd1e4f24c"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-20T04:50:27Z"
-rationale = "clean-pass: the trigger changes only move the method loads of pipelex validate, pipelex-agent validate, the build inputs and output commands and pipelex run's empty-result row model off the event loop into a worker thread; no flag, output, exit code or error format changes, and neither docs/tools/cli/ nor pipelex/cli/agent_cli/CLAUDE.md describes where a command's load runs, so nothing there is stale."
+reviewed_at = "2026-10-20T05:17:54Z"
+rationale = "clean-pass: merging origin/dev keeps dev's tree_files_read envelope change, whose docs dev already updated, beside this branch's changes to the same triggers, which only move the method loads of pipelex validate, pipelex-agent validate, the build inputs and output commands and pipelex run's empty-result row model into a worker thread; no flag, output, exit code or error format changes, and neither docs/tools/cli/ nor pipelex/cli/agent_cli/CLAUDE.md describes where a command's load runs, so nothing there is stale."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -45,7 +45,7 @@ rationale = "clean-pass: the trigger changes only move the method loads of pipel
 "pipelex/cli/agent_cli/commands/run/pipe_cmd.py" = "blob:1a5a2f86ac80fb86cb53376202bad05ffd19e9f6"
 "pipelex/cli/agent_cli/commands/run/stdin_resolver.py" = "blob:db0176d7de1e074fd6eefd787c10e71b891eeb32"
 "pipelex/cli/agent_cli/commands/validate/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:4a3d940800ae59bbede14c211d5eb6fa214343dd"
+"pipelex/cli/agent_cli/commands/validate/_validate_core.py" = "blob:e6556f74ed0ebdbf4926856a624328d92b08fc61"
 "pipelex/cli/agent_cli/commands/validate/app.py" = "blob:1982684a2aae81e0d634bb3b262457a5f187d979"
 "pipelex/cli/agent_cli/commands/validate/bundle_cmd.py" = "blob:3c7045c77c15b2ab5fdb1629a4203e53231b764d"
 "pipelex/cli/agent_cli/commands/validate/method_cmd.py" = "blob:19cbf94ca5027983e5fd95b73bc346efaf195c37"

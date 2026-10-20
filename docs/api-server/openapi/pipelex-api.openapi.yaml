@@ -8647,6 +8647,32 @@ components:
         ``nb_tokens_by_category`` keys) are open sets on the wire, typed as plain strings —
 
         runtime enum churn is non-breaking for clients.'
+    TreeFileRead:
+      properties:
+        tree_path:
+          type: string
+          title: Tree Path
+          description: The file's path from the root of the step's method tree, such as `templates/invoice.html`.
+        use:
+          $ref: '#/components/schemas/TreeFileUse'
+          description: 'What the step reads the file as: `template`, the template a PipeDocGen step fills; `template_asset`,
+            an image, a stylesheet or a font its HTML template names; `python_module`, the module of the function a PipeFunc
+            step calls.'
+      additionalProperties: false
+      type: object
+      required:
+      - tree_path
+      - use
+      title: TreeFileRead
+      description: 'A file of its method tree a step reads: its tree path, and what the step reads it as.'
+    TreeFileUse:
+      type: string
+      enum:
+      - template
+      - template_asset
+      - python_module
+      title: TreeFileUse
+      description: What a step reads a file of its method tree as.
     UnexplainedPath:
       properties:
         path:
@@ -8866,6 +8892,26 @@ components:
             $ref: '#/components/schemas/LiftablePipeEntry'
           type: array
           title: Liftable Pipes
+        tree_files_read:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/TreeFileRead'
+            type: array
+          type: object
+          title: Tree Files Read
+          description: 'Per pipe, the files of the method''s tree the step reads, keyed by namespaced `pipe_ref` like `pipe_io_contracts`:
+            each file by its tree path, with what the step reads it as. A PipeDocGen step reads its template and the images,
+            stylesheets and fonts its HTML template names by literal relative URLs; a PipeFunc step reads the module of its
+            function. A pipe that reads no file of the tree, a controller included, has an empty list.'
+        tree_file_readers:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+          title: Tree File Readers
+          description: 'The per-file view of `tree_files_read`: each tree path a step reads, in sorted order, to the namespaced
+            refs of the pipes that read it. A file of the method''s tree absent here is read by no step.'
         graph_spec:
           anyOf:
           - $ref: '#/components/schemas/GraphSpec'
