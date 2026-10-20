@@ -187,7 +187,7 @@ A method sent in `files` carries the files its steps read in its own tree, each 
 }
 ```
 
-`resources` is being retired with `mthds_contents`, and a later release refuses both. Until then, a bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, can be sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-method).
+`resources` is being retired on every route that takes it, and a later release refuses it: here and on the run routes it goes with `mthds_contents`, and on the routes that take a method only as a tree, a file the steps read travels inside the tree. Until then, a bundle sent as content has no directory, so a file one of its steps reads from beside the bundle, such as a `PipeDocGen` step's `template_file`, can be sent with it in `resources`. The same field, with the same rules, is accepted by [`/v1/execute` and `/v1/start`](pipe-run.md), [`/v1/pipe-io`](pipe-io.md), and [`/v1/resolve` and `/v1/codegen`](codegen.md#selecting-the-method).
 
 ```json
 {

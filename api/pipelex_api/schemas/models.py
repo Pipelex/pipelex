@@ -88,7 +88,7 @@ DEPENDENCIES_FIELD_DESCRIPTION = (
     "by. They are searched before the runner's installed copies, for this request alone. Accompanies `files`."
 )
 
-RESOURCES_FIELD_DESCRIPTION = (
+_RESOURCES_FIELD_FACTS = (
     "The files submitted with the bundle that its steps read, such as a PipeDocGen step's `template_file` (an "
     "`.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file's bundle-relative path, exactly "
     "as the step names it, to the file's bytes in standard base64. A path must be relative and written with forward "
@@ -99,9 +99,20 @@ RESOURCES_FIELD_DESCRIPTION = (
     f"By default at most {DEFAULT_MAX_RESOURCES_PER_REQUEST} files, {DEFAULT_MAX_RESOURCE_FILE_KIB} KiB each and "
     f"{DEFAULT_MAX_RESOURCES_TOTAL_KIB} KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`, "
     "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which the run "
-    "names by its digest: no file's bytes travel with the run, each being read where a step uses it. Being retired with "
-    "`mthds_contents`, and refused by a later release: send these files in the method's tree, in `files`."
+    "names by its digest: no file's bytes travel with the run, each being read where a step uses it."
 )
+
+RESOURCES_FIELD_DESCRIPTION = (
+    f"{_RESOURCES_FIELD_FACTS} Being retired with `mthds_contents`, and refused by a later release: send these files in "
+    "the method's tree, in `files`."
+)
+"""`resources` on the routes that also take `mthds_contents`, the run routes and `/validate`, with which it is retired."""
+
+TREE_ROUTE_RESOURCES_FIELD_DESCRIPTION = (
+    f"{_RESOURCES_FIELD_FACTS} Being retired, and refused by a later release: a file the steps read travels inside the "
+    "method's tree, in `files`, at its path beside the bundle that names it."
+)
+"""`resources` on the routes that take a method only as `files` or `method_ref`: `/resolve`, `/codegen` and `/pipe-io`."""
 
 MTHDS_CONTENTS_RETIRING_NOTE = "Being retired, and refused by a later release: send the method in `files`."
 """Opens the description of every request field that takes a method's bundles as `mthds_contents`."""
@@ -673,7 +684,7 @@ class MethodTreeRequest(BaseModel):
             "until a method registry exists). Exactly one of `files` / `method_ref`."
         ),
     )
-    resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
+    resources: dict[str, str] | None = Field(default=None, description=TREE_ROUTE_RESOURCES_FIELD_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_TREE_READ_SCOPE_DESCRIPTION)
 
     @field_validator("read_scope")

@@ -2181,7 +2181,8 @@ components:
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
             the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
-            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
@@ -4308,7 +4309,8 @@ components:
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
             the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
-            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
@@ -5914,7 +5916,8 @@ components:
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
             the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
-            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
