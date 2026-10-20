@@ -143,7 +143,11 @@ def validate_bundle_cmd(
     run to one pipe. --graph and --view draw the pipe named, else the method's main pipe, and say so when it has none.
 
     Default output is markdown; use --format json for structured JSON.
-    Results go to stdout on success, errors to stderr with exit code 1.
+    Results go to stdout on success, and a failure's problem to stderr. Exit codes: 0 when the bundle is valid; 1 on
+    the invalid verdict, on a whole bundle not runnable without --allow-signatures, and when Pipelex fails to boot; 2
+    when no verdict could be produced (a command line that does not parse, a path that is no bundle, a folder holding
+    no bundle, a missing file or pipe, a method file it cannot read, a model no enabled backend serves, a configuration
+    refused before the boot, an unexpected failure) and when the graph or view asked for cannot be drawn.
 
     Examples:
         pipelex-agent validate bundle my_bundle.mthds

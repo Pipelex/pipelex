@@ -222,18 +222,22 @@ class TestAgentFolderEntryCommands:
         assert "linked.mthds" in capsys.readouterr().err
         mock_fix.assert_not_called()
 
-    @pytest.mark.parametrize("command", ["validate", "fix", "inputs", "run"])
+    @pytest.mark.parametrize(("command", "exit_code"), [("validate", 2), ("fix", 2), ("inputs", 1), ("run", 1)])
     def test_a_configuration_that_does_not_validate_before_the_boot_is_the_failed_boot_problem(
-        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str
+        self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str, exit_code: int
     ) -> None:
-        """Listing the tree reads its limits from the configuration: a refusal there is the problem a failed boot gives."""
+        """Listing the tree reads its limits from the configuration: a refusal there is the problem a failed boot gives.
+
+        `validate` and `fix` exit 2 on it, no verdict, as the human `pipelex validate bundle` and `fix bundle` do;
+        `inputs` and `run` exit 1, as a failed boot does.
+        """
         mocker.patch("pipelex.libraries.method_trees.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 
         with pytest.raises(typer.Exit) as exc_info:
             _invoke_pre_boot_command(command=command, path=tmp_path)
 
-        assert exc_info.value.exit_code == 1
+        assert exc_info.value.exit_code == exit_code
         problem = json.loads(capsys.readouterr().err)
         assert problem["code"] == "pipelex.config.invalid"
         assert problem["diagnostics"]["error_class"] == "PipelexConfigError"
