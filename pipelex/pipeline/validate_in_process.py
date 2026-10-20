@@ -26,6 +26,7 @@ from typing import TYPE_CHECKING
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, ValidationErrorItem
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_trees import list_local_method_tree
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipe_run.dry_run_in_process import best_effort_graph_spec
@@ -53,7 +54,8 @@ def _graph_target_ref(*, graph_pipe_code: str | None, method_dir: Path | None, b
     """The pipe the graph arm draws: the explicit target, else a method tree's entry pipe, else the batch's `main_pipe`.
 
     A method tree starts at its entry pipe by the MTHDS protocol's rule (`select_method_entry`), so its graph is that
-    pipe's, and a tree with no entry pipe, which a run naming no pipe refuses, gets no graph.
+    pipe's, and a tree with no entry pipe, which a run naming no pipe refuses, gets no graph. Listing and reading the tree
+    is blocking work, so `validate_bundles_in_process` runs this in a worker thread.
     """
     if graph_pipe_code is not None:
         return graph_pipe_code
@@ -206,7 +208,10 @@ async def _validate_bundles_in_scope(
             dry_run_result=result.dry_run_result,
         )
         validation_report.count_warnings(count=len(warnings))
-        graph_target_ref = _graph_target_ref(graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints)
+        # A method tree's entry pipe is read from its files on this host's disk: blocking work, done in a worker thread.
+        graph_target_ref = await run_method_load(
+            _graph_target_ref, graph_pipe_code=graph_pipe_code, method_dir=method_dir, blueprints=result.blueprints
+        )
         # The graph arm dry-runs its target once more, and finds again what the sweep found, which `warnings`
         # already carries: it is collected and dropped here rather than logged as if nothing reported it.
         with collecting_dry_run_warnings():

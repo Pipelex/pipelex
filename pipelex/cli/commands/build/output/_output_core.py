@@ -15,6 +15,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.interpreter_hub import get_library_manager, get_required_entry_pipe, resolve_library_dirs, set_current_library
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipe_machinery.rendering.output_renderer import render_output
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -81,7 +82,8 @@ async def _generate_output_core(
         set_current_library(library_id=library_id)
         effective_dirs, _ = resolve_library_dirs(library_dir)
         if effective_dirs:
-            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            # In a worker thread, off the event loop, as every load reached from asynchronous code.
+            await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
         if not pipe_code:
             typer.secho("Failed to build output: no pipe code specified", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)

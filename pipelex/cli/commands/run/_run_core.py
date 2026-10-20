@@ -37,6 +37,7 @@ from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.errors.failure_problem import failure_log_fields
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.interpreter_hub import clear_current_library, get_concept_library, get_library_manager
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.mthds_parsing.parser import MthdsParser
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -463,7 +464,9 @@ async def _execute_run(
             if csv_list_content.items:
                 csv_row_model = type(csv_list_content.items[0])
             else:
-                csv_row_model = _resolve_row_model_for_empty_result(
+                # The reload is a whole library load, opened, read and torn down in a worker thread, off the event loop.
+                csv_row_model = await run_method_load(
+                    _resolve_row_model_for_empty_result,
                     concept=csv_main_stuff.concept,
                     bundle_path=bundle_path,
                     mthds_content=mthds_content,

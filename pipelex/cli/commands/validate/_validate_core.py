@@ -22,6 +22,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
@@ -243,8 +244,9 @@ async def _validate_pipe_or_bundle(
                 # other invalid bundle. The entry-pipe lookup between them stays outside it: a code that names
                 # no pipe, or several, is an unresolvable target — no verdict, handled by execute_validate.
                 if effective_dirs:
+                    # In a worker thread, off the event loop, as every load reached from asynchronous code.
                     with translate_to_validate_bundle_error():
-                        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                        await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
                 pipe = get_required_entry_pipe(pipe_code=pipe_code)
                 validation_report.describe(pipes=get_own_pipes())
