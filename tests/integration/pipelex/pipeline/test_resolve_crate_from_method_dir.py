@@ -141,6 +141,8 @@ class TestResolveCrateFromMethodDir:
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
         assert item.source == "host.mthds"
         assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message
+        # Its advice is what the caller of a crate route can do: send the package's files beside the method's.
+        assert "`dependencies`" in item.message
         # A hosted run tells it apart by the problem item's code and parameters, the package it names included.
         problem_errors = exc_info.value.to_problem(view=ProblemView.CALLER).errors
         assert problem_errors is not None

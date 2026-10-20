@@ -5,6 +5,11 @@
 ### Changed
 
 - **The API server's examples send a method in `files`**: the server's README and the API Server pages send a method to `/v1/execute` and `/v1/validate` in `files`, a map from each file's path in the method's folder to its content, where they sent `mthds_contents`. The reference pages and the OpenAPI artifact now say that `mthds_contents`, with `bundle_b64`, `resources` and `/v1/validate`'s `mthds_sources`, is being retired and will be refused by a later release, so a client sends `files` now.
+- **The refusal of a package the request did not send**: the message of the `unresolved_package_dependency` refusal a static resolution gives, such as the one behind `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io`, tells its reader to send the package's files in `dependencies`, keyed by its address, beside the method's own files in `files`, where it spoke of an in-memory resolve and the host filesystem and advised directory-based resolution; it still carries the words `address-based dependency '<address>'`.
+
+### Fixed
+
+- **Where a method's Python travels, in the PipeFunc pages**: the PipeFunc Requirements page and the PipeFunc page say that a run's crate names each step's method tree by its digest and carries none of its files, that a `PipeFunc` call's files are read through the method file store the worker's host installs, and that a worker a method tree's validation is dispatched to checks the method's requirements again, where they said the crate carried the method's Python sources and the worker never checked anything.
 
 ## [v0.90.0] - 2026-10-19
 
