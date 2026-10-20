@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The API server's examples send a method in `files`**: the server's README and the API Server pages send a method to `/v1/execute` and `/v1/validate` in `files`, a map from each file's path in the method's folder to its content, where they sent `mthds_contents`. The reference pages and the OpenAPI artifact now say that `mthds_contents`, with `bundle_b64`, `resources` and `/v1/validate`'s `mthds_sources`, is being retired and will be refused by a later release, so a client sends `files` now.
+
 ## [v0.90.0] - 2026-10-19
 
 ### Added
