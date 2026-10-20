@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import click
 import httpx
 import pytest
 import tomli
@@ -85,8 +86,9 @@ class TestOpenRouterCommand:
         assert "HTTP 503" in result.stderr
         assert "private upstream body" not in result.output
 
-    def test_help(self) -> None:
+    @pytest.mark.parametrize("color", [False, True])
+    def test_help(self, color: bool) -> None:
         assert "openrouter" in CliRunner().invoke(app, ["--help"]).stdout
-        result = CliRunner().invoke(app, ["openrouter", "list-models", "--help"])
+        result = CliRunner().invoke(app, ["openrouter", "list-models", "--help"], color=color)
         assert result.exit_code == 0
-        assert "--save" in result.stdout
+        assert "--save" in click.unstyle(result.stdout)
