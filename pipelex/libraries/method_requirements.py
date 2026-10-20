@@ -15,6 +15,9 @@ never installs anything:
   for the tree's requirements, asked for each tree, so trees judged together each get the offer stated for their own.
   A deployment that cannot hold a tree's requirements in any environment refuses them with its own reason, which the
   method's refusal carries.
+- A tree is judged once per run: the run's listing (`pipelex.libraries.method_tree_listing`) keeps each tree a check
+  found met, so the later steps of a load, or a load after a server's check of the same request, ask nothing more. A
+  refused tree is never kept, and is judged again by the next check that reads it.
 - A requirement whose marker is false in that environment is not needed there and is not checked. One is met when the
   environment holds a distribution of its name at a version its specifier contains, pre-releases included, and, for
   each extra it names, when what the extra needs is met in turn.
@@ -416,12 +419,14 @@ def _refused_by_deployment_error(
     return MethodRequirementsNotMetError(msg, items=[item]).with_params(**params)
 
 
-def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool) -> None:
+def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_host_paths: bool, tree_listing: MethodTreeListing | None) -> None:
     """Refuse the first of the methods whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
 
     Each tree is judged once however often it is given, in the order given, against the environment stated for its own
     requirements: in a sandbox-hosted mode, the plugin providing the mode is asked for each tree declaring requirements,
-    so trees judged together never share an environment stated for another's. Methods declaring none never read it.
+    so trees judged together never share an environment stated for another's. Methods declaring none never read it. A
+    tree `tree_listing` holds as met, which an earlier check of the run judged, is not judged again, and each tree found
+    met is kept there for the run's later checks.
 
     Raises:
         MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
@@ -436,22 +441,41 @@ def _ensure_judged_methods_met(*, judged_methods: Iterable[JudgedMethod], names_
         if tree_identity in judged_trees:
             continue
         judged_trees.add(tree_identity)
-        if not holds_requirements_to_check(tree=judged.tree):
+        if tree_listing is not None and tree_listing.meets_requirements(tree=judged.tree):
             continue
-        parsed = parse_requirements_text(text=_read_requirements_text(judged=judged))
-        if parsed.refused_lines:
-            _raise_refused_lines(judged=judged, refused_lines=parsed.refused_lines)
-        if not parsed.requirements:
-            continue
-        environment = resolve_pipe_func_package_environment(requirements=parsed.requirements, names_host_paths=names_host_paths)
-        if isinstance(environment, PipeFuncPackageRefusal):
-            raise _refused_by_deployment_error(judged=judged, refusal=environment, requirements=parsed.requirements)
-        unmet = unmet_requirements(requirements=parsed.requirements, environment=environment)
-        if unmet:
-            _raise_unmet(judged=judged, unmet=unmet, environment=environment)
+        _ensure_judged_method_met(judged=judged, names_host_paths=names_host_paths)
+        if tree_listing is not None:
+            tree_listing.record_requirements_met(tree=judged.tree)
 
 
-def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_paths: bool) -> None:
+def _ensure_judged_method_met(*, judged: JudgedMethod, names_host_paths: bool) -> None:
+    """Refuse a method whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
+
+    A tree with nothing to check, holding no requirements or no Python, meets them.
+
+    Raises:
+        MethodRequirementsFileError: The tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
+        MethodRequirementsNotMetError: The environment does not meet the tree's requirements, or the deployment refuses
+            them with its own reason.
+        PipeFuncPackageSetUnstatedError: PipeFunc steps run out of this process and the deployment states no package
+            set for them.
+    """
+    if not holds_requirements_to_check(tree=judged.tree):
+        return
+    parsed = parse_requirements_text(text=_read_requirements_text(judged=judged))
+    if parsed.refused_lines:
+        _raise_refused_lines(judged=judged, refused_lines=parsed.refused_lines)
+    if not parsed.requirements:
+        return
+    environment = resolve_pipe_func_package_environment(requirements=parsed.requirements, names_host_paths=names_host_paths)
+    if isinstance(environment, PipeFuncPackageRefusal):
+        raise _refused_by_deployment_error(judged=judged, refusal=environment, requirements=parsed.requirements)
+    unmet = unmet_requirements(requirements=parsed.requirements, environment=environment)
+    if unmet:
+        _raise_unmet(judged=judged, unmet=unmet, environment=environment)
+
+
+def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_paths: bool, tree_listing: MethodTreeListing | None = None) -> None:
     """Refuse a method among the trees whose `requirements.txt` the standard refuses or its PipeFunc environment does not meet.
 
     Each tree is judged once however often it is given, in the order given, and the first refused ends the check.
@@ -460,6 +484,9 @@ def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_pa
         trees: The method trees a load reads, each checked when it lies on disk, declares requirements and holds Python.
         names_host_paths: Whether a refusal may name the method's root and this interpreter by their paths on this host,
             as a load's may: its refusal is the caller's own disk's, or the host's fault, withheld from the caller.
+        tree_listing: The run's listing of its method trees, which keeps each tree a check of the run found met: such a
+            tree is not judged again, so the package-offer factory is asked once per tree in a run, whose verdict does
+            not depend on how a refusal names the method. None judges every tree given.
 
     Raises:
         MethodRequirementsFileError: A tree's `requirements.txt` holds a line the standard refuses, or cannot be read.
@@ -471,6 +498,7 @@ def ensure_method_requirements_met(*, trees: Iterable[MethodTree], names_host_pa
     _ensure_judged_methods_met(
         judged_methods=(_judged_method(tree=tree, names_host_paths=names_host_paths) for tree in trees),
         names_host_paths=names_host_paths,
+        tree_listing=tree_listing,
     )
 
 
@@ -492,7 +520,7 @@ def ensure_package_requirements_met(*, tree: MethodTree, package_address: str) -
         method_name=f"The method package '{package_address}'",
         requirements_source=f"{package_address}/{REQUIREMENTS_FILE_NAME}",
     )
-    _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False)
+    _ensure_judged_methods_met(judged_methods=[judged], names_host_paths=False, tree_listing=None)
 
 
 def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_listing: MethodTreeListing | None = None) -> None:
@@ -506,8 +534,8 @@ def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_
     directories' and this interpreter's included.
 
     The trees are listed through `tree_listing`, which the server hands to the load of the same request, so the method
-    loaded is the one checked here and its files are listed and hashed once (`pipelex.libraries.method_tree_listing`).
-    None lists them for this check alone.
+    loaded is the one checked here and its files are listed and hashed once (`pipelex.libraries.method_tree_listing`),
+    and the listing keeps each tree found met, so the load does not judge it again. None lists them for this check alone.
 
     Raises:
         HostLibraryTreeError: A tree of the directories could not be listed.
@@ -520,4 +548,4 @@ def ensure_served_method_requirements_met(*, library_dirs: Sequence[Path], tree_
     listing = tree_listing if tree_listing is not None else MethodTreeListing()
     with reporting_host_library_tree_faults():
         library_trees = listing.library_dir_trees(library_dirs=library_dirs)
-    ensure_method_requirements_met(trees=[library_tree.tree for library_tree in library_trees], names_host_paths=False)
+    ensure_method_requirements_met(trees=[library_tree.tree for library_tree in library_trees], names_host_paths=False, tree_listing=listing)

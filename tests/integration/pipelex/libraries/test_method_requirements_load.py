@@ -239,9 +239,9 @@ class TestMethodRequirementsLoad:
             library_manager.teardown(library_id=library_id)
 
         assert sorted(pipe.domain_code for pipe in pipes) == ["requirements_excel", "requirements_load"]
-        # A load judges a tree at each of its checks, so the factory is asked again for the same requirements, which is
-        # why a plugin caches by them; each request carries one tree's requirements, never another's.
-        assert {tuple(requirement_texts) for requirement_texts in asked} == {("pandas>=3", "xlsxwriter"), ("polars>=1",)}
+        # A load judges each tree once, through the listing its steps share, so the factory is asked once per tree, and
+        # each request carries one tree's requirements, never another's.
+        assert sorted(tuple(requirement_texts) for requirement_texts in asked) == [("pandas>=3", "xlsxwriter"), ("polars>=1",)]
         assert not sentinel.exists()
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")

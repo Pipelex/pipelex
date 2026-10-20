@@ -90,7 +90,8 @@ class PipeFuncPackageOfferRequest(NamedTuple):
 # packages at all. The requirements arrive with their markers unevaluated: the factory evaluates them against the marker
 # environment of the place it would offer, and a refusal rests only on those whose markers hold there, never on one the
 # place does not need (``requirements_needed_in``). Called synchronously, once for each method tree declaring
-# requirements each time a check judges it, never at registration.
+# requirements the first time a check of a run judges it, never at registration: the run's listing keeps the tree's
+# verdict when it meets them, so a later check of the run asks nothing (`MethodTreeListing`), and the next run asks again.
 #
 # Its threading contract: a factory is never called on a thread running an event loop. Every method load pipelex reaches
 # from asynchronous code, such as a validation or a run on the API server or in a worker's activity, runs in the

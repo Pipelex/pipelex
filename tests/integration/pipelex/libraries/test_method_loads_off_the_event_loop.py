@@ -111,9 +111,11 @@ class TestMethodLoadsOffTheEventLoop:
     async def test_a_validation_of_a_method_tree_asks_the_package_offer_off_the_event_loop(
         self, held_tree: Path, recording_offer: _RecordingOffer
     ) -> None:
+        """The validation asks the factory off the loop, once for the tree, however many steps of its load judge it."""
         result = await validate_bundle(method_dir=held_tree)
 
         assert [pipe.code for pipe in result.pipes] == ["echo"]
+        assert len(recording_offer.thread_names) == 1, recording_offer.thread_names
         assert _all_in_the_method_load_pool(recording_offer.thread_names), recording_offer.thread_names
 
     async def test_the_in_process_validator_lists_the_tree_once_off_the_event_loop_and_draws_its_graph_from_it(
@@ -133,6 +135,7 @@ class TestMethodLoadsOffTheEventLoop:
         assert report.graph_spec is not None
         assert len(listing_threads) == 1
         assert _all_in_the_method_load_pool(listing_threads), listing_threads
+        assert len(recording_offer.thread_names) == 1, recording_offer.thread_names
         assert _all_in_the_method_load_pool(recording_offer.thread_names), recording_offer.thread_names
 
     async def test_an_asynchronous_acquisition_loads_off_the_event_loop_and_leaves_the_library_current(
@@ -146,6 +149,7 @@ class TestMethodLoadsOffTheEventLoop:
             assert library_id == "off-the-loop-acquisition"
             assert qualified_main_pipe is None
             assert get_current_library_id_or_none() == library_id
+            assert len(recording_offer.thread_names) == 1, recording_offer.thread_names
             assert _all_in_the_method_load_pool(recording_offer.thread_names), recording_offer.thread_names
         finally:
             library_manager.teardown(library_id=library_id)

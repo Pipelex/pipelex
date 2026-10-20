@@ -740,12 +740,15 @@ class LibraryManager(LibraryManagerAbstract):
             # holding no bundle included, such as a library directory whose files are submitted beside the bundles parsed
             # from content strings (below). A refusal may name host paths: these are the caller's own
             # directories, or the host's, whose refusal `reporting_host_library_tree_faults` withholds as its own fault.
+            # The run's listing keeps each tree found met, so the blueprint load below, or a server's check of the same
+            # method before this load, judges each tree once and asks a sandbox's package-offer factory once for it.
             ensure_method_requirements_met(
                 trees=[
                     *(library_tree.tree for library_tree in library_trees),
                     *(bundle_file.tree_bundle.tree for bundle_file in all_bundle_files),
                 ],
                 names_host_paths=True,
+                tree_listing=listing,
             )
 
             # A library directory whose own tree holds no bundle, such as the directory a server writes a request's
@@ -1076,11 +1079,14 @@ class LibraryManager(LibraryManagerAbstract):
             for blueprint in blueprints:
                 if blueprint.tree_bundle is None and blueprint.host_bundle_file is not None:
                     blueprint.place_in_tree(tree_bundle=listing.lone_file_bundle(bundle_file=blueprint.host_bundle_file))
-            # Every bundle read from this host's disk loads under its tree's requirements.txt, on every load: a blueprint
-            # placed by an earlier load, a refused one included, is judged again rather than taken as judged.
+            # Every bundle read from this host's disk loads under its tree's requirements.txt, judged once per run: a tree
+            # the run's listing holds as met, such as one `load_libraries` judged just before this load, is not judged
+            # again, while a refused tree, or a blueprint an earlier load placed under another listing, is judged again
+            # rather than taken as judged.
             ensure_method_requirements_met(
                 trees=[blueprint.tree_bundle.tree for blueprint in blueprints if blueprint.tree_bundle is not None],
                 names_host_paths=True,
+                tree_listing=listing,
             )
             # Bundles parsed from content strings sit at the root of the tree of the files submitted beside them, when
             # there are any, so a step resolves a file it names there.

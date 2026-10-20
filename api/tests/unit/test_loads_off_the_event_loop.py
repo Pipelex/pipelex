@@ -129,24 +129,24 @@ class TestLoadsOffTheEventLoop:
         assert WRITTEN_METHOD_TREES.tree_written_at(directory=method_dir) is None
 
     def test_a_validation_asks_the_package_offer_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path, recording_offer: _RecordingOffer):
-        """The runner's check of the served method asks the factory first, then the in-process validator's load does."""
+        """The runner's check of the served method asks the factory, once, and the in-process validator's load takes its verdict."""
         client = _build_client(mocker, tmp_path=tmp_path)
 
         response = client.post("/v1/validate", json={"files": _TREE_WITH_REQUIREMENTS})
 
         assert response.status_code == 200, response.text
         assert response.json()["is_valid"] is True, response.text
-        assert len(recording_offer.thread_names) > 1, recording_offer.thread_names
+        assert len(recording_offer.thread_names) == 1, recording_offer.thread_names
         assert all(_in_the_method_load_pool(thread_name) for thread_name in recording_offer.thread_names), recording_offer.thread_names
 
     def test_a_run_asks_the_package_offer_off_the_event_loop(self, mocker: MockerFixture, tmp_path: Path, recording_offer: _RecordingOffer):
-        """The runner's check of the served method asks the factory first, then the run's own load does."""
+        """The runner's check of the served method asks the factory, once, and the run's own load takes its verdict."""
         client = _build_client(mocker, tmp_path=tmp_path)
 
         response = client.post("/v1/execute", json={"files": _TREE_WITH_REQUIREMENTS, "inputs": {"data": "hello"}})
 
         assert response.status_code == 200, response.text
-        assert len(recording_offer.thread_names) > 1, recording_offer.thread_names
+        assert len(recording_offer.thread_names) == 1, recording_offer.thread_names
         assert all(_in_the_method_load_pool(thread_name) for thread_name in recording_offer.thread_names), recording_offer.thread_names
 
     @pytest.mark.parametrize(

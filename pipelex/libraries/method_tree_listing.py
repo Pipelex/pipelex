@@ -16,6 +16,11 @@ listing: a host validating through it puts its listing in scope around the call 
 in-process validation takes it from there (`validate_bundles_in_process`), while a validator dispatching to another
 process never reads it.
 
+A listing also keeps the trees whose `requirements.txt` a check of the run found met (`pipelex.libraries.method_requirements`),
+so each tree is judged once per run, and the package-offer factory of a sandbox-hosted deployment is asked once for it:
+a later step of the load, or the load that follows a server's check of the method it holds, takes the verdict as given.
+A refused tree is never kept, so a run that goes on after a refusal judges it again.
+
 Every tree is listed under this machine's limits (`[interpreter.method_tree_limits]`), read once for the whole listing,
 and a directory a host wrote a tree out as returns the tree as written, as every listing of it does
 (`pipelex.libraries.written_trees`).
@@ -36,6 +41,7 @@ from pipelex.libraries.method_trees import (
     library_trees_from,
     list_library_dir_tree,
     list_local_method_tree,
+    listing_identity,
     local_tree_limits,
     lone_file_member,
 )
@@ -67,6 +73,8 @@ class MethodTreeListing:
         self._rooted_trees: dict[Path, MethodTree] = {}
         # The trees each library directory holds, its own first, by the directory's resolved path.
         self._library_trees: dict[Path, list[MethodTree]] = {}
+        # The trees whose requirements a check of the run found met, by their listing identity.
+        self._trees_meeting_requirements: set[tuple[str, str, bool]] = set()
 
     @property
     def limits(self) -> TreeLimits:
@@ -132,6 +140,16 @@ class MethodTreeListing:
                 trees = library_trees_from(library_dir=library_dir, own_tree=own_tree, limits=self.limits)
             self._library_trees[key] = trees
             return trees
+
+    def meets_requirements(self, *, tree: MethodTree) -> bool:
+        """Whether a check of the run already found the tree's requirements met, so no later check judges them again."""
+        with self._lock:
+            return listing_identity(tree=tree) in self._trees_meeting_requirements
+
+    def record_requirements_met(self, *, tree: MethodTree) -> None:
+        """Keep that a check found the tree's requirements met, which every later check of the run takes as given."""
+        with self._lock:
+            self._trees_meeting_requirements.add(listing_identity(tree=tree))
 
     def library_dir_trees(self, *, library_dirs: Iterable[Path]) -> list[LibraryTree]:
         """The method trees of the library directories, in the order given, each directory's own first (`list_library_dir_trees`).
