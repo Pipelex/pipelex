@@ -537,9 +537,9 @@ description = "An invented method whose lock pins what it fetches"
 """
 
     @classmethod
-    def caller_calling(cls, *, pipe_ref: str) -> str:
-        """The calling method's bundle, whose single step names `pipe_ref`."""
-        return f"""domain      = "fom_lock_caller"
+    def caller_calling(cls, *, pipe_ref: str, domain: str = "fom_lock_caller") -> str:
+        """The calling method's bundle, in `domain`, whose single step names `pipe_ref`."""
+        return f"""domain      = "{domain}"
 description = "A method calling a fetched package"
 
 [pipe.go]

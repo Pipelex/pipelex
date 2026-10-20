@@ -16,11 +16,13 @@ from mthds.package.manifest.parser import parse_methods_toml
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cli.installed_methods import PROVENANCE_FILENAME
+from pipelex.core.method_trees.file_references import BundleFileOrigin
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_library_manager
 from pipelex.methods.exceptions import MethodLockInvalidError, MethodLockMismatchError
 from pipelex.methods.fetching import FetchedMethodPackage
 from pipelex.methods.method_ref import parse_method_ref
+from pipelex.mthds_parsing.parser import MthdsParser
 from tests.integration.pipelex.libraries.test_data import FetchedDependencyLockTestData
 
 if TYPE_CHECKING:
@@ -122,15 +124,63 @@ class TestFetchedDependencyLock:
         assert OTHER_DIGEST in exc_info.value.message
         assert digest in exc_info.value.message
 
-    def test_the_copy_an_earlier_fetch_installed_is_checked_too(self, global_methods_dir: Path, tmp_path: Path, mocker: MockerFixture) -> None:
-        """A first load with no lock installs the fetched copy; a second, locked to another tree, finds it installed and is refused."""
+    @pytest.mark.parametrize("pinned_tag", [None, "v0.1.0"])
+    def test_the_copy_an_earlier_fetch_installed_is_checked_too(
+        self, global_methods_dir: Path, tmp_path: Path, mocker: MockerFixture, pinned_tag: str | None
+    ) -> None:
+        """A first load with no lock installs the fetched copy; a second, locked to another tree, finds it installed and is refused.
+
+        The first fetch pinned no tag, so a second reference pinning one is answered by that installed copy, which the refusal
+        says, rather than telling the author to pin a reference that already pins.
+        """
         fetch_mock, _digest = _mock_fetch(tmp_path=tmp_path, mocker=mocker)
         assert _load(method_dir=_write_caller(method_dir=tmp_path / "unlocked-caller", lock=None)) == {DEP_ALIAS}
         assert (global_methods_dir / "scoring" / PROVENANCE_FILENAME).is_file()
 
         lock = FetchedDependencyLockTestData.lock_naming(address=DEP_ALIAS, digest=OTHER_DIGEST)
-        with pytest.raises(MethodLockMismatchError):
-            _load(method_dir=_write_caller(method_dir=tmp_path / "locked-caller", lock=lock))
+        pinned_alias = DEP_ALIAS if pinned_tag is None else f"{DEP_ALIAS}@{pinned_tag}"
+        with pytest.raises(MethodLockMismatchError) as exc_info:
+            _load(method_dir=_write_caller(method_dir=tmp_path / "locked-caller", lock=lock, pipe_ref=f"{pinned_alias}->fom_lock_scoring.compute"))
+        assert fetch_mock.call_count == 1
+        message = exc_info.value.message
+        if pinned_tag is None:
+            assert "installed copy" not in message
+        else:
+            assert f"The reference pins the tag {pinned_tag}, but an installed copy of version 0.1.0" in message
+            assert "remove that installed copy so the pinned tag is fetched" in message
+
+    @pytest.mark.usefixtures("global_methods_dir")
+    @pytest.mark.parametrize("locks_the_fetched_tree", [True, False])
+    def test_a_later_batch_calling_a_dependency_an_earlier_batch_fetched_is_checked(
+        self, tmp_path: Path, mocker: MockerFixture, locks_the_fetched_tree: bool
+    ) -> None:
+        """A library loads its directories, then the contents submitted beside them, as a run does: the dependency the
+        directories' batch fetched is not loaded again, and the lock submitted with the contents is checked against its tree.
+        """
+        fetch_mock, digest = _mock_fetch(tmp_path=tmp_path, mocker=mocker)
+        host_dir = _write_caller(method_dir=tmp_path / "host-library", lock=None)
+        lock = FetchedDependencyLockTestData.lock_naming(address=DEP_ALIAS, digest=digest if locks_the_fetched_tree else OTHER_DIGEST)
+        submitted = MthdsParser.make_pipelex_bundle_blueprint(
+            mthds_content=FetchedDependencyLockTestData.caller_calling(
+                pipe_ref=f"{DEP_ALIAS}->fom_lock_scoring.compute", domain="fom_lock_submitted"
+            ),
+            file_origin=BundleFileOrigin.SUBMITTED_FILES,
+        )
+        library_manager = get_library_manager()
+        library_id, library = library_manager.open_library()
+        try:
+            library_manager.load_libraries(library_id=library_id, library_dirs=[host_dir])
+            assert set(library.dependency_libraries) == {DEP_ALIAS}
+            library_manager.add_submitted_files(library_id=library_id, submitted_files={LOCK_FILENAME: lock.encode("utf-8")})
+            if locks_the_fetched_tree:
+                library_manager.load_from_blueprints(library_id=library_id, blueprints=[submitted])
+            else:
+                with pytest.raises(MethodLockMismatchError) as exc_info:
+                    library_manager.load_from_blueprints(library_id=library_id, blueprints=[submitted])
+                assert OTHER_DIGEST in exc_info.value.message
+                assert digest in exc_info.value.message
+        finally:
+            library_manager.teardown(library_id=library_id)
         assert fetch_mock.call_count == 1
 
     @pytest.mark.usefixtures("global_methods_dir")

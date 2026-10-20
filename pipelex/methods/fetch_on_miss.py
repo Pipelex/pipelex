@@ -61,9 +61,19 @@ def _lookup_address(*, full_address: str) -> _LookupAddress:
     return _LookupAddress(address=ref.address, ref=ref, parse_error=None)
 
 
-def reference_address(*, full_address: str) -> str:
-    """The address an address-based reference names, any ``@<tag>`` stripped: how the stores and a method's lock key a package."""
-    return _lookup_address(full_address=full_address).address
+class AddressReference(NamedTuple):
+    """An address-based reference split into the address it names and the tag it pins."""
+
+    address: str
+    tag: str | None
+
+
+def split_address_reference(*, full_address: str) -> AddressReference:
+    """Split a reference into its address, any ``@<tag>`` stripped, which is how the stores and a method's lock key a
+    package, and the tag it pins, None when it pins none or does not parse.
+    """
+    lookup = _lookup_address(full_address=full_address)
+    return AddressReference(address=lookup.address, tag=lookup.ref.tag if lookup.ref is not None else None)
 
 
 def find_vendored_method(*, full_address: str, methods_dirs: list[Path]) -> InstalledMethod | None:

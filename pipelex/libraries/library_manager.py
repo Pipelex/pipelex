@@ -73,8 +73,8 @@ from pipelex.libraries.visibility_utils import make_visibility_checker
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES
 from pipelex.methods.address_dependencies import AddressDependencySources, unshipped_address_dependency_message
 from pipelex.methods.exceptions import MethodDependencyFetchError, MethodDependencyNotShippedError, MethodFetchDisabledError
-from pipelex.methods.fetch_on_miss import find_vendored_method, reference_address, resolve_address_based_method
-from pipelex.methods.method_lock import FetchedDependency, ensure_fetched_tree_locked
+from pipelex.methods.fetch_on_miss import find_vendored_method, resolve_address_based_method, split_address_reference
+from pipelex.methods.method_lock import FetchedCopy, FetchedTree, ensure_fetched_tree_locked
 from pipelex.methods.structures_check import ensure_no_structured_content_in_library_sources
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.mthds_parsing.handle_pipe_errors import categorize_pipe_validation_error
@@ -380,6 +380,9 @@ class LibraryManager(LibraryManagerAbstract):
         # library_id -> the files its library directories submit, joined only when a bundle parsed from a content
         # string loads: a library that loads none never has two directories' files judged as one tree.
         self._library_dir_submissions: dict[str, list[dict[str, HeldFile]]] = {}
+        # library_id -> alias -> the tree loaded for a dependency from a copy this runtime fetched, against which a later
+        # load batch calling the same alias, which runs that tree, checks the locks of its own callers.
+        self._fetched_dependency_trees: dict[str, dict[str, FetchedTree]] = {}
 
     ############################################################
     # Manager lifecycle
@@ -418,6 +421,7 @@ class LibraryManager(LibraryManagerAbstract):
             self._submitted_files.pop(library_id, None)
             self._submitted_trees.pop(library_id, None)
             self._library_dir_submissions.pop(library_id, None)
+            self._fetched_dependency_trees.pop(library_id, None)
             # The library's runs are over: its hold on a method tree's Python, if a PipeFunc step took one, is released,
             # and so are the trees it held for its runs to read.
             TREE_PYTHON_HOLD.release(holder=library_id)
@@ -446,6 +450,7 @@ class LibraryManager(LibraryManagerAbstract):
         self._submitted_files = {}
         self._submitted_trees = {}
         self._library_dir_submissions = {}
+        self._fetched_dependency_trees = {}
         TREE_PYTHON_HOLD.release_all()
         LOCAL_METHOD_FILES.release_all()
         with ExitStack() as teardown_stack:
@@ -1603,7 +1608,8 @@ class LibraryManager(LibraryManagerAbstract):
         resolved_dep: ResolvedDependency,
         package_address: str,
         tree_limits: TreeLimits | None = None,
-        fetched_dependency: FetchedDependency | None = None,
+        fetched_copy: FetchedCopy | None = None,
+        caller_trees: tuple[MethodTree, ...] = (),
     ) -> None:
         """Load a single resolved dependency into an isolated child library.
 
@@ -1626,9 +1632,10 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_dep: The resolved dependency info
             package_address: The dependency's address as a reference names it, without any ``@<tag>``
             tree_limits: The limits the package's tree is listed under, read from the configuration when not given
-            fetched_dependency: When the package is a copy this runtime fetched, the dependency to check against the
-                locks of the methods calling it, before any of its files is read; None for a package shipped or
-                installed otherwise, which no lock is checked against here
+            fetched_copy: When the package is a copy this runtime fetched, that copy, whose listed tree is checked against
+                the locks of ``caller_trees`` before any of its files is read, and recorded for a later load batch calling
+                it; None for a package shipped or installed otherwise, which no lock is checked against here
+            caller_trees: The trees of the bundles calling the package, whose locks a fetched copy is checked against
 
         Raises:
             MthdsParserError: A bundle of the dependency does not parse, its items named by the bundle's source.
@@ -1647,10 +1654,12 @@ class LibraryManager(LibraryManagerAbstract):
         tree_bundles_by_source: dict[str, TreeBundle] = {}
         # Listed under the package's address: a refusal never names the directory it was installed or fetched into.
         package_tree = list_package_method_tree(root=resolved_dep.package_root, package_address=package_address, limits=tree_limits)
-        if fetched_dependency is not None:
+        fetched_tree: FetchedTree | None = None
+        if fetched_copy is not None:
             # The tree this load lists, and so loads, is the one checked: a fetched copy that is not the tree its callers'
             # locks record is refused before any of its files is read.
-            ensure_fetched_tree_locked(dependency=fetched_dependency, tree_digest=package_tree.digest)
+            fetched_tree = FetchedTree(copy=fetched_copy, tree_digest=package_tree.digest)
+            ensure_fetched_tree_locked(fetched_tree=fetched_tree, caller_trees=caller_trees)
         # The package's own requirements.txt is judged before any of its bundles loads, as the consumer's tree is.
         ensure_package_requirements_met(tree=package_tree, package_address=package_address)
         # Held for the consumer's runs, which read a file of the package's tree, such as one of its steps' template
@@ -1811,6 +1820,9 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Register child library for isolation
         library.dependency_libraries[alias] = child_library
+        if fetched_tree is not None:
+            # A later load batch calling this alias runs this tree, so the locks of its callers are checked against it.
+            self._fetched_dependency_trees.setdefault(library_id, {})[alias] = fetched_tree
 
         # Add aliased entries to main library for backward-compatible cross-package lookups
         for concept in dep_concepts:
@@ -1854,7 +1866,9 @@ class LibraryManager(LibraryManagerAbstract):
         address is tried, then the load is refused with one ``unresolved_package_dependency`` item per address that
         failed, located on the first pipe naming it. A failure of the host's own store (``MethodInstallError``), the
         refusal of a package's Python structures (``MethodStructuresRefusedError``) and the refusal of a fetched copy
-        its callers' locks do not record (``MethodLockMismatchError``, ``MethodLockInvalidError``) propagate as they are.
+        its callers' locks do not record (``MethodLockMismatchError``, ``MethodLockInvalidError``) propagate as they are. An
+        address an earlier batch of the library already loaded is not loaded again, but when it was loaded from a copy
+        this runtime fetched, the locks of this batch's callers are checked against the tree it loaded, which they run.
 
         Also searches for .mthds/methods/ directories relative to the bundle
         source path, walking up ancestor directories to find installed methods
@@ -1900,6 +1914,11 @@ class LibraryManager(LibraryManagerAbstract):
         unresolved_items: list[PipesAndConceptValidationErrorData] = []
         for full_address, (reference, blueprint) in first_references.items():
             if full_address in library.dependency_libraries:
+                # An earlier batch of this library loaded the package, and this batch runs the tree it loaded: when that
+                # tree is a copy this runtime fetched, the locks of this batch's callers are checked against it too.
+                loaded_fetched_tree = self._fetched_dependency_trees.get(library_id, {}).get(full_address)
+                if loaded_fetched_tree is not None:
+                    ensure_fetched_tree_locked(fetched_tree=loaded_fetched_tree, caller_trees=caller_trees.get(full_address, []))
                 continue
             try:
                 self._load_address_based_dependency(
@@ -1991,12 +2010,14 @@ class LibraryManager(LibraryManagerAbstract):
         # checked against the locks of the methods calling it. A shipped copy travels with the lock, from the same author,
         # and a copy another installer wrote, such as `mthds install`, which checks the lock itself, is not this runtime's
         # fetch: neither is checked here.
-        fetched_dependency: FetchedDependency | None = None
+        fetched_copy: FetchedCopy | None = None
         if vendored is None and installed.provenance is not None:
-            fetched_dependency = FetchedDependency(
-                address=reference_address(full_address=full_address),
+            reference = split_address_reference(full_address=full_address)
+            fetched_copy = FetchedCopy(
+                address=reference.address,
                 version=installed.manifest.version,
-                caller_trees=caller_trees,
+                pinned_tag=reference.tag,
+                fetched_tag=installed.provenance.tag,
             )
 
         resolved_dep = ResolvedDependency(
@@ -2014,7 +2035,8 @@ class LibraryManager(LibraryManagerAbstract):
             resolved_dep=resolved_dep,
             # The address the lookup matched (the manifest's address and the method's name), never a tag.
             package_address=f"{installed.manifest.address}/{installed.name}",
-            fetched_dependency=fetched_dependency,
+            fetched_copy=fetched_copy,
+            caller_trees=caller_trees,
         )
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
