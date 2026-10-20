@@ -521,17 +521,20 @@ def handle_validate_bundle_error(
 
 
 def handle_pre_boot_config_error(*, exc: PipelexConfigError, command: str, exit_code: int) -> NoReturn:
-    """Report a configuration that cannot be read before the boot, as the command reports a boot that fails on it.
+    """Report a configuration that cannot be read before the boot, naming the command, never as a traceback.
 
     A command handed a method's folder or bundle file lists its method tree before it boots, under the limits the
-    configuration sets, so a configuration the boot would refuse is refused there first. It is reported as the
-    command's boundary reports the boot's refusal, `Failed to <command>:` and the refusal, which names what to fix and
-    the migration that would, never as a traceback.
+    configuration sets, so a configuration the boot would refuse is refused there first. It is reported as
+    `Failed to <command>:` and the refusal, which names what to fix and the migration that would.
 
     Args:
         exc: The configuration's refusal.
         command: The human command name, as the command's other failures name it (e.g. ``"validate"``).
-        exit_code: The exit code the command gives a failed boot.
+        exit_code: The exit code the command gives this refusal. ``validate`` and ``fix`` give 2, since it gives no
+            verdict on the method, as the 0/1/2 policy reserves 2 for, and the agent CLI's ``validate bundle`` and
+            ``fix bundle`` give the same; ``run`` and ``build`` give 1, as they give their other failures. ``validate``
+            and ``fix`` do not list a lone ``.mthds`` file before the boot, so for a file the same configuration
+            surfaces only at the boot, which exits 1.
     """
     print_traceback_if_requested(console=get_error_console())
     typer.secho(f"Failed to {command}: {exc.message}", fg=typer.colors.RED, err=True)

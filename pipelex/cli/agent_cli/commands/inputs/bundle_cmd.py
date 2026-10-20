@@ -55,7 +55,8 @@ def inputs_bundle_cmd(
     """Generate an example inputs template from a bundle file (.mthds) or pipeline directory.
 
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown; a
+    command line that does not parse exits 2.
 
     Examples:
         pipelex-agent inputs bundle my_bundle.mthds

@@ -5,7 +5,13 @@ import pytest
 from mthds.method_tree.digest import tree_listing
 from mthds.method_tree.lister import list_method_tree
 
-from pipelex.cli.commands.run._run_output_folder import METHOD_TREE_RECORD_NAME, make_run_output_folder, run_output_label, write_method_tree_record
+from pipelex.cli.commands.run._run_output_folder import (
+    METHOD_TREE_RECORD_NAME,
+    bundle_run_outputs_dir,
+    make_run_output_folder,
+    run_output_label,
+    write_method_tree_record,
+)
 
 
 class TestRunOutputFolder:
@@ -53,3 +59,35 @@ class TestRunOutputFolder:
     def test_a_run_folder_is_labelled_by_the_pipe_s_own_code(self, pipe_ref: str, expected_label: str) -> None:
         """A pipe named with its domain, or through a dependency's alias, labels its folder as its bare code does, locally or hosted."""
         assert run_output_label(pipe_ref=pipe_ref) == expected_label
+
+    @pytest.mark.parametrize(
+        ("target", "pipe_override", "entry_bundle", "expected_outputs_dir"),
+        [
+            ("method/bundle.mthds", None, None, "method/results"),
+            ("method/parts/extra.mthds", "wave", None, "method/parts/results"),
+            ("method", None, "method/bundle.mthds", "method/results"),
+            ("method", None, "method/parts/extra.mthds", "method/parts/results"),
+            ("method", "graph_folder_probe.wave", "method/parts/extra.mthds", "method/results"),
+            ("method", "wave", None, "method/results"),
+        ],
+    )
+    def test_a_bundle_run_writes_beside_the_bundle_it_starts_in_else_in_the_folder_named(
+        self,
+        tmp_path: Path,
+        target: str,
+        pipe_override: str | None,
+        entry_bundle: str | None,
+        expected_outputs_dir: str,
+    ) -> None:
+        """A file writes beside itself, a folder beside its entry bundle, and a folder whose pipe is named in the folder itself."""
+        (tmp_path / "method" / "parts").mkdir(parents=True)
+        for bundle_name in ("method/bundle.mthds", "method/parts/extra.mthds"):
+            (tmp_path / bundle_name).write_text("domain = 'run_folder_tests'\n", encoding="utf-8")
+
+        outputs_dir = bundle_run_outputs_dir(
+            target_path=tmp_path / target,
+            pipe_override=pipe_override,
+            entry_bundle_file=tmp_path / entry_bundle if entry_bundle else None,
+        )
+
+        assert outputs_dir == tmp_path / expected_outputs_dir

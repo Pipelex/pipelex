@@ -1,5 +1,6 @@
 from typing import Any, ClassVar, Self
 
+from mthds.package.lock_file import LOCK_FILENAME
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
@@ -119,3 +120,19 @@ class MethodDependencyNotShippedError(MethodRefError):
     """An address-referenced method the caller did not ship, under a resolution that reads nothing installed and fetches nothing."""
 
     error_code = CoreCode.METHOD_DEPENDENCY_MISSING
+
+
+class MethodLockInvalidError(MethodRefError):
+    """The `methods.lock` of a method calling a dependency the runtime fetched cannot be read, so it cannot verify the dependency."""
+
+    error_code = CoreCode.METHOD_PACKAGE_INVALID
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"reason": MethodPackageReason.LOCK_INVALID, "path": LOCK_FILENAME}
+
+
+class MethodLockMismatchError(MethodRefError):
+    """A dependency the runtime fetched holds a tree whose digest is not the one the calling method's `methods.lock` records."""
+
+    error_code = CoreCode.SECURITY_INTEGRITY_MISMATCH

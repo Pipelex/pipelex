@@ -175,7 +175,11 @@ class TestHumanFolderEntryCommands:
     def test_a_configuration_that_does_not_validate_before_the_boot_is_reported_as_a_failed_boot(
         self, mocker: MockerFixture, tmp_path: Path, capsys: pytest.CaptureFixture[str], command: str, exit_code: int
     ) -> None:
-        """Listing the tree reads its limits from the configuration: a refusal there names the command, never a traceback."""
+        """Listing the tree reads its limits from the configuration: a refusal there names the command, never a traceback.
+
+        `validate` and `fix` exit 2 on it, no verdict, as the agent CLI's `validate bundle` and `fix bundle` do; `run`
+        and `build` exit 1, as their other failures do.
+        """
         mocker.patch("pipelex.libraries.method_tree_listing.local_tree_limits", side_effect=PipelexConfigError("the configuration is out of date"))
         write_method_folder(directory=tmp_path, shape=MethodFolderShape.ONE_DECLARED_MAIN_PIPE)
 

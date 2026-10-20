@@ -24,13 +24,14 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_pipe_in_bundle_core,
 )
 from pipelex.cli.bundle_target_resolution import locate_folder_pipe
+from pipelex.cli.commands.run._run_output_folder import bundle_run_outputs_dir, make_run_output_folder, run_output_label
 from pipelex.cli.judged_target import JudgedBundleTarget
 from pipelex.graph.graph_rendering import GraphFormat
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.bundle_graph_rendering import generate_graph_for_bundle, generate_view_for_bundle
+from pipelex.pipeline.bundle_graph_rendering import GraphOutputFolderMaker, generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.pipeline.exceptions import MethodEntryError, PipelineExecutionError, ValidateBundleError
 from pipelex.pipeline.validation_render import format_validate_markdown
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -39,10 +40,12 @@ _GRAPH_UNAVAILABLE_KEY = "graph_unavailable"
 
 
 class _GraphTarget(NamedTuple):
-    """The bundle file a graph is drawn from, and the pipe drawn: the one named, else the bundle's or method's entry."""
+    """The bundle file a graph is drawn from, the pipe drawn (the one named, else the bundle's or method's entry), and where."""
 
     bundle_path: Path
     pipe_code: str | None
+    #: The directory a `run bundle` of the same target makes its output folders under, where `--graph` makes its own.
+    outputs_dir: Path
 
 
 def _graph_target(*, target: JudgedBundleTarget, pipe: str | None) -> _GraphTarget | str:
@@ -54,15 +57,34 @@ def _graph_target(*, target: JudgedBundleTarget, pipe: str | None) -> _GraphTarg
     the validation standing as it is.
     """
     if target.bundle_path is not None:
-        return _GraphTarget(bundle_path=target.bundle_path, pipe_code=pipe)
-    if target.method_tree is None:
+        outputs_dir = bundle_run_outputs_dir(target_path=target.bundle_path, pipe_override=pipe, entry_bundle_file=None)
+        return _GraphTarget(bundle_path=target.bundle_path, pipe_code=pipe, outputs_dir=outputs_dir)
+    if target.method_tree is None or target.method_dir is None:
         msg = "A method's folder was resolved without its method tree."
         raise PipelexUnexpectedError(msg)
     try:
         entry = locate_folder_pipe(tree=target.method_tree, pipe_override=pipe)
     except MethodEntryError as exc:
         return f"No graph was drawn, since a graph is drawn from one pipe: {exc.message}"
-    return _GraphTarget(bundle_path=target.method_tree.file_location(entry.tree_path), pipe_code=entry.pipe_ref)
+    bundle_path = target.method_tree.file_location(entry.tree_path)
+    # A run of the folder writes beside the bundle defining its entry pipe, or in the folder itself when a pipe is named.
+    outputs_dir = bundle_run_outputs_dir(target_path=target.method_dir, pipe_override=pipe, entry_bundle_file=bundle_path)
+    return _GraphTarget(bundle_path=bundle_path, pipe_code=entry.pipe_ref, outputs_dir=outputs_dir)
+
+
+def _graph_output_folder_maker(*, outputs_dir: Path) -> GraphOutputFolderMaker:
+    """Where `--graph` writes its files: a new numbered folder, `<pipe_code>_output_<NN>/`, under `outputs_dir`.
+
+    `outputs_dir` is where a `run bundle` of the same target makes its output folders, and the folder is made the same
+    way, holding a `.gitignore` that ignores everything in it, so the viewer and its graph files never join the method
+    tree they were drawn from: validating a method leaves its tree, and its digest, as they were. The envelope names
+    each file's path.
+    """
+
+    def make_output_folder(*, pipe_code: str) -> Path:
+        return make_run_output_folder(output_dir=outputs_dir, label=run_output_label(pipe_ref=pipe_code))
+
+    return make_output_folder
 
 
 def validate_bundle_cmd(
@@ -76,7 +98,12 @@ def validate_bundle_cmd(
     ] = None,
     graph: Annotated[
         bool,
-        typer.Option("--graph", "-g", help="On successful bundle validation, save graph HTML files and include their paths in the JSON output"),
+        typer.Option(
+            "--graph",
+            "-g",
+            help="On successful bundle validation, save graph HTML files in a new <pipe_code>_output_<NN>/ folder under the results/ "
+            "directory a run of the same target writes to, kept out of the method tree, and include their paths in the output",
+        ),
     ] = False,
     graph_format: Annotated[
         GraphFormat,
@@ -116,7 +143,11 @@ def validate_bundle_cmd(
     run to one pipe. --graph and --view draw the pipe named, else the method's main pipe, and say so when it has none.
 
     Default output is markdown; use --format json for structured JSON.
-    Results go to stdout on success, errors to stderr with exit code 1.
+    Results go to stdout on success, and a failure's problem to stderr. Exit codes: 0 when the bundle is valid; 1 on
+    the invalid verdict, on a whole bundle not runnable without --allow-signatures, and when Pipelex fails to boot; 2
+    when no verdict could be produced (a command line that does not parse, a path that is no bundle, a folder holding
+    no bundle, a missing file or pipe, a method file it cannot read, a model no enabled backend serves, a configuration
+    refused before the boot, an unexpected failure) and when the graph or view asked for cannot be drawn.
 
     Examples:
         pipelex-agent validate bundle my_bundle.mthds
@@ -180,6 +211,7 @@ def validate_bundle_cmd(
                     generate_graph_for_bundle(
                         bundle_path=graph_target.bundle_path,
                         graph_format=graph_format,
+                        make_output_folder=_graph_output_folder_maker(outputs_dir=graph_target.outputs_dir),
                         library_dirs=library_dir_strings,
                         pipe_code=graph_target.pipe_code,
                         direction=direction,
