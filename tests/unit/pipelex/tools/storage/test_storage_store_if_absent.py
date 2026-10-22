@@ -22,6 +22,7 @@ class _PlainProvider(StorageProviderAbstract):
 
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
+        self.checksums: dict[str, str | None] = {}
 
     @override
     async def _load_with_metadata(self, key: str) -> StoredData:
@@ -31,8 +32,9 @@ class _PlainProvider(StorageProviderAbstract):
         return StoredData(data=self.objects[key], mime_type=None)
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         self.objects[key] = data
+        self.checksums[key] = checksum_sha256_hex
 
     @override
     async def public_url(self, uri: str) -> str | None:
@@ -58,6 +60,15 @@ class TestStorageStoreIfAbsent:
 
             assert created is True
             assert await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}{KEY}") == PAYLOAD
+
+    async def test_the_default_hands_the_checksum_on_to_the_plain_store(self) -> None:
+        """A provider overriding only `_store` still receives the checksum, for a storage that can check it."""
+        provider = _PlainProvider()
+        sha256 = hashlib.sha256(PAYLOAD).hexdigest()
+
+        assert await provider.store_if_absent(data=PAYLOAD, key=KEY, checksum_sha256_hex=sha256) is True
+
+        assert provider.checksums == {KEY: sha256}
 
     async def test_bytes_not_matching_their_checksum_are_refused_before_any_write(self, tmp_path: Path) -> None:
         for provider in _providers(tmp_path=tmp_path):

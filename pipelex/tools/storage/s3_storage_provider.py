@@ -46,6 +46,26 @@ def checksum_sha256_header_value(*, sha256_hex: str) -> str:
     return base64.b64encode(bytes.fromhex(sha256_hex)).decode("ascii")
 
 
+def _checksum_sha256_put_params(*, checksum_sha256_hex: str | None) -> dict[str, str]:
+    """The `PutObject` parameters that make S3 check a write's SHA-256 and keep it beside the object.
+
+    Every write the provider makes carries them, so S3 refuses a body that does not hash to the checksum and stores the
+    checksum, which a `HeadObject` with `ChecksumMode=ENABLED` returns as `ChecksumSHA256`. With the digest, it goes as
+    the `x-amz-checksum-sha256` header, and the bytes are not hashed again. Without it, `ChecksumAlgorithm` alone makes
+    botocore hash the body as it sends it and send the checksum as a trailer of the upload.
+
+    Args:
+        checksum_sha256_hex: The SHA-256 of the body in lowercase hexadecimal, or None for botocore to compute it.
+
+    Returns:
+        The parameters to add to a `put_object` call.
+    """
+    params = {"ChecksumAlgorithm": "SHA256"}
+    if checksum_sha256_hex is not None:
+        params["ChecksumSHA256"] = checksum_sha256_header_value(sha256_hex=checksum_sha256_hex)
+    return params
+
+
 class S3StorageProvider(StorageProviderAbstract):
     """Storage provider implementation for AWS S3 storage.
 
@@ -116,7 +136,13 @@ class S3StorageProvider(StorageProviderAbstract):
         # shared host. A content security policy can allow a bucket only by its own host, so pin the virtual
         # style: `<bucket>.s3.<region>.amazonaws.com`. botocore still falls back to path-style for a bucket
         # name that cannot be a hostname, a dotted one included.
-        config = AioConfig(signature_version="s3v4", s3={"addressing_style": "virtual"})
+        #
+        # Every write carries the body's SHA-256, which S3 checks the body against (`_checksum_sha256_put_params`).
+        # When botocore computes it, it goes as a trailer of an upload botocore already leaves unsigned. When the
+        # caller gave it, it goes as the signed `x-amz-checksum-sha256` header, and botocore, which recognises only
+        # a checksum of its own, would hash the whole body once more just to sign it. Over TLS the signed checksum
+        # protects the body as well as a signed payload would, so the payload is never signed.
+        config = AioConfig(signature_version="s3v4", s3={"addressing_style": "virtual", "payload_signing_enabled": False})
 
         return {
             "service_name": "s3",
@@ -274,13 +300,18 @@ class S3StorageProvider(StorageProviderAbstract):
             return content_length
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
-        """Store bytes to an S3 object.
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
+        """Store bytes to an S3 object, with S3 checking their SHA-256.
+
+        The PUT carries the SHA-256, so S3 refuses a body that arrived damaged, as a `BadDigest`, and keeps the
+        checksum beside the object, where a `HeadObject` with `ChecksumMode=ENABLED` reads it.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the object.
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, or None for botocore to compute it as
+                it sends the bytes.
 
         Raises:
             StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
@@ -303,6 +334,7 @@ class S3StorageProvider(StorageProviderAbstract):
                 }
                 if content_type:
                     put_params["ContentType"] = content_type
+                put_params.update(_checksum_sha256_put_params(checksum_sha256_hex=checksum_sha256_hex))
                 await client.put_object(**put_params)
             except client.exceptions.NoSuchBucket as exc:
                 msg = f"Bucket not found in S3: '{self._bucket_name}'"
@@ -323,8 +355,9 @@ class S3StorageProvider(StorageProviderAbstract):
         """Create an S3 object unless one exists at the key, with S3 checking the condition and the checksum.
 
         The PUT carries `If-None-Match: *`, so S3 writes it only when the key holds no object and answers `412`
-        otherwise, which is the key already held. With a checksum, it carries the SHA-256 as `x-amz-checksum-sha256`,
-        and S3 refuses a body whose hash differs, so the object holds exactly the bytes the checksum names.
+        otherwise, which is the key already held. It carries the SHA-256, as `x-amz-checksum-sha256` when the caller
+        gave it and computed by botocore otherwise, and S3 refuses a body whose hash differs, so the object holds
+        exactly the bytes the checksum names, and keeps the checksum beside it.
 
         A `409 ConditionalRequestConflict` means another operation on the key, a conditional write or a delete, was
         in flight, and S3's answer to it is to retry: the PUT is sent again after a short pause, a bounded number of
@@ -336,7 +369,8 @@ class S3StorageProvider(StorageProviderAbstract):
             data: The bytes to store, already checked against their checksum.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the object.
-            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, sent for S3 to check, or None.
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, sent for S3 to check, or None for
+                botocore to compute it as it sends the bytes.
 
         Returns:
             True when this call created the object, False when the key already held one.
@@ -361,8 +395,7 @@ class S3StorageProvider(StorageProviderAbstract):
         }
         if content_type:
             put_params["ContentType"] = content_type
-        if checksum_sha256_hex is not None:
-            put_params["ChecksumSHA256"] = checksum_sha256_header_value(sha256_hex=checksum_sha256_hex)
+        put_params.update(_checksum_sha256_put_params(checksum_sha256_hex=checksum_sha256_hex))
 
         retry_delays = CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS
         conditional_conflict: ClientError | None = None
