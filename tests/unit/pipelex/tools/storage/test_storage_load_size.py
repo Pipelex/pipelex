@@ -34,7 +34,7 @@ class _LoadOnlyProvider(StorageProviderAbstract):
         return StoredData(data=self.objects[key], mime_type=None)
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         self.objects[key] = data
 
     @override

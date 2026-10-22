@@ -1,3 +1,5 @@
+import hashlib
+
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
@@ -10,6 +12,7 @@ from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 FAKE_IMAGE_BYTES = b"fake-image-bytes-for-hashing"
+FAKE_IMAGE_SHA256 = hashlib.sha256(FAKE_IMAGE_BYTES).hexdigest()
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -64,6 +67,47 @@ class TestGeneratedContentFactoryStoredObject:
         assert image_content.mime_type == expected_mime_type
         assert image_content.url == "pipelex-storage://stored-uri"
 
+    async def test_the_write_carries_the_whole_digest_the_key_shortens(self, mocker: MockerFixture):
+        """The bytes are hashed once: the key carries the first 16 digits, and the write the whole digest.
+
+        A storage that checks a write's SHA-256, as S3 does, keeps it beside the object, so a reader learns the
+        file's full hash without reading it, which a key holding only its start cannot give.
+        """
+        storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+        storage_provider.store = mocker.AsyncMock(return_value="pipelex-storage://stored-uri")
+        storage_provider.public_url = mocker.AsyncMock(return_value=None)
+        factory = GeneratedContentFactory(storage_provider=storage_provider)
+
+        await factory.make_image_content(
+            storage_scope="test/scope",
+            raw_details=GeneratedImageRawDetails(size=None, actual_bytes=FAKE_IMAGE_BYTES, mime_type="image/png"),
+        )
+
+        store_call = storage_provider.store.await_args
+        assert store_call is not None
+        assert store_call.kwargs["key"] == f"test/scope/generated/{FAKE_IMAGE_SHA256[:16]}.png"
+        assert store_call.kwargs["checksum_sha256_hex"] == FAKE_IMAGE_SHA256
+
+    async def test_a_document_write_carries_the_whole_digest_its_key_shortens(self, mocker: MockerFixture):
+        storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+        storage_provider.store = mocker.AsyncMock(return_value="pipelex-storage://stored-uri")
+        storage_provider.public_url = mocker.AsyncMock(return_value=None)
+        factory = GeneratedContentFactory(storage_provider=storage_provider)
+        document_bytes = b"%PDF-1.7 a generated document"
+        document_sha256 = hashlib.sha256(document_bytes).hexdigest()
+
+        document_content = await factory.make_document_content(
+            storage_scope="test/scope", data=document_bytes, mime_type="application/pdf", filename="invoice.pdf"
+        )
+
+        storage_provider.store.assert_awaited_once_with(
+            data=document_bytes,
+            key=f"test/scope/generated/{document_sha256[:16]}/invoice.pdf",
+            content_type="application/pdf",
+            checksum_sha256_hex=document_sha256,
+        )
+        assert document_content.url == "pipelex-storage://stored-uri"
+
 
 class TestGeneratedContentFactoryStorageKey:
     """The key builder on its own, whatever its caller passes.
@@ -97,7 +141,7 @@ class TestGeneratedContentFactoryStorageKey:
 
         storage_key = factory._build_storage_key(  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
             storage_scope="test/scope",
-            data=FAKE_IMAGE_BYTES,
+            sha256_hex=FAKE_IMAGE_SHA256,
             mime_type=mime_type,
         )
 
@@ -172,6 +216,7 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
         stored_key: str = store_call.kwargs["key"]
         assert stored_key.endswith(f".{expected_extension}")
         assert store_call.kwargs["content_type"] == expected_mime_type
+        assert store_call.kwargs["checksum_sha256_hex"] == FAKE_IMAGE_SHA256
         assert image_content.mime_type == expected_mime_type
 
     @pytest.mark.usefixtures("_remote_fetch_enabled")

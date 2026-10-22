@@ -32,10 +32,10 @@ class GeneratedContentFactory:
         self,
         storage_scope: str,
         *,
-        data: bytes,
+        sha256_hex: str,
         mime_type: str,
     ) -> str:
-        """Build a storage key using a SHA-256 hash of the data.
+        """Build a storage key from the SHA-256 of the data.
 
         Args:
             storage_scope: The run's opaque storage prefix — see
@@ -45,7 +45,9 @@ class GeneratedContentFactory:
                 Collapsing them into one host-supplied string is what lets a host
                 key generated content by tenant instead of by uploader, without
                 the runtime learning what a tenant is.
-            data: The binary data to hash
+            sha256_hex: The SHA-256 of the data in lowercase hexadecimal, of
+                which the key carries the first 16 digits. The caller sends the
+                whole digest with the write, so the bytes are hashed once.
             mime_type: The resolved effective MIME type — the same value the
                 resulting content reports. It alone decides the file extension,
                 so the key can never disagree with the content's `mime_type`
@@ -58,7 +60,7 @@ class GeneratedContentFactory:
             `{storage_scope}/generated/<filename>`, where the filename is
             rendered from the configured `uri_format` (`{hash}`, `{extension}`).
         """
-        hash_digest = hashlib.sha256(data).hexdigest()[:16]
+        hash_digest = sha256_hex[:16]
 
         media_type = mime_type.split(";", 1)[0].strip().lower()
         match media_type:
@@ -138,15 +140,17 @@ class GeneratedContentFactory:
     ) -> DocumentContent:
         """Store a produced file's bytes and return the `DocumentContent` that points at them.
 
-        The key is `{storage_scope}/generated/{hash}/{filename}`: the hash keeps two different files with the
-        same name apart, and ending in the human filename means every backend's URL, and so every download, is
-        called `invoice-INV-2026-0142.pdf` rather than a hash. The caller owns the filename's safety: it must be
-        one name every `pipelex-storage://` reader accepts, as `path_safe_file_name` makes it, or a host that
-        checks the key, such as the hosted platform, refuses to serve the file.
+        The key is `{storage_scope}/generated/{hash}/{filename}`: the hash, the first 16 hexadecimal digits of the
+        bytes' SHA-256, keeps two different files with the same name apart, and ending in the human filename means
+        every backend's URL, and so every download, is called `invoice-INV-2026-0142.pdf` rather than a hash. The
+        whole digest goes with the write, so a storage that checks it, as S3 does, keeps it beside the file. The
+        caller owns the filename's safety: it must be one name every `pipelex-storage://` reader accepts, as
+        `path_safe_file_name` makes it, or a host that checks the key, such as the hosted platform, refuses to serve
+        the file.
         """
-        hash_digest = hashlib.sha256(data).hexdigest()[:16]
-        storage_key = f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{hash_digest}/{filename}"
-        url = await self.storage_provider.store(data=data, key=storage_key, content_type=mime_type)
+        sha256_hex = hashlib.sha256(data).hexdigest()
+        storage_key = f"{storage_scope}/{GENERATED_CONTENT_LEAF}/{sha256_hex[:16]}/{filename}"
+        url = await self.storage_provider.store(data=data, key=storage_key, content_type=mime_type, checksum_sha256_hex=sha256_hex)
         public_url = await self.storage_provider.public_url(uri=url)
         return DocumentContent(url=url, public_url=public_url, mime_type=mime_type, filename=filename)
 
@@ -216,12 +220,13 @@ class GeneratedContentFactory:
             url = remote_url
             is_remote_url = True
         elif actual_bytes:
+            sha256_hex = hashlib.sha256(actual_bytes).hexdigest()
             storage_key = self._build_storage_key(
                 storage_scope=storage_scope,
-                data=actual_bytes,
+                sha256_hex=sha256_hex,
                 mime_type=mime_type,
             )
-            url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type)
+            url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type, checksum_sha256_hex=sha256_hex)
             is_remote_url = False
         else:
             msg = "No URL or bytes found"
@@ -244,12 +249,13 @@ class GeneratedContentFactory:
             else:
                 if not declared_mime_type and fetched_mime_type:
                     mime_type = fetched_mime_type
+                sha256_hex = hashlib.sha256(actual_bytes).hexdigest()
                 storage_key = self._build_storage_key(
                     storage_scope=storage_scope,
-                    data=actual_bytes,
+                    sha256_hex=sha256_hex,
                     mime_type=mime_type,
                 )
-                url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type)
+                url = await self.storage_provider.store(data=actual_bytes, key=storage_key, content_type=mime_type, checksum_sha256_hex=sha256_hex)
                 public_url = await self.storage_provider.public_url(uri=url)
         elif not is_remote_url:
             public_url = await self.storage_provider.public_url(uri=url)

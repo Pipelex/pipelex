@@ -11,6 +11,8 @@ class TestMimeTypeToExtension:
             ("text/markdown", "md"),
             ("text/markdown; charset=utf-8", "md"),
             ("TEXT/Markdown", "md"),
+            ("application/yaml", "yaml"),
+            ("application/vnd.oasis.opendocument.text", "odt"),
             ("text/plain", "txt"),
             ("text/csv", "csv"),
             ("text/html", "html"),

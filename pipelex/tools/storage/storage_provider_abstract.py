@@ -28,7 +28,7 @@ class StorageProviderAbstract(ABC):
 
     Subclasses must implement:
         - _load_with_metadata(key): Load data with MIME type by key (without scheme)
-        - _store(data, key, content_type): Store data and return URI
+        - _store(data, key, content_type, checksum_sha256_hex): Store data
         - public_url(uri): Return human-readable link for URI
 
     A provider Pipelex ships names its kind in ``storage_kind``, the ``scheme`` its refusals carry; a plugin's provider
@@ -165,29 +165,39 @@ class StorageProviderAbstract(ABC):
         stored_data = await self._load_with_metadata(key)
         return len(stored_data.data)
 
-    async def store(self, data: bytes, *, key: str, content_type: str | None = None) -> str:
+    async def store(self, data: bytes, *, key: str, content_type: str | None = None, checksum_sha256_hex: str | None = None) -> str:
         """Store data and return full URI with scheme.
+
+        A provider whose storage can check a write's checksum, as S3 can, sends the bytes' SHA-256 with every write, so
+        the storage refuses a body that arrived damaged and keeps the checksum beside the object. A caller that hashed
+        the bytes already, for their key, passes the digest, so they are not hashed again. Unlike `store_if_absent`,
+        which checks a checksum handed to it, this trusts the caller's, which is the hash of bytes the caller holds, and
+        S3 still refuses a body that does not match it.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data (used by cloud providers).
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, when the caller has it, or None.
 
         Returns:
             Full URI with PIPELEX_STORAGE_SCHEME prefix.
         """
         uri = self._add_scheme(key)
-        await self._store(data=data, key=key, content_type=content_type)
+        await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
         return uri
 
     @abstractmethod
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         """Store data in storage.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data.
+            checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, or None when the caller has not hashed
+                the bytes. A provider whose storage checks a write's checksum sends it, hashing the bytes itself when it
+                is None; another ignores it.
         """
 
     async def store_if_absent(
@@ -238,17 +248,15 @@ class StorageProviderAbstract(ABC):
             data: The bytes to store, already checked against `checksum_sha256_hex`.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data.
-            checksum_sha256_hex: The SHA-256 of `data`, or None. This default sends it nowhere.
+            checksum_sha256_hex: The SHA-256 of `data`, or None, handed on to `_store`.
 
         Returns:
             True when this call stored the object, False when the key already held one.
         """
-        # A plain store has nowhere to send a checksum: `store_if_absent` checked the bytes against it already.
-        _ = checksum_sha256_hex
         try:
             await self._load_size(key)
         except StorageFileNotFoundError:
-            await self._store(data=data, key=key, content_type=content_type)
+            await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
             return True
         return False
 

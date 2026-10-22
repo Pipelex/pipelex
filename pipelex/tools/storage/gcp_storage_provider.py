@@ -269,13 +269,15 @@ class GcpStorageProvider(StorageProviderAbstract):
             raise StorageGcpError(msg) from exc
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         """Store bytes to a GCS object.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the object.
+            checksum_sha256_hex: Ignored: GCS takes no SHA-256 checksum, and the client library checks the upload's own
+                CRC32C or MD5 on the way.
 
         Raises:
             StorageGcpError: If the GCS operation fails.
