@@ -88,12 +88,13 @@ class HostedRunPollingError(HostedRunError):
 
 
 class HostedRunOutcomeUnknownError(HostedRunError):
-    """The request that runs the method was sent, and the connection failed before its answer came back.
+    """The request that runs the method may have reached the hosted API, and the connection failed before its answer came back.
 
     The hosted API may have created the run before the connection failed, with no way to tell from here: its id never
     arrived. Running the command again could start a second paid run, so the next step is the run history first. The
-    cause is pipelex-sdk's `ApiUnreachableError`, whose own cause is the transport failure: a read, a write, a protocol
-    failure or a body that could not be decoded, met after the request left this machine.
+    cause is pipelex-sdk's `ApiUnreachableError` for the start or the execute request, which the SDK reads as one that
+    may have started the run (`run_may_have_started`); its own cause is the transport failure, such as a read, a write,
+    a protocol failure or a body that could not be decoded, which does not prove the request never left this machine.
     """
 
     error_code = CoreCode.CLIENT_OUTCOME_UNKNOWN

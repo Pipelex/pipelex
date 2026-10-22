@@ -35,15 +35,6 @@ from pipelex.system.usage_stats.usage_stats_client import note_command_hosted
 #: The `implementation` a bare runner names in its `GET /v1/version` handshake: an open-source pipelex-api, which
 #: keeps no runs to poll. The same value pipelex-sdk's `start_and_wait` tests to choose the blocking route.
 BARE_RUNNER_IMPLEMENTATION = "pipelex-api"
-#: The transport failures httpx raises before a request leaves this machine: no connection was made, so no run exists.
-#: Every other one (a read, a write, a protocol failure) may come after the hosted API received the request.
-_PRE_SEND_TRANSPORT_ERRORS: tuple[type[httpx.TransportError], ...] = (
-    httpx.ConnectError,
-    httpx.ConnectTimeout,
-    httpx.PoolTimeout,
-    httpx.UnsupportedProtocol,
-    httpx.ProxyError,
-)
 
 
 class RunStartedCallback(Protocol):
@@ -143,21 +134,21 @@ async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunReque
     A start the server refuses for a missing run store created no run, so running the blocking route next cannot run
     the method twice.
 
-    The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and only some of
-    them mean the hosted API was not reached. A failure before the request left this machine stays the SDK's error.
-    Any later one, a connection lost or a read timed out after the request was sent, is a
-    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived. A tree past the
-    inline threshold is uploaded by the SDK inside the run call, so a connection lost on one of those requests reads as
-    such a failure too, which errs toward checking the run history.
+    The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and decides whether
+    a run may have started (`run_may_have_started`): only on the start or the execute request itself, and only when the
+    failure does not prove the request never left this machine. A failure it reads as starting nothing stays the SDK's
+    error: the version handshake, the blob requests of a tree sent by hash, or a connection that was never made. Any
+    other one, a connection lost or a read timed out once the run request may have left, is a
+    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived.
     """
     try:
         return await _start_or_execute_unmapped(client=client, request=request, inputs=inputs)
     except ApiUnreachableError as exc:
-        transport_error = exc.__cause__
-        if isinstance(transport_error, _PRE_SEND_TRANSPORT_ERRORS):
+        if not exc.run_may_have_started:
             raise
+        transport_error = exc.__cause__
         failure = f"{type(transport_error).__name__}: {transport_error}" if transport_error is not None else str(exc)
-        msg = f"The connection to the hosted API at {client.base_url} failed after the run request was sent ({failure})"
+        msg = f"The connection to the hosted API at {client.base_url} failed on the run request, which the hosted API may have received ({failure})"
         raise HostedRunOutcomeUnknownError(msg) from exc
 
 
@@ -204,8 +195,9 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
         RunTimeoutError: If the run outlived the wait; it keeps running, and its id resumes it.
         MissingMainStuffError: If the run completed and delivered no main output.
         HostedRunPollingError: If following a started run failed any other way; it names the run.
-        HostedRunOutcomeUnknownError: If the connection failed after the run request was sent, so a run may exist.
-        ApiUnreachableError: If the hosted API cannot be reached before the run request is sent.
+        HostedRunOutcomeUnknownError: If the connection failed on the run request in a way that may have let it reach
+            the hosted API, so a run may exist.
+        ApiUnreachableError: If a request got no answer and pipelex-sdk reads it as starting no run.
         InputPreparationError: If a local file cannot be read or uploaded.
         MethodFileTransferError: If a file of the method's tree the hosted API lacks could not be uploaded, so no run
             started.

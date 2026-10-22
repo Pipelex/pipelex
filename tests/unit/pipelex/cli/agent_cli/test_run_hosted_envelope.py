@@ -12,12 +12,16 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
+from mthds.protocol.problem.client_problems import make_client_problem
 from mthds.protocol.problem.models import Problem
 from mthds.protocol.problem.registry import CoreCode
 from pipelex_sdk.error_models import RunErrorReport
 from pipelex_sdk.errors import (
     ApiResponseError,
     InvalidLocalSourceError,
+    MethodFileTransferCode,
+    MethodFileTransferError,
+    MethodFileTransferOperation,
     MissingMainStuffError,
     PipelexRequestError,
     PipelineExecuteTimeoutError,
@@ -383,6 +387,64 @@ class TestRunHostedEnvelope:
         problem = json.loads(capsys.readouterr().err)
         assert problem["code"] == error.problem.code
         assert problem["next_step"] == {"kind": error.problem.next_step.kind, "detail": describe_hosted_error(error=error).next_step}
+
+    @pytest.mark.parametrize(
+        ("error", "retry", "kind"),
+        [
+            (
+                MethodFileTransferError(
+                    "Uploading the file with SHA-256 abc to storage.test failed: no answer came back, so the run was not started.",
+                    operation=MethodFileTransferOperation.UPLOAD,
+                    code=MethodFileTransferCode.UNREACHABLE,
+                    sha256="abc",
+                    problem=make_client_problem(CoreCode.CLIENT_UNREACHABLE, params={"base_url": "https://storage.test"}),
+                ),
+                "yes",
+                "retry",
+            ),
+            (
+                MethodFileTransferError(
+                    "Uploading the file with SHA-256 abc to storage.test failed (429 Too Many Requests), so the run was not started.",
+                    operation=MethodFileTransferOperation.UPLOAD,
+                    code=MethodFileTransferCode.STORAGE_ERROR,
+                    sha256="abc",
+                    status=429,
+                ),
+                "yes",
+                "retry",
+            ),
+            (
+                MethodFileTransferError(
+                    "Uploading the file with SHA-256 abc to storage.test failed (403 Forbidden), so the run was not started.",
+                    operation=MethodFileTransferOperation.UPLOAD,
+                    code=MethodFileTransferCode.REFUSED,
+                    sha256="abc",
+                    status=403,
+                ),
+                "no",
+                "report",
+            ),
+        ],
+        ids=["unreachable", "throttled", "refused"],
+    )
+    def test_a_file_of_the_tree_that_could_not_be_uploaded_carries_the_sdk_s_verdict(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error: MethodFileTransferError, retry: str, kind: str
+    ) -> None:
+        """The SDK's problem for storage's answer is read from its status alone, which the standard may read as no retry
+        helping, a 429 for one; the problem carries the SDK's verdict instead, and the step the human CLI prints.
+        """
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=error))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=CliOutputFormat.JSON)
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == error.problem.code
+        assert problem["retry"] == retry
+        assert problem["next_step"] == {"kind": kind, "detail": describe_hosted_error(error=error).next_step}
+        assert problem["message"] == str(error)
+        for retired in RetiredEnvelope.MEMBERS:
+            assert retired not in problem
 
     @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
     @pytest.mark.parametrize(

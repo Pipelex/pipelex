@@ -42,6 +42,10 @@ if TYPE_CHECKING:
 
 #: A local method's tree, as the CLI reads it: each bundle's bytes by tree path, which the SDK sends as `files`.
 BUNDLE_CONTENTS = {"probe.mthds": b'domain = "probe"\n'}
+#: What the transport says of a connection reset on the request it fails.
+CONNECTION_RESET = "connection reset"
+#: A tree past the SDK's inline threshold of 256 KiB, which travels by the hash of each file once the missing blobs are uploaded.
+LARGE_BUNDLE_CONTENTS = {"probe.mthds": b'domain = "probe"\n' + b"#" * (300 * 1024) + b"\n"}
 DOCUMENT_METHOD_REF = "github.com/Pipelex/methods/documents@v0.1.7"
 HOSTED_RUN_MODULE = "pipelex.hosted.hosted_run"
 RUN_ID = "run_1"
@@ -96,6 +100,13 @@ def _mocked_client(
     return client
 
 
+def _connect_error_from(*, cause: BaseException) -> httpx.ConnectError:
+    """A `ConnectError` raised from `cause`, as httpx raises one for a connection dropped during the TLS handshake."""
+    error = httpx.ConnectError("connection failed")
+    error.__cause__ = cause
+    return error
+
+
 async def _sdk_transport_failure(*, transport_error: httpx.TransportError) -> ApiUnreachableError:
     """The error the real client raises when its transport fails this way while sending `POST /v1/start`."""
 
@@ -111,6 +122,26 @@ async def _sdk_transport_failure(*, transport_error: httpx.TransportError) -> Ap
         await sdk_client.close()
     assert exc_info.value.__cause__ is transport_error
     return exc_info.value
+
+
+def _client_reset_on(*, path: str, requested: list[str]) -> PipelexAPIClient:
+    """The real client over a deployment with a blob store whose connection is reset once `path` was requested.
+
+    Every request is recorded in `requested`; the version handshake is answered, and any other request is unexpected.
+    """
+    reset = httpx.ReadError(CONNECTION_RESET)
+
+    def _handle(request: httpx.Request) -> httpx.Response:
+        requested.append(f"{request.method} {request.url.path}")
+        if request.url.path == path:
+            raise reset
+        if request.url.path == "/v1/version":
+            return httpx.Response(200, content=HostedVersions.HOSTED_WITH_BLOB_STORE.encode("utf-8"), headers={"content-type": "application/json"})
+        pytest.fail(f"unexpected request {request.method} {request.url.path}")
+
+    sdk_client = PipelexAPIClient(api_key="plx_sk_test_not_a_secret", base_url="https://hosted.test")
+    sdk_client.client = httpx.AsyncClient(transport=httpx.MockTransport(_handle))
+    return sdk_client
 
 
 class TestHostedRun:
@@ -470,14 +501,14 @@ class TestHostedRun:
             (httpx.ConnectTimeout("connect timed out"), "ConnectTimeout"),
             (httpx.PoolTimeout("no free connection"), "PoolTimeout"),
             (httpx.UnsupportedProtocol("unknown scheme"), "UnsupportedProtocol"),
-            (httpx.ProxyError("proxy refused"), "ProxyError"),
         ],
     )
     async def test_a_transport_failure_before_the_start_is_sent_is_an_unreachable_api(
         self, mocker: MockerFixture, transport_error: httpx.TransportError, expected_code: str
     ) -> None:
-        """No byte of the start left this machine, so no run exists: checking the network is the right advice."""
+        """No byte of the start left this machine, as the SDK reads the failure, so no run exists: checking the network is the right advice."""
         sdk_error = await _sdk_transport_failure(transport_error=transport_error)
+        assert sdk_error.run_may_have_started is False
         client = _mocked_client(mocker)
         client.start.side_effect = sdk_error
 
@@ -498,14 +529,21 @@ class TestHostedRun:
             httpx.ReadTimeout("timed out"),
             httpx.WriteError("broken pipe"),
             httpx.WriteTimeout("write timed out"),
+            httpx.ProxyError("proxy refused"),
+            _connect_error_from(cause=ConnectionResetError("reset during the TLS handshake")),
         ],
+        ids=["read", "remote_protocol", "read_timeout", "write", "write_timeout", "proxy", "handshake_reset"],
     )
     @pytest.mark.parametrize("bare_runner", [False, True])
     async def test_a_transport_failure_after_the_run_request_was_sent_is_an_unknown_outcome(
         self, mocker: MockerFixture, transport_error: httpx.TransportError, bare_runner: bool
     ) -> None:
-        """The hosted API may have created the run before the connection failed, so "check the network" would lead to a second paid run."""
+        """The hosted API may have created the run before the connection failed, as the SDK reads the failure, so "check the
+        network" would lead to a second paid run. A proxy's failure and a handshake reset are among them: neither proves the
+        request never left.
+        """
         sdk_error = await _sdk_transport_failure(transport_error=transport_error)
+        assert sdk_error.run_may_have_started is True
         bare_version = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
         client = _mocked_client(mocker, version=bare_version) if bare_runner else _mocked_client(mocker)
         client.start.side_effect = sdk_error
@@ -539,6 +577,43 @@ class TestHostedRun:
 
         assert exc_info.value is transfer_error
         client.wait_for_result.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_a_connection_reset_on_the_start_request_itself_is_an_unknown_outcome(self) -> None:
+        """A tree inline asks nothing before the start, so the reset is on the request that may have created the run."""
+        requested: list[str] = []
+        sdk_client = _client_reset_on(path="/v1/start", requested=requested)
+
+        try:
+            with pytest.raises(HostedRunOutcomeUnknownError) as exc_info:
+                await run_hosted(client=sdk_client, request=HostedRunRequest(contents=BUNDLE_CONTENTS, pipe_code="entry"))
+        finally:
+            await sdk_client.close()
+
+        assert requested == ["GET /v1/version", "POST /v1/start"]
+        cause = exc_info.value.__cause__
+        assert isinstance(cause, ApiUnreachableError)
+        assert cause.run_may_have_started is True
+        assert f"ReadError: {CONNECTION_RESET}" in exc_info.value.message
+
+    @pytest.mark.asyncio
+    async def test_a_connection_reset_on_the_blob_request_of_a_large_tree_is_an_unreachable_api(self) -> None:
+        """The SDK asks which blobs the hosted API lacks before the start leaves, so a reset there started no run: it stays
+        the SDK's error, and no start is sent.
+        """
+        requested: list[str] = []
+        sdk_client = _client_reset_on(path="/v1/blobs/missing", requested=requested)
+
+        try:
+            with pytest.raises(ApiUnreachableError) as exc_info:
+                await run_hosted(client=sdk_client, request=HostedRunRequest(contents=LARGE_BUNDLE_CONTENTS, pipe_code="entry"))
+        finally:
+            await sdk_client.close()
+
+        assert "POST /v1/blobs/missing" in requested
+        assert "POST /v1/start" not in requested
+        assert exc_info.value.run_may_have_started is False
+        assert isinstance(exc_info.value.__cause__, httpx.ReadError)
 
     @pytest.mark.parametrize(
         "source",

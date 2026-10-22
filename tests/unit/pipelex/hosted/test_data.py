@@ -67,6 +67,11 @@ class HostedVersions:
     )
     #: A bare runner's, which keeps no runs, so a run on it takes the blocking `POST /v1/execute`.
     BARE_RUNNER: ClassVar[str] = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
+    #: The hosted API's with a blob store, so a tree past the inline threshold travels by the hash of each file.
+    HOSTED_WITH_BLOB_STORE: ClassVar[str] = (
+        '{"protocol_version":"0.1.0","implementation":"pipelex-hosted","implementation_version":"0.30.0","runtime_version":null,'
+        '"blob_store":true,"extensions":["runs","method_id","method_ref"]}'
+    )
 
 
 class HostedPipeIoVerdicts:

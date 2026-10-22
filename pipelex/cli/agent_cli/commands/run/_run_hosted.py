@@ -26,8 +26,8 @@ from typing import TYPE_CHECKING, Any, NoReturn, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
 from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, SuggestedFix
-from mthds.protocol.problem.registry import CoreCode, RetryVerdict
-from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, PipelexRequestError, RunFailedError
+from mthds.protocol.problem.registry import CoreCode, RetryVerdict, StepKind
+from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, MethodFileTransferError, PipelexRequestError, RunFailedError
 from pydantic import BaseModel, ValidationError
 
 from pipelex.base_exceptions import PipelexError, ValidationErrorCategory, ValidationErrorItem
@@ -418,7 +418,26 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
     tailored = None if isinstance(error, ApiResponseError) else tailored_next_step(error=error)
     if tailored is not None:
         problem = problem.model_copy(update={"next_step": NextStep(kind=problem.next_step.kind, detail=tailored)})
+    if isinstance(error, MethodFileTransferError):
+        problem = _transfer_verdict_problem(problem=problem, error=error)
     return problem
+
+
+def _transfer_verdict_problem(*, problem: PipelexProblem, error: MethodFileTransferError) -> PipelexProblem:
+    """The problem of a file of the method's tree that could not be moved, its retry verdict and its step's kind the SDK's verdict.
+
+    pipelex-sdk states the problem of an answer storage gave from its status alone, which the standard reads by its own
+    table, so a status the SDK calls retryable, a `429` for one, can come as a code no retry gets past. Whether the
+    same transfer can succeed later is the SDK's verdict (`error.retryable`), the one the human CLI tells
+    (`describe_hosted_error`), so the problem carries it: a retry for every code but a refusal, which is reported.
+    """
+    kind = StepKind.RETRY if error.retryable else StepKind.REPORT
+    return problem.model_copy(
+        update={
+            "retry": RetryVerdict.YES if error.retryable else RetryVerdict.NO,
+            "next_step": NextStep(kind=kind, detail=problem.next_step.detail),
+        }
+    )
 
 
 def agent_error_hosted(*, error: PipelineRequestError | HostedRunError, credential_sent: bool, exit_code: int = 1) -> NoReturn:
