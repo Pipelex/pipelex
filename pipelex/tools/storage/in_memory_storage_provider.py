@@ -60,13 +60,14 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         return len(self.root[key])
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         """Store bytes in memory.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Ignored for in-memory storage.
+            checksum_sha256_hex: Ignored: memory has no checksum of its own to send it to.
         """
         self.root[key] = data
 
