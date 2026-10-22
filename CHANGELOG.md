@@ -29,6 +29,10 @@
 
 - **`resolve_crate_from_contents` (Breaking)**: `pipelex.pipeline.resolve_bundle` no longer resolves a crate from bundle contents held as strings. A host resolves a method as `/v1/resolve`, `/v1/codegen` and `/v1/pipe-io` do, by writing its tree out and calling `resolve_crate_from_method_dir`, with the packages it ships in `methods_dirs`; a call into a package nothing shipped is then an `unresolved_package_dependency` item of the invalid verdict, never the `request.unsupported` refusal with the reason `address_based_dependency`, which no resolution of this release gives.
 
+### Security
+
+- **`aiohttp` 3.14.5 in the API server image**: the lock the `pipelex/pipelex-api` image installs from moves `aiohttp` past GHSA-494j-54xm-rwp3, GHSA-5wr8-gcqf-gqf3 and GHSA-2g87-pp6c-29x5, with `yarl` 1.25.1 alongside; the published `pipelex` wheel's own requirements are unchanged.
+
 ## [v0.90.0] - 2026-10-19
 
 ### Added
