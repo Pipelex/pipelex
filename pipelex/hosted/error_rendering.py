@@ -25,6 +25,8 @@ from pipelex_sdk.errors import (
     InputPreparationError,
     InvalidLocalSourceError,
     MethodErrorCode,
+    MethodFileTransferCode,
+    MethodFileTransferError,
     MissingMainStuffError,
     PipelineExecuteTimeoutError,
     RejectedAssetError,
@@ -98,6 +100,19 @@ HOSTED_SERVER_FAULT_NEXT_STEP = (
 HOSTED_UNREACHABLE_NEXT_STEP = f"Check the network connection. {HOSTED_BASE_URL_NEXT_STEP}"
 #: The next step of a failure no arm of `describe_hosted_error` tailors a step for.
 HOSTED_RUN_REQUEST_NEXT_STEP = "Check the run request: the method, the pipe and the inputs"
+#: The next steps of a file of the method's tree that could not be moved to or from the hosted API's storage, by why it
+#: failed. pipelex-sdk moves a tree's files before the request that needs them, so nothing was started.
+HOSTED_FILE_UNREACHABLE_NEXT_STEP = (
+    "The hosted API's storage gave no answer for a file of the method, so nothing was started: check the network connection, then run again"
+)
+HOSTED_FILE_STORAGE_ERROR_NEXT_STEP = (
+    "The hosted API's storage failed, timed out or throttled a file of the method, so nothing was started: wait a few seconds, then run again"
+)
+HOSTED_FILE_MISMATCH_NEXT_STEP = "A file of the method came back from the hosted API's storage as other bytes than the ones it names: run again"
+HOSTED_FILE_REFUSED_NEXT_STEP = (
+    "The hosted API's storage refused a file of the method, so nothing was started, and running again meets the same refusal: "
+    "report it with the SHA-256 the message names"
+)
 
 
 #: The member of the hosted plane's own refusal that states, in seconds, how long to wait before asking again; its
@@ -347,6 +362,23 @@ def hosted_refusal_message(*, error: ApiResponseError) -> str:
     return message
 
 
+def _method_file_transfer_next_step(*, error: MethodFileTransferError) -> str:
+    """The next step of a file of the method's tree that could not be moved, by why it failed (`error.code`).
+
+    Running again is the step for every code pipelex-sdk calls retryable, and a refusal is reported, since storage gives
+    the same answer to the same upload; whether a retry can succeed is the SDK's own verdict, `error.retryable`.
+    """
+    match error.code:
+        case MethodFileTransferCode.UNREACHABLE:
+            return HOSTED_FILE_UNREACHABLE_NEXT_STEP
+        case MethodFileTransferCode.STORAGE_ERROR:
+            return HOSTED_FILE_STORAGE_ERROR_NEXT_STEP
+        case MethodFileTransferCode.MISMATCH:
+            return HOSTED_FILE_MISMATCH_NEXT_STEP
+        case MethodFileTransferCode.REFUSED:
+            return HOSTED_FILE_REFUSED_NEXT_STEP
+
+
 def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> HostedErrorView:
     """Read a hosted run's failure off the error pipelex-sdk or pipelex raised.
 
@@ -451,6 +483,12 @@ def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> Ho
         case InputPreparationError():
             error_domain = ErrorDomain.INPUT
             next_step = "Check the inputs against the pipe's signature (pipelex-agent inputs prints a template), then run again"
+        case MethodFileTransferError():
+            # A file of the method's tree, sent by hash, that could not be uploaded before pipe-io or the run: who acts and
+            # whether a retry can succeed are the SDK's verdict.
+            error_domain = error.error_domain
+            retryable = error.retryable
+            next_step = _method_file_transfer_next_step(error=error)
         case _:
             next_step = HOSTED_RUN_REQUEST_NEXT_STEP
     return HostedErrorView(

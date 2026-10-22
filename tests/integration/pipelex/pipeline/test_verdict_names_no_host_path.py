@@ -389,7 +389,7 @@ class TestVerdictNamesNoHostPath:
         )
 
         with pytest.raises(ValidateBundleError) as raised:
-            await runtime.validate([_VALID_CALLER_BUNDLE])
+            await runtime.validate(mthds_contents=[_VALID_CALLER_BUNDLE])
 
         assert "linked_board.mthds" in raised.value.message
 
@@ -480,7 +480,7 @@ class TestVerdictNamesNoHostPath:
         )
 
         with pytest.raises(HostLibraryLoadRefusalError) as raised:
-            await runtime.validate([_VALID_CALLER_BUNDLE])
+            await runtime.validate(mthds_contents=[_VALID_CALLER_BUNDLE])
 
         _assert_the_host_s_fault(error=raised.value, tmp_path=tmp_path)
 
@@ -495,7 +495,7 @@ class TestVerdictNamesNoHostPath:
         )
 
         with pytest.raises(ValidateBundleError) as raised:
-            await runtime.validate([_VALID_CALLER_BUNDLE])
+            await runtime.validate(mthds_contents=[_VALID_CALLER_BUNDLE])
 
         items = raised.value.validation_error_items() or []
         concept_items = [item for item in items if item.error_type == PipeValidationErrorType.UNRESOLVED_CONCEPT]

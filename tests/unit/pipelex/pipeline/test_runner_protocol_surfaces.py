@@ -1,6 +1,7 @@
 """Coverage for the small protocol surfaces of :class:`PipelexMTHDSProtocol`.
 
-Pins the ``extra`` rejection guard on ``execute``, the ``start`` not-implemented
+Pins the refusal of the protocol's ``files`` map on ``execute`` and ``validate``, the
+``extra`` rejection guard on ``execute``, the ``start`` not-implemented
 contract, the ``models`` deck shaping (presets to ModelInfo, aliases/waterfalls kept
 keyed by category, category filter passthrough), and the ``version`` handshake
 including the missing-distribution fallback.
@@ -19,6 +20,7 @@ from mthds.protocol.protocol import PROTOCOL_VERSION
 
 from pipelex.cogt.models.model_listing import ModelCategory
 from pipelex.errors.problem import ProblemView
+from pipelex.errors.unsupported_reasons import METHOD_FILES_UNSUPPORTED_REASON
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.pipeline.runner import (
@@ -44,6 +46,15 @@ _MODELS_PAYLOAD: dict[str, Any] = {
         "extract": {},
     },
 }
+
+
+def _assert_the_files_map_refusal(*, error: PipelineRequestError) -> None:
+    """The refusal of a `files` map: `request.unsupported` on the field `files`, with the local runtime's reason."""
+    assert isinstance(error, PipelexRequestError)
+    assert error.field == "files"
+    problem = error.to_problem(view=ProblemView.CALLER)
+    assert problem.code == CoreCode.REQUEST_UNSUPPORTED
+    assert problem.model_dump(mode="json")["params"] == {"field": "files", "reason": METHOD_FILES_UNSUPPORTED_REASON}
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -75,6 +86,41 @@ class TestRunnerProtocolSurfaces:
         assert isinstance(exc_info.value, PipelexRequestError)
         assert exc_info.value.message == "validate extra 'graph_pipe_code' must not be blank when provided."
         assert exc_info.value.field == "extra.graph_pipe_code"
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_INVALID
+
+    async def test_execute_refuses_a_method_given_as_the_protocol_s_files_map(self) -> None:
+        """The local runtime takes a method as `mthds_contents` or its library directories, and refuses the map unread."""
+        runner = PipelexMTHDSProtocol()
+
+        with pytest.raises(PipelineRequestError) as exc_info:
+            await runner.execute(pipe_code="any_pipe", files={"main.mthds": 'domain = "files_map"'})
+
+        _assert_the_files_map_refusal(error=exc_info.value)
+
+    async def test_validate_refuses_a_method_given_as_the_protocol_s_files_map(self) -> None:
+        runner = PipelexMTHDSProtocol()
+
+        with pytest.raises(PipelineRequestError) as exc_info:
+            await runner.validate(files={"main.mthds": 'domain = "files_map"'}, mthds_contents=['domain = "files_map"'])
+
+        _assert_the_files_map_refusal(error=exc_info.value)
+
+    async def test_an_empty_files_map_is_no_method_and_is_not_refused(self) -> None:
+        """An empty map sends nothing: the call goes on to its next guard, here the extension args one."""
+        runner = PipelexMTHDSProtocol()
+
+        with pytest.raises(PipelexRequestError) as exc_info:
+            await runner.execute(pipe_code="any_pipe", files={}, extra={"abc": 1})
+
+        assert exc_info.value.field == "extra"
+
+    async def test_validate_without_mthds_contents_is_an_invalid_request(self) -> None:
+        runner = PipelexMTHDSProtocol()
+
+        with pytest.raises(PipelexRequestError) as exc_info:
+            await runner.validate()
+
+        assert exc_info.value.field == "mthds_contents"
         assert exc_info.value.to_problem(view=ProblemView.CALLER).code == CoreCode.REQUEST_INVALID
 
     async def test_start_raises_not_implemented_pointing_at_execute(self) -> None:

@@ -279,10 +279,6 @@ class TestMethodTrees:
         bundle_paths = {bundle_file.path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])}
         assert bundle_paths == {tmp_path / "top.mthds", tmp_path / "vendor" / "tool" / "inputs.json" / "flow.mthds"}
 
-    @pytest.mark.xfail(
-        raises=MethodTreeLoadError,
-        reason="The run-inputs default is applied by the mthds lister from the mthds release implementing it, not pinned yet",
-    )
     def test_a_run_s_inputs_file_is_no_member_of_any_tree_at_any_depth(self, tmp_path: Path) -> None:
         """An inputs.json or inputs.toml, regular file or link never followed, stays out at the root and below; names match byte for byte."""
         outside = _touch(directory=tmp_path, tree_path="outside/secrets.json", content='{"token": "x"}')

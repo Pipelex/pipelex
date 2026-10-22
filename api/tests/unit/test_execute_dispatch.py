@@ -30,9 +30,12 @@ from mthds.protocol.pipe_io_contracts import (
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.problem import ProblemView
+from pipelex.errors.unsupported_reasons import METHOD_FILES_UNSUPPORTED_REASON
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipeline.request_exceptions import PipelexRequestError
 from pipelex.plugins.orchestrator_registry import OrchestratorRegistry
 from pipelex.runtime_bridge.exceptions import MissingOrchestratorError
 from pipelex.runtime_bridge.payloads import PipelexPipeDispatchAck, PipelexPipeRunOutput
@@ -48,6 +51,13 @@ from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
 
 _PIPELINE_NS = "pipelex_api.routes.pipelex.pipeline"
+
+
+def _assert_the_files_map_refusal(*, error: PipelexRequestError) -> None:
+    """The refusal of a `files` map handed to the runner object: on the field `files`, with the local runtime's reason."""
+    assert error.field == "files"
+    params = error.to_problem(view=ProblemView.CALLER).model_dump(mode="json")["params"]
+    assert params == {"field": "files", "reason": METHOD_FILES_UNSUPPORTED_REASON}
 
 
 class _StubOrchestrator:
@@ -407,3 +417,24 @@ class TestExecuteDispatch:
             )
         assert exc_info.value.mode == "temporal"
         assert exc_info.value.resolve_error_code() == "runtime.unsupported"
+
+    @pytest.mark.asyncio
+    async def test_execute_refuses_a_method_given_as_the_protocol_s_files_map_before_any_dispatch(self, mocker: MockerFixture) -> None:
+        """The runner's routes resolve a request's `files` into a tree themselves: the runner object takes `mthds_contents`."""
+        registry = mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry")
+
+        with pytest.raises(PipelexRequestError) as exc_info:
+            await ApiRunner().execute(pipe_code="echo", files={"main.mthds": VALID_MTHDS}, inputs={"text": "hello"})
+
+        _assert_the_files_map_refusal(error=exc_info.value)
+        registry.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_start_refuses_a_method_given_as_the_protocol_s_files_map_before_any_dispatch(self, mocker: MockerFixture) -> None:
+        registry = mocker.patch(f"{_PIPELINE_NS}.get_orchestrator_registry")
+
+        with pytest.raises(PipelexRequestError) as exc_info:
+            await ApiRunner().start(pipe_code="echo", files={"main.mthds": VALID_MTHDS}, inputs={"text": "hello"})
+
+        _assert_the_files_map_refusal(error=exc_info.value)
+        registry.assert_not_called()

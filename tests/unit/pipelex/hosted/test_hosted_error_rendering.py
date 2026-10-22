@@ -10,6 +10,9 @@ from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
     InvalidLocalSourceError,
+    MethodFileTransferCode,
+    MethodFileTransferError,
+    MethodFileTransferOperation,
     MissingMainStuffError,
     PipelineExecuteTimeoutError,
     RunFailedError,
@@ -22,11 +25,17 @@ from pipelex_sdk.validation_models import ValidationErrorItem
 
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.error_rendering import (
+    HOSTED_FILE_MISMATCH_NEXT_STEP,
+    HOSTED_FILE_REFUSED_NEXT_STEP,
+    HOSTED_FILE_STORAGE_ERROR_NEXT_STEP,
+    HOSTED_FILE_UNREACHABLE_NEXT_STEP,
     HOSTED_REFUSAL_CALLER_NEXT_STEP,
     HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS,
+    HOSTED_RUN_REQUEST_NEXT_STEP,
     HOSTED_SERVER_FAULT_NEXT_STEP,
     describe_hosted_error,
     hosted_refusal_next_step,
+    tailored_next_step,
 )
 from pipelex.hosted.exceptions import (
     HostedLocalFileUploadUnavailableError,
@@ -53,7 +62,7 @@ def _refusal(*, status: int, body: str) -> ApiResponseError:
         client = PipelexAPIClient(api_key="plx_sk_test_not_a_secret", base_url=API_URL)
         client.client = httpx.AsyncClient(transport=httpx.MockTransport(_handler))
         try:
-            await client.start(pipe_code="entry", mthds_contents=['domain = "probe"\n'])
+            await client.start(pipe_code="entry", contents={"probe.mthds": 'domain = "probe"\n'})
         finally:
             await client.close()
 
@@ -190,6 +199,42 @@ class TestHostedErrorRendering:
         assert view.error_domain == "config"
         assert PIPELEX_BASE_URL_ENV_KEY in view.next_step
         assert "network" in view.next_step
+
+    @pytest.mark.parametrize(
+        ("code", "status", "retryable", "next_step"),
+        [
+            (MethodFileTransferCode.UNREACHABLE, None, True, HOSTED_FILE_UNREACHABLE_NEXT_STEP),
+            (MethodFileTransferCode.STORAGE_ERROR, 503, True, HOSTED_FILE_STORAGE_ERROR_NEXT_STEP),
+            (MethodFileTransferCode.STORAGE_ERROR, 429, True, HOSTED_FILE_STORAGE_ERROR_NEXT_STEP),
+            (MethodFileTransferCode.MISMATCH, None, True, HOSTED_FILE_MISMATCH_NEXT_STEP),
+            (MethodFileTransferCode.REFUSED, 403, False, HOSTED_FILE_REFUSED_NEXT_STEP),
+        ],
+        ids=["unreachable", "storage_failed", "storage_throttled", "mismatch", "refused"],
+    )
+    def test_a_file_of_the_tree_that_could_not_be_moved_carries_the_sdk_s_verdict(
+        self, code: MethodFileTransferCode, status: int | None, retryable: bool, next_step: str
+    ) -> None:
+        """A tree sent by hash uploads what the hosted API lacks before the request: nothing started, and whether running
+        again helps is the SDK's verdict, every code but a refusal, which is reported.
+        """
+        error = MethodFileTransferError(
+            "Uploading the file with SHA-256 abc to storage.test failed, so the run was not started.",
+            operation=MethodFileTransferOperation.UPLOAD,
+            code=code,
+            sha256="abc",
+            status=status,
+        )
+
+        view = describe_hosted_error(error=error)
+
+        assert view.error_type == "MethodFileTransferError"
+        assert view.message == "Uploading the file with SHA-256 abc to storage.test failed, so the run was not started."
+        assert view.error_domain == "runtime"
+        assert view.retryable is retryable
+        assert view.retryable is error.retryable
+        assert view.next_step == next_step
+        assert view.next_step != HOSTED_RUN_REQUEST_NEXT_STEP
+        assert tailored_next_step(error=error) == next_step
 
     def test_an_upload_the_server_failed_is_a_server_fault(self) -> None:
         error = UploadTransportError('Upload of "a.pdf" failed (502): Bad Gateway.')

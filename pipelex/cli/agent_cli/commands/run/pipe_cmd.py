@@ -28,7 +28,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
     run_hosted_for_agent,
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
-from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
+from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_contents
 from pipelex.cli.exceptions import ExportedPipeAmbiguousError
 from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.hosted.exceptions import HostedRunSourceError
@@ -147,11 +147,11 @@ def run_pipe_cmd(
         refuse_local_only_flags(dry_run=dry_run, mock_inputs=mock_inputs)
         # The hosted API holds no library of yours: the one a local run would load is sent along.
         try:
-            library_files = hosted_pipe_library_files(library_dirs=library_dir)
+            library_contents = hosted_pipe_library_contents(library_dirs=library_dir)
         except HostedRunSourceError as exc:
             agent_error(exc.message, cause=exc)
         request = HostedRunRequest(
-            mthds_files=library_files,
+            contents=library_contents,
             pipe_code=pipe_code,
             inputs=pipeline_inputs,
             inputs_base_dir=parsed_inputs.inputs_base_dir,

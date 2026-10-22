@@ -452,6 +452,7 @@ def _holds_a_tree_of_its_own(*, rule: ExclusionRule) -> bool:
             ExclusionRule.DOT_SEGMENT
             | ExclusionRule.PYCACHE_OR_NODE_MODULES
             | ExclusionRule.VIRTUAL_ENVIRONMENT
+            | ExclusionRule.RUN_INPUTS
             | ExclusionRule.GITIGNORE
             | ExclusionRule.PACKAGE_EXCLUDE
         ):
