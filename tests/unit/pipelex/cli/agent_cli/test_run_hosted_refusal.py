@@ -162,7 +162,7 @@ class TestRunHostedRefusal:
 
     @pytest.fixture
     def bundle_file(self, tmp_path: Path) -> Path:
-        """A bundle file the command reads and sends as is (never parsed: --pipe is passed)."""
+        """A bundle file the command reads and sends as is, keyed by its tree path (never parsed: --pipe is passed)."""
         path = tmp_path / "bundle.mthds"
         path.write_text("# bundle\n", encoding="utf-8")
         return path
@@ -191,7 +191,8 @@ class TestRunHostedRefusal:
         assert _routes(seen=seen) == [START_ROUTE]
         start_body = json.loads(seen[-1].content)
         assert start_body["pipe_code"] == "entry"
-        assert start_body["mthds_contents"] == ["# bundle\n"]
+        assert start_body["files"] == {"bundle.mthds": "# bundle\n"}
+        assert "mthds_contents" not in start_body
         captured = capsys.readouterr()
         assert not captured.out
         problem = json.loads(captured.err)
@@ -347,7 +348,7 @@ class TestRunHostedRefusal:
             )
 
         assert exc_info.value.exit_code == 1
-        assert json.loads(seen[-1].content)["mthds_contents"] == ["# bundle\n"]
+        assert json.loads(seen[-1].content)["files"] == {"bundle.mthds": "# bundle\n"}
         assert json.loads(capsys.readouterr().err) == json.loads(RunnerProblems.OUTPUT_MULTIPLICITY)
 
     @pytest.mark.usefixtures("tty_stdin")
@@ -363,6 +364,7 @@ class TestRunHostedRefusal:
         assert exc_info.value.exit_code == 1
         start_body = json.loads(seen[-1].content)
         assert start_body["method_ref"] == "github.com/Pipelex/methods/news@v1.0.0"
+        assert "files" not in start_body
         assert "mthds_contents" not in start_body
         markdown = capsys.readouterr().err
         assert markdown.startswith("## The method does not validate\n")

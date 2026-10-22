@@ -8,10 +8,13 @@ import pytest
 from mthds.protocol.input_form import PipeInputFormDescriptor
 from mthds.protocol.models import VersionInfo
 from pipelex_sdk.client import PipelexAPIClient
-from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest, PipeIOValidReport
+from pipelex_sdk.crate_models import CrateInvalidReport, PipeIORequest, PipeIOValidReport
 from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
+    MethodFileTransferCode,
+    MethodFileTransferError,
+    MethodFileTransferOperation,
     MissingMainStuffError,
     RunFailedError,
     RunLifecycleUnavailableError,
@@ -37,7 +40,8 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-BUNDLE_FILE = MthdsFileItem(content='domain = "probe"\n', source="probe.mthds")
+#: A local method's tree, as the CLI reads it: each bundle's bytes by tree path, which the SDK sends as `files`.
+BUNDLE_CONTENTS = {"probe.mthds": b'domain = "probe"\n'}
 DOCUMENT_METHOD_REF = "github.com/Pipelex/methods/documents@v0.1.7"
 HOSTED_RUN_MODULE = "pipelex.hosted.hosted_run"
 RUN_ID = "run_1"
@@ -102,7 +106,7 @@ async def _sdk_transport_failure(*, transport_error: httpx.TransportError) -> Ap
     sdk_client.client = httpx.AsyncClient(transport=httpx.MockTransport(_fail))
     try:
         with pytest.raises(ApiUnreachableError) as exc_info:
-            await sdk_client.start(pipe_code="entry", mthds_contents=[BUNDLE_FILE.content])
+            await sdk_client.start(pipe_code="entry", contents=BUNDLE_CONTENTS)
     finally:
         await sdk_client.close()
     assert exc_info.value.__cause__ is transport_error
@@ -111,16 +115,16 @@ async def _sdk_transport_failure(*, transport_error: httpx.TransportError) -> Ap
 
 class TestHostedRun:
     @pytest.mark.asyncio
-    async def test_an_inline_bundle_without_inputs_starts_and_waits_on_its_contents(self, mocker: MockerFixture) -> None:
-        """A local bundle travels as `mthds_contents`, and with no inputs nothing is asked of pipe-io."""
+    async def test_a_local_method_without_inputs_starts_and_waits_on_its_tree(self, mocker: MockerFixture) -> None:
+        """A local method travels as its tree, handed to the SDK as its contents, and with no inputs nothing is asked of pipe-io."""
         client = _mocked_client(mocker)
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], pipe_code="entry", dynamic_output_concept_ref="probe.Thing")
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, pipe_code="entry", dynamic_output_concept_ref="probe.Thing")
 
         outcome = await run_hosted(client=client, request=request)
 
         client.start.assert_awaited_once_with(
             pipe_code="entry",
-            mthds_contents=[BUNDLE_FILE.content],
+            contents=BUNDLE_CONTENTS,
             inputs=None,
             dynamic_output_concept_ref="probe.Thing",
             method_ref=None,
@@ -157,7 +161,7 @@ class TestHostedRun:
 
         client.start.assert_awaited_once_with(
             pipe_code=None,
-            mthds_contents=None,
+            contents=None,
             inputs=None,
             dynamic_output_concept_ref=None,
             method_ref=expected_method_ref,
@@ -180,10 +184,9 @@ class TestHostedRun:
 
     @pytest.mark.asyncio
     async def test_an_address_dependency_runs_with_inputs_naming_no_local_file(self, mocker: MockerFixture) -> None:
-        """pipe-io loads no address-based dependency; with no file to upload it is not asked, and the run route fetches the dependency."""
-        client = _mocked_client(mocker)
-        client.pipe_io.side_effect = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.ADDRESS_DEPENDENCY)
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"item": "a widget"})
+        """pipe-io loads no package nothing shipped; with no file to upload it is not asked, and the run route fetches the dependency."""
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS))
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"item": "a widget"})
 
         outcome = await run_hosted(client=client, request=request)
 
@@ -195,7 +198,8 @@ class TestHostedRun:
     async def test_a_local_file_is_anchored_then_uploaded_before_the_run(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A relative file path resolves against the inputs file's directory, is uploaded, and the run gets the storage URI.
 
-        The signature is read once: the upload is driven from that one answer, not from a second pipe-io request.
+        The signature is read once: the upload is driven from that one answer, not from a second pipe-io request. pipe-io
+        and the run receive the same tree.
         """
         (tmp_path / "docs").mkdir()
         (tmp_path / "docs" / "invoice.pdf").write_bytes(b"%PDF")
@@ -204,7 +208,7 @@ class TestHostedRun:
         upload = UploadRecord(uri="pipelex-storage://uploads/abc.pdf", filename="invoice.pdf", content_type="application/pdf", size=4)
         client.upload_file.return_value = upload
         request = HostedRunRequest(
-            mthds_files=[BUNDLE_FILE],
+            contents=BUNDLE_CONTENTS,
             pipe_code="summarize_report",
             inputs={"document": "docs/invoice.pdf", "notes": "see attached"},
             inputs_base_dir=tmp_path,
@@ -212,7 +216,9 @@ class TestHostedRun:
 
         outcome = await run_hosted(client=client, request=request)
 
-        client.pipe_io.assert_awaited_once_with(PipeIORequest(files=[BUNDLE_FILE], pipe_ref="summarize_report"))
+        sent_contents: dict[str, bytes | str] = dict(BUNDLE_CONTENTS)
+        client.pipe_io.assert_awaited_once_with(PipeIORequest(contents=sent_contents, pipe_ref="summarize_report"))
+        assert client.start.await_args.kwargs["contents"] == BUNDLE_CONTENTS
         client.prepare_inputs.assert_not_awaited()
         client.upload_file.assert_awaited_once_with(str(tmp_path / "docs" / "invoice.pdf"))
         assert client.start.await_args.kwargs["inputs"] == {"document": {"url": "pipelex-storage://uploads/abc.pdf"}, "notes": "see attached"}
@@ -233,7 +239,7 @@ class TestHostedRun:
             "report": {"title": "Report", "cover": None},
             "pages": ["invoice.pdf", None],
         }
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs=inputs, inputs_base_dir=tmp_path)
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs=inputs, inputs_base_dir=tmp_path)
 
         await run_hosted(client=client, request=request)
 
@@ -243,31 +249,6 @@ class TestHostedRun:
             "report": {"title": "Report", "cover": None},
             "pages": [{"url": "pipelex-storage://uploads/invoice.pdf"}, None],
         }
-
-    @pytest.mark.asyncio
-    async def test_a_local_file_for_a_method_with_an_address_dependency_is_refused_with_a_url_to_use(
-        self, mocker: MockerFixture, tmp_path: Path
-    ) -> None:
-        """Uploading needs the signature, which pipe-io cannot read through an address-based dependency: the method is not at fault.
-
-        pipe-io answers the refusal with its problem, coded `request.unsupported` and giving the address-dependency reason.
-        """
-        (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
-        client = _mocked_client(mocker)
-        client.pipe_io.side_effect = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.ADDRESS_DEPENDENCY)
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
-
-        with pytest.raises(HostedLocalFileUploadUnavailableError) as exc_info:
-            await run_hosted(client=client, request=request)
-
-        error = exc_info.value
-        assert "address-based dependencies" in error.message
-        assert isinstance(error.__cause__, ApiResponseError)
-        assert error.user_action is not None
-        assert "https URL" in error.user_action.detail
-        assert "Fix the method" not in error.user_action.detail
-        client.upload_file.assert_not_awaited()
-        client.start.assert_not_awaited()
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -290,7 +271,7 @@ class TestHostedRun:
         """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
         client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedLocalFileUploadUnavailableError) as exc_info:
             await run_hosted(client=client, request=request)
@@ -318,7 +299,7 @@ class TestHostedRun:
         """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
         client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedMethodInvalidError):
             await run_hosted(client=client, request=request)
@@ -327,13 +308,13 @@ class TestHostedRun:
         client.start.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_another_unsupported_request_form_from_pipe_io_is_the_hosted_api_s_refusal(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """The same code for another reason is no address-based dependency, so the hosted API's refusal propagates as it is."""
+    async def test_a_pipe_io_refusal_is_the_hosted_api_s_refusal(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """A request pipe-io refuses, here for a form it does not accept, is the hosted API's refusal, propagated as it is."""
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
-        refusal = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.OTHER_UNSUPPORTED_FORM)
+        refusal = _pipe_io_refusal(problem_json=HostedPipeIoRefusals.UNSUPPORTED_FORM)
         client = _mocked_client(mocker)
         client.pipe_io.side_effect = refusal
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(ApiResponseError) as exc_info:
             await run_hosted(client=client, request=request)
@@ -343,14 +324,14 @@ class TestHostedRun:
 
     @pytest.mark.asyncio
     async def test_a_method_that_does_not_load_is_refused_before_the_run_with_its_labelled_items(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """pipe-io's verdict names each file by the label it was sent under; `/v1/start` takes bare contents and could not."""
+        """pipe-io's verdict names each faulty file by its tree path, before any run starts."""
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
         item = ValidationErrorItem.model_validate(
             {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
         )
         invalid = CrateInvalidReport(is_valid=False, validation_errors=[item], message="Bundle does not load")
         client = _mocked_client(mocker, pipe_io_report=invalid)
-        request = HostedRunRequest(mthds_files=[BUNDLE_FILE], inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
+        request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedMethodInvalidError) as exc_info:
             await run_hosted(client=client, request=request)
@@ -377,7 +358,7 @@ class TestHostedRun:
         client.wait_for_result.side_effect = follow_error
 
         with pytest.raises(HostedRunPollingError) as exc_info:
-            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         error = exc_info.value
         assert error.pipeline_run_id == RUN_ID
@@ -395,7 +376,7 @@ class TestHostedRun:
         client.wait_for_result.side_effect = drift.value
 
         with pytest.raises(HostedRunPollingError) as exc_info:
-            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         assert exc_info.value.pipeline_run_id == RUN_ID
 
@@ -413,7 +394,7 @@ class TestHostedRun:
         client.wait_for_result.side_effect = terminal_error
 
         with pytest.raises(type(terminal_error)) as exc_info:
-            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         assert exc_info.value is terminal_error
 
@@ -429,7 +410,7 @@ class TestHostedRun:
         client.start.assert_not_awaited()
         client.execute.assert_awaited_once_with(
             pipe_code="extract",
-            mthds_contents=None,
+            contents=None,
             inputs=None,
             dynamic_output_concept_ref=None,
             method_ref=DOCUMENT_METHOD_REF,
@@ -445,7 +426,7 @@ class TestHostedRun:
         client.start.side_effect = RunLifecycleUnavailableError("no run store", api_url="https://hosted.test")
         mocker.patch(f"{HOSTED_RUN_MODULE}.results_from_execute", return_value=DONE)
 
-        outcome = await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+        outcome = await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         client.execute.assert_awaited_once()
         client.wait_for_result.assert_not_awaited()
@@ -466,7 +447,7 @@ class TestHostedRun:
 
         client.wait_for_result.side_effect = _follow
 
-        await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]), on_started=_on_started)
+        await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS), on_started=_on_started)
 
         assert announced == [RUN_ID]
 
@@ -477,7 +458,7 @@ class TestHostedRun:
         mocker.patch(f"{HOSTED_RUN_MODULE}.results_from_execute", return_value=DONE)
         on_started = mocker.Mock()
 
-        await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]), on_started=on_started)
+        await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS), on_started=on_started)
 
         on_started.assert_not_called()
 
@@ -501,7 +482,7 @@ class TestHostedRun:
         client.start.side_effect = sdk_error
 
         with pytest.raises(ApiUnreachableError) as exc_info:
-            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         assert exc_info.value is sdk_error
         assert exc_info.value.api_url == "https://hosted.test"
@@ -531,7 +512,7 @@ class TestHostedRun:
         client.execute.side_effect = sdk_error
 
         with pytest.raises(HostedRunOutcomeUnknownError) as exc_info:
-            await run_hosted(client=client, request=HostedRunRequest(mthds_files=[BUNDLE_FILE]))
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
 
         error = exc_info.value
         assert error.__cause__ is sdk_error
@@ -540,13 +521,32 @@ class TestHostedRun:
         assert "run history" in error.user_action.detail
         assert "before running again" in error.user_action.detail
 
+    @pytest.mark.asyncio
+    async def test_a_tree_upload_that_fails_is_the_sdk_s_transfer_error_and_no_unknown_outcome(self, mocker: MockerFixture) -> None:
+        """The SDK uploads a large tree before the run request leaves, and says no run started: that is not an unknown outcome."""
+        transfer_error = MethodFileTransferError(
+            "Uploading the file with SHA-256 abc to storage failed (503 Service Unavailable), so the run was not started.",
+            operation=MethodFileTransferOperation.UPLOAD,
+            code=MethodFileTransferCode.STORAGE_ERROR,
+            sha256="abc",
+            status=503,
+        )
+        client = _mocked_client(mocker)
+        client.start.side_effect = transfer_error
+
+        with pytest.raises(MethodFileTransferError) as exc_info:
+            await run_hosted(client=client, request=HostedRunRequest(contents=BUNDLE_CONTENTS))
+
+        assert exc_info.value is transfer_error
+        client.wait_for_result.assert_not_awaited()
+
     @pytest.mark.parametrize(
         "source",
         [
             {},
             {"method_ref": DOCUMENT_METHOD_REF, "method_id": "mt_abc123"},
-            {"mthds_files": [BUNDLE_FILE], "method_ref": DOCUMENT_METHOD_REF},
-            {"mthds_files": []},
+            {"contents": BUNDLE_CONTENTS, "method_ref": DOCUMENT_METHOD_REF},
+            {"contents": {}},
         ],
     )
     def test_a_request_names_exactly_one_source(self, source: dict[str, Any]) -> None:

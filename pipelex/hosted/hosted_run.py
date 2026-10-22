@@ -1,8 +1,11 @@
 """A run on the hosted Pipelex API, mapped onto pipelex-sdk's `PipelexAPIClient`.
 
-The request names the method one of three ways, as the hosted API takes them: a local bundle sent as its
-`.mthds` contents, a published method's address (`method_ref`, resolved by the hosted runner), or a stored method's
-catalog id (`method_id`, resolved by the platform). Local files named in the inputs are uploaded first
+The request names the method one of three ways, as the hosted API takes them: a local method sent as its tree, the
+MTHDS protocol's `files` map, a published method's address (`method_ref`, resolved by the hosted runner), or a stored
+method's catalog id (`method_id`, resolved by the platform). A local method's tree is handed to the SDK as `contents`,
+each bundle's bytes by tree path, for both the signature read and the run, and the SDK sends it as `mthds` prepares
+it: inline when its map weighs 256 KiB or less, otherwise every file by hash once the blobs the hosted API lacks are
+uploaded, a file uploaded for the signature read being found held for the run. Local files named in the inputs are uploaded first
 (`pipelex.hosted.hosted_inputs`), then the run is started and followed to its end, which outlives the hosted
 gateway's 30-second ceiling on a synchronous request.
 
@@ -19,7 +22,6 @@ from typing import Any, Protocol, Self
 import httpx
 from mthds.protocol.exceptions import PipelineRequestError
 from pipelex_sdk.client import PipelexAPIClient
-from pipelex_sdk.crate_models import MthdsFileItem
 from pipelex_sdk.errors import ApiUnreachableError, MissingMainStuffError, RunFailedError, RunLifecycleUnavailableError, RunTimeoutError
 from pipelex_sdk.execute_result import results_from_execute
 from pipelex_sdk.runs import RunResults
@@ -53,15 +55,15 @@ class RunStartedCallback(Protocol):
 class HostedRunRequest(BaseModel):
     """One run to execute on the hosted API: its source, its pipe and its inputs.
 
-    Exactly one source: `mthds_files` (a local bundle and the rest of its library), `method_ref` (an address such as
-    `github.com/Pipelex/methods/documents@v0.1.7`) or `method_id` (a catalog id such as `mt_abc123`). Each file of
-    `mthds_files` carries a label, its path: the signature read before the run sends it, so the hosted API names the
-    file in the validation errors of a method that does not load, while the run itself takes the bare contents.
+    Exactly one source: `contents` (a local method's bundles, with the rest of its library, as one tree's bytes by tree
+    path), `method_ref` (an address such as `github.com/Pipelex/methods/documents@v0.1.7`) or `method_id` (a catalog id
+    such as `mt_abc123`). The tree path a bundle is keyed by is how the hosted API names it, in the validation errors of
+    a method that does not load and in the run's own diagnostics.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    mthds_files: list[MthdsFileItem] | None = None
+    contents: dict[str, bytes] | None = None
     method_ref: str | None = None
     method_id: str | None = None
     #: The pipe to run; `None` runs the method's entry pipe (a package manifest's or the bundle's `main_pipe`).
@@ -73,17 +75,11 @@ class HostedRunRequest(BaseModel):
 
     @model_validator(mode="after")
     def _exactly_one_source(self) -> Self:
-        named = [name for name, value in (("mthds_files", self.mthds_files), ("method_ref", self.method_ref), ("method_id", self.method_id)) if value]
+        named = [name for name, value in (("contents", self.contents), ("method_ref", self.method_ref), ("method_id", self.method_id)) if value]
         if len(named) != 1:
-            msg = f"A hosted run names exactly one source among mthds_files, method_ref and method_id, got {named or 'none'}"
+            msg = f"A hosted run names exactly one source among contents, method_ref and method_id, got {named or 'none'}"
             raise ValueError(msg)
         return self
-
-    @property
-    def mthds_contents(self) -> list[str] | None:
-        if not self.mthds_files:
-            return None
-        return [mthds_file.content for mthds_file in self.mthds_files]
 
 
 class HostedRunOutcome(BaseModel):
@@ -115,7 +111,7 @@ async def _execute_blocking(*, client: PipelexAPIClient, request: HostedRunReque
     """The blocking `POST /v1/execute` of a server with no run store, lifted onto the results a started run returns."""
     result = await client.execute(
         pipe_code=request.pipe_code,
-        mthds_contents=request.mthds_contents,
+        contents=request.contents,
         inputs=inputs,
         dynamic_output_concept_ref=request.dynamic_output_concept_ref,
         method_ref=request.method_ref,
@@ -130,7 +126,7 @@ async def _start_or_execute_unmapped(*, client: PipelexAPIClient, request: Hoste
     try:
         started = await client.start(
             pipe_code=request.pipe_code,
-            mthds_contents=request.mthds_contents,
+            contents=request.contents,
             inputs=inputs,
             dynamic_output_concept_ref=request.dynamic_output_concept_ref,
             method_ref=request.method_ref,
@@ -150,7 +146,9 @@ async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunReque
     The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and only some of
     them mean the hosted API was not reached. A failure before the request left this machine stays the SDK's error.
     Any later one, a connection lost or a read timed out after the request was sent, is a
-    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived.
+    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived. A tree past the
+    inline threshold is uploaded by the SDK inside the run call, so a connection lost on one of those requests reads as
+    such a failure too, which errs toward checking the run history.
     """
     try:
         return await _start_or_execute_unmapped(client=client, request=request, inputs=inputs)
@@ -209,12 +207,14 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
         HostedRunOutcomeUnknownError: If the connection failed after the run request was sent, so a run may exist.
         ApiUnreachableError: If the hosted API cannot be reached before the run request is sent.
         InputPreparationError: If a local file cannot be read or uploaded.
+        MethodFileTransferError: If a file of the method's tree the hosted API lacks could not be uploaded, so no run
+            started.
     """
     # A command running this sends its work to the hosted API; its `command_completed` says so and no more.
     note_command_hosted()
     prepared = await prepare_hosted_inputs(
         client=client,
-        mthds_files=request.mthds_files,
+        contents=request.contents,
         method_ref=request.method_ref,
         method_id=request.method_id,
         pipe_code=request.pipe_code,

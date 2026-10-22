@@ -18,7 +18,6 @@ from pytest_mock import MockerFixture
 from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager
 from pipelex.libraries.written_trees import WRITTEN_METHOD_TREES, write_method_tree
-from pipelex.methods.address_dependencies import ADDRESS_DEPENDENCY_REFUSAL_MARKER
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.validation_error_types import PipeValidationErrorType
@@ -144,7 +143,7 @@ class TestResolveCrateFromMethodDir:
         item = validation_errors[0]
         assert item.error_type == PipeValidationErrorType.UNRESOLVED_PACKAGE_DEPENDENCY
         assert item.source == "host.mthds"
-        assert f"{ADDRESS_DEPENDENCY_REFUSAL_MARKER} 'github.com/org/pkg'" in item.message
+        assert "address-based dependency 'github.com/org/pkg'" in item.message
         # Its advice is what the caller of a crate route can do: send the package's files beside the method's.
         assert "`dependencies`" in item.message
         # A hosted run tells it apart by the problem item's code and parameters, the package it names included.

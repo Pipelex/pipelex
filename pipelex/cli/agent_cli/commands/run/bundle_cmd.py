@@ -34,7 +34,7 @@ from pipelex.cli.agent_cli.commands.run._run_hosted import (
 )
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.bundle_target_resolution import list_bundle_file_tree, resolve_method_folder_run
-from pipelex.cli.commands.run._hosted_sources import collect_mthds_files, hosted_library_dirs
+from pipelex.cli.commands.run._hosted_sources import hosted_library_dirs, method_tree_contents
 from pipelex.cli.commands.run._run_output_folder import bundle_run_outputs_dir
 from pipelex.hosted.exceptions import HostedRunSourceError
 from pipelex.hosted.hosted_run import HostedRunRequest
@@ -254,15 +254,14 @@ def run_bundle_cmd(
     pipeline_inputs: dict[str, Any] | None = parsed_inputs.pipeline_inputs
 
     if execution.is_hosted:
-        # The bundle goes first, then the rest of the library a local run would load with it: -L, else PIPELEXPATH.
+        # The method's tree, a bundle file's own entry first, then the rest of the library a local run would load with it:
+        # the method's folder and -L, else PIPELEXPATH, as one tree keyed from the method's own.
         try:
-            bundle_files = collect_mthds_files(
-                primary=Path(bundle_path) if bundle_path else None, library_dirs=hosted_library_dirs(library_dirs=library_dir)
-            )
+            bundle_contents = method_tree_contents(method_tree=method_tree, library_dirs=hosted_library_dirs(library_dirs=library_dir))
         except HostedRunSourceError as exc:
             agent_error(exc.message, cause=exc)
         request = HostedRunRequest(
-            mthds_files=bundle_files,
+            contents=bundle_contents,
             pipe_code=hosted_pipe_code,
             inputs=pipeline_inputs,
             inputs_base_dir=parsed_inputs.inputs_base_dir,

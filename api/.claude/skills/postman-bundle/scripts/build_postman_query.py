@@ -14,11 +14,10 @@ judged by the membership rule the runner and every MTHDS client apply
 (``mthds/docs/spec/method-tree.md``): its root is the nearest directory at or
 above the bundle holding ``METHODS.toml``, else the directory handed over, else,
 for a ``.mthds`` file named alone, the one-file tree of that file; dotfiles,
-``.gitignore``d files, virtual environments and nested packages stay out. The
-script itself drops a run's inputs file, any file named ``inputs.json`` or
-``inputs.toml`` at any depth, as the standard's run-inputs default does, since
-the ``mthds`` lister pinned here still lists it: the sibling ``inputs.json``
-travels as ``inputs`` and never as a file of the tree. A body built here never uses the by-hash entry
+``.gitignore``d files, virtual environments, nested packages and a run's inputs
+file, any file named ``inputs.json`` or ``inputs.toml`` at any depth, stay out:
+the sibling ``inputs.json`` travels as ``inputs`` and never as a file of the
+tree. A body built here never uses the by-hash entry
 (``{"sha256", "size"}``), which only resolves once the bytes are uploaded to the
 runner's blob store, so a Postman query or a curl command stays self-contained.
 The listing stops at the runner's own limits on a tree a request sends.
@@ -61,21 +60,16 @@ from pathlib import Path
 from typing import Any, NamedTuple, NoReturn, cast
 
 from mthds.method_tree.exceptions import MethodTreeError
-from mthds.method_tree.file_entry import encode_file_map
+from mthds.method_tree.file_entry import Base64FileEntry, HashFileEntry, encode_file_map
 from mthds.method_tree.lister import list_method_tree
 from mthds.method_tree.models import MethodTree, TreeLimits
 from mthds.method_tree.tree_path import nfc
-from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME
+from pipelex.pipeline.default_file_names import DEFAULT_INPUTS_FILE_NAME
 
 from pipelex_api.limits import MAX_METHOD_TREE_FILE_BYTES, MAX_METHOD_TREE_FILES, MAX_METHOD_TREE_TOTAL_BYTES
 
 # One file of a method tree as a body carries it: its UTF-8 text, or {"base64": ...} for other bytes.
 FileEntry = str | dict[str, str | int]
-
-# A run's inputs file, which the standard's run-inputs default keeps out of every tree at any depth
-# (`mthds/docs/spec/method-tree.md`, "Run Inputs Files"): a file named exactly so, letter case included.
-# A directory of either name excludes nothing.
-RUN_INPUTS_FILE_NAMES = frozenset({DEFAULT_INPUTS_FILE_NAME, DEFAULT_INPUTS_TOML_FILE_NAME})
 
 DEFAULT_COLLECTION_UID = "35082494-559c5753-885c-409a-af63-7647fe28d301"
 POSTMAN_API_BASE = "https://api.getpostman.com"
@@ -205,19 +199,8 @@ def tree_path_of(tree: MethodTree, file_path: Path) -> str | None:
     return tree_path if tree_path in tree.members else None
 
 
-def is_run_inputs_file(tree_path: str) -> bool:
-    """Whether a file of a tree is a run's inputs file, which the standard's run-inputs default keeps out of every tree."""
-    return tree_path.rsplit("/", 1)[-1] in RUN_INPUTS_FILE_NAMES
-
-
 def build_files_map(tree: MethodTree) -> dict[str, FileEntry]:
-    """The ``files`` a body carries: every file of the tree under its tree path, inline, but a run's inputs file.
-
-    The ``mthds`` lister pinned here still lists a file named ``inputs.json`` or
-    ``inputs.toml``, which the standard keeps out of every tree and a runner
-    applying the rule refuses as a key, so it is dropped here: a run's inputs
-    travel as ``inputs``, never as a file of the method. Once the lister applies
-    the rule itself, no such file reaches this loop.
+    """The ``files`` a body carries: every file of the tree under its tree path, inline, as the body's JSON writes it.
 
     ``mthds`` encodes each file: its text when its bytes are UTF-8, else
     ``{"base64": ...}``. No file is sent by hash, since a hash entry resolves
@@ -226,14 +209,19 @@ def build_files_map(tree: MethodTree) -> dict[str, FileEntry]:
     """
     contents: dict[str, bytes] = {}
     for tree_path in tree.tree_paths:
-        if is_run_inputs_file(tree_path):
-            continue
         location = tree.file_location(tree_path)
         try:
             contents[tree_path] = location.read_bytes()
         except OSError as exc:
             fail(f"cannot read '{location}' to send it as '{tree_path}': {exc}")
-    return encode_file_map(contents)
+    files: dict[str, FileEntry] = {}
+    for tree_path, entry in encode_file_map(contents).items():
+        match entry:
+            case str():
+                files[tree_path] = entry
+            case Base64FileEntry() | HashFileEntry():
+                files[tree_path] = entry.model_dump(mode="json")
+    return files
 
 
 def parse_bundle_meta(text: str) -> tuple[str | None, str | None]:

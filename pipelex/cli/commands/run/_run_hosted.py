@@ -36,7 +36,6 @@ from pipelex.tools.misc.pretty import pretty_print, pretty_print_md
 
 if TYPE_CHECKING:
     from pipelex_sdk.client import PipelexAPIClient
-    from pipelex_sdk.crate_models import MthdsFileItem
 
     from pipelex.cli.commands.run._inputs_file_loader import DetectedInputsFile
 
@@ -183,7 +182,7 @@ def bundle_main_pipe_code(*, bundle_path: str, library_dirs: list[str] | None) -
 
 def execute_hosted_run(
     *,
-    mthds_files: list[MthdsFileItem] | None = None,
+    contents: dict[str, bytes] | None = None,
     method_ref: str | None = None,
     method_id: str | None = None,
     pipe_code: str | None,
@@ -200,7 +199,8 @@ def execute_hosted_run(
 ) -> None:
     """Run on the hosted API, print the main output, and save the outputs as a local run saves them.
 
-    The method is named by exactly one of `mthds_files`, `method_ref` and `method_id`. `inputs` is `--inputs` as the
+    The method is named by exactly one of `contents`, a local method's bundles as one tree's bytes by tree path,
+    `method_ref` and `method_id`. `inputs` is `--inputs` as the
     command resolved it, inline JSON or a JSON or TOML file, or the inputs file auto-detection read from a bundle
     directory, read as a local run reads it, and a local file it names at a document or image input is uploaded first.
 
@@ -222,7 +222,7 @@ def execute_hosted_run(
 
     loaded_inputs = load_run_inputs(inputs=inputs)
     request = HostedRunRequest(
-        mthds_files=mthds_files,
+        contents=contents,
         method_ref=method_ref,
         method_id=method_id,
         pipe_code=pipe_code,

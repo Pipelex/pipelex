@@ -25,7 +25,7 @@ from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.runner import PipelexMTHDSProtocol, refuse_method_files
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
@@ -83,6 +83,7 @@ from pipelex_api.security import AuthMode, get_auth_mode
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from mthds.method_tree.file_entry import MethodFiles
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
@@ -345,12 +346,14 @@ class ApiRunner(PipelexMTHDSProtocol):
     async def execute(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
         tree_listing: MethodTreeListing | None = None,
@@ -381,6 +384,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         The method's trees are listed once for the request: the check of its requirements lists them through
         `tree_listing`, or a listing of its own when none is given, and the run loads them from that same listing.
         """
+        # The route resolves a method sent as `files` into a written tree before it calls this runner, which takes it
+        # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
+        # base runner refuses it, before any backend is looked up.
+        refuse_method_files(files=files)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
         api_config = get_api_config()
@@ -398,6 +405,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         self._pipe_run = _OrchestratorPipeRun(orchestrator=orchestrator, orchestration_mode=orchestration_mode)
         return await super().execute(
             pipe_code=pipe_code,
+            files=files,
             mthds_contents=mthds_contents,
             inputs=inputs,
             output_name=output_name,
@@ -413,12 +421,14 @@ class ApiRunner(PipelexMTHDSProtocol):
     async def start(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
         pipeline_run_id: str | None = None,
         callback_urls: list[str] | None = None,
         request_id: str | None = None,
@@ -459,6 +469,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         (`PipelineApiExtras.orchestration_mode`); it is resolved against the deployment's
         `api.toml` policy and a forbidden override is refused with a 422.
         """
+        # The route resolves a method sent as `files` into a written tree before it calls this runner, which takes it
+        # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
+        # base runner refuses it.
+        refuse_method_files(files=files)
         if extra:
             # Nothing on the wire reaches `extra`: the route parses the extras itself and passes them by name, so a
             # value here is a fault of the in-process code calling this runner, never the caller's.

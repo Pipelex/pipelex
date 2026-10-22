@@ -11,10 +11,6 @@ routes, reads nothing of its own and fetches nothing: a package the caller did n
 
 from enum import StrEnum
 
-#: The words every refusal of an address-based dependency nothing shipped carries in its message, the operator's. No
-#: client matches them: it reads the refusal's code and parameters.
-ADDRESS_DEPENDENCY_REFUSAL_MARKER = "address-based dependency"
-
 
 class AddressDependencySources(StrEnum):
     """Where a load looks for a package its bundles call by address."""
@@ -34,7 +30,7 @@ def unshipped_address_dependency_message(*, alias: str) -> str:
     beside the method's own in `files`.
     """
     return (
-        f"The method calls the {ADDRESS_DEPENDENCY_REFUSAL_MARKER} '{alias}', which was not sent with it, and this "
+        f"The method calls the address-based dependency '{alias}', which was not sent with it, and this "
         "resolution loads only the packages sent with the method, fetching none: send the package's files in "
         "`dependencies`, keyed by its address, beside the method's own files in `files`."
     )

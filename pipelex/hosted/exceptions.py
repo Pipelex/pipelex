@@ -50,8 +50,7 @@ class HostedMethodInvalidError(HostedRunError):
     """The hosted API read the method's signature before the run and found that the method does not load.
 
     Raised from `POST /v1/pipe-io`'s invalid verdict, before any run starts. Its `validation_errors` are the hosted
-    API's items, each naming the file it found the fault in by the label the file was sent under, which the run route
-    could not do: it takes the method's files as bare contents.
+    API's items, each naming the file it found the fault in by its tree path in the tree the run sends.
     """
 
     error_code = CoreCode.METHOD_INVALID
@@ -147,9 +146,9 @@ class HostedRunInterruptedError(HostedRunError):
 class HostedLocalFileUploadUnavailableError(HostedRunError):
     """A hosted run's inputs name a local file, and its method calls another method by its address.
 
-    Uploading a local file is guided by the pipe's signature, which `POST /v1/pipe-io` reads, and the crate core behind
-    that route loads no address-based dependency, while the run route fetches it. The method is not at fault: the same
-    run goes through when the file is given as an https URL, which needs no upload.
+    Uploading a local file is guided by the pipe's signature, which `POST /v1/pipe-io` reads with only the packages the
+    request ships, and a hosted run ships none, while the run route fetches such a dependency. The method is not at
+    fault: the same run goes through when the file is given as an https URL, which needs no upload.
     """
 
     error_code = CoreCode.REQUEST_UNSUPPORTED

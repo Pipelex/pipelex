@@ -120,18 +120,8 @@ class HostedPipeIoVerdicts:
 class HostedPipeIoRefusals:
     """`POST /v1/pipe-io` refusals, as the runner answers them in the caller's view."""
 
-    # A method calling a published method by address, refused by a runner older than 0.89.0, whose pipe-io resolved the
-    # method from content strings and loaded no address-based dependency, which `/v1/start` fetches and runs. Built from
-    # that runner's refusal on 2026-10-17.
-    ADDRESS_DEPENDENCY: ClassVar[str] = (
-        '{"type": "https://mthds.ai/errors/request.unsupported", "title": "The request uses a form this runtime does not accept", '
-        '"status": 422, "detail": "This runtime does not accept the form the request\'s field \'files\' uses (reason: '
-        'address_based_dependency).", "code": "request.unsupported", "domain": "input", "retry": "no", "next_step": {"kind": '
-        '"change_input", "detail": "Send the field \'files\' in a form this runtime accepts, then send the request again."}, '
-        '"params": {"field": "files", "reason": "address_based_dependency"}, "request_id": "01K7ADDRESSDEPENDENCY0000"}'
-    )
-    # The same code for another reason, which is no address-based dependency.
-    OTHER_UNSUPPORTED_FORM: ClassVar[str] = (
+    # A form of a field the runtime does not accept: a refusal no hosted run reads as anything but the hosted API's own.
+    UNSUPPORTED_FORM: ClassVar[str] = (
         '{"type": "https://mthds.ai/errors/request.unsupported", "title": "The request uses a form this runtime does not accept", '
         '"status": 422, "detail": "This runtime does not accept the form the request\'s field \'extra\' uses (reason: '
         'hosted_only_extension).", "code": "request.unsupported", "domain": "input", "retry": "no", "next_step": {"kind": '

@@ -5,7 +5,7 @@ from typing import Annotated
 
 import typer
 
-from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_files
+from pipelex.cli.commands.run._hosted_sources import hosted_pipe_library_contents
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run, validate_run_flag_combination
 from pipelex.cli.commands.run._run_hosted import execute_hosted_run, refuse_local_only_flags, resolve_cli_run_execution
 from pipelex.cli.commands.run._run_output_folder import run_output_label
@@ -171,12 +171,12 @@ def run_pipe_cmd(
         )
         # The hosted API holds no library of yours: the one a local run would load is sent along.
         try:
-            library_files = hosted_pipe_library_files(library_dirs=library_dir)
+            library_contents = hosted_pipe_library_contents(library_dirs=library_dir)
         except HostedRunSourceError as exc:
             typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         execute_hosted_run(
-            mthds_files=library_files,
+            contents=library_contents,
             pipe_code=pipe_code,
             inputs=inputs,
             dynamic_output_concept_ref=dynamic_output_concept_ref,

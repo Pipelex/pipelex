@@ -14,7 +14,7 @@ The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BAS
 
 ## Running a Method
 
-The client runs the same three sources the CLI does: a published method by its address (`method_ref`), a method stored on the hosted platform by its catalog id (`method_id`), or your own bundle by its contents (`mthds_contents`). `start_and_wait` starts the run and polls it until it ends, so a long run is not cut short by a synchronous request's timeout.
+The client runs the same three sources the CLI does: a published method by its address (`method_ref`), a method stored on the hosted platform by its catalog id (`method_id`), or your own method as its tree, the MTHDS protocol's `files` map from each file's path in the method's folder to its content, which the client builds for you from a folder or a `.mthds` file (`tree`) or from each file's bytes or text by its path (`contents`). `start_and_wait` starts the run and polls it until it ends, so a long run is not cut short by a synchronous request's timeout.
 
 ```python
 import asyncio
@@ -37,17 +37,19 @@ asyncio.run(main())
 
 `results.main_stuff` is the main output's content, as JSON. `results.working_memory` holds every stuff of the run, each naming its concept by ref, and `results.graph_spec` the run's execution graph.
 
-To run your own bundle, send its contents and name the pipe, or leave `pipe_code` out to run the bundle's `main_pipe`:
+To run your own method, send its tree and name the pipe, or leave `pipe_code` out to run the method's entry pipe:
 
 ```python
 from pathlib import Path
 
 results = await client.start_and_wait(
     pipe_code="summarize",
-    mthds_contents=[Path("my_bundle.mthds").read_text(encoding="utf-8")],
+    tree=Path("my_bundle.mthds"),
     inputs={"text": "…"},
 )
 ```
+
+The client lists the tree as every MTHDS client lists it, so a `.gitignore`d or hidden file, and a run's `inputs.json`, stay out. A small tree travels inline; a larger one by the hash of each file, once the client has uploaded the files the hosted API lacks.
 
 ## Inputs That Name Local Files
 
@@ -71,7 +73,7 @@ A relative path is read from the working directory, and a `file://` URI is not d
 Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 
 - `prepare_inputs` refuses an explicit `None` at a document or image input. Leave an optional file out of the inputs rather than setting it to `None`. The CLI uploads the files itself and keeps the `null` for the run.
-- `prepare_inputs` reads the signature through a route that cannot load a method calling another method by its address (`github.com/…`), so it refuses such a method, which `start_and_wait` runs. Give its files as `https://` URLs and start the run without preparing the inputs.
+- `prepare_inputs` reads the signature through a route that loads only the packages the request sends in `dependencies`, so it refuses a method calling another method by its address (`github.com/…`) whose package is not sent with it, which `start_and_wait` runs, the hosted API fetching the package itself. Send that package in `dependencies`, or give the files as `https://` URLs and start the run without preparing the inputs.
 
 ## Errors
 

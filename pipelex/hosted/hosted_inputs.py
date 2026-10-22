@@ -8,8 +8,10 @@ the path it names, `~` expanded), uploaded once with the SDK's `upload_file`, an
 carrying the storage URI. Every other value, an explicit `null` included, reaches the run as the caller wrote it.
 
 The signature is read only when it can matter: when some string of the inputs, at any depth, names an existing file on
-this machine. Any other inputs go straight to the run, which keeps pipe-io out of a run that uploads nothing; pipe-io
-cannot load a method calling another one by its address, which the run route fetches and runs.
+this machine. Any other inputs go straight to the run, which keeps pipe-io out of a run that uploads nothing. pipe-io
+reads the method's tree as the run reads it, the same `files` map, but loads only the packages the request ships, so it
+answers a method calling another one by its address with its invalid verdict, while the run route fetches the package
+and runs it.
 """
 
 import contextlib
@@ -36,15 +38,13 @@ from mthds.protocol.input_form import (
 from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKind, MethodDependencyMissingReason
 from pipelex_sdk.client import PipelexAPIClient
-from pipelex_sdk.crate_models import CrateInvalidReport, MthdsFileItem, PipeIORequest
-from pipelex_sdk.errors import ApiResponseError
+from pipelex_sdk.crate_models import CrateInvalidReport, PipeIORequest
 from pipelex_sdk.upload import UploadRecord
 from pipelex_sdk.validation_models import ValidationErrorItem
 from pydantic import ValidationError
 
 from pipelex.core.pipes.exceptions import pipe_validation_error_code
 from pipelex.core.qualified_ref import QualifiedRef
-from pipelex.errors.unsupported_reasons import ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 from pipelex.hosted.exceptions import HostedLocalFileUploadUnavailableError, HostedMethodInvalidError
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -58,10 +58,6 @@ _HTTP_URL_PATTERN = re.compile(r"^https?://", re.IGNORECASE)
 _NOT_LOCAL_PREFIXES: tuple[str, ...] = ("pipelex-storage://", "data:")
 #: A `file://` URI, which a local run reads as the local path it names.
 _FILE_URI_PREFIX = "file://"
-#: The code of the refusal a runner older than 0.89.0 answers a method calling another one by its address with, its
-#: pipe-io resolving the method from content strings, carrying the reason `ADDRESS_DEPENDENCY_UNSUPPORTED_REASON`. The
-#: run route fetches such a dependency.
-_ADDRESS_DEPENDENCY_REFUSAL_CODES: frozenset[str] = frozenset({CoreCode.REQUEST_UNSUPPORTED})
 
 
 class AnchoredInputs(NamedTuple):
@@ -254,29 +250,6 @@ def _with_storage_uris(*, anchored: AnchoredInputs, descriptor: PipeInputFormDes
     return _walk_inputs(inputs=anchored.inputs, descriptor=descriptor, at_file_position=_rewrite)
 
 
-def _address_dependency_refusal(*, refusal: ApiResponseError) -> HostedLocalFileUploadUnavailableError | None:
-    """The error to raise when pipe-io refused the method for calling another one by its address, else `None`.
-
-    A runner older than 0.89.0, whose pipe-io resolved the method from content strings, answers that refusal with its
-    problem, coded `request.unsupported` and giving the reason `ADDRESS_DEPENDENCY_UNSUPPORTED_REASON`: the request is
-    what it cannot serve, not the method, which the run route fetches the dependency of. A current runner's pipe-io
-    resolves the method's tree and answers a call into a package nothing shipped with its invalid verdict instead
-    (`_unshipped_dependency_refusal`). The refusal's own advice, to send the package's files in
-    `dependencies`, is meant for the API's callers, so the error leaves it out.
-
-    The error does not name the dependency, because the problem does not carry it: `request.unsupported` declares only
-    `field` and `reason`, and the sentence naming the dependency's address is the server's message, which reaches its
-    operator alone. Naming it would need a parameter of the error registry for the address.
-    """
-    if refusal.code not in _ADDRESS_DEPENDENCY_REFUSAL_CODES:
-        return None
-    params = (refusal.problem_document or {}).get("params")
-    if not isinstance(params, dict) or cast("dict[str, Any]", params).get("reason") != ADDRESS_DEPENDENCY_UNSUPPORTED_REASON:
-        return None
-    msg = "Local file upload is not available yet for methods with address-based dependencies, and the inputs name a local file"
-    return HostedLocalFileUploadUnavailableError(msg)
-
-
 def _unshipped_dependency_refusal(*, report: CrateInvalidReport) -> HostedLocalFileUploadUnavailableError | None:
     """The error to raise when pipe-io's invalid verdict refuses the method for calling a package by its address, else `None`.
 
@@ -351,7 +324,7 @@ def _missing_package_of_validation_item(*, item: ValidationErrorItem) -> str | N
 async def prepare_hosted_inputs(
     *,
     client: PipelexAPIClient,
-    mthds_files: list[MthdsFileItem] | None,
+    contents: dict[str, bytes] | None,
     method_ref: str | None,
     method_id: str | None,
     pipe_code: str | None,
@@ -361,29 +334,26 @@ async def prepare_hosted_inputs(
     """Upload the local files a hosted run's inputs name, and hand back the inputs to send.
 
     Inputs naming no existing file on this machine go as they are, with no request. Otherwise one `POST /v1/pipe-io`
-    reads the signature of the pipe that runs, `pipe_code` or the method's entry pipe; each local file at a file
-    position is uploaded once with `upload_file` and rewritten to its `pipelex-storage://` URI, and every other value
-    is sent as written. A method whose signature does not resolve is refused here, before any run starts: pipe-io's
-    verdict names each faulty file by the label it was sent under, which the run route, taking the files as bare
-    contents, cannot do.
+    reads the signature of the pipe that runs, `pipe_code` or the method's entry pipe, from the method's tree,
+    `contents`, the tree the run sends, or from `method_ref` or `method_id`; each local file at a file position is
+    uploaded once with `upload_file` and rewritten to its `pipelex-storage://` URI, and every other value is sent as
+    written. A method whose signature does not resolve is refused here, before any run starts, pipe-io's verdict
+    naming each faulty file by its tree path.
 
     Raises:
-        HostedLocalFileUploadUnavailableError: If pipe-io cannot load the method because it calls another method by
-            its address, refusing the request or answering its verdict: the run route would, so the file has to reach
-            it as a URL.
-        HostedMethodInvalidError: If the method does not load, with the hosted API's labelled validation items.
+        HostedLocalFileUploadUnavailableError: If pipe-io's verdict refuses the method because it calls another method
+            by its address, which nothing shipped: the run route would fetch it, so the file has to reach it as a URL.
+        HostedMethodInvalidError: If the method does not load, with the hosted API's validation items.
         ApiResponseError: If the hosted API refuses the pipe-io request (an unknown method, a key it refuses).
         InputPreparationError: If an upload fails, or a local file cannot be read.
+        MethodFileTransferError: If a file of the method's tree the hosted API lacks could not be uploaded.
     """
     if not inputs or not inputs_name_a_local_file(inputs=inputs, base_dir=inputs_base_dir):
         return PreparedHostedInputs(inputs=inputs, uploads=[], pipe_ref=None)
 
-    try:
-        report = await client.pipe_io(PipeIORequest(files=mthds_files, method_ref=method_ref, method_id=method_id, pipe_ref=pipe_code))
-    except ApiResponseError as refusal:
-        if (address_dependency_refusal := _address_dependency_refusal(refusal=refusal)) is not None:
-            raise address_dependency_refusal from refusal
-        raise
+    # The request model takes a tree's files as bytes or text alike: the tree a run sends holds bytes.
+    request_contents: dict[str, bytes | str] | None = dict(contents) if contents else None
+    report = await client.pipe_io(PipeIORequest(contents=request_contents, method_ref=method_ref, method_id=method_id, pipe_ref=pipe_code))
     if isinstance(report, CrateInvalidReport):
         if (unshipped_dependency_refusal := _unshipped_dependency_refusal(report=report)) is not None:
             raise unshipped_dependency_refusal

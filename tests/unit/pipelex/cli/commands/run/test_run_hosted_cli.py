@@ -109,16 +109,14 @@ class TestRunHostedCli:
         (pipeline_dir / "lib.mthds").write_text(LIBRARY_BUNDLE, encoding="utf-8")
         return pipeline_dir
 
-    def test_bundle_sends_the_bundle_first_then_its_library_and_saves_the_outputs(
-        self, run_hosted: AsyncMock, bundle_dir: Path, tmp_path: Path
-    ) -> None:
+    def test_a_folder_run_sends_its_tree_and_saves_the_outputs(self, run_hosted: AsyncMock, bundle_dir: Path, tmp_path: Path) -> None:
         output_dir = tmp_path / "results"
 
         run_bundle_cmd(path=str(bundle_dir), hosted=True, output_dir=str(output_dir), no_pretty_print=True)
 
         request = _hosted_request(run_hosted=run_hosted)
         assert request.pipe_code == "probe.summarize"
-        assert [mthds_file.content for mthds_file in request.mthds_files or []] == [BUNDLE, LIBRARY_BUNDLE]
+        assert request.contents == {"bundle.mthds": BUNDLE.encode(), "lib.mthds": LIBRARY_BUNDLE.encode()}
         assert request.method_ref is None
         assert request.method_id is None
         saved_dir = output_dir / "summarize_output_01"
@@ -158,7 +156,7 @@ class TestRunHostedCli:
         request = _hosted_request(run_hosted=run_hosted)
         assert request.method_ref == expected_method_ref
         assert request.method_id == expected_method_id
-        assert request.mthds_files is None
+        assert request.contents is None
         assert request.pipe_code is None
         assert request.inputs == {"text": "Hello"}
         fetch.assert_not_called()
@@ -237,7 +235,7 @@ class TestRunHostedCli:
 
         request = _hosted_request(run_hosted=run_hosted)
         assert request.pipe_code == "summarize"
-        assert sorted(mthds_file.content for mthds_file in request.mthds_files or []) == sorted([BUNDLE, LIBRARY_BUNDLE])
+        assert request.contents == {"bundle.mthds": BUNDLE.encode(), "lib.mthds": LIBRARY_BUNDLE.encode()}
 
     def test_a_hosted_failure_exits_with_its_next_step(self, mocker: MockerFixture, bundle_dir: Path) -> None:
         unreachable = ApiUnreachableError("Could not reach Pipelex API at https://api.pipelex.com (ConnectError)", api_url="https://api.pipelex.com")
@@ -253,7 +251,7 @@ class TestRunHostedCli:
     def test_a_bundle_file_without_a_library_sends_pipelexpath(
         self, monkeypatch: pytest.MonkeyPatch, run_hosted: AsyncMock, bundle_dir: Path, tmp_path: Path
     ) -> None:
-        """A local run of a bundle file loads PIPELEXPATH when no -L is given; a hosted one sends it."""
+        """A local run of a bundle file loads PIPELEXPATH when no -L is given; a hosted one sends it, beside the bundle's own tree."""
         shared_dir = tmp_path / "shared"
         shared_dir.mkdir()
         (shared_dir / "shared.mthds").write_text(LIBRARY_BUNDLE, encoding="utf-8")
@@ -262,7 +260,7 @@ class TestRunHostedCli:
         run_bundle_cmd(path=str(bundle_dir / "bundle.mthds"), hosted=True, output_dir=str(tmp_path / "results"), no_pretty_print=True)
 
         request = _hosted_request(run_hosted=run_hosted)
-        assert [mthds_file.source for mthds_file in request.mthds_files or []] == [str(bundle_dir / "bundle.mthds"), str(shared_dir / "shared.mthds")]
+        assert list(request.contents or {}) == ["bundle.mthds", "shared/shared.mthds"]
 
     def test_a_folder_run_names_its_main_pipe_by_its_domain_when_two_domains_share_its_code(self, run_hosted: AsyncMock, tmp_path: Path) -> None:
         """The hosted API starts at the pipe the local run would, never at a same-coded pipe of another domain sent with it."""

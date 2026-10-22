@@ -514,7 +514,7 @@ class TestRunHostedEnvelope:
         assert run_hosted.await_args is not None
         request = run_hosted.await_args.kwargs["request"]
         assert isinstance(request, HostedRunRequest)
-        assert [mthds_file.source for mthds_file in request.mthds_files or []] == [str(bundle_path), str(shared_dir / "shared.mthds")]
+        assert list(request.contents or {}) == ["bundle.mthds", "shared/shared.mthds"]
 
     def test_a_folder_run_names_its_main_pipe_by_its_domain_when_two_domains_share_its_code(
         self, run_hosted: AsyncMock, tmp_path: Path, capsys: pytest.CaptureFixture[str]

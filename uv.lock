@@ -2755,7 +2755,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.22.1"
+version = "0.25.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2764,9 +2764,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/0d/00/86fbece07c3adbe53aa1a935fee525c89cf03438287172762e479a7a71a8/mthds-0.22.1.tar.gz", hash = "sha256:53de0f874786d9ff71912f1bf070bd2c0216a8b25f93a5b3b77f870919e26def", size = 478852, upload-time = "2026-10-18T22:44:12.284Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/ce/436c4dc0a14e92dda0be376487b6c59ccb5df8f1bdd237d269dba7267f2d/mthds-0.25.0.tar.gz", hash = "sha256:924aa73e4bccbc29859048468d7a68f4fa8c61f738fda13fd857775893ef4187", size = 517806, upload-time = "2026-10-18T19:46:53.986Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/78/16/bea1ef16bf3398b7d1942ae014d9913942209885d939cbd595fed41894ae/mthds-0.22.1-py3-none-any.whl", hash = "sha256:af592e279ee5c7a3395c49171526f03b62462a45b171cb4232bbcb98e17c1066", size = 197875, upload-time = "2026-10-18T22:44:10.145Z" },
+    { url = "https://files.pythonhosted.org/packages/44/d6/9ac2510bb6aaee2d8768371af85e13e4dd584ac2ffb445ccd349494c7dd5/mthds-0.25.0-py3-none-any.whl", hash = "sha256:86e865a74498ce2baffc8426522afe96ceccc493d1fc334f4c47e61758b41714", size = 210461, upload-time = "2026-10-18T19:46:52.295Z" },
 ]
 
 [[package]]
@@ -3737,7 +3737,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.22.1" },
+    { name = "mthds", specifier = "==0.25.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
@@ -3747,7 +3747,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "pipelex-sdk", specifier = "==0.46.0" },
+    { name = "pipelex-sdk", specifier = "==0.48.0" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3859,7 +3859,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-sdk"
-version = "0.46.0"
+version = "0.48.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3867,9 +3867,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cd/66/9f0e2148d96b646357125c30859046e93e7530ba85d82419a5972aaadbbb/pipelex_sdk-0.46.0.tar.gz", hash = "sha256:9c3f7ad921c6d1399125e9c687b8ac720199fb29ba1ffeac7bef008118a41f25", size = 644042, upload-time = "2026-10-19T07:19:39.969Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7d/2e/decbb96df27e6aab6442f19737d986e8416ff0b5b84ff75246afc10e49e8/pipelex_sdk-0.48.0.tar.gz", hash = "sha256:e9cc8921174e67e9f1f70eb3f8ec6bd005b3ffed550b61eed864f2493597c859", size = 695789, upload-time = "2026-10-20T09:19:03.443Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/82/fe/6a2cc6394ed34f89096fa0fbc3a5330a99df716958f5799dc6abcde13d87/pipelex_sdk-0.46.0-py3-none-any.whl", hash = "sha256:db6b6c8e27578671984352a806294062e91aa0b5189ced658be94a8ee1e4f175", size = 254349, upload-time = "2026-10-19T07:19:38.333Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/20/8e5f44348090854b5e207188b3be3480eb4af0e2f89b30c4a6630dad81df/pipelex_sdk-0.48.0-py3-none-any.whl", hash = "sha256:e992714e25f6a5fa91465d0788b51bc4341149deeb95c2963146350939295dcf", size = 273538, upload-time = "2026-10-20T09:19:01.523Z" },
 ]
 
 [[package]]

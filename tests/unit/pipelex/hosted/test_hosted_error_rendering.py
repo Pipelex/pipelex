@@ -53,7 +53,7 @@ def _refusal(*, status: int, body: str) -> ApiResponseError:
         client = PipelexAPIClient(api_key="plx_sk_test_not_a_secret", base_url=API_URL)
         client.client = httpx.AsyncClient(transport=httpx.MockTransport(_handler))
         try:
-            await client.start(pipe_code="entry", mthds_contents=['domain = "probe"\n'])
+            await client.start(pipe_code="entry", contents={"probe.mthds": 'domain = "probe"\n'})
         finally:
             await client.close()
 
