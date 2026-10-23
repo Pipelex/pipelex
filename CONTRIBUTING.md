@@ -46,6 +46,8 @@ We are open to contributions in all areas of our core Pipelex library:
   - Dev deps: `uv add --optional dev <package>`
   - Keep dependencies alphabetically ordered in pyproject.toml
 
+The development interpreter is the one `.python-version` names at the root of the repository, and it serves both the library's `.venv` and the API server's `api/.venv`. The next `make install` moves an environment built on another Python to that version, and so does the next `make -C api install` for the server's. `PYTHON_VERSION=<version> make install` builds the environment on another supported version instead, and the next plain `make install` returns it to the pinned one.
+
 ## Pull Request Process
 
 - Fork the Pipelex repository

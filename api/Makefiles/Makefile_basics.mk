@@ -14,8 +14,10 @@ PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"
 export UV_PROJECT_ENVIRONMENT := $(VIRTUAL_ENV)
 WORKSPACE_ROOT := $(abspath $(CURDIR)/..)
 
-# The "?" is used to make the variable optional, so that it can be overridden by the user.
-PYTHON_VERSION ?= 3.13
+# The interpreter is the one the workspace root's .python-version names, unless PYTHON_VERSION or UV_PYTHON asks for another.
+# Exporting it hands the same version to every uv command, so `uv sync` never rebuilds .venv on the pin.
+PYTHON_VERSION ?= $(or $(UV_PYTHON),$(shell cat "$(WORKSPACE_ROOT)/.python-version"))
+export UV_PYTHON := $(PYTHON_VERSION)
 # The Python version pyright and mypy check against, when it is not the environment's own: the root's
 # pre-main gate (`lint-fresh-check.yml`) checks every supported version from one 3.11 environment.
 LINT_PYTHON_VERSION ?=
