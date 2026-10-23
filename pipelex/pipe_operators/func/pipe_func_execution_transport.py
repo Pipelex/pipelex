@@ -1,10 +1,15 @@
+from mthds.protocol.problem.registry import CoreCode
+from pydantic import ValidationError
+
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.errors.problem import DiagnosticCause, PipelexProblem, ProblemDiagnostics, ProblemView, cap_problem_text, make_problem
 from pipelex.interpreter_hub import get_current_library, get_library_manager
-from pipelex.pipe_operators.func.exceptions import PipeFuncTransportError
+from pipelex.pipe_operators.func.exceptions import PipeFuncRaisedError, PipeFuncTransportError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import (
     DEFAULT_PIPE_FUNC_TIMEOUT_SECONDS,
     PipeFuncExecutionRequest,
     PipeFuncExecutionResponse,
+    PipeFuncRaisedReport,
 )
 from pipelex.pipe_operators.func.pipe_func_executor_protocol import PipeFuncExecutionResult
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -75,4 +80,56 @@ def pipe_func_execution_result_from_response(response: PipeFuncExecutionResponse
         content=content,
         function_module=response.function_module,
         function_qualname=response.function_qualname,
+    )
+
+
+def pipe_func_raised_report(*, error: PipeFuncRaisedError) -> PipeFuncRaisedReport:
+    """The report a transported call writes to its result file when the function it calls raised `error`.
+
+    The problem is `error`'s in the operator's view, built where the function ran: its code is `pipe.function_raised`,
+    its parameters name the function and the step, and its diagnostics name the class of what the function raised and
+    never its text, which can quote the run's inputs.
+    """
+    return PipeFuncRaisedReport(problem=error.to_problem(view=ProblemView.OPERATOR).to_wire())
+
+
+def read_pipe_func_raised_report(*, result_json: str | bytes) -> PipelexProblem | None:
+    """The problem of a function that raised in a transported call, read from the call's result file; `None` when it holds none.
+
+    An out-of-process executor reads the result file of a call whose sandbox exited non-zero with it: a report means the
+    function itself raised, and the executor raises a Pipelex error carrying the problem, which the step then reports
+    as `pipe.function_raised`; no report means the sandbox failed another way, and the failure keeps a code of its own.
+
+    The file was written where the function ran, and the function can write it too, so only what `pipe.function_raised`
+    lets it say is kept: a report of another code is no report, the sentences, the domain, the verdict and the step
+    are rendered again from the registry with the parameters the code declares, and the diagnostics keep the class of
+    the error, its message, capped, the classes and codes of its causes and the runtime's version.
+
+    Args:
+        result_json: The content of the result file.
+
+    Returns:
+        The problem in the operator's view, or `None` when the file holds no report of the function's failure.
+    """
+    try:
+        report = PipeFuncRaisedReport.model_validate_json(result_json)
+        written = PipelexProblem.model_validate(report.problem)
+    except ValidationError:
+        return None
+    if written.code != CoreCode.PIPE_FUNCTION_RAISED:
+        return None
+    diagnostics: ProblemDiagnostics | None = None
+    if written.diagnostics is not None:
+        causes = [DiagnosticCause(error_class=cause.error_class, code=cause.code) for cause in written.diagnostics.causes or []]
+        diagnostics = ProblemDiagnostics(
+            error_class=written.diagnostics.error_class,
+            message=cap_problem_text(text=written.diagnostics.message),
+            causes=causes or None,
+            runtime_version=written.diagnostics.runtime_version,
+        )
+    return make_problem(
+        code=CoreCode.PIPE_FUNCTION_RAISED,
+        view=ProblemView.OPERATOR,
+        params=written.params.as_wire() if written.params is not None else None,
+        diagnostics=diagnostics,
     )
