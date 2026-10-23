@@ -25,13 +25,14 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.should-run == 'true'
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.11"
     steps:
       - uses: actions/checkout@v4
 
       - name: Install uv (with cache)
         uses: astral-sh/setup-uv@v7
         with:
-          python-version: '3.11'
           enable-cache: true
           cache-dependency-glob: "uv.lock"
 
