@@ -578,3 +578,6 @@ method-rgx = "^(?!.$)[a-z_][a-z0-9_]*$"
 class-rgx = "^(?!.$)[A-Z_][a-zA-Z0-9_]*$"
 typevar-rgx = "^[A-Za-z_][A-Za-z0-9_]*$"
 good-names = ["_"]
+
+[tool.uv.sources]
+pipelex-sdk = { git = "https://github.com/Pipelex/pipelex-sdk.git", rev = "73a8f7b811cb3e3f2bfacf2c44456cf0f81d34e1", subdirectory = "python" }
