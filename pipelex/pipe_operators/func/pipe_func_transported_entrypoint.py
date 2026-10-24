@@ -15,8 +15,12 @@ the sandbox *client* (box provisioning, upload/download, teardown) is a worker-s
 in the out-of-tree plugin. This is the module a sandbox client runs as
 ``python -m pipelex.pipe_operators.func.pipe_func_transported_entrypoint <request_json> <result_json> <tree_root>``.
 
-On any failure the process exits non-zero with a diagnostic on stderr, which the calling sandbox client
-turns into a sandbox error.
+On success the result file holds the ``PipeFuncExecutionResponse`` and the process exits zero. On any failure the
+process exits non-zero with a diagnostic on stderr. When the failure is the function's own, the ``direct`` executor's
+``PipeFuncRaisedError``, it first writes a ``PipeFuncRaisedReport`` to the result file, the operator's view of the
+``pipe.function_raised`` problem, which the calling sandbox client reads back (``read_pipe_func_raised_report``) and
+raises as the function's failure; on any other failure, such as the function running past its timeout or the call's
+files failing to load, it writes nothing there, and the client turns the exit into a sandbox error of its own.
 """
 
 import asyncio
@@ -24,7 +28,9 @@ import sys
 from pathlib import Path
 
 from pipelex.pipe_operators.func.direct_pipe_func_executor import DirectPipeFuncExecutor
+from pipelex.pipe_operators.func.exceptions import PipeFuncRaisedError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest
+from pipelex.pipe_operators.func.pipe_func_execution_transport import pipe_func_raised_report
 
 
 def main() -> None:
@@ -43,6 +49,11 @@ def main() -> None:
     executor = DirectPipeFuncExecutor()
     try:
         result = asyncio.run(executor.run_pipe_func_transported_at(request=request, tree_root=tree_root))
+    except PipeFuncRaisedError as exc:
+        # The function's own failure is reported before the process exits non-zero, while Pipelex is still up to build
+        # its problem; the error still propagates, so the exit and the diagnostic on stderr are any failure's.
+        result_path.write_text(pipe_func_raised_report(error=exc).model_dump_json(), encoding="utf-8")
+        raise
     finally:
         Pipelex.teardown_if_needed()
     result_path.write_text(result.model_dump_json(), encoding="utf-8")
