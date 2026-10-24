@@ -1,6 +1,7 @@
 """Shared data for the unit tests of `pipelex/hosted/`: a captured pipe-io descriptor and the problem documents of hosted refusals."""
 
-from typing import ClassVar
+import json
+from typing import Any, ClassVar
 
 
 class HostedDescriptors:
@@ -34,28 +35,69 @@ class HostedDescriptors:
 
 
 class HostedRefusals:
-    """Problem documents the hosted plane answers a refused request with, as they come off the wire."""
+    """Answers the hosted API, or the edge in front of it, refuses a request with, as they come off the wire."""
 
-    # The platform's own refusal of a key, authored in front of the runner: no `user_action`.
-    UNAUTHORIZED: ClassVar[str] = (
-        '{"type":"https://docs.pipelex.com/latest/errors/unauthorized/","title":"Unauthorized","status":401,'
-        '"detail":"Invalid or expired API key.","instance":"/v1/start","code":"unauthorized"}'
+    # The runner's refusal of a method at load, a problem document in the caller's view listing its faults.
+    INVALID_METHOD_ITEMS: ClassVar[list[dict[str, Any]]] = [
+        {
+            "code": "model.unknown",
+            "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
+            "params": {"model": "gpt-5.1", "model_type": "llm"},
+            "location": {"pipe": "draft_pitch", "field": "model", "file": "bundle.mthds"},
+            "suggestions": ["gpt-5.5"],
+        }
+    ]
+    INVALID_METHOD_NEXT_STEP: ClassVar[str] = "Fix each fault the problem's errors list, then validate the method again."
+    INVALID_METHOD: ClassVar[str] = json.dumps(
+        {
+            "type": "https://mthds.ai/errors/method.invalid",
+            "title": "The method does not validate",
+            "status": 422,
+            "detail": "The method does not validate.",
+            "code": "method.invalid",
+            "domain": "method",
+            "retry": "no",
+            "next_step": {"kind": "change_method", "detail": INVALID_METHOD_NEXT_STEP},
+            "errors": INVALID_METHOD_ITEMS,
+            "request_id": "01M55PINVALIDMETHOD000000",
+        }
     )
-    UNAUTHORIZED_DETAIL: ClassVar[str] = "Invalid or expired API key."
-
-    # The runner's refusal of a bundle at load, with its own next step.
-    INVALID_BUNDLE: ClassVar[str] = (
-        '{"type":"https://docs.pipelex.com/latest/errors/validate-bundle-error/","title":"Validate bundle","status":422,'
-        "\"detail\":\"Pipe 'draft_pitch' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck\","
-        '"instance":"/v1/start","request_id":"req_a3dd6900-7909-48d3-b551-0140e73ac7fc","error_domain":"input",'
-        '"retryable":false,"error_type":"ValidateBundleError",'
-        '"user_action":{"kind":"change_input","detail":"Edit the bundle as each validation error says"}}'
+    # The hosted plane's refusal of a key it does not know, a problem document with its own reason and next step.
+    INVALID_KEY_DETAIL: ClassVar[str] = "The API key is not valid."
+    INVALID_KEY_NEXT_STEP: ClassVar[str] = "Create a new API key on app.pipelex.com, then send the request again."
+    INVALID_KEY: ClassVar[str] = json.dumps(
+        {
+            "type": "https://mthds.ai/errors/auth.invalid_credential",
+            "title": "The credential was refused",
+            "status": 401,
+            "detail": INVALID_KEY_DETAIL,
+            "code": "auth.invalid_credential",
+            "domain": "account",
+            "retry": "no",
+            "next_step": {"kind": "check_credentials", "detail": INVALID_KEY_NEXT_STEP},
+            "request_id": "01M55PINVALIDKEY000000000",
+        }
     )
-    INVALID_BUNDLE_DETAIL: ClassVar[str] = "Pipe 'draft_pitch' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck"
-    INVALID_BUNDLE_NEXT_STEP: ClassVar[str] = "Edit the bundle as each validation error says"
-
-    # A server fault with nothing to advise.
-    SERVER_FAULT: ClassVar[str] = '{"title":"Internal Server Error","status":500,"detail":"Unexpected failure.","request_id":"req_42"}'
+    # The hosted plane's rate limit, a problem document whose delay rides its `Retry-After` header.
+    RATE_LIMITED: ClassVar[str] = json.dumps(
+        {
+            "type": "https://mthds.ai/errors/account.rate_limited",
+            "title": "The account is over its request rate",
+            "status": 429,
+            "detail": "Too many runs started in the last minute.",
+            "code": "account.rate_limited",
+            "domain": "account",
+            "retry": "yes",
+            "next_step": {"kind": "wait", "detail": "Wait for the rate window to pass, then send the request again."},
+        }
+    )
+    # The hosted edge's bare refusals, which are no problem document: of a request its authorizer did not let through,
+    # of a route no server behind it serves, and a gateway's error page.
+    BARE_UNAUTHORIZED: ClassVar[str] = '{"message":"Unauthorized"}'
+    BARE_FORBIDDEN: ClassVar[str] = '{"message":"Forbidden"}'
+    BARE_NOT_FOUND: ClassVar[str] = '{"detail":"Not Found"}'
+    BARE_BAD_REQUEST: ClassVar[str] = '{"message":"Bad Request"}'
+    GATEWAY_PAGE: ClassVar[str] = "<html><head><title>502 Bad Gateway</title></head><body><h1>502 Bad Gateway</h1></body></html>"
 
 
 class HostedVersions:
@@ -78,47 +120,42 @@ class HostedPipeIoVerdicts:
     """`POST /v1/pipe-io` invalid verdicts, as the runner's crate core builds them in the caller's view."""
 
     # A method calling a package by its address that the request did not ship: pipe-io loads only the packages shipped
-    # with the method, and `/v1/start` fetches the dependency and runs. Built from the item
-    # `resolve_crate_from_method_dir`'s refusal carries on 2026-10-18, in the shape that predates the standard, which a
-    # runner answering `validation_errors` alone sends.
+    # with the method, and `/v1/start` fetches the dependency and runs. Its item is coded `method.dependency_missing`.
     UNSHIPPED_ADDRESS_DEPENDENCY: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [{"category": "pipe_validation", "error_type": "unresolved_package_dependency", '
-        '"pipe_code": "score_invoice", "domain_code": "invoicing", "source": "bundle.mthds", '
-        '"field_path": "pipe.score_invoice.steps[0].pipe", "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score", '
-        '"message": "In-memory resolve cannot load address-based dependency '
-        "'github.com/mthds/scoring-lib/scoring' from the host filesystem; provide the dependency contents in the request or "
-        'use directory-based resolution."}], "message": "The method does not validate."}'
-    )
-    # The same verdict from a runner speaking the standard, whose items are its problem's `errors`. The empty
-    # `validation_errors` is there only because the SDK model this package pins requires that member.
-    UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [], "errors": [{"code": "method.dependency_missing", "detail": "The method '
+        '{"is_valid": false, "errors": [{"code": "method.dependency_missing", "detail": "The method '
         "depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: not_found).\", "
         '"params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "not_found"}, '
         '"location": {"pipe": "score_invoice", "field": "pipe.score_invoice.steps[0].pipe", "file": "bundle.mthds"}}], '
         '"message": "The method does not validate."}'
     )
-    # The same verdict from a runner answering both members, whose `errors` item this client cannot read (it gives no
-    # `detail`): its `validation_errors` still name the package.
-    UNSHIPPED_ADDRESS_DEPENDENCY_UNREADABLE_PROBLEM_ITEMS: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [{"category": "pipe_validation", "error_type": "unresolved_package_dependency", '
-        '"pipe_code": "score_invoice", "source": "bundle.mthds", "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score", '
-        '"message": "In-memory resolve cannot load address-based dependency \'github.com/mthds/scoring-lib/scoring\'."}], '
-        '"errors": [{"code": "method.dependency_missing", "params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", '
-        '"reason": "not_found"}}], "message": "The method does not validate."}'
+    # The same verdict with an item before it that this client cannot read, since it gives no `detail`: the SDK skips it,
+    # and the item after it still names the package.
+    UNSHIPPED_ADDRESS_DEPENDENCY_AFTER_AN_UNREADABLE_ITEM: ClassVar[str] = (
+        '{"is_valid": false, "errors": [{"code": "method.dependency_missing", "params": {"kind": "package", '
+        '"name": "github.com/mthds/other-lib/other", "reason": "not_found"}}, {"code": "method.dependency_missing", "detail": "The method '
+        "depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: not_found).\", "
+        '"params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "not_found"}}], '
+        '"message": "The method does not validate."}'
     )
     # A package the method calls that was found in a cycle: the method's own fault, which no fetch cures.
-    DEPENDENCY_CYCLE_PROBLEM_ITEMS: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [], "errors": [{"code": "method.dependency_missing", "detail": "The method '
+    DEPENDENCY_CYCLE: ClassVar[str] = (
+        '{"is_valid": false, "errors": [{"code": "method.dependency_missing", "detail": "The method '
         "depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: cycle).\", "
         '"params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "cycle"}, '
         '"location": {"pipe": "score_invoice", "file": "bundle.mthds"}}], "message": "The method does not validate."}'
     )
-    # An item quoting the words of that refusal that no stage coded as a missing dependency: the method's own fault.
+    # An item quoting the words of that refusal under another code: the method's own fault.
     ADDRESS_DEPENDENCY_WORDS_ONLY: ClassVar[str] = (
-        '{"is_valid": false, "validation_errors": [{"category": "blueprint_validation", "source": "bundle.mthds", '
-        '"message": "In-memory resolve cannot load address-based dependency \'github.com/mthds/scoring-lib/scoring\'."}], '
-        '"message": "The method does not validate."}'
+        '{"is_valid": false, "errors": [{"code": "method.schema_violation", "detail": "The declaration at \'pipe.score_invoice\' '
+        "breaks a rule of the language (In-memory resolve cannot load address-based dependency 'github.com/mthds/scoring-lib/scoring').\", "
+        '"params": {"field_path": "pipe.score_invoice", "finding": "In-memory resolve cannot load address-based dependency '
+        '\'github.com/mthds/scoring-lib/scoring\'"}, "location": {"file": "bundle.mthds"}}], "message": "The method does not validate."}'
+    )
+    # A method whose model no catalog knows, with the item locating the fault by its file.
+    UNKNOWN_MODEL: ClassVar[str] = (
+        '{"is_valid": false, "errors": [{"code": "model.unknown", "detail": "The method names the llm model \'gpt-5.1\', which '
+        'no catalog knows.", "params": {"model": "gpt-5.1", "model_type": "llm"}, "location": {"pipe": "step2", "field": "model", '
+        '"file": "lib/b.mthds"}, "suggestions": ["gpt-5.5"]}], "message": "Bundle does not load"}'
     )
 
 

@@ -40,15 +40,10 @@ from mthds.protocol.problem.registry import CoreCode, MethodDependencyMissingKin
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, PipeIORequest
 from pipelex_sdk.upload import UploadRecord
-from pipelex_sdk.validation_models import ValidationErrorItem
-from pydantic import ValidationError
 
-from pipelex.core.pipes.exceptions import pipe_validation_error_code
-from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.hosted.exceptions import HostedLocalFileUploadUnavailableError, HostedMethodInvalidError
 from pipelex.tools.uri.resolved_uri import ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
-from pipelex.validation_error_types import PipeValidationErrorType
 
 #: An `http(s)://` URL, which the hosted API fetches itself. Matched as the SDK matches it, whatever the case of the
 #: scheme.
@@ -272,25 +267,12 @@ def _unshipped_dependency_refusal(*, report: CrateInvalidReport) -> HostedLocalF
 def _missing_package(*, report: CrateInvalidReport) -> str | None:
     """The address of the first method package pipe-io's invalid verdict names as missing, else `None`.
 
-    A runner speaking the standard answers the verdict's items as `errors`, read from the members the SDK's model does
-    not name, and a `method.dependency_missing` item of the `kind` `package` and the `reason` `not_found` names the
-    package in `params.name`; a package found in a cycle or in no matching version is the method's own fault. A runner
-    answering the shape that predates the standard sends `validation_errors` alone, whose items carry no code: each is
-    read by the code the runner gives the same item in its problem's `errors`, its type's (`pipe_validation_error_code`),
-    and the package it names, the alias of the reference it could not resolve. An item this client cannot read is
-    skipped, so it never takes the verdict's place, and when no item of `errors` names a package, `validation_errors`
-    is read too.
+    The verdict's items are its `errors`, and a `method.dependency_missing` item of the `kind` `package` and the
+    `reason` `not_found` names the package in `params.name`; a package found in a cycle or in no matching version is the
+    method's own fault. The SDK reads each item member by member, skipping one it cannot read, so an item never takes
+    the verdict's place.
     """
-    raw_errors = (report.model_extra or {}).get("errors")
-    if isinstance(raw_errors, list):
-        for raw_item in cast("list[Any]", raw_errors):
-            try:
-                item = ProblemItem.model_validate(raw_item)
-            except ValidationError:
-                continue
-            if (package := _missing_package_of_problem_item(item=item)) is not None:
-                return package
-    return next((package for item in report.validation_errors if (package := _missing_package_of_validation_item(item=item)) is not None), None)
+    return next((package for item in report.errors if (package := _missing_package_of_problem_item(item=item)) is not None), None)
 
 
 def _missing_package_of_problem_item(*, item: ProblemItem) -> str | None:
@@ -306,19 +288,6 @@ def _missing_package_of_problem_item(*, item: ProblemItem) -> str | None:
     ):
         return None
     return name
-
-
-def _missing_package_of_validation_item(*, item: ValidationErrorItem) -> str | None:
-    """The address of the method package a validation item the runner codes `method.dependency_missing` names, else `None`."""
-    if item.error_type is None or not item.missing_pipe_code:
-        return None
-    try:
-        error_type = PipeValidationErrorType(item.error_type)
-    except ValueError:
-        return None
-    if pipe_validation_error_code(error_type=error_type) != CoreCode.METHOD_DEPENDENCY_MISSING:
-        return None
-    return QualifiedRef.package_named_by(raw=item.missing_pipe_code)
 
 
 async def prepare_hosted_inputs(
@@ -343,7 +312,7 @@ async def prepare_hosted_inputs(
     Raises:
         HostedLocalFileUploadUnavailableError: If pipe-io's verdict refuses the method because it calls another method
             by its address, which nothing shipped: the run route would fetch it, so the file has to reach it as a URL.
-        HostedMethodInvalidError: If the method does not load, with the hosted API's validation items.
+        HostedMethodInvalidError: If the method does not load, with the verdict's problem items.
         ApiResponseError: If the hosted API refuses the pipe-io request (an unknown method, a key it refuses).
         InputPreparationError: If an upload fails, or a local file cannot be read.
         MethodFileTransferError: If a file of the method's tree the hosted API lacks could not be uploaded.
@@ -358,7 +327,7 @@ async def prepare_hosted_inputs(
         if (unshipped_dependency_refusal := _unshipped_dependency_refusal(report=report)) is not None:
             raise unshipped_dependency_refusal
         msg = f"The hosted API cannot load the method: {report.message}"
-        raise HostedMethodInvalidError(msg, validation_errors=report.validation_errors)
+        raise HostedMethodInvalidError(msg, errors=report.errors)
     selected_pipe_ref = report.pipe_ref
     descriptor = report.input_form.get(selected_pipe_ref) if selected_pipe_ref is not None else None
     if descriptor is None:

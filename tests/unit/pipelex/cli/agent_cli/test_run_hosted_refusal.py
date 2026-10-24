@@ -1,8 +1,8 @@
 """Unit tests: `pipelex-agent run … --runner hosted` reports a refused, failed or unreachable run as the problem it got.
 
-The answers are a runner's own problem documents, replayed through the real pipelex-sdk `PipelexAPIClient` over a mocked
-HTTP transport that answers the version handshake as the hosted API does and refuses the run, or refuses every
-connection, so no test reaches the network.
+The answers are a runner's own problem documents and the bare answers of the edge in front of it, replayed through the
+real pipelex-sdk `PipelexAPIClient` over a mocked HTTP transport that answers the version handshake as the hosted API
+does and refuses the run, or refuses every connection, so no test reaches the network.
 """
 
 from __future__ import annotations
@@ -21,27 +21,17 @@ from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
 from pipelex.cli.agent_cli.commands.run.pipe_cmd import run_pipe_cmd
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.error_rendering import (
-    HOSTED_FORBIDDEN_NEXT_STEP,
-    HOSTED_MISSING_KEY_NEXT_STEP,
-    HOSTED_REFUSAL_CALLER_NEXT_STEP,
-    HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS,
-    HOSTED_UNREACHABLE_NEXT_STEP,
-)
+from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP, HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS, HOSTED_UNREACHABLE_NEXT_STEP
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
 from tests.unit.pipelex.cli.agent_cli.test_data import (
     GatewayAnswers,
-    HostedMethodItems,
-    HostedPlaneRefusals,
     OperatorViewAnswers,
     RetiredEnvelope,
-    RunnerOwnMethodRefusals,
-    RunnerOwnRefusals,
     RunnerProblems,
     UndeclaredMembers,
 )
-from tests.unit.pipelex.hosted.test_data import HostedVersions
+from tests.unit.pipelex.hosted.test_data import HostedRefusals, HostedVersions
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -65,7 +55,7 @@ UNREACHABLE_PROBLEM: dict[str, Any] = {
     "next_step": {"kind": "retry", "detail": HOSTED_UNREACHABLE_NEXT_STEP},
     "params": {"base_url": HOSTED_URL},
 }
-#: A runner's own problem for a fault it met while running, which an answer on the run request cannot be trusted for.
+#: A runner's own problem for a fault it met while running, whose `retry` says no run is worth sending again.
 RUNNER_FAULT: str = json.dumps(
     {
         "type": "https://mthds.ai/errors/runtime.unexpected",
@@ -243,10 +233,10 @@ class TestRunHostedRefusal:
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize(
         ("status", "body"),
-        [(502, GatewayAnswers.HTML_PAGE), (500, RUNNER_FAULT)],
-        ids=["gateway_page", "runner_problem"],
+        [(502, GatewayAnswers.HTML_PAGE), (500, "")],
+        ids=["gateway_page", "empty_body"],
     )
-    def test_a_server_fault_on_the_run_request_leaves_the_outcome_unknown(
+    def test_a_bare_server_fault_on_the_run_request_leaves_the_outcome_unknown(
         self,
         mocker: MockerFixture,
         monkeypatch: pytest.MonkeyPatch,
@@ -255,7 +245,7 @@ class TestRunHostedRefusal:
         status: int,
         body: str,
     ) -> None:
-        """A 5xx on the run request may follow a run that started, so it is the client's `client.outcome_unknown`, whatever its body."""
+        """A bare 5xx on the run request may follow a run that started, so it is the client's `client.outcome_unknown`."""
         _install_hosted_api(mocker, monkeypatch, status=status, body=body)
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -268,6 +258,18 @@ class TestRunHostedRefusal:
         assert problem["retry"] == "outcome_unknown"
         assert problem["next_step"]["kind"] == "read_run"
         _assert_no_retired_member(problem=problem)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    def test_a_runner_s_own_fault_on_the_run_request_is_reported_as_it_came(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
+    ) -> None:
+        """A 5xx whose body is the runner's problem document says itself whether a run may exist, by its own `retry`."""
+        _install_hosted_api(mocker, monkeypatch, status=500, body=RUNNER_FAULT)
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        assert json.loads(capsys.readouterr().err) == json.loads(RUNNER_FAULT)
 
     @pytest.mark.usefixtures("tty_stdin")
     def test_a_server_fault_in_markdown(
@@ -407,90 +409,38 @@ class TestRunHostedRefusal:
         assert _routes(seen=seen) == [START_ROUTE, ("POST", "/v1/execute")]
         problem = json.loads(capsys.readouterr().err)
         assert problem["code"] == "request.not_found"
-        assert problem["detail"] == "Not Found"
+        assert problem["status"] == 404
+        assert problem["detail"] == "This runner serves no such route."
         assert problem["next_step"] == {"kind": "upgrade", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]}
         _assert_no_retired_member(problem=problem)
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="the hosted plane's former-shape refusal names none of its code's parameters; the agent reads its status and own code alone"
-    )
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize(
-        ("status", "body", "headers", "expected"),
+        ("status", "body", "expected"),
         [
             (
                 401,
-                HostedPlaneRefusals.UNAUTHORIZED,
-                {},
+                GatewayAnswers.UNAUTHORIZED,
                 {
                     "type": "https://mthds.ai/errors/auth.invalid_credential",
                     "title": "The credential was refused",
                     "status": 401,
-                    "detail": "The API key is not valid.",
+                    "detail": "The runtime refused the request's credential.",
                     "code": "auth.invalid_credential",
                     "domain": "account",
                     "retry": "no",
                     "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[401]},
-                    "request_id": "01M55PLEGACY401000000000000",
-                },
-            ),
-            (
-                403,
-                HostedPlaneRefusals.FORBIDDEN,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/auth.forbidden",
-                    "title": "The credential does not permit this",
-                    "status": 403,
-                    "detail": "Your role in this organization does not allow running methods.",
-                    "code": "auth.forbidden",
-                    "params": {},
-                    "domain": "account",
-                    "retry": "no",
-                    "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
-                    "request_id": "01M55PLEGACY403000000000000",
-                },
-            ),
-            (
-                403,
-                HostedPlaneRefusals.FORBIDDEN_OPERATION,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/auth.forbidden",
-                    "title": "The credential does not permit this",
-                    "status": 403,
-                    "detail": "This route is served to a web session only.",
-                    "code": "auth.forbidden",
-                    "params": {},
-                    "domain": "account",
-                    "retry": "no",
-                    "next_step": {"kind": "request_access", "detail": HOSTED_FORBIDDEN_NEXT_STEP},
-                },
-            ),
-            (
-                403,
-                HostedPlaneRefusals.FORBIDDEN_EXPIRED_KEY,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/auth.invalid_credential",
-                    "title": "The credential was refused",
-                    "status": 403,
-                    "detail": "The API key has expired.",
-                    "code": "auth.invalid_credential",
-                    "domain": "account",
-                    "retry": "no",
-                    "next_step": {"kind": "check_credentials", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[403]},
+                    "request_id": HEADER_REQUEST_ID,
                 },
             ),
             (
                 403,
                 GatewayAnswers.FORBIDDEN,
-                {"x-request-id": HEADER_REQUEST_ID},
                 {
                     "type": "https://mthds.ai/errors/auth.invalid_credential",
                     "title": "The credential was refused",
                     "status": 403,
-                    "detail": "Forbidden",
+                    "detail": "The runtime refused the request's credential.",
                     "code": "auth.invalid_credential",
                     "domain": "account",
                     "retry": "no",
@@ -498,87 +448,10 @@ class TestRunHostedRefusal:
                     "request_id": HEADER_REQUEST_ID,
                 },
             ),
-            (
-                404,
-                HostedPlaneRefusals.RUN_NOT_FOUND,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/run.not_found",
-                    "title": "No such run",
-                    "status": 404,
-                    "detail": "No run run_9 is visible to this key.",
-                    "code": "run.not_found",
-                    "params": {},
-                    "domain": "input",
-                    "retry": "no",
-                    "next_step": {"kind": "change_input", "detail": "Check the run id, then read the run again."},
-                },
-            ),
-            (
-                404,
-                HostedPlaneRefusals.METHOD_VERSION_NOT_FOUND,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/method.not_found",
-                    "title": "No method at this address",
-                    "status": 404,
-                    "detail": "The method mt_7 has no published version 3.",
-                    "code": "method.not_found",
-                    "params": {},
-                    "domain": "input",
-                    "retry": "no",
-                    "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404]},
-                },
-            ),
-            (
-                429,
-                HostedPlaneRefusals.RATE_LIMITED,
-                {"retry-after": "30"},
-                {
-                    "type": "https://mthds.ai/errors/account.rate_limited",
-                    "title": "The account is over its request rate",
-                    "status": 429,
-                    "detail": "Too many runs started in the last minute.",
-                    "code": "account.rate_limited",
-                    "params": {},
-                    "domain": "account",
-                    "retry": "yes",
-                    "retry_after": 30,
-                    "next_step": {"kind": "wait", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[429]},
-                    "request_id": "01M55PLEGACY429000000000000",
-                },
-            ),
-            (
-                429,
-                HostedPlaneRefusals.RATE_LIMITED_BODY_DELAY,
-                {},
-                {
-                    "type": "https://mthds.ai/errors/account.rate_limited",
-                    "title": "The account is over its request rate",
-                    "status": 429,
-                    "detail": "Too many runs started in the last minute.",
-                    "code": "account.rate_limited",
-                    "params": {},
-                    "domain": "account",
-                    "retry": "yes",
-                    "retry_after": 12,
-                    "next_step": {"kind": "wait", "detail": HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[429]},
-                },
-            ),
         ],
-        ids=[
-            "unauthorized",
-            "forbidden",
-            "forbidden_operation",
-            "forbidden_expired_key",
-            "gateway_forbidden",
-            "run_not_found",
-            "method_version_not_found",
-            "rate_limited",
-            "rate_limited_body_delay",
-        ],
+        ids=["unauthorized", "forbidden"],
     )
-    def test_a_refusal_of_the_hosted_plane_reads_as_its_core_code_with_the_hosted_guidance(
+    def test_a_bare_refusal_of_the_edge_reads_as_a_refused_credential_with_the_hosted_guidance(
         self,
         mocker: MockerFixture,
         monkeypatch: pytest.MonkeyPatch,
@@ -586,15 +459,12 @@ class TestRunHostedRefusal:
         bundle_file: Path,
         status: int,
         body: str,
-        headers: dict[str, str],
         expected: dict[str, Any],
     ) -> None:
-        """The hosted plane answers in its pre-standard shape: its refusal reads as the core code its status and its own
-        code name, the plane's own detail kept, the next step the human CLI gives, and a rate limit's delay from its header
-        or its body. A 403 the platform answers with an authorization code refuses a key it authenticated; one with any
-        other code, and the edge's bare 403, may refuse the key itself.
+        """An answer of the edge that is no problem document reads by its status: a request that carried a key had it
+        refused, with the next step that names this client's key and origin settings and the request id of the edge's header.
         """
-        _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers=headers)
+        _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers={"x-request-id": HEADER_REQUEST_ID})
 
         with pytest.raises(typer.Exit) as exc_info:
             run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
@@ -605,10 +475,60 @@ class TestRunHostedRefusal:
         _assert_no_retired_member(problem=problem)
 
     @pytest.mark.usefixtures("tty_stdin")
+    def test_a_bare_throttle_of_the_edge_keeps_the_client_s_reading_and_its_delay(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], bundle_file: Path
+    ) -> None:
+        """The edge's bare 429 names no rate window, so it is pipelex-sdk's `runtime.unavailable`, with the delay its header gives."""
+        _install_hosted_api(mocker, monkeypatch, status=429, body=GatewayAnswers.TOO_MANY_REQUESTS, headers={"retry-after": "30"})
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        problem = json.loads(capsys.readouterr().err)
+        assert problem["code"] == "runtime.unavailable"
+        assert problem["retry"] == "yes"
+        assert problem["retry_after"] == 30
+        assert problem["next_step"]["kind"] == "retry"
+        _assert_no_retired_member(problem=problem)
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize("credential_sent", [True, False])
     @pytest.mark.parametrize(
-        ("status", "body", "detail"),
-        [(401, HostedPlaneRefusals.UNAUTHORIZED, "The API key is not valid."), (403, GatewayAnswers.FORBIDDEN, "Forbidden")],
-        ids=["unauthorized", "gateway_forbidden"],
+        ("status", "body", "headers"),
+        [(401, HostedRefusals.INVALID_KEY, {}), (429, HostedRefusals.RATE_LIMITED, {"retry-after": "30"})],
+        ids=["invalid_key", "rate_limited"],
+    )
+    def test_a_refusal_of_the_hosted_plane_is_its_own_problem_document_whatever_the_key(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        bundle_file: Path,
+        status: int,
+        body: str,
+        headers: dict[str, str],
+        credential_sent: bool,
+    ) -> None:
+        """The hosted plane answers its refusals as problem documents, which are never read by their status: the code,
+        the domain, the retry verdict and the next step are its own, the delay of its `Retry-After` header filled in.
+        """
+        _install_hosted_api(mocker, monkeypatch, status=status, body=body, headers=headers)
+        if not credential_sent:
+            monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "")
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
+
+        problem = json.loads(capsys.readouterr().err)
+        sent = json.loads(body)
+        expected = {**sent, "retry_after": 30} if "retry-after" in headers else sent
+        assert problem == expected
+
+    @pytest.mark.usefixtures("tty_stdin")
+    @pytest.mark.parametrize(
+        ("status", "body"),
+        [(401, GatewayAnswers.UNAUTHORIZED), (403, GatewayAnswers.FORBIDDEN)],
+        ids=["unauthorized", "forbidden"],
     )
     def test_a_refused_request_that_carried_no_key_is_a_missing_credential(
         self,
@@ -618,7 +538,6 @@ class TestRunHostedRefusal:
         bundle_file: Path,
         status: int,
         body: str,
-        detail: str,
     ) -> None:
         """With no key sent, a refused credential is a missing one, and its next step says how to get a key, never that one was refused."""
         _install_hosted_api(mocker, monkeypatch, status=status, body=body)
@@ -628,78 +547,11 @@ class TestRunHostedRefusal:
             run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.MARKDOWN, runner=RunExecution.HOSTED)
 
         markdown = capsys.readouterr().err
-        assert markdown.startswith(f"## No credential was sent\n\n{detail}\n")
+        assert markdown.startswith("## No credential was sent\n\nThis route needs a credential, and the request carried none.\n")
         assert f"**Next step** (`check_credentials`): {HOSTED_MISSING_KEY_NEXT_STEP}" in markdown
         assert "refused the credentials" not in markdown
         assert "- Code: `auth.missing_credential` (domain account, retry no)" in markdown
         _assert_no_retired_markdown(markdown=markdown)
-
-    @pytest.mark.usefixtures("tty_stdin")
-    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
-    def test_a_runner_s_own_refusal_in_the_former_shape_keeps_its_reason(
-        self,
-        mocker: MockerFixture,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        bundle_file: Path,
-        error_format: CliOutputFormat,
-    ) -> None:
-        """A runner's own 422, which no standard client reads, keeps the client's `client.response_unreadable` but tells
-        its reason and the step the human CLI gives it, never to report a body this CLI does not print.
-        """
-        _install_hosted_api(mocker, monkeypatch, status=422, body=RunnerOwnRefusals.RESERVED_OBJECT_KEY)
-
-        with pytest.raises(typer.Exit) as exc_info:
-            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
-
-        assert exc_info.value.exit_code == 1
-        printed = capsys.readouterr().err
-        reason = json.loads(RunnerOwnRefusals.RESERVED_OBJECT_KEY)["detail"]
-        match error_format:
-            case CliOutputFormat.JSON:
-                problem = json.loads(printed)
-                assert problem == {
-                    "type": "https://mthds.ai/errors/client.response_unreadable",
-                    "title": "The runtime's answer could not be read",
-                    "status": 422,
-                    "detail": reason,
-                    "code": "client.response_unreadable",
-                    "domain": "runtime",
-                    "retry": "no",
-                    "next_step": {"kind": "change_input", "detail": HOSTED_REFUSAL_CALLER_NEXT_STEP},
-                    "params": {"status": 422},
-                    "request_id": "01M55PRESERVED00000000000",
-                }
-                _assert_no_retired_member(problem=problem)
-            case CliOutputFormat.MARKDOWN:
-                assert printed.startswith(f"## The runtime's answer could not be read\n\n{reason}\n")
-                assert f"**Next step** (`change_input`): {HOSTED_REFUSAL_CALLER_NEXT_STEP}" in printed
-                assert "with the status and the body" not in printed
-                _assert_no_retired_markdown(markdown=printed)
-
-    @pytest.mark.usefixtures("tty_stdin")
-    def test_a_refusal_in_the_former_shape_takes_the_step_kind_its_advice_names(
-        self,
-        mocker: MockerFixture,
-        monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str],
-        bundle_file: Path,
-    ) -> None:
-        """A 4xx in the former shape that advises a step of its own kind, here checking the billing, reports that kind
-        beside the advice it gave, never `change_input`, so the step's kind and its detail agree.
-        """
-        _install_hosted_api(mocker, monkeypatch, status=402, body=RunnerOwnRefusals.NO_CREDIT)
-
-        with pytest.raises(typer.Exit) as exc_info:
-            run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=CliOutputFormat.JSON, runner=RunExecution.HOSTED)
-
-        assert exc_info.value.exit_code == 1
-        problem = json.loads(capsys.readouterr().err)
-        assert problem["code"] == "client.response_unreadable"
-        assert problem["status"] == 402
-        assert problem["detail"] == RunnerOwnRefusals.NO_CREDIT_REASON
-        assert problem["next_step"] == {"kind": "check_account", "detail": RunnerOwnRefusals.NO_CREDIT_ADVICE}
-        _assert_no_retired_member(problem=problem)
 
     @pytest.mark.usefixtures("tty_stdin")
     @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
@@ -708,7 +560,7 @@ class TestRunHostedRefusal:
         [(HostedVersions.HOSTED, START_ROUTE), (HostedVersions.BARE_RUNNER, ("POST", "/v1/execute"))],
         ids=["start", "execute"],
     )
-    def test_a_runner_s_own_refusal_of_a_method_in_the_former_shape_lists_its_items(
+    def test_a_runner_s_refusal_of_a_method_lists_its_items_on_either_route(
         self,
         mocker: MockerFixture,
         monkeypatch: pytest.MonkeyPatch,
@@ -718,11 +570,10 @@ class TestRunHostedRefusal:
         route: tuple[str, str],
         error_format: CliOutputFormat,
     ) -> None:
-        """A runner's own 422 in the former shape that lists validation items is `method.invalid`, its items coded as a
-        local verdict codes them, with its reason as the detail and its advice as the next step, as a stored report in the
-        same shape reads, so the agent CLI lists what the human CLI lists.
+        """A runner's 422 for a method that does not load is its `method.invalid` problem with its items, on the start of
+        the hosted API and on the blocking execute of a bare runner alike.
         """
-        seen = _install_hosted_api(mocker, monkeypatch, status=422, body=RunnerOwnMethodRefusals.INVALID_METHOD, version=version)
+        seen = _install_hosted_api(mocker, monkeypatch, status=422, body=HostedRefusals.INVALID_METHOD, version=version)
 
         with pytest.raises(typer.Exit) as exc_info:
             run_bundle_cmd(path=str(bundle_file), pipe="entry", output_format=error_format, runner=RunExecution.HOSTED)
@@ -733,27 +584,14 @@ class TestRunHostedRefusal:
         match error_format:
             case CliOutputFormat.JSON:
                 problem = json.loads(printed)
-                assert problem == {
-                    "type": "https://mthds.ai/errors/method.invalid",
-                    "title": "The method does not validate",
-                    "status": 422,
-                    "detail": RunnerOwnMethodRefusals.REASON,
-                    "code": "method.invalid",
-                    "domain": "method",
-                    "retry": "no",
-                    "next_step": {"kind": "change_model", "detail": RunnerOwnMethodRefusals.ADVICE},
-                    "errors": HostedMethodItems.PROBLEM_ITEMS[:2],
-                    "request_id": "01M55PINVALIDMETHOD000000",
-                }
+                assert problem == json.loads(HostedRefusals.INVALID_METHOD)
                 _assert_no_retired_member(problem=problem)
             case CliOutputFormat.MARKDOWN:
-                assert printed.startswith(f"## The method does not validate\n\n{RunnerOwnMethodRefusals.REASON}\n")
-                assert f"**Next step** (`change_model`): {RunnerOwnMethodRefusals.ADVICE}" in printed
+                assert printed.startswith("## The method does not validate\n\nThe method does not validate.\n")
+                assert f"**Next step** (`change_method`): {HostedRefusals.INVALID_METHOD_NEXT_STEP}" in printed
                 assert "### Errors" in printed
-                assert (
-                    f"- `model.unknown`: {HostedMethodItems.PROBLEM_ITEMS[1]['detail']} (pipe 'draft', field 'model', file 'main.mthds')" in printed
-                )
-                assert "client.response_unreadable" not in printed
+                item = HostedRefusals.INVALID_METHOD_ITEMS[0]
+                assert f"- `model.unknown`: {item['detail']} (pipe 'draft_pitch', field 'model', file 'bundle.mthds')" in printed
                 _assert_no_retired_markdown(markdown=printed)
 
     @pytest.mark.usefixtures("tty_stdin")

@@ -14,13 +14,12 @@ from typing import TYPE_CHECKING, Any, cast
 
 import typer
 from mthds.protocol.exceptions import PipelineRequestError
-from pipelex_sdk.errors import ApiResponseError
 from rich.markup import escape
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.commands.run._run_core import load_run_inputs
 from pipelex.cli.commands.run._run_output_folder import make_run_output_folder
-from pipelex.cli.error_handlers import handle_validate_bundle_error, print_traceback_if_requested
+from pipelex.cli.error_handlers import handle_validate_bundle_error, print_problem_items, print_problem_rows, print_traceback_if_requested
 from pipelex.hosted.client_factory import make_hosted_client
 from pipelex.hosted.error_rendering import describe_hosted_error
 from pipelex.hosted.exceptions import HostedRunError, HostedRunInterruptedError
@@ -108,29 +107,39 @@ def refuse_local_only_flags(
         raise _fail(message=msg)
 
 
-def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError, heading: str = _FAILURE_HEADING) -> None:
-    """Print a hosted run's failure as `pipelex.hosted.error_rendering` reads it, the view the agent CLI's envelope carries.
+def _print_hosted_failure(*, error: PipelineRequestError | HostedRunError, credential_sent: bool, heading: str = _FAILURE_HEADING) -> None:
+    """Print a hosted run's failure as its problem, the one the agent CLI reports (`pipelex.hosted.error_rendering`).
 
-    Its validation items name the file each fault is in when the hosted API was told it, and the run id is printed
-    once the hosted API acknowledged the run, so a run that failed, outlived the wait, was lost on the way or was left
-    running by an interruption can be looked up.
+    The heading, the error's own sentence when it says what the problem does not, then the problem's rows: its title,
+    its detail, its next step, its code with its domain and its retry verdict, where it happened, the request and the
+    run, so a run that failed, outlived the wait, was lost on the way or was left running by an interruption can be
+    looked up. Its faults follow, one per line with its code, its sentence and where, each naming its file when the
+    hosted API was told it, then the failed run's own problem when the run started and failed, and the advice
+    pipelex's own error gives as a tip.
+
+    Args:
+        error: The failure.
+        credential_sent: Whether the run's requests carried a key, which tells a refused key from a missing one.
+        heading: The headline, which names what failed.
     """
-    view = describe_hosted_error(error=error)
+    view = describe_hosted_error(error=error, credential_sent=credential_sent)
     # On stderr, as every failure's report: stdout is the run's output.
     console = get_error_console()
     console.print(f"\n[bold red]{escape(heading)}[/bold red]\n")
-    console.print(f"  {escape(view.message)}\n")
-    if view.validation_errors:
-        for item in view.validation_errors:
-            location = item.source or item.pipe_code or item.concept_code or item.domain_code
-            prefix = f"{location}: " if location else ""
-            console.print(f"  - {escape(prefix + item.message)}")
-        console.print("")
-    console.print(f"  [bold]Next step:[/bold] {escape(view.next_step)}\n")
-    if view.pipeline_run_id is not None:
-        console.print(f"  Run id: {escape(view.pipeline_run_id)}\n")
-    if isinstance(error, ApiResponseError) and error.request_id:
-        console.print(f"  Request id: {escape(error.request_id)}\n")
+    # The sentence and the advice are plain text, so they are escaped before Rich reads markup in them.
+    printed_message = escape(view.message) if view.message else None
+    printed_tip = escape(view.advice) if view.advice else None
+    if printed_message is not None:
+        console.print(f"  {printed_message}\n")
+    print_problem_rows(console=console, problem=view.problem, error_message=printed_message, tip=printed_tip)
+    print_problem_items(console=console, problem=view.problem)
+    run_error = view.problem.run_error
+    if run_error is not None:
+        console.print("[bold]The run's own problem[/bold]\n")
+        print_problem_rows(console=console, problem=run_error, error_message=printed_message, tip=None)
+        print_problem_items(console=console, problem=run_error)
+    if printed_tip is not None:
+        console.print(f"[bold green]💡 Tip:[/bold green] {printed_tip}\n")
 
 
 async def _start_and_wait(*, client: PipelexAPIClient, request: HostedRunRequest, on_started: RunStartedCallback) -> HostedRunOutcome:
@@ -233,6 +242,8 @@ def execute_hosted_run(
 
     console = get_console()
     console.print(f"Running on the hosted Pipelex API at [bold]{escape(client.base_url)}[/bold]")
+    # Whether the run's requests carry a key, which tells a refused key from a missing one; never the key itself.
+    credential_sent = bool(client.api_key)
     started_run_ids: list[str] = []
 
     def _announce_start(*, pipeline_run_id: str) -> None:
@@ -244,11 +255,11 @@ def execute_hosted_run(
     except (KeyboardInterrupt, asyncio.CancelledError) as exc:
         # Ctrl-C stops the wait, not the run: name the run that keeps going, then exit as an interrupted command does.
         interrupted = HostedRunInterruptedError(pipeline_run_id=started_run_ids[-1] if started_run_ids else None)
-        _print_hosted_failure(error=interrupted, heading="Interrupted")
+        _print_hosted_failure(error=interrupted, credential_sent=credential_sent, heading="Interrupted")
         raise typer.Exit(_INTERRUPTED_EXIT_CODE) from exc
     except (PipelineRequestError, HostedRunError) as exc:
         print_traceback_if_requested(console=console)
-        _print_hosted_failure(error=exc)
+        _print_hosted_failure(error=exc, credential_sent=credential_sent)
         raise typer.Exit(1) from exc
     except Exception as exc:
         # CLI command root: any unexpected failure is reported to the user and exits non-zero via typer.Exit.
