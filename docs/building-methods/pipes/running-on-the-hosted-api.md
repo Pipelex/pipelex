@@ -77,34 +77,38 @@ Two cases where `pipelex run --hosted` goes further than `prepare_inputs`:
 
 ## Errors
 
-A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`:
+A failure is one of the SDK's typed errors, from `pipelex_sdk.errors`, all subclasses of the protocol's `PipelineRequestError`, and every one carries what went wrong as the MTHDS standard's problem document, `exc.problem`. Branch on `exc.problem.code`, the stable name of the case in the [error registry](../../errors/index.md), never on an HTTP status or the wording of a message. Beside its code, the problem says who acts on the failure (`exc.problem.effective_domain`), whether sending the same thing again can help (`exc.problem.effective_retry`: `yes`, `no`, or `outcome_unknown` when a run may have started), how long to wait first when the answer said (`retry_after`, in seconds), what to do next (`next_step.kind` and `next_step.detail`), and the faults one by one when there are several (`errors`, each with its own `code`, `detail` and `location`).
 
-- `ApiResponseError` is a refusal the hosted API answered: `status`, the reason in `server_message`, the next step in `user_action.detail` when the server advised one, and `validation_errors` locating the faults of a bundle it refused to load.
-- `RunFailedError` is a run that started and failed; `error` holds the error the hosted API stored for the run, with the runner's `error_type`, `message`, `error_domain` and `user_action`.
-- `RunTimeoutError` is a run that outlived the wait; it keeps running, and `run_id` reads its result later with `wait_for_result`.
-- `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its `__cause__` is httpx's exception, and its `code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
+- `ApiResponseError` is an answer the hosted API, or a server in front of it, gave. Its problem is the answer's own problem document, as the hosted API answers every refusal, with the runner's own code and next step. An answer that is no problem document, such as a gateway's error page, is read from its status: `auth.missing_credential` for a `401`, `auth.invalid_credential` for a `403`, `request.not_found` for a `404`, `runtime.unavailable` with `retry` `yes` for a `408`, a `429`, a `502`, a `503` or a `504`, `runtime.unexpected` for a `500`, and `client.response_unreadable` naming the status for any other. `status` is the answer's HTTP status and `request_id` the id to quote to support.
+- `RunFailedError` is a run that started and failed. Its problem is `run.failed`, naming the run and its terminal status, and `run_error` is the run's own problem, why it did not succeed, under its own code, with its own retry verdict and next step, or `None` when the run stored none.
+- `RunTimeoutError` is a run that outlived the wait. Its problem is `client.follow_failed`: the run keeps running, and `run_id` reads its result later with `wait_for_result`.
+- `ApiUnreachableError` is a request that got no answer, on every route, `start` and `execute` included. Its problem is `client.unreachable` naming the base URL, or `client.timeout` naming the time limit for a request whose time ran out. Its `__cause__` is httpx's exception, and its `network_code` names the failure: `ABORT_TIMEOUT` for a read or a write that timed out, otherwise httpx's class name, such as `ConnectError`, `ConnectTimeout`, `ReadError` or `RemoteProtocolError`.
 - `InputPreparationError` and its subclasses are a local file that could not be read or uploaded.
-- `MethodFileTransferError` is a file of a tree sent by hash that could not be uploaded to the hosted API's storage before the request, so nothing was started. Its `code` says why, `unreachable`, `storage_error` or `refused`, and `retryable` whether the same call can succeed later, which holds for every code but `refused`.
+- `MethodFileTransferError` is a file of a tree sent by hash that could not be uploaded to the hosted API's storage before the request, so nothing was started. Its `reason` says why, `unreachable`, `storage_error`, `refused` or `mismatch`, and its problem's retry verdict whether the same call can succeed later, which holds for `unreachable` and `storage_error`.
 
 ### A Start That Got No Answer
 
-An `ApiUnreachableError` raised by `start` or `execute` says whether the run may have been created, in `run_may_have_started`. pipelex-sdk sets it only on the start or the execute request itself, and only when the transport failure does not prove the request never left your machine. It is `False` for a connection that could not be made, and for a failure on a request the call sends before the run's, such as the blob check of a tree sent by hash, so no run exists and starting again is safe. It is `True` for a read or a write that failed or timed out, a connection closed once the request had left, a proxy's failure or a TLS handshake that was dropped, any of which can come after the hosted API received the request: a run may exist with no id returned, so check the run history on app.pipelex.com before starting it again.
+A failure of `start` or `execute` says whether the run may have been created: its problem is then `client.outcome_unknown`, whose retry verdict is `outcome_unknown`. pipelex-sdk reads it on the start or the execute request alone. An `ApiUnreachableError` reads so unless the transport failure proves the request never left your machine: a connection that could not be made, or a failure on a request the call sends before the run's, such as the blob check of a tree sent by hash, created no run, so starting again is safe. A read or a write that failed or timed out, a connection closed once the request had left, a proxy's failure or a TLS handshake that was dropped can each come after the hosted API received the request. So can a gateway's bare answer to the start, a `408` or a `5xx` other than `501`, which arrives as an `ApiResponseError`. In those cases a run may exist with no id returned, so check the run history on app.pipelex.com before starting it again.
 
 ```python
-from pipelex_sdk.errors import ApiUnreachableError
+from mthds.protocol.problem.registry import RetryVerdict
+from pipelex_sdk.errors import PipelexRequestError
 
 try:
     started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
-except ApiUnreachableError as exc:
-    if exc.run_may_have_started:
-        ...  # A run may exist: look it up in the run history before starting again.
-    else:
-        ...  # No run was created: check the network and the origin, then start again.
+except PipelexRequestError as exc:
+    match exc.problem.effective_retry:
+        case RetryVerdict.OUTCOME_UNKNOWN:
+            ...  # A run may exist: look it up in the run history before starting again.
+        case RetryVerdict.YES:
+            ...  # No run was created: wait `exc.problem.retry_after` seconds when it says, then start again.
+        case RetryVerdict.NO:
+            ...  # Starting again changes nothing: do what `exc.problem.next_step.detail` says first.
 ```
 
-`start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs `run_may_have_started` read as above.
+`start_and_wait` sends more than the start, so tell its requests apart with its two callbacks. `on_starting` is called right before each request that may create a run is sent, and `on_started` with the acknowledgement once the run exists. A failure before `on_starting` was called started nothing, a failure after `on_started` concerns a run whose id you hold, which `wait_for_result` follows, and only a failure in between needs its retry verdict read as above.
 
-`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report the second case as pipelex's own `HostedRunOutcomeUnknownError`. `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the cause itself.
+`pipelex run --hosted` and `pipelex-agent run --runner hosted` draw the same line, and report a connection lost on the run request as pipelex's own `HostedRunOutcomeUnknownError`. `PipelexAPIClient` never raises that error, so a program that calls the client directly reads the problem itself.
 
 ## Related Documentation
 
