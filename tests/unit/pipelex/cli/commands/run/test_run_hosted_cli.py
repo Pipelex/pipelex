@@ -16,6 +16,7 @@ import pytest
 import typer
 from mthds.protocol.problem.models import Problem, ProblemItem
 from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, MissingMainStuffError, RunFailedError, RunTimeoutError, run_failed_problem
+from pipelex_sdk.problem_items import read_problem_items
 from pipelex_sdk.runs import RunResults, RunStatus
 from pydantic import ValidationError
 from rich.console import Console
@@ -25,12 +26,14 @@ from pipelex.cli._cli import app as pipelex_app
 from pipelex.cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.commands.run.method_cmd import run_method_cmd
 from pipelex.cli.commands.run.pipe_cmd import run_pipe_cmd
+from pipelex.errors.problem import UNKNOWN_CODE_ITEM_DETAIL
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP
+from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP, describe_hosted_error
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY
+from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems
 from tests.unit.pipelex.hosted.test_data import HostedRefusals
 
 if TYPE_CHECKING:
@@ -417,6 +420,27 @@ class TestRunHostedCli:
         for expected_line in expected_lines:
             assert re.search(expected_line, printed), expected_line
             assert not re.search(expected_line, output.getvalue())
+
+    def test_an_item_of_a_code_newer_than_this_client_keeps_the_runner_s_sentence(self, mocker: MockerFixture, bundle_dir: Path) -> None:
+        """An item of pipe-io's verdict under a code this client's registry does not hold is printed as the runner wrote
+        it, never as the generic sentence, and the problem both CLIs share keeps its parameters.
+        """
+        refused = HostedMethodInvalidError(
+            "The hosted API cannot load the method: Bundle does not load", errors=read_problem_items([PipeIoItems.NEWER_CODE])
+        )
+        failure_output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=io.StringIO(), width=250))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_error_console", return_value=Console(file=failure_output, width=1000))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refused))
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_dir), hosted=True)
+
+        printed = failure_output.getvalue()
+        assert f"- method.construct_unsupported_here: {PipeIoItems.NEWER_CODE['detail']} (pipe 'summarize', file 'main.mthds')" in printed
+        assert UNKNOWN_CODE_ITEM_DETAIL not in printed
+        shared = describe_hosted_error(error=refused, credential_sent=True).problem
+        assert [item.as_wire() for item in shared.errors or []] == [PipeIoItems.NEWER_CODE]
 
     def test_a_refused_request_that_carried_no_key_is_a_missing_credential(
         self, mocker: MockerFixture, bundle_dir: Path, monkeypatch: pytest.MonkeyPatch

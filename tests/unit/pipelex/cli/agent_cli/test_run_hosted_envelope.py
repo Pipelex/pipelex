@@ -36,7 +36,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.agent_cli.commands.run.method_cmd import run_method_cmd
-from pipelex.errors.problem import ProblemView, make_problem
+from pipelex.errors.problem import UNKNOWN_CODE_ITEM_DETAIL, ProblemView, make_problem
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.error_rendering import (
     HOSTED_FILE_MISMATCH_NEXT_STEP,
@@ -460,6 +460,32 @@ class TestRunHostedEnvelope:
                     f"- `method.concept_unresolved`: {PipeIoItems.REPORTED[1]['detail']} (pipe 'summarize', field 'output', "
                     "file 'lib/summarize.mthds')"
                 ) in printed
+
+    @pytest.mark.parametrize("error_format", [CliOutputFormat.JSON, CliOutputFormat.MARKDOWN])
+    def test_an_item_of_a_code_newer_than_this_client_keeps_the_runner_s_sentence_and_parameters(
+        self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str], error_format: CliOutputFormat
+    ) -> None:
+        """The runner answered its verdict to its caller already, so an item under a code this client's registry does
+        not hold is reported as it came, its sentence and its parameters kept, never replaced by the generic sentence.
+        """
+        refused = HostedMethodInvalidError(
+            "The hosted API cannot load the method: Bundle does not load",
+            errors=read_problem_items([PipeIoItems.NEWER_CODE]),
+        )
+        mocker.patch(f"{AGENT_RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refused))
+
+        with pytest.raises(typer.Exit):
+            run_method_cmd(name=METHOD_REF, runner=RunExecution.HOSTED, output_format=error_format)
+
+        printed = capsys.readouterr().err
+        assert UNKNOWN_CODE_ITEM_DETAIL not in printed
+        match error_format:
+            case CliOutputFormat.JSON:
+                problem = json.loads(printed)
+                assert problem["code"] == "method.invalid"
+                assert problem["errors"] == [PipeIoItems.NEWER_CODE]
+            case CliOutputFormat.MARKDOWN:
+                assert (f"- `method.construct_unsupported_here`: {PipeIoItems.NEWER_CODE['detail']} (pipe 'summarize', file 'main.mthds')") in printed
 
     def test_a_configuration_that_cannot_be_read_gives_the_boot_s_problem(self, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """Reading `[run] execution` meets the configuration a local boot meets, and reports the problem a local boot reports."""

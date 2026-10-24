@@ -49,7 +49,7 @@ from pydantic import BaseModel, ValidationError
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
-from pipelex.hosted.exceptions import HostedRunError, HostedRunInterruptedError, HostedRunPollingError
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
 #: The command that gets a Pipelex API key and saves it where a hosted run reads it.
 PIPELEX_LOGIN_COMMAND = "pipelex login"
@@ -343,6 +343,20 @@ def tailored_next_step(*, error: PipelineRequestError) -> str | None:
             return None
 
 
+def _method_invalid_problem(*, error: HostedMethodInvalidError) -> PipelexProblem:
+    """The problem of a method pipe-io's verdict found does not load: `method.invalid`, listing the verdict's items as they came.
+
+    The runner answered its verdict to its caller already, so its items are reported as a runner's own problem is
+    (:func:`received_problem`): by the members the standard declares alone, since pipelex-sdk keeps those it does not
+    declare as it received them, and never projected onto a view again. A projection would read an item under a code
+    this client's registry does not hold, as a runner newer than the client answers, as one whose parameters it cannot
+    tell apart, and replace its sentence and its parameters with the generic sentence, losing the runner's explanation.
+    """
+    head = error.to_problem(view=ProblemView.CALLER)
+    verdict_items = [ProblemItem.model_validate(_declared_members(members=item.as_wire(), shape=ProblemItem)) for item in error.errors]
+    return head.model_copy(update={"errors": verdict_items or None})
+
+
 def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, credential_sent: bool) -> PipelexProblem:
     """The problem of a run on a runner that failed, in the caller's view: the runner's, the client's, or pipelex's own.
 
@@ -354,7 +368,7 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
       URL, with the next step this client tailors for it (:func:`tailored_next_step`) in place of its code's.
     - A failure pipelex detects itself is its `HostedRunError`'s problem, naming the run the hosted API acknowledged
       when there is one, and a method the hosted API found does not load lists the verdict's items as its `errors`,
-      by their declared members alone.
+      as they came, by their declared members alone (:func:`_method_invalid_problem`).
 
     Args:
         error: The failure.
@@ -365,14 +379,10 @@ def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, cred
     """
     if isinstance(error, HostedRunPollingError | HostedRunInterruptedError):
         return error.to_problem(view=ProblemView.CALLER, pipeline_run_id=error.pipeline_run_id)
+    if isinstance(error, HostedMethodInvalidError):
+        return _method_invalid_problem(error=error)
     if isinstance(error, HostedRunError):
-        own_problem = error.to_problem(view=ProblemView.CALLER)
-        if not own_problem.errors:
-            return own_problem
-        # The items of a pipe-io verdict, which pipelex-sdk keeps with the members the standard does not declare as it
-        # received them: they are reported by their declared members alone, as a runner's own problem is.
-        declared_items = [ProblemItem.model_validate(_declared_members(members=item.as_wire(), shape=ProblemItem)) for item in own_problem.errors]
-        return own_problem.model_copy(update={"errors": declared_items})
+        return error.to_problem(view=ProblemView.CALLER)
     if isinstance(error, ApiResponseError):
         return _answered_problem(error=error, credential_sent=credential_sent)
     problem = received_problem(problem=error.problem)

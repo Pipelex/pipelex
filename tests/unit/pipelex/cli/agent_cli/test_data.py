@@ -305,6 +305,14 @@ class PipeIoItems:
             "location": {"pipe": "summarize", "field": "output", "file": "lib/summarize.mthds"},
         },
     ]
+    # An item under a code this client's registry does not hold, as a hosted API newer than the client may answer: the
+    # runner's own sentence and parameters are all the client has to tell the fault by.
+    NEWER_CODE: ClassVar[dict[str, Any]] = {
+        "code": "method.construct_unsupported_here",
+        "detail": "Pipe 'summarize' uses the construct 'streamed_output', which this method's runtime introduced.",
+        "params": {"construct": "streamed_output"},
+        "location": {"pipe": "summarize", "file": "main.mthds"},
+    }
 
 
 class RefusedBundles:
