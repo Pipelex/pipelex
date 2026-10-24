@@ -15,7 +15,7 @@ from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.tree_files import write_call_files
 from pipelex.errors.problem import MAX_PROBLEM_TEXT_LENGTH, ProblemDiagnostics, ProblemView, make_problem
-from pipelex.interpreter_hub import get_library_manager, scoped_current_library, set_current_library
+from pipelex.interpreter_hub import get_library_manager, scoped_current_library
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.pipe_operators.func import pipe_func_transported_entrypoint
 from pipelex.pipe_operators.func.direct_pipe_func_executor import TRANSPORTED_LIBRARY_ID, DirectPipeFuncExecutor
@@ -73,18 +73,19 @@ def _note_request(*, tmp_path: Path) -> Generator[PipeFuncExecutionRequest, None
     library_manager = get_library_manager()
     try:
         build_library_id, _ = library_manager.open_library()
-        set_current_library(library_id=build_library_id)
         try:
-            library_manager.load_libraries(library_id=build_library_id, library_dirs=[method_dir])
-            yield build_pipe_func_execution_request(
-                job_metadata=JobMetadata(
-                    run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user", pipeline_run_id="run")
-                ),
-                pipe_code="note_demo.file_note",
-                function_name=_FUNCTION_NAME,
-                working_memory=WorkingMemoryFactory.make_empty(),
-                pipe_run_params=PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=10, batch_max_concurrency=None),
-            )
+            # Scoped, so a later test in the same worker never inherits the id of a library this helper tore down.
+            with scoped_current_library(library_id=build_library_id):
+                library_manager.load_libraries(library_id=build_library_id, library_dirs=[method_dir])
+                yield build_pipe_func_execution_request(
+                    job_metadata=JobMetadata(
+                        run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="user", pipeline_run_id="run")
+                    ),
+                    pipe_code="note_demo.file_note",
+                    function_name=_FUNCTION_NAME,
+                    working_memory=WorkingMemoryFactory.make_empty(),
+                    pipe_run_params=PipeRunParams(run_mode=PipeRunMode.LIVE, pipe_stack_limit=10, batch_max_concurrency=None),
+                )
         finally:
             library_manager.teardown(library_id=build_library_id)
     finally:
