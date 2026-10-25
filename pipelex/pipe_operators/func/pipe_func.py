@@ -42,6 +42,7 @@ from pipelex.pipe_operators.func.pipe_func_python import (
     locate_on_import_path,
 )
 from pipelex.pipe_operators.pipe_operator import PipeOperator
+from pipelex.pipe_run.located_failure import reported_failure_code
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.runtime_hub import get_class_registry
 from pipelex.system.job_metadata import JobMetadata
@@ -55,9 +56,11 @@ def _describe_executor_failure(*, exc: BaseException) -> str:
     """What the executor's failure was, named by classes and a code, never by a text.
 
     What the function raised is named by its class, which the in-process executor marks by raising `PipeFuncRaisedError`
-    from it. Any other failure is named by its class, and a Pipelex error by its code as well: an out-of-process
-    executor reports a coded Pipelex error whose message can hold the function's own text, and a foreign exception, a
-    transport's, can quote it too. The text of either can quote the run's inputs, and no message carries those.
+    from it. Any other failure is named by its class, and a Pipelex error by the code it reports as well: an
+    out-of-process executor reports a coded Pipelex error whose message can hold the function's own text, and a foreign
+    exception, a transport's, can quote it too. The text of either can quote the run's inputs, and no message carries
+    those. A carrier of a problem recovered across a transport boundary is named by that problem's code, such as
+    `pipe.function_raised` for a function that raised in a sandbox, never by its own class's `runtime.unexpected`.
     """
     if isinstance(exc, PipeFuncRaisedError):
         function_exc = exc.__cause__
@@ -65,7 +68,7 @@ def _describe_executor_failure(*, exc: BaseException) -> str:
             return "The function raised an exception"
         return f"The function raised {type(function_exc).__name__}"
     if isinstance(exc, PipelexError):
-        return f"{type(exc).__name__} ({exc.resolve_error_code()})"
+        return f"{type(exc).__name__} ({reported_failure_code(failure=exc)})"
     return type(exc).__name__
 
 
