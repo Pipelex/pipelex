@@ -139,7 +139,7 @@ A parameter the code does not declare, or one of the wrong type, is dropped when
 | `runtime_version` | The version of the Pipelex runtime that built the problem |
 | `trace_id`, `span_id` | The OpenTelemetry span the failure happened in, when one was recording |
 
-Every text a raise site, a provider or a caller wrote is bounded in a problem: `diagnostics.message`, the provider's message and every text parameter are cut to `MAX_PROBLEM_TEXT_LENGTH` characters by `cap_problem_text()`, which keeps the head of the text and appends ` […]`. The full text is left to the logs, so a provider's answer quoting a whole prompt cannot inflate a webhook, a stored run or a graph.
+Every text a raise site, a provider or a caller wrote is bounded in a problem: `diagnostics.message`, the provider's message, every text parameter and every text of the diagnostics a sandboxed `PipeFunc` call's report carries (see [A PipeFunc Call in a Sandbox](#a-pipefunc-call-in-a-sandbox)) are cut to `MAX_PROBLEM_TEXT_LENGTH` characters by `cap_problem_text()`, which keeps the head of the text and appends ` […]`. The full text is left to the logs, so a provider's answer quoting a whole prompt cannot inflate a webhook, a stored run or a graph.
 
 ### The identity, and why renaming an error class or changing its code is a wire break
 
@@ -172,7 +172,7 @@ class PipeRunInputsError(PipeRunError):
 raise PipeRunInputsError(msg).with_error_code(CoreCode.INPUT_MISSING)
 ```
 
-`PipelexError.resolve_error_code()` walks the `__cause__` chain: it stops at the first error that carries a code by itself, the code its raise site chose or its class's, descends through every error that takes its cause's code, and stops at a cause that is not a Pipelex error. When no error on the way carries one, the error reports the code the deepest error implies (`implied_error_code`, which an inference error built with a category alone names, see below), else the fallback of the deepest wrapper, and `runtime.unexpected`, whose step is `report`, when none names one. It is one walk, guarded against a cyclic chain, and no error's code starts a walk of its own. So a wrapper that adds the fact deciding the code keeps its own over a coded cause, as `pipe.function_raised` does over any coded error raised inside the method's function (the in-process executor raises what the function raised as `PipeFuncRaisedError`, so a failure of the executor itself keeps its own code; an out-of-process executor must mark the function's failure the same way, with a Pipelex error carrying `pipe.function_raised`, since an exception that is not a Pipelex error, such as a transport failure, proves nothing about the function and reads `runtime.unexpected`), and a wrapper that adds nothing passes its cause's code through.
+`PipelexError.resolve_error_code()` walks the `__cause__` chain: it stops at the first error that carries a code by itself, the code its raise site chose or its class's, descends through every error that takes its cause's code, and stops at a cause that is not a Pipelex error. When no error on the way carries one, the error reports the code the deepest error implies (`implied_error_code`, which an inference error built with a category alone names, see below), else the fallback of the deepest wrapper, and `runtime.unexpected`, whose step is `report`, when none names one. It is one walk, guarded against a cyclic chain, and no error's code starts a walk of its own. So a wrapper that adds the fact deciding the code keeps its own over a coded cause, as `pipe.function_raised` does over any coded error raised inside the method's function (the in-process executor raises what the function raised as `PipeFuncRaisedError`, so a failure of the executor itself keeps its own code; an out-of-process executor must mark the function's failure the same way, with a Pipelex error carrying `pipe.function_raised`, which the sandbox reports in its result file (see [A PipeFunc Call in a Sandbox](#a-pipefunc-call-in-a-sandbox)), since an exception that is not a Pipelex error, such as a transport failure, proves nothing about the function and reads `runtime.unexpected`), and a wrapper that adds nothing passes its cause's code through.
 
 `make_problem()` builds every problem from its code: the title, the documentation page, the domain, the retry verdict, the steps, the sentences' templates, the parameters model and the HTTP status are the code's, read from the registries' generated tables (`error_code_spec()` in `pipelex/errors/error_codes.py`), so building a problem is a pure lookup with no file read, safe inside a Temporal workflow's sandbox.
 
@@ -459,6 +459,16 @@ The runtime itself stays transport-agnostic: the machinery that carries an error
 
 See [Runtime Bridge & Transport](./runtime-bridge-and-transport.md) for the boundary these converters span; the per-backend converters themselves live in the host-runtime plugins.
 
+### A PipeFunc Call in a Sandbox
+
+A sandbox-hosted deployment runs a `PipeFunc` call in an isolated sandbox, which runs one command, `python -m pipelex.pipe_operators.func.pipe_func_transported_entrypoint <request_json> <result_json> <tree_root>`: it reads the `PipeFuncExecutionRequest`, runs the call with the `direct` executor's transported path from the call's files unpacked at `<tree_root>`, and leaves its outcome in the result file and its exit code. The executor that dispatched the call reads them on the other side, and the contract between the two is three outcomes:
+
+- **The function returned.** The result file holds the `PipeFuncExecutionResponse`, and the process exits zero.
+- **The function raised.** The `direct` executor marks it as the function's own, `PipeFuncRaisedError`, whose parameters name the function and the step. The entrypoint writes a `PipeFuncRaisedReport` to the result file, whose `problem` is that error's problem in the operator's view, `pipe.function_raised`, its message naming the class of what the function raised and never its text (`pipe_func_raised_report()`), then exits non-zero with the traceback on stderr.
+- **The sandbox failed another way**, such as the function running past its timeout, the call's files that cannot be read back as a tree, or a step the crate does not hold. The process exits non-zero and writes nothing to the result file.
+
+So an executor reads the result file of a call that exited non-zero with `read_pipe_func_raised_report()` (`pipelex/pipe_operators/func/pipe_func_execution_transport.py`). A problem means the function raised: the executor raises a Pipelex error carrying it, whose `recovered_problem()` returns it, and the step reports `pipe.function_raised`, located at the pipe, as a run in this process does. `None` means the sandbox failed, and the executor raises an error of its own whose code says what failed, never `pipe.function_raised`. The report is written where the function ran, and the function can write the file itself, so the reader keeps only what `pipe.function_raised` lets a sandbox say: a report of any other code reads as no report, the sentences, the domain, the verdict and the step are rendered again from the registry with the parameters the code declares, the location is left to the run that locates the failure, and the diagnostics keep the error's class, its message and the classes and codes of its first `MAX_REPORTED_CAUSES` causes, each of these texts capped at `MAX_PROBLEM_TEXT_LENGTH` characters as a raise site's message is, so neither a long text nor a long list the function wrote travels whole into a stored run report, and the runtime's version only when it is a public version number, normalized and without a local label, since it also rides the metadata view, which holds nothing a user wrote. The success shape is unchanged, so a sandbox and an executor at different Pipelex versions still agree on a call that returns; an executor that does not read the report reads the function's failure as the sandbox's.
+
 ---
 
 ## Security Refusals and the Security Event
@@ -659,6 +669,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
 | `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
 | `pipelex/pipe_run/located_failure.py` | `find_root_fault()`, `located_root_fault()`, `failure_location_of()`, `make_unexpected_failure()` |
+| `pipelex/pipe_operators/func/pipe_func_execution_transport.py` | `pipe_func_raised_report()` and `read_pipe_func_raised_report()`: the report a sandboxed `PipeFunc` call writes when its function raises, and its reading back |
 | `pipelex/graph/node_problem.py` | `make_node_problem()`: the caller-view problem a failed node of the execution graph records |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder — and `problem_item_of()` |
 | `pipelex/validation_error_types.py` | The closed `error_type` registry — `VALIDATION_ERROR_TYPES`, `PipeValidationErrorType`, `PipeFactoryErrorType`, `ValidationResidualErrorType`, `HintLintErrorType` |
@@ -711,6 +722,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | A pipe raises a non-Pipelex exception | Located as a `PipelexUnexpectedError` whose message names the original class; `runtime.unexpected`, its message the operator's alone |
 | Failure on a distributed worker | The problem recovered from the transport's serialized details — the same as local |
 | Worker exception with no packed problem | A fallback problem — `runtime.unexpected` |
+| A `PipeFunc`'s function raises inside a sandbox | The sandbox writes the operator's view of `pipe.function_raised` to its result file and exits non-zero; its executor reads it back and the step reports `pipe.function_raised`. A sandbox failing any other way writes no report and keeps a code of its own |
 
 ---
 
