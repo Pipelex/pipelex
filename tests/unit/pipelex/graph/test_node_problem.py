@@ -4,11 +4,13 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.stuffs.exceptions import StuffFactoryError
 from pipelex.errors.problem import ProblemView
 from pipelex.graph.node_problem import NODE_PROBLEM_FAULT_MESSAGE, make_node_problem
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.located_failure import reported_failure_code
 from pipelex.system.pipe_run_mode import PipeRunMode
 from tests.helpers.recovered_problem import make_recovered_function_raised
 
@@ -81,6 +83,26 @@ class TestNodeProblem:
         run_problem = located.to_problem(view=ProblemView.CALLER)
 
         assert node_problem.to_wire() == run_problem.to_wire()
+
+    def test_an_error_implying_its_code_records_that_code(self) -> None:
+        """An inference error implying its category's code, above a cause that carries none, records the implied code.
+
+        The error carries no code of its own, so a walk below it alone would stop at its cause's fallback,
+        `runtime.unexpected`, while the run reports the code the error implies: the node reads that code too.
+        """
+        cause = PipeRunError(message="the inner step failed", run_mode=PipeRunMode.LIVE, pipe_code="inner")
+        error = LLMCompletionError(message="the completion failed", error_category=InferenceErrorCategory.TRANSIENT)
+        error.fill_model_and_provider("gpt-4o-mini", backend_name="openai")
+        error.__cause__ = cause
+
+        problem = make_node_problem(error=error, pipe_code="summarize", pipe_path=["flow", "summarize"])
+
+        assert error.own_error_code is None
+        assert error.implied_error_code == CoreCode.PROVIDER_UNAVAILABLE
+        assert reported_failure_code(failure=error) == CoreCode.PROVIDER_UNAVAILABLE
+        assert problem.code == CoreCode.PROVIDER_UNAVAILABLE
+        assert problem.location is not None
+        assert problem.location.as_wire() == {"pipe": "summarize", "path": ["flow", "summarize"]}
 
     def test_a_foreign_exception_is_a_fault_of_ours(self) -> None:
         problem = make_node_problem(error=RuntimeError("The worker was lost"), pipe_code="flow", pipe_path=["flow"])
