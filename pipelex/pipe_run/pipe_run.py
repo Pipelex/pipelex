@@ -15,7 +15,7 @@ from pipelex.interpreter_hub import get_concept_library, get_own_pipes
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import DeliveryError
-from pipelex.pipe_run.located_failure import find_root_fault, make_unexpected_failure
+from pipelex.pipe_run.located_failure import make_unexpected_failure, reported_failure_code
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
@@ -54,11 +54,7 @@ def _failure_code(*, error: Exception) -> str:
     """
     if not isinstance(error, PipelexError):
         return CoreCode.RUNTIME_UNEXPECTED
-    root_fault = find_root_fault(error=error)
-    recovered = root_fault.recovered_problem() if root_fault is not None else None
-    if recovered is not None:
-        return recovered.code
-    return str(error.resolve_error_code())
+    return reported_failure_code(failure=error)
 
 
 WEBHOOK_PROBLEM_FAULT_MESSAGE = "The problem of a failed run could not be built for its webhooks"
