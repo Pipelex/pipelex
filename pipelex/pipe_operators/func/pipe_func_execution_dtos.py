@@ -72,3 +72,19 @@ class PipeFuncExecutionResponse(BaseModel):
     output_memory_raw: dict[str, Any]
     function_module: str | None = None
     function_qualname: str | None = None
+
+
+class PipeFuncRaisedReport(BaseModel):
+    """What a transported call writes to its result file, in place of a response, when the function it calls raised.
+
+    The out-of-process twin of ``PipeFuncRaisedError``: the sandbox entrypoint writes it before it exits non-zero, so the
+    executor that dispatched the call tells the function's own failure, ``pipe.function_raised``, from a failure of the
+    sandbox itself (a timeout inside it, a boot that failed), which exits non-zero and writes nothing. ``problem`` is the
+    operator's view of that error's problem as ``PipelexProblem.to_wire()`` writes it: its message names the class of
+    what the function raised and never its text, which can quote the run's inputs. The file is written where the
+    function ran, so its reader trusts nothing but its shape (``read_pipe_func_raised_report``).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    problem: dict[str, Any]
