@@ -1,10 +1,11 @@
 """A sandbox-hosted deployment refuses a method whose requirements.txt its PipeFunc sandbox does not meet, naming the packages.
 
 The package set is what the plugin providing the execution mode states; here a stub registered for the neutral
-`sandbox` mode. A run is refused on the runner before the method's files load, before any dispatch, and a validation by
-address is refused on the runner as an invalid verdict, before the validator is reached, since a dispatched validator
-never reads the method's Python. A method of the runner's own library directories whose requirements are not met is
-the deployment's fault, never the caller's.
+`sandbox` mode. A run is refused on the runner before the method's files load, before any dispatch, as a 422
+`method.invalid` whose items locate each refused line of `requirements.txt`, the problem a local load of the same method
+raises, and a validation is refused on the runner as the invalid verdict carrying the same items, before the validator is
+reached, since a dispatched validator never reads the method's Python. A method of the runner's own library directories
+whose requirements are not met is the deployment's fault, never the caller's.
 """
 
 import asyncio
@@ -47,6 +48,9 @@ _SANDBOX_ENVIRONMENT = "the Daytona sandbox snapshot 'pipelex-base-test'"
 _ABSENT_PACKAGE = "pipelex-requirements-test-absent"
 _UNRESOLVABLE_REQUIREMENT = "pandas<2"
 _REFUSAL_REASON = "uv explains: Because pandas<2 conflicts with the base snapshot's pandas==2.2.3, the requirements are unsatisfiable."
+# The conformance fixture's requirements.txt: a comment, then a requirement the sandbox holds at a version it refuses.
+_UNMET_REQUIREMENTS_TEXT = "# The function imports pipelex alone\npydantic>=9999\n"
+_REQUIREMENTS_FILE = "requirements.txt"
 
 _PLAIN_MTHDS = """\
 domain = "plain_demo"
@@ -131,7 +135,7 @@ def _stated_offer(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer 
         return PipeFuncPackageRefusal(environment="the Daytona sandbox", reason=_REFUSAL_REASON)
     return PipeFuncPackageOffer(
         environment=_SANDBOX_ENVIRONMENT,
-        distributions={"pandas": "2.2.3", "openpyxl": "3.1.5"},
+        distributions={"pandas": "2.2.3", "openpyxl": "3.1.5", "pydantic": "2.12.3"},
         marker_environment={"python_version": "3.12", "sys_platform": "linux"},
     )
 
@@ -169,24 +173,76 @@ def _build_client(
 
 class TestMethodRequirementsRefusal:
     @pytest.mark.usefixtures("sandbox_hosted_mode")
-    def test_a_run_whose_requirements_the_sandbox_does_not_meet_is_refused_before_dispatch(self, mocker: MockerFixture) -> None:
+    @pytest.mark.parametrize("route", ["/v1/execute", "/v1/start"])
+    def test_a_run_whose_requirement_the_sandbox_does_not_meet_is_an_invalid_method_located_on_the_line(
+        self, mocker: MockerFixture, route: str
+    ) -> None:
+        """The conformance case's refusal: a 422 `method.invalid` whose one item locates the requirement, as the caller reads it."""
         orchestrator = _RecordingOrchestrator()
-        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator())
 
-        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": "pandas>=2\npandas>=3\npolars\n"}
-        response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, _REQUIREMENTS_FILE: _UNMET_REQUIREMENTS_TEXT}
+        response = client.post(route, json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code == 422, response.text
         assert response.headers["content-type"].startswith("application/problem+json")
         body = response.json()
-        assert body["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert body["type"] == "https://mthds.ai/errors/method.invalid"
+        assert body["code"] == CoreCode.METHOD_INVALID
         assert body["domain"] == "method"
-        assert body["diagnostics"]["error_class"] == "MethodRequirementsNotMetError"
-        # The refusal names each package and the sandbox, and no directory of the runner.
-        message = body["diagnostics"]["message"]
-        assert "line 2 'pandas>=3' (pandas 2.2.3 is there); line 3 'polars' (polars is missing)" in message
-        assert message.startswith(f"The method needs Python packages that {_SANDBOX_ENVIRONMENT} does not have")
-        assert "rooted at" not in message
+        assert body["status"] == 422
+        assert body["next_step"]["kind"] == "change_method"
+        # The refusal of the method is an item, not the problem: the problem itself names no parameter and no location.
+        assert "params" not in body
+        assert "location" not in body
+        assert body["errors"] == [
+            {
+                "code": CoreCode.METHOD_DEPENDENCY_MISSING,
+                "detail": "The method depends on the requirement 'pydantic', which is not available here (reason: no_matching_version).",
+                "params": {
+                    "kind": MethodDependencyMissingKind.REQUIREMENT,
+                    "name": "pydantic",
+                    "reason": MethodDependencyMissingReason.NO_MATCHING_VERSION,
+                },
+                "location": {"file": _REQUIREMENTS_FILE, "line": 2},
+            }
+        ]
+        # The caller's view: the operator's message, which names the sandbox, stays out of it.
+        assert "diagnostics" not in body
+        assert orchestrator.dispatches == []
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    def test_a_run_whose_requirements_the_sandbox_does_not_meet_is_refused_before_dispatch(self, mocker: MockerFixture) -> None:
+        orchestrator = _RecordingOrchestrator()
+        client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
+
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, _REQUIREMENTS_FILE: "pandas>=2\npandas>=3\npolars\n"}
+        response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
+
+        assert response.status_code == 422, response.text
+        body = response.json()
+        assert body["code"] == CoreCode.METHOD_INVALID
+        # One item per requirement not met, each on its line, naming the distribution that fails it and why.
+        assert [(item["code"], item["params"], item["location"]) for item in body["errors"]] == [
+            (
+                CoreCode.METHOD_DEPENDENCY_MISSING,
+                {"kind": "requirement", "name": "pandas", "reason": "no_matching_version"},
+                {"file": _REQUIREMENTS_FILE, "line": 2},
+            ),
+            (
+                CoreCode.METHOD_DEPENDENCY_MISSING,
+                {"kind": "requirement", "name": "polars", "reason": "not_found"},
+                {"file": _REQUIREMENTS_FILE, "line": 3},
+            ),
+        ]
+        # The operator reads which requirement the sandbox refuses and why, and no directory of the runner.
+        diagnostics = body["diagnostics"]
+        assert diagnostics["error_class"] == "ValidateBundleError"
+        assert diagnostics["causes"] == [{"error_class": "MethodRequirementsNotMetError", "code": CoreCode.METHOD_DEPENDENCY_MISSING}]
+        assert diagnostics["message"] == (
+            f"2 validation errors (first: The requirement 'pandas>=3' is not met by {_SANDBOX_ENVIRONMENT}: pandas 2.2.3 is there.)"
+        )
+        assert "rooted at" not in response.text
         assert orchestrator.dispatches == []
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
@@ -194,18 +250,19 @@ class TestMethodRequirementsRefusal:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
-        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": f"{_UNRESOLVABLE_REQUIREMENT}\n"}
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, _REQUIREMENTS_FILE: f"{_UNRESOLVABLE_REQUIREMENT}\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
-        assert body["diagnostics"]["error_class"] == "MethodRequirementsNotMetError"
-        # The deployment's own reason, and no directory of the runner.
-        assert (
-            body["diagnostics"]["message"]
-            == f"The method needs Python packages that the Daytona sandbox cannot offer, as its requirements.txt declares: {_REFUSAL_REASON}"
-        )
+        assert body["code"] == CoreCode.METHOD_INVALID
+        # The deployment's reason is about the requirements together, so its one item is on the file and no line.
+        (item,) = body["errors"]
+        assert item["code"] == CoreCode.METHOD_DEPENDENCY_MISSING
+        assert item["params"] == {"kind": "requirement", "name": "pandas", "reason": "no_matching_version"}
+        assert item["location"] == {"file": _REQUIREMENTS_FILE}
+        # The deployment's own reason reaches the operator, with no directory of the runner.
+        assert body["diagnostics"]["message"] == f"The requirements are refused by the Daytona sandbox: {_REFUSAL_REASON}"
         assert orchestrator.dispatches == []
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
@@ -224,15 +281,48 @@ class TestMethodRequirementsRefusal:
         orchestrator = _RecordingOrchestrator()
         client = _build_client(mocker, orchestrator=orchestrator, validator=_UnreachableValidator(), as_operator=True)
 
-        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, "requirements.txt": "-r base.txt\n"}
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, _REQUIREMENTS_FILE: "-r base.txt\n"}
         response = client.post("/v1/start", json={"files": files, "inputs": {"data": "1,2,3"}})
 
         assert response.status_code == 422, response.text
         body = response.json()
-        assert body["code"] == CoreCode.METHOD_PACKAGE_INVALID
-        assert body["diagnostics"]["error_class"] == "MethodRequirementsFileError"
+        assert body["code"] == CoreCode.METHOD_INVALID
+        assert body["errors"] == [
+            {
+                "code": CoreCode.METHOD_PACKAGE_INVALID,
+                "detail": "The method's package breaks a package rule (reason: requirements_invalid).",
+                "params": {"reason": "requirements_invalid", "path": _REQUIREMENTS_FILE},
+                "location": {"file": _REQUIREMENTS_FILE, "line": 1},
+            }
+        ]
+        assert body["diagnostics"]["causes"] == [{"error_class": "MethodRequirementsFileError", "code": CoreCode.METHOD_PACKAGE_INVALID}]
         assert "line 1 '-r base.txt'" in body["diagnostics"]["message"]
         assert orchestrator.dispatches == []
+
+    @pytest.mark.usefixtures("sandbox_hosted_mode")
+    @pytest.mark.parametrize(
+        "requirements_text",
+        [
+            pytest.param(_UNMET_REQUIREMENTS_TEXT, id="requirement-not-met"),
+            pytest.param("-r base.txt\n", id="line-the-standard-refuses"),
+            pytest.param(f"{_UNRESOLVABLE_REQUIREMENT}\n", id="refused-by-the-deployment"),
+        ],
+    )
+    def test_a_run_is_refused_with_the_items_of_the_validation_verdict(self, mocker: MockerFixture, requirements_text: str) -> None:
+        """The run's refusal and the verdict on the same tree are the one translation of the requirements check: same items."""
+        validator = _UnreachableValidator()
+        client = _build_client(mocker, orchestrator=_RecordingOrchestrator(), validator=validator)
+        files = {"main.mthds": _PIPE_FUNC_MTHDS, "funcs/pipe_func.py": _PIPE_FUNC_PY, _REQUIREMENTS_FILE: requirements_text}
+
+        run_response = client.post("/v1/execute", json={"files": files, "inputs": {"data": "1,2,3"}})
+        validate_response = client.post("/v1/validate", json={"files": files})
+
+        assert run_response.status_code == 422, run_response.text
+        assert validate_response.status_code == 200, validate_response.text
+        verdict = validate_response.json()
+        assert verdict["is_valid"] is False
+        assert run_response.json()["errors"] == verdict["errors"]
+        assert validator.calls == 0
 
     @pytest.mark.usefixtures("sandbox_hosted_mode")
     def test_a_validation_by_address_is_an_invalid_verdict_located_on_the_requirement(
