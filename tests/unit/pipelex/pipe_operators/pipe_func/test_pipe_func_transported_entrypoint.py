@@ -14,7 +14,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.method_trees.tree_files import write_call_files
-from pipelex.errors.problem import MAX_PROBLEM_TEXT_LENGTH, ProblemDiagnostics, ProblemView, make_problem
+from pipelex.errors.problem import MAX_PROBLEM_TEXT_LENGTH, ProblemDiagnostics, ProblemView, make_problem, problem_metadata
 from pipelex.interpreter_hub import get_library_manager, scoped_current_library
 from pipelex.libraries.pipe_func_call_files import read_pipe_func_call_files
 from pipelex.pipe_operators.func import pipe_func_transported_entrypoint
@@ -22,6 +22,7 @@ from pipelex.pipe_operators.func.direct_pipe_func_executor import TRANSPORTED_LI
 from pipelex.pipe_operators.func.exceptions import PipeFuncRaisedError
 from pipelex.pipe_operators.func.pipe_func_execution_dtos import PipeFuncExecutionRequest, PipeFuncExecutionResponse, PipeFuncRaisedReport
 from pipelex.pipe_operators.func.pipe_func_execution_transport import (
+    MAX_REPORTED_CAUSES,
     build_pipe_func_execution_request,
     pipe_func_raised_report,
     read_pipe_func_raised_report,
@@ -214,3 +215,50 @@ class TestPipeFuncTransportedEntrypoint:
         assert forged_wire == genuine_wire
         assert set(forged_diagnostics) == {"error_class", "message", "causes", "runtime_version"}
         assert len(forged_diagnostics["message"]) == MAX_PROBLEM_TEXT_LENGTH
+
+    def test_every_diagnostics_text_of_a_report_is_capped_and_its_causes_bounded(self) -> None:
+        """The function can write any text and any number of causes into the file, and none of it travels whole."""
+        genuine = _genuine_report_problem()
+        oversized = "x" * (MAX_PROBLEM_TEXT_LENGTH * 2)
+        forged_causes = [{"error_class": oversized, "code": oversized}] + [{"error_class": "KeyError"}] * (MAX_REPORTED_CAUSES * 2)
+        forged = {
+            **genuine,
+            "diagnostics": {**genuine["diagnostics"], "error_class": oversized, "causes": forged_causes, "runtime_version": oversized},
+        }
+
+        problem = read_pipe_func_raised_report(result_json=PipeFuncRaisedReport(problem=forged).model_dump_json())
+
+        assert problem is not None
+        assert problem.diagnostics is not None
+        assert len(problem.diagnostics.error_class) == MAX_PROBLEM_TEXT_LENGTH
+        causes = problem.diagnostics.causes or []
+        assert len(causes) == MAX_REPORTED_CAUSES
+        assert len(causes[0].error_class) == MAX_PROBLEM_TEXT_LENGTH
+        assert causes[0].code is not None
+        assert len(causes[0].code) == MAX_PROBLEM_TEXT_LENGTH
+        assert [cause.error_class for cause in causes[1:]] == ["KeyError"] * (MAX_REPORTED_CAUSES - 1)
+        assert problem.diagnostics.runtime_version is None
+
+    @pytest.mark.parametrize(
+        ("written", "kept"),
+        [
+            ("0.90.0", "0.90.0"),
+            ("1.2.0rc1", "1.2.0rc1"),
+            ("v1.2.0-RC1", "1.2.0rc1"),
+            ("1.2.0+confidential.patient.diagnosis", None),
+            ("cannot file the note 'confidential-patient-diagnosis'", None),
+            ("1." + ".".join(["0"] * MAX_PROBLEM_TEXT_LENGTH), None),
+        ],
+        ids=["release", "pre_release", "normalized", "local_label", "sentence", "past_the_cap"],
+    )
+    def test_a_report_keeps_a_runtime_version_only_when_it_is_a_public_version_number(self, written: str, kept: str | None) -> None:
+        """The version reaches the metadata view, which holds nothing a user wrote, so only a version number is kept."""
+        genuine = _genuine_report_problem()
+        forged = {**genuine, "diagnostics": {**genuine["diagnostics"], "runtime_version": written}}
+
+        problem = read_pipe_func_raised_report(result_json=PipeFuncRaisedReport(problem=forged).model_dump_json())
+
+        assert problem is not None
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.runtime_version == kept
+        assert problem_metadata(problem=problem).runtime_version == kept

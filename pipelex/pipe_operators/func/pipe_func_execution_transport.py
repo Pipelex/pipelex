@@ -1,4 +1,5 @@
 from mthds.protocol.problem.registry import CoreCode
+from packaging.version import InvalidVersion, Version
 from pydantic import ValidationError
 
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -20,6 +21,15 @@ from pipelex.system.job_metadata import JobMetadata
 # ``pipe_func_execution_dtos`` module so the executor protocol can reference them without a hub cycle;
 # they are re-exported here (and genuinely used by the builders below), so existing
 # ``from ...pipe_func_execution_transport import PipeFuncExecutionRequest`` imports keep working.
+
+MAX_REPORTED_CAUSES = 10
+"""The most causes the diagnostics of a function's report keep: the first ones, nearest the error the function raised.
+
+A report's causes are the cause chain of what the function raised, which Python built and which is a handful of errors
+deep in practice, but the report is a file the function can write itself, with any number of causes in it, and none of
+them may travel whole into a stored run report. The first cause is the class of what the function raised, which the
+problem's message names too.
+"""
 
 
 def build_pipe_func_execution_request(
@@ -103,7 +113,9 @@ def read_pipe_func_raised_report(*, result_json: str | bytes) -> PipelexProblem 
     The file was written where the function ran, and the function can write it too, so only what `pipe.function_raised`
     lets it say is kept: a report of another code is no report, the sentences, the domain, the verdict and the step
     are rendered again from the registry with the parameters the code declares, and the diagnostics keep the class of
-    the error, its message, capped, the classes and codes of its causes and the runtime's version.
+    the error, its message, the classes and codes of its first :data:`MAX_REPORTED_CAUSES` causes, every one of these
+    texts capped at :data:`~pipelex.errors.problem.MAX_PROBLEM_TEXT_LENGTH` characters, and the runtime's version when
+    it is a public version number (:func:`_reported_runtime_version`).
 
     Args:
         result_json: The content of the result file.
@@ -120,12 +132,15 @@ def read_pipe_func_raised_report(*, result_json: str | bytes) -> PipelexProblem 
         return None
     diagnostics: ProblemDiagnostics | None = None
     if written.diagnostics is not None:
-        causes = [DiagnosticCause(error_class=cause.error_class, code=cause.code) for cause in written.diagnostics.causes or []]
+        causes: list[DiagnosticCause] = []
+        for cause in (written.diagnostics.causes or [])[:MAX_REPORTED_CAUSES]:
+            code = cap_problem_text(text=cause.code) if cause.code is not None else None
+            causes.append(DiagnosticCause(error_class=cap_problem_text(text=cause.error_class), code=code))
         diagnostics = ProblemDiagnostics(
-            error_class=written.diagnostics.error_class,
+            error_class=cap_problem_text(text=written.diagnostics.error_class),
             message=cap_problem_text(text=written.diagnostics.message),
             causes=causes or None,
-            runtime_version=written.diagnostics.runtime_version,
+            runtime_version=_reported_runtime_version(written=written.diagnostics.runtime_version),
         )
     return make_problem(
         code=CoreCode.PIPE_FUNCTION_RAISED,
@@ -133,3 +148,22 @@ def read_pipe_func_raised_report(*, result_json: str | bytes) -> PipelexProblem 
         params=written.params.as_wire() if written.params is not None else None,
         diagnostics=diagnostics,
     )
+
+
+def _reported_runtime_version(*, written: str | None) -> str | None:
+    """The runtime version a function's report names, kept only when it is a public version number; `None` otherwise.
+
+    The version rides the metadata view of the problem too (`problem_metadata`), which holds no sentence and no name a
+    user wrote, while a report is a file the function can write itself. A version number, normalized and with no local
+    label, is digits and a release marker at most, so it says nothing else; a text that is no such number, or that the
+    cap at `MAX_PROBLEM_TEXT_LENGTH` characters cuts, is dropped rather than kept.
+    """
+    if written is None:
+        return None
+    try:
+        version = Version(cap_problem_text(text=written))
+    except InvalidVersion:
+        return None
+    if version.local is not None:
+        return None
+    return str(version)
