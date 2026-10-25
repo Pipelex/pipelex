@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The API server refuses a method's unmet requirements as an invalid method (Breaking)**: `/v1/execute` and `/v1/start` refuse a method whose `requirements.txt` the PipeFunc sandbox does not meet, or holds a line the standard refuses, with a `422` `method.invalid` whose `errors` hold one `method.dependency_missing` or `method.package_invalid` item per refused line, located at `requirements.txt` and the line, the problem a local run of the method raises and the items `/v1/validate` gives, where they answered a bare `method.dependency_missing` or `method.package_invalid` with no item and no location; a client reads the refused requirement from the item's `params` and `location`.
+
 ### Fixed
 
 - **A failed step's trace records the failure's own code**: a failed node of the execution graph, and the `pipe_end_error` trace event, now carry the problem the run fails with when the step's error wraps a carrier of a problem recovered across a transport boundary, such as `pipe.function_raised` for a `PipeFunc` whose function raised in a sandbox, located at the step, where they carried the carrier's catch-all `runtime.unexpected`. The step's own message names that recovered code too, `Error: <carrier class> (pipe.function_raised)`, and `reported_failure_code` (`pipelex.pipe_run.located_failure`) reads the code a failure reports without building its problem.

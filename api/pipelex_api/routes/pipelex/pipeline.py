@@ -590,9 +590,14 @@ class ApiRunner(PipelexMTHDSProtocol):
         and it is made through `tree_listing`, which the caller hands to the request's load, so the load reads the trees
         checked here without listing them again.
 
+        A refusal of the method is the invalid verdict the load of the same directories gives, through the one translation
+        the run path's load uses (`translate_to_validate_bundle_error`): a `method.invalid` problem whose items each keep
+        their own code, a `method.dependency_missing` or a `method.package_invalid` located at `requirements.txt` and at the
+        line refused. A run answers it as a 422, and a validation as its invalid verdict.
+
         Raises:
-            MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
-            MethodRequirementsNotMetError: The PipeFunc environment does not meet the method's requirements.
+            ValidateBundleError: The method's requirements.txt holds a line the standard refuses, or the PipeFunc
+                environment does not meet the method's requirements, or the deployment refuses them with its own reason.
             HostLibraryTreeError: A directory of the request could not be listed as a method tree.
             PipeFuncPackageSetUnstatedError: The deployment states no package set for its PipeFunc sandbox.
         """
@@ -601,7 +606,9 @@ class ApiRunner(PipelexMTHDSProtocol):
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
         # In the method-load pool, whose cancellation waits for the check to end: the directories it lists are removed
         # when the request's scope exits, which a client disconnect can make happen while the check still hashes them.
-        await run_method_load(ensure_served_method_requirements_met, library_dirs=library_dirs, tree_listing=tree_listing)
+        # The directories are the caller's (`library_dirs_are_callers`), so their refusal is translated as their load's is.
+        with translate_to_validate_bundle_error():
+            await run_method_load(ensure_served_method_requirements_met, library_dirs=library_dirs, tree_listing=tree_listing)
 
     async def validate_verdict(
         self,
@@ -668,11 +675,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         # its PipeFunc steps run with, before any dispatch, so a refusal reaches the caller whichever validator runs. A
         # worker a method tree's validation is dispatched to never reads these directories: it receives the method's
         # trees through its method file store and judges their requirements again as it loads them. A refusal is the
-        # method's invalid verdict, as a run of it is refused before its files load.
+        # method's invalid verdict, the same one a run of it is refused with before its files load.
         tree_listing = MethodTreeListing()
         try:
-            with translate_to_validate_bundle_error():
-                await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
+            await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
         except ValidateBundleError as invalid_method:
             return BundleValidationFailure(
                 problem=invalid_method.to_problem(view=ProblemView.OPERATOR),
