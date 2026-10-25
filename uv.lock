@@ -3747,7 +3747,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=12.1.1" },
-    { name = "pipelex-sdk", specifier = "==0.48.0" },
+    { name = "pipelex-sdk", specifier = "==0.53.0" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3859,7 +3859,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-sdk"
-version = "0.48.0"
+version = "0.53.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3867,9 +3867,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/7d/2e/decbb96df27e6aab6442f19737d986e8416ff0b5b84ff75246afc10e49e8/pipelex_sdk-0.48.0.tar.gz", hash = "sha256:e9cc8921174e67e9f1f70eb3f8ec6bd005b3ffed550b61eed864f2493597c859", size = 695789, upload-time = "2026-10-20T09:19:03.443Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cd/21/83417e62e4a5387561382f922db0e48df2679cefe7135b88b4f728bcd73a/pipelex_sdk-0.53.0.tar.gz", hash = "sha256:2324a6f478965123e2c2920d4eef97bef2f1990534a6e5224524d083020ec8e3", size = 751851, upload-time = "2026-10-25T09:39:52.315Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7f/20/8e5f44348090854b5e207188b3be3480eb4af0e2f89b30c4a6630dad81df/pipelex_sdk-0.48.0-py3-none-any.whl", hash = "sha256:e992714e25f6a5fa91465d0788b51bc4341149deeb95c2963146350939295dcf", size = 273538, upload-time = "2026-10-20T09:19:01.523Z" },
+    { url = "https://files.pythonhosted.org/packages/ec/19/7b1c826c04304b6855e56428f52fbe3f780fdfa0e03c1cdff823cb0c5981/pipelex_sdk-0.53.0-py3-none-any.whl", hash = "sha256:3758edc0b631bc9d995d8cf1f225633069a2046e8ef969bd4bb91d68c6013662", size = 288276, upload-time = "2026-10-25T09:39:50.431Z" },
 ]
 
 [[package]]

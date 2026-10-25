@@ -7,14 +7,15 @@ import httpx
 import pytest
 from mthds.protocol.input_form import PipeInputFormDescriptor
 from mthds.protocol.models import VersionInfo
+from mthds.protocol.problem.registry import RetryVerdict
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.crate_models import CrateInvalidReport, PipeIORequest, PipeIOValidReport
 from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
-    MethodFileTransferCode,
     MethodFileTransferError,
     MethodFileTransferOperation,
+    MethodFileTransferReason,
     MissingMainStuffError,
     RunFailedError,
     RunLifecycleUnavailableError,
@@ -22,9 +23,9 @@ from pipelex_sdk.errors import (
 )
 from pipelex_sdk.runs import PipelexRunResultStart, RunResults, RunStatus
 from pipelex_sdk.upload import UploadRecord
-from pipelex_sdk.validation_models import ValidationErrorItem
 from pydantic import ValidationError
 
+from pipelex.errors.problem import ProblemView
 from pipelex.hosted.exceptions import (
     HostedLocalFileUploadUnavailableError,
     HostedMethodInvalidError,
@@ -72,7 +73,7 @@ def _invalid_report(*, verdict_json: str) -> CrateInvalidReport:
 
 
 def _pipe_io_refusal(*, problem_json: str) -> ApiResponseError:
-    """The error the client raises when `POST /v1/pipe-io` answers this problem document."""
+    """The error the client raises when `POST /v1/pipe-io` answers this problem document, which it reads as the problem."""
     problem: dict[str, Any] = json.loads(problem_json)
     return ApiResponseError(
         f"API POST /v1/pipe-io failed (422): {problem['detail']}",
@@ -80,9 +81,7 @@ def _pipe_io_refusal(*, problem_json: str) -> ApiResponseError:
         status=422,
         status_text="Unprocessable Entity",
         response_body=problem_json,
-        server_message=problem["detail"],
-        code=problem["code"],
-        problem_document=problem,
+        headers={"content-type": "application/problem+json"},
     )
 
 
@@ -216,7 +215,7 @@ class TestHostedRun:
     @pytest.mark.asyncio
     async def test_an_address_dependency_runs_with_inputs_naming_no_local_file(self, mocker: MockerFixture) -> None:
         """pipe-io loads no package nothing shipped; with no file to upload it is not asked, and the run route fetches the dependency."""
-        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS))
+        client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY))
         request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"item": "a widget"})
 
         outcome = await run_hosted(client=client, request=request)
@@ -286,10 +285,9 @@ class TestHostedRun:
         "verdict_json",
         [
             HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY,
-            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_PROBLEM_ITEMS,
-            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_UNREADABLE_PROBLEM_ITEMS,
+            HostedPipeIoVerdicts.UNSHIPPED_ADDRESS_DEPENDENCY_AFTER_AN_UNREADABLE_ITEM,
         ],
-        ids=["validation_errors", "problem_items", "unreadable_problem_items"],
+        ids=["problem_items", "after_an_unreadable_item"],
     )
     async def test_a_local_file_for_a_method_whose_address_dependency_was_not_shipped_is_refused_naming_it(
         self, mocker: MockerFixture, tmp_path: Path, verdict_json: str
@@ -297,8 +295,8 @@ class TestHostedRun:
         """pipe-io loads only the packages shipped with the method, and answers a call into another one with its verdict.
 
         The run route fetches that dependency, so the method is not at fault: the error names the dependency, read from
-        the `method.dependency_missing` item's parameters in either shape of the verdict, from `validation_errors` when no
-        item of `errors` reads, and the URL to use, never the verdict's advice to fix the method.
+        the parameters of the verdict's `method.dependency_missing` item, an item before it that does not read skipped,
+        and the URL to use, never the verdict's advice to fix the method.
         """
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
         client = _mocked_client(mocker, pipe_io_report=_invalid_report(verdict_json=verdict_json))
@@ -319,7 +317,7 @@ class TestHostedRun:
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "verdict_json",
-        [HostedPipeIoVerdicts.ADDRESS_DEPENDENCY_WORDS_ONLY, HostedPipeIoVerdicts.DEPENDENCY_CYCLE_PROBLEM_ITEMS],
+        [HostedPipeIoVerdicts.ADDRESS_DEPENDENCY_WORDS_ONLY, HostedPipeIoVerdicts.DEPENDENCY_CYCLE],
         ids=["words_only", "dependency_cycle"],
     )
     async def test_a_verdict_naming_no_unshipped_dependency_is_the_method_s_fault(
@@ -354,20 +352,23 @@ class TestHostedRun:
         client.start.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_a_method_that_does_not_load_is_refused_before_the_run_with_its_labelled_items(self, mocker: MockerFixture, tmp_path: Path) -> None:
-        """pipe-io's verdict names each faulty file by its tree path, before any run starts."""
+    async def test_a_method_that_does_not_load_is_refused_before_the_run_with_its_items(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """pipe-io's verdict lists its faults as problem items, each naming its file by its tree path, before any run starts."""
         (tmp_path / "invoice.pdf").write_bytes(b"%PDF")
-        item = ValidationErrorItem.model_validate(
-            {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
-        )
-        invalid = CrateInvalidReport(is_valid=False, validation_errors=[item], message="Bundle does not load")
+        invalid = _invalid_report(verdict_json=HostedPipeIoVerdicts.UNKNOWN_MODEL)
         client = _mocked_client(mocker, pipe_io_report=invalid)
         request = HostedRunRequest(contents=BUNDLE_CONTENTS, inputs={"document": "invoice.pdf"}, inputs_base_dir=tmp_path)
 
         with pytest.raises(HostedMethodInvalidError) as exc_info:
             await run_hosted(client=client, request=request)
 
-        assert exc_info.value.validation_errors == [item]
+        assert exc_info.value.errors == invalid.errors
+        assert [item.code for item in exc_info.value.errors] == ["model.unknown"]
+        assert exc_info.value.errors[0].location is not None
+        assert exc_info.value.errors[0].location.file == "lib/b.mthds"
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == "method.invalid"
+        assert problem.errors == invalid.errors
         assert "Bundle does not load" in exc_info.value.message
         client.upload_file.assert_not_awaited()
         client.start.assert_not_awaited()
@@ -377,7 +378,7 @@ class TestHostedRun:
         "follow_error",
         [
             ApiUnreachableError(
-                "Could not reach Pipelex API at https://hosted.test (ConnectError)", api_url="https://hosted.test", code="ConnectError"
+                "Could not reach Pipelex API at https://hosted.test (ConnectError)", api_url="https://hosted.test", network_code="ConnectError"
             ),
             httpx.RemoteProtocolError("server disconnected"),
             json.JSONDecodeError("Expecting value", "<html>Bad gateway</html>", 0),
@@ -508,7 +509,8 @@ class TestHostedRun:
     ) -> None:
         """No byte of the start left this machine, as the SDK reads the failure, so no run exists: checking the network is the right advice."""
         sdk_error = await _sdk_transport_failure(transport_error=transport_error)
-        assert sdk_error.run_may_have_started is False
+        # `client.unreachable` or `client.timeout`, both of which a retry may pass: no run may exist.
+        assert sdk_error.problem.effective_retry == RetryVerdict.YES
         client = _mocked_client(mocker)
         client.start.side_effect = sdk_error
 
@@ -517,7 +519,7 @@ class TestHostedRun:
 
         assert exc_info.value is sdk_error
         assert exc_info.value.api_url == "https://hosted.test"
-        assert exc_info.value.code == expected_code
+        assert exc_info.value.network_code == expected_code
         assert str(exc_info.value).startswith("Could not reach Pipelex API at https://hosted.test")
 
     @pytest.mark.asyncio
@@ -543,7 +545,8 @@ class TestHostedRun:
         request never left.
         """
         sdk_error = await _sdk_transport_failure(transport_error=transport_error)
-        assert sdk_error.run_may_have_started is True
+        assert sdk_error.problem.code == "client.outcome_unknown"
+        assert sdk_error.problem.effective_retry == RetryVerdict.OUTCOME_UNKNOWN
         bare_version = '{"protocol_version":"0.1.0","implementation":"pipelex-api","implementation_version":"0.76.0"}'
         client = _mocked_client(mocker, version=bare_version) if bare_runner else _mocked_client(mocker)
         client.start.side_effect = sdk_error
@@ -565,7 +568,7 @@ class TestHostedRun:
         transfer_error = MethodFileTransferError(
             "Uploading the file with SHA-256 abc to storage failed (503 Service Unavailable), so the run was not started.",
             operation=MethodFileTransferOperation.UPLOAD,
-            code=MethodFileTransferCode.STORAGE_ERROR,
+            reason=MethodFileTransferReason.STORAGE_ERROR,
             sha256="abc",
             status=503,
         )
@@ -593,7 +596,7 @@ class TestHostedRun:
         assert requested == ["GET /v1/version", "POST /v1/start"]
         cause = exc_info.value.__cause__
         assert isinstance(cause, ApiUnreachableError)
-        assert cause.run_may_have_started is True
+        assert cause.problem.code == "client.outcome_unknown"
         assert f"ReadError: {CONNECTION_RESET}" in exc_info.value.message
 
     @pytest.mark.asyncio
@@ -612,7 +615,7 @@ class TestHostedRun:
 
         assert "POST /v1/blobs/missing" in requested
         assert "POST /v1/start" not in requested
-        assert exc_info.value.run_may_have_started is False
+        assert exc_info.value.problem.code == "client.unreachable"
         assert isinstance(exc_info.value.__cause__, httpx.ReadError)
 
     @pytest.mark.parametrize(

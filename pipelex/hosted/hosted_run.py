@@ -21,6 +21,7 @@ from typing import Any, Protocol, Self
 
 import httpx
 from mthds.protocol.exceptions import PipelineRequestError
+from mthds.protocol.problem.registry import RetryVerdict
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.errors import ApiUnreachableError, MissingMainStuffError, RunFailedError, RunLifecycleUnavailableError, RunTimeoutError
 from pipelex_sdk.execute_result import results_from_execute
@@ -134,18 +135,22 @@ async def _start_or_execute(*, client: PipelexAPIClient, request: HostedRunReque
     A start the server refuses for a missing run store created no run, so running the blocking route next cannot run
     the method twice.
 
-    The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and decides whether
-    a run may have started (`run_may_have_started`): only on the start or the execute request itself, and only when the
-    failure does not prove the request never left this machine. A failure it reads as starting nothing stays the SDK's
-    error: the version handshake, the blob requests of a tree sent by hash, or a connection that was never made. Any
-    other one, a connection lost or a read timed out once the run request may have left, is a
-    `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id never arrived.
+    The SDK raises `ApiUnreachableError` for every transport failure, chained from httpx's error, and states whether
+    a run may have started as its problem's retry verdict, `outcome_unknown` (`client.outcome_unknown`): only on the
+    start or the execute request itself, and only when the failure does not prove the request never left this machine.
+    A failure it reads as starting nothing stays the SDK's error: the version handshake, the blob requests of a tree
+    sent by hash, or a connection that was never made. Any other one, a connection lost or a read timed out once the run
+    request may have left, is a `HostedRunOutcomeUnknownError`: the hosted API may have created the run, and its id
+    never arrived.
     """
     try:
         return await _start_or_execute_unmapped(client=client, request=request, inputs=inputs)
     except ApiUnreachableError as exc:
-        if not exc.run_may_have_started:
-            raise
+        match exc.problem.effective_retry:
+            case RetryVerdict.OUTCOME_UNKNOWN:
+                pass
+            case RetryVerdict.YES | RetryVerdict.NO:
+                raise
         transport_error = exc.__cause__
         failure = f"{type(transport_error).__name__}: {transport_error}" if transport_error is not None else str(exc)
         msg = f"The connection to the hosted API at {client.base_url} failed on the run request, which the hosted API may have received ({failure})"
@@ -190,7 +195,7 @@ async def run_hosted(*, client: PipelexAPIClient, request: HostedRunRequest, on_
             address, which the signature read cannot load.
         HostedMethodInvalidError: If the hosted API reads the method's signature and the method does not load.
         ApiResponseError: If the hosted API refuses the request: a key it does not accept, a method it cannot load
-            (its `validation_errors` locate the fault), an input it rejects.
+            (its problem's `errors` locate the faults), an input it rejects.
         RunFailedError: If the run started and ended in a status other than completed.
         RunTimeoutError: If the run outlived the wait; it keeps running, and its id resumes it.
         MissingMainStuffError: If the run completed and delivered no main output.

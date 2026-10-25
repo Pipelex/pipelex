@@ -1,12 +1,13 @@
 from typing import Any, ClassVar
 
+from mthds.protocol.problem.models import ProblemItem
 from mthds.protocol.problem.registry import CoreCode
-from pipelex_sdk.validation_models import ValidationErrorItem
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ABSTRACT_ERROR, ErrorCodeDeclaration, ErrorCodeSet
+from pipelex.errors.unsupported_reasons import LOCAL_FILE_WITH_ADDRESS_DEPENDENCY_UNSUPPORTED_REASON
 
 
 class HostedRunError(PipelexError):
@@ -49,16 +50,21 @@ class HostedRunSourceError(HostedRunError):
 class HostedMethodInvalidError(HostedRunError):
     """The hosted API read the method's signature before the run and found that the method does not load.
 
-    Raised from `POST /v1/pipe-io`'s invalid verdict, before any run starts. Its `validation_errors` are the hosted
-    API's items, each naming the file it found the fault in by its tree path in the tree the run sends.
+    Raised from `POST /v1/pipe-io`'s invalid verdict, before any run starts. Its `errors` are the verdict's problem
+    items, each locating a fault, its file by its tree path in the tree the run sends, and its problem lists them as its
+    own `errors`.
     """
 
     error_code = CoreCode.METHOD_INVALID
-    user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Fix the method as each validation error says, then run it again")
+    user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Fix the method as each of its errors says, then run it again")
 
-    def __init__(self, message: str, *, validation_errors: list[ValidationErrorItem]):
+    def __init__(self, message: str, *, errors: list[ProblemItem]):
         super().__init__(message)
-        self.validation_errors = validation_errors
+        self.errors = errors
+
+    @override
+    def problem_items(self) -> list[ProblemItem] | None:
+        return list(self.errors) or None
 
 
 class HostedRunPollingError(HostedRunError):
@@ -92,9 +98,10 @@ class HostedRunOutcomeUnknownError(HostedRunError):
 
     The hosted API may have created the run before the connection failed, with no way to tell from here: its id never
     arrived. Running the command again could start a second paid run, so the next step is the run history first. The
-    cause is pipelex-sdk's `ApiUnreachableError` for the start or the execute request, which the SDK reads as one that
-    may have started the run (`run_may_have_started`); its own cause is the transport failure, such as a read, a write,
-    a protocol failure or a body that could not be decoded, which does not prove the request never left this machine.
+    cause is pipelex-sdk's `ApiUnreachableError` for the start or the execute request, whose problem the SDK states as
+    `client.outcome_unknown`, a request that may have started the run; its own cause is the transport failure, such as a
+    read, a write, a protocol failure or a body that could not be decoded, which does not prove the request never left
+    this machine.
     """
 
     error_code = CoreCode.CLIENT_OUTCOME_UNKNOWN
@@ -157,3 +164,8 @@ class HostedLocalFileUploadUnavailableError(HostedRunError):
         kind=UserActionKind.CHANGE_INPUT,
         detail="Pass each local file as an https URL the hosted API can fetch, instead of a path on this machine, then run again",
     )
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        # The form refused is a local file in the inputs, for a method whose dependency is named by its address.
+        return {"field": "inputs", "reason": LOCAL_FILE_WITH_ADDRESS_DEPENDENCY_UNSUPPORTED_REASON}

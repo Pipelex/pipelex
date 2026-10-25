@@ -145,6 +145,25 @@ def print_problem_rows(*, console: Console, problem: PipelexProblem, error_messa
     console.print()
 
 
+def print_problem_items(*, console: Console, problem: PipelexProblem) -> None:
+    """Print a problem's faults, its ``errors``, one per line with its code, its sentence and where, then a blank line.
+
+    Nothing is printed for a problem that lists none.
+
+    Args:
+        console: The console to print to.
+        problem: The problem whose faults to print.
+    """
+    if not problem.errors:
+        return
+    console.print("[bold cyan]Errors:[/bold cyan]")
+    for item in problem.errors:
+        where = format_problem_location(location=item.location)
+        located = f" ({where})" if where else ""
+        console.print(f"  - [yellow]{escape(item.code)}[/yellow]: {escape(item.detail + located)}")
+    console.print()
+
+
 def print_failure_problem(*, console: Console, title: str, error: BaseException) -> PipelexProblem:
     """Print a command's own report of a failure it caught at its root, and return the failure's problem.
 

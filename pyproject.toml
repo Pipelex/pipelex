@@ -44,7 +44,7 @@ dependencies = [
   # The client for the hosted Pipelex API, behind hosted runs (pipelex/hosted/). Pinned exactly, like
   # mthds: each pipelex-sdk release pins mthds exactly too, so the release chosen here must pin the
   # same mthds as this file, and the two pins move together (the bump-mthds skill says so).
-  "pipelex-sdk==0.48.0",
+  "pipelex-sdk==0.53.0",
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",

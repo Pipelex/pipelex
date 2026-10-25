@@ -9,14 +9,15 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
-from pipelex_sdk.error_models import RunErrorReport
-from pipelex_sdk.errors import ApiUnreachableError, MissingMainStuffError, RunFailedError, RunTimeoutError
+from mthds.protocol.problem.models import Problem, ProblemItem
+from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError, MissingMainStuffError, RunFailedError, RunTimeoutError, run_failed_problem
+from pipelex_sdk.problem_items import read_problem_items
 from pipelex_sdk.runs import RunResults, RunStatus
-from pipelex_sdk.validation_models import ValidationErrorItem
 from pydantic import ValidationError
 from rich.console import Console
 from typer.testing import CliRunner
@@ -25,11 +26,15 @@ from pipelex.cli._cli import app as pipelex_app
 from pipelex.cli.commands.run.bundle_cmd import run_bundle_cmd
 from pipelex.cli.commands.run.method_cmd import run_method_cmd
 from pipelex.cli.commands.run.pipe_cmd import run_pipe_cmd
+from pipelex.errors.problem import UNKNOWN_CODE_ITEM_DETAIL
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.hosted.error_rendering import HOSTED_MISSING_KEY_NEXT_STEP, describe_hosted_error
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunPollingError
 from pipelex.hosted.hosted_run import HostedRunOutcome, HostedRunRequest
 from pipelex.hosted.run_config import RunExecution
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY
+from tests.unit.pipelex.cli.agent_cli.test_data import PipeIoItems
+from tests.unit.pipelex.hosted.test_data import HostedRefusals
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,8 +49,9 @@ PIPE_CMD_MODULE = "pipelex.cli.commands.run.pipe_cmd"
 EXECUTION_MODULE = "pipelex.hosted.execution"
 ROOT_CLI_MODULE = "pipelex.cli._cli"
 TEXT_STATS_REF = "github.com/Pipelex/methods/text_stats@v0.1.7"
-LABELLED_ITEM = ValidationErrorItem.model_validate(
-    {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"}
+#: The line the failure report gives the item of `HostedRefusals.INVALID_METHOD`: its code, its sentence and where.
+INVALID_METHOD_ITEM_LINE = (
+    "- model.unknown: The method names the llm model 'gpt-5.1', which no catalog knows. (pipe 'draft_pitch', field 'model', file 'bundle.mthds')"
 )
 
 BUNDLE = """domain = "probe"
@@ -79,6 +85,24 @@ def _results_body_drift() -> ValidationError:
         return drift
     msg = "the drifted body validated"
     raise AssertionError(msg)
+
+
+def _refused_start(*, status: int, body: str, headers: dict[str, str] | None = None) -> ApiResponseError:
+    """The error pipelex-sdk raises when the hosted API answers `POST /v1/start` with this status, body and headers."""
+    return ApiResponseError(
+        f"API POST /v1/start failed ({status})",
+        api_url="https://api.pipelex.com",
+        status=status,
+        status_text="Refused",
+        response_body=body,
+        headers={"content-type": "application/json", **(headers or {})},
+        may_start_run=True,
+    )
+
+
+def _row(*, label: str, value: str) -> str:
+    """The pattern of a row of the failure report: its label, padded to the rows' common width, then its value."""
+    return rf"{re.escape(label)}:\s+{re.escape(value)}"
 
 
 def _hosted_request(*, run_hosted: AsyncMock) -> HostedRunRequest:
@@ -246,7 +270,7 @@ class TestRunHostedCli:
             run_bundle_cmd(path=str(bundle_dir), hosted=True)
 
         assert exc_info.value.exit_code == 1
-        print_failure.assert_called_once_with(error=unreachable)
+        print_failure.assert_called_once_with(error=unreachable, credential_sent=True)
 
     def test_a_bundle_file_without_a_library_sends_pipelexpath(
         self, monkeypatch: pytest.MonkeyPatch, run_hosted: AsyncMock, bundle_dir: Path, tmp_path: Path
@@ -316,36 +340,73 @@ class TestRunHostedCli:
         ("error", "expected_lines"),
         [
             (
-                RunFailedError(
-                    "Run finished with status FAILED: bundle invalid",
-                    run_id="run_9",
-                    status=RunStatus.FAILED,
-                    error=RunErrorReport.model_validate(
-                        {
-                            "error_type": "ValidateBundleError",
-                            "message": "bundle invalid",
-                            "validation_errors": [LABELLED_ITEM.model_dump(mode="json")],
-                        }
-                    ),
-                ),
-                ["lib/b.mthds: unknown concept Foo", "Run id: run_9"],
+                _refused_start(status=422, body=HostedRefusals.INVALID_METHOD),
+                [
+                    _row(label="Problem", value="The method does not validate"),
+                    _row(label="Next step", value=HostedRefusals.INVALID_METHOD_NEXT_STEP),
+                    _row(label="Code", value="method.invalid (domain method, retry no)"),
+                    _row(label="Request id", value="01M55PINVALIDMETHOD000000"),
+                    re.escape(INVALID_METHOD_ITEM_LINE),
+                ],
             ),
             (
-                HostedMethodInvalidError("The hosted API cannot load the method: Bundle does not load", validation_errors=[LABELLED_ITEM]),
-                ["lib/b.mthds: unknown concept Foo"],
+                _refused_start(status=429, body=HostedRefusals.RATE_LIMITED, headers={"retry-after": "30"}),
+                [
+                    _row(label="Detail", value="Too many runs started in the last minute."),
+                    _row(label="Code", value="account.rate_limited (domain account, retry yes, after 30 seconds)"),
+                ],
+            ),
+            (
+                _refused_start(status=401, body=HostedRefusals.BARE_UNAUTHORIZED),
+                [_row(label="Code", value="auth.invalid_credential (domain account, retry no)"), re.escape(PIPELEX_API_KEY_ENV_KEY)],
+            ),
+            (
+                RunFailedError(
+                    "Run finished with status FAILED: The method does not validate.",
+                    run_id="run_9",
+                    status=RunStatus.FAILED,
+                    problem=run_failed_problem(
+                        run_id="run_9", status=RunStatus.FAILED, run_error=Problem.model_validate_json(HostedRefusals.INVALID_METHOD)
+                    ),
+                ),
+                [
+                    _row(label="Code", value="run.failed (domain runtime, retry no)"),
+                    _row(label="Run", value="run_9"),
+                    re.escape("The run's own problem"),
+                    _row(label="Code", value="method.invalid (domain method, retry no)"),
+                    re.escape(INVALID_METHOD_ITEM_LINE),
+                ],
+            ),
+            (
+                HostedMethodInvalidError(
+                    "The hosted API cannot load the method: Bundle does not load",
+                    errors=[ProblemItem.model_validate(item) for item in HostedRefusals.INVALID_METHOD_ITEMS],
+                ),
+                [
+                    re.escape("The hosted API cannot load the method: Bundle does not load"),
+                    _row(label="Code", value="method.invalid (domain method, retry no)"),
+                    re.escape(INVALID_METHOD_ITEM_LINE),
+                    re.escape("Tip: Fix the method as each of its errors says, then run it again"),
+                ],
             ),
             (
                 HostedRunPollingError("The run run_7 started on the hosted API, but following it failed", pipeline_run_id="run_7"),
-                ["Run id: run_7", "may still be running"],
+                [_row(label="Run", value="run_7"), re.escape("may still be running")],
             ),
-            (RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0), ["Run id: run_7"]),
-            (MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"), ["Run id: run_7"]),
+            (
+                RunTimeoutError("Run 'run_7' did not finish within 1200s", run_id="run_7", timeout_seconds=1200.0),
+                [_row(label="Run", value="run_7"), _row(label="Code", value="client.follow_failed (domain runtime, retry outcome_unknown)")],
+            ),
+            (MissingMainStuffError("Completed run 'run_7' returned no main stuff", run_id="run_7"), [_row(label="Run", value="run_7")]),
         ],
+        ids=["method_invalid", "rate_limited", "bare_unauthorized", "run_failed", "pipe_io_invalid", "polling", "timeout", "no_main_stuff"],
     )
-    def test_a_hosted_failure_prints_its_items_and_its_run(
+    def test_a_hosted_failure_prints_its_problem_its_items_and_its_run(
         self, mocker: MockerFixture, bundle_dir: Path, error: Exception, expected_lines: list[str]
     ) -> None:
-        """The failure's report goes to stderr, the run's output stream holding none of it."""
+        """The report is the problem the agent CLI reports, its code with its domain and retry verdict, its next step, its
+        request, its run and its items, and the failed run's own problem; it goes to stderr, the run's output stream holding none of it.
+        """
         output = io.StringIO()
         failure_output = io.StringIO()
         mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=output, width=250))
@@ -357,8 +418,48 @@ class TestRunHostedCli:
 
         printed = failure_output.getvalue()
         for expected_line in expected_lines:
-            assert expected_line in printed
-            assert expected_line not in output.getvalue()
+            assert re.search(expected_line, printed), expected_line
+            assert not re.search(expected_line, output.getvalue())
+
+    def test_an_item_of_a_code_newer_than_this_client_keeps_the_runner_s_sentence(self, mocker: MockerFixture, bundle_dir: Path) -> None:
+        """An item of pipe-io's verdict under a code this client's registry does not hold is printed as the runner wrote
+        it, never as the generic sentence, and the problem both CLIs share keeps its parameters.
+        """
+        refused = HostedMethodInvalidError(
+            "The hosted API cannot load the method: Bundle does not load", errors=read_problem_items([PipeIoItems.NEWER_CODE])
+        )
+        failure_output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=io.StringIO(), width=250))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_error_console", return_value=Console(file=failure_output, width=1000))
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refused))
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_dir), hosted=True)
+
+        printed = failure_output.getvalue()
+        assert f"- method.construct_unsupported_here: {PipeIoItems.NEWER_CODE['detail']} (pipe 'summarize', file 'main.mthds')" in printed
+        assert UNKNOWN_CODE_ITEM_DETAIL not in printed
+        shared = describe_hosted_error(error=refused, credential_sent=True).problem
+        assert [item.as_wire() for item in shared.errors or []] == [PipeIoItems.NEWER_CODE]
+
+    def test_a_refused_request_that_carried_no_key_is_a_missing_credential(
+        self, mocker: MockerFixture, bundle_dir: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """With no key sent, the edge's bare refusal is a missing credential, and the next step says how to get a key."""
+        monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "")
+        failure_output = io.StringIO()
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_console", return_value=Console(file=io.StringIO(), width=250))
+        # Wide enough for the next step's whole line.
+        mocker.patch(f"{RUN_HOSTED_MODULE}.get_error_console", return_value=Console(file=failure_output, width=1000))
+        refusal = _refused_start(status=403, body=HostedRefusals.BARE_FORBIDDEN)
+        mocker.patch(f"{RUN_HOSTED_MODULE}.run_hosted", new=mocker.AsyncMock(side_effect=refusal))
+
+        with pytest.raises(typer.Exit):
+            run_bundle_cmd(path=str(bundle_dir), hosted=True)
+
+        printed = failure_output.getvalue()
+        assert re.search(_row(label="Code", value="auth.missing_credential (domain account, retry no)"), printed)
+        assert re.search(_row(label="Next step", value=HOSTED_MISSING_KEY_NEXT_STEP), printed)
 
     def test_an_acknowledged_start_is_announced_with_its_run_id(self, mocker: MockerFixture, bundle_dir: Path, tmp_path: Path) -> None:
         output = io.StringIO()
@@ -397,7 +498,7 @@ class TestRunHostedCli:
         assert exc_info.value.exit_code == 130
         assert "Run run_77 started on the hosted API" in output.getvalue()
         printed = failure_output.getvalue()
-        assert "Run id: run_77" in printed
+        assert re.search(_row(label="Run", value="run_77"), printed)
         assert "keeps going on the hosted API" in printed
         assert "Traceback" not in printed
 
@@ -413,7 +514,7 @@ class TestRunHostedCli:
         assert exc_info.value.exit_code == 130
         printed = failure_output.getvalue()
         assert "run history" in printed
-        assert "Run id:" not in printed
+        assert not re.search(r"Run:\s", printed)
 
     def test_a_hosted_run_prints_no_deck_notice_and_a_local_run_does(self, mocker: MockerFixture, run_hosted: AsyncMock, tmp_path: Path) -> None:
         """The deck notice is about this machine's inference, which a hosted run never boots."""
