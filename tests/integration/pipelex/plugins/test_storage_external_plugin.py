@@ -43,7 +43,7 @@ class _FakeExternalStorageProvider(StorageProviderAbstract):
         raise NotImplementedError
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         raise NotImplementedError
 
     @override

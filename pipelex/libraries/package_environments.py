@@ -19,17 +19,24 @@ import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from importlib.metadata import PackageNotFoundError, distribution
-from typing import Protocol
+from typing import NamedTuple, Protocol
 
 from packaging.markers import default_environment
 from packaging.utils import canonicalize_name
 from typing_extensions import override
 
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.config import get_config, get_pipe_func_execution_mode, is_pipe_func_sandbox_hosted
 from pipelex.core.method_trees.requirements_file import RequirementLine
 from pipelex.interpreter_hub import get_pipe_func_package_offer_registry
 from pipelex.libraries.exceptions import PipeFuncPackageSetUnstatedError
-from pipelex.plugins.pipe_func_package_offer_registry import PipeFuncPackageOffer, PipeFuncPackageOfferRequest, PipeFuncPackageRefusal
+from pipelex.plugins.pipe_func_package_offer_registry import (
+    PipeFuncPackageOffer,
+    PipeFuncPackageOfferFactoryFn,
+    PipeFuncPackageOfferRequest,
+    PipeFuncPackageRefusal,
+)
+from pipelex.tools.misc.async_utils import is_event_loop_running_on_this_thread
 
 
 class PythonPackageEnvironment(Protocol):
@@ -143,6 +150,28 @@ class OfferedPackageEnvironment(PythonPackageEnvironment):
         )
 
 
+class PipeFuncEnvironmentSource(NamedTuple):
+    """What a requirements verdict is judged against, beside the tree: the PipeFunc execution mode, and the factory stating its packages.
+
+    Two verdicts judged against equal sources are one: a run keeps a tree's met verdict for the checks after it only
+    while they judge against the same mode and the same factory, compared as `==` compares them, by identity for a
+    function or a plain object.
+    """
+
+    execution_mode: str
+    offer_factory: PipeFuncPackageOfferFactoryFn | None
+
+
+def current_pipe_func_environment_source() -> PipeFuncEnvironmentSource:
+    """The source a check judges requirements against now: this interpreter in the `direct` mode, else the mode's registered factory."""
+    execution_mode = get_pipe_func_execution_mode()
+    if not is_pipe_func_sandbox_hosted():
+        return PipeFuncEnvironmentSource(execution_mode=execution_mode, offer_factory=None)
+    return PipeFuncEnvironmentSource(
+        execution_mode=execution_mode, offer_factory=get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
+    )
+
+
 def resolve_pipe_func_package_environment(
     *, requirements: Sequence[RequirementLine], names_host_paths: bool
 ) -> PythonPackageEnvironment | PipeFuncPackageRefusal:
@@ -160,6 +189,8 @@ def resolve_pipe_func_package_environment(
     Raises:
         PipeFuncPackageSetUnstatedError: The mode runs PipeFunc steps out of this process and no plugin states, or the
             stating plugin could not state, the packages found there.
+        PipelexUnexpectedError: The factory would be called on a thread running an event loop, which its contract
+            forbids: the load reaching it was called on the loop rather than through `run_method_load`.
     """
     if not is_pipe_func_sandbox_hosted():
         return InterpreterPackageEnvironment(names_host_paths=names_host_paths)
@@ -167,6 +198,16 @@ def resolve_pipe_func_package_environment(
     offer_factory = get_pipe_func_package_offer_registry().get_optional(mode=execution_mode)
     if offer_factory is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=False)
+    if is_event_loop_running_on_this_thread():
+        # The factory's contract: it is never called on a thread running an event loop, so it may block. A load reached
+        # from asynchronous code runs in the method-load pool (`run_method_load`); one called on the loop itself is a host
+        # wired wrongly, refused here rather than let the factory hold up every task the loop serves.
+        msg = (
+            f"The package-offer factory of the PipeFunc execution mode '{execution_mode}' was about to be called on a thread "
+            "running an event loop: a method load reached from asynchronous code must run off the loop, through "
+            "`run_method_load` (pipelex.libraries.method_load_threads)."
+        )
+        raise PipelexUnexpectedError(msg)
     answer = offer_factory(PipeFuncPackageOfferRequest(pipe_func_config=get_config().interpreter.pipe_func, requirements=tuple(requirements)))
     if answer is None:
         raise PipeFuncPackageSetUnstatedError(execution_mode=execution_mode, offer_registered=True)

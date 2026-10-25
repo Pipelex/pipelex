@@ -9,9 +9,9 @@ PipeFunc-only Python is supported.
 
 Two doors apply it. A fetched package is scanned on disk before it is installed
 (`ensure_no_structured_content_python`). Every sandbox-hosted library load, whatever the content's
-origin (an inline bundle, a stored method, a host directory), scans the sources it would ship to
-the sandbox before it keeps any of them (`ensure_no_structured_content_in_library_sources`). Both
-run the same walk over one source string, so the two refusals cannot drift apart.
+origin (an inline bundle, a stored method, a host directory), scans the text of every Python file
+of the trees it lists before it parses any bundle (`ensure_no_structured_content_in_library_sources`).
+Both run the same walk over one source string, so the two refusals cannot drift apart.
 
 One file declaring such classes is not refused: the `python-structures` projection that
 `pipelex build structures` writes, left as generated. It is a copy of the method's own MTHDS
@@ -103,7 +103,7 @@ def structured_content_class_names_in_source(*, source: str, filename: str) -> l
     """Class names declared in one Python source whose bases resolve to `StructuredContent`.
 
     This is the one walk both refusals run, over the text itself, so the fetch-time scan of a
-    directory and the load-time scan of captured sources cannot drift apart. A source that does not
+    directory and the load-time scan of the sources a load reads cannot drift apart. A source that does not
     parse declares nothing: it cannot be imported either, so it cannot smuggle a structure class
     into the process. That includes a source nested deeply enough to exhaust the parser, which
     Python's own import rejects the same way.
@@ -178,14 +178,14 @@ def scan_structured_content_classes(*, package_dir: Path) -> list[StructuredCont
 
 
 def scan_structured_content_sources(*, sources: Mapping[str, str]) -> list[StructuredContentViolation]:
-    """Scan captured Python sources, keyed by relative path, for `StructuredContent` subclasses.
+    """Scan Python sources, keyed by relative path, for `StructuredContent` subclasses.
 
-    The sandbox-hosted loader calls this on the very mapping it would ship, so the bytes it refuses
-    are exactly the bytes that would travel, with no second read of the disk. The generated
-    `python-structures` projection, left as generated, is not a violation (`is_generated_structures_module`).
+    The sandbox-hosted loader calls this on the text of every Python file of the trees it lists
+    (`tree_python_sources`), and the API server on the Python of a method tree a request sends. The
+    generated `python-structures` projection, left as generated, is not a violation (`is_generated_structures_module`).
 
     Args:
-        sources: POSIX relative path to source text, as the sandbox-hosted loader captures it.
+        sources: POSIX relative path to source text, as the sandbox-hosted loader reads it.
 
     Returns:
         One violation per offending source, ordered by relative path.
@@ -234,7 +234,7 @@ def ensure_no_structured_content_in_library_sources(*, sources_by_dir: Mapping[P
     the directory itself: on a host that directory is a temporary one, which is not the caller's to read.
 
     Args:
-        sources_by_dir: For each library directory of the load, the Python sources it would ship,
+        sources_by_dir: For each library directory of the load, the text of its Python files,
             keyed by POSIX relative path.
 
     Raises:

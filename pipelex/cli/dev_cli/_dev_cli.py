@@ -32,6 +32,7 @@ from pipelex.cli.dev_cli.commands.generate_error_identity_cmd import generate_er
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.generate_projection_corpus_cmd import generate_projection_corpus_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
+from pipelex.cli.dev_cli.commands.openrouter.openrouter_cmd import openrouter_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.refresh_graph_ui_sri_cmd import refresh_graph_ui_sri_cmd
 from pipelex.cli.dev_cli.commands.store_test_durations_cmd import store_test_durations_cmd
@@ -70,6 +71,7 @@ class PipelexDevCLI(TyperGroup):
             "generate-mthds-schema",
             "generate-projection-corpus",
             "kit",
+            "openrouter",
             "preprocess-test-models",
             "refresh-graph-ui-sri",
             "store-test-durations",
@@ -106,12 +108,13 @@ app = typer.Typer(
 
 app.add_typer(drift_app, name="drift", help="Drift contracts: deterministic review obligations between code, docs, and tests")
 app.add_typer(kit_app, name="kit", help="Manage agent rules for the Pipelex repository")
+app.add_typer(openrouter_app, name="openrouter")
 
 
 @app.callback(invoke_without_command=True)
 def app_callback(_ctx: typer.Context) -> None:
     # Skip banner if --quiet or -q flag is present
-    if "--quiet" in sys.argv or "-q" in sys.argv:
+    if "--quiet" in sys.argv or "-q" in sys.argv or _ctx.invoked_subcommand == "openrouter":
         return
 
     console = get_console()

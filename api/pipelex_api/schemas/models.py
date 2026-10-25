@@ -88,7 +88,7 @@ DEPENDENCIES_FIELD_DESCRIPTION = (
     "by. They are searched before the runner's installed copies, for this request alone. Accompanies `files`."
 )
 
-RESOURCES_FIELD_DESCRIPTION = (
+_RESOURCES_FIELD_FACTS = (
     "The files submitted with the bundle that its steps read, such as a PipeDocGen step's `template_file` (an "
     "`.xlsx`, `.docx`, `.pptx` or `.html` template): a JSON object mapping each file's bundle-relative path, exactly "
     "as the step names it, to the file's bytes in standard base64. A path must be relative and written with forward "
@@ -101,6 +101,21 @@ RESOURCES_FIELD_DESCRIPTION = (
     "`MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which the run "
     "names by its digest: no file's bytes travel with the run, each being read where a step uses it."
 )
+
+RESOURCES_FIELD_DESCRIPTION = (
+    f"{_RESOURCES_FIELD_FACTS} Being retired with `mthds_contents`, and refused by a later release: send these files in "
+    "the method's tree, in `files`."
+)
+"""`resources` on the routes that also take `mthds_contents`, the run routes and `/validate`, with which it is retired."""
+
+TREE_ROUTE_RESOURCES_FIELD_DESCRIPTION = (
+    f"{_RESOURCES_FIELD_FACTS} Being retired, and refused by a later release: a file the steps read travels inside the "
+    "method's tree, in `files`, at its path beside the bundle that names it."
+)
+"""`resources` on the routes that take a method only as `files` or `method_ref`: `/resolve`, `/codegen` and `/pipe-io`."""
+
+MTHDS_CONTENTS_RETIRING_NOTE = "Being retired, and refused by a later release: send the method in `files`."
+"""Opens the description of every request field that takes a method's bundles as `mthds_contents`."""
 
 
 class RunRequest(BaseModel):
@@ -124,7 +139,8 @@ class RunRequest(BaseModel):
 
     Attributes:
         pipe_code: Code of the pipe to execute.
-        mthds_contents: List of MTHDS bundle contents to load.
+        mthds_contents: List of MTHDS bundle contents to load. Being retired, with `bundle_b64`
+            and `resources`, in favor of `files`.
         inputs: Inputs in PipelineInputs format, as plain JSON — Pydantic validation is
             skipped to preserve the flexible format (strings, lists, objects); the runtime
             shapes each value against the entry pipe's declared input.
@@ -154,7 +170,14 @@ class RunRequest(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     pipe_code: str | None = None
-    mthds_contents: list[str] | None = None
+    mthds_contents: list[str] | None = Field(
+        default=None,
+        description=(
+            f"{MTHDS_CONTENTS_RETIRING_NOTE} The method's `.mthds` files as raw strings, always an array, even for a single "
+            "file; with no `pipe_code`, a file must declare `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and "
+            "`method_ref`."
+        ),
+    )
     inputs: Annotated[PipelineInputs | None, SkipValidation] = None
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
@@ -166,7 +189,8 @@ class RunRequest(BaseModel):
             "map of its entries, so the archive's names are judged by the method tree's rule as the keys of `files` are. "
             "The method packages it calls by address may travel with it under `.mthds/methods/<name>/`, each with its "
             "`METHODS.toml`; they are searched before the runner's installed copies, for this run alone. "
-            "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment."
+            "Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired "
+            "with `mthds_contents`, and refused by a later release: send the method in `files`."
         ),
     )
     # Documents the wire only: the map is read from the request's raw JSON text (`pipelex_api.method_tree_request`),
@@ -660,7 +684,7 @@ class MethodTreeRequest(BaseModel):
             "until a method registry exists). Exactly one of `files` / `method_ref`."
         ),
     )
-    resources: dict[str, str] | None = Field(default=None, description=RESOURCES_FIELD_DESCRIPTION)
+    resources: dict[str, str] | None = Field(default=None, description=TREE_ROUTE_RESOURCES_FIELD_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_TREE_READ_SCOPE_DESCRIPTION)
 
     @field_validator("read_scope")
@@ -735,7 +759,10 @@ class MthdsContentsRequest(BaseModel):
         default=None,
         min_length=1,
         max_length=MAX_MTHDS_FILES_PER_REQUEST,
-        description="MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref`.",
+        description=(
+            f"{MTHDS_CONTENTS_RETIRING_NOTE} MTHDS contents to load (always an array, even for a single file). "
+            "Exactly one of `mthds_contents` / `files` / `method_ref`."
+        ),
     )
     # Documents the wire only: the route reads the map from the request's raw JSON text, never from this field.
     files: Annotated[dict[str, FileEntry] | None, SkipValidation] = Field(

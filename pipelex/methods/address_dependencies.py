@@ -11,10 +11,6 @@ routes, reads nothing of its own and fetches nothing: a package the caller did n
 
 from enum import StrEnum
 
-#: The words every refusal of an address-based dependency nothing shipped carries in its message, the operator's. No
-#: client matches them: it reads the refusal's code and parameters.
-ADDRESS_DEPENDENCY_REFUSAL_MARKER = "address-based dependency"
-
 
 class AddressDependencySources(StrEnum):
     """Where a load looks for a package its bundles call by address."""
@@ -27,8 +23,14 @@ class AddressDependencySources(StrEnum):
 
 
 def unshipped_address_dependency_message(*, alias: str) -> str:
-    """The refusal of an address-based dependency a static resolution cannot load, since nothing shipped it."""
+    """The refusal of an address-based dependency a static resolution cannot load, since nothing shipped it.
+
+    The advice is what the caller of such a resolution can do, such as the caller of the API server's `/v1/resolve`,
+    `/v1/codegen` and `/v1/pipe-io`: send the package's files in the request's `dependencies`, keyed by its address,
+    beside the method's own in `files`.
+    """
     return (
-        f"In-memory resolve cannot load {ADDRESS_DEPENDENCY_REFUSAL_MARKER} '{alias}' from the host filesystem; "
-        "provide the dependency contents in the request or use directory-based resolution."
+        f"The method calls the address-based dependency '{alias}', which was not sent with it, and this "
+        "resolution loads only the packages sent with the method, fetching none: send the package's files in "
+        "`dependencies`, keyed by its address, beside the method's own files in `files`."
     )

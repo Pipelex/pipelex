@@ -25,12 +25,17 @@ A method's folder is fixed the same way (``fix_method_folder``): the loop valida
 method tree, as ``validate_bundle(method_dir=...)`` judges it, with no entry file. The tree is
 rooted at the nearest ``METHODS.toml`` at or above the folder, so its root is in the write scope,
 not only the folder named, and so are the ``library_dirs`` passed beside it.
+
+Each round lists the method's trees once (``pipelex.libraries.method_tree_listing``): the snapshot
+and the validation of the round read the same listing, so the files a fix is bound to are those the
+validation loaded. A round that writes a file ends its listing, and the next round lists anew. The
+first round's listing is the caller's, when it listed the trees to resolve what it fixes.
 """
 
 import os
-from collections.abc import Awaitable, Callable, Iterable, Sequence
+from collections.abc import Awaitable, Iterable, Sequence
 from pathlib import Path
-from typing import Any, NamedTuple, Self, cast
+from typing import Any, NamedTuple, Protocol, Self, cast
 
 import tomlkit
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -47,8 +52,8 @@ from pipelex.fix_ops.file_transaction import (
     read_file_snapshot,
 )
 from pipelex.interpreter_hub import resolve_library_dirs
-from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
-from pipelex.libraries.method_trees import method_tree_root
+from pipelex.libraries.method_tree_listing import MethodTreeListing
+from pipelex.libraries.method_trees import library_bundle_files_of, method_tree_root
 from pipelex.pipe_machinery.pipe_blueprint import SIGNATURE_ONLY_KEYS
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes.applicability import is_safe_fix_for_load_scope, is_target_in_write_scope
@@ -173,21 +178,22 @@ def _absolute_source_path(path: Path) -> Path:
     return Path(os.path.abspath(path))
 
 
-def _snapshot_loaded_sources(*, entry_source_path: Path | None, effective_dirs: Sequence[Path]) -> dict[Path, FileSnapshot]:
+def _snapshot_loaded_sources(
+    *, entry_source_path: Path | None, effective_dirs: Sequence[Path], tree_listing: MethodTreeListing
+) -> dict[Path, FileSnapshot]:
     """Snapshot every source identity validation is about to load.
 
     Keys are lexical absolute source names, while each snapshot is pinned to the destination
     resolved at the same time. The resolved destination is also an alias when unambiguous, which
     accommodates injected managers that already report canonical source paths. A method's folder
-    has no entry file: its bundles are those of its directory, among ``effective_dirs``.
+    has no entry file: its bundles are those of its directory, among ``effective_dirs``. The trees
+    are listed through ``tree_listing``, the listing the validation that follows loads them from.
     """
     source_paths: set[Path] = set()
     if entry_source_path is not None:
         source_paths.add(_absolute_source_path(entry_source_path))
-    source_paths.update(
-        _absolute_source_path(mthds_path)
-        for mthds_path in get_pipelex_mthds_files_from_dirs(dirs={_absolute_source_path(directory) for directory in effective_dirs})
-    )
+    library_trees = tree_listing.library_dir_trees(library_dirs=sorted({_absolute_source_path(directory) for directory in effective_dirs}))
+    source_paths.update(_absolute_source_path(bundle_file.path) for bundle_file in library_bundle_files_of(library_trees=library_trees))
     snapshots_by_source: dict[Path, FileSnapshot] = {}
     for source_path in sorted(source_paths, key=str):
         target_path = source_path.resolve()
@@ -447,6 +453,7 @@ async def fix_bundle_file(
     max_iterations: int | None = None,
     select_codes: Sequence[str] | None = None,
     ignore_codes: Sequence[str] | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> FixBundleResult:
     """Fix a bundle in place until valid, out of fixes, no progress, or max_iterations.
 
@@ -459,13 +466,17 @@ async def fix_bundle_file(
     reports ``pending_signatures`` and ``is_runnable``. ``max_iterations=None`` resolves to the
     ``fix_loop_max_attempts`` builder config. ``select_codes`` / ``ignore_codes`` filter which fix
     rules may apply (see ``_safe_fixes``); the CLI validates the codes before calling.
+    ``tree_listing`` is the listing the caller listed the bundle's trees through, which the first
+    round reads; None lists them in that round.
     """
     entry_source_path = _absolute_source_path(mthds_file_path)
     effective_dirs, _ = resolve_library_dirs(library_dirs)
     write_scope_dirs = library_dirs if writable_library_dirs is None else writable_library_dirs
 
-    async def validate_the_bundle() -> ValidateBundleResult:
-        return await validate_bundle(mthds_file_path=mthds_file_path, library_dirs=library_dirs, allow_signatures=allow_signatures)
+    async def validate_the_bundle(*, round_listing: MethodTreeListing) -> ValidateBundleResult:
+        return await validate_bundle(
+            mthds_file_path=mthds_file_path, library_dirs=library_dirs, allow_signatures=allow_signatures, tree_listing=round_listing
+        )
 
     return await _fix_to_fixed_point(
         validate=validate_the_bundle,
@@ -475,6 +486,7 @@ async def fix_bundle_file(
         max_iterations=max_iterations,
         select_codes=select_codes,
         ignore_codes=ignore_codes,
+        tree_listing=tree_listing,
     )
 
 
@@ -487,6 +499,7 @@ async def fix_method_folder(
     max_iterations: int | None = None,
     select_codes: Sequence[str] | None = None,
     ignore_codes: Sequence[str] | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> FixBundleResult:
     """Fix a method's folder in place, judged whole, until valid, out of fixes, no progress, or max_iterations.
 
@@ -500,6 +513,8 @@ async def fix_method_folder(
     ``writable_library_dirs`` when given, as the ``--diff`` preview's sandbox gives them, having mirrored that root.
     The snapshot taken before each validation lists the same directories the validation loads, the folder's listing
     being its whole tree's, so every file a fix can target was snapshotted under the name the load gives it.
+    ``tree_listing`` is the listing the caller listed the folder's tree through, which the first round reads; None
+    lists it in that round.
     """
     beside_dirs = dirs_beside_method(method_dir=method_dir, library_dirs=library_dirs)
     loaded_dirs = [method_dir, *beside_dirs]
@@ -514,12 +529,13 @@ async def fix_method_folder(
     else:
         write_scope_dirs = writable_library_dirs
 
-    async def validate_the_method() -> ValidateBundleResult:
+    async def validate_the_method(*, round_listing: MethodTreeListing) -> ValidateBundleResult:
         return await validate_bundle(
             method_dir=method_dir,
             library_dirs=library_dirs,
             library_dirs_are_callers=True,
             allow_signatures=allow_signatures,
+            tree_listing=round_listing,
         )
 
     return await _fix_to_fixed_point(
@@ -530,20 +546,32 @@ async def fix_method_folder(
         max_iterations=max_iterations,
         select_codes=select_codes,
         ignore_codes=ignore_codes,
+        tree_listing=tree_listing,
     )
+
+
+class _RoundValidation(Protocol):
+    """What the fix loop validates in a round: the bundle file or the method's folder, its trees taken from the round's listing."""
+
+    def __call__(self, *, round_listing: MethodTreeListing) -> Awaitable[ValidateBundleResult]: ...
 
 
 async def _fix_to_fixed_point(
     *,
-    validate: Callable[[], Awaitable[ValidateBundleResult]],
+    validate: _RoundValidation,
     entry_source_path: Path | None,
     effective_dirs: Sequence[Path],
     writable_dirs: list[Path],
     max_iterations: int | None,
     select_codes: Sequence[str] | None,
     ignore_codes: Sequence[str] | None,
+    tree_listing: MethodTreeListing | None,
 ) -> FixBundleResult:
-    """The fix loop over what ``validate`` judges: a bundle file and its entry, or a method's folder with none."""
+    """The fix loop over what ``validate`` judges: a bundle file and its entry, or a method's folder with none.
+
+    Each round's snapshot and validation read one listing of the trees: the caller's ``tree_listing`` in the first round,
+    and a new one in each round after a write, since the files it listed changed.
+    """
     if max_iterations is None:
         max_iterations = get_config().interpreter.builder.fix_loop_max_attempts
     entry_path = entry_source_path.resolve() if entry_source_path is not None else None
@@ -557,11 +585,14 @@ async def _fix_to_fixed_point(
     last_error_items: list[ValidationErrorItem] = []
     last_error_codes: list[ValidationItemCode] = []
 
+    round_listing = tree_listing if tree_listing is not None else MethodTreeListing()
     for _ in range(max_iterations):
         # The snapshot lists the method's trees: one that cannot be listed is the invalid verdict, with nothing to fix.
         try:
             with translate_to_validate_bundle_error():
-                snapshots_by_source = _snapshot_loaded_sources(entry_source_path=entry_source_path, effective_dirs=effective_dirs)
+                snapshots_by_source = _snapshot_loaded_sources(
+                    entry_source_path=entry_source_path, effective_dirs=effective_dirs, tree_listing=round_listing
+                )
         except ValidateBundleError as exc:
             return FixBundleResult(
                 is_valid=False,
@@ -572,7 +603,7 @@ async def _fix_to_fixed_point(
                 remaining_error_codes=exc.item_codes(),
             )
         try:
-            validation_result = await validate()
+            validation_result = await validate(round_listing=round_listing)
             pending_signatures = _pending_signatures_from_validation_result(validation_result)
             return FixBundleResult(
                 is_valid=True,
@@ -693,10 +724,12 @@ async def _fix_to_fixed_point(
                 written_paths.add(target_path)
                 files_written.append(str(target_path))
         apply_rounds += 1
+        # The round wrote files its listing hashed, so the next validation lists the trees anew.
+        round_listing = MethodTreeListing()
 
     # max_iterations apply rounds done — the final verdict comes from one last validation.
     try:
-        validation_result = await validate()
+        validation_result = await validate(round_listing=round_listing)
         pending_signatures = _pending_signatures_from_validation_result(validation_result)
         return FixBundleResult(
             is_valid=True,

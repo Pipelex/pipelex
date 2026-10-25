@@ -38,6 +38,7 @@ jobs:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
         group: [1, 2, 3, 4, 5, 6, 7, 8]
     env:
+      UV_PYTHON: ${{ matrix.python-version }}
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
       PIPELEX_HANG_DUMP_DIR: /tmp/pipelex-hang-dumps-${{ github.run_id }}-py${{ matrix.python-version }}-shard${{ matrix.group }}
@@ -55,7 +56,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+        run: make install
 
       - name: Run tests (py${{ matrix.python-version }}, shard ${{ matrix.group }}/8)
         run: SPLITS=8 GROUP=${{ matrix.group }} make gha-tests
@@ -73,6 +74,9 @@ jobs:
             echo "No hang dumps were produced."
           fi
 
+      - name: The interpreter is the one this job names
+        run: .venv/bin/python -c 'import sys; want = "${{ matrix.python-version }}"; got = "%d.%d" % sys.version_info[:2]; assert got == want, f"ran {got}, expected {want}"'
+
 # --------------------------------------------------------------------------
 #  The API server (`api/`) on every supported version, in its own environment
 #  against the pipelex of this commit. Its suite is small, so one job per
@@ -87,6 +91,7 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
     env:
+      UV_PYTHON: ${{ matrix.python-version }}
       ENV: dev
     steps:
       - uses: actions/checkout@v4
@@ -100,10 +105,13 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install the server's environment
-        run: PYTHON_VERSION=${{ matrix.python-version }} make -C api install
+        run: make -C api install
 
       - name: Run the server's tests (py${{ matrix.python-version }})
         run: make -C api gha-tests
+
+      - name: The interpreter is the one this job names
+        run: api/.venv/bin/python -c 'import sys; want = "${{ matrix.python-version }}"; got = "%d.%d" % sys.version_info[:2]; assert got == want, f"ran {got}, expected {want}"'
 
 # --------------------------------------------------------------------------
 #  Aggregator — the single required status check for the full-matrix gate.

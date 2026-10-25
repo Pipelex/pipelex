@@ -78,7 +78,7 @@ class _CountingStorage(StorageProviderAbstract):
             self._lookups_in_flight -= 1
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         self.unconditional_keys.append(key)
         self.objects[key] = data
 

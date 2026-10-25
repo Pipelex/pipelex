@@ -20,6 +20,18 @@ BUNDLE_GRAPH_RENDERING_MODULE = "pipelex.pipeline.bundle_graph_rendering"
 BUNDLE_CONTENT = 'domain = "test_domain"\nmain_pipe = "test_pipe"\n'
 
 
+class _FolderMaker:
+    """Hands back one folder, whatever pipe the graph draws, and records the pipes it was asked to make a folder for."""
+
+    def __init__(self, *, folder: Path) -> None:
+        self.folder = folder
+        self.pipes_drawn: list[str] = []
+
+    def __call__(self, *, pipe_code: str) -> Path:
+        self.pipes_drawn.append(pipe_code)
+        return self.folder
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestGenerateGraphForBundle:
     """Tests for generate_graph_for_bundle format dispatch, rename branch, and return shape."""
@@ -32,9 +44,10 @@ class TestGenerateGraphForBundle:
     ) -> dict[str, Any]:
         """Create the bundle file and patch the bundle_graph_rendering collaborators.
 
-        The renderer is patched as a whole: since the split, `render_graph_from_spec` lives in the
-        kernel-layer `pipelex.graph.graph_rendering` and is this module's collaborator, not its
-        internals. How it maps the inclusion flags onto the graph config is its own test's business
+        The renderer and the saver are patched as a whole: `render_graph_outputs` lives in the
+        kernel-layer `pipelex.graph.graph_rendering` and `save_graph_outputs_to_dir` in
+        `pipelex.graph.graph_factory`, both this module's collaborators, not its internals. How the
+        renderer maps the inclusion flags onto the graph config is its own test's business
         (`tests/unit/pipelex/graph/test_graph_rendering.py`); what belongs here is the dispatch.
         """
         bundle_path = tmp_path / "bundle.mthds"
@@ -52,11 +65,13 @@ class TestGenerateGraphForBundle:
         config_mock.interpreter.pipeline_execution.with_execution_overrides.return_value = execution_config_mock
         mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.get_config", return_value=config_mock)
 
+        graph_outputs_mock = mocker.MagicMock()
         mock_render = mocker.patch(
-            f"{BUNDLE_GRAPH_RENDERING_MODULE}.render_graph_from_spec",
+            f"{BUNDLE_GRAPH_RENDERING_MODULE}.render_graph_outputs",
             new_callable=mocker.AsyncMock,
-            return_value=saved_files,
+            return_value=graph_outputs_mock,
         )
+        mock_save = mocker.patch(f"{BUNDLE_GRAPH_RENDERING_MODULE}.save_graph_outputs_to_dir", return_value=saved_files)
 
         return {
             "bundle_path": bundle_path,
@@ -65,6 +80,8 @@ class TestGenerateGraphForBundle:
             "config_mock": config_mock,
             "execution_config_mock": execution_config_mock,
             "mock_render": mock_render,
+            "graph_outputs_mock": graph_outputs_mock,
+            "mock_save": mock_save,
         }
 
     @pytest.mark.parametrize(
@@ -89,6 +106,7 @@ class TestGenerateGraphForBundle:
         await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=graph_format,
+            make_output_folder=_FolderMaker(folder=tmp_path),
         )
 
         render_kwargs = mocks["mock_render"].call_args.kwargs
@@ -111,6 +129,7 @@ class TestGenerateGraphForBundle:
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             graph_name="../../evil.html",
         )
 
@@ -132,6 +151,7 @@ class TestGenerateGraphForBundle:
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.MERMAIDFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             graph_name="renamed.html",
         )
 
@@ -153,16 +173,18 @@ class TestGenerateGraphForBundle:
         direction: FlowchartDirection | None,
         expected_direction: str | None,
     ) -> None:
-        """The result should carry the bundle parent dir, dry-run pipe_code, and stringified direction."""
+        """The result should carry the folder the graph was written to, dry-run pipe_code, and stringified direction."""
         mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+        graph_folder = tmp_path / "results" / "pipe_code_output_01"
 
         result = await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.BOTH,
+            make_output_folder=_FolderMaker(folder=graph_folder),
             direction=direction,
         )
 
-        assert result["graph_output_dir"] == str(tmp_path)
+        assert result["graph_output_dir"] == str(graph_folder)
         assert result["pipe_code"] == "pipe_code"
         assert result["direction"] == expected_direction
 
@@ -177,8 +199,49 @@ class TestGenerateGraphForBundle:
         await generate_graph_for_bundle(
             bundle_path=mocks["bundle_path"],
             graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=_FolderMaker(folder=tmp_path),
             pipe_code="other_pipe",
         )
 
         mocks["mock_dry_run"].assert_awaited_once()
         assert mocks["mock_dry_run"].call_args.kwargs["pipe_code"] == "other_pipe"
+
+    async def test_the_graph_is_written_to_the_folder_made_for_the_pipe_drawn(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """The folder is made once the dry run has settled the pipe, never the bundle's own folder, and the renderer writes there."""
+        mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+        folder_maker = _FolderMaker(folder=tmp_path / "elsewhere")
+
+        await generate_graph_for_bundle(
+            bundle_path=mocks["bundle_path"],
+            graph_format=GraphFormat.REACTFLOW,
+            make_output_folder=folder_maker,
+        )
+
+        assert folder_maker.pipes_drawn == ["pipe_code"]
+        assert mocks["mock_save"].call_args.kwargs == {"graph_outputs": mocks["graph_outputs_mock"], "output_dir": tmp_path / "elsewhere"}
+
+    async def test_a_render_that_fails_makes_no_folder(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """The folder is made only once the graph has rendered, so a failed render spends no folder number and leaves nothing."""
+        mocks = self._setup_mocks(mocker, tmp_path, saved_files={})
+        render_error = RuntimeError("the renderer broke")
+        mocks["mock_render"].side_effect = render_error
+        folder_maker = _FolderMaker(folder=tmp_path / "elsewhere")
+
+        with pytest.raises(RuntimeError) as exc_info:
+            await generate_graph_for_bundle(
+                bundle_path=mocks["bundle_path"],
+                graph_format=GraphFormat.REACTFLOW,
+                make_output_folder=folder_maker,
+            )
+
+        assert exc_info.value is render_error
+        assert folder_maker.pipes_drawn == []
+        mocks["mock_save"].assert_not_called()

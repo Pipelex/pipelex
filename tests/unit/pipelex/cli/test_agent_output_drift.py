@@ -2,25 +2,20 @@ import ast
 from pathlib import Path
 from typing import Any, cast
 
-import pytest
 from mthds.protocol.exceptions import PipelineRequestError
-from pipelex_sdk.error_models import RunErrorReport
-from pipelex_sdk.errors import ApiResponseError, RunFailedError
+from mthds.protocol.problem.models import Problem
+from pipelex_sdk.errors import ApiResponseError, RunFailedError, run_failed_problem
+from pipelex_sdk.problem_items import read_problem_items
 from pipelex_sdk.runs import RunStatus
 from pydantic import BaseModel
 
 import pipelex.cli.agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import problem_payload
-from pipelex.cli.agent_cli.commands.run._run_hosted import PROBLEM_PARTS as READ_PROBLEM_PARTS
-from pipelex.cli.agent_cli.commands.run._run_hosted import hosted_failure_problem
 from pipelex.errors.problem import PipelexProblem
-from tests.unit.pipelex.cli.agent_cli.test_data import (
-    HostedPlaneRefusals,
-    OperatorViewAnswers,
-    RunnerOwnRefusals,
-    StoredRunReports,
-    UndeclaredMembers,
-)
+from pipelex.hosted.error_rendering import PROBLEM_PARTS as READ_PROBLEM_PARTS
+from pipelex.hosted.error_rendering import hosted_failure_problem
+from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError
+from tests.unit.pipelex.cli.agent_cli.test_data import GatewayAnswers, OperatorViewAnswers, PipeIoItems, StoredRunReports, UndeclaredMembers
 
 # The functions that report a problem and take the command's own members as keyword arguments.
 _PROBLEM_REPORTERS: frozenset[str] = frozenset({"agent_error", "agent_argument_error", "agent_file_error"})
@@ -100,26 +95,22 @@ def _refusal(*, status: int, body: str) -> ApiResponseError:
     )
 
 
-def _reported_failures() -> list[PipelineRequestError]:
+def _reported_failures() -> list[PipelineRequestError | HostedRunError]:
     """Failures of a run on a runner whose answers carry members no reader declares, at every level."""
     return [
         _refusal(status=422, body=UndeclaredMembers.SENT),
-        _refusal(status=401, body=HostedPlaneRefusals.UNAUTHORIZED),
-        _refusal(status=429, body=HostedPlaneRefusals.RATE_LIMITED_BODY_DELAY),
+        _refusal(status=401, body=GatewayAnswers.UNAUTHORIZED),
+        _refusal(status=429, body=GatewayAnswers.TOO_MANY_REQUESTS),
         _refusal(status=409, body=OperatorViewAnswers.UNREADABLE_REQUEST_ID),
-        _refusal(status=422, body=RunnerOwnRefusals.RESERVED_OBJECT_KEY),
         RunFailedError(
             "Run finished with status FAILED",
             run_id="run_9",
             status=RunStatus.FAILED,
-            error=RunErrorReport.model_validate(StoredRunReports.PROBLEM_WITH_REPORT_MEMBERS),
+            problem=run_failed_problem(
+                run_id="run_9", status=RunStatus.FAILED, run_error=Problem.model_validate(StoredRunReports.PROBLEM_WITH_REPORT_MEMBERS)
+            ),
         ),
-        RunFailedError(
-            "Run finished with status FAILED",
-            run_id="run_9",
-            status=RunStatus.FAILED,
-            error=RunErrorReport.model_validate(StoredRunReports.FORMER_SHAPE_WITH_ITEMS),
-        ),
+        HostedMethodInvalidError("The hosted API cannot load the method", errors=read_problem_items(PipeIoItems.SENT)),
     ]
 
 
@@ -176,9 +167,6 @@ class TestAgentOutputDrift:
                     offenders.append(f"{source_file.relative_to(package_dir)}:{getattr(node, 'lineno', 0)} writes '{member}'")
         assert not offenders, f"These lines write a member of the envelope the problem replaced: {offenders}"
 
-    @pytest.mark.builds_problems_without_required_params(
-        reason="the hosted plane's former-shape refusal names none of its code's parameters; the agent reads its status and own code alone"
-    )
     def test_no_reported_problem_carries_a_member_its_reader_does_not_declare(self) -> None:
         """The document a run on a runner reports holds only the members the standard and Pipelex declare, at every level.
 

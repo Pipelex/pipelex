@@ -31,6 +31,7 @@ jobs:
       matrix:
         python-version: ["3.11", "3.13"]
     env:
+      UV_PYTHON: ${{ matrix.python-version }}
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
       ENV: dev
       PIPELEX_NO_DECK_NOTICE: "1"
@@ -38,7 +39,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install
-        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+        run: make install
 
       - name: Upgrade dependencies to latest within ranges
         run: uv lock --upgrade && uv sync --all-extras
@@ -51,6 +52,9 @@ jobs:
           .venv/bin/pipelex --version
           .venv/bin/pipelex validate bundle tests/data/packages/analytics_dep/analytics.mthds
           .venv/bin/pipelex run bundle tests/data/packages/analytics_dep/analytics.mthds --dry-run --mock-inputs
+
+      - name: The interpreter is the one this job names
+        run: .venv/bin/python -c 'import sys; want = "${{ matrix.python-version }}"; got = "%d.%d" % sys.version_info[:2]; assert got == want, f"ran {got}, expected {want}"'
 
   # 2. Force the typer/click family PAST its pyproject cap, then run the CLI
   #    smoke test and the real CLI commands. This is the signal to bump the cap:

@@ -5,6 +5,7 @@ import tomlkit
 from pytest_mock import MockerFixture
 
 from pipelex.core.exceptions import PipesAndConceptValidationErrorData
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.fixes import fix_loop
 from pipelex.pipeline.fixes.fix_loop import fix_method_folder
@@ -87,12 +88,18 @@ class TestFixMethodFolder:
         assert summary_path.read_text(encoding="utf-8") == _SUMMARY_MTHDS
         assert validate_mock.await_count == 2
         for call in validate_mock.await_args_list:
-            assert call.kwargs == {
+            assert {key: value for key, value in call.kwargs.items() if key != "tree_listing"} == {
                 "method_dir": method_dir,
                 "library_dirs": [method_dir],
                 "library_dirs_are_callers": True,
                 "allow_signatures": False,
             }
+        # Each validation reads the listing its round's snapshot was taken from, and the round that wrote the fix
+        # ended its listing, so the validation after it lists the trees anew.
+        first_listing, second_listing = [call.kwargs["tree_listing"] for call in validate_mock.await_args_list]
+        assert isinstance(first_listing, MethodTreeListing)
+        assert isinstance(second_listing, MethodTreeListing)
+        assert second_listing is not first_listing
 
     async def test_a_sourceless_fix_is_dropped_since_a_folder_has_no_entry_file(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """With no entry file, a fix that names no file has nowhere to land: nothing is written."""

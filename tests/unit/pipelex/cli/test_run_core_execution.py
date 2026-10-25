@@ -473,7 +473,13 @@ class TestRunCoreExecution:
         csv_codec_mock.assert_called_once()
         assert csv_codec_mock.call_args.kwargs["row_model"] is TextContent
         # The reload sees exactly the load inputs the run was handed, and is torn down again.
-        assert reload.acquire.call_args.kwargs == {"library_id": "", "library_dirs": ["libs"], "mthds_contents": None, "bundle_uris": None}
+        assert reload.acquire.call_args.kwargs == {
+            "library_id": "",
+            "library_dirs": ["libs"],
+            "mthds_contents": None,
+            "bundle_uris": None,
+            "tree_listing": None,
+        }
         self._assert_reload_library_torn_down(reload)
 
     @pytest.mark.usefixtures("config_mock", "console")

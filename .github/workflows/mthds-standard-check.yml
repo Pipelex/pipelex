@@ -31,6 +31,7 @@ jobs:
     name: "Pinned natives vs the standard's page (a red with no pinned-set change in this PR means the standard moved)"
     runs-on: ubuntu-latest
     env:
+      UV_PYTHON: "3.11"
       VIRTUAL_ENV: ${{ github.workspace }}/pipelex/.venv
       ENV: dev
     # The documented workspace layout, reproduced on the runner: this repo and the standard as
@@ -67,7 +68,7 @@ jobs:
           cache-dependency-glob: "pipelex/uv.lock"
 
       - name: Install dependencies
-        run: PYTHON_VERSION=3.11 make install
+        run: make install
 
       - name: Hold the pinned natives to the standard's page
         run: .venv/bin/pytest tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py -v

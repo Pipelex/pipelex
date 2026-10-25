@@ -10,6 +10,9 @@ Only literal URLs are checked. A value holding a template expression or a sigil,
 `href="$link"`, is the run's, and is checked when the document prints. What is read is what a printer reads from HTML:
 an image's `src`, an embedded object, a linked stylesheet or attachment, an SVG image, and every `url()` and `@import`
 of a stylesheet, an inline one or a `style` attribute included. A Jinja comment is skipped, and so is a CSS comment.
+
+The check also says which files of the tree those literal URLs name, so the step can tell a validation the files its
+print reads beside its template (`pipelex.core.method_trees.tree_file_reads`).
 """
 
 import re
@@ -55,6 +58,17 @@ class TemplateAssetRefusal(NamedTuple):
     reference: str
     holder_label: str
     reason: str
+
+
+class TemplateAssetCheck(NamedTuple):
+    """What checking an HTML template's literal relative URLs found: the files of the tree they name, and the first refusal.
+
+    `asset_tree_paths` holds each image, stylesheet and font the template or one of its stylesheets names, by tree path,
+    once, in the order the check reached it; when the check refuses a URL, it holds those reached before it.
+    """
+
+    asset_tree_paths: list[str]
+    refusal: TemplateAssetRefusal | None
 
 
 class _HtmlUrls(HTMLParser):
@@ -109,10 +123,10 @@ def literal_template_urls(*, template: str) -> list[str]:
     return [url for url in parser.urls if not any(marker in url for marker in _TEMPLATE_VALUE_MARKERS)]
 
 
-def find_template_asset_refusal(
+def check_template_assets(
     *, template: str, template_label: str, holder: str | None, tree: MethodTree, read_file: Callable[[str], bytes | None]
-) -> TemplateAssetRefusal | None:
-    """The first literal relative URL of an HTML template that names no image, stylesheet or font of its method tree.
+) -> TemplateAssetCheck:
+    """Resolve each literal relative URL of an HTML template in its method tree, and find the first that names no asset.
 
     Args:
         template: The template's text, as written.
@@ -123,8 +137,10 @@ def find_template_asset_refusal(
         read_file: Reads a file of the tree by its tree path, for a stylesheet's own URLs; None when it cannot.
 
     Returns:
-        The refusal, or None when every literal relative URL names an image, a stylesheet or a font of the tree.
+        The images, stylesheets and fonts the URLs name, by tree path, and the refusal of the first URL that names no
+        image, stylesheet or font of the tree, None when every one does.
     """
+    asset_tree_paths: list[str] = []
     checked_stylesheets: set[str] = set()
     pending: list[tuple[str, str | None, str]] = [(url, holder, template_label) for url in literal_template_urls(template=template)]
     while pending:
@@ -132,12 +148,16 @@ def find_template_asset_refusal(
         try:
             tree_path = _resolve(reference=reference, holder=url_holder, tree=tree)
         except MethodTreeRefusedError as exc:
-            return TemplateAssetRefusal(reference=reference, holder_label=holder_label, reason=exc.message)
+            refusal = TemplateAssetRefusal(reference=reference, holder_label=holder_label, reason=exc.message)
+            return TemplateAssetCheck(asset_tree_paths=asset_tree_paths, refusal=refusal)
         if tree_path is None:
             continue
         asset_refusal = template_asset_refusal(tree_path=tree_path)
         if asset_refusal is not None:
-            return TemplateAssetRefusal(reference=reference, holder_label=holder_label, reason=asset_refusal)
+            refusal = TemplateAssetRefusal(reference=reference, holder_label=holder_label, reason=asset_refusal)
+            return TemplateAssetCheck(asset_tree_paths=asset_tree_paths, refusal=refusal)
+        if tree_path not in asset_tree_paths:
+            asset_tree_paths.append(tree_path)
         if not tree_path.lower().endswith(_STYLESHEET_SUFFIX) or tree_path in checked_stylesheets:
             continue
         checked_stylesheets.add(tree_path)
@@ -145,7 +165,7 @@ def find_template_asset_refusal(
         if stylesheet is not None:
             stylesheet_label = f"the stylesheet '{tree_path}'"
             pending.extend((url, tree_path, stylesheet_label) for url in stylesheet_urls(stylesheet=stylesheet))
-    return None
+    return TemplateAssetCheck(asset_tree_paths=asset_tree_paths, refusal=None)
 
 
 def _resolve(*, reference: str, holder: str | None, tree: MethodTree) -> str | None:

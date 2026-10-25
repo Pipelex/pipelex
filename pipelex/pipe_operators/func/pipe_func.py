@@ -19,6 +19,7 @@ from pipelex.core.method_trees.building_bundle import BuildingBundle
 from pipelex.core.method_trees.exceptions import TreePythonError
 from pipelex.core.method_trees.method_file_store import LOCAL_METHOD_FILES
 from pipelex.core.method_trees.tree_bundle import TreeBundle, TreeBundleRef
+from pipelex.core.method_trees.tree_file_reads import TreeFileRead, TreeFileUse
 from pipelex.core.method_trees.tree_python import check_tree_module_names, top_level_module_names, tree_label_holding
 from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
@@ -94,6 +95,10 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     # Whether validation located the function and proved its form, which a dependency package's step, validated as it is
     # built and again with its consumer's library, then need not do twice.
     _is_function_proven: bool = PrivateAttr(default=False)
+    # The tree path of the function's module, once validation located it among the files of the step's method tree. None
+    # until then, and when the module lies on this process's import path rather than in a tree, or the step was built
+    # from a crate that names its tree by digest alone.
+    _module_tree_path: str | None = PrivateAttr(default=None)
 
     @override
     def required_variables(self) -> set[str]:
@@ -140,7 +145,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         if self._is_function_proven:
             return
         try:
-            self._check_function_statically()
+            self._module_tree_path = self._check_function_statically()
         except (PipeFuncFunctionError, TreePythonError) as exc:
             msg = f"PipeFunc '{self.code}' cannot call its function '{self.function_name}': {exc.message}"
             raise PipeValidationError(
@@ -157,13 +162,16 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         """Locate the function and prove its form: a step whose function cannot be found is one that cannot be built."""
         self.validate_output_with_library()
 
-    def _check_function_statically(self) -> None:
+    def _check_function_statically(self) -> str | None:
         """Locate the module where the step's import root puts it, prove the function's form, and check the tree's module names.
 
         A sandbox-hosted deployment imports the function in a sandbox, whose packages are not this process's, so there
         a module name is checked against the standard library only. A step built from a crate that names its tree by
         digest alone is not checked again: its tree holds no file here, and the host that assembled the crate proved the
         function before the run was dispatched.
+
+        Returns:
+            The module's tree path when it was located among the files of the step's method tree, else None.
 
         Raises:
             PipeFuncFunctionError: The module is not found, or the form is not proven.
@@ -173,7 +181,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         module_source: PipeFuncModuleSource
         match self._tree_bundle:
             case TreeBundleRef():
-                return
+                return None
             case TreeBundle(tree=MethodTree(directory=Path() as tree_directory)) as tree_bundle:
                 tree = tree_bundle.tree
                 try:
@@ -189,6 +197,8 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                     root=tree_directory.resolve(),
                     checks_this_process=imports_in_this_process,
                 )
+                # Located in the tree, the module is labelled by its tree path.
+                return module_source.module_label
             case TreeBundle() as tree_bundle if not imports_in_this_process:
                 # The files submitted with bundles parsed from content strings, which this process holds in memory: a
                 # sandbox imports the function from them.
@@ -201,15 +211,30 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                     root=None,
                     checks_this_process=False,
                 )
+                # Located among the submitted files, the module is labelled by its tree path in the tree they make.
+                return module_source.module_label
             case None if not imports_in_this_process:
                 # No file was submitted with the bundle, so a sandbox would have no module to import.
                 module_source = locate_in_files(function_name=self.function_name, files={})
                 check_pipe_func_definition(module_source=module_source)
+                return None
             case TreeBundle() | None:
                 # A bundle parsed from a content string imports its function from this process's import path, where
-                # the library directories loaded beside it put their Python.
+                # the library directories loaded beside it put their Python: no file of a tree.
                 module_source = locate_on_import_path(function_name=self.function_name)
                 check_pipe_func_definition(module_source=module_source)
+                return None
+
+    @override
+    def tree_files_read(self) -> list[TreeFileRead]:
+        """The module of the step's function, when validation located it among the files of the step's method tree.
+
+        A function found on this process's import path is no file of a tree, and a step built from a crate that names its
+        tree by digest alone was proven where the crate was assembled: neither names a file here.
+        """
+        if self._module_tree_path is None:
+            return []
+        return [TreeFileRead(tree_path=self._module_tree_path, use=TreeFileUse.PYTHON_MODULE)]
 
     @staticmethod
     def _tree_label(*, tree_bundle: TreeBundle) -> str:

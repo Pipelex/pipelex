@@ -18,6 +18,7 @@ from mthds.protocol.models import ValidationReport
 from pydantic import Field
 
 from pipelex.base_exceptions import ValidationErrorItem
+from pipelex.core.method_trees.tree_file_reads import TreeFileRead
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.mthds_parsing.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
@@ -25,6 +26,7 @@ from pipelex.pipeline.bundle_validator import DryRunOutput
 from pipelex.pipeline.input_form import InputForm, OutputForm
 from pipelex.pipeline.liftable_pipes import LiftablePipeEntry
 from pipelex.pipeline.pipe_io_contracts import PipeIOContracts
+from pipelex.pipeline.tree_files_read import TreeFilesRead, build_tree_file_readers
 from pipelex.pipeline.validate_bundle import ValidatedPipeEntry, build_validated_pipes
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -69,6 +71,25 @@ class PipelexValidationReport(ValidationReport[Any]):
     """Pipes that may be skipped (lifted) when an optional slot resolves absent — the
     build-time visibility that the implicit-lifting design (D3) commits to."""
 
+    tree_files_read: dict[str, list[TreeFileRead]] = Field(
+        default_factory=dict,
+        description=(
+            "Per pipe, the files of the method's tree the step reads, keyed by namespaced `pipe_ref` like `pipe_io_contracts`: "
+            "each file by its tree path, with what the step reads it as. A PipeDocGen step reads its template and the images, "
+            "stylesheets and fonts its HTML template names by literal relative URLs; a PipeFunc step reads the module of its "
+            "function. A pipe that reads no file of the tree, a controller included, has an empty list."
+        ),
+    )
+
+    # Derived from `tree_files_read` by `build_validation_report`, never assembled apart from it.
+    tree_file_readers: dict[str, list[str]] = Field(
+        default_factory=dict,
+        description=(
+            "The per-file view of `tree_files_read`: each tree path a step reads, in sorted order, to the namespaced refs of "
+            "the pipes that read it. A file of the method's tree absent here is read by no step."
+        ),
+    )
+
     graph_spec: GraphSpec | None = None
     """Best-effort execution graph of the declared main pipe; `None` when the batch
     declares no `main_pipe` or the graph dry-run degrades."""
@@ -96,6 +117,7 @@ def build_validation_report(
     output_form: OutputForm,
     dry_run_result: dict[str, DryRunOutput],
     pending_signatures: list[str],
+    tree_files_read: TreeFilesRead,
     graph_spec: GraphSpec | None = None,
     liftable_pipes: list[LiftablePipeEntry] | None = None,
     warnings: list[ValidationErrorItem] | None = None,
@@ -104,7 +126,8 @@ def build_validation_report(
 
     The single constructor every backend calls — local protocol `validate` and the hosted
     API's Temporal mapping. Selects the primary blueprint, projects the dry-run status map
-    into `validated_pipes`, and derives the `is_runnable` verdict.
+    into `validated_pipes`, derives the per-file `tree_file_readers` from `tree_files_read`,
+    and derives the `is_runnable` verdict.
 
     Args:
         blueprints: The validated batch's blueprints, in declaration order (non-empty).
@@ -113,6 +136,8 @@ def build_validation_report(
         output_form: Per-pipe output-form descriptors from `build_output_form`, keyed the same way.
         dry_run_result: The sweep's per-pipe status map (`ValidateBundleResult.dry_run_result`).
         pending_signatures: Library-wide unsatisfied signature refs.
+        tree_files_read: The files of the method's tree each pipe reads, from `build_tree_files_read`, keyed like
+            `pipe_io_contracts`. Required, so a backend that forgets it fails loudly instead of reporting no file read.
         graph_spec: Best-effort graph of the declared main pipe, when one was produced.
         liftable_pipes: Entries from `build_liftable_pipes`, when the caller computed them.
         warnings: Advisory items from `build_advisory_warnings`, when the caller computed them.
@@ -126,6 +151,8 @@ def build_validation_report(
         input_form=input_form,
         output_form=output_form,
         liftable_pipes=liftable_pipes or [],
+        tree_files_read=tree_files_read,
+        tree_file_readers=build_tree_file_readers(tree_files_read=tree_files_read),
         graph_spec=graph_spec,
         validated_pipes=build_validated_pipes(dry_run_result),
         pending_signatures=pending_signatures,

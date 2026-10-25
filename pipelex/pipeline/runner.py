@@ -18,6 +18,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.models.model_listing import ModelCategory, list_models
 from pipelex.config import get_config
 from pipelex.errors.security_event import emit_security_event, emit_security_event_for_run
+from pipelex.errors.unsupported_reasons import METHOD_FILES_UNSUPPORTED_REASON
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import (
     clear_current_library,
@@ -46,12 +47,14 @@ if TYPE_CHECKING:
     import asyncio
     from collections.abc import Mapping
 
+    from mthds.method_tree.file_entry import MethodFiles
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
@@ -163,6 +166,23 @@ def _extract_validate_graph_pipe_code(extra: dict[str, Any] | None) -> str | Non
     return graph_pipe_code
 
 
+def refuse_method_files(*, files: MethodFiles | None) -> None:
+    """Refuse a method given as the protocol's `files` map, which this runtime does not take yet.
+
+    The protocol's run and validate operations take the method as `files`, a map from tree path to file entry. This
+    runtime takes it as `mthds_contents`, the bundles' contents, or as the method trees of its library directories, and
+    refuses the map before anything is set up, rather than running something other than what was sent. An empty map is
+    no method and is not refused here.
+
+    Raises:
+        PipelexRequestError: If `files` holds a file, coded `request.unsupported`.
+    """
+    if not files:
+        return
+    msg = "The local runtime takes a method as its bundles' contents (mthds_contents) or as its library directories, not as the protocol's files map."
+    raise PipelexRequestError(msg, field="files", unsupported_reason=METHOD_FILES_UNSUPPORTED_REASON)
+
+
 class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     """Pipelex implementation of the mthds MTHDSProtocol.
 
@@ -258,14 +278,17 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     async def execute(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
+        tree_listing: MethodTreeListing | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
@@ -282,10 +305,15 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             provided. When both ``mthds_contents`` and ``pipe_code`` are provided, the
             specified pipe from the MTHDS contents will be executed (overriding any
             ``main_pipe`` defined in the contents).
+        files:
+            The protocol's run source, the method as a map from tree path to file entry,
+            which this runtime does not take yet: a map holding a file is refused with a
+            ``PipelexRequestError`` coded ``request.unsupported`` (``refuse_method_files``).
         mthds_contents:
-            List of MTHDS bundle contents as strings. The pipe to execute is determined by
-            ``pipe_code`` (if provided) or the ``main_pipe`` property in the content.
-            Can be combined with ``library_dirs`` to load additional definitions.
+            List of MTHDS bundle contents as strings, this runtime's own run source. The pipe
+            to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
+            property in the content. Can be combined with ``library_dirs`` to load additional
+            definitions.
         inputs:
             Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
             or a ``WorkingMemory`` instance.
@@ -309,6 +337,16 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             extension. It must be one to 128 ASCII letters, digits, ``_``
             or ``-`` (``validate_request_id``): any other value is the host's
             bug, refused with a ``RunParameterError`` before the run is set up.
+        tree_listing:
+            The listing of the method trees this run reads, when the caller
+            listed them before the run, such as a CLI that resolved the
+            folder or the bundle file it runs, or a server that checked the
+            requirements of the method it holds: the run loads each tree from
+            it rather than listing it again, so one listing serves the whole
+            run and the tree whose digest the run records is the tree it
+            loaded. A listing serves one run: pass a new one to each
+            ``execute``, since the files may change between two runs.
+            ``None`` lists the trees for this run.
 
         Returns:
         -------
@@ -319,6 +357,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             ``graph_spec``.
 
         """
+        refuse_method_files(files=files)
         if extra:
             msg = f"The local runtime defines no extension args; got {sorted(extra)}."
             raise PipelexRequestError(msg, field="extra", unsupported_reason="extension_args_on_local_execute")
@@ -367,6 +406,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 methods_dirs=self.methods_dirs,
                 submitted_files=self.submitted_files,
                 request_id=request_id,
+                tree_listing=tree_listing,
             )
             effective_pipe_run = self._pipe_run or get_pipe_run()
             with method_source_scope(source=self._method_source(mthds_contents=mthds_contents)):
@@ -478,12 +518,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     async def start(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
     ) -> PipelexRunResultStart:
         """Start a method asynchronously — not implemented by the local runtime.
 
@@ -494,6 +536,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         """
         _ = (
             pipe_code,
+            files,
             mthds_contents,
             inputs,
             output_name,
@@ -507,9 +550,11 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
     @override
     async def validate(
         self,
-        mthds_contents: list[str],
+        files: MethodFiles | None = None,
         allow_signatures: bool = False,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
     ) -> PipelexValidationReport:
         """Parse, validate, and dry-run MTHDS bundles — protocol `validate`.
 
@@ -542,18 +587,26 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         `main_pipe` means no graph.
 
         Args:
-            mthds_contents: MTHDS contents to load (always a list, even for one file).
+            files: The protocol's method source, a map from tree path to file entry, which this runtime does not take
+                yet: a map holding a file is refused (`refuse_method_files`).
             allow_signatures: Tolerate unimplemented pipe signatures (strict by default).
             extra: Optional local runtime extension args. The only accepted key is
                 `graph_pipe_code`, an explicit pipe target for graph generation.
+            mthds_contents: MTHDS contents to load (always a list, even for one file), this runtime's own method
+                source, which the call requires.
 
         Returns:
             PipelexValidationReport with the structural artifacts of a valid bundle.
 
         Raises:
-            PipelineRequestError: When unsupported or invalid extension args are passed.
+            PipelineRequestError: When the method is given as `files` or not given as `mthds_contents`, or when
+                unsupported or invalid extension args are passed.
             PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
         """
+        refuse_method_files(files=files)
+        if mthds_contents is None:
+            msg = "validate takes the method's bundles as mthds_contents on the local runtime."
+            raise PipelexRequestError(msg, field="mthds_contents")
         graph_pipe_code = _extract_validate_graph_pipe_code(extra)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # Delegate to the shared in-process orchestrator (library-window management,

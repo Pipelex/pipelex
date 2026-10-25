@@ -18,7 +18,6 @@ from pipelex.libraries.method_trees import (
     list_package_method_tree,
     reporting_host_library_tree_faults,
     submitted_tree_files,
-    tree_bundle_of_lone_file,
     tree_python_sources,
 )
 from pipelex.methods.package_reason import MethodPackageReason
@@ -109,22 +108,6 @@ class TestMethodTrees:
         assert caller.code == CoreCode.METHOD_PACKAGE_INVALID
         assert caller.params is not None
         assert caller.params.as_wire() == {"reason": MethodPackageReason.TOO_MANY_FILES, "limit": 1}
-
-    def test_a_bundle_file_named_alone_is_rooted_at_the_manifest_above_it_else_alone(self, tmp_path: Path) -> None:
-        """Named alone, a bundle reads the files of the method a METHODS.toml above it roots, and with none only itself."""
-        lone = _touch(directory=tmp_path, tree_path="loose/lone.mthds")
-        _touch(directory=tmp_path, tree_path="loose/notes.md")
-        _touch(directory=tmp_path, tree_path="method/METHODS.toml", content=_MANIFEST)
-        rooted = _touch(directory=tmp_path, tree_path="method/bundles/main.mthds")
-
-        lone_bundle = tree_bundle_of_lone_file(bundle_file=lone)
-        rooted_bundle = tree_bundle_of_lone_file(bundle_file=rooted)
-
-        assert lone_bundle.tree.is_one_file
-        assert lone_bundle.tree.tree_paths == ["lone.mthds"]
-        assert not rooted_bundle.tree.is_one_file
-        assert rooted_bundle.tree_path == "bundles/main.mthds"
-        assert rooted_bundle.tree.tree_paths == ["METHODS.toml", "bundles/main.mthds"]
 
     def test_a_library_directory_holding_only_nested_methods_loads_them_all(self, tmp_path: Path) -> None:
         """Its own tree is empty, yet the packages and repositories nested in it load, and those nested in an empty one of them."""
@@ -296,10 +279,6 @@ class TestMethodTrees:
         bundle_paths = {bundle_file.path for bundle_file in list_library_bundle_files(library_dirs=[tmp_path])}
         assert bundle_paths == {tmp_path / "top.mthds", tmp_path / "vendor" / "tool" / "inputs.json" / "flow.mthds"}
 
-    @pytest.mark.xfail(
-        raises=MethodTreeLoadError,
-        reason="The run-inputs default is applied by the mthds lister from the mthds release implementing it, not pinned yet",
-    )
     def test_a_run_s_inputs_file_is_no_member_of_any_tree_at_any_depth(self, tmp_path: Path) -> None:
         """An inputs.json or inputs.toml, regular file or link never followed, stays out at the root and below; names match byte for byte."""
         outside = _touch(directory=tmp_path, tree_path="outside/secrets.json", content='{"token": "x"}')

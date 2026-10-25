@@ -146,7 +146,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             os.fsync(file_handle.fileno())
 
     @override
-    async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
         """Store bytes to a file, published whole or not at all.
 
         The bytes are written to a temporary file beside the target, flushed to disk, then renamed onto the target,
@@ -158,6 +158,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             data: The bytes to store.
             key: Storage key (relative path, without scheme prefix).
             content_type: Ignored for local storage.
+            checksum_sha256_hex: Ignored: a file has no checksum of its own to send it to.
 
         Raises:
             StorageInvalidUriError: If the key is invalid.

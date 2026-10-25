@@ -168,7 +168,7 @@ def run_method_cmd(
             typer.secho(f"Failed to run: {exc.message}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         execute_hosted_run(
-            mthds_files=target.mthds_files,
+            contents=target.contents,
             method_ref=target.method_ref,
             method_id=target.method_id,
             pipe_code=target.pipe_code,

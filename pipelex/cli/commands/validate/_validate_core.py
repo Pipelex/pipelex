@@ -22,6 +22,7 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_signature.signature_walk import collect_signature_refs
@@ -46,6 +47,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from pipelex.base_exceptions import ValidationErrorItem
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
     from pipelex.pipeline.bundle_validator import DryRunOutput
 
@@ -162,10 +164,12 @@ async def _validate_pipe_or_bundle(
     method_dir: Path | None = None,
     library_dirs: list[Path] | None = None,
     allow_signatures: bool = False,
+    tree_listing: MethodTreeListing | None = None,
 ) -> None:
     """Core async validation logic shared between the bundle, method and pipe subcommands.
 
-    A method's folder is judged whole, every bundle of its method tree, with ``library_dirs`` loaded beside it.
+    A method's folder is judged whole, every bundle of its method tree, with ``library_dirs`` loaded beside it, its tree
+    loaded from ``tree_listing``, the listing the command resolved the folder through, when given.
     """
     with MethodValidationReport() as validation_report:
         judged_path = method_dir or bundle_path
@@ -180,6 +184,7 @@ async def _validate_pipe_or_bundle(
                         library_dirs_are_callers=True,
                         allow_signatures=allow_signatures,
                         collect_dry_run_warnings=True,
+                        tree_listing=tree_listing,
                     )
                 else:
                     bundle_result = await validate_bundle(
@@ -187,6 +192,7 @@ async def _validate_pipe_or_bundle(
                         library_dirs=library_dirs,
                         allow_signatures=allow_signatures,
                         collect_dry_run_warnings=True,
+                        tree_listing=tree_listing,
                     )
                 # Advisory lints, printed BEFORE the signature gate below exits non-zero — same ordering
                 # as `validate --all`. A method with an unimplemented placeholder is the state an author
@@ -243,8 +249,9 @@ async def _validate_pipe_or_bundle(
                 # other invalid bundle. The entry-pipe lookup between them stays outside it: a code that names
                 # no pipe, or several, is an unresolvable target — no verdict, handled by execute_validate.
                 if effective_dirs:
+                    # In a worker thread, off the event loop, as every load reached from asynchronous code.
                     with translate_to_validate_bundle_error():
-                        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                        await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
                 pipe = get_required_entry_pipe(pipe_code=pipe_code)
                 validation_report.describe(pipes=get_own_pipes())
@@ -287,6 +294,7 @@ def execute_validate(
     telemetry_command_label: str = COMMAND,
     allow_signatures: bool = False,
     orchestrator: str | None = None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> None:
     """Synchronous entry point wrapping the async validation with Pipelex setup/teardown.
 
@@ -295,6 +303,9 @@ def execute_validate(
     its own in-process router so nested controller sub-pipes do not dispatch to the orchestrator
     runtime — so this flag does not change *what* validation does; it controls how Pipelex boots,
     which is the lever for exercising the "validation stays in-process on an orchestrator backend" contract.
+
+    ``tree_listing`` is the listing the command resolved its target through, which the validation loads the method's
+    trees from, so the tree is listed once.
     """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False, boot_orchestrator=orchestrator)
 
@@ -313,6 +324,7 @@ def execute_validate(
                     method_dir=method_dir,
                     library_dirs=library_dirs,
                     allow_signatures=allow_signatures,
+                    tree_listing=tree_listing,
                 )
             )
     except PipeNotFoundError as exc:

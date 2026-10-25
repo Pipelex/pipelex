@@ -24,6 +24,7 @@ from pipelex.libraries.method_requirements import (
     ensure_served_method_requirements_met,
     requirements_needed_in,
 )
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.libraries.method_trees import reporting_host_library_tree_faults
 from pipelex.libraries.package_environments import OfferedPackageEnvironment
 from pipelex.pipeline.exceptions import ValidateBundleError
@@ -228,6 +229,40 @@ class TestMethodRequirementsCheck:
         assert "line 1 'pandas>=4' (pandas 3.0.1 is there)" in message
         assert "pipelex-env-pandas" not in message
         assert [(item.source, item.line) for item in exc_info.value.blueprint_validation_errors] == [("requirements.txt", 1)]
+
+    def test_a_run_s_listing_asks_the_factory_once_for_a_tree_found_met_and_again_for_a_refused_one(
+        self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]
+    ) -> None:
+        """The listing keeps the trees a check of the run found met, however the check names them, and never a refused one."""
+        offers_by_requirements: dict[tuple[str, ...], PipeFuncPackageOffer] = {
+            ("polars>=1",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-polars", distributions={"polars": "1.2.0"}),
+            ("pandas>=4",): MethodRequirementsTestData.environment_offer(snapshot_name="pipelex-env-stale", distributions={"pandas": "3.0.1"}),
+        }
+        asked: list[tuple[str, ...]] = []
+
+        def offer_for(request: PipeFuncPackageOfferRequest) -> PipeFuncPackageOffer | PipeFuncPackageRefusal | None:
+            requirement_texts = tuple(line.text for line in request.requirements)
+            asked.append(requirement_texts)
+            return offers_by_requirements[requirement_texts]
+
+        sandbox_offering(offers={"daytona": offer_for})
+        polars_tree = list_method_tree(_method(directory=tmp_path / "polars", requirements="polars>=1\n"))
+        stale_tree = list_method_tree(_method(directory=tmp_path / "stale", requirements="pandas>=4\n"))
+        tree_listing = MethodTreeListing()
+
+        # A server's check, then the load of the same request, which names host paths, then a later step of that load.
+        ensure_method_requirements_met(trees=[polars_tree], names_host_paths=False, tree_listing=tree_listing)
+        ensure_method_requirements_met(trees=[polars_tree], names_host_paths=True, tree_listing=tree_listing)
+        ensure_method_requirements_met(trees=[polars_tree], names_host_paths=True, tree_listing=tree_listing)
+        assert asked == [("polars>=1",)]
+
+        for _ in range(2):
+            with pytest.raises(MethodRequirementsNotMetError):
+                ensure_method_requirements_met(trees=[polars_tree, stale_tree], names_host_paths=True, tree_listing=tree_listing)
+        assert asked == [("polars>=1",), ("pandas>=4",), ("pandas>=4",)]
+
+        ensure_method_requirements_met(trees=[polars_tree], names_host_paths=True, tree_listing=MethodTreeListing())
+        assert asked == [("polars>=1",), ("pandas>=4",), ("pandas>=4",), ("polars>=1",)]
 
     def test_a_factory_refusing_only_what_its_sandbox_needs_lets_a_false_marker_requirement_load(
         self, tmp_path: Path, sandbox_offering: Callable[..., PipeFuncConfig]

@@ -15,6 +15,10 @@ command:
 - A `.mthds` file named alone is the member of its own file's tree (see `list_bundle_file_tree`), and acts on its own
   `main_pipe` unless a pipe is named.
 
+The tree is listed once, through a `MethodTreeListing` the command hands down to its load
+(`pipelex.libraries.method_tree_listing`): the load takes the tree from it rather than listing the folder or the file
+again, so the tree whose digest a run records is the tree it loaded.
+
 The shared core decides; each command renders the refusals as its own surface renders them.
 """
 
@@ -27,7 +31,7 @@ from mthds.method_tree.models import MethodTree
 from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.libraries.exceptions import EmptyMethodTreeError, MethodTreeLoadError
-from pipelex.libraries.method_trees import list_local_method_tree
+from pipelex.libraries.method_tree_listing import MethodTreeListing
 from pipelex.mthds_parsing.helpers import is_pipelex_file
 from pipelex.pipeline.exceptions import MethodEntryError
 from pipelex.pipeline.method_entry import (
@@ -63,8 +67,8 @@ class MethodFolderTarget(NamedTuple):
     entry_bundle_file: Path | None
 
 
-def list_method_folder(*, directory: Path) -> MethodTree:
-    """The method tree of a folder handed to a command.
+def list_method_folder(*, directory: Path, tree_listing: MethodTreeListing) -> MethodTree:
+    """The method tree of a folder handed to a command, listed through the listing the command hands to its load.
 
     Raises:
         EmptyMethodTreeError: The tree holds no bundle: the membership rule keeps every file of the folder out of it, or
@@ -75,7 +79,7 @@ def list_method_folder(*, directory: Path) -> MethodTree:
     """
     msg = f"The folder '{directory}' holds no .mthds bundle."
     try:
-        tree = list_local_method_tree(handed_over=directory)
+        tree = tree_listing.method_tree(handed_over=directory)
     except EmptyMethodTreeError as exc:
         raise EmptyMethodTreeError(msg) from exc
     except MethodTreeLoadError:
@@ -86,8 +90,8 @@ def list_method_folder(*, directory: Path) -> MethodTree:
     return tree
 
 
-def resolve_method_folder(*, directory: Path, pipe_override: str | None) -> MethodFolderTarget:
-    """List a method folder's tree and settle the one pipe a command acts on.
+def resolve_method_folder(*, directory: Path, pipe_override: str | None, tree_listing: MethodTreeListing) -> MethodFolderTarget:
+    """List a method folder's tree, through the listing the command hands to its load, and settle the one pipe it acts on.
 
     Raises:
         MethodEntryError: The folder holds no bundle, or no pipe was named and the method has no single pipe to start
@@ -97,7 +101,7 @@ def resolve_method_folder(*, directory: Path, pipe_override: str | None) -> Meth
             read, each as the invalid verdict `validate` gives.
     """
     try:
-        tree = list_method_folder(directory=directory)
+        tree = list_method_folder(directory=directory, tree_listing=tree_listing)
     except EmptyMethodTreeError as exc:
         msg = f"The folder '{directory}' holds no .mthds bundle, so it has no pipe to start at."
         raise MethodEntryError(msg).with_error_code(CoreCode.METHOD_INVALID) from exc
@@ -110,8 +114,10 @@ def resolve_method_folder(*, directory: Path, pipe_override: str | None) -> Meth
     return MethodFolderTarget(tree=tree, pipe_code=entry.pipe_ref, entry=entry, entry_bundle_file=tree.file_location(entry.tree_path))
 
 
-def resolve_method_folder_run(*, directory: Path, pipe_override: str | None) -> MethodFolderTarget:
+def resolve_method_folder_run(*, directory: Path, pipe_override: str | None, tree_listing: MethodTreeListing) -> MethodFolderTarget:
     """A method folder as `run bundle` reads it: every refusal of the method is the verdict.
+
+    The tree is listed through `tree_listing`, which the run hands to its load, so the run loads the tree listed here.
 
     Raises:
         ValidateBundleError: The tree is refused or past this machine's limits, or a bundle does not parse, each as the
@@ -120,7 +126,7 @@ def resolve_method_folder_run(*, directory: Path, pipe_override: str | None) -> 
             on the method, coded as the refusal of a run that selects no pipe.
     """
     with translate_to_validate_bundle_error():
-        return resolve_method_folder(directory=directory, pipe_override=pipe_override)
+        return resolve_method_folder(directory=directory, pipe_override=pipe_override, tree_listing=tree_listing)
 
 
 def locate_folder_pipe(*, tree: MethodTree, pipe_override: str | None) -> MethodEntry:
@@ -141,17 +147,18 @@ def locate_folder_pipe(*, tree: MethodTree, pipe_override: str | None) -> Method
     return select_entry(candidates=candidates, manifest=read_method_manifest(tree=tree), method_label=method_label)
 
 
-def list_bundle_file_tree(*, bundle_file: Path) -> MethodTree:
+def list_bundle_file_tree(*, bundle_file: Path, tree_listing: MethodTreeListing) -> MethodTree:
     """The method tree of a `.mthds` file named alone, as the run loads it.
 
     It is the member of the tree rooted at the nearest `METHODS.toml` at or above its folder, else the one-file tree of
-    that file, from which a reference to any other file is refused.
+    that file, from which a reference to any other file is refused. It is listed through `tree_listing`, which the run
+    hands to its load, so the run places the file in the tree listed here.
 
     Raises:
         ValidateBundleError: The tree is refused or past this machine's limits, as the invalid verdict `validate` gives.
     """
     with translate_to_validate_bundle_error():
-        return list_local_method_tree(handed_over=bundle_file)
+        return tree_listing.method_tree(handed_over=bundle_file)
 
 
 class BundleTargetResolutionSuccess(NamedTuple):
@@ -171,6 +178,8 @@ class BundleTargetResolutionSuccess(NamedTuple):
     method_tree: MethodTree | None
     #: The pipe the protocol's rule selected for a folder whose command acts on one pipe and named none, else None.
     entry: MethodEntry | None
+    #: The listing the folder's tree was listed through, for the command to hand to its load; it holds nothing for a file.
+    tree_listing: MethodTreeListing
 
 
 class BundleTargetResolutionError(NamedTuple):
@@ -203,13 +212,15 @@ def resolve_bundle_target_core(
     """
     library_dirs = [Path(library_dir_item).expanduser() for library_dir_item in library_dir] if library_dir else None
     target_path = Path(path).expanduser()
+    # The command's one listing: the folder's tree is listed through it here, and its load takes the tree from it.
+    tree_listing = MethodTreeListing()
 
     if target_path.is_dir():
         # The folder first, then the -L directories that are not the folder, however either is spelled.
         library_dirs = [target_path, *dirs_beside_method(method_dir=target_path, library_dirs=library_dirs)]
         match reading:
             case FolderReading.ENTRY_PIPE:
-                folder = resolve_method_folder(directory=target_path, pipe_override=pipe_override)
+                folder = resolve_method_folder(directory=target_path, pipe_override=pipe_override, tree_listing=tree_listing)
                 return BundleTargetResolutionSuccess(
                     bundle_path=folder.entry_bundle_file,
                     pipe_code=folder.pipe_code,
@@ -217,6 +228,7 @@ def resolve_bundle_target_core(
                     method_dir=target_path,
                     method_tree=folder.tree,
                     entry=folder.entry,
+                    tree_listing=tree_listing,
                 )
             case FolderReading.WHOLE_TREE:
                 return BundleTargetResolutionSuccess(
@@ -224,8 +236,9 @@ def resolve_bundle_target_core(
                     pipe_code=pipe_override,
                     library_dirs=library_dirs,
                     method_dir=target_path,
-                    method_tree=list_method_folder(directory=target_path),
+                    method_tree=list_method_folder(directory=target_path, tree_listing=tree_listing),
                     entry=None,
+                    tree_listing=tree_listing,
                 )
 
     if is_pipelex_file(target_path):
@@ -236,6 +249,7 @@ def resolve_bundle_target_core(
             method_dir=None,
             method_tree=None,
             entry=None,
+            tree_listing=tree_listing,
         )
 
     return BundleTargetResolutionError(input_path=path, target_path=target_path)

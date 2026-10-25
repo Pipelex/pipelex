@@ -194,7 +194,7 @@ An override — skipped because of `@override`; fix (and grant) the base signatu
 
 ```python
 @override
-def _store(self, data, *, key, content_type): ...  # base StorageProviderAbstract._store defines the contract and holds any grant
+def _store(self, data, *, key, content_type, checksum_sha256_hex): ...  # base StorageProviderAbstract._store defines the contract and holds any grant
 ```
 
 A dunder — skipped by name; the interpreter owns the calling convention:

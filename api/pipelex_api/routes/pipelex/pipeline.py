@@ -16,14 +16,16 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
+from pipelex.libraries.method_tree_listing import MethodTreeListing, scoped_tree_listing
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
-from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.runner import PipelexMTHDSProtocol, refuse_method_files
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
@@ -52,7 +54,7 @@ from pipelex_api.method_tree_request import (
     select_tree_entry,
     tree_documents_of,
     with_resources,
-    written_method,
+    written_method_async,
 )
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import (
@@ -81,6 +83,7 @@ from pipelex_api.security import AuthMode, get_auth_mode
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from mthds.method_tree.file_entry import MethodFiles
     from mthds.protocol.pipe_output import VariableMultiplicity
     from mthds.protocol.pipeline_inputs import PipelineInputs
     from mthds.protocol.working_memory import WorkingMemoryAbstract
@@ -343,14 +346,17 @@ class ApiRunner(PipelexMTHDSProtocol):
     async def execute(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
+        tree_listing: MethodTreeListing | None = None,
         requested_orchestration_mode: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a method synchronously, dispatching by the resolved `orchestration_mode`.
@@ -374,7 +380,14 @@ class ApiRunner(PipelexMTHDSProtocol):
         `RunMetadata.request_id` for log correlation, so it reaches the job a worker is handed.
         `requested_orchestration_mode` is the optional per-request backend override
         (`PipelineApiExtras.orchestration_mode`).
+
+        The method's trees are listed once for the request: the check of its requirements lists them through
+        `tree_listing`, or a listing of its own when none is given, and the run loads them from that same listing.
         """
+        # The route resolves a method sent as `files` into a written tree before it calls this runner, which takes it
+        # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
+        # base runner refuses it, before any backend is looked up.
+        refuse_method_files(files=files)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
         api_config = get_api_config()
@@ -382,7 +395,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         orchestrator = get_orchestrator_registry().get_optional(mode=orchestration_mode)
         if orchestrator is None:
             raise _missing_orchestrator_error(mode=orchestration_mode, api_config=api_config)
-        await self._ensure_served_method_requirements_met()
+        listing = tree_listing if tree_listing is not None else MethodTreeListing()
+        await self._ensure_served_method_requirements_met(tree_listing=listing)
 
         # Dispatch the run through the mode-selected orchestrator by injecting it as this runner's
         # PipeRun, then delegate to the base execute, which owns the full run lifecycle. The
@@ -391,6 +405,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         self._pipe_run = _OrchestratorPipeRun(orchestrator=orchestrator, orchestration_mode=orchestration_mode)
         return await super().execute(
             pipe_code=pipe_code,
+            files=files,
             mthds_contents=mthds_contents,
             inputs=inputs,
             output_name=output_name,
@@ -399,18 +414,21 @@ class ApiRunner(PipelexMTHDSProtocol):
             extra=extra,
             delivery_assignment=delivery_assignment,
             request_id=request_id,
+            tree_listing=listing,
         )
 
     @override
     async def start(
         self,
         pipe_code: str | None = None,
-        mthds_contents: list[str] | None = None,
+        files: MethodFiles | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_ref: str | None = None,
         extra: dict[str, Any] | None = None,
+        *,
+        mthds_contents: list[str] | None = None,
         pipeline_run_id: str | None = None,
         callback_urls: list[str] | None = None,
         request_id: str | None = None,
@@ -451,6 +469,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         (`PipelineApiExtras.orchestration_mode`); it is resolved against the deployment's
         `api.toml` policy and a forbidden override is refused with a 422.
         """
+        # The route resolves a method sent as `files` into a written tree before it calls this runner, which takes it
+        # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
+        # base runner refuses it.
+        refuse_method_files(files=files)
         if extra:
             # Nothing on the wire reaches `extra`: the route parses the extras itself and passes them by name, so a
             # value here is a fault of the in-process code calling this runner, never the caller's.
@@ -472,7 +494,10 @@ class ApiRunner(PipelexMTHDSProtocol):
                 f"async-capable orchestration, and this deployment has none. Use /execute (synchronous) instead."
             )
             raise AsyncExecutionNotEnabledError(msg)
-        await self._ensure_served_method_requirements_met()
+        # The method's trees are listed once for the request: the requirements check lists them, and the job's load
+        # takes them from the same listing.
+        tree_listing = MethodTreeListing()
+        await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
         created_at = get_current_iso_timestamp()
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
@@ -506,6 +531,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             submitted_files=self.submitted_files,
             pipeline_run_id=pipeline_run_id,
             request_id=request_id,
+            tree_listing=tree_listing,
         )
 
         delivery_assignment = DeliveryAssignment(
@@ -554,13 +580,15 @@ class ApiRunner(PipelexMTHDSProtocol):
             crate_fingerprint=pipe_job.job_metadata.run_metadata.crate_fingerprint,
         )
 
-    async def _ensure_served_method_requirements_met(self) -> None:
+    async def _ensure_served_method_requirements_met(self, *, tree_listing: MethodTreeListing) -> None:
         """Refuse the request's method when its requirements.txt is not met, before anything loads or is dispatched.
 
         This runner's `library_dirs` are the directories it wrote the request's method tree into, the caller's own,
         whose load reports a requirements refusal as the caller's too; judging it here first refuses the run before
         any library opens or any run is registered, naming no path on this host. The tree is held as written, so its
-        listing is the tree the request sent. The listing reads and hashes files, so it runs off the event loop.
+        listing is the tree the request sent. The listing reads and hashes files, so it runs off the event loop, in the method-load pool,
+        and it is made through `tree_listing`, which the caller hands to the request's load, so the load reads the trees
+        checked here without listing them again.
 
         Raises:
             MethodRequirementsFileError: The method's requirements.txt holds a line the standard refuses.
@@ -571,7 +599,9 @@ class ApiRunner(PipelexMTHDSProtocol):
         if not self.library_dirs:
             return
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs]
-        await asyncio.to_thread(ensure_served_method_requirements_met, library_dirs=library_dirs)
+        # In the method-load pool, whose cancellation waits for the check to end: the directories it lists are removed
+        # when the request's scope exits, which a client disconnect can make happen while the check still hashes them.
+        await run_method_load(ensure_served_method_requirements_met, library_dirs=library_dirs, tree_listing=tree_listing)
 
     async def validate_verdict(
         self,
@@ -621,6 +651,10 @@ class ApiRunner(PipelexMTHDSProtocol):
         arm hands the method's trees to its worker through. The route builds a validating runner with the
         `read_scope` its request names, `None` when it names none, and never with the caller's id a run
         would fall back to: nothing lists or erases what a validation would leave under that prefix.
+
+        The method's trees are listed once for the request: the requirements check lists them, and the validation is
+        called with that listing in scope (`scoped_tree_listing`), which the in-process validator loads the trees from,
+        while a validator dispatching to a worker never reads it.
         """
         # Resolve the effective mode FIRST — a per-request override the deployment policy forbids
         # is refused (422) here, before any validator dispatch / library load. Mirrors start().
@@ -631,33 +665,39 @@ class ApiRunner(PipelexMTHDSProtocol):
             raise _missing_bundle_validator_error(mode=orchestration_mode, api_config=api_config)
         library_dirs = [Path(library_dir) for library_dir in self.library_dirs] if self.library_dirs else None
         # The method's requirements.txt is judged here, on the runner, which holds the method's files and the package set
-        # its PipeFunc steps run with, before any dispatch: a dispatched validator never reads these directories. A
-        # refusal is the method's invalid verdict, as a run of it is refused before its files load.
+        # its PipeFunc steps run with, before any dispatch, so a refusal reaches the caller whichever validator runs. A
+        # worker a method tree's validation is dispatched to never reads these directories: it receives the method's
+        # trees through its method file store and judges their requirements again as it loads them. A refusal is the
+        # method's invalid verdict, as a run of it is refused before its files load.
+        tree_listing = MethodTreeListing()
         try:
             with translate_to_validate_bundle_error():
-                await self._ensure_served_method_requirements_met()
+                await self._ensure_served_method_requirements_met(tree_listing=tree_listing)
         except ValidateBundleError as invalid_method:
             return BundleValidationFailure(
                 problem=invalid_method.to_problem(view=ProblemView.OPERATOR),
                 validation_errors=invalid_method.validation_error_items(),
             )
-        verdict = await validator.validate_bundles(
-            mthds_contents=mthds_contents,
-            mthds_sources=mthds_sources,
-            allow_signatures=allow_signatures,
-            # A method directory is the whole method: no library directory loads beside it.
-            library_dirs=None if method_dir is not None else library_dirs,
-            method_dir=method_dir,
-            methods_dirs=self.methods_dirs if method_dir is not None else None,
-            # A validation is not a run, but its dry runs and its `pipe_dry_run` event are still
-            # done for the caller this runner was built for — the user and groups a run would state.
-            caller_identity=self.caller_identity,
-            graph_pipe_code=graph_pipe_code,
-            # The files submitted with the contents, which the validation's dry run reads, the template check included.
-            submitted_files=self.submitted_files,
-            # The scope the host named, under which a dispatched validator's worker reads the method's trees.
-            read_scope=self.read_scope,
-        )
+        # The validator seam takes no listing: the one the requirements check made is in scope around the call, so the
+        # in-process validator loads the trees it checked without listing them again.
+        with scoped_tree_listing(tree_listing=tree_listing):
+            verdict = await validator.validate_bundles(
+                mthds_contents=mthds_contents,
+                mthds_sources=mthds_sources,
+                allow_signatures=allow_signatures,
+                # A method directory is the whole method: no library directory loads beside it.
+                library_dirs=None if method_dir is not None else library_dirs,
+                method_dir=method_dir,
+                methods_dirs=self.methods_dirs if method_dir is not None else None,
+                # A validation is not a run, but its dry runs and its `pipe_dry_run` event are still
+                # done for the caller this runner was built for — the user and groups a run would state.
+                caller_identity=self.caller_identity,
+                graph_pipe_code=graph_pipe_code,
+                # The files submitted with the contents, which the validation's dry run reads, the template check included.
+                submitted_files=self.submitted_files,
+                # The scope the host named, under which a dispatched validator's worker reads the method's trees.
+                read_scope=self.read_scope,
+            )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
         # PipelexValidationReport. Recover the precise type here — the single narrowing point — so
@@ -874,7 +914,7 @@ async def _request_method_of(*, run_request: RunRequest, body: bytes, blob_store
 async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) -> AsyncGenerator[_ResolvedRunSource, None]:
     """Resolve the request's run source: a method tree (`files`, `bundle_b64` or a `method_ref`), or the inline contents.
 
-    A method tree is written into a temporary directory and held as written, then handed to the runner as its one
+    A method tree is written into a temporary directory in a worker thread and held as written, then handed to the runner as its one
     library directory, the caller's own, with the dependency trees it carries as `methods_dirs`: the load reads the
     tree whole, its `.mthds` files as the method's bundles and every other file as one a step may read, such as a
     `PipeDocGen` template or a `PipeFunc` module, and names each by its tree path. A refusal while loading it is the
@@ -912,7 +952,7 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
         )
         return
     pipe_code = run_request.pipe_code or select_tree_entry(tree=request_method.tree, method_label=method_label).pipe_ref
-    with written_method(request_method=request_method) as written:
+    async with written_method_async(request_method=request_method) as written:
         yield _ResolvedRunSource(
             mthds_contents=None,
             library_dirs=[str(written.method_dir)],

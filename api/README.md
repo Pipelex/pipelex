@@ -69,26 +69,27 @@ The API is now running at `http://localhost:8081`. To customize behavior (enable
 
 # 🧪 Run your first pipeline
 
-Once `/health` is green, send an inline pipeline definition and inputs to `/v1/execute`. The example below summarizes a string with a one-pipe MTHDS bundle — no files, no auth, copy-paste:
+Once `/health` is green, send a method and its inputs to `/v1/execute`. The method travels in `files`, a map from each file's path in the method's folder to that file's content. The example below summarizes a string with a method made of a single `.mthds` file, with no auth, ready to copy and paste:
 
 ```bash
 curl -s http://localhost:8081/v1/execute \
   -H "Content-Type: application/json" \
   -d '{
-    "pipe_code": "summarize",
-    "mthds_contents": ["domain = \"hello\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize the input text in one sentence\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize in one sentence:\\n@text\"\n"],
+    "files": {
+      "summarize.mthds": "domain = \"hello\"\nmain_pipe = \"summarize\"\n\n[pipe.summarize]\ntype = \"PipeLLM\"\ndescription = \"Summarize the input text in one sentence\"\ninputs = { text = \"Text\" }\noutput = \"Text\"\nprompt = \"Summarize in one sentence:\\n@text\"\n"
+    },
     "inputs": { "text": "Pipelex turns plain-language pipeline definitions into reproducible AI workflows that run as HTTP endpoints." }
   }'
 ```
 
-You'll get back a JSON response with `state: "COMPLETED"` and the summary under `pipe_output.working_memory.root.<main_stuff_name>.content`.
+You'll get back a JSON response with `state: "COMPLETED"` and the summary under `pipe_output.working_memory.root.<main_stuff_name>.content`. The run starts at the method's `main_pipe`; to start at another pipe of the method, name it in `pipe_code`.
 
 **Passing files (PDFs, images) as inputs.** Use the `Document` concept and point it at any HTTP(S) URL:
 
 ```json
 {
   "pipe_code": "your_pipe",
-  "mthds_contents": ["...your MTHDS..."],
+  "files": { "your_method.mthds": "...your MTHDS..." },
   "inputs": {
     "cv": { "concept": "Document", "content": { "url": "https://example.com/resume.pdf" } }
   }
@@ -97,7 +98,7 @@ You'll get back a JSON response with `state: "COMPLETED"` and the summary under 
 
 `Document` accepts public HTTP/HTTPS URLs, `pipelex-storage://` URIs, or base64 data URLs. For images, use the `Image` concept with the same `{ "url": "..." }` shape.
 
-For inline MTHDS in the request, `mthds_contents` is a JSON array of raw `.mthds` (TOML) file contents as strings — typically `[open("my_pipe.mthds").read()]` from a client. See the [Pipe Run page](https://docs.pipelex.com/latest/api-server/pipe-run/) for every supported input shape and the full `/execute` reference.
+**Sending the method.** `files` holds the whole method, as the MTHDS standard's method tree: each key is a file's path relative to the method's folder, such as `summarize.mthds` or `templates/invoice.docx`, and each value is that file's content. A text file, such as a `.mthds` bundle or a Python module, is sent as its UTF-8 text in a JSON string, and a file that is not text, such as an office template or an image, as `{"base64": "..."}`. This server also keeps a blob store, which `GET /v1/version` reports as `blob_store: true`, so a client can send a file as `{"sha256": "...", "size": n}` instead: it asks `POST /v1/blobs/missing` which of its files the server lacks, uploads each of those to the target the answer names, and then sends the method with a hash entry for each file, so a method that has not changed is not uploaded again. The older `mthds_contents` field, a JSON array of `.mthds` texts, is still accepted, but it is being retired together with `bundle_b64` and `resources`, and a later release refuses them, so new clients send `files`. See the [Pipe Run page](https://docs.pipelex.com/latest/api-server/pipe-run/) for every supported input shape, the rules of [a method sent as a tree](https://docs.pipelex.com/latest/api-server/pipe-run/#sending-a-method-as-a-tree) and of [sending files by hash](https://docs.pipelex.com/latest/api-server/pipe-run/#sending-files-by-hash), and the full `/execute` reference.
 
 # 📈 How to scale Pipelex
 

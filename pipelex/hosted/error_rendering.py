@@ -1,45 +1,53 @@
-"""What went wrong on a hosted run, and what to do next, read off the error pipelex-sdk or pipelex raised.
+"""What went wrong on a hosted run, and what to do next: the problem both CLIs report, read off the error pipelex-sdk or pipelex raised.
 
-Every error of a hosted run that is not pipelex's own arrives as one of the SDK's classes, all of which derive from
-the protocol's `PipelineRequestError`; pipelex's own derive from `HostedRunError`. An `ApiResponseError` carries the
-hosted API's problem document: its reason (the problem's `detail`) and, when the server advised one, its next step
-(`user_action.detail`). Answers the hosted plane authors in front of the runner (a refused key, an unknown route, a
-rate limit, an unavailable runner) advise none, so their next step follows their status here. The human CLI prints
-this view of an error, its run id and its validation items included; the agent CLI reports the problem the error
-carries instead (`pipelex/cli/agent_cli/commands/run/_run_hosted.py`), with the next step this module tailors for a
-failure of the client's own (`tailored_next_step`), and for an answer in a shape that predates the standard's problem
-document, which the standard's client reads by its status alone, the problem `hosted_refusal_problem` reads from it:
-the core code its status and the plane's own code name, or the client's reading with the answer's own reason, with
-the next step this module gives the human CLI, so both CLIs tell the same thing.
+Every error of a hosted run that is not pipelex's own arrives as one of pipelex-sdk's classes, all of which derive from
+the protocol's `PipelineRequestError` and carry the failure as the standard's problem document (`exc.problem`): the
+runner's own when it answered one, and otherwise the code the client states. pipelex's own derive from `HostedRunError`
+and give theirs (:meth:`PipelexError.to_problem`). The problem is reported as it came, in the caller's view, since the
+runner is someone else's runtime (:func:`received_problem`), with two readings of this client's own
+(:func:`hosted_failure_problem`):
+
+- an answer that is no problem document, the bare answer of the hosted edge, a gateway or a proxy, which pipelex-sdk
+  reads by its status alone, is read here too: a refused credential is a missing one when the request carried no key,
+  and a refused credential or a route the server does not serve takes the next step that names this client's settings.
+  This reading stays written by hand until the registry records it and every client generates it;
+- a failure the client met on its own side, such as a runner that cannot be reached, a run past the wait or a file that
+  could not be uploaded, takes the next step this client tailors for it, naming its settings and the run.
+
+Both CLIs report the same problem (:func:`describe_hosted_error`): the agent CLI prints it as JSON or Markdown
+(`pipelex/cli/agent_cli/commands/run/_run_hosted.py`), the human CLI as the rows of its failure panels
+(`pipelex/cli/commands/run/_run_hosted.py`), each with the error's own sentence and pipelex's own advice beside it.
 """
 
-from typing import Any, NamedTuple
+from collections.abc import Mapping
+from typing import Any, NamedTuple, cast
 
 from mthds.protocol.exceptions import PipelineRequestError
-from mthds.protocol.problem.answers import parse_retry_after, read_problem_document
-from mthds.protocol.problem.models import NextStep, Problem
-from mthds.protocol.problem.registry import STATUS_READINGS, CoreCode, StepKind
+from mthds.protocol.problem.answers import read_problem_document
+from mthds.protocol.problem.models import NextStep, Problem, ProblemItem, ProblemLocation, SuggestedFix
+from mthds.protocol.problem.registry import CoreCode, RetryVerdict
 from pipelex_sdk.errors import (
     ApiResponseError,
     ApiUnreachableError,
     InputPreparationError,
     InvalidLocalSourceError,
-    MethodErrorCode,
+    MethodFileTransferError,
+    MethodFileTransferReason,
     MissingMainStuffError,
+    PipelexRequestError,
     PipelineExecuteTimeoutError,
     RejectedAssetError,
-    RunFailedError,
     RunLifecycleUnavailableError,
     RunTimeoutError,
     UnsupportedUploadCapabilityError,
     UploadAuthenticationError,
     UploadTransportError,
+    UploadTransportReason,
 )
-from pipelex_sdk.validation_models import ValidationErrorItem
+from pydantic import BaseModel, ValidationError
 
-from pipelex.base_exceptions import ErrorDomain
-from pipelex.errors.error_codes import error_code_spec
-from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
+from pipelex.base_exceptions import PipelexError
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.hosted.exceptions import HostedMethodInvalidError, HostedRunError, HostedRunInterruptedError, HostedRunPollingError
 
@@ -57,408 +65,375 @@ HOSTED_BASE_URL_NEXT_STEP = (
     f"Check the hosted API origin: --base-url, else {PIPELEX_BASE_URL_ENV_KEY}, else https://api.pipelex.com; "
     "it is scheme://host[:port], with no path such as /v1"
 )
-_RATE_LIMITED_NEXT_STEP = "Too many requests: wait retry_after seconds when the error gives it, otherwise a few seconds, then run again"
-# A 503 does not say whether the run happened: the hosted plane can answer it before forwarding the request and also
-# after the run completed, when it failed to record the result. So its next step warns that running again can repeat
-# a paid run.
-_UNAVAILABLE_NEXT_STEP = (
-    "The hosted API or the runner behind it was unavailable. It may have failed before the run or after it, so running "
-    "again can repeat a paid run: wait retry_after seconds when the error gives it, then run again only if a repeated run is acceptable"
-)
 
-#: The next step of a request refused because it carried no key, which the hosted plane answers with a 401 or a 403.
+#: The next step of a request refused because it carried no key, which the hosted edge answers with a bare 401 or 403.
 HOSTED_MISSING_KEY_NEXT_STEP = f"The request carried no Pipelex API key. {HOSTED_API_KEY_NEXT_STEP}"
-#: The next step of a 403 the platform answers itself, for a key it authenticated and an operation the key may not do.
-HOSTED_FORBIDDEN_NEXT_STEP = (
-    "The hosted API accepted the key and refused what this request does: the message says what it may not do. Ask the "
-    "organization's owner for that access, or use a key of an account that has it"
-)
-
-#: The next step of a refusal whose answer advised none, by its HTTP status.
+#: The next step of an answer that is no problem document, by its HTTP status, for the statuses this client reads.
 HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS: dict[int, str] = {
     401: f"The hosted API refused the credentials. {HOSTED_API_KEY_NEXT_STEP}",
     403: (
-        f"The hosted API refused the request: check that {PIPELEX_API_KEY_ENV_KEY} is a valid key for the API at "
+        f"The hosted API refused the request's key: check that {PIPELEX_API_KEY_ENV_KEY} is a valid key for the API at "
         f"{PIPELEX_BASE_URL_ENV_KEY} (or --base-url), and run {PIPELEX_LOGIN_COMMAND} to replace it when it is not; "
-        "when it is, the message says what this request may not do"
+        "a valid key may also be refused a route it may not call"
     ),
-    404: f"The hosted API has no such method or route: check the method's address or catalog id. {HOSTED_BASE_URL_NEXT_STEP}",
-    429: _RATE_LIMITED_NEXT_STEP,
-    503: _UNAVAILABLE_NEXT_STEP,
+    404: f"The server at the base URL serves no such route. {HOSTED_BASE_URL_NEXT_STEP}",
 }
-#: The next step of a 4xx refusal that advised none and whose status has no next step of its own.
-HOSTED_REFUSAL_CALLER_NEXT_STEP = (
-    "The hosted API refused the request: change what the message names (the method, the inputs or the configuration), then run again"
-)
-#: The next step of a server-side failure that advised none.
-HOSTED_SERVER_FAULT_NEXT_STEP = (
-    "The hosted API failed on its side: report it with the request_id, or with the http_status when the error carries no request_id"
-)
 #: The next step of a request that never reached the hosted API.
 HOSTED_UNREACHABLE_NEXT_STEP = f"Check the network connection. {HOSTED_BASE_URL_NEXT_STEP}"
-#: The next step of a failure no arm of `describe_hosted_error` tailors a step for.
-HOSTED_RUN_REQUEST_NEXT_STEP = "Check the run request: the method, the pipe and the inputs"
+#: The next steps of a file of the method's tree that could not be moved to or from the hosted API's storage, by why it
+#: failed. pipelex-sdk moves a tree's files before the request that needs them, so nothing was started.
+HOSTED_FILE_UNREACHABLE_NEXT_STEP = (
+    "The hosted API's storage gave no answer for a file of the method, so nothing was started: check the network connection, then run again"
+)
+HOSTED_FILE_STORAGE_ERROR_NEXT_STEP = (
+    "The hosted API's storage failed, timed out or throttled a file of the method, so nothing was started: wait a few seconds, then run again"
+)
+HOSTED_FILE_MISMATCH_NEXT_STEP = (
+    "A file of the method came back from the hosted API's storage as other bytes than the ones it names: report it with the SHA-256 the message names"
+)
+HOSTED_FILE_REFUSED_NEXT_STEP = (
+    "The hosted API's storage refused a file of the method, so nothing was started, and running again meets the same refusal: "
+    "report it with the SHA-256 the message names"
+)
 
-
-#: The member of the hosted plane's own refusal that states, in seconds, how long to wait before asking again; its
-#: `Retry-After` header states it too, and wins.
-_SENT_RETRY_AFTER_MEMBER = "retry_after_seconds"
-#: The codes the platform answers a `403` with when it authenticated the key and refuses the operation: `forbidden`, and
-#: `role_not_permitted` for a role that may not do it. pipelex-sdk names no constant for them. Any other code on a `403`
-#: is no refusal of an operation this client can tell, so it reads as the credential's.
-_PLANE_AUTHORIZATION_CODES: frozenset[str] = frozenset({"forbidden", "role_not_permitted"})
-
-#: The step kind each advice of an answer or a report in the former shape names (its `user_action.kind`), in the
-#: standard's closed list of kinds; an advice of another kind, `unknown` included, takes the kind its reader gives.
-FORMER_ADVICE_KINDS: dict[str, StepKind] = {
-    "wait_and_retry": StepKind.WAIT,
-    "check_billing": StepKind.CHECK_ACCOUNT,
-    "check_credentials": StepKind.CHECK_CREDENTIALS,
-    "change_input": StepKind.CHANGE_INPUT,
-    "change_model": StepKind.CHANGE_MODEL,
-    "contact_support": StepKind.REPORT,
+#: The parts of a problem, each read against the model that declares its members, so that a member neither the standard
+#: nor Pipelex declares is left out at every level. A problem's `params` and a fix's `ops` are the code's and the
+#: operation's own and are kept whole; the nested `run_error` and Pipelex's other members are read apart.
+PROBLEM_PARTS: dict[type[BaseModel], dict[str, type[BaseModel]]] = {
+    PipelexProblem: {"next_step": NextStep, "location": ProblemLocation, "errors": ProblemItem},
+    ProblemItem: {"location": ProblemLocation, "suggested_fix": SuggestedFix},
 }
+#: Pipelex's members beside the standard's, each of which a problem a runner sent may carry in a shape this version does
+#: not read: it is read apart and left out alone when it does not read, never losing the problem around it.
+_PIPELEX_PROBLEM_MEMBERS: tuple[str, ...] = ("request_id", "run_error", "diagnostics")
 
 
-class _RefusalReading(NamedTuple):
-    """The core code a refusal of the hosted plane in its own shape reads as, and the step for it when the plane advised none.
+def _declared_members(*, members: Mapping[str, Any], shape: type[BaseModel]) -> dict[str, Any]:
+    """The members of ``members`` that ``shape`` declares, each part it nests read the same way (:data:`PROBLEM_PARTS`)."""
+    declared: dict[str, Any] = {}
+    parts = PROBLEM_PARTS.get(shape, {})
+    for name in shape.model_fields:
+        if name not in members:
+            continue
+        value = members[name]
+        part_shape = parts.get(name)
+        if part_shape is not None and isinstance(value, Mapping):
+            declared[name] = _declared_members(members=cast("Mapping[str, Any]", value), shape=part_shape)
+        elif part_shape is not None and isinstance(value, list):
+            declared[name] = [
+                _declared_members(members=cast("Mapping[str, Any]", item), shape=part_shape) if isinstance(item, Mapping) else item
+                for item in cast("list[Any]", value)
+            ]
+        else:
+            declared[name] = value
+    return declared
 
-    `next_step` is `None` when the code's own step, from the registry, fits the refusal better than its status's.
-    """
 
-    code: CoreCode
-    next_step: str | None
+def _holds_diagnostics(*, members: Mapping[str, Any]) -> bool:
+    """Whether a document, or the run's problem it nests, carries diagnostics, whatever their shape: only an operator reads them."""
+    if "diagnostics" in members:
+        return True
+    run_error = members.get("run_error")
+    return isinstance(run_error, Mapping) and _holds_diagnostics(members=cast("Mapping[str, Any]", run_error))
 
 
-def _hosted_refusal_reading(*, status: int, plane_code: str | None, credential_sent: bool) -> _RefusalReading | None:
-    """The core code a refusal of the hosted plane in its own shape reads as, by its status and its own code.
+def _readable_problem(*, members: Mapping[str, Any]) -> PipelexProblem | None:
+    """The problem a document's declared members make, each of Pipelex's members kept only when it reads.
 
-    A refused credential is the hosted plane's `401` and the bare `403` its edge's authorizer answers, without a reason,
-    for an unknown key among others; it is `auth.missing_credential` when the request carried no key. A `403` the
-    platform answers with one of its authorization codes (:data:`_PLANE_AUTHORIZATION_CODES`) refuses an operation to a
-    key it authenticated, and a `403` with any other code, such as one for a key that is invalid or expired, refuses the
-    credential. A `404` is the run or the method the platform's code names (`run_not_found`,
-    `method_version_not_found`), and otherwise a route or a method this origin does not serve, which the platform's
-    `not_found` does not tell apart. A `429` is a rate limit.
+    The standard's members are read first, by their declared members alone; then ``request_id`` is added when it is a
+    text, and ``run_error`` when it reads the same way, so a nested problem whose own members do not all read is kept
+    without them. ``diagnostics`` is never kept: the problem is reported to a caller, who reads none.
 
     Returns:
-        The reading, or ``None`` for a status none names.
+        The problem, or ``None`` when the standard's members do not make one.
     """
-    by_status = HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS
+    declared = _declared_members(members=members, shape=PipelexProblem)
+    extensions = {name: declared.pop(name) for name in _PIPELEX_PROBLEM_MEMBERS if name in declared}
+    try:
+        readable = PipelexProblem.model_validate(declared)
+    except ValidationError:
+        return None
+    run_error = extensions.get("run_error")
+    if isinstance(run_error, Mapping):
+        nested = _readable_problem(members=cast("Mapping[str, Any]", run_error))
+        if nested is not None:
+            readable = readable.model_copy(update={"run_error": nested})
+    request_id = extensions.get("request_id")
+    if isinstance(request_id, str) and request_id:
+        readable = readable.model_copy(update={"request_id": request_id})
+    return readable
+
+
+def received_problem(*, problem: Problem, request_id: str | None = None) -> PipelexProblem:
+    """A problem a runner answered or a client decided, as both CLIs report it: as it came, in the caller's view.
+
+    A runner answers its caller in the caller's view already, so the problem is kept as it came, the runner's own next
+    step included, by the members the standard and Pipelex declare alone (:func:`_readable_problem`): a member no reader
+    declares, such as the `error_type`, `error_domain` and `retryable` a runner may still write, is left out at every
+    level, and one of Pipelex's members that does not read is left out alone. An answer that carries diagnostics, which
+    a runner answers only to its operator, is projected onto the caller's view (:func:`caller_view_of`), decided from
+    the document as it came, before any member is left out, since this machine is not the runner's operator; so is the
+    failed run's own problem an answer nests (`run_error`), which is the run's stored record, in its operator's view,
+    whatever view the answer around it is in.
+
+    The reading never fails: a problem the standard's client validated always makes one, and the last resort for one
+    that would not is `runtime.unexpected`, so the command always prints a problem.
+
+    Args:
+        problem: The problem as the standard's client reads it.
+        request_id: The request the answer belongs to, when the client read it off the answer and the problem names none.
+
+    Returns:
+        The problem, in the caller's view.
+    """
+    members = problem.as_wire()
+    received = _readable_problem(members=members)
+    if received is None:
+        return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.CALLER, request_id=request_id)
+    if request_id and received.request_id is None:
+        received = received.model_copy(update={"request_id": request_id})
+    if _holds_diagnostics(members=members):
+        return caller_view_of(problem=received)
+    if received.run_error is not None:
+        # A runner's caller-view answer may still nest the run's record as it was stored, in its operator's view, with an
+        # operator-only next step and nothing that tells its view, so the record is projected whatever the answer's view.
+        return received.model_copy(update={"run_error": caller_view_of(problem=received.run_error)})
+    return received
+
+
+class _BareAnswerReading(NamedTuple):
+    """The code an answer that is no problem document reads as here, and the next step that names this client's settings."""
+
+    code: CoreCode
+    next_step: str
+
+
+def _bare_answer_reading(*, status: int, credential_sent: bool) -> _BareAnswerReading | None:
+    """The reading of an answer that is no problem document by its status, for the statuses this client reads itself.
+
+    pipelex-sdk reads the hosted edge's bare `401` as `auth.missing_credential`, since the edge answers it to a request
+    that carries no key, and its bare `403` as `auth.invalid_credential`: this client knows whether the request carried
+    a key, so either is `auth.missing_credential` when none was sent and `auth.invalid_credential` when one was. A bare
+    `404` is `request.not_found`: the server at the base URL serves no such route.
+
+    Returns:
+        The reading, or ``None`` for a status whose reading by pipelex-sdk stands, with its code's own next step.
+    """
     match status:
         case 401 | 403 if not credential_sent:
-            return _RefusalReading(code=CoreCode.AUTH_MISSING_CREDENTIAL, next_step=HOSTED_MISSING_KEY_NEXT_STEP)
-        case 401:
-            return _RefusalReading(code=CoreCode.AUTH_INVALID_CREDENTIAL, next_step=by_status[401])
-        case 403 if plane_code in _PLANE_AUTHORIZATION_CODES:
-            return _RefusalReading(code=CoreCode.AUTH_FORBIDDEN, next_step=HOSTED_FORBIDDEN_NEXT_STEP)
-        case 403:
-            return _RefusalReading(code=CoreCode.AUTH_INVALID_CREDENTIAL, next_step=by_status[403])
+            return _BareAnswerReading(code=CoreCode.AUTH_MISSING_CREDENTIAL, next_step=HOSTED_MISSING_KEY_NEXT_STEP)
+        case 401 | 403:
+            return _BareAnswerReading(code=CoreCode.AUTH_INVALID_CREDENTIAL, next_step=HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[status])
         case 404:
-            match plane_code:
-                # The platform's code for a run it holds none of, which pipelex-sdk names no constant for.
-                case "run_not_found":
-                    return _RefusalReading(code=CoreCode.RUN_NOT_FOUND, next_step=None)
-                case MethodErrorCode.METHOD_VERSION_NOT_FOUND:
-                    return _RefusalReading(code=CoreCode.METHOD_NOT_FOUND, next_step=by_status[404])
-                case _:
-                    return _RefusalReading(code=CoreCode.REQUEST_NOT_FOUND, next_step=by_status[404])
-        case 429:
-            return _RefusalReading(code=CoreCode.ACCOUNT_RATE_LIMITED, next_step=by_status[429])
+            return _BareAnswerReading(code=CoreCode.REQUEST_NOT_FOUND, next_step=HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS[404])
         case _:
             return None
 
 
-def _sent_retry_after(*, error: ApiResponseError) -> float | None:
-    """How long the hosted plane said to wait, in seconds: its `Retry-After` header, else its body's own member.
+def _answered_problem(*, error: ApiResponseError, credential_sent: bool) -> PipelexProblem:
+    """The problem of an answer the hosted API, or a server in front of it, gave: the body's own, or this client's reading.
 
-    Whether the delay is one a problem can carry, and whether its code invites a retry at all, is :func:`make_problem`'s.
+    A body that is a problem document is the runner's own problem, reported as it came (:func:`received_problem`),
+    with the request id the answer names. Any other body is the bare answer of the hosted edge, a gateway or a proxy,
+    which pipelex-sdk reads by its status alone: an answer that may have started a run keeps its reading as
+    `client.outcome_unknown`, and a status this client reads itself (:func:`_bare_answer_reading`) reads as that code,
+    with the next step that names this client's settings; any other keeps pipelex-sdk's reading.
     """
-    from_header = parse_retry_after((error.headers or {}).get("retry-after"))
-    if from_header is not None:
-        return from_header
-    sent = (error.problem_document or {}).get(_SENT_RETRY_AFTER_MEMBER)
-    if isinstance(sent, int | float) and not isinstance(sent, bool):
-        return sent
-    return None
+    received = received_problem(problem=error.problem, request_id=error.request_id)
+    if read_problem_document(error.response_body, status=error.status, headers=error.headers or {}) is not None:
+        return received
+    match received.effective_retry:
+        case RetryVerdict.OUTCOME_UNKNOWN:
+            return received
+        case RetryVerdict.YES | RetryVerdict.NO:
+            pass
+    reading = _bare_answer_reading(status=error.status, credential_sent=credential_sent)
+    if reading is None:
+        return received
+    problem = make_problem(code=reading.code, view=ProblemView.CALLER, request_id=error.request_id)
+    return problem.model_copy(update={"status": error.status, "next_step": NextStep(kind=problem.next_step.kind, detail=reading.next_step)})
 
 
-def answered_in_former_shape(*, error: ApiResponseError) -> bool:
-    """Whether a refusal is an answer in a shape that predates the standard's problem document, read by its status alone.
+def _upload_transport_next_step(*, reason: UploadTransportReason | None) -> str | None:
+    """The next step of an upload of an input's file that met a transport failure, ``None`` where its code's own fits."""
+    match reason:
+        case UploadTransportReason.TIMEOUT | UploadTransportReason.UNREACHABLE:
+            return HOSTED_UNREACHABLE_NEXT_STEP
+        case (
+            UploadTransportReason.SERVER_ERROR
+            | UploadTransportReason.STORAGE_TIMEOUT
+            | UploadTransportReason.CONFLICT
+            | UploadTransportReason.REDIRECTED
+            | UploadTransportReason.INVALID_GRANT_URL
+            | UploadTransportReason.UNEXPECTED
+            | None
+        ):
+            return None
 
-    An answer that is a problem document of the standard speaks for itself, and one that may have started a run keeps the
-    client's reading as `client.outcome_unknown`, so neither is.
+
+def _method_file_transfer_next_step(*, reason: MethodFileTransferReason) -> str:
+    """The next step of a file of the method's tree that could not be moved, by why it failed.
+
+    Running again is the step for a reason pipelex-sdk reads as `runtime.unavailable`, which a later attempt can pass,
+    and the others are reported, since storage gives the same answer to the same upload.
     """
-    if error.run_may_have_started:
-        return False
-    return read_problem_document(error.response_body, status=error.status, headers=error.headers or {}) is None
-
-
-def _client_reading(*, error: ApiResponseError) -> PipelexProblem:
-    """The client's reading of a refusal, by the members the standard declares alone.
-
-    A member beside them, such as a `run_error` or `diagnostics` of Pipelex's in a shape no reader takes, is left out, so
-    the reading never fails: the members of a problem the client validated always make one.
-    """
-    standard = {name: value for name, value in error.problem.as_wire().items() if name in Problem.model_fields}
-    return PipelexProblem.model_validate(standard)
-
-
-def hosted_refusal_problem(*, error: ApiResponseError, credential_sent: bool) -> PipelexProblem | None:
-    """An answer in a shape that predates the standard's problem document, as the problem the agent CLI reports for it.
-
-    The hosted plane answers its own refusals in that shape (a closed `code` such as `unauthorized` or `rate_limited`,
-    beside `error_domain` and `retryable`), and so does a runner for a refusal it authors itself, such as the `422` an
-    older runner answers for a reserved input key. The standard's client reads such an answer by its status alone,
-    `client.response_unreadable` for most, losing its reason and what to do.
-
-    - A refusal whose status and plane code name a core code (:func:`_hosted_refusal_reading`) reads as that code, in
-      the caller's view (:func:`make_problem`), the plane's own `detail` kept, its request id, the delay its
-      `Retry-After` header or its body states, and the step it advised, else the step the human CLI gives its status.
-    - Any other answer that gives its reason keeps the client's reading, its code and its status, by the standard's
-      members alone (:func:`_client_reading`), with that reason as its `detail` and the step the human CLI gives it
-      (:func:`hosted_refusal_next_step`), so the reader is told what the body said rather than to report a body it
-      never sees. The step's kind is the one the answer's advice names (:data:`FORMER_ADVICE_KINDS`), else
-      `change_input` for a `4xx`, a refusal of the caller's request, and the client's reading's for any other status.
-
-    The agent CLI reads an answer that lists validation items before this one is asked, as a method that does not
-    validate (`pipelex.cli.agent_cli.commands.run._run_hosted`), since only it codes the items.
-
-    Args:
-        error: The refusal, as the client raised it.
-        credential_sent: Whether the request carried a key, which tells a refused key from a missing one.
-
-    Returns:
-        The problem, or ``None`` when the answer is a problem document of the standard, which speaks for itself, when it
-        may have started a run, whose reading as `client.outcome_unknown` stands, when its status is one the standard
-        reads as a code, or when it names no core code here and gives no reason.
-    """
-    if not answered_in_former_shape(error=error):
-        return None
-    reading = _hosted_refusal_reading(status=error.status, plane_code=error.code, credential_sent=credential_sent)
-    if reading is not None:
-        return _coded_refusal_problem(error=error, reading=reading)
-    if error.status in STATUS_READINGS or not error.server_message:
-        return None
-    reason_kept = _client_reading(error=error)
-    # A refusal of the caller's request asks for a change to it; any other answer is the runtime's to explain. Advice
-    # the answer gave is the step's detail, so the step takes the kind that advice names.
-    status_kind = StepKind.CHANGE_INPUT if 400 <= error.status < 500 else reason_kept.next_step.kind
-    advice = error.user_action
-    kind = FORMER_ADVICE_KINDS.get(advice.kind, status_kind) if advice is not None else status_kind
-    updates: dict[str, Any] = {
-        "status": error.status,
-        "detail": error.server_message,
-        "next_step": NextStep(kind=kind, detail=hosted_refusal_next_step(error=error)),
-    }
-    if error.request_id:
-        updates["request_id"] = error.request_id
-    return reason_kept.model_copy(update=updates)
-
-
-def _coded_refusal_problem(*, error: ApiResponseError, reading: _RefusalReading) -> PipelexProblem:
-    """A refusal of the hosted plane as the core code it reads as, with what the plane said of it (:func:`hosted_refusal_problem`)."""
-    problem = make_problem(code=reading.code, view=ProblemView.CALLER, retry_after=_sent_retry_after(error=error), request_id=error.request_id)
-    if error.user_action is not None:
-        step_detail = error.user_action.detail
-    else:
-        step_detail = reading.next_step or problem.next_step.detail
-    return problem.model_copy(
-        update={
-            "status": error.status,
-            "detail": error.server_message or problem.detail,
-            "next_step": NextStep(kind=problem.next_step.kind, detail=step_detail),
-        }
-    )
+    match reason:
+        case MethodFileTransferReason.UNREACHABLE:
+            return HOSTED_FILE_UNREACHABLE_NEXT_STEP
+        case MethodFileTransferReason.STORAGE_ERROR:
+            return HOSTED_FILE_STORAGE_ERROR_NEXT_STEP
+        case MethodFileTransferReason.MISMATCH:
+            return HOSTED_FILE_MISMATCH_NEXT_STEP
+        case MethodFileTransferReason.REFUSED:
+            return HOSTED_FILE_REFUSED_NEXT_STEP
 
 
 def tailored_next_step(*, error: PipelineRequestError) -> str | None:
-    """The next step the human CLI tailors for a failure the client met, ``None`` when it gives the generic one.
+    """The next step this client tailors for a failure it met on its own side, ``None`` where its code's own step fits.
 
-    The agent CLI reports the problem the client decided for such a failure, whose step its code gives, and takes this
-    one in its place where there is one, so both CLIs tell the same thing (:func:`describe_hosted_error`).
+    The step names this client's settings and the run it means, which the code's own step, written for every client,
+    cannot. An answer the hosted API gave is read apart (:func:`_answered_problem`), and a run that started and failed
+    keeps its code's step, which points at the run's own problem.
     """
-    next_step = describe_hosted_error(error=error).next_step
-    return None if next_step == HOSTED_RUN_REQUEST_NEXT_STEP else next_step
-
-
-class SentVerdict(NamedTuple):
-    """The `error_domain` and `retryable` a hosted API's problem document carried, each `None` when it sent none."""
-
-    error_domain: str | None
-    retryable: bool | None
-
-
-def sent_verdict(*, error: ApiResponseError) -> SentVerdict:
-    """The verdict the hosted API sent with a refusal, read off the problem document it answered.
-
-    pipelex-sdk gives every `ApiResponseError` a decided `error_domain` and `retryable`, filling a member the server
-    did not send from its own table by status, which reads every unlabelled 5xx, a 503 included, as retryable. A 503
-    does not say whether the run happened (see `_UNAVAILABLE_NEXT_STEP`), and who has to act is only the runner's to
-    say, so both CLIs report what the server sent and nothing the SDK inferred. `problem_document` keeps the server's
-    members as it sent them; `problem` is the standard's reading of the answer, which may be inferred from the status.
-    """
-    problem_document = error.problem_document or {}
-    sent_domain = problem_document.get("error_domain")
-    sent_retryable = problem_document.get("retryable")
-    return SentVerdict(
-        error_domain=sent_domain if isinstance(sent_domain, str) and sent_domain else None,
-        retryable=sent_retryable if isinstance(sent_retryable, bool) else None,
-    )
-
-
-class HostedErrorView(NamedTuple):
-    """A hosted run's failure, as both CLIs tell it: the class to branch on, what happened, and what to do next.
-
-    `error_domain` says who acts (`input`: the caller's request; `config`: the key, the base URL or the network;
-    `runtime`: the run itself), as the hosted API said it when it did; `retryable` is the hosted API's own verdict,
-    `None` when it gave none. `pipeline_run_id` names the run once the hosted API acknowledged it, so a run that failed,
-    outlived the wait, was lost on the way or was left running by an interruption can be looked up.
-    `validation_errors` are the hosted API's items locating the faults of a method it refused, each naming its file
-    when the file was sent under a label.
-    """
-
-    error_type: str
-    message: str
-    next_step: str
-    error_domain: str | None = None
-    retryable: bool | None = None
-    pipeline_run_id: str | None = None
-    validation_errors: tuple[ValidationErrorItem, ...] = ()
-
-
-def hosted_refusal_next_step(*, error: ApiResponseError) -> str:
-    """The next step of a refusal: the one the server advised, else the one its status calls for."""
-    if error.user_action is not None:
-        return error.user_action.detail
-    by_status = HOSTED_REFUSAL_NEXT_STEPS_BY_STATUS.get(error.status)
-    if by_status is not None:
-        return by_status
-    if 400 <= error.status < 500:
-        return HOSTED_REFUSAL_CALLER_NEXT_STEP
-    return HOSTED_SERVER_FAULT_NEXT_STEP
-
-
-def hosted_refusal_message(*, error: ApiResponseError) -> str:
-    """`API POST /v1/start failed (422): <reason>`, the error's own message without the next step it appends."""
-    message = str(error)
-    if error.user_action is not None:
-        message = message.removesuffix(f"\nNext step: {error.user_action.detail}")
-    return message
-
-
-def describe_hosted_error(*, error: PipelineRequestError | HostedRunError) -> HostedErrorView:
-    """Read a hosted run's failure off the error pipelex-sdk or pipelex raised.
-
-    Args:
-        error: The SDK's error, or one pipelex raised during the run. Its class decides the next step; an
-            `ApiResponseError` names the runner's own class when the problem document carries one, and a failed run
-            names its stored report's.
-
-    Returns:
-        The class to report, the message, the next step, and the run and the validation items when there are any.
-    """
-    error_type = type(error).__name__
-    message = str(error)
-    next_step: str
-    error_domain: str | None = None
-    retryable: bool | None = None
-    pipeline_run_id: str | None = None
-    validation_errors: tuple[ValidationErrorItem, ...] = ()
     match error:
-        case HostedRunError():
-            message = error.message
-            next_step = error.user_action.detail if error.user_action is not None else HOSTED_RUN_REQUEST_NEXT_STEP
-            # Who acts and whether a retry can succeed are the error's code's.
-            hosted_code_spec = error_code_spec(error.resolve_error_code())
-            error_domain = ErrorDomain.from_problem_domain(hosted_code_spec.domain)
-            retryable = hosted_code_spec.invites_retry
-            if isinstance(error, (HostedRunPollingError, HostedRunInterruptedError)):
-                pipeline_run_id = error.pipeline_run_id
-            if isinstance(error, HostedMethodInvalidError):
-                validation_errors = tuple(error.validation_errors)
-        case ApiResponseError():
-            error_type = error.error_type or error_type
-            message = hosted_refusal_message(error=error)
-            next_step = hosted_refusal_next_step(error=error)
-            error_domain, retryable = sent_verdict(error=error)
-            validation_errors = tuple(error.validation_errors or ())
-        case RunFailedError():
-            report = error.error
-            pipeline_run_id = error.run_id
-            error_domain = ErrorDomain.RUNTIME
-            if report is not None:
-                error_type = report.error_type or error_type
-                error_domain = report.error_domain or error_domain
-                retryable = report.retryable
-                validation_errors = tuple(report.validation_errors or ())
-            if report is not None and report.user_action is not None and report.user_action.detail:
-                next_step = report.user_action.detail
-            else:
-                next_step = f"The run {error.run_id} ended {error.status}: change what the message names, then run again"
         case RunTimeoutError():
-            pipeline_run_id = error.run_id
-            error_domain = ErrorDomain.RUNTIME
-            next_step = (
+            return (
                 f"The run {error.run_id} keeps running on the hosted API: find it on app.pipelex.com, or read its result "
                 "later with pipelex-sdk's PipelexAPIClient.wait_for_result"
             )
         case MissingMainStuffError():
-            pipeline_run_id = error.run_id
-            error_domain = ErrorDomain.RUNTIME
-            next_step = (
+            return (
                 f"The run {error.run_id} completed, but the hosted API delivered no main output: look the run up by its id on "
                 "app.pipelex.com, and report it with the run id"
             )
         case PipelineExecuteTimeoutError():
             # A hosted run calls the blocking route only on a server that keeps no runs (its version handshake says so,
             # or its start refused for a missing run store), so running again takes the same route and repeats a paid run.
-            error_domain = ErrorDomain.RUNTIME
-            retryable = False
-            next_step = (
+            return (
                 "The server at the base URL keeps no runs to poll, so the run went through the blocking route and the connection "
                 "was cut before the result came back. The run may still be going there, and running the command again runs the "
                 "method again on the same route: raise the timeout of the proxy in front of that server, or point --base-url or "
                 f"{PIPELEX_BASE_URL_ENV_KEY} at a server that keeps runs, such as {HOSTED_API_DEFAULT_BASE_URL}"
             )
         case ApiUnreachableError():
-            error_domain = ErrorDomain.CONFIG
-            next_step = HOSTED_UNREACHABLE_NEXT_STEP
+            # A request that may have started a run keeps its code's step, which reads the run rather than sends it again.
+            match error.problem.effective_retry:
+                case RetryVerdict.OUTCOME_UNKNOWN:
+                    return None
+                case RetryVerdict.YES | RetryVerdict.NO:
+                    return HOSTED_UNREACHABLE_NEXT_STEP
         case RunLifecycleUnavailableError():
-            error_domain = ErrorDomain.CONFIG
-            next_step = f"The server at the base URL is a bare runner without run polling. {HOSTED_BASE_URL_NEXT_STEP}"
+            return f"The server at the base URL is a bare runner without run polling. {HOSTED_BASE_URL_NEXT_STEP}"
         case UploadAuthenticationError():
-            error_domain = ErrorDomain.CONFIG
-            next_step = HOSTED_API_KEY_NEXT_STEP
+            return HOSTED_API_KEY_NEXT_STEP
         case InvalidLocalSourceError():
-            error_domain = ErrorDomain.INPUT
-            next_step = "Check the file path in the inputs: a relative path in an inputs file resolves against that file's directory"
+            return "Check the file path in the inputs: a relative path in an inputs file resolves against that file's directory"
         case RejectedAssetError():
-            error_domain = ErrorDomain.INPUT
-            next_step = "The hosted API refused the file: send a smaller one, or one of a type the input accepts"
+            return "The hosted API refused the file: send a smaller one, or one of a type the input accepts"
         case UnsupportedUploadCapabilityError():
-            error_domain = ErrorDomain.CONFIG
-            next_step = f"The server at the base URL takes no uploads: pass the file as an http(s) URL. {HOSTED_BASE_URL_NEXT_STEP}"
+            return f"The server at the base URL takes no uploads: pass the file as an http(s) URL. {HOSTED_BASE_URL_NEXT_STEP}"
         case UploadTransportError():
-            # The SDK raises it for an upload that never reached the hosted API, chained from `ApiUnreachableError`,
-            # and for one the hosted API failed on its side, a 5xx.
-            if isinstance(error.__cause__, ApiUnreachableError):
-                error_domain = ErrorDomain.CONFIG
-                next_step = HOSTED_UNREACHABLE_NEXT_STEP
-            else:
-                error_domain = ErrorDomain.RUNTIME
-                next_step = HOSTED_SERVER_FAULT_NEXT_STEP
+            return _upload_transport_next_step(reason=error.reason)
         case InputPreparationError():
-            error_domain = ErrorDomain.INPUT
-            next_step = "Check the inputs against the pipe's signature (pipelex-agent inputs prints a template), then run again"
+            return "Check the inputs against the pipe's signature (pipelex-agent inputs prints a template), then run again"
+        case MethodFileTransferError():
+            # A file of the method's tree, sent by hash, that could not be uploaded before pipe-io or the run.
+            return _method_file_transfer_next_step(reason=error.reason)
         case _:
-            next_step = HOSTED_RUN_REQUEST_NEXT_STEP
-    return HostedErrorView(
-        error_type=error_type,
-        message=message,
-        next_step=next_step,
-        error_domain=error_domain,
-        retryable=retryable,
-        pipeline_run_id=pipeline_run_id,
-        validation_errors=validation_errors,
-    )
+            return None
+
+
+def _method_invalid_problem(*, error: HostedMethodInvalidError) -> PipelexProblem:
+    """The problem of a method pipe-io's verdict found does not load: `method.invalid`, listing the verdict's items as they came.
+
+    The runner answered its verdict to its caller already, so its items are reported as a runner's own problem is
+    (:func:`received_problem`): by the members the standard declares alone, since pipelex-sdk keeps those it does not
+    declare as it received them, and never projected onto a view again. A projection would read an item under a code
+    this client's registry does not hold, as a runner newer than the client answers, as one whose parameters it cannot
+    tell apart, and replace its sentence and its parameters with the generic sentence, losing the runner's explanation.
+    """
+    head = error.to_problem(view=ProblemView.CALLER)
+    verdict_items = [ProblemItem.model_validate(_declared_members(members=item.as_wire(), shape=ProblemItem)) for item in error.errors]
+    return head.model_copy(update={"errors": verdict_items or None})
+
+
+def hosted_failure_problem(*, error: PipelineRequestError | HostedRunError, credential_sent: bool) -> PipelexProblem:
+    """The problem of a run on a runner that failed, in the caller's view: the runner's, the client's, or pipelex's own.
+
+    - An answer the hosted API, or a server in front of it, gave is the runner's own problem document when its body is
+      one, and otherwise this client's reading of the bare answer (:func:`_answered_problem`).
+    - A run that started and failed is `run.failed`, naming the run and its status, and nests the run's own problem as
+      `run_error`, projected onto the caller's view (:func:`received_problem`).
+    - Every other failure the client met carries the problem it decided, such as `client.unreachable` naming the base
+      URL, with the next step this client tailors for it (:func:`tailored_next_step`) in place of its code's.
+    - A failure pipelex detects itself is its `HostedRunError`'s problem, naming the run the hosted API acknowledged
+      when there is one, and a method the hosted API found does not load lists the verdict's items as its `errors`,
+      as they came, by their declared members alone (:func:`_method_invalid_problem`).
+
+    Args:
+        error: The failure.
+        credential_sent: Whether the run's requests carried a key, which tells a refused key from a missing one.
+
+    Returns:
+        The problem, in the caller's view.
+    """
+    if isinstance(error, HostedRunPollingError | HostedRunInterruptedError):
+        return error.to_problem(view=ProblemView.CALLER, pipeline_run_id=error.pipeline_run_id)
+    if isinstance(error, HostedMethodInvalidError):
+        return _method_invalid_problem(error=error)
+    if isinstance(error, HostedRunError):
+        return error.to_problem(view=ProblemView.CALLER)
+    if isinstance(error, ApiResponseError):
+        return _answered_problem(error=error, credential_sent=credential_sent)
+    problem = received_problem(problem=error.problem)
+    tailored = tailored_next_step(error=error)
+    if tailored is None:
+        return problem
+    return problem.model_copy(update={"next_step": NextStep(kind=problem.next_step.kind, detail=tailored)})
+
+
+class HostedErrorView(NamedTuple):
+    """A hosted run's failure, as both CLIs tell it: its problem, the error's own sentence, and pipelex's own advice.
+
+    `problem` is in the caller's view (:func:`hosted_failure_problem`): its title and its detail, its next step, its
+    code with its domain and its retry verdict, the request and the run it names, the faults it lists as its `errors`,
+    and, for a run that started and failed, the run's own problem it nests as `run_error`. `message` is the error's own
+    sentence when it says what the problem does not, `None` when the problem says it all. `advice` is what pipelex's own
+    error advises, which a CLI prints as its tip and no problem carries.
+    """
+
+    problem: PipelexProblem
+    message: str | None
+    advice: str | None
+
+
+def describe_hosted_error(*, error: PipelineRequestError | HostedRunError, credential_sent: bool) -> HostedErrorView:
+    """Read a hosted run's failure off the error pipelex-sdk or pipelex raised, as both CLIs report it.
+
+    pipelex's own errors give their sentence and their advice. Every error of pipelex-sdk's own gives its sentence,
+    which says what its code's parameters cannot: the reason a run that failed stored, how long the client waited for
+    one that did not finish, that a completed run delivered no main output. An answer's refusal and a runner that
+    cannot be reached give none, their problem saying it all, where their sentence would quote a raw body or a
+    transport's class, and so does an error of the MTHDS client's.
+
+    Args:
+        error: The SDK's error, or one pipelex raised during the run.
+        credential_sent: Whether the run's requests carried a key, which tells a refused key from a missing one.
+
+    Returns:
+        The problem, the error's own sentence and pipelex's own advice.
+    """
+    problem = hosted_failure_problem(error=error, credential_sent=credential_sent)
+    message: str | None
+    advice: str | None
+    if isinstance(error, PipelexError):
+        message = error.message
+        advised_action = error.advised_action()
+        advice = advised_action.detail if advised_action is not None else None
+    elif isinstance(error, PipelexRequestError) and not isinstance(error, ApiResponseError | ApiUnreachableError):
+        message = str(error)
+        advice = None
+    else:
+        message = None
+        advice = None
+    return HostedErrorView(problem=problem, message=message, advice=advice)

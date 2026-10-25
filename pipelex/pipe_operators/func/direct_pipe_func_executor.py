@@ -136,6 +136,7 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
 
         Raises:
             PipeFuncExecutionError: The call's files cannot be read back as a tree, or the function runs past its timeout.
+            PipeFuncRaisedError: The function raised; its parameters name the function and the step.
         """
         self._write_generated_structures(crate=request.crate, tree_root=tree_root)
         try:
@@ -225,6 +226,11 @@ class DirectPipeFuncExecutor(PipeFuncExecutorProtocol):
                 .with_error_code(CoreCode.PIPE_FUNCTION_TIMED_OUT)
                 .with_params(function=request.function_name, timeout=request.timeout_seconds)
             ) from exc
+        except PipeFuncRaisedError as exc:
+            # The function's own failure names its step here: no router locates it in the process that runs the call, and
+            # the problem a sandbox reports for it (`pipe_func_raised_report`) is taken as it is where the call was made.
+            exc.with_params(pipe=pipe_func.code)
+            raise
 
         # Wrap the output in a memory so it round-trips with its concept (and thus its class identity).
         pipe = get_library_manager().get_library(library_id=TRANSPORTED_LIBRARY_ID).pipe_library.get_required_pipe(pipe_code=request.pipe_code)

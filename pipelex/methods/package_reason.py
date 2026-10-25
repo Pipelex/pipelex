@@ -42,3 +42,7 @@ class MethodPackageReason(StrEnum):
     VERSION_INVALID = "version_invalid"
     # The method's tree cannot be listed: a path it names is missing, one of its files cannot be read, or its manifest does not parse.
     TREE_UNREADABLE = "tree_unreadable"
+    # A file of the method's tree changed, was removed or became unreadable between the tree's listing and a read of it.
+    TREE_CHANGED = "tree_changed"
+    # The method's `methods.lock` is not UTF-8 text, does not parse, or records an entry the lock format refuses.
+    LOCK_INVALID = "lock_invalid"

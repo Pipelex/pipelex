@@ -20,7 +20,7 @@ The hosted model catalog is not in this repository: the hosted plane carries it.
 
 ## 1. Establish the facts, from the provider
 
-Build a fact sheet before touching a file, and give every fact its source. The provider's own documentation is the primary source: its model page, its pricing page and its API reference name the exact model id, the input and output modalities, the prices, whether it reasons and how that is controlled, and which request parameters it refuses. Fetch those pages. OpenRouter is a useful cross-check for prices and modalities (`references/openrouter-price-lookup.md`), not a substitute: it lags new releases, and it cannot tell you which parameters a model deprecates.
+Build a fact sheet before touching a file, and give every fact its source. The provider's own documentation is the primary source: its model page, its pricing page and its API reference name the exact model id, the input and output modalities, the prices, whether it reasons and how that is controlled, and which request parameters it refuses. Fetch those pages. Use `.venv/bin/pipelex-dev openrouter list-models -f <name> --json` from a development checkout for OpenRouter facts; read `ok` and its `models` list. OpenRouter is a useful cross-check for prices and modalities (`references/openrouter-price-lookup.md`), not a substitute: it lags new releases, and it cannot tell you which parameters a model deprecates.
 
 | Fact | Where it goes | Watch for |
 |---|---|---|

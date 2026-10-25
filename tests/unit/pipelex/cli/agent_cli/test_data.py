@@ -186,120 +186,6 @@ class UndeclaredMembers:
     }
 
 
-class HostedPlaneRefusals:
-    """Refusals the hosted plane answers in its own shape, which predates the standard's problem document."""
-
-    UNAUTHORIZED: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/unauthorized",
-            "title": "Unauthorized",
-            "status": 401,
-            "code": "unauthorized",
-            "detail": "The API key is not valid.",
-            "instance": "urn:pipelex:request:01M55PLEGACY401000000000000",
-            "request_id": "01M55PLEGACY401000000000000",
-            "error_domain": "config",
-            "retryable": False,
-        }
-    )
-    FORBIDDEN: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/role_not_permitted",
-            "title": "Forbidden",
-            "status": 403,
-            "code": "role_not_permitted",
-            "detail": "Your role in this organization does not allow running methods.",
-            "request_id": "01M55PLEGACY403000000000000",
-            "error_domain": "input",
-            "retryable": False,
-        }
-    )
-    # The platform's generic refusal of an operation to a key it authenticated, which is no matter of role.
-    FORBIDDEN_OPERATION: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/forbidden",
-            "title": "Forbidden",
-            "status": 403,
-            "code": "forbidden",
-            "detail": "This route is served to a web session only.",
-            "error_domain": "config",
-            "retryable": False,
-        }
-    )
-    # A 403 whose code is no refusal of an operation but of the credential, as a key that expired.
-    FORBIDDEN_EXPIRED_KEY: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/api_key_expired",
-            "title": "Forbidden",
-            "status": 403,
-            "code": "api_key_expired",
-            "detail": "The API key has expired.",
-            "error_domain": "config",
-            "retryable": False,
-        }
-    )
-    NOT_FOUND: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/not_found",
-            "title": "Not found",
-            "status": 404,
-            "code": "not_found",
-            "detail": "No route serves POST /v1/execute.",
-            "error_domain": "config",
-            "retryable": False,
-        }
-    )
-    RATE_LIMITED: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/rate_limited",
-            "title": "Too many requests",
-            "status": 429,
-            "code": "rate_limited",
-            "detail": "Too many runs started in the last minute.",
-            "request_id": "01M55PLEGACY429000000000000",
-            "error_domain": "runtime",
-            "retryable": True,
-        }
-    )
-    # A run the platform knows no run by, which names the run it means by its own code.
-    RUN_NOT_FOUND: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/run_not_found",
-            "title": "Not found",
-            "status": 404,
-            "code": "run_not_found",
-            "detail": "No run run_9 is visible to this key.",
-            "error_domain": "input",
-            "retryable": False,
-        }
-    )
-    # A method version the method never published, which names the method by its own code.
-    METHOD_VERSION_NOT_FOUND: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/method_version_not_found",
-            "title": "Not found",
-            "status": 404,
-            "code": "method_version_not_found",
-            "detail": "The method mt_7 has no published version 3.",
-            "error_domain": "input",
-            "retryable": False,
-        }
-    )
-    # A rate limit whose delay rides the body alone, with no `Retry-After` header.
-    RATE_LIMITED_BODY_DELAY: ClassVar[str] = json.dumps(
-        {
-            "type": "https://pipelex.com/errors/rate_limited",
-            "title": "Too many requests",
-            "status": 429,
-            "code": "rate_limited",
-            "detail": "Too many runs started in the last minute.",
-            "retry_after_seconds": 12,
-            "error_domain": "runtime",
-            "retryable": True,
-        }
-    )
-
-
 class GatewayAnswers:
     """Answers that are no problem document, which a gateway or a hosted plane in front of the runner may give."""
 
@@ -309,45 +195,10 @@ class GatewayAnswers:
     NOT_FOUND: ClassVar[str] = '{"detail":"Not Found"}'
     # A gateway's refusal of a request its authorizer did not let through.
     FORBIDDEN: ClassVar[str] = '{"message":"Forbidden"}'
-
-
-class RunnerOwnRefusals:
-    """Refusals a runner authors itself rather than raising a Pipelex error for, in the shape that predates the standard's."""
-
-    # The runner's 422 for a run request carrying a reserved object key, as `raise_validation_error` answers it: a
-    # reason, but no code, domain, retry verdict or next step the standard's client reads.
-    RESERVED_OBJECT_KEY: ClassVar[str] = json.dumps(
-        {
-            "type": "https://docs.pipelex.com/latest/errors/reserved-object-key/",
-            "title": "Reserved object key",
-            "status": 422,
-            "detail": (
-                "Request body contains the reserved object key '__class__'. A run request is plain JSON: no object in it may "
-                "carry a '__class__' or '__module__' key, or a key starting with '__kajson'."
-            ),
-            "instance": "urn:pipelex:request:01M55PRESERVED00000000000",
-            "request_id": "01M55PRESERVED00000000000",
-            "error_type": "ReservedObjectKey",
-            "error_domain": "input",
-            "retryable": False,
-        }
-    )
-    # The reason and the advice of a refusal whose advice names a kind of its own.
-    NO_CREDIT_REASON: ClassVar[str] = "The account has no inference credit left."
-    NO_CREDIT_ADVICE: ClassVar[str] = "Add credit to the account on app.pipelex.com, then run again"
-    # A 402 advising the caller to check its billing: a reason and an advice of the kind `check_billing`, but no code,
-    # domain, retry verdict or next step the standard's client reads.
-    NO_CREDIT: ClassVar[str] = json.dumps(
-        {
-            "type": "https://docs.pipelex.com/latest/errors/payment-required/",
-            "title": "Payment required",
-            "status": 402,
-            "detail": NO_CREDIT_REASON,
-            "error_domain": "config",
-            "retryable": False,
-            "user_action": {"kind": "check_billing", "detail": NO_CREDIT_ADVICE},
-        }
-    )
+    # A gateway's refusal of a request that carried no credential it reads.
+    UNAUTHORIZED: ClassVar[str] = '{"message":"Unauthorized"}'
+    # A gateway's throttle.
+    TOO_MANY_REQUESTS: ClassVar[str] = '{"message":"Too Many Requests"}'
 
 
 class RetiredEnvelope:
@@ -372,44 +223,8 @@ class RetiredEnvelope:
 
 
 class StoredRunReports:
-    """Reports the hosted API may store for a failed run, as `RunFailedError.error` hands them back."""
+    """The run's own problem the hosted API may store for a failed run, which `run.failed` nests as its `run_error`."""
 
-    # The report in the shape the hosted plane wrote before it stored problem documents.
-    FORMER_SHAPE: ClassVar[dict[str, Any]] = {
-        "error_type": "LLMCompletionError",
-        "message": "The provider refused the prompt",
-        "error_domain": "runtime",
-        "error_category": "transient",
-        "retryable": True,
-        "model": "claude-5.5-sonnet",
-        "user_action": {"kind": "wait_and_retry", "detail": "Run it again in a minute"},
-    }
-    # A report in the former shape for a run whose method did not validate, with the items and the advice it gives.
-    FORMER_SHAPE_WITH_ITEMS: ClassVar[dict[str, Any]] = {
-        "error_type": "ValidateBundleError",
-        "message": "The method does not validate: pipe 'draft' names an unknown model",
-        "title": "Validate bundle error",
-        "type_uri": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
-        "error_domain": "input",
-        "error_category": "configuration",
-        "retryable": False,
-        "caller_facing_message": True,
-        "user_action": {"kind": "change_model", "detail": "Name a model the catalog knows, such as gpt-5.5, then run again"},
-        "validation_errors": [
-            {
-                "category": "pipe_validation",
-                "message": "Pipe 'draft' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck",
-                "error_type": "unknown_model",
-                "pipe_code": "draft",
-                "field_name": "model",
-                "model_reference": "gpt-5.1",
-                "model_type": "llm",
-                "suggestions": ["gpt-5.5"],
-                "source": "main.mthds",
-                "pipe_type": "PipeLLM",
-            }
-        ],
-    }
     # The run's own problem, as a runner that speaks the problem document stores it, in the operator's view.
     PROBLEM: ClassVar[dict[str, Any]] = {
         "type": "https://mthds.ai/errors/pipe.output_multiplicity",
@@ -437,102 +252,67 @@ class StoredRunReports:
         "provider_metadata": {"region": "eu"},
         "validation_errors": [{"category": "pipe_validation", "message": "multiplicity"}],
     }
+    # A run refused at load, its stored problem listing the method's faults as its items, in the operator's view.
+    PROBLEM_WITH_ITEMS: ClassVar[dict[str, Any]] = {
+        "type": "https://mthds.ai/errors/method.invalid",
+        "title": "The method does not validate",
+        "detail": "The method does not validate.",
+        "code": "method.invalid",
+        "domain": "method",
+        "retry": "no",
+        "next_step": {"kind": "change_method", "detail": "Fix each fault the problem's errors list, then validate the method again."},
+        "errors": [
+            {
+                "code": "model.unknown",
+                "detail": "The method names the llm model 'claude-5.5-sonnet', which no catalog knows.",
+                "params": {"model": "claude-5.5-sonnet", "model_type": "llm"},
+                "location": {"pipe": "draft", "field": "model", "file": "main.mthds"},
+            }
+        ],
+        "diagnostics": {"error_class": "ValidateBundleError", "message": "the bundle does not load"},
+    }
 
 
-class HostedMethodItems:
-    """The items of `POST /v1/pipe-io`'s verdict that a method does not load, and the problem items the agent CLI reports."""
+class PipeIoItems:
+    """The items of a pipe-io verdict for a method that does not load, as sent and as both CLIs report them.
+
+    pipelex-sdk reads each item member by member: a declared member that does not read is left out of its item alone,
+    so the item keeps its code, its locators and its other facts, and a member the standard does not declare is kept
+    as received, which the CLIs leave out, reporting each item by its declared members.
+    """
 
     SENT: ClassVar[list[dict[str, Any]]] = [
-        # An item no stage classified: its message is the finding of `method.schema_violation`.
-        {"category": "blueprint_validation", "message": "unknown concept Foo", "source": "lib/b.mthds", "pipe_code": "step2"},
-        # An item of a type this version reads, with the locators the model check gives it.
-        {
-            "category": "pipe_validation",
-            "message": "Pipe 'draft' (PipeLLM), field 'model': Model handle 'gpt-5.1' was not found in the model deck",
-            "error_type": "unknown_model",
-            "pipe_code": "draft",
-            "field_name": "model",
-            "model_reference": "gpt-5.1",
-            "model_type": "llm",
-            "suggestions": ["gpt-5.5"],
-            "source": "main.mthds",
-        },
-        # An item of a newer runner, whose type this version does not read.
-        {"category": "pipe_validation", "message": "A kind of fault from a newer runner", "error_type": "some_future_fault", "pipe_code": "step3"},
-    ]
-    # An item of a type this version reads, carrying a field neither this version nor the SDK declares.
-    SENT_WITH_AN_UNKNOWN_FIELD: ClassVar[dict[str, Any]] = {**SENT[1], "pipe_type": "PipeLLM"}
-    # A missing dependency of a newer runner, whose fix carries a member the SDK reads and this version does not.
-    SENT_WITH_AN_UNREADABLE_FIX: ClassVar[dict[str, Any]] = {
-        "category": "pipe_validation",
-        "message": "In-memory resolve cannot load address-based dependency 'github.com/mthds/scoring-lib/scoring'.",
-        "error_type": "unresolved_package_dependency",
-        "pipe_code": "score_invoice",
-        "source": "bundle.mthds",
-        "field_path": "pipe.score_invoice.steps[0].pipe",
-        "missing_pipe_code": "github.com/mthds/scoring-lib/scoring->scoring.score",
-        "suggested_fix": {
-            "fix_code": "ship-dependency",
-            "description": "Ship the dependency with the method",
-            "safety": "unsafe",
-            "ops": [{"kind": "set_key", "table_path": ["pipe", "score_invoice"], "key": "note", "value": "shipped"}],
-            "preview": "A member a newer runner adds to its fixes",
-        },
-    }
-    # Its problem item: the missing dependency its type and its locators give, without the fix this version cannot read.
-    UNREADABLE_FIX_PROBLEM_ITEM: ClassVar[dict[str, Any]] = {
-        "code": "method.dependency_missing",
-        "detail": "The method depends on the package 'github.com/mthds/scoring-lib/scoring', which is not available here (reason: not_found).",
-        "params": {"kind": "package", "name": "github.com/mthds/scoring-lib/scoring", "reason": "not_found"},
-        "location": {"pipe": "score_invoice", "field": "pipe.score_invoice.steps[0].pipe", "file": "bundle.mthds"},
-    }
-    PROBLEM_ITEMS: ClassVar[list[dict[str, Any]]] = [
-        {
-            "code": "method.schema_violation",
-            "detail": "The declaration at 'pipe.step2' breaks a rule of the language (unknown concept Foo).",
-            "params": {"field_path": "pipe.step2", "finding": "unknown concept Foo"},
-            "location": {"pipe": "step2", "file": "lib/b.mthds"},
-        },
         {
             "code": "model.unknown",
             "detail": "The method names the llm model 'gpt-5.1', which no catalog knows.",
-            "params": {"model": "gpt-5.1", "model_type": "llm", "suggestions": ["gpt-5.5"]},
+            "params": {"model": "gpt-5.1", "model_type": "llm"},
             "location": {"pipe": "draft", "field": "model", "file": "main.mthds"},
             "suggestions": ["gpt-5.5"],
         },
         {
-            "code": "method.schema_violation",
-            "detail": "The declaration at 'pipe.step3' breaks a rule of the language (A kind of fault from a newer runner).",
-            "params": {"field_path": "pipe.step3", "finding": "A kind of fault from a newer runner"},
-            "location": {"pipe": "step3"},
+            "code": "method.concept_unresolved",
+            "detail": "Pipe 'summarize' names the concept 'Summary', which no domain defines.",
+            "location": {"pipe": "summarize", "field": "output", "file": "lib/summarize.mthds"},
+            "suggested_fix": "define the concept",
+            "rank": 2,
         },
     ]
-
-
-class RunnerOwnMethodRefusals:
-    """A runner's refusal of a run request whose method does not validate, in the shape that predates the standard's."""
-
-    # The reason and the advice the refusal gives.
-    REASON: ClassVar[str] = "The method does not validate: pipe 'draft' names an unknown model"
-    ADVICE: ClassVar[str] = "Name a model the catalog knows, such as gpt-5.5, then run again"
-    # The 422 a runner answers `POST /v1/start` and `POST /v1/execute` with for a method that does not load, as
-    # `ValidateBundleError` answers it in the former shape: its reason, its advice and the validation items locating the
-    # faults, but no code, domain, retry verdict or next step the standard's client reads.
-    INVALID_METHOD: ClassVar[str] = json.dumps(
+    REPORTED: ClassVar[list[dict[str, Any]]] = [
+        SENT[0],
         {
-            "type": "https://docs.pipelex.com/latest/errors/validate-bundle-error/",
-            "title": "Validate bundle error",
-            "status": 422,
-            "detail": REASON,
-            "instance": "urn:pipelex:request:01M55PINVALIDMETHOD000000",
-            "request_id": "01M55PINVALIDMETHOD000000",
-            "error_type": "ValidateBundleError",
-            "error_domain": "input",
-            "retryable": False,
-            "user_action": {"kind": "change_model", "detail": ADVICE},
-            "validation_errors": HostedMethodItems.SENT[:2],
-        }
-    )
+            "code": "method.concept_unresolved",
+            "detail": "Pipe 'summarize' names the concept 'Summary', which no domain defines.",
+            "location": {"pipe": "summarize", "field": "output", "file": "lib/summarize.mthds"},
+        },
+    ]
+    # An item under a code this client's registry does not hold, as a hosted API newer than the client may answer: the
+    # runner's own sentence and parameters are all the client has to tell the fault by.
+    NEWER_CODE: ClassVar[dict[str, Any]] = {
+        "code": "method.construct_unsupported_here",
+        "detail": "Pipe 'summarize' uses the construct 'streamed_output', which this method's runtime introduced.",
+        "params": {"construct": "streamed_output"},
+        "location": {"pipe": "summarize", "file": "main.mthds"},
+    }
 
 
 class RefusedBundles:

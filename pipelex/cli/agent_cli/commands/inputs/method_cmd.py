@@ -50,7 +50,8 @@ def inputs_method_cmd(
 
     Resolves the method by name, finds its .mthds bundle, and generates inputs.
     Outputs the JSON envelope (or raw TOML with --format toml) to stdout on
-    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown.
+    success, and the problem to stderr on error with exit code 1, as JSON unless --error-format says markdown; a
+    command line that does not parse exits 2.
 
     Examples:
         pipelex-agent inputs method my-method

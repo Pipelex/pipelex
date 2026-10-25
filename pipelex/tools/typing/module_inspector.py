@@ -2,6 +2,7 @@ import ast
 import importlib.util
 import inspect
 import sys
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,13 @@ from pipelex.tools.typing.exceptions import ModuleFileError
 #: The directories `import_module_from_file` put on `sys.path`, each once, so that whoever unloads the modules of a
 #: directory, such as the process's hold on a method tree's Python, takes the entries introduced beneath it off again.
 _inserted_module_dirs: list[str] = []
+
+
+#: Held while `import_module_from_file` publishes a module in `sys.modules` and executes it, and by a library load around
+#: its imports and the class discovery that reads them (`LibraryManager.load_libraries`). Method loads run in parallel
+#: worker threads, and a module is published before it executes, so without it a second load could take a module half
+#: executed, or discover the classes of one, as complete. Reentrant, since a module executing may import another by file.
+MODULE_IMPORT_LOCK = threading.RLock()
 
 
 def import_module_from_file(file_path: Path) -> Any:
@@ -38,37 +46,47 @@ def import_module_from_file(file_path: Path) -> Any:
     # Convert file path to module-style path to use as the actual module name
     module_name = convert_file_path_to_module_path(file_path)
 
-    # Check if module is already loaded to avoid duplicate loading
-    if module_name in sys.modules:
-        return sys.modules[module_name]
+    # The module is published before it executes, so another thread must not read it until it has: the check, the
+    # publication and the execution hold the lock together.
+    with MODULE_IMPORT_LOCK:
+        # Check if module is already loaded to avoid duplicate loading
+        if module_name in sys.modules:
+            return sys.modules[module_name]
 
-    # Use importlib.util to load the module from file path
-    spec = importlib.util.spec_from_file_location(module_name, str(file_path))
-    if spec is None or spec.loader is None:
-        msg = f"Could not load module from {file_path}"
-        raise ModuleFileError(msg)
+        # Use importlib.util to load the module from file path
+        spec = importlib.util.spec_from_file_location(module_name, str(file_path))
+        if spec is None or spec.loader is None:
+            msg = f"Could not load module from {file_path}"
+            raise ModuleFileError(msg)
 
-    module = importlib.util.module_from_spec(spec)
+        module = importlib.util.module_from_spec(spec)
 
-    # Add the module to sys.modules to ensure proper imports within the module
-    sys.modules[module_name] = module
+        # Add the module to sys.modules to ensure proper imports within the module
+        sys.modules[module_name] = module
 
-    # Put the file's OWN directory on sys.path so a module imported by path can import its siblings
-    # (e.g. `from helpers import ...` between files in the same bundle). Importing via
-    # spec_from_file_location does NOT do this automatically — unlike running a script, where the
-    # script's directory lands on sys.path[0]. Without it, a top-level sibling import raises
-    # ModuleNotFoundError and the module never finishes importing. Deduped, so repeated scans don't
-    # grow sys.path unbounded.
-    module_dir = str(file_path.resolve().parent)
-    if module_dir not in sys.path:
-        sys.path.insert(0, module_dir)
-        if module_dir not in _inserted_module_dirs:
-            _inserted_module_dirs.append(module_dir)
+        # Put the file's OWN directory on sys.path so a module imported by path can import its siblings
+        # (e.g. `from helpers import ...` between files in the same bundle). Importing via
+        # spec_from_file_location does NOT do this automatically — unlike running a script, where the
+        # script's directory lands on sys.path[0]. Without it, a top-level sibling import raises
+        # ModuleNotFoundError and the module never finishes importing. Deduped, so repeated scans don't
+        # grow sys.path unbounded.
+        module_dir = str(file_path.resolve().parent)
+        if module_dir not in sys.path:
+            sys.path.insert(0, module_dir)
+            if module_dir not in _inserted_module_dirs:
+                _inserted_module_dirs.append(module_dir)
 
-    # Execute the module
-    spec.loader.exec_module(module)
+        # Execute the module. One that fails to execute leaves `sys.modules`, as the import system's own imports do, so a
+        # later import executes it again rather than taking the half-executed module as imported.
+        executed = False
+        try:
+            spec.loader.exec_module(module)
+            executed = True
+        finally:
+            if not executed and sys.modules.get(module_name) is module:
+                del sys.modules[module_name]
 
-    return module
+        return module
 
 
 def drop_module_dirs_inserted_under(*, directory: Path) -> None:

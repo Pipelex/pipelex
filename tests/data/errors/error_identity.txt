@@ -203,6 +203,8 @@ MethodFetchDisabledError | method.dependency_missing
 MethodFetchError | one of method.fetch_failed, pipelex.config.dependency_missing, method.not_found, method.package_invalid
 MethodFileUnavailableError | one of runtime.unexpected, method.resource_missing
 MethodInstallError | one of pipelex.config.invalid, method.package_invalid
+MethodLockInvalidError | method.package_invalid
+MethodLockMismatchError | security.integrity_mismatch
 MethodNotFoundError | method.not_found
 MethodPackageAmbiguityError | method.ambiguous
 MethodPackageNotFoundError | method.not_found
@@ -214,6 +216,7 @@ MethodRequirementsError | abstract
 MethodRequirementsFileError | method.package_invalid
 MethodRequirementsNotMetError | method.dependency_missing
 MethodStructuresRefusedError | pipelex.deployment.python_structures_refused
+MethodTreeChangedError | method.package_invalid
 MethodTreeLoadError | method.package_invalid
 MigrationError | abstract
 MigrationGoldenError | runtime.unexpected

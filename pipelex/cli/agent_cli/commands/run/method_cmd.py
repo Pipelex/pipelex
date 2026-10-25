@@ -141,7 +141,7 @@ def run_method_cmd(
             stdin_fallback=True,
         )
         request = HostedRunRequest(
-            mthds_files=target.mthds_files,
+            contents=target.contents,
             method_ref=target.method_ref,
             method_id=target.method_id,
             pipe_code=target.pipe_code,

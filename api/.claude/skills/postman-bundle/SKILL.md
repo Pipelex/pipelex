@@ -13,7 +13,8 @@ description: >-
   API", "test /v1/resolve on this bundle", "give me the curl
   for this bundle", or just "postman" said alongside a bundle path. It resolves the bundle exactly like
   `pipelex run bundle <path>` (auto-detects bundle.mthds / the single .mthds, reads main_pipe, loads the
-  sibling inputs.json). Trigger it even when the user does not name the endpoint or the word "skill".
+  sibling inputs.json) and sends the method's whole tree as `files`. Trigger it even when the user does not
+  name the endpoint or the word "skill".
 ---
 
 # Postman Bundle
@@ -24,13 +25,13 @@ This is a focused, one-bundle-at-a-time tool. It is **not** the full collection 
 
 ## Endpoint cheat sheet
 
-| `--endpoint` | Route | Body envelope | Needs a pipe? | Needs `inputs`? | Inference? |
+| `--endpoint` | Route | Body beside `files` | Needs a pipe? | Needs `inputs`? | Inference? |
 |---|---|---|---|---|---|
-| `execute` | `POST /v1/execute` | run (`pipe_code`) | yes | yes | **YES — costs money** |
-| `start` | `POST /v1/start` | run + `callback_urls` | yes | yes | **YES — costs money** |
-| `validate` | `POST /v1/validate` | `mthds_contents` | no | no | no (free dry-run) |
-| `resolve` | `POST /v1/resolve` | `files[]` crate | no | no | no (free) |
-| `codegen` | `POST /v1/codegen` | `files[]` crate + `kind`/`target` | no | no | no (free) |
+| `execute` | `POST /v1/execute` | `pipe_code`, `inputs` | yes | yes | **YES — costs money** |
+| `start` | `POST /v1/start` | `pipe_code`, `inputs`, `callback_urls` | yes | yes | **YES — costs money** |
+| `validate` | `POST /v1/validate` | `allow_signatures`, optional `render` | no | no | no (free dry-run) |
+| `resolve` | `POST /v1/resolve` | nothing | no | no | no (free) |
+| `codegen` | `POST /v1/codegen` | `kind`, `target` | no | no | no (free) |
 
 Every non-run endpoint answers with the **`/validate` verdict discipline**: a produced verdict is always a `200` discriminated on `is_valid` — the artifact on the valid arm, structured `errors[]` problem items on the invalid arm. Non-2xx is reserved for no-verdict conditions (request-shape `422`, auth `401`, server `5xx`), rendered as RFC 9457 `problem+json` with a registry `code`.
 
@@ -49,32 +50,35 @@ Which requests appear depends on `--endpoint`: the default `both` is `execute` +
 
 (The top folder used to be `Run Bundle/` — if a stale folder by that name lingers in the collection, it can be deleted.)
 
-## The two request envelopes
+## The request body: the method as `files`
 
-**Run + validate routes** carry the bundle as parallel lists — `mthds_contents` (full text of each `.mthds` file, main one first) plus, on `/validate`, `mthds_sources` (one filename per content, so `errors[].location.file` names the owning file):
+Every route carries the method the same way: `files`, the MTHDS standard's map of file entries. Each key is a file's tree path, its path from the method tree's root, and each value is the file's UTF-8 text, or `{"base64": "..."}` for a file whose bytes are not UTF-8, such as an image or an office template:
 
 ```json
 {
-  "pipe_code": "<the bundle's main_pipe>",
-  "mthds_contents": ["<file text>", "..."],
+  "pipe_code": "greeting.greet",
   "inputs": { "...": "inputs.json copied verbatim" },
-  "allow_signatures": false
+  "files": {
+    "bundle.mthds": "domain = \"greeting\"\nmain_pipe = \"greet\"\n...",
+    "templates/card.html": "<p>Hello, {{ text }}</p>\n",
+    "assets/logo.png": { "base64": "iVBORw0KGgo..." }
+  }
 }
 ```
 
-(`pipe_code` and `inputs` ride execute/start only; `allow_signatures` rides validate.)
+`pipe_code` and `inputs` ride execute/start only, `allow_signatures` and the optional `render` ride validate, and `kind`/`target` ride codegen; `resolve` sends `files` alone. The **start** body additionally carries `callback_urls` (see [Callback URLs](#callback-urls-the-async-start-endpoint)). `files` comes last in every body, so the fields you edit in Postman stay on top.
 
-**Crate routes** (`resolve`, `codegen`) pair each content with its source in one `files[]` entry — the envelope the codegen spec pins. No `inputs`; the closure is the whole request:
+What travels is **every file of the method's tree**, listed by the `mthds` package's own lister, so it is judged by the same membership rule the runner and every MTHDS client apply (the standard's `method-tree.md`):
 
-```json
-{
-  "kind": "types",
-  "target": "ts-zod",
-  "files": [{ "content": "<file text>", "source": "<file name>" }]
-}
-```
+- **The root** is the nearest directory at or above the bundle holding `METHODS.toml`, else the directory you point at. A `.mthds` file named alone with no `METHODS.toml` above it travels as the one-file tree of that file, nothing beside it.
+- **What stays out**: every path segment starting with a dot (`.git/`, `.venv/`, `.env`, `.mthds/`), `__pycache__` and `node_modules`, virtual environments, nested repositories and nested packages, the tree's own `.gitignore`d files and the manifest's `[package] exclude` patterns.
+- **A run's inputs file never travels as a file.** The standard keeps every file named `inputs.json` or `inputs.toml`, at any depth, out of every tree, and a runner applying that rule refuses such a key. The `mthds` lister pinned here still lists it, so the script drops it from `files` itself: the sibling `inputs.json` travels as `inputs` on execute/start and nowhere else.
+- **Never by hash.** The standard's third entry form, `{"sha256", "size"}`, names bytes the runner already holds in its blob store, which only an upload (`POST /v1/blobs/missing`, then `PUT /v1/blobs/{sha256}`) puts there. A Postman query or a curl command never uploads, so every file travels inline.
+- **No retired fields.** The skill never sends `mthds_contents`, `mthds_sources`, `bundle_b64` or `resources`.
 
-(`kind`/`target` are codegen-only.) The **start** body additionally carries `callback_urls` (see [Callback URLs](#callback-urls-the-async-start-endpoint)). The **validate** body optionally carries `render` (see below).
+The listing stops at the runner's own limits on a tree a request sends (the `MAX_METHOD_TREE_*` limits of `pipelex_api.limits`), so pointing the skill at a large directory by mistake fails in moments. The script also refuses a main bundle the membership rule keeps out of the tree, such as a `.gitignore`d one, since the `pipe_code` read from it would name a pipe the runner never receives.
+
+The `pipe_code` the script infers is the main bundle's `main_pipe` **qualified by that bundle's domain** (`greeting.greet`, not `greet`): the whole tree travels, so a sibling bundle declaring a pipe of the same code would make a bare code ambiguous, which the runner refuses. An explicit `--pipe` is sent exactly as given.
 
 ## Validate = the API's dry-run
 
@@ -96,7 +100,7 @@ Which requests appear depends on `--endpoint`: the default `both` is `execute` +
 
 The valid arm carries the **stamped** artifact set plus its `codegen.lock`: a client that writes them verbatim reproduces a local `pipelex codegen types` run **byte-for-byte** and passes the offline `pipelex codegen check`. There is deliberately no server-side check route (the drift check is offline by design). An unknown `kind`/`target`, or a `pipe_ref` on the concept-set-wide `types`, is a request-shape `422`.
 
-`--target` is **required** for codegen — there is no default; ask the user which consumer they're generating for if unclear. The request envelope also accepts a `method_ref` instead of `files[]` (an address-form reference is fetched and resolved; only the registry form answers `501`) — this skill always sends `files[]`.
+`--target` is **required** for codegen — there is no default; ask the user which consumer they're generating for if unclear. The request also accepts a `method_ref` instead of `files` (an address-form reference is fetched and resolved; the registry form is a `422 request.unsupported`) — this skill always sends `files`.
 
 ## Callback URLs (the async `start` endpoint)
 
@@ -114,7 +118,7 @@ This only affects `start` — no other endpoint takes `callback_urls`. The API's
 
 ## How to run it
 
-Every command on this page runs from `api/`, the server's directory in the pipelex repository: `cd api` first, or prefix the make targets with `-C api` from the repository root (`make -C api bundle-run …`), and give `BUNDLE` and the script's paths relative to `api/`. The make targets are the convenient wrapper (they run the script with the server's venv):
+Every command on this page runs from `api/`, the server's directory in the pipelex repository: `cd api` first, or prefix the make targets with `-C api` from the repository root (`make -C api bundle-run …`), and give `BUNDLE` and the script's paths relative to `api/`. The script lists the method's tree with the `mthds` package and reads the runner's limits from `pipelex_api`, so it runs with the server's own environment, `api/.venv`, never a bare `python3`. The make targets are the convenient wrapper: they install that environment, then run the script with it.
 
 ```bash
 make bundle-run      BUNDLE=<dir|.mthds>                 # POST to a running API, print the response
@@ -131,13 +135,13 @@ make bundle-dry      BUNDLE=<dir|.mthds>                 # print the request bod
 
 `bundle-validate` / `bundle-resolve` / `bundle-codegen` hardcode `--run` with their endpoint (they're free and safe to run live).
 
-Under the hood it's one script that resolves the bundle once and sends the request to one of four sinks. `<bundle-path>` is a bundle **directory** (preferred) or a single `.mthds` file. Call the script directly for a path outside the repo or finer control:
+Under the hood it's one script that resolves the bundle once and sends the request to one of four sinks. `<bundle-path>` is a bundle **directory** (preferred) or a single `.mthds` file. Call the script directly for a path outside the repo or finer control, with the server's environment (`make install` creates it when it is missing):
 
 **Push into the Postman collection** (default). Source the env first so the Postman key is present (it lives in `~/.zshenv`):
 
 ```bash
 source ~/.zshenv 2>/dev/null
-python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> [--endpoint <ep>] [--target <t>]
+.venv/bin/python .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> [--endpoint <ep>] [--target <t>]
 ```
 
 After a successful push, tell the user it's in Postman (it auto-syncs), and that they should set `base_url` and `auth_token` in their Postman environment, then Send.
@@ -145,7 +149,7 @@ After a successful push, tell the user it's in Postman (it auto-syncs), and that
 **Run it yourself from Claude Code** — POSTs the exact same body to a running API and prints the response:
 
 ```bash
-python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint <ep>
+.venv/bin/python .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint <ep>
 # defaults to http://127.0.0.1:8081 and no auth (AUTH_MODE=none). Override:
 #   --base-url https://api.pipelex.com   --token <bearer>
 ```
@@ -153,12 +157,12 @@ python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-pat
 The API must be up — start it locally with `make run` first. **Heads-up: only `execute`/`start` trigger real inference (cost + latency)** — confirm the user wants a live run for those. Every other endpoint is free and safe to fire without confirmation:
 
 ```bash
-python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint validate
-python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint resolve
-python3 .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint codegen --target python-pydantic
+.venv/bin/python .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint validate
+.venv/bin/python .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint resolve
+.venv/bin/python .claude/skills/postman-bundle/scripts/build_postman_query.py <bundle-path> --run --endpoint codegen --target python-pydantic
 ```
 
-**Emit a curl command** (`--curl`) — writes the body to a temp file and prints a `curl --data @file`, so the multi-line contents never need shell escaping. **Preview only** (`--dry-run`) — print the request body, touch nothing.
+**Emit a curl command** (`--curl`) — writes the body to a temp file and prints a `curl --data @file`, so the files' contents never need shell escaping. **Preview only** (`--dry-run`) — print the request body, touch nothing. Every mode prints the tree's root and the files it sends first, marking those that travel in Base64.
 
 Useful options (apply across modes):
 
@@ -169,7 +173,7 @@ Useful options (apply across modes):
 | `--allow-signatures` | (validate only) Tolerate unimplemented pipe signatures. Default strict. |
 | `--render <fmt>` | (validate only) Opt-in server-side view, e.g. `--render markdown` → response carries `rendered_markdown` (what a skill-driven validate sends). Omit for the lean structured body a hook reads. Repeatable. |
 | `--inputs <path>` | Inputs JSON lives elsewhere, or you point at a `.mthds` file directly (file mode does not auto-detect inputs). execute/start only. |
-| `--pipe <pipe_code>` | The bundle has no `main_pipe`, or you want a different pipe. Used by execute/start (as `pipe_code`); ignored by validate/resolve/codegen. |
+| `--pipe <pipe_code>` | The bundle has no `main_pipe`, or you want a different pipe. Used by execute/start (as `pipe_code`, exactly as given, so write `domain.pipe_code` when another bundle of the tree declares the same code); ignored by validate/resolve/codegen. |
 | `--callback-url <url>` | (start only) Webhook the async result is POSTed to. Repeatable. Falls back to `CALLBACK_URL` in env/`.env`. |
 | `--base-url` / `--token` | Target server + bearer for `--run`/`--curl`. |
 | `--name <folder>` | Override the per-bundle Postman subfolder name. |
@@ -185,16 +189,16 @@ Useful options (apply across modes):
 
 ## Resolution rules (mirrors `pipelex run bundle`)
 
-- **Directory** → use `bundle.mthds` if present, else the single `*.mthds` in the dir. Multiple `.mthds` and no `bundle.mthds` is ambiguous → ask the user to pass the file directly. The sibling `inputs.json` is auto-detected. Every `*.mthds` in the directory is sent (main one first), so multi-file bundles resolve.
-- **`.mthds` file** → used as-is; inputs only come from `--inputs`.
-- **`pipe_code`** (run routes) comes from the bundle's `main_pipe` (override with `--pipe`).
-- **`inputs`** is the inputs.json content copied verbatim — exactly what the API receives, same as the CLI.
+- **Directory** → the main bundle is `bundle.mthds` if present, else the single `*.mthds` in the dir. Multiple `.mthds` and no `bundle.mthds` is ambiguous → ask the user to pass the file directly. The sibling `inputs.json` is auto-detected. The directory's whole method tree is sent as `files`, its bundles in subdirectories included, so multi-file methods resolve.
+- **`.mthds` file** → the main bundle is that file, and the tree it belongs to is sent: the package's tree when a `METHODS.toml` sits at or above its directory, else that one file. Inputs only come from `--inputs`.
+- **`pipe_code`** (run routes) is the main bundle's `main_pipe`, qualified by its domain (override with `--pipe`, sent as given).
+- **`inputs`** is the inputs.json content copied verbatim — exactly what the API receives, same as the CLI. The file itself is never one of the `files`.
 
 ## Important: file/document inputs are out of scope
 
 We are not doing uploads. If inputs.json references a **local file** (e.g. `"url": "inputs/cv.pdf"`), the script copies it verbatim and prints a warning listing those URLs. Pass that warning on to the user: those entries must be replaced with real `https://` URLs before the request will run. Prefer demoing on a self-contained, text-input bundle.
 
-A related limit: the API receives only the inline bundle text, not the bundle directory. Bundles that depend on Python structure classes in a `structures/` folder (rather than inline `[concept.X.structure]` blocks) won't be fully self-contained over the API — flag that if you see a `structures/` dir doing real work.
+The method's own files are a different matter: a template, an image or a module the steps read travels in `files` with the bundles. Python is the one limit: a tree holding a `.py` file runs only on a sandbox-hosted runner (any other answers a `501`), and a Python structure class is refused on every runner, so a method whose concepts rely on a `structures/` folder of Python classes, rather than inline `[concept.X.structure]` blocks, will not run over the API — flag that if you see a `structures/` dir doing real work.
 
 ## If something's missing
 
@@ -203,6 +207,8 @@ A related limit: the API receives only the inline bundle text, not the bundle di
 - **`codegen` without `--target`** → the script exits listing the three targets; ask the user which consumer they're generating for.
 - **`start` selected via `--run`/`--curl` and no callback URL** → the script exits. Resolve from `--callback-url`, `CALLBACK_URL` in `.env`, or ask the user (e.g. a `https://webhook.site/...` endpoint). (The Postman push never hits this — it uses the `{{callback_url}}` variable and needs no resolution.)
 - **No `main_pipe`, validating/resolving** → fine, not an error: those endpoints need no pipe; validate just returns `graph_spec: null`.
+- **The tree cannot be listed** (a symbolic link or a name the standard refuses inside it, a malformed `METHODS.toml`, a tree past the runner's limits) or **the main bundle is outside its own tree** (`.gitignore`d, say) → the script exits naming the cause; fix the method's directory, or point at the method's own folder rather than a directory above it.
+- **`ModuleNotFoundError: mthds` or `pipelex_api`** → the script ran with the wrong interpreter: use `.venv/bin/python` from `api/` (`make install` creates it) or a `make bundle-*` target.
 
 ## Constants
 

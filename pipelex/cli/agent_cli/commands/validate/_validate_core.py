@@ -14,17 +14,21 @@ from pipelex.interpreter_hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.pipeline.advisory_warnings import collect_advisory_warnings, collect_current_library_entry_pipe_refs
 from pipelex.pipeline.blueprint_selection import collect_entry_pipe_refs
 from pipelex.pipeline.bundle_validator import BundleValidator
 from pipelex.pipeline.dry_run_warnings import build_dry_run_warnings
-from pipelex.pipeline.execution_seams import acquire_library
+from pipelex.pipeline.execution_seams import acquire_library_async
+from pipelex.pipeline.tree_files_read import tree_files_envelope_fields
 from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import build_pending_signatures, build_validated_pipes, validate_bundle
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from pipelex.libraries.method_tree_listing import MethodTreeListing
 
 
 async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_signatures: bool = False) -> dict[str, Any]:
@@ -49,19 +53,19 @@ async def validate_all_core(*, library_dirs: list[Path] | None = None, allow_sig
         prev_library_id = get_current_library_id_or_none()
         # A refusal of the libraries while loading them is the invalid verdict, through the shared
         # bundle-loading cascade, as on `validate bundle`. The directories are the caller's own, so
-        # acquire_library translates their load itself, while the library is still current: the translation
+        # acquire_library_async translates their load itself, while the library is still current: the translation
         # reads the library's pipe sources to locate an item, and a translation around the call would run
-        # only after acquire_library had torn the failed library down, leaving the item without its file.
-        # The sweep below stays untranslated on purpose: a failing dry run is answered as the DryRunError it
-        # is, as on `validate pipe`.
-        acquired_id, _ = acquire_library(
+        # only after the failed library was torn down, leaving the item without its file. The load runs in a
+        # worker thread, off the event loop. The sweep below stays untranslated on purpose: a failing dry run
+        # is answered as the DryRunError it is, as on `validate pipe`.
+        acquired_id, _ = await acquire_library_async(
             library_id="",
             library_dirs=[str(library_dir) for library_dir in library_dirs] if library_dirs else None,
             library_dirs_are_callers=True,
         )
         try:
             validation_report.describe(pipes=get_own_pipes())
-            # acquire_library left the freshly-acquired library current, so the inner sweep targets it
+            # acquire_library_async left the freshly-acquired library current, so the inner sweep targets it
             # (it filters signatures in strict mode itself). The returned map is keyed by namespaced pipe_ref.
             # A pipe whose dry run fails is the invalid verdict, one located dry_run item per failing pipe,
             # through the same cascade and item builder as `validate bundle`.
@@ -151,6 +155,8 @@ async def validate_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }
 
 
@@ -160,6 +166,7 @@ async def validate_method_folder_core(
     library_dirs: list[Path] | None,
     allow_signatures: bool,
     pipe_code: str | None,
+    tree_listing: MethodTreeListing | None = None,
 ) -> dict[str, Any]:
     """Validate a method's folder whole: every bundle of its method tree, as the MTHDS protocol's validation judges a method.
 
@@ -172,6 +179,8 @@ async def validate_method_folder_core(
         library_dirs: The folder and the ``-L`` directories, the caller's own.
         allow_signatures: Whether to accept PipeSignature placeholders in the dependency graph.
         pipe_code: The one pipe to dry-run, or None for every pipe of the method.
+        tree_listing: The listing the command resolved the folder through, which the validation loads its tree from, so
+            the tree is listed once; None lists it for the validation.
 
     Returns:
         Dictionary with validation results suitable for JSON serialization, ``bundle_path`` naming the folder.
@@ -188,6 +197,7 @@ async def validate_method_folder_core(
             allow_signatures=allow_signatures,
             dry_run_pipe_codes=[pipe_code] if pipe_code else None,
             collect_dry_run_warnings=True,
+            tree_listing=tree_listing,
         )
         warnings = collect_advisory_warnings(
             pipes=result.pipes,
@@ -206,6 +216,8 @@ async def validate_method_folder_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }
 
 
@@ -241,9 +253,9 @@ async def validate_pipe_core(
 
             if effective_dirs:
                 # A refusal of the libraries while loading them is the invalid verdict, through the shared
-                # bundle-loading cascade, as on `validate bundle`.
+                # bundle-loading cascade, as on `validate bundle`. The load runs in a worker thread, off the event loop.
                 with translate_to_validate_bundle_error():
-                    library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+                    await run_method_load(library_manager.load_libraries, library_id=library_id, library_dirs=effective_dirs)
 
             # The entry-pipe lookup stays outside the cascade: a code naming no pipe is no verdict. A pipe whose
             # dry run fails is the invalid verdict, one located dry_run item per failing pipe, as on `validate bundle`.
@@ -341,4 +353,6 @@ async def validate_pipe_in_bundle_core(
         "pending_signatures": result.pending_signatures,
         "is_runnable": not result.pending_signatures,
         "warnings": [warning.model_dump(exclude_none=True) for warning in warnings],
+        # The files of the method's tree each loaded pipe reads, and who reads each, as the canonical report states them.
+        **tree_files_envelope_fields(pipes=result.pipes),
     }

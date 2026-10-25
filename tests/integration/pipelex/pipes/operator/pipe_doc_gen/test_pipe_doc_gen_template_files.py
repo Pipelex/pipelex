@@ -14,6 +14,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.resolve_bundle import resolve_crate_from_method_dir
 from pipelex.pipeline.validate_bundle import ValidateBundleResult, validate_bundle
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import (
     METHOD_MANIFEST,
@@ -42,6 +43,15 @@ async def _validate_with_html_template_file(*, directory: Path, load: str, templ
             )
 
 
+async def _load_method(*, load: str, method_dir: Path, bundle_path: Path) -> None:
+    """Validate the bundle file, or resolve the crate of its method's folder as the runner's crate routes do."""
+    match load:
+        case "validate":
+            await validate_bundle(mthds_file_path=bundle_path)
+        case _:
+            resolve_crate_from_method_dir(method_dir=method_dir)
+
+
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeDocGenTemplateFiles:
     @pytest.mark.usefixtures("stub_engines")
@@ -58,10 +68,11 @@ class TestPipeDocGenTemplateFiles:
         ],
         ids=["missing_file", "gitignored", "hidden"],
     )
+    @pytest.mark.parametrize("load", ["validate", "resolve"])
     async def test_a_template_file_is_a_file_of_the_bundle_s_method_tree(
-        self, tmp_path: Path, template_file: str, expected_code: CoreCode, expected: str
+        self, tmp_path: Path, template_file: str, expected_code: CoreCode, expected: str, load: str
     ) -> None:
-        """A template file must be a file of the method's tree: one its membership rule keeps out is never read."""
+        """A template file must be a file of the method's tree, validated or resolved: one its membership rule keeps out is never read."""
         method_dir = tmp_path / "method"
         method_dir.mkdir()
         (method_dir / "ignored.docx").write_bytes(b"docx")
@@ -71,13 +82,14 @@ class TestPipeDocGenTemplateFiles:
         bundle_path = write_bundle(directory=method_dir, step_fields=f'format = "docx"\ntemplate_file = "{template_file}"')
 
         with pytest.raises(ValidateBundleError) as exc_info:
-            await validate_bundle(mthds_file_path=bundle_path)
+            await _load_method(load=load, method_dir=method_dir, bundle_path=bundle_path)
 
         assert only_problem_item(exc_info.value).code == expected_code
         assert expected in refusal_messages(exc_info.value)
 
     @pytest.mark.usefixtures("stub_engines")
-    async def test_a_template_file_outside_the_tree_is_the_method_s_security_refusal_not_a_verdict(self, tmp_path: Path) -> None:
+    @pytest.mark.parametrize("load", ["validate", "resolve"])
+    async def test_a_template_file_outside_the_tree_is_the_method_s_security_refusal_not_a_verdict(self, tmp_path: Path, load: str) -> None:
         """A template file that climbs out of the method's tree is refused under its security code, never absorbed into a verdict."""
         method_dir = tmp_path / "method"
         method_dir.mkdir()
@@ -85,7 +97,7 @@ class TestPipeDocGenTemplateFiles:
         bundle_path = write_bundle(directory=method_dir, step_fields='format = "docx"\ntemplate_file = "../outside.docx"')
 
         with pytest.raises(PipelexError) as exc_info:
-            await validate_bundle(mthds_file_path=bundle_path)
+            await _load_method(load=load, method_dir=method_dir, bundle_path=bundle_path)
 
         assert not isinstance(exc_info.value, ValidateBundleError)
         assert exc_info.value.resolve_error_code() == CoreCode.SECURITY_METHOD_PATH_REFUSED

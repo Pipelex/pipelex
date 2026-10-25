@@ -21,7 +21,7 @@ from pipelex_api.bundle_resources import decode_bundle_resources
 from pipelex_api.exception_handlers import problem_response
 from pipelex_api.exceptions import RequestFieldConflictError
 from pipelex_api.json_body import JsonBodyRoute
-from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method
+from pipelex_api.method_tree_request import RequestMethod, select_tree_entry, written_method_async
 from pipelex_api.middleware import request_id_of
 from pipelex_api.openapi_responses import PROBLEM_403_READ_SCOPE, PROBLEM_404_METHOD_PACKAGE, PROBLEM_500_HELD_BLOBS, PROBLEM_501_RUN_POLICY
 from pipelex_api.problem_view import problem_view_of
@@ -79,7 +79,10 @@ def _resolve_validation_views(views: list[str]) -> set[ValidationView]:
 
 
 class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
-    """The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.
+    """The method to validate, in `files`, by `method_ref` or as `mthds_contents`, plus `allow_signatures` and optional per-file sources.
+
+    `mthds_contents`, and the `mthds_sources` and `resources` that serve it, are being retired: a later release
+    refuses them, and a method is sent in `files`, whose bundles are named by their tree paths.
 
     `mthds_sources`, when provided, pairs each `mthds_contents[i]` with a logical source (e.g. the
     file's path relative to the submitted directory). The runner threads it onto
@@ -91,7 +94,8 @@ class ValidateRequest(MthdsContentsRequest, CallerAnalyticsGroupsMixin):
     mthds_sources: list[str] | None = Field(
         default=None,
         description=(
-            "Optional per-file sources, parallel to `mthds_contents`. When provided, each entry is threaded "
+            "Being retired with `mthds_contents`, and refused by a later release: the bundles of a method sent in `files` "
+            "are named by their tree paths. Optional per-file sources, parallel to `mthds_contents`. When provided, each entry is threaded "
             "onto the corresponding bundle's `source` so server-side validation errors carry a `source` pointing "
             "at the owning file. Must match `mthds_contents` in length when present."
         ),
@@ -366,7 +370,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
     - **Either arm:** a member with no value is absent rather than `null`, at the arm's top level and in its
       problem items; the structured artifacts of the valid arm keep their own serialization.
     - **No verdict (non-2xx):** a malformed request body, an `mthds_sources` length mismatch, or
-      both/neither of `mthds_contents` / `method_ref` is a request-shape **422**, and so is a forbidden
+      more or fewer than one of `files` / `method_ref` / `mthds_contents` is a request-shape **422**, and so is a forbidden
       `orchestration_mode` override; a host-wiring programmer error or a genuine orchestrator fault is a
       **5xx**; auth is **401/403**. A `method_ref` **resolution failure** is also a no-verdict condition —
       never an `is_valid: false`: each answers the status its code declares, such as a **422** for a
@@ -425,7 +429,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
         entry = _optional_tree_entry(request_method=request_method, method_label=method_label)
         tree_default_pipe_ref = entry.pipe_ref if entry is not None else None
         default_pipe_ref_known = True
-        with written_method(request_method=request_method) as written:
+        async with written_method_async(request_method=request_method) as written:
             verdict = await ApiRunner(
                 library_dirs=[str(written.method_dir)],
                 library_dirs_are_callers=True,

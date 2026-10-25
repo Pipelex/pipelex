@@ -2,7 +2,9 @@
 
 Execute pipelines with flexible input formats. Choose between synchronous execution (wait for completion) or asynchronous execution (non-blocking). Both routes are part of the [MTHDS Protocol](https://mthds.ai) — this server is the protocol's reference implementation.
 
-> **About `mthds_contents` and MTHDS.** An "MTHDS file" is a Pipelex pipeline definition written in TOML (with the `.mthds` extension). The `mthds_contents` field on every endpoint below is a JSON array of those file contents as raw strings — typically `[open("my_pipe.mthds").read()]` from a client. You can either pass a `pipe_code` referring to a pipe already registered on the server, pass `mthds_contents` inline (the array must contain a file with a `main_pipe` property), or both.
+> **About `files` and MTHDS.** An "MTHDS file" is a Pipelex pipeline definition written in TOML (with the `.mthds` extension), and a method is the folder holding its `.mthds` files with the other files its steps read. Both endpoints below take the method in `files`, a map from each file's path in the method's folder to that file's content, such as `{"summarize.mthds": "domain = \"hello\"\n…"}` — see [Sending a method as a tree](#sending-a-method-as-a-tree). With no `pipe_code`, the run starts at the method's entry pipe, its `main_pipe`; `pipe_code` names another pipe of the method to start at, or, sent alone, a pipe already registered on the server. A published method is run by its address instead, in `method_ref`.
+>
+> **`mthds_contents` is being retired.** The older field, a JSON array of `.mthds` texts that must include a file declaring `main_pipe` when no `pipe_code` is sent, is still accepted, together with `bundle_b64` and `resources`, but a later release refuses all three. Send the method in `files`.
 
 ### Execute Pipeline
 
@@ -16,8 +18,10 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 
 ```json
 {
-  "pipe_code": "your_pipeline_code",
-  "mthds_contents": null,
+  "pipe_code": null,
+  "files": {
+    "my_method.mthds": "domain = \"my_domain\"\nmain_pipe = \"my_pipe\"\n…"
+  },
   "inputs": {
     "input_name": "simple text or object"
   },
@@ -29,27 +33,28 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 
 **Request Fields:**
 
-- `pipe_code` (string, optional): The code identifying the pipeline to execute. Required if no `mthds_contents` is provided, or if `mthds_contents` doesn't have a `main_pipe` property. Can be combined with `mthds_contents` to specify which pipe to execute from the provided MTHDS definition.
-- `mthds_contents` (list[str], optional): Inline MTHDS file contents as raw strings (always an array, even for a single file). If provided without `pipe_code`, the bundle must contain a file with a `main_pipe` property.
+- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree: each key a tree path, each value the file's text, `{"base64": "…"}`, or `{"sha256": "…", "size": n}` naming bytes this runner holds — see [Sending a method as a tree](#sending-a-method-as-a-tree). Mutually exclusive with `mthds_contents`, `bundle_b64` and `method_ref`.
+- `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
-- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree: each key a tree path, each value the file's text, `{"base64": "…"}`, or `{"sha256": "…", "size": n}` naming bytes this runner holds — see [Sending a method as a tree](#sending-a-method-as-a-tree). Mutually exclusive with `mthds_contents`, `bundle_b64` and `method_ref`.
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
-- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of the method's folder, read as a map of its entries, which may carry the method packages it calls under `.mthds/methods/<name>/`. Mutually exclusive with `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
-- `resources` (dict[str, str], optional): **Pipelex-API extension.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or a method sent as a tree, whose tree each file joins at its path from the root; beside `method_ref`, or with no bundle at all, it is a 422. The job names the method's tree by its digest and carries none of its files: the step that reads one, on an orchestrator that runs the job remotely such as Temporal included, reads it through the deployment's method file store.
+- `mthds_contents` (list[str], optional): **Being retired: send the method in `files`.** Inline MTHDS file contents as raw strings (always an array, even for a single file). If provided without `pipe_code`, the bundle must contain a file with a `main_pipe` property. Still accepted until a later release refuses it.
+- `bundle_b64` (string, optional): **Pipelex-API extension, being retired with `mthds_contents`: send the method in `files`.** Base64-encoded zip of the method's folder, read as a map of its entries, which may carry the method packages it calls under `.mthds/methods/<name>/`. Mutually exclusive with `files`.
+- `resources` (dict[str, str], optional): **Pipelex-API extension, being retired with `mthds_contents`: put the files in the method's tree, in `files`.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or a method sent as a tree, whose tree each file joins at its path from the root; beside `method_ref`, or with no bundle at all, it is a 422. The job names the method's tree by its digest and carries none of its files: the step that reads one, on an orchestrator that runs the job remotely such as Temporal included, reads it through the deployment's method file store.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 
 **Validation Rules:**
 
-- At least one of `pipe_code`, `mthds_contents`, a method bundle, or `method_ref` must be provided
+- At least one of `files`, `method_ref`, `pipe_code` or a method sent the older way (`mthds_contents` or `bundle_b64`) must be provided
 - If only `pipe_code`: Must reference a pipe already registered in the library
-- If only `mthds_contents`: Must contain a `main_pipe` property
-- If both: `pipe_code` specifies which pipe to execute from the `mthds_contents`
+- With `files` and no `pipe_code`: the run starts at the method's entry pipe, the `main_pipe` of its root `METHODS.toml` or else the one `main_pipe` its bundles declare (see [Sending a method as a tree](#sending-a-method-as-a-tree))
+- With `mthds_contents` and no `pipe_code`: a file must declare `main_pipe`
+- With `pipe_code` beside a method: `pipe_code` specifies which pipe of that method to execute
 
 **Response:**
 
@@ -100,8 +105,10 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 
 ```json
 {
-  "pipe_code": "your_pipeline_code",
-  "mthds_contents": null,
+  "pipe_code": null,
+  "files": {
+    "my_method.mthds": "domain = \"my_domain\"\nmain_pipe = \"my_pipe\"\n…"
+  },
   "inputs": {
     "input_name": "simple text or object"
   },
@@ -113,27 +120,28 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 
 **Request Fields:**
 
-- `pipe_code` (string, optional): The code identifying the pipeline to execute. Required if no `mthds_contents` is provided, or if `mthds_contents` doesn't have a `main_pipe` property.
-- `mthds_contents` (list[str], optional): Inline pipeline definitions (always an array, even for a single file). If provided without `pipe_code`, must have a `main_pipe` property.
+- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree: each key a tree path, each value the file's text, `{"base64": "…"}`, or `{"sha256": "…", "size": n}` naming bytes this runner holds — see [Sending a method as a tree](#sending-a-method-as-a-tree). Mutually exclusive with `mthds_contents`, `bundle_b64` and `method_ref`.
+- `pipe_code` (string, optional): The code identifying the pipe to execute. Beside a method sent in `files`, it names the pipe to start at in place of the method's entry pipe; beside `method_ref`, it overrides the package's `main_pipe`; sent alone, it must name a pipe already registered on the server.
 - `inputs` (PipelineInputs, optional): Flexible input format - see [Input Format: PipelineInputs](#input-format-pipelineinputs) below
 - `output_name` (string, optional): Name for the output slot
 - `output_multiplicity` (string, optional): Output multiplicity setting (`"single"`, `"variable"`, or a specific number)
 - `dynamic_output_concept_ref` (string, optional): Override output concept ref
-- `files` (object, optional): The method as a map of file entries, the MTHDS standard's method tree: each key a tree path, each value the file's text, `{"base64": "…"}`, or `{"sha256": "…", "size": n}` naming bytes this runner holds — see [Sending a method as a tree](#sending-a-method-as-a-tree). Mutually exclusive with `mthds_contents`, `bundle_b64` and `method_ref`.
 - `dependencies` (object, optional): **Pipelex-API extension.** The method packages the method calls by address that the runner cannot fetch, each a map of file entries keyed by its address — see [Sending the method packages the method calls](#sending-the-method-packages-the-method-calls). Accompanies `files`.
-- `bundle_b64` (string, optional): **Pipelex-API extension.** Base64-encoded zip of the method's folder, read as a map of its entries, which may carry the method packages it calls under `.mthds/methods/<name>/`. Mutually exclusive with `files`.
 - `method_ref` (string, optional): **Pipelex-API extension.** Run a published method by address instead of inline source — see [Running a method by address](#running-a-method-by-address-method_ref). Mutually exclusive with `mthds_contents` and with a method sent as a tree; `pipe_code` may accompany it to override the package's `main_pipe`.
-- `resources` (dict[str, str], optional): **Pipelex-API extension.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or a method sent as a tree, whose tree each file joins at its path from the root; beside `method_ref`, or with no bundle at all, it is a 422. The job names the method's tree by its digest and carries none of its files: the step that reads one, on an orchestrator that runs the job remotely such as Temporal included, reads it through the deployment's method file store.
+- `mthds_contents` (list[str], optional): **Being retired: send the method in `files`.** Inline pipeline definitions (always an array, even for a single file). If provided without `pipe_code`, must have a `main_pipe` property. Still accepted until a later release refuses it.
+- `bundle_b64` (string, optional): **Pipelex-API extension, being retired with `mthds_contents`: send the method in `files`.** Base64-encoded zip of the method's folder, read as a map of its entries, which may carry the method packages it calls under `.mthds/methods/<name>/`. Mutually exclusive with `files`.
+- `resources` (dict[str, str], optional): **Pipelex-API extension, being retired with `mthds_contents`: put the files in the method's tree, in `files`.** The files the bundle's steps read, such as a `PipeDocGen` step's `template_file`, as a map from the path the step names to the file's bytes in standard base64 — see [Sending the files the steps read](pipe-validate.md#sending-the-files-the-steps-read-resources). It accompanies `mthds_contents` or a method sent as a tree, whose tree each file joins at its path from the root; beside `method_ref`, or with no bundle at all, it is a 422. The job names the method's tree by its digest and carries none of its files: the step that reads one, on an orchestrator that runs the job remotely such as Temporal included, reads it through the deployment's method file store.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 
 **Validation Rules:**
 
-- At least one of `pipe_code`, `mthds_contents`, a method bundle, or `method_ref` must be provided
+- At least one of `files`, `method_ref`, `pipe_code` or a method sent the older way (`mthds_contents` or `bundle_b64`) must be provided
 - If only `pipe_code`: Must reference a pipe already registered in the library
-- If only `mthds_contents`: Must contain a `main_pipe` property
-- If both: `pipe_code` specifies which pipe to execute from the `mthds_contents`
+- With `files` and no `pipe_code`: the run starts at the method's entry pipe, the `main_pipe` of its root `METHODS.toml` or else the one `main_pipe` its bundles declare (see [Sending a method as a tree](#sending-a-method-as-a-tree))
+- With `mthds_contents` and no `pipe_code`: a file must declare `main_pipe`
+- With `pipe_code` beside a method: `pipe_code` specifies which pipe of that method to execute
 
 **Important Notes:**
 
@@ -219,10 +227,12 @@ The receiver-side secret must be the same value. In typical deployments both sid
 
 ## Sending a method as a tree
 
-`mthds_contents` carries only `.mthds` text. A method is more than its bundles: a custom `PipeFunc`'s Python, a `PipeDocGen` step's template, a `requirements.txt`, a `METHODS.toml`. Both `/execute` and `/start`, and [`/validate`](pipe-validate.md), take the whole method as a **method tree**, the MTHDS standard's unit of a method, in one of two mutually exclusive forms:
+A method is more than its bundles: a custom `PipeFunc`'s Python, a `PipeDocGen` step's template, a `requirements.txt`, a `METHODS.toml`. Both `/execute` and `/start`, and [`/validate`](pipe-validate.md), take the whole method as a **method tree**, the MTHDS standard's unit of a method, in one of two mutually exclusive forms:
 
-- `files`: a **map of file entries**, the standard's form. Each key is the file's tree path, and each value one of three entries: the file's text as a JSON string, `{"base64": "…"}` for bytes that are not text, or `{"sha256": "…", "size": n}` naming bytes this runner already holds in its [blob store](#sending-files-by-hash). One request may mix all three.
-- `bundle_b64`: a base64-encoded **zip** of the method's folder, a Pipelex-API extension, read as a map of its entries.
+- `files`: a **map of file entries**, the standard's form, and the way to send a method. Each key is the file's tree path, its path relative to the method's folder, and each value one of three entries: the file's text as a JSON string, `{"base64": "…"}` for bytes that are not text, or `{"sha256": "…", "size": n}` naming bytes this runner already holds in its [blob store](#sending-files-by-hash). One request may mix all three.
+- `bundle_b64`: a base64-encoded **zip** of the method's folder, a Pipelex-API extension, read as a map of its entries. It is being retired with `mthds_contents`.
+
+The older `mthds_contents`, which carries only `.mthds` text, and `resources`, which carries the files its steps read beside it, are being retired too: a later release refuses `mthds_contents`, `bundle_b64` and `resources`, and a method sent in `files` needs none of them.
 
 ```json
 {
@@ -238,7 +248,7 @@ The receiver-side secret must be the same value. In typical deployments both sid
 
 **One rule for every path.** The map is the tree: the runner reads it with the standard's reader and holds every key to the tree's one rule, whatever form the method came in. A key that is not a tree path (absolute, with a `.` or `..` segment, an empty segment, a backslash, a colon), a key the membership rule keeps out of every tree (a dotfile or a file under a dot directory such as `.mthds/`, `.git/` or `.env`, `__pycache__/`, `node_modules/`), one key given twice, two keys naming one file once normalized, or a file that is another entry's directory is a `422` `method.package_invalid` whose `reason` is the standard's refusal code, such as `invalid_tree_path`, `excluded_name`, `duplicate_key` or `path_collision`, and whose `path` is the first name it refuses; a key that would leave the tree's root, absolute or climbing with `..`, is the security refusal `security.input_path_refused`, naming the `rule` it broke, never the path. A malformed entry, such as a size written `13.0`, is a `422` `request.invalid` naming the field. A zip's member names are judged by the same rule, so a name given twice in an archive is a duplicate key.
 
-**The tree is written whole and loaded as the caller's.** The runner writes the tree into a temporary directory, exactly as the map holds it, and loads it as one library directory that belongs to the caller: every bundle is a member of the tree and is named by its tree path, every other file is one a step may read where the bundle sits, a `PipeDocGen` template beside its bundle or a `PipeFunc` module at the tree's import root, and a refusal of the load is the caller's `422`, or an `is_valid: false` verdict on `/validate`, naming files by their tree paths and never by the directory on the server. The directory is removed once the request returns, and the run's job names the tree by its digest, so an orchestrator that runs the job remotely reads its files from the deployment's method file store.
+**The tree is written whole and loaded as the caller's.** The runner writes the tree into a temporary directory, exactly as the map holds it, and loads it as one library directory that belongs to the caller: every bundle is a member of the tree and is named by its tree path, every other file is one a step may read where the bundle sits, a `PipeDocGen` template beside its bundle or a `PipeFunc` module at the tree's import root, and a refusal of the load is the caller's `422`, or an `is_valid: false` verdict on `/validate`, naming files by their tree paths and never by the directory on the server. The directory is written in a worker thread of the bounded method-load pool, off the server's event loop, and removed there once the request returns, whether it succeeded, failed or was cancelled. The run's job names the tree by its digest, so an orchestrator that runs the job remotely reads its files from the deployment's method file store.
 
 **The entry pipe.** With no `pipe_code`, the run starts at the pipe the MTHDS protocol's rule names: the `main_pipe` of the `METHODS.toml` at the tree's root, in the bundle of a domain exporting it, or, in a tree with no manifest, the one `main_pipe` its bundles declare. A manifest declaring none, or bundles declaring none or several, is a `422` `request.pipe_unspecified`, which names the bundles' `main_pipe`s as its `candidates` when they declare several; name the pipe with `pipe_code` instead.
 
@@ -294,7 +304,9 @@ bundle.mthds
 
 Two shipped packages a reference could not tell apart, whose manifests declare the same address and name compared without regard to case, the name being the directory's when the manifest has none, are a `422` `method.package_invalid` with the reason `dependency_address_collision`, whose `path` is the second package's directory, since nothing but their order would decide which one answers. In an archive, a package directory without a valid `METHODS.toml` is a `422` `method.package_invalid` with the reason `manifest_missing` or `manifest_invalid`, naming the manifest's path, and any other entry under `.mthds/`, such as a file directly under `.mthds/methods/`, one under a directory whose name no package's directory can take, such as a dot directory, or a package's own `.mthds/` store, is refused by the tree's rule; a package fetched by `method_ref` holds its `.mthds/methods/` to the same rule, its other entries left out of its tree. A package whose manifest declares no name takes the last segment of its address, which must then be a name a directory can take: a dependency keyed by an address ending in `.` or `..` with a nameless manifest is a `422` `method.package_invalid` with the reason `package_name_invalid`.
 
-The validation of a method sent as a tree, or fetched by `method_ref`, loads its shipped packages too, so `/validate` resolves a dependency the run would resolve.
+The validation of a method sent as a tree, or fetched by `method_ref`, resolves the packages it calls as the run does, its shipped packages first, then the methods installed on the server and a fetch on a miss, so `/validate` resolves a dependency the run would resolve (see [Validating a method tree](pipe-validate.md#validating-a-method-tree)). Both write the method to disk and load it in worker threads of the bounded method-load pool, off the server's event loop, so a large tree or a slow load never holds up the server's other requests.
+
+**A package the server fetches is checked against the method's `methods.lock`.** When the method, sent as `files` or in a `bundle_b64` archive or fetched by `method_ref`, carries a `methods.lock` at the root of its tree, a package it calls by address that the server fetches on a miss, or finds installed by an earlier fetch of its own, must have the tree digest the lock records for that address. A different digest refuses the run with a `422` `security.integrity_mismatch`, whose `dependency` names the address, and the operator's `diagnostics` name the digest and version the lock records and the version and digest that were fetched; `/validate` answers the same `422`, as a security refusal is never a verdict, and the deployment logs the refusal's security event. A lock naming another version than the one fetched refuses the run as well, since the version is part of the package's tree, and the server never fetches the locked version in place of the reference. A lock that does not name the address, or no lock, checks nothing, and a package shipped with the request is not checked, as it travels with the lock. The lock is read only when a dependency the method calls resolves to a copy the server fetched, for this request or an earlier one. A lock the server then cannot read, such as one written before tree digests that records a `hash`, refuses the run with a `422` verdict whose item is `method.package_invalid` with the reason `lock_invalid` and the `path` `methods.lock`. See [Include by Address: Fetch-on-Miss](../building-methods/packages.md#include-by-address-fetch-on-miss).
 
 ---
 
@@ -317,7 +329,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 
 **Provenance.** The response carries `method_provenance = {address, tag, commit_sha, tree_digest}` — on `/execute` only for `method_ref` runs, on the `/start` ack as a nullable field. Tags can move; the recorded SHA is what keeps a run explainable after the fact, and `tree_digest` names the exact tree the run loaded.
 
-**Custom Python follows the tree rules, plus one more.** What decides is *where the code would execute*: `.mthds` content is data, always acceptable. On a deployment that is **not** sandbox-hosted, a fetched package carrying any `.py` is refused with a `501` `pipelex.deployment.custom_code_requires_sandbox`, whose `origin` is `package`. On a sandbox-hosted deployment, PipeFunc `.py` is accepted (captured as text, executed in the isolated sandbox) — but a package declaring **Python structure classes** (`StructuredContent` subclasses) is refused with a `422` (`pipelex.deployment.python_structures_refused`), exactly as a tree sent with the request is: see [No Python structure classes](#sending-a-method-as-a-tree).
+**Custom Python follows the tree rules, plus one more.** What decides is *where the code would execute*: `.mthds` content is data, always acceptable. On a deployment that is **not** sandbox-hosted, a fetched package carrying any `.py` is refused with a `501` `pipelex.deployment.custom_code_requires_sandbox`, whose `origin` is `package`. On a sandbox-hosted deployment, PipeFunc `.py` is accepted (the runner never imports it: validation reads its text, and each PipeFunc call runs in the isolated sandbox, which receives the files of the step's tree) — but a package declaring **Python structure classes** (`StructuredContent` subclasses) is refused with a `422` (`pipelex.deployment.python_structures_refused`), exactly as a tree sent with the request is: see [No Python structure classes](#sending-a-method-as-a-tree).
 
 **Errors.** Every resolution failure is an RFC 9457 `problem+json` named by its code (see [Error responses](error-responses.md)):
 
@@ -329,6 +341,7 @@ Both `/execute` and `/start` accept **`method_ref`** — a globally resolvable a
 | More than one package matches | 422 | `method.ambiguous` |
 | Package exceeds the fetched-package ceilings, or contains a symlink (file or directory) | 422 | `method.package_invalid` |
 | Package declares Python structure classes | 422 | `pipelex.deployment.python_structures_refused` |
+| A package it calls, fetched by the server, differs from the tree digest its `methods.lock` records | 422 | `security.integrity_mismatch` |
 | Package ships `.py` on a non-sandbox deployment | 501 | `pipelex.deployment.custom_code_requires_sandbox` |
 
 **The clone cache.** Fetched repositories are cached on local disk **keyed by resolved commit SHA** — never by tag. Each request first resolves the reference to its current SHA with a cheap `git ls-remote` (no clone); a cached SHA is reused, a new one (a moved tag, an advanced HEAD) triggers a fresh clone. The cache is per server instance and bounded by count, total bytes, and age, oldest first; a clone a request is still reading is never evicted, though it counts toward the bounds. That protection holds within one process, so a deployment running several worker processes gives each its own `METHOD_CACHE_DIR`.

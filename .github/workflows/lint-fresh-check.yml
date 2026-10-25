@@ -33,7 +33,10 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+    # Every cell runs in a 3.11 environment: the matrix names the version pyright and mypy
+    # check against (LINT_PYTHON_VERSION), not the interpreter.
     env:
+      UV_PYTHON: "3.11"
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
     steps:
@@ -46,7 +49,7 @@ jobs:
           cache-dependency-glob: "uv.lock"
 
       - name: Install dependencies
-        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
+        run: TEST_PROFILE=ci make install
 
       # No mypy cache restore anywhere in this workflow — the clean run is the point.
 
@@ -102,7 +105,7 @@ jobs:
       # lint-check.yml checks it on the floor version on every pull request, and this leg adds the
       # version this matrix row names, so the versions its classifiers claim are the ones checked.
       - name: Install the API server's environment
-        run: PYTHON_VERSION=3.11 make -C api install
+        run: make -C api install
 
       - name: Run the API server's ruff merge checks
         run: make -C api merge-check-ruff-format merge-check-ruff-lint

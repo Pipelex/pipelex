@@ -2,8 +2,8 @@
 openapi: 3.1.0
 info:
   title: Pipelex API
-  summary: The source-available Pipelex runner — implements MTHDS Protocol v1.0.0.
-  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v1.0.0 (`POST /execute`, `POST /start`, `POST
+  summary: The source-available Pipelex runner — implements MTHDS Protocol v2.0.0.
+  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v2.0.0 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
     and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), and
     editor tooling (`/lint`, `/format`). Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API.
@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.90.0
+  version: 0.91.0
 paths:
   /health:
     get:
@@ -259,6 +259,9 @@ paths:
                     type: array
                   - type: 'null'
                   title: Mthds Contents
+                  description: 'Being retired, and refused by a later release: send the method in `files`. The method''s `.mthds`
+                    files as raw strings, always an array, even for a single file; with no `pipe_code`, a file must declare
+                    `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and `method_ref`.'
                 inputs:
                   anyOf:
                   - additionalProperties:
@@ -297,11 +300,12 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
-                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
-                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
-                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
-                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method''s
+                    folder, read as a map of its entries, so the archive''s names are judged by the method tree''s rule as
+                    the keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner''s installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired
+                    with `mthds_contents`, and refused by a later release: send the method in `files`.'
                 files:
                   anyOf:
                   - additionalProperties:
@@ -374,7 +378,8 @@ paths:
                     the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
                     sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
                     The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
-                    with the run, each being read where a step uses it.'
+                    with the run, each being read where a step uses it. Being retired with `mthds_contents`, and refused by
+                    a later release: send these files in the method''s tree, in `files`.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -610,6 +615,9 @@ paths:
                     type: array
                   - type: 'null'
                   title: Mthds Contents
+                  description: 'Being retired, and refused by a later release: send the method in `files`. The method''s `.mthds`
+                    files as raw strings, always an array, even for a single file; with no `pipe_code`, a file must declare
+                    `main_pipe`. Mutually exclusive with `files`, `bundle_b64` and `method_ref`.'
                 inputs:
                   anyOf:
                   - additionalProperties:
@@ -648,11 +656,12 @@ paths:
                   - type: string
                   - type: 'null'
                   title: Bundle B64
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method's
-                    folder, read as a map of its entries, so the archive's names are judged by the method tree's rule as the
-                    keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
-                    each with its `METHODS.toml`; they are searched before the runner's installed copies, for this run alone.
-                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment.
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — base64-encoded zip of the method''s
+                    folder, read as a map of its entries, so the archive''s names are judged by the method tree''s rule as
+                    the keys of `files` are. The method packages it calls by address may travel with it under `.mthds/methods/<name>/`,
+                    each with its `METHODS.toml`; they are searched before the runner''s installed copies, for this run alone.
+                    Mutually exclusive with `files`. Custom `.py` is only honored on a sandbox-hosted deployment. Being retired
+                    with `mthds_contents`, and refused by a later release: send the method in `files`.'
                 files:
                   anyOf:
                   - additionalProperties:
@@ -725,7 +734,8 @@ paths:
                     the same bytes. By default at most 32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment
                     sets its own with `MAX_RESOURCES_PER_REQUEST`, `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`.
                     The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
-                    with the run, each being read where a step uses it.'
+                    with the run, each being read where a step uses it. Being retired with `mthds_contents`, and refused by
+                    a later release: send these files in the method''s tree, in `files`.'
                 pipeline_run_id:
                   anyOf:
                   - type: string
@@ -915,14 +925,14 @@ paths:
         \ diagnostics is a backend, configuration or runtime\n  fault, and its problem is answered as every raised failure's\
         \ is.\n- **Either arm:** a member with no value is absent rather than `null`, at the arm's top level and in its\n\
         \  problem items; the structured artifacts of the valid arm keep their own serialization.\n- **No verdict (non-2xx):**\
-        \ a malformed request body, an `mthds_sources` length mismatch, or\n  both/neither of `mthds_contents` / `method_ref`\
-        \ is a request-shape **422**, and so is a forbidden\n  `orchestration_mode` override; a host-wiring programmer error\
-        \ or a genuine orchestrator fault is a\n  **5xx**; auth is **401/403**. A `method_ref` **resolution failure** is also\
-        \ a no-verdict condition —\n  never an `is_valid: false`: each answers the status its code declares, such as a **422**\
-        \ for a\n  malformed reference, a **502** for a failed fetch, a **404** for no matching package in the\n  repository\
-        \ and a **422** for the method's Python structure classes, and the custom-code sandbox gate\n  a **501**. All are\
-        \ `application/problem+json` documents carrying a registry `code`, rendered by the\n  global handlers in `pipelex_api.exception_handlers`\
-        \ — routes never shape them."
+        \ a malformed request body, an `mthds_sources` length mismatch, or\n  more or fewer than one of `files` / `method_ref`\
+        \ / `mthds_contents` is a request-shape **422**, and so is a forbidden\n  `orchestration_mode` override; a host-wiring\
+        \ programmer error or a genuine orchestrator fault is a\n  **5xx**; auth is **401/403**. A `method_ref` **resolution\
+        \ failure** is also a no-verdict condition —\n  never an `is_valid: false`: each answers the status its code declares,\
+        \ such as a **422** for a\n  malformed reference, a **502** for a failed fetch, a **404** for no matching package\
+        \ in the\n  repository and a **422** for the method's Python structure classes, and the custom-code sandbox gate\n\
+        \  a **501**. All are `application/problem+json` documents carrying a registry `code`, rendered by the\n  global handlers\
+        \ in `pipelex_api.exception_handlers` — routes never shape them."
       operationId: validate_mthds_v1_validate_post
       requestBody:
         content:
@@ -2170,7 +2180,9 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
@@ -4296,7 +4308,9 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
@@ -5901,7 +5915,9 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired, and refused by a later release: a file the steps read travels inside the method''s tree, in `files`,
+            at its path beside the bundle that names it.'
         read_scope:
           anyOf:
           - type: string
@@ -7125,6 +7141,10 @@ components:
           - type: string
           - type: 'null'
           title: Runner Version
+        blob_store:
+          type: boolean
+          title: Blob Store
+          default: false
         implementation:
           type: string
           title: Implementation
@@ -7136,10 +7156,6 @@ components:
           - type: string
           - type: 'null'
           title: Runtime Version
-        blob_store:
-          type: boolean
-          title: Blob Store
-          default: false
       additionalProperties: true
       type: object
       required:
@@ -8631,6 +8647,32 @@ components:
         ``nb_tokens_by_category`` keys) are open sets on the wire, typed as plain strings —
 
         runtime enum churn is non-breaking for clients.'
+    TreeFileRead:
+      properties:
+        tree_path:
+          type: string
+          title: Tree Path
+          description: The file's path from the root of the step's method tree, such as `templates/invoice.html`.
+        use:
+          $ref: '#/components/schemas/TreeFileUse'
+          description: 'What the step reads the file as: `template`, the template a PipeDocGen step fills; `template_asset`,
+            an image, a stylesheet or a font its HTML template names; `python_module`, the module of the function a PipeFunc
+            step calls.'
+      additionalProperties: false
+      type: object
+      required:
+      - tree_path
+      - use
+      title: TreeFileRead
+      description: 'A file of its method tree a step reads: its tree path, and what the step reads it as.'
+    TreeFileUse:
+      type: string
+      enum:
+      - template
+      - template_asset
+      - python_module
+      title: TreeFileUse
+      description: What a step reads a file of its method tree as.
     UnexplainedPath:
       properties:
         path:
@@ -8850,6 +8892,26 @@ components:
             $ref: '#/components/schemas/LiftablePipeEntry'
           type: array
           title: Liftable Pipes
+        tree_files_read:
+          additionalProperties:
+            items:
+              $ref: '#/components/schemas/TreeFileRead'
+            type: array
+          type: object
+          title: Tree Files Read
+          description: 'Per pipe, the files of the method''s tree the step reads, keyed by namespaced `pipe_ref` like `pipe_io_contracts`:
+            each file by its tree path, with what the step reads it as. A PipeDocGen step reads its template and the images,
+            stylesheets and fonts its HTML template names by literal relative URLs; a PipeFunc step reads the module of its
+            function. A pipe that reads no file of the tree, a controller included, has an empty list.'
+        tree_file_readers:
+          additionalProperties:
+            items:
+              type: string
+            type: array
+          type: object
+          title: Tree File Readers
+          description: 'The per-file view of `tree_files_read`: each tree path a step reads, in sorted order, to the namespaced
+            refs of the pipes that read it. A file of the method''s tree absent here is read by no step.'
         graph_spec:
           anyOf:
           - $ref: '#/components/schemas/GraphSpec'
@@ -8962,8 +9024,8 @@ components:
             minItems: 1
           - type: 'null'
           title: Mthds Contents
-          description: MTHDS contents to load (always an array, even for a single file). Exactly one of `mthds_contents` /
-            `files` / `method_ref`.
+          description: 'Being retired, and refused by a later release: send the method in `files`. MTHDS contents to load
+            (always an array, even for a single file). Exactly one of `mthds_contents` / `files` / `method_ref`.'
         files:
           anyOf:
           - additionalProperties:
@@ -9029,9 +9091,10 @@ components:
             type: array
           - type: 'null'
           title: Mthds Sources
-          description: Optional per-file sources, parallel to `mthds_contents`. When provided, each entry is threaded onto
-            the corresponding bundle's `source` so server-side validation errors carry a `source` pointing at the owning file.
-            Must match `mthds_contents` in length when present.
+          description: 'Being retired with `mthds_contents`, and refused by a later release: the bundles of a method sent
+            in `files` are named by their tree paths. Optional per-file sources, parallel to `mthds_contents`. When provided,
+            each entry is threaded onto the corresponding bundle''s `source` so server-side validation errors carry a `source`
+            pointing at the owning file. Must match `mthds_contents` in length when present.'
         resources:
           anyOf:
           - additionalProperties:
@@ -9048,7 +9111,8 @@ components:
             its path from the tree''s root, where a file the tree already holds must have the same bytes. By default at most
             32 files, 5120 KiB each and 10240 KiB in all, decoded; a deployment sets its own with `MAX_RESOURCES_PER_REQUEST`,
             `MAX_RESOURCE_FILE_KIB` and `MAX_RESOURCES_TOTAL_KIB`. The files make one method tree with the bundles, which
-            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it.'
+            the run names by its digest: no file''s bytes travel with the run, each being read where a step uses it. Being
+            retired with `mthds_contents`, and refused by a later release: send these files in the method''s tree, in `files`.'
         render:
           items:
             type: string
@@ -9092,7 +9156,13 @@ components:
             is handed no scope, so a dry run without one leaves nothing stored.'
       type: object
       title: ValidateRequest
-      description: 'The shared `mthds_contents` + `allow_signatures` payload, plus optional per-file sources.
+      description: 'The method to validate, in `files`, by `method_ref` or as `mthds_contents`, plus `allow_signatures` and
+        optional per-file sources.
+
+
+        `mthds_contents`, and the `mthds_sources` and `resources` that serve it, are being retired: a later release
+
+        refuses them, and a method is sent in `files`, whose bundles are named by their tree paths.
 
 
         `mthds_sources`, when provided, pairs each `mthds_contents[i]` with a logical source (e.g. the
