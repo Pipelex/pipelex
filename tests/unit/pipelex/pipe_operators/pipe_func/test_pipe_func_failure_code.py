@@ -12,6 +12,7 @@ from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.problem import ProblemView
+from pipelex.graph.node_problem import make_node_problem
 from pipelex.interpreter_hub import scoped_pipe_func_executor
 from pipelex.kernel.exceptions import FuncOutputTypeError
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
@@ -27,6 +28,7 @@ from pipelex.system.exceptions import RunParameterError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.storage.exceptions import StorageS3Error
+from tests.helpers.recovered_problem import make_recovered_function_raised
 
 
 def _raises_a_request_refusal(working_memory: WorkingMemory) -> TextContent:
@@ -227,8 +229,14 @@ class TestPipeFuncFailureCode:
                 "Error: PipeFuncExecutionError (runtime.unexpected)",
             ),
             (ConnectionResetError(f"The sandbox closed the call: {_FUNCTION_TEXT}"), "Error: ConnectionResetError"),
+            (
+                make_recovered_function_raised(
+                    pipe="read_line", function="ledger_funcs.lines.read_line", message=f"The function raised in the sandbox: {_FUNCTION_TEXT}"
+                ),
+                "Error: RecoveredProblemError (pipe.function_raised)",
+            ),
         ],
-        ids=["function_raised_far_away", "coded_seam_failure", "foreign_transport_failure"],
+        ids=["function_raised_far_away", "coded_seam_failure", "foreign_transport_failure", "recovered_function_raised"],
     )
     @pytest.mark.asyncio
     async def test_an_out_of_process_failure_is_named_without_its_text(
@@ -246,6 +254,24 @@ class TestPipeFuncFailureCode:
 
         assert step_failure.message.endswith(expected_error)
         assert _FUNCTION_TEXT not in step_failure.message
+
+    @pytest.mark.asyncio
+    async def test_a_function_that_raised_in_a_sandbox_is_the_step_s_traced_failure(
+        self, load_empty_library: Callable[[], str], mocker: MockerFixture
+    ) -> None:
+        """The carrier of the sandbox's report declares `runtime.unexpected`: the step's trace record reads the code it carries."""
+        load_empty_library()
+        mocker.patch("pipelex.pipe_operators.func.pipe_func.is_pipe_func_sandbox_hosted", return_value=True)
+        carrier = make_recovered_function_raised(pipe="read_line", function="ledger_funcs.lines.read_line")
+
+        step_failure = await _failure_of(pipe_func=_make_pipe_func(), executor=_OutOfProcessExecutor(failure=carrier), function=_raises_a_plain_error)
+        node_problem = make_node_problem(error=step_failure, pipe_code="read_line", pipe_path=["flow", "read_line"])
+
+        assert step_failure.__cause__ is carrier
+        assert node_problem.code == CoreCode.PIPE_FUNCTION_RAISED
+        assert node_problem.location is not None
+        assert node_problem.location.as_wire() == {"pipe": "read_line", "path": ["flow", "read_line"]}
+        assert node_problem.diagnostics is None
 
     @pytest.mark.builds_problems_without_required_params(
         reason="the coercion of a function's return knows neither the step's output concept nor a field of it"

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A failed step's trace records the failure's own code**: a failed node of the execution graph, and the `pipe_end_error` trace event, now carry the problem the run fails with when the step's error wraps a carrier of a problem recovered across a transport boundary, such as `pipe.function_raised` for a `PipeFunc` whose function raised in a sandbox, located at the step, where they carried the carrier's catch-all `runtime.unexpected`. The step's own message names that recovered code too, `Error: <carrier class> (pipe.function_raised)`, and `reported_failure_code` (`pipelex.pipe_run.located_failure`) reads the code a failure reports without building its problem.
+
 ## [v0.91.0] - 2026-10-25
 
 ### Added

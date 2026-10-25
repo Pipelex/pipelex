@@ -62,6 +62,21 @@ def find_root_fault(*, error: BaseException) -> PipelexError | None:
     return implying_fault or root_fault
 
 
+def reported_failure_code(*, failure: PipelexError) -> str:
+    """The registry code `failure` reports, read without building its problem.
+
+    The code its cause chain resolves to (`PipelexError.resolve_error_code`), or, when its root fault carries a problem
+    recovered across a transport boundary (`PipelexError.recovered_problem`), that problem's code, as the problem a
+    located wrapper of `failure` reports does (`located_problem`). A carrier's own class declares the catch-all
+    `runtime.unexpected`, so a reader of the resolved code alone would name the carrier rather than the failure.
+    """
+    root_fault = find_root_fault(error=failure)
+    recovered = root_fault.recovered_problem() if root_fault is not None else None
+    if recovered is not None:
+        return recovered.code
+    return str(failure.resolve_error_code())
+
+
 def find_foreign_fault(*, error: BaseException) -> BaseException | None:
     """Return the non-Pipelex exception a run failure stands in for, or `None`.
 
@@ -169,7 +184,8 @@ def located_problem(
     `PipeRouterError` standing for a foreign exception under the runner's `PipelineExecutionError`.
 
     Args:
-        wrapper: The located wrapper, a `PipeRouterError` or a `PipelineExecutionError`.
+        wrapper: The located wrapper, a `PipeRouterError` or a `PipelineExecutionError`, or the error that ended a node
+            of the execution graph, which the node locates at its pipe (`pipelex.graph.node_problem`).
         root_fault: The root fault below it (`located_root_fault`).
         view: The view of the reader the problem is built for.
         request_id: The request that carried the failure, when known.

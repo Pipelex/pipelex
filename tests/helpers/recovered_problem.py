@@ -29,6 +29,12 @@ class RecoveredProblemError(PipelexError):
         return self.carried_problem
 
 
+def make_recovered_function_raised(*, pipe: str, function: str, message: str = "a sandbox reported the function's failure") -> RecoveredProblemError:
+    """A function a `PipeFunc` called that raised in a sandbox, as the sandbox's report reaches the submitter: `pipe.function_raised`."""
+    problem = make_problem(code=CoreCode.PIPE_FUNCTION_RAISED, view=ProblemView.OPERATOR, params={"pipe": pipe, "function": function})
+    return RecoveredProblemError(message, problem=problem)
+
+
 def make_recovered_url_refusal() -> RecoveredProblemError:
     """A recovered refusal of an input URL: an `input` problem a retry can clear, unlike the carrier's own code."""
     problem = make_problem(code=CoreCode.INPUT_URL_UNREACHABLE, view=ProblemView.OPERATOR, params={"input": "document", "host": "example.com"})
