@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The API server refuses a method's unmet requirements as an invalid method (Breaking)**: `/v1/execute` and `/v1/start` refuse a method whose `requirements.txt` the PipeFunc sandbox does not meet, or holds a line the standard refuses, with a `422` `method.invalid` whose `errors` hold one `method.dependency_missing` or `method.package_invalid` item per refused line, located at `requirements.txt` and the line, the problem a local run of the method raises and the items `/v1/validate` gives, where they answered a bare `method.dependency_missing` or `method.package_invalid` with no item and no location; a client reads the refused requirement from the item's `params` and `location`.
+
 ## [v0.91.0] - 2026-10-25
 
 ### Added

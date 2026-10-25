@@ -260,7 +260,31 @@ The older `mthds_contents`, which carries only `.mthds` text, and `resources`, w
 
 **No Python structure classes.** A structure class (a `StructuredContent` subclass) can only be used by importing its module into the runner's own process, which a sandbox-hosted deployment never does, so a tree whose Python declares one is refused with a `422` problem, `pipelex.deployment.python_structures_refused`, before anything is loaded; its operator view's message names each file and class. The rule is the same however the method arrives: sent as a tree, or fetched by `method_ref`. Declare the types as MTHDS concepts with inline structures instead; a PipeFunc returns them by importing the classes the sandbox generates from those concepts (`from structures import <domain>__<Concept>`). The `structures` module that `pipelex build structures` writes is accepted as long as it is left as generated, and it is not sent to the sandbox, which generates its own.
 
-**Requirements are checked against the sandbox.** A `requirements.txt` at the root of the tree declares the packages its Python imports, one PEP 508 requirement per line (see [Method Trees](../building-methods/method-trees.md#python-packages-requirementstxt)). Nothing is installed into a running sandbox: the packages the deployment states its PipeFunc sandbox offers for the method's requirements are the whole offer, a fixed package set or an environment the deployment builds for those requirements, and a method asking for a package the sandbox does not offer, or for a version it does not offer, is refused with a `422` (`MethodRequirementsNotMetError`) naming each requirement and the version offered, before the method loads and before anything is dispatched. A deployment that can build no environment holding the requirements refuses them with the same `422`, carrying its own explanation. The refusal names the file by its tree path, `requirements.txt`, and no path on the server. A line the standard refuses, such as `-r base.txt`, a URL or a comment after a requirement, is a `422` (`MethodRequirementsFileError`) naming the line. A deployment that states no package set for its sandbox refuses every method declaring requirements with a `500` (`PipeFuncPackageSetUnstatedError`), a fault of its configuration, and so does a method of the server's own library directories whose requirements are not met (`HostLibraryRequirementsError`), whose message is withheld from the caller. A `method_ref` package is checked the same way, on a run as on [`/validate`](pipe-validate.md), where the refusal is an `is_valid: false` verdict located on the requirement's line.
+**Requirements are checked against the sandbox.** A `requirements.txt` at the root of the tree declares the packages its Python imports, one PEP 508 requirement per line (see [Method Trees](../building-methods/method-trees.md#python-packages-requirementstxt)). Nothing is installed into a running sandbox: the packages the deployment states its PipeFunc sandbox offers for the method's requirements are the whole offer, a fixed package set or an environment the deployment builds for those requirements, and a method asking for a package the sandbox does not offer, or for a version it does not offer, is refused before the method loads and before anything is dispatched with a `422` `method.invalid`, the problem an invalid bundle is refused with, whose `errors` hold one `method.dependency_missing` item per requirement not met, located at `location.file` `requirements.txt` and the requirement's `location.line`, its `params` naming the distribution that fails it (`name`) and why (`reason`: `not_found`, or `no_matching_version` for a version the requirement refuses). A deployment that can build no environment holding the requirements refuses them with the same `422`, its one `method.dependency_missing` item located on the file alone, and its own explanation in the operator's `diagnostics`. A line the standard refuses, such as `-r base.txt`, a URL or a comment after a requirement, is the same `422` with a `method.package_invalid` item on the line, whose `reason` is `requirements_invalid`. These are the items [`/validate`](pipe-validate.md) gives the same tree, and the ones a local run of the method is refused with. The refusal names the file by its tree path, `requirements.txt`, and no path on the server:
+
+```json
+{
+  "type": "https://mthds.ai/errors/method.invalid",
+  "title": "The method does not validate",
+  "status": 422,
+  "detail": "The method does not validate.",
+  "code": "method.invalid",
+  "domain": "method",
+  "retry": "no",
+  "next_step": {"kind": "change_method", "detail": "Fix each fault the problem's errors list, then validate the method again."},
+  "errors": [
+    {
+      "code": "method.dependency_missing",
+      "detail": "The method depends on the requirement 'pydantic', which is not available here (reason: no_matching_version).",
+      "params": {"kind": "requirement", "name": "pydantic", "reason": "no_matching_version"},
+      "location": {"file": "requirements.txt", "line": 2}
+    }
+  ],
+  "request_id": "9f2c1ab3-…"
+}
+```
+
+A deployment that states no package set for its sandbox refuses every method declaring requirements with a `500` (`PipeFuncPackageSetUnstatedError`), a fault of its configuration, and so does a method of the server's own library directories whose requirements are not met (`HostLibraryRequirementsError`), whose message is withheld from the caller. A `method_ref` package is checked the same way, on a run as on [`/validate`](pipe-validate.md), where the refusal is an `is_valid: false` verdict located on the requirement's line.
 
 ### Sending files by hash
 

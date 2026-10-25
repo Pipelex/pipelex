@@ -348,6 +348,49 @@ class TestMethodRequirementsCheck:
         assert item.line == 1
         assert f"The requirement '{_ABSENT_PACKAGE}' is not met" in item.message
 
+    @pytest.mark.parametrize(
+        ("topic", "requirements", "expected_item"),
+        [
+            (
+                "a requirement this interpreter holds at a version it refuses, after a comment",
+                "# The function imports pipelex alone\npydantic>=9999\n",
+                {
+                    "code": "method.dependency_missing",
+                    "detail": "The method depends on the requirement 'pydantic', which is not available here (reason: no_matching_version).",
+                    "params": {"kind": "requirement", "name": "pydantic", "reason": "no_matching_version"},
+                    "location": {"file": "requirements.txt", "line": 2},
+                },
+            ),
+            (
+                "a line the standard refuses",
+                "-r base.txt\n",
+                {
+                    "code": "method.package_invalid",
+                    "detail": "The method's package breaks a package rule (reason: requirements_invalid).",
+                    "params": {"reason": "requirements_invalid", "path": "requirements.txt"},
+                    "location": {"file": "requirements.txt", "line": 1},
+                },
+            ),
+        ],
+    )
+    def test_a_refusal_is_the_invalid_method_problem_carrying_its_located_item(
+        self, tmp_path: Path, topic: str, requirements: str, expected_item: dict[str, object]
+    ) -> None:
+        """The problem a local load and the runner's check both answer: `method.invalid`, the refused line as its one item."""
+        _method(directory=tmp_path, requirements=requirements)
+
+        with pytest.raises(ValidateBundleError) as exc_info, translate_to_validate_bundle_error():
+            ensure_served_method_requirements_met(library_dirs=[tmp_path])
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
+        assert problem["code"] == CoreCode.METHOD_INVALID, topic
+        assert problem["domain"] == ProblemDomain.METHOD
+        # The fault is the item's: the umbrella names no parameter and no location of its own.
+        assert "params" not in problem
+        assert "location" not in problem
+        assert problem["errors"] == [expected_item]
+        assert "diagnostics" not in problem
+
     def test_a_served_method_refused_in_direct_mode_names_no_host_path_to_its_caller(self, tmp_path: Path) -> None:
         """This interpreter, read for real in the direct mode: the caller reads the method's lines, and no path on the host."""
         method_dir = _method(directory=tmp_path / "request-files", requirements=f"pydantic>=2\n{_ABSENT_PACKAGE}>=1\n")
