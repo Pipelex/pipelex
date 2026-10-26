@@ -9,7 +9,12 @@ from pytest_mock import MockerFixture
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError, StorageS3Error
-from pipelex.tools.storage.s3_storage_provider import CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS, S3StorageProvider, checksum_sha256_header_value
+from pipelex.tools.storage.s3_storage_provider import (
+    CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS,
+    S3_MAX_POOL_CONNECTIONS,
+    S3StorageProvider,
+    checksum_sha256_header_value,
+)
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 # Test constants
@@ -153,6 +158,17 @@ class TestS3StorageProvider:
 
         client_config = mock_aiobotocore["session"].create_client.call_args.kwargs["config"]
         assert client_config.s3 == {"addressing_style": "virtual", "payload_signing_enabled": False}
+
+    async def test_the_client_pool_is_sized_for_operations_running_at_once(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """Every operation on a loop shares one client, so its pool, not botocore's default of 10, bounds them."""
+        await s3_provider_no_signed_urls.store(data=b"bytes", key="scope/file.bin")
+
+        client_config = mock_aiobotocore["session"].create_client.call_args.kwargs["config"]
+        assert client_config.max_pool_connections == S3_MAX_POOL_CONNECTIONS
 
     async def test_load_returns_data(
         self,
@@ -478,8 +494,8 @@ class TestS3StorageProvider:
         expected_public_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
         assert display == expected_public_url
 
-    async def test_session_is_reused(self, mock_aiobotocore: dict[str, Any]) -> None:
-        """Test that the session is lazily initialized and reused."""
+    async def test_session_and_client_are_reused(self, mock_aiobotocore: dict[str, Any]) -> None:
+        """The session and the loop's client are opened on the first operation, and every later one shares them."""
         provider = S3StorageProvider(
             bucket_name=S3_TEST_BUCKET,
             region=S3_TEST_REGION,
@@ -496,6 +512,7 @@ class TestS3StorageProvider:
 
         assert first_call_count == 1
         assert second_call_count == 1  # Session should only be created once
+        assert mock_aiobotocore["session"].create_client.call_count == 1
 
     async def test_load_head_sends_a_ranged_get(
         self,

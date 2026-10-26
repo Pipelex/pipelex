@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.92.1] - 2026-10-26
+
+### Fixed
+
+- **The S3 storage provider reuses one client per event loop**: each event loop opens one aiobotocore client on its first S3 operation, and every later operation on that loop shares it and its pool of `S3_MAX_POOL_CONNECTIONS` connections, where every operation, a presigned URL included, built a client and opened a TLS connection of its own; the client is closed as its loop shuts down or at the runtime's teardown, which now calls `StorageProviderAbstract.teardown()`, a no-op that a storage plugin keeping a client open between operations overrides to close it. Measured from a laptop against a bucket in another region, the API server's read of a method tree of 20 blobs went from 4,261 ms of wall time and 425 ms of CPU to 1,582 ms and 32 ms with this change alone.
+- **The API server reads each blob a request names in one request**: a run, a validation and the tooling routes read each hash entry of `files` and `dependencies` with one read of at most one byte past the size the entry states, 16 at a time, where they looked each blob's size up first and then read the blobs 4 at a time; a hash held at another size still answers `422` `request.invalid`, its size looked up only for that refusal's message, and damaged bytes still answer `500` `pipelex.storage.damaged`. Measured as above with both changes, reading a tree of 1, 20 and 50 blobs takes 194, 419 and 838 ms of wall time and 1.3, 14 and 31 ms of CPU, where it took 1,142, 4,261 and 10,253 ms and 26, 425 and 1,000 ms. The local storage provider now reads such a leading range of a file without loading the whole file.
+
 ## [v0.92.0] - 2026-10-25
 
 ### Changed
