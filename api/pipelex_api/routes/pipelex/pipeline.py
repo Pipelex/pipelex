@@ -1043,8 +1043,9 @@ async def execute(request: Request) -> JSONResponse:
     # `TokensUsageRecord` wire shape instead (pipelex owns the shape authority).
     response_dump = response.model_dump(mode="json", serialize_as_any=True, by_alias=True)
     apply_tokens_usage_wire_shape(response_dump, pipe_output=response.pipe_output)
-    # Provenance of a `method_ref` run (address, tag, resolved commit SHA) — attached only when
-    # the run was selected by reference, so the classic response stays byte-identical.
+    # Provenance of a `method_ref` run (address, tag, resolved commit SHA, tree digest, the manifest's
+    # display name) — attached only when the run was selected by reference, so the classic response
+    # stays byte-identical.
     if source.method_provenance is not None:
         response_dump["method_provenance"] = source.method_provenance.model_dump(mode="json")
     return JSONResponse(content=response_dump)
@@ -1140,9 +1141,10 @@ async def start(
             requested_orchestration_mode=extras.orchestration_mode,
             callback_problem_view=problem_view_of(request),
         )
-    # The ack plus this server's provenance extension: `(address, tag, commit_sha)` for a
-    # `method_ref` run, null otherwise — the caller (and, on hosted, the platform's Run row)
-    # learns exactly what was fetched and at which commit.
+    # The ack plus this server's provenance extension: `(address, tag, commit_sha, tree_digest,
+    # display_name)` for a `method_ref` run, null otherwise — the caller (and, on hosted, the
+    # platform's Run row) learns exactly what was fetched, at which commit, and what the package
+    # calls itself.
     return PipelexApiStartResponse(
         **dict(start_result),
         method_provenance=source.method_provenance,

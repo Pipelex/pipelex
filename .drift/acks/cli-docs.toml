@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:197170f0ab55d758506727daadfedcd91777769b1d964a49a81b6b3ca5c91970"
+digest = "sha256:41cf54e443532e0e23af98acf3c6c31dcaf5d51a006d8b2fad0d2c3b90c8c3c1"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-24T04:25:12Z"
-rationale = "real-catch: both CLIs now report a hosted failure as the problem pipelex-sdk carries, the human CLI printing its rows, items and the run's own problem; the former-shape readings are gone, a bare 401/403/404 is read by the key sent, a run past the wait is client.follow_failed and a failed tree upload reads by its reason; docs/tools/cli/run.md, agent-cli.md and pipelex/cli/agent_cli/CLAUDE.md now say so. No flag or output format changed."
+reviewed_at = "2026-10-26T16:40:50Z"
+rationale = "clean-pass: installed_methods.py changed only its comments, which now say the provenance sidecar records the manifest's display_name; the CLI docs describe what a fetch prints (address, tag, commit), which did not change, and the sidecar's contents are documented in docs/building-methods/packages.md, updated in this change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -132,7 +132,7 @@ rationale = "real-catch: both CLIs now report a hosted failure as the problem pi
 "pipelex/cli/deck_notice.py" = "blob:542877125e89e35b02bc969cfee952155b0d7c2c"
 "pipelex/cli/error_handlers.py" = "blob:649461025ca7a84b2e73bfe63cd2649d472f4088"
 "pipelex/cli/exceptions.py" = "blob:5c66f20b0a06c8ae8c20b94f92e2c30b78f5b6c5"
-"pipelex/cli/installed_methods.py" = "blob:7e7f289d50ca6bc446b6891cbc846dc4a8cee6e2"
+"pipelex/cli/installed_methods.py" = "blob:208cb640a3685e5850d9de3f889b4b4cbd895a56"
 "pipelex/cli/judged_target.py" = "blob:626ccf65bc3b15e06422d9f16c0b1a8083041b59"
 "pipelex/cli/method_resolver.py" = "blob:54fe2e6036b637c2e298f18bbfd10cfc616ef4a8"
 "pipelex/cli/readiness.py" = "blob:6d185324ed0784663e1dc78d1194a28312c54798"

@@ -615,9 +615,10 @@ class PipeOutputWire(PipeOutput):
 
 _METHOD_PROVENANCE_DESCRIPTION = (
     "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — provenance of a `method_ref` run: the package's "
-    "resolved full address, the requested tag (null for a bare address), and the commit SHA that was actually "
-    "fetched. The SHA is what keeps the run explainable when a tag moves. Absent (or null) for runs from inline "
-    "source or a bundle."
+    "resolved full address, the requested tag (null for a bare address), the commit SHA that was actually "
+    "fetched, the digest of the method tree the run loaded, and the `display_name` the package's manifest declares "
+    "(null when it declares none). The SHA is what keeps the run explainable when a tag moves. Absent (or null) for "
+    "runs from inline source or a bundle."
 )
 
 

@@ -29,7 +29,7 @@ _SKIPPED_DIR_NAMES = {".git"}
 
 
 class MethodProvenance(BaseModel):
-    """What a fetched-method run must record: address, tag, and the resolved commit SHA."""
+    """What a fetched-method run must record: address, tag, the resolved commit SHA, and the name the package declares."""
 
     model_config = ConfigDict(frozen=True)
 
@@ -41,6 +41,14 @@ class MethodProvenance(BaseModel):
         description=(
             "The digest of the package's method tree, `sha256:` and 64 lowercase hex characters, as read from the commit's "
             "git objects, set by a runner that reads the package as a tree, and null otherwise."
+        ),
+    )
+    # Defaulted, so a record written before the field existed, such as an installed copy's `.provenance.json`, still loads.
+    display_name: str | None = Field(
+        default=None,
+        description=(
+            "The package's human-readable name, the `display_name` its `METHODS.toml` manifest declares at the fetched commit, "
+            "for a host to name the run's method by, and null when the manifest declares none."
         ),
     )
 
@@ -59,7 +67,12 @@ class FetchedMethodPackage(BaseModel):
 
     @property
     def provenance(self) -> MethodProvenance:
-        return MethodProvenance(address=self.full_address, tag=self.ref.tag, commit_sha=self.commit_sha)
+        return MethodProvenance(
+            address=self.full_address,
+            tag=self.ref.tag,
+            commit_sha=self.commit_sha,
+            display_name=self.manifest.display_name,
+        )
 
 
 CLONE_DIRECTORY_PLACEHOLDER = "<clone directory>"

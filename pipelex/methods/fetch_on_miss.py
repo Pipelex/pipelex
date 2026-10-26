@@ -134,7 +134,7 @@ def resolve_address_based_method(
     lookup — the installed store is keyed by address alone). On a miss, when fetch-on-miss is
     enabled and the address is fetchable, fetches the package by reference and installs it
     into the installed-methods store, recording the fetch provenance (address, tag, commit
-    SHA) beside the manifest.
+    SHA, and the manifest's display name) beside the manifest.
 
     Args:
         full_address: The address-based alias as written in the bundle, e.g.

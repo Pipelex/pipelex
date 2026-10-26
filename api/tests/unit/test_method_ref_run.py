@@ -5,7 +5,7 @@ with a local git repository (`install_method_package` in conftest), so these pin
 layer's contract: the fetched package is read from its commit's git objects as a method tree,
 written as the run's one library directory, the caller's own; the entry pipe defaults to the
 manifest's `main_pipe` (a request `pipe_code` overrides); provenance `{address, tag,
-commit_sha, tree_digest}` lands on the response; the exclusivity rules 422; the
+commit_sha, tree_digest, display_name}` lands on the response; the exclusivity rules 422; the
 execution-locus gate refuses Python where it must; and each resolution failure maps to its
 distinct code + status as RFC 7807 `problem+json`, the status being the code's.
 """
@@ -38,6 +38,13 @@ _TREE_NS = "pipelex_api.method_tree_request"
 
 # The digest of the stub package's tree: its manifest and its one bundle.
 _STUB_TREE_DIGEST = digest_of_contents({"METHODS.toml": STUB_METHOD_MANIFEST.encode("utf-8"), "documents.mthds": VALID_MTHDS.encode("utf-8")})
+
+# The stub manifest declaring the human-readable name a host names the run's method by.
+_DISPLAY_NAME = "Document Smoke Test"
+_MANIFEST_WITH_DISPLAY_NAME = STUB_METHOD_MANIFEST.replace('name = "documents"\n', f'name = "documents"\ndisplay_name = "{_DISPLAY_NAME}"\n', 1)
+_DISPLAY_NAME_TREE_DIGEST = digest_of_contents(
+    {"METHODS.toml": _MANIFEST_WITH_DISPLAY_NAME.encode("utf-8"), "documents.mthds": VALID_MTHDS.encode("utf-8")}
+)
 
 _PIPE_FUNC_PY = "def echo(working_memory):\n    return 'hi'\n"
 
@@ -121,12 +128,14 @@ class TestMethodRefRun:
         assert snapshot["pipe_code"] == "smoke.echo"
         # The tree is removed once the request returns.
         assert not Path(snapshot["library_dirs"][0]).exists()
-        # Provenance: resolved full address, the requested tag, the fetched commit SHA, the digest of the tree it ran.
+        # Provenance: resolved full address, the requested tag, the fetched commit SHA, the digest of the tree it ran, and
+        # no display name, which the stub manifest does not declare.
         assert response.json()["method_provenance"] == {
             "address": STUB_METHOD_ADDRESS,
             "tag": "v0.1.0",
             "commit_sha": STUB_METHOD_COMMIT_SHA,
             "tree_digest": _STUB_TREE_DIGEST,
+            "display_name": None,
         }
 
     @pytest.mark.parametrize(
@@ -180,6 +189,24 @@ class TestMethodRefRun:
             "tag": None,
             "commit_sha": STUB_METHOD_COMMIT_SHA,
             "tree_digest": _STUB_TREE_DIGEST,
+            "display_name": None,
+        }
+
+    @pytest.mark.parametrize(("route", "expected_status"), [("/v1/execute", 200), ("/v1/start", 202)])
+    def test_provenance_carries_the_display_name_the_manifest_declares(
+        self, mocker: MockerFixture, install_method_package: Callable[..., Path], route: str, expected_status: int
+    ):
+        """Both run routes report the package's declared display name, which a host names the run's method by."""
+        install_method_package(files={"documents.mthds": VALID_MTHDS}, manifest_toml=_MANIFEST_WITH_DISPLAY_NAME)
+        client, _ = _build_client(mocker)
+        response = client.post(route, json={"method_ref": _METHOD_REF, "inputs": {"text": "hi"}})
+        assert response.status_code == expected_status, response.text
+        assert response.json()["method_provenance"] == {
+            "address": STUB_METHOD_ADDRESS,
+            "tag": "v0.1.0",
+            "commit_sha": STUB_METHOD_COMMIT_SHA,
+            "tree_digest": _DISPLAY_NAME_TREE_DIGEST,
+            "display_name": _DISPLAY_NAME,
         }
 
     def test_inline_runs_carry_no_provenance(self, mocker: MockerFixture):
