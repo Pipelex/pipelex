@@ -1,9 +1,10 @@
 """The runner's blob store over a storage provider: what it looks up by size, what it reads, and how many at once.
 
-The storage here counts its calls and the ones in flight, so these pin what the routes cannot show: a blob held at
-another size than an entry states is never read, reads and lookups run a bounded number at a time, every write is
-create-only with its checksum, a short object is never written over, and a tree whose listing is held is recorded
-without a lookup per file.
+The storage here counts its calls and the ones in flight, so these pin what the routes cannot show: a request's blobs
+are read in one request each, never past a byte more than the size stated, a blob held at another size than an entry
+states is refused without its bytes read, reads and lookups run a bounded number at a time, every write is create-only
+with its checksum, a short object is never written over, and a tree whose listing is held is recorded without a lookup
+per file.
 """
 
 import asyncio
@@ -14,6 +15,7 @@ import pytest
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
 from pipelex.tools.log.log_fields import carried_attributes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
+from pipelex.tools.storage.s3_storage_provider import S3_MAX_POOL_CONNECTIONS
 from pipelex.tools.storage.storage_config import StorageMethod
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 from pytest_mock import MockerFixture
@@ -22,7 +24,7 @@ from typing_extensions import override
 from pipelex_api.blob_store import (
     BLOB_DAMAGED_MESSAGE,
     MAX_CONCURRENT_BLOB_LOOKUPS,
-    MAX_CONCURRENT_BLOB_TRANSFERS,
+    MAX_CONCURRENT_BLOB_READS,
     RunnerBlobStore,
     problem_scheme_of,
 )
@@ -39,6 +41,7 @@ class _CountingStorage(StorageProviderAbstract):
     def __init__(self) -> None:
         self.objects: dict[str, bytes] = {}
         self.loaded_keys: list[str] = []
+        self.head_reads: list[tuple[str, int]] = []
         self.sized_keys: list[str] = []
         self.created: list[tuple[str, str | None]] = []
         self.create_attempts: list[str] = []
@@ -60,6 +63,20 @@ class _CountingStorage(StorageProviderAbstract):
                 msg = f"File not found: '{key}'"
                 raise StorageFileNotFoundError(msg)
             return StoredData(data=self.objects[key], mime_type=None)
+        finally:
+            self._loads_in_flight -= 1
+
+    @override
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        self._loads_in_flight += 1
+        self.most_loads_at_once = max(self.most_loads_at_once, self._loads_in_flight)
+        try:
+            await asyncio.sleep(0)
+            self.head_reads.append((key, nb_bytes))
+            if key not in self.objects:
+                msg = f"File not found: '{key}'"
+                raise StorageFileNotFoundError(msg)
+            return self.objects[key][:nb_bytes]
         finally:
             self._loads_in_flight -= 1
 
@@ -109,22 +126,65 @@ def _hash_map(entries: dict[str, tuple[bytes, int]]) -> str:
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestRunnerBlobStore:
-    async def test_a_blob_held_at_another_size_is_refused_before_any_byte_is_read(self) -> None:
-        """An entry stating a size other than the held bytes' is a `request.invalid`, and the census bounds every read."""
+    async def test_a_blob_held_larger_than_stated_is_refused_reading_one_byte_past_the_size_stated(self) -> None:
+        """An entry stating a size other than the held bytes' is a `request.invalid`, and the census bounds every read.
+
+        The read asks for one byte more than the size stated, which shows the object is larger without reading it, and
+        only this refusal looks the size held up, for the operator's message.
+        """
         storage = _CountingStorage()
         blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
         large = b"x" * 4096
         await blob_store.store_blob(data=large)
+        storage.sized_keys.clear()
 
         with pytest.raises(RunnerRequestError) as exc_info:
-            await read_request_tree(document=_hash_map({"large.bin": (large, 0)}), blob_store=blob_store, label="The `files` map", field="files")
+            await read_request_tree(document=_hash_map({"large.bin": (large, 10)}), blob_store=blob_store, label="The `files` map", field="files")
 
         problem = problem_of(exc_info.value)
         assert problem["status"] == 422
         assert problem["code"] == "request.invalid"
         assert problem["params"] == {"field": "files"}
         # The hash and the size held ride the operator's message alone.
-        assert f"{sha256_hex(large)}" in problem["diagnostics"]["message"]
+        assert f"{sha256_hex(large)} (held at 4096 bytes)" in problem["diagnostics"]["message"]
+        assert storage.head_reads == [(_blob_key(large), 11)]
+        assert storage.sized_keys == [_blob_key(large)]
+        assert storage.loaded_keys == []
+
+    async def test_a_blob_held_smaller_than_stated_is_refused_with_no_lookup(self) -> None:
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
+        small = b"a few bytes"
+        await blob_store.store_blob(data=small)
+        storage.sized_keys.clear()
+
+        with pytest.raises(RunnerRequestError) as exc_info:
+            await read_request_tree(document=_hash_map({"small.txt": (small, 100)}), blob_store=blob_store, label="The `files` map", field="files")
+
+        problem = problem_of(exc_info.value)
+        assert problem["code"] == "request.invalid"
+        assert f"{sha256_hex(small)} (held at {len(small)} bytes)" in problem["diagnostics"]["message"]
+        assert storage.head_reads == [(_blob_key(small), 101)]
+        assert storage.sized_keys == []
+
+    async def test_each_blob_a_request_names_is_read_in_one_request(self) -> None:
+        """No size is looked up before a read: the read itself shows the length, which the hash then checks."""
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
+        contents = {f"file_{index_file}.txt": f"content {index_file}".encode() for index_file in range(5)}
+        for data in contents.values():
+            storage.objects[_blob_key(data)] = data
+
+        tree = await read_request_tree(
+            document=_hash_map({tree_path: (data, len(data)) for tree_path, data in contents.items()}),
+            blob_store=blob_store,
+            label="The map",
+            field="files",
+        )
+
+        assert tree == RequestTree.make_from_contents(contents=contents)
+        assert sorted(storage.head_reads) == sorted((_blob_key(data), len(data) + 1) for data in contents.values())
+        assert storage.sized_keys == []
         assert storage.loaded_keys == []
 
     async def test_a_blob_not_held_is_missing_and_a_held_one_is_read_and_checked(self) -> None:
@@ -182,16 +242,22 @@ class TestRunnerBlobStore:
     async def test_lookups_and_reads_run_a_bounded_number_at_a_time(self) -> None:
         storage = _CountingStorage()
         blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
-        blobs = [f"file number {index_blob}".encode() for index_blob in range(3 * MAX_CONCURRENT_BLOB_LOOKUPS)]
+        blobs = [f"file number {index_blob}".encode() for index_blob in range(3 * max(MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_READS))]
         for data in blobs:
             storage.objects[_blob_key(data)] = data
 
         stored = await blob_store.stored_sizes(sha256s=[sha256_hex(data) for data in blobs])
-        held = await blob_store.read_held(sizes={sha256: size for sha256, size in stored.items() if size is not None})
+        stated = await blob_store.read_stated(stated_sizes={sha256_hex(data): {len(data)} for data in blobs})
 
-        assert [held.read_blob(sha256_hex(data)) for data in blobs] == blobs
+        assert stored == {sha256_hex(data): len(data) for data in blobs}
+        assert [stated.held.read_blob(sha256_hex(data)) for data in blobs] == blobs
+        assert stated.mismatched == {}
         assert storage.most_lookups_at_once == MAX_CONCURRENT_BLOB_LOOKUPS
-        assert storage.most_loads_at_once == MAX_CONCURRENT_BLOB_TRANSFERS
+        assert storage.most_loads_at_once == MAX_CONCURRENT_BLOB_READS
+
+    async def test_the_s3_client_pool_holds_every_request_a_blob_store_runs_at_once(self) -> None:
+        """The S3 provider shares one client per loop, so a pool smaller than these would queue a request's own reads."""
+        assert max(MAX_CONCURRENT_BLOB_LOOKUPS, MAX_CONCURRENT_BLOB_READS) <= S3_MAX_POOL_CONNECTIONS
 
     async def test_a_short_object_is_asked_for_and_its_upload_is_a_server_fault_that_writes_nothing(self) -> None:
         """A blob cut short is damaged storage, which no write repairs: nothing writes over a blob, so its operator must."""

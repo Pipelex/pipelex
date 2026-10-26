@@ -753,6 +753,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.sdk_client_manager.teardown()
 
             # tools
+            self.runtime_hub.get_storage_provider().teardown()
             if self.class_registry:
                 self.class_registry.teardown()
 

@@ -38,21 +38,24 @@ From this the blob store answers without reading what it does not need:
   ones held, and nothing is written, while bytes of another size mean the object held is damaged, which only a storage
   that does not publish writes whole could leave, a 500 `pipelex.storage.damaged`, since nothing writes over a blob
   and its operator must remove the object.
-- A run looks up each hash's stored size first. A hash held at another size than an entry states is a 422
-  `request.invalid`, never `request.blobs_missing`, since uploading those bytes again would change nothing: the entry
-  is wrong.
-  Only a blob held at the size its entries state is read, so the bytes read are bounded by the sizes the request
-  states, which its census already held to the tree's limits, and each is checked against its hash once read. Bytes
-  that do not hash to their key mean the object stored under it is damaged, which no caller can repair and no retry
-  cures: a 500 `pipelex.storage.damaged` naming the kind of storage, whose verdict is not to retry, and an error
-  record, "Stored blob bytes do not match their hash", naming the hash for the operator to remove the object, after
-  which the blob is uploaded again.
+- A run reads each hash's bytes in one request, a read of at most one byte more than the largest size its entries
+  state, so the bytes read are bounded by the sizes the request states, which its census already held to the tree's
+  limits, whatever size the object is held at. A hash held at another size than an entry states, which the length read
+  shows, is a 422 `request.invalid`, never `request.blobs_missing`, since uploading those bytes again would change
+  nothing: the entry is wrong. Only that refusal looks the size held up, for the operator's message, when the read
+  stopped short of the object's end.
+  Bytes read at the size their entries state are checked against their hash. Bytes that do not hash to their key mean
+  the object stored under it is damaged, which no caller can repair and no retry cures: a 500
+  `pipelex.storage.damaged` naming the kind of storage, whose verdict is not to retry, and an error record, "Stored blob
+  bytes do not match their hash", naming the hash for the operator to remove the object, after which the blob is
+  uploaded again.
 
 Lookups and reads run a bounded number at a time, so one request naming many blobs never opens them all at once.
 """
 
 from collections.abc import Iterable, Mapping
 from functools import partial
+from typing import NamedTuple
 
 from mthds.method_tree.digest import DIGEST_PREFIX, sha256_hex, tree_listing
 from mthds.method_tree.file_entry import BlobStore, InMemoryBlobStore
@@ -73,9 +76,11 @@ BLOBS_PREFIX = "blobs"
 TREES_PREFIX = "trees"
 _BLOB_CONTENT_TYPE = "application/octet-stream"
 _LISTING_CONTENT_TYPE = "text/plain; charset=utf-8"
-# How many lookups of a blob's size, which read metadata alone, and how many reads or writes of a blob's bytes, one
-# request runs at a time.
+# How many lookups of a blob's size, which read metadata alone, how many reads of the blobs a request names, each
+# bounded by the size the request states for it, and how many writes of a blob's bytes one request runs at a time. The
+# S3 provider's pool of connections holds at least as many as the first two (`S3_MAX_POOL_CONNECTIONS`).
 MAX_CONCURRENT_BLOB_LOOKUPS = 16
+MAX_CONCURRENT_BLOB_READS = 16
 MAX_CONCURRENT_BLOB_TRANSFERS = 4
 # The message of the error record a blob read whose bytes do not match their hash writes, for the operator to search.
 BLOB_DAMAGED_MESSAGE = "Stored blob bytes do not match their hash"
@@ -102,6 +107,16 @@ def problem_scheme_of(*, storage_method: str) -> str:
         case _:
             # An external storage plugin's method token: the configured method is an open string.
             return PLUGIN_STORAGE_SCHEME
+
+
+class StatedBlobs(NamedTuple):
+    """The blobs a map of file entries names by hash, as the blob store holds them."""
+
+    held: BlobStore
+    """The bytes of each hash held at the size its entries state, checked against the hash."""
+
+    mismatched: dict[str, int]
+    """Each hash held at another size than an entry states, with the size it is held at, in hash order."""
 
 
 class RunnerBlobStore:
@@ -155,37 +170,68 @@ class RunnerBlobStore:
         sizes = await gather_bounded([partial(self.stored_size, sha256=sha256) for sha256 in hashes], max_concurrency=MAX_CONCURRENT_BLOB_LOOKUPS)
         return dict(zip(hashes, sizes, strict=True))
 
-    async def _read_verified(self, *, sha256: str, size: int) -> bytes:
-        """The stored bytes of `sha256`, held at `size`, checked against their hash.
+    async def _read_bounded(self, *, sha256: str, nb_bytes: int) -> bytes | None:
+        """At most `nb_bytes` leading bytes of the blob `sha256`, read in one request, or None when the hash is not held."""
+        try:
+            return await self._storage.load_head(f"{PIPELEX_STORAGE_SCHEME}{self._blob_key(sha256=sha256)}", nb_bytes=nb_bytes)
+        except StorageFileNotFoundError:
+            return None
 
-        Raises (as a problem document): a 500 `pipelex.storage.damaged` naming the kind of storage, for bytes that
-        are not `size` bytes hashing to `sha256`, after an error record naming the hash, the one place the operator
-        reads which damaged object to remove.
+    async def read_stated(self, *, stated_sizes: Mapping[str, set[int]]) -> StatedBlobs:
+        """Read the blobs a map of file entries names, each in one request bounded by the sizes its entries state.
+
+        Each hash is read for at most one byte more than the largest size its entries state, so a hash held at a larger
+        size shows it without its bytes being read, and the bytes read stay bounded by the sizes stated. A hash not
+        held is left out, for the reader to report among the blobs this runner does not hold.
+
+        Args:
+            stated_sizes: Each hash the map names, with every size its entries state for it, which the map's census
+                held to the tree's limits.
+
+        Raises (as a problem document): a 500 `pipelex.storage.damaged` naming the kind of storage, when no hash is
+        held at another size and bytes read at the size their entries state do not hash to their key, after an error
+        record naming each such hash, the one place the operator reads which damaged object to remove.
         """
-        data = await self._storage.load(f"{PIPELEX_STORAGE_SCHEME}{self._blob_key(sha256=sha256)}")
-        if len(data) != size or sha256_hex(data) != sha256:
+        hashes = sorted(stated_sizes)
+        reads = await gather_bounded(
+            [partial(self._read_bounded, sha256=sha256, nb_bytes=max(stated_sizes[sha256]) + 1) for sha256 in hashes],
+            max_concurrency=MAX_CONCURRENT_BLOB_READS,
+        )
+        blobs: dict[str, bytes] = {}
+        mismatched: dict[str, int] = {}
+        for sha256, data in zip(hashes, reads, strict=True):
+            if data is None:
+                continue
+            sizes = stated_sizes[sha256]
+            if sizes == {len(data)}:
+                blobs[sha256] = data
+            elif len(data) <= max(sizes):
+                mismatched[sha256] = len(data)
+            else:
+                # The read stopped a byte past the largest size stated: the object is larger, and its size is looked up.
+                held_size = await self.stored_size(sha256=sha256)
+                if held_size is not None:
+                    mismatched[sha256] = held_size
+        if mismatched:
+            return StatedBlobs(held=InMemoryBlobStore(), mismatched=mismatched)
+        damaged = [sha256 for sha256, data in blobs.items() if sha256_hex(data) != sha256]
+        for sha256 in damaged:
             log.error(
                 BLOB_DAMAGED_MESSAGE,
-                fields={"blob_sha256": sha256, "blob_size_bytes": size, "read_size_bytes": len(data), "storage_scheme": self._scheme},
+                fields={
+                    "blob_sha256": sha256,
+                    "blob_size_bytes": len(blobs[sha256]),
+                    "read_size_bytes": len(blobs[sha256]),
+                    "storage_scheme": self._scheme,
+                },
             )
+        if damaged:
             msg = (
-                f"The bytes this runner's blob store holds under {sha256} do not hash to it: the storage holds a damaged "
+                f"The bytes this runner's blob store holds under {damaged[0]} do not hash to it: the storage holds a damaged "
                 "object, which its operator removes for the blob to be uploaded again."
             )
             raise BlobStoreDamagedError(msg, scheme=self._scheme)
-        return data
-
-    async def read_held(self, *, sizes: Mapping[str, int]) -> BlobStore:
-        """Read these held blobs, each at its stored size, as the synchronous blob store a map of file entries is read with.
-
-        Args:
-            sizes: Each hash to read, with the size it is held at, which the caller bounded before asking.
-        """
-        blobs = await gather_bounded(
-            [partial(self._read_verified, sha256=sha256, size=size) for sha256, size in sizes.items()],
-            max_concurrency=MAX_CONCURRENT_BLOB_TRANSFERS,
-        )
-        return InMemoryBlobStore(blobs)
+        return StatedBlobs(held=InMemoryBlobStore(list(blobs.values())), mismatched={})
 
     async def store_blob(self, *, data: bytes) -> str:
         """Hold `data` under its SHA-256, creating the blob unless it is held already, and return the hash.
