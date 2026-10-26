@@ -6,6 +6,8 @@
 
 - **A fetched method's provenance carries its declared name**: `MethodProvenance` gains `display_name`, the `display_name` the package's `METHODS.toml` declares at the fetched commit, and `null` when it declares none, so the `method_provenance` of a `method_ref` run on `/v1/execute` and `/v1/start` reports it beside the address, tag, commit and tree digest, and a host can name the run's method after it. A fetched copy's `.provenance.json` sidecar records it too, and a sidecar or a record written without it still reads, its `display_name` null.
 
+## [v0.92.1] - 2026-10-26
+
 ### Fixed
 
 - **The S3 storage provider reuses one client per event loop**: each event loop opens one aiobotocore client on its first S3 operation, and every later operation on that loop shares it and its pool of `S3_MAX_POOL_CONNECTIONS` connections, where every operation, a presigned URL included, built a client and opened a TLS connection of its own; the client is closed as its loop shuts down or at the runtime's teardown, which now calls `StorageProviderAbstract.teardown()`, a no-op that a storage plugin keeping a client open between operations overrides to close it. Measured from a laptop against a bucket in another region, the API server's read of a method tree of 20 blobs went from 4,261 ms of wall time and 425 ms of CPU to 1,582 ms and 32 ms with this change alone.
