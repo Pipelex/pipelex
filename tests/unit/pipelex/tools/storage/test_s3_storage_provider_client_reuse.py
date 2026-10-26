@@ -25,9 +25,10 @@ class _ClientEvent(NamedTuple):
 class _RecordingSession:
     """An aiobotocore session whose clients record, on the loop they run on, when they open and when they close."""
 
-    def __init__(self, *, mocker: MockerFixture, failing_opens: int = 0) -> None:
+    def __init__(self, *, mocker: MockerFixture, failing_opens: int = 0, failing_closes: int = 0) -> None:
         self._mocker = mocker
         self.failing_opens = failing_opens
+        self.failing_closes = failing_closes
         self.events: list[_ClientEvent] = []
 
     def kinds(self) -> list[str]:
@@ -49,6 +50,10 @@ class _RecordingSession:
                 return client
 
             async def __aexit__(self, *_exc_info: object) -> None:
+                if session.failing_closes > 0:
+                    session.failing_closes -= 1
+                    msg = "The connection could not be closed"
+                    raise OSError(msg)
                 session.events.append(_ClientEvent(kind="close", loop=asyncio.get_running_loop()))
 
         return _ClientContext()
@@ -139,6 +144,49 @@ class TestS3StorageProviderClientReuse:
             assert session.events == [_ClientEvent(kind="open", loop=loop), _ClientEvent(kind="close", loop=loop)]
         finally:
             loop.close()
+
+    def test_a_close_failing_on_a_stopped_loop_is_logged_and_the_other_loops_clients_still_close(self, mocker: MockerFixture) -> None:
+        """The runtime's teardown must never fail, so a client that cannot be closed does not keep the next one open."""
+        failing_session = _RecordingSession(mocker=mocker, failing_closes=1)
+        mocker.patch("aiobotocore.session.get_session", return_value=failing_session)
+        log_debug = mocker.patch("pipelex.tools.storage.s3_storage_provider.log.debug")
+        provider = _make_provider()
+        first_loop = asyncio.new_event_loop()
+        second_loop = asyncio.new_event_loop()
+        try:
+            first_loop.run_until_complete(provider.load_size(uri=_URI))
+            second_loop.run_until_complete(provider.load_size(uri=_URI))
+
+            provider.teardown()
+
+            assert failing_session.events == [
+                _ClientEvent(kind="open", loop=first_loop),
+                _ClientEvent(kind="open", loop=second_loop),
+                _ClientEvent(kind="close", loop=second_loop),
+            ]
+            log_debug.assert_called_once()
+            assert log_debug.call_args.args == ("An S3 client could not be closed",)
+        finally:
+            first_loop.close()
+            second_loop.close()
+
+    def test_a_close_failing_on_the_running_loop_is_logged(self, mocker: MockerFixture) -> None:
+        failing_session = _RecordingSession(mocker=mocker, failing_closes=1)
+        mocker.patch("aiobotocore.session.get_session", return_value=failing_session)
+        log_debug = mocker.patch("pipelex.tools.storage.s3_storage_provider.log.debug")
+        provider = _make_provider()
+
+        async def _operate() -> None:
+            await provider.load_size(uri=_URI)
+            provider.teardown()
+            for _ in range(5):
+                await asyncio.sleep(0)
+            log_debug.assert_called_once()
+            assert log_debug.call_args.args == ("An S3 client could not be closed",)
+
+        asyncio.run(_operate())
+
+        assert failing_session.kinds() == ["open"]
 
     def test_teardown_leaves_a_closed_loop_s_client_alone(self, session: _RecordingSession) -> None:
         """A loop closed without shutting its generators down left its client open, and nothing can run its close any more."""

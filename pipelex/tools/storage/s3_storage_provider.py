@@ -4,15 +4,18 @@ import importlib.util
 import threading
 from asyncio import sleep
 from collections.abc import AsyncGenerator, Callable
+from concurrent.futures import Future
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from typing import Any, ClassVar
 from urllib.parse import quote
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.errors.error_codes import ErrorCode
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.system.exceptions import MissingDependencyError
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.async_utils import is_event_loop_running_on_this_thread
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
@@ -130,13 +133,34 @@ class _LoopClient:
         On a running loop the close is scheduled there. A loop no longer running is run until the close is done, unless
         this thread runs another loop, which cannot run a second one: that client is left to its loop's own shutdown. A
         closed loop has nothing left to close with, and holds no connection a client of it could still use.
+
+        It never raises, as it runs in the runtime's teardown: a close that fails is only logged, either way.
         """
         if self._closer is None or self.loop.is_closed():
             return
         if self.loop.is_running():
-            asyncio.run_coroutine_threadsafe(self.close(), self.loop)
+            close_future = asyncio.run_coroutine_threadsafe(self.close(), self.loop)
+            close_future.add_done_callback(lambda done: self.log_close_failure(close_future=done))
         elif not is_event_loop_running_on_this_thread():
-            self.loop.run_until_complete(self.close())
+            try:
+                self.loop.run_until_complete(self.close())
+            except Exception as exc:  # ruff: ignore[blind-except]
+                # (2) closing runs aiobotocore's and aiohttp's own teardown, whose exception surface is not documented;
+                # the runtime's teardown must never fail, and the other loops' clients must still be closed.
+                log.debug("An S3 client could not be closed", fields=error_fields(exc=exc))
+
+    @classmethod
+    def log_close_failure(cls, *, close_future: Future[None]) -> None:
+        """Say at DEBUG why a close scheduled on a running loop failed, as that close's done callback.
+
+        A cancelled close holds no exception to read: `Future.exception()` raises `CancelledError` for it, which would
+        escape the callback.
+        """
+        if close_future.cancelled():
+            return
+        close_exc = close_future.exception()
+        if close_exc is not None:
+            log.debug("An S3 client could not be closed", fields=error_fields(exc=close_exc))
 
 
 class S3StorageProvider(StorageProviderAbstract):
