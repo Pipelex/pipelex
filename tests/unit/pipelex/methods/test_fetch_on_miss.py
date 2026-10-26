@@ -41,6 +41,8 @@ main_pipe = "compute"
 pipes = ["compute"]
 """
 
+MANIFEST_WITH_DISPLAY_NAME = MANIFEST.replace('name = "scoring"\n', 'name = "scoring"\ndisplay_name = "Scoring Engine"\n', 1)
+
 STRUCTURES_MODULE = """\
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -50,15 +52,15 @@ class Invoice(StructuredContent):
 """
 
 
-def _make_package_dir(base: Path) -> Path:
+def _make_package_dir(base: Path, *, manifest: str = MANIFEST) -> Path:
     package_dir = base / "fetched-pkg"
     package_dir.mkdir(parents=True)
-    (package_dir / MANIFEST_FILENAME).write_text(MANIFEST, encoding="utf-8")
+    (package_dir / MANIFEST_FILENAME).write_text(manifest, encoding="utf-8")
     (package_dir / "scoring.mthds").write_text("# placeholder", encoding="utf-8")
     return package_dir
 
 
-def _make_fetched(package_dir: Path, *, ref_str: str = f"{FULL_ADDRESS}@v0.1.0") -> FetchedMethodPackage:
+def _make_fetched(package_dir: Path, *, ref_str: str = f"{FULL_ADDRESS}@v0.1.0", manifest: str = MANIFEST) -> FetchedMethodPackage:
     ref = parse_method_ref(ref_str)
     return FetchedMethodPackage(
         ref=ref,
@@ -66,7 +68,7 @@ def _make_fetched(package_dir: Path, *, ref_str: str = f"{FULL_ADDRESS}@v0.1.0")
         commit_sha=COMMIT_SHA,
         clone_dir=package_dir.parent,
         package_dir=package_dir,
-        manifest=parse_methods_toml(MANIFEST),
+        manifest=parse_methods_toml(manifest),
     )
 
 
@@ -165,6 +167,30 @@ class TestResolveAddressBasedMethod:
         resolved_again = resolve_address_based_method(full_address=FULL_ADDRESS)
         assert resolved_again.path == resolved.path
         assert fetch_mock.call_count == 1
+
+    @pytest.mark.parametrize(
+        ("manifest", "expected_display_name"),
+        [
+            pytest.param(MANIFEST_WITH_DISPLAY_NAME, "Scoring Engine", id="declared"),
+            pytest.param(MANIFEST, None, id="not-declared"),
+        ],
+    )
+    def test_installed_copy_records_the_manifest_display_name(
+        self, isolated_methods_dirs: Path, tmp_path: Path, mocker: MockerFixture, manifest: str, expected_display_name: str | None
+    ) -> None:
+        """The provenance sidecar of a fetched copy keeps the manifest's display name, which the next resolve reads back."""
+        mocker.patch("pipelex.methods.fetch_on_miss.is_method_fetch_on_miss_enabled", return_value=True)
+        package_dir = _make_package_dir(tmp_path, manifest=manifest)
+        fetch_mock = mocker.patch("pipelex.methods.fetch_on_miss.fetch_method_package", return_value=_make_fetched(package_dir, manifest=manifest))
+
+        resolved = resolve_address_based_method(full_address=f"{FULL_ADDRESS}@v0.1.0")
+        resolved_again = resolve_address_based_method(full_address=FULL_ADDRESS)
+
+        assert fetch_mock.call_count == 1
+        assert resolved.path == (isolated_methods_dirs / "scoring").resolve()
+        expected = MethodProvenance(address=FULL_ADDRESS, tag="v0.1.0", commit_sha=COMMIT_SHA, display_name=expected_display_name)
+        assert resolved.provenance == expected
+        assert resolved_again.provenance == expected
 
     def test_bare_name_collision_across_addresses_is_a_loud_error(self, isolated_methods_dirs: Path, tmp_path: Path, mocker: MockerFixture) -> None:
         """Two packages sharing the bare name never silently load or overwrite each other — the collision names both addresses."""

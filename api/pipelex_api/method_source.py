@@ -13,7 +13,8 @@ commit, read from the commit's git objects as stored, with no checkout filter, l
 `export-ignore`, so its digest is the same on every machine, and filtered by the membership rule read with that
 commit's own `.gitignore` files and the package's own `exclude` patterns. A submodule contributes no file, and a
 symbolic link committed in the package is refused unless the rule excludes it. The tree's digest is recorded in the
-run's provenance (`method_provenance.tree_digest`), beside the commit.
+run's provenance (`method_provenance.tree_digest`), beside the commit and the `display_name` the package's manifest
+declares, which the fetched package's own provenance already carries.
 
 The packages a package ships under its own `.mthds/methods/<name>/`, the layout of the local method cache, are out of
 its tree (a dot directory), and each becomes a dependency tree of its own, keyed by the address its manifest declares,
@@ -291,5 +292,7 @@ def fetched_method(method_ref: str) -> FetchedMethod:
     """
     with _fetched_package(method_ref) as package:
         request_method = _read_package_method(package=package)
+    # The package's own provenance already holds the address, the tag, the commit and the manifest's display name;
+    # only the digest of the tree this runner read is added here.
     provenance = package.provenance.model_copy(update={"tree_digest": request_method.tree.tree.digest})
     return FetchedMethod(request_method=request_method, package=package, provenance=provenance)

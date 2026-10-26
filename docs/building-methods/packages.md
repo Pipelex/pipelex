@@ -45,7 +45,7 @@ pipes = ["compute_weighted_score"]
 | `version` | Yes | Semantic version such as `1.0.0` or `2.1.3-beta.1` |
 | `description` | Yes | Human-readable package description |
 | `name` | No | Optional short method name |
-| `display_name` | No | Optional display label |
+| `display_name` | No | Optional human-readable name, such as `Slide Designer`; a run of the package fetched by its address records it in its provenance |
 | `authors` | No | List of author names |
 | `license` | No | License string such as `MIT` |
 | `main_pipe` | No | Optional main pipe code |
@@ -130,7 +130,7 @@ steps = [
 ]
 ```
 
-An address-based reference resolves against the **installed methods** — `~/.mthds/methods/` (global), `.mthds/methods/` in the working directory (project-local), and a `.mthds/methods/` directory beside the bundle being loaded or in a directory above it — matched by the manifest's `address` + `name`, case-insensitively. When no installed method matches, Pipelex **fetches on miss**: it fetches the package by address — honoring an `@<tag>` pin, through the same grammar, bounds, and tags-only rules as a direct fetch — installs it into `~/.mthds/methods/`, records the fetch provenance (address, tag, and the commit SHA of what was actually cloned) in a `.provenance.json` sidecar beside the manifest, and loads it so resolution proceeds. The next load finds the installed copy and never touches the network again.
+An address-based reference resolves against the **installed methods** — `~/.mthds/methods/` (global), `.mthds/methods/` in the working directory (project-local), and a `.mthds/methods/` directory beside the bundle being loaded or in a directory above it — matched by the manifest's `address` + `name`, case-insensitively. When no installed method matches, Pipelex **fetches on miss**: it fetches the package by address — honoring an `@<tag>` pin, through the same grammar, bounds, and tags-only rules as a direct fetch — installs it into `~/.mthds/methods/`, records the fetch provenance (address, tag, the commit SHA of what was actually cloned, and the manifest's `display_name`) in a `.provenance.json` sidecar beside the manifest, and loads it so resolution proceeds. The next load finds the installed copy and never touches the network again.
 
 A few behaviors worth knowing:
 
