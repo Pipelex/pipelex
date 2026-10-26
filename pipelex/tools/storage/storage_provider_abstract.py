@@ -31,6 +31,8 @@ class StorageProviderAbstract(ABC):
         - _store(data, key, content_type, checksum_sha256_hex): Store data
         - public_url(uri): Return human-readable link for URI
 
+    A subclass holding a client open between operations overrides ``teardown`` to close it.
+
     A provider Pipelex ships names its kind in ``storage_kind``, the ``scheme`` its refusals carry; a plugin's provider
     keeps the default, ``plugin``.
     """
@@ -259,6 +261,15 @@ class StorageProviderAbstract(ABC):
             await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
             return True
         return False
+
+    def teardown(self) -> None:
+        """Release what the provider keeps open between operations, such as a client and its connections.
+
+        The runtime's teardown calls it on the provider it booted with, from synchronous code, possibly on the thread
+        running the event loop the provider served. This default holds nothing. A provider that keeps a client
+        bound to an event loop closes it on that loop, scheduling the close on a loop still running rather than
+        waiting for it, and must still work afterwards, opening a new client on its next operation.
+        """
 
     @abstractmethod
     async def public_url(self, uri: str) -> str | None:

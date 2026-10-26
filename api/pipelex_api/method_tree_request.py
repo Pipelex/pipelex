@@ -419,26 +419,27 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str, field: str
 
 
 async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str, field: str) -> BlobStore:
-    """The bytes a map's hash entries name that the blob store holds, looked up by size before any is read.
+    """The bytes a map's hash entries name that the blob store holds, each read in one request bounded by its stated size.
 
     A hash held at another size than one of its entries states is refused, since uploading its bytes again would not
-    change the size the store holds them at. Every other held hash is held at the one size its entries state, which the
-    census bounded, so reading them reads no more than the census allowed. A hash not held is left out, for the reader
-    to report among the blobs this runner does not hold.
+    change the size the store holds them at. Every hash is read for at most one byte past the largest size its entries
+    state, which the census bounded, so reading them reads no more than the census allowed. A hash not held is left
+    out, for the reader to report among the blobs this runner does not hold.
 
-    Raises (as a problem document): a 422 `request.invalid` naming the field the map rides; its message, in the operator's
-    diagnostics, lists each hash held at another size, with that size, which no parameter of the code carries.
+    Raises (as problem documents): a 422 `request.invalid` naming the field the map rides, whose message, in the
+    operator's diagnostics, lists each hash held at another size, with that size, which no parameter of the code
+    carries; and, when no hash is, the 500 `pipelex.storage.damaged` of the blob store for bytes that do not hash to
+    their key.
     """
-    stored = await blob_store.stored_sizes(sha256s=sorted(stated_sizes))
-    mismatched = {sha256: size for sha256, size in stored.items() if size is not None and stated_sizes[sha256] != {size}}
-    if mismatched:
-        described = ", ".join(f"{sha256} (held at {size} bytes)" for sha256, size in mismatched.items())
+    stated = await blob_store.read_stated(stated_sizes=stated_sizes)
+    if stated.mismatched:
+        described = ", ".join(f"{sha256} (held at {size} bytes)" for sha256, size in stated.mismatched.items())
         msg = (
             f"{label} states a size for a hash other than the size of the bytes this runner holds under it: {described}. "
             "A hash names one set of bytes, so state the size of those bytes."
         )
         raise RunnerRequestError(msg, field=field)
-    return await blob_store.read_held(sizes={sha256: size for sha256, size in stored.items() if size is not None})
+    return stated.held
 
 
 async def read_request_tree(

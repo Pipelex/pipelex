@@ -1,6 +1,6 @@
 """The default head read every storage provider inherits: the whole object, sliced.
 
-A provider that can read a byte range (S3, GCS) overrides it; one that cannot, including an external
+A provider that can read a byte range (local, S3, GCS) overrides it; one that cannot, including an external
 storage plugin written before the head read existed, keeps working through this default.
 """
 

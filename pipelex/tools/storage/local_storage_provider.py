@@ -106,6 +106,34 @@ class LocalStorageProvider(StorageProviderAbstract):
         return StoredData(data=data, mime_type=mime_type)
 
     @override
+    async def _load_head(self, key: str, *, nb_bytes: int) -> bytes:
+        """Read the first bytes of a file, instead of the whole file.
+
+        Args:
+            key: Storage key (relative path, without scheme prefix).
+            nb_bytes: How many leading bytes to read. A file shorter than this is read whole.
+
+        Returns:
+            At most `nb_bytes` leading bytes of the file.
+
+        Raises:
+            StorageFileNotFoundError: If the file does not exist.
+            StorageInvalidUriError: If the key is invalid.
+            StorageLocalError: If the filesystem read fails (e.g. permission denied, I/O error).
+        """
+        file_path = self._validate_key(key)
+        try:
+            async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
+                data: bytes = await file_handle.read(nb_bytes)
+        except FileNotFoundError as exc:
+            msg = f"File not found: '{key}'"
+            raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind) from exc
+        except OSError as exc:
+            msg = f"Failed to read file '{key}': {exc}"
+            raise StorageLocalError(msg) from exc
+        return data
+
+    @override
     async def _load_size(self, key: str) -> int:
         """The size of a file, read from its metadata without opening it.
 
