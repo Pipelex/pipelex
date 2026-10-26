@@ -105,6 +105,36 @@ class TestInstallMethodPackage:
         assert found.path == installed.path
         assert found.provenance is None
 
+    @pytest.mark.parametrize(
+        "sidecar",
+        [
+            pytest.param(
+                b'{"address": "github.com/pipelex-tests/fom-methods/scoring", "tag": "v0.1.0", "commit_sha": "' + b"a" * 40 + b'"}',
+                id="before-tree-digest",
+            ),
+            pytest.param(
+                b'{"address": "github.com/pipelex-tests/fom-methods/scoring", "tag": "v0.1.0", "commit_sha": "'
+                + b"a" * 40
+                + b'", "tree_digest": null}',
+                id="before-display-name",
+            ),
+        ],
+    )
+    def test_discovery_reads_a_sidecar_an_earlier_release_wrote(self, tmp_path: Path, sidecar: bytes) -> None:
+        """A sidecar written before the provenance recorded a display name still reads, its display name null."""
+        package_dir = _make_package_dir(tmp_path)
+        methods_dir = tmp_path / "methods"
+        installed = install_method_package(package_dir=package_dir, name="scoring", provenance=PROVENANCE, methods_dir=methods_dir)
+        (installed.path / PROVENANCE_FILENAME).write_bytes(sidecar)
+
+        methods = discover_installed_methods(include_global=False, include_project=False, extra_search_dirs=[methods_dir])
+        found = find_method_by_full_address(FULL_ADDRESS, methods=methods)
+
+        assert found is not None
+        assert found.provenance is not None
+        assert found.provenance == PROVENANCE
+        assert found.provenance.display_name is None
+
     def test_install_refuses_a_target_occupied_by_a_non_package(self, tmp_path: Path) -> None:
         """An existing target directory that is not a method package is never overwritten."""
         package_dir = _make_package_dir(tmp_path)

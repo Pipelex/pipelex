@@ -36,6 +36,8 @@ main_pipe = "extract"
 pipes = ["extract"]
 """
 
+MANIFEST_WITH_DISPLAY_NAME = MANIFEST.replace('name = "documents"\n', 'name = "documents"\ndisplay_name = "Document Extractor"\n', 1)
+
 STRUCTURES_MODULE = """\
 from pipelex.core.stuffs.structured_content import StructuredContent
 
@@ -45,10 +47,10 @@ class Invoice(StructuredContent):
 """
 
 
-def _write_package(destination: Path) -> None:
+def _write_package(destination: Path, *, manifest: str = MANIFEST) -> None:
     package_dir = destination / "methods" / "documents"
     package_dir.mkdir(parents=True, exist_ok=True)
-    (package_dir / "METHODS.toml").write_text(MANIFEST, encoding="utf-8")
+    (package_dir / "METHODS.toml").write_text(manifest, encoding="utf-8")
     (package_dir / "documents.mthds").write_text("# placeholder", encoding="utf-8")
 
 
@@ -97,6 +99,36 @@ class TestFetchMethodPackage:
         assert clone_default.call_count == 0
         assert tag_check.call_count == 1
         assert fetched.provenance.tag == "v0.2.0"
+
+    @pytest.mark.parametrize(
+        ("manifest", "expected_display_name"),
+        [
+            pytest.param(MANIFEST_WITH_DISPLAY_NAME, "Document Extractor", id="declared"),
+            pytest.param(MANIFEST, None, id="not-declared"),
+        ],
+    )
+    def test_provenance_carries_the_manifest_display_name(
+        self, mocker: MockerFixture, tmp_path: Path, manifest: str, expected_display_name: str | None
+    ) -> None:
+        """The provenance records the display name the fetched manifest declares, and null when it declares none."""
+
+        def fake_clone(*, clone_url: str, destination: Path) -> None:
+            assert clone_url == "https://github.com/Pipelex/methods.git"
+            _write_package(destination, manifest=manifest)
+
+        mocker.patch("pipelex.methods.fetching.clone_default_branch", side_effect=fake_clone)
+        mocker.patch("pipelex.methods.fetching.resolve_head_commit_sha", return_value=FAKE_SHA)
+
+        fetched = fetch_method_package(ref=parse_method_ref("github.com/Pipelex/methods/documents"), dest_dir=tmp_path)
+
+        assert fetched.manifest.display_name == expected_display_name
+        assert fetched.provenance.model_dump(mode="json") == {
+            "address": "github.com/Pipelex/methods/documents",
+            "tag": None,
+            "commit_sha": FAKE_SHA,
+            "tree_digest": None,
+            "display_name": expected_display_name,
+        }
 
     def test_clone_failure_is_a_method_fetch_error(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """A VCS failure surfaces as MethodFetchError naming the reference."""

@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.92.1
+  version: 0.92.2
 paths:
   /health:
     get:
@@ -4235,12 +4235,20 @@ components:
           title: Tree Digest
           description: The digest of the package's method tree, `sha256:` and 64 lowercase hex characters, as read from the
             commit's git objects, set by a runner that reads the package as a tree, and null otherwise.
+        display_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Display Name
+          description: The package's human-readable name, the `display_name` its `METHODS.toml` manifest declares at the fetched
+            commit, for a host to name the run's method by, and null when the manifest declares none.
       type: object
       required:
       - address
       - commit_sha
       title: MethodProvenance
-      description: 'What a fetched-method run must record: address, tag, and the resolved commit SHA.'
+      description: 'What a fetched-method run must record: address, tag, the resolved commit SHA, and the name the package
+        declares.'
     MethodTreeRequest:
       properties:
         files:
@@ -6853,9 +6861,10 @@ components:
           - $ref: '#/components/schemas/MethodProvenance'
           - type: 'null'
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — provenance of a `method_ref` run: the package''s
-            resolved full address, the requested tag (null for a bare address), and the commit SHA that was actually fetched.
-            The SHA is what keeps the run explainable when a tag moves. Absent (or null) for runs from inline source or a
-            bundle.'
+            resolved full address, the requested tag (null for a bare address), the commit SHA that was actually fetched,
+            the digest of the method tree the run loaded, and the `display_name` the package''s manifest declares (null when
+            it declares none). The SHA is what keeps the run explainable when a tag moves. Absent (or null) for runs from
+            inline source or a bundle.'
       additionalProperties: true
       type: object
       required:
@@ -6910,9 +6919,10 @@ components:
           - $ref: '#/components/schemas/MethodProvenance'
           - type: 'null'
           description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — provenance of a `method_ref` run: the package''s
-            resolved full address, the requested tag (null for a bare address), and the commit SHA that was actually fetched.
-            The SHA is what keeps the run explainable when a tag moves. Absent (or null) for runs from inline source or a
-            bundle.'
+            resolved full address, the requested tag (null for a bare address), the commit SHA that was actually fetched,
+            the digest of the method tree the run loaded, and the `display_name` the package''s manifest declares (null when
+            it declares none). The SHA is what keeps the run explainable when a tag moves. Absent (or null) for runs from
+            inline source or a bundle.'
       additionalProperties: true
       type: object
       required:

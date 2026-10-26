@@ -25,7 +25,9 @@ GLOBAL_METHODS_DIR = Path.home() / ".mthds" / "methods"
 PROJECT_METHODS_DIR = Path(".mthds") / "methods"
 
 # Written beside METHODS.toml when a method is installed by fetch: the address, the tag when one
-# was named, and the commit SHA of what was actually cloned — tags can move, the SHA explains runs.
+# was named, the commit SHA of what was actually cloned — tags can move, the SHA explains runs —
+# and the display name the manifest declares. A sidecar written before the display name was
+# recorded still reads, its display name null.
 PROVENANCE_FILENAME = ".provenance.json"
 
 _STAGING_SUFFIX = ".staging"
@@ -35,7 +37,7 @@ class InstalledMethod(BaseModel):
     """An installed method discovered from the filesystem.
 
     ``provenance`` is set only for methods fetched by reference: the address, the tag when
-    one was named, and the commit SHA of what was actually cloned.
+    one was named, the commit SHA of what was actually cloned, and the manifest's display name.
     """
 
     name: str

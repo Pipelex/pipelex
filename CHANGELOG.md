@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.92.2] - 2026-10-26
+
+### Added
+
+- **A fetched method's provenance carries its declared name**: `MethodProvenance` gains `display_name`, the `display_name` the package's `METHODS.toml` declares at the fetched commit, and `null` when it declares none, so the `method_provenance` of a `method_ref` run on `/v1/execute` and `/v1/start` reports it beside the address, tag, commit and tree digest, and a host can name the run's method after it. A fetched copy's `.provenance.json` sidecar records it too, and a sidecar or a record written without it still reads, its `display_name` null.
+
 ## [v0.92.1] - 2026-10-26
 
 ### Fixed
