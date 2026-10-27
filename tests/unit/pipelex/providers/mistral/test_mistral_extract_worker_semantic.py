@@ -52,7 +52,8 @@ class TestMistralExtractWorkerSemantic:
         ("status_code", "error_message", "expected_category", "expected_kind"),
         [
             (402, "Payment required: insufficient credits", InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
-            (429, "Too many requests, quota exceeded", InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
+            # Every 429 is a rate limit, whatever its words say
+            (429, "Too many requests, quota exceeded", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (429, "Rate limit exceeded", InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             (401, "Invalid API key", InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             (403, "Forbidden", InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),

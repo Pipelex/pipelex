@@ -121,7 +121,8 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         assert metadata.request_id == "req_rate"
         assert metadata.retry_after_seconds == 5.0
 
-    async def test_wrapped_rate_limit_quota_is_capacity(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_resource_exhausted_whose_words_name_a_quota_is_transient(self, mocker: MockerFixture) -> None:
+        """Every Gemini 429 `RESOURCE_EXHAUSTED` is a rate limit, whatever its words say."""
         worker = _make_worker(mocker)
         sdk_exc = _make_client_error(
             429,
@@ -134,10 +135,10 @@ class TestGoogleLLMWorkerObjectErrorHandling:
         with pytest.raises(LLMCompletionError) as exc_info:
             await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
-        assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
+        assert exc_info.value.error_category is InferenceErrorCategory.TRANSIENT
         assert exc_info.value.user_action is not None
-        assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
-        assert "billing" in exc_info.value.user_action.detail.lower()
+        assert exc_info.value.user_action.kind is UserActionKind.WAIT_AND_RETRY
+        assert "run it again" in exc_info.value.user_action.detail
         metadata = exc_info.value.provider_metadata
         assert metadata is not None
         assert metadata.status_code == 429

@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 from botocore.exceptions import ClientError
+from mthds.protocol.problem.registry import CoreCode
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -133,8 +134,8 @@ class TestBedrockWorkerErrorHandling:
     @pytest.mark.builds_problems_without_required_params(
         reason="calls the worker below its public method, whose enrichment names the model and the provider"
     )
-    async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
-        """The problem of a CAPACITY Bedrock error invites no retry."""
+    async def test_problem_service_quota_exceeded_is_retryable(self, mocker: MockerFixture) -> None:
+        """Bedrock's service-quota refusal, which AWS says can be resubmitted later, is a rate limit whose problem invites a retry."""
         worker = _make_bedrock_llm_worker(mocker)
         sdk_exc = _make_bedrock_client_error("ServiceQuotaExceededException", "Service quota exceeded")
         worker.bedrock_client_for_text.chat.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
@@ -151,8 +152,9 @@ class TestBedrockWorkerErrorHandling:
 
         error = exc_info.value
         problem = error.to_problem(view=ProblemView.OPERATOR)
-        assert find_inference_error_category_in_chain(error) == "capacity"
-        assert problem.is_retryable is False
+        assert find_inference_error_category_in_chain(error) == "transient"
+        assert problem.code == CoreCode.PROVIDER_RATE_LIMITED
+        assert problem.is_retryable is True
 
     @pytest.mark.builds_problems_without_required_params(
         reason="calls the worker below its public method, whose enrichment names the model and the provider"

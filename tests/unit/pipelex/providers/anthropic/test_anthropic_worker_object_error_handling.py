@@ -7,7 +7,7 @@ are categorized correctly instead of being flattened to ``CONTENT``.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import anthropic
 import httpx
@@ -21,6 +21,7 @@ from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
 from tests.helpers.instructor_test_utils import DummySchema, make_llm_job, wrap_in_instructor_retry
+from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
 
 
 def _mock_httpx_response(status_code: int) -> httpx.Response:
@@ -28,12 +29,12 @@ def _mock_httpx_response(status_code: int) -> httpx.Response:
     return httpx.Response(status_code=status_code, request=request)
 
 
-def _make_anthropic_rate_limit_error(message: str) -> anthropic.RateLimitError:
-    return anthropic.RateLimitError(message, response=_mock_httpx_response(429), body=None)
+def _make_anthropic_rate_limit_error(message: str, *, body: dict[str, Any] | None = None) -> anthropic.RateLimitError:
+    return anthropic.RateLimitError(message, response=_mock_httpx_response(429), body=body)
 
 
-def _make_anthropic_bad_request_error(message: str) -> anthropic.BadRequestError:
-    return anthropic.BadRequestError(message, response=_mock_httpx_response(400), body=None)
+def _make_anthropic_bad_request_error(message: str, *, body: dict[str, Any] | None = None) -> anthropic.BadRequestError:
+    return anthropic.BadRequestError(message, response=_mock_httpx_response(400), body=body)
 
 
 def _make_anthropic_timeout_error() -> anthropic.APITimeoutError:
@@ -127,10 +128,13 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert metadata.sdk_exception_type == "RateLimitError"
         assert metadata.status_code == 429
 
-    async def test_wrapped_rate_limit_quota_is_capacity(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_spend_cap_is_capacity(self, mocker: MockerFixture) -> None:
+        """The spend cap's 429, recovered from instructor's wrapper with its body, is a spent quota by its code."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded")
+        sdk_exc = _make_anthropic_rate_limit_error(
+            "You have reached your API usage limits", body=DirectProviderQuotaTestData.ANTHROPIC_SPEND_CAP_BODY
+        )
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -200,10 +204,13 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS
 
-    async def test_wrapped_permission_quota_is_capacity(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_credit_balance_is_capacity(self, mocker: MockerFixture) -> None:
+        """The credit balance's 400, recovered from instructor's wrapper with its body, is a spent credit by its sentence."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        wrapped = wrap_in_instructor_retry(_make_anthropic_permission_denied_error("Your account quota has been exceeded"))
+        wrapped = wrap_in_instructor_retry(
+            _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaTestData.ANTHROPIC_CREDIT_BALANCE_BODY)
+        )
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
@@ -212,6 +219,20 @@ class TestAnthropicWorkerObjectErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
         assert exc_info.value.user_action is not None
         assert exc_info.value.user_action.kind is UserActionKind.CHECK_BILLING
+
+    async def test_wrapped_permission_denied_with_quota_wording_is_configuration(self, mocker: MockerFixture) -> None:
+        """A 403 whose words name a quota is still a refused credential: its wording decides nothing."""
+        _patch_gen_object_dependencies(mocker)
+        worker = _make_worker(mocker)
+        wrapped = wrap_in_instructor_retry(_make_anthropic_permission_denied_error("Your account quota has been exceeded"))
+        worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+        with pytest.raises(LLMCompletionError) as exc_info:
+            await worker._gen_object(llm_job=make_llm_job(mocker), schema=DummySchema)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        assert exc_info.value.error_category is InferenceErrorCategory.CONFIGURATION
+        assert exc_info.value.user_action is not None
+        assert exc_info.value.user_action.kind is UserActionKind.CHECK_CREDENTIALS
 
     async def test_wrapped_server_error_is_transient(self, mocker: MockerFixture) -> None:
         """A wrapped 5xx APIStatusError is categorized TRANSIENT via the generic fallback branch."""
@@ -290,7 +311,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         """The operator's problem carries what the provider answered, and the error advises its local reader what to do."""
         _patch_gen_object_dependencies(mocker)
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded")
+        sdk_exc = _make_anthropic_rate_limit_error("Your account quota has been exceeded", body=DirectProviderQuotaTestData.ANTHROPIC_SPEND_CAP_BODY)
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.chat.completions.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -303,6 +324,7 @@ class TestAnthropicWorkerObjectErrorHandling:
         # The provider's `name` is the backend the error names, which the worker leaves to its caller to fill.
         assert problem_wire["diagnostics"]["provider"] == {
             "status": 429,
+            "code": "rate_limit_error",
             "message": "Your account quota has been exceeded",
         }
         # What the provider answered is the operator's alone.

@@ -57,16 +57,18 @@ class _TestCases:
             CoreCode.PROVIDER_RATE_LIMITED,
             False,
         ),
+        # A 429 whose words name a quota but which carries no quota code is a rate limit; the quota code's verdict is
+        # pinned in `test_classify_extra_signals`, which carries the provider's code
         (
-            "quota_429",
+            "quota_wording_429_without_a_quota_code",
             ProviderName.OPENAI,
             "RateLimitError",
             "You exceeded your current quota",
             429,
             _LLM,
-            InferenceErrorCategory.CAPACITY,
-            UserActionKind.CHECK_BILLING,
-            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+            InferenceErrorCategory.TRANSIENT,
+            UserActionKind.WAIT_AND_RETRY,
+            CoreCode.PROVIDER_RATE_LIMITED,
             False,
         ),
         (
@@ -105,16 +107,18 @@ class _TestCases:
             CoreCode.PROVIDER_CREDENTIAL_REFUSED,
             False,
         ),
+        # Anthropic's credit sentence is a spent credit on a 400 `invalid_request_error` alone; a 403 is a credential
+        # refusal whatever it says
         (
-            "permission_denied_403_quota_anthropic",
+            "permission_denied_403_with_a_credit_sentence_anthropic",
             ProviderName.ANTHROPIC,
             "PermissionDeniedError",
             "Your credit balance is too low",
             403,
             _LLM,
-            InferenceErrorCategory.CAPACITY,
-            UserActionKind.CHECK_BILLING,
-            CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+            InferenceErrorCategory.CONFIGURATION,
+            UserActionKind.CHECK_CREDENTIALS,
+            CoreCode.PROVIDER_CREDENTIAL_REFUSED,
             False,
         ),
         (
@@ -629,14 +633,25 @@ class TestClassifyInferenceError:
                 CoreCode.RUNTIME_UNEXPECTED,
             ),
             (
-                "bedrock_service_quota_via_error_code",
+                "openai_quota_code_on_429",
+                ProviderName.OPENAI,
+                "RateLimitError",
+                "You exceeded your current quota",
+                429,
+                "insufficient_quota",
+                InferenceErrorCategory.CAPACITY,
+                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+            ),
+            # AWS documents it as resubmittable later: a throttle on its 400, read as a rate limit
+            (
+                "bedrock_service_quota_exceeded_is_a_throttle",
                 ProviderName.BEDROCK,
                 "ClientError",
                 "An error occurred",
                 400,
                 "ServiceQuotaExceededException",
-                InferenceErrorCategory.CAPACITY,
-                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+                InferenceErrorCategory.TRANSIENT,
+                CoreCode.PROVIDER_RATE_LIMITED,
             ),
         ],
     )
