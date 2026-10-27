@@ -1608,6 +1608,10 @@ rationale = "Factory from source: builds the result from the inference_model; si
 param = "response"
 rationale = "Extracts/derives from the response; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_error_codes_in_body"]
+param = "body"
+rationale = "Lists the codes and types of one error body, the operand the OpenAI and gateway spent-quota rule reads; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::_error_sections"]
 param = "body"
 rationale = "Lists the sections of one error body, the operand its readers error_code_from_body_code_first and _google_detail_entries pass straight through; single operand."

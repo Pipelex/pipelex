@@ -35,6 +35,6 @@ A provider Pipelex calls directly, with your own keys, is read the same way, fro
 - **Amazon Bedrock**: no failure is a spent quota, because Bedrock bills your AWS account and keeps no balance to run out. A `ThrottlingException` is a rate limit, and so is a `ServiceQuotaExceededException`, which arrives as a `400` but which AWS documents as a request to send again later.
 - **Every other provider**, Azure OpenAI included, reports no spent quota: its `429` is a rate limit.
 
-When a provider gives its delay twice, as Azure OpenAI does in `retry-after-ms` and in `retry-after`, Pipelex carries the milliseconds, the more precise of the two, as the OpenAI and Anthropic SDKs do for their own retries, and, as they do, only when the milliseconds are above zero; a `retry-after-ms` of `0` leaves the decision to `retry-after`.
+When a provider gives its delay twice, as Azure OpenAI does in `retry-after-ms` and in `retry-after`, Pipelex carries the milliseconds, the more precise of the two, which the OpenAI and Anthropic SDKs also read first for their own retries. It does so only when the milliseconds are above zero: for a `retry-after-ms` of `0`, Pipelex deliberately falls back to `retry-after`, since a zero gives no delay to wait.
 
 For the full mechanics of how errors are classified, carried, and reported, see [Error Model](../under-the-hood/error-model.md).

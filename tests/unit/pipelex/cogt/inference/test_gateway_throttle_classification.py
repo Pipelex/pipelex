@@ -5,13 +5,14 @@ import json
 from typing import TYPE_CHECKING, Any
 
 import httpx
+import openai
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from portkey_ai import Portkey
 from portkey_ai._vendor import openai as portkey_vendored_openai
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import UserActionKind, extract_gateway_metadata
+from pipelex.cogt.inference.error_classification import UserActionKind, extract_gateway_metadata, extract_openai_metadata
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
@@ -112,6 +113,28 @@ class TestGatewayThrottleClassification:
 
         assert metadata.retry_after_seconds == GatewayThrottleTestData.AZURE_RETRY_AFTER_MS_SECONDS
         assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_RATE_LIMITED
+
+    @pytest.mark.parametrize("raise_it", _HOPS)
+    def test_the_broad_quota_type_beside_another_code_reads_as_it_does_directly(self, raise_it: Callable[..., BaseException]) -> None:
+        """OpenAI's broad quota `type` beside a code the set does not hold is a spent quota through a gateway, as it is directly.
+
+        The gateway's Extract step keeps the code and the OpenAI one the type, so the rule reads both off the body. The
+        code is built: one OpenAI's guide does not name.
+        """
+        body = copy.deepcopy(GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY)
+        body["error"]["type"] = GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        body["error"]["code"] = "quota_code_not_in_the_set"
+        _, response = _gateway_response(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
+        direct_client = openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
+        direct_metadata = extract_openai_metadata(direct_client._make_status_error_from_response(response))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        gateway_metadata = extract_gateway_metadata(raise_it(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER))
+
+        assert gateway_metadata.provider_error_code == "quota_code_not_in_the_set"
+        assert direct_metadata.provider_error_code == GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        for metadata in (gateway_metadata, direct_metadata):
+            assert metadata.is_quota_exhaustion is True
+            assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_QUOTA_EXHAUSTED
 
     @pytest.mark.parametrize(
         ("error_type", "error_code"),

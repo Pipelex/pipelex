@@ -136,8 +136,8 @@ class ProviderErrorMetadata(BaseModel):
         its message says: when the structure says nothing either way, a quota read as a rate limit costs some refused
         calls and some waiting, while a rate limit read as a quota fails the run and sends a person to add credit that
         cannot help. The providers whose rule never reports a spent quota reach one through the classifier's status
-        ladder alone, which reads every 402 as one, or, for Linkup, through its typed exception. Each verdict is
-        computed once here; the classifier reads this property once.
+        ladder alone, which reads every 402 as one, or, for Linkup, through its typed exception. The property computes
+        the throttle, quota and rate-limit verdicts together, each once per read, and the classifier reads it once.
         """
         if self.is_throttle_on_another_status:
             return ProviderLimitVerdict.RATE_LIMITED
@@ -161,16 +161,12 @@ class ProviderErrorMetadata(BaseModel):
         """Apply the provider's own spent-quota rule, once ``is_throttle_on_another_status`` has set its throttles aside."""
         status_code = self.status_code or 0
         match self.provider:
-            case ProviderName.OPENAI:
-                # The Extract step keeps the type before the code, so the rule reads both: the type when there is one,
-                # and the body's code when there is one.
-                return _is_quota_exhaustion_by_code(
-                    status_code=status_code, error_codes=(self.provider_error_code, error_code_from_body_code_first(self.body))
-                )
-            case ProviderName.GATEWAY:
-                # A gateway relays every provider's prose, so its message decides nothing; its Extract step already
-                # reads the body's code before its type.
-                return _is_quota_exhaustion_by_code(status_code=status_code, error_codes=(self.provider_error_code,))
+            case ProviderName.OPENAI | ProviderName.GATEWAY:
+                # OpenAI names a billing cause in `code` beside a broad `type`, and the two Extract steps keep a different
+                # one of them as `provider_error_code`, the OpenAI one the type and the gateway one the code. The rule
+                # reads both from the body as well, so a refusal gets the same verdict directly and through a gateway,
+                # whose relayed message decides nothing.
+                return _is_quota_exhaustion_by_code(status_code=status_code, error_codes=(self.provider_error_code, *_error_codes_in_body(self.body)))
             case ProviderName.ANTHROPIC:
                 return _is_quota_exhaustion_anthropic(status_code=status_code, error_type=self.provider_error_code, body=self.body)
             case ProviderName.GOOGLE:
@@ -711,9 +707,10 @@ def retry_after_seconds_from_headers(*, headers: Any) -> float | None:
 
     ``retry-after-ms``, a delay in milliseconds, comes first: it is not standard, but Azure OpenAI sends it beside
     ``retry-after`` on a 429 (https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/provisioned-get-started),
-    it is the more precise of the two, and the OpenAI and Anthropic SDKs read it first for their own retries. As in
-    those SDKs, it decides only when it is a finite number above zero; otherwise ``retry-after`` decides, through
-    ``parse_retry_after_seconds``.
+    it is the more precise of the two, and the OpenAI and Anthropic SDKs read it first for their own retries. It
+    decides only when it is a finite number above zero. Below or at zero Pipelex deliberately falls back to
+    ``retry-after``, through ``parse_retry_after_seconds``, where the SDKs' header parsers return the zero and leave
+    their retry-timeout step to discard it: a zero is no delay, and the seconds the provider sent beside it are one.
     """
     if headers is None:
         return None
@@ -873,6 +870,13 @@ def _provider_error_code_from_flat_body(body: Any) -> str | None:
     if isinstance(code, str):
         return code
     return None
+
+
+def _error_codes_in_body(body: Any) -> tuple[str, ...]:
+    """Every ``code`` and ``type`` an error body carries, in its nested ``error`` section and at its top level."""
+    return tuple(
+        error_code for section in _error_sections(body) for error_code in (section.get("code"), section.get("type")) if isinstance(error_code, str)
+    )
 
 
 def error_code_from_body_code_first(body: Any) -> str | None:
