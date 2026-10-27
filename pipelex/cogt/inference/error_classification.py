@@ -104,9 +104,11 @@ class ProviderErrorMetadata(BaseModel):
 
     provider: ProviderName
     sdk_exception_type: str
-    # Human-readable error text from the SDK exception (``str(exc)``). Both the
-    # Classify step (quota / content-policy discrimination) and the Render step
-    # (message composition) read it, so the Extract step must capture it. A
+    # Human-readable error text from the SDK exception (``str(exc)``). The
+    # Classify step reads it for the content-policy and context-window checks, and
+    # never for a spent quota or a rate limit (Anthropic's credit sentences are read
+    # from the body's message), and the Render step composes its message from it,
+    # so the Extract step must capture it. A
     # pydantic ``ValidationError``, which ends instructor's re-asks, is written by
     # its locations and reasons alone: its own text quotes the model's answer. Any
     # other failure to parse that answer, such as instructor's assertion carrying a
@@ -137,7 +139,8 @@ class ProviderErrorMetadata(BaseModel):
         calls and some waiting, while a rate limit read as a quota fails the run and sends a person to add credit that
         cannot help. The providers whose rule never reports a spent quota reach one through the classifier's status
         ladder alone, which reads every 402 as one, or, for Linkup, through its typed exception. The property computes
-        the throttle, quota and rate-limit verdicts together, each once per read, and the classifier reads it once.
+        the throttle, quota and rate-limit verdicts together, each once per read, and the classifier reads it once: it is
+        the one entry point to them.
         """
         if self.is_throttle_on_another_status:
             return ProviderLimitVerdict.RATE_LIMITED
@@ -147,16 +150,6 @@ class ProviderErrorMetadata(BaseModel):
             return ProviderLimitVerdict.RATE_LIMITED
         return ProviderLimitVerdict.NEITHER
 
-    @property
-    def is_quota_exhaustion(self) -> bool:
-        """Whether the provider said, in its status or its structured error, that a quota or a credit is spent."""
-        return self.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED
-
-    @property
-    def is_rate_limit(self) -> bool:
-        """Whether the provider refused the call for a limit that time cures, which the classifier reads as a rate limit."""
-        return self.limit_verdict is ProviderLimitVerdict.RATE_LIMITED
-
     def _reads_as_spent_quota(self) -> bool:
         """Apply the provider's own spent-quota rule, once ``is_throttle_on_another_status`` has set its throttles aside."""
         status_code = self.status_code or 0
@@ -164,8 +157,10 @@ class ProviderErrorMetadata(BaseModel):
             case ProviderName.OPENAI | ProviderName.GATEWAY:
                 # OpenAI names a billing cause in `code` beside a broad `type`, and the two Extract steps keep a different
                 # one of them as `provider_error_code`, the OpenAI one the type and the gateway one the code. The rule
-                # reads both from the body as well, so a refusal gets the same verdict directly and through a gateway,
-                # whose relayed message decides nothing.
+                # reads both from the body as well, through `_error_codes_in_body`, so a spent-quota code gets the same
+                # verdict directly and through a gateway, whose relayed message decides nothing. That code read is all
+                # the gateway hop shares: the provider-specific rules, the throttles `is_throttle_on_another_status`
+                # reads and the Anthropic and Google billing rules, apply on the direct path only.
                 return _is_quota_exhaustion_by_code(status_code=status_code, error_codes=(self.provider_error_code, *_error_codes_in_body(self.body)))
             case ProviderName.ANTHROPIC:
                 return _is_quota_exhaustion_anthropic(status_code=status_code, error_type=self.provider_error_code, body=self.body)
@@ -270,9 +265,12 @@ class ProviderErrorMetadata(BaseModel):
             return True
         if error_code_from_body_code_first(self.body) in _CONTEXT_WINDOW_ERROR_CODES:
             return True
-        if _names_the_context_window(text=self.message):
+        is_aws_validation_error = self.provider_error_code == _AWS_VALIDATION_ERROR_CODE
+        if _names_the_context_window(text=self.message, is_aws_validation_error=is_aws_validation_error):
             return True
-        return self.body is not None and _names_the_context_window(text=_stringify_for_scan(self.body))
+        return self.body is not None and _names_the_context_window(
+            text=_stringify_for_scan(self.body), is_aws_validation_error=is_aws_validation_error
+        )
 
     @property
     def is_network_error(self) -> bool:
@@ -350,16 +348,24 @@ _CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
     # Bedrock's ValidationException, in full: a 400 about one field's length, such as a tool description's, may say
     # "input is too long" of that field alone
     "input is too long for requested model",
-    # Bedrock's ValidationException for the models that word it themselves. Bedrock has no structured signal for an
-    # input over the window, only the model's sentence: Amazon Nova's "Input Tokens Exceeded: Number of input tokens
-    # exceeds maximum length." and Amazon Titan's "Too many input tokens", each matched the same way by langchain-aws's
-    # `_CONTEXT_OVERFLOW_MARKERS` (libs/aws/langchain_aws/chat_models/bedrock_converse.py). The bare "too many tokens" is
-    # left out on purpose: it is also Bedrock's throttle, "Too many tokens per day". The models Bedrock serves through its
-    # OpenAI-compatible engine word it with numbers inside, so `_PROMPT_TOKENS_OVER_MODEL_MAXIMUM` reads theirs.
-    "input tokens exceeded",
-    "too many input tokens",
     # Gemini's INVALID_ARGUMENT
     "exceeds the maximum number of tokens allowed",
+)
+
+# AWS's error code for a request Bedrock refuses as invalid, the only one an input over the model's window arrives with
+_AWS_VALIDATION_ERROR_CODE = "ValidationException"
+
+# How the Bedrock models that word it themselves refuse an input over their window, read only on an AWS
+# `ValidationException`, since the words alone could be another provider's throttle ("Daily input tokens exceeded").
+# Bedrock has no structured signal for it, only the model's sentence: Amazon Nova's "Input Tokens Exceeded: Number of
+# input tokens exceeds maximum length." and Amazon Titan's "Too many input tokens", each matched the same way by
+# langchain-aws's `_CONTEXT_OVERFLOW_MARKERS` (libs/aws/langchain_aws/chat_models/bedrock_converse.py). The bare "too
+# many tokens" is left out on purpose: it is also Bedrock's throttle, "Too many tokens per day". The models Bedrock
+# serves through its OpenAI-compatible engine word it with numbers inside, so `_PROMPT_TOKENS_OVER_MODEL_MAXIMUM` reads
+# theirs.
+_BEDROCK_CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
+    "input tokens exceeded",
+    "too many input tokens",
 )
 
 # The models Bedrock serves through its OpenAI-compatible engine, such as Kimi, refuse an input over their window with
@@ -569,10 +575,15 @@ def _is_content_policy_violation(error_message: str) -> bool:
     return any(pattern in lower_message for pattern in _CONTENT_POLICY_PATTERNS)
 
 
-def _names_the_context_window(*, text: str) -> bool:
-    """Check if an error's text words a refusal of inputs over the model's context window, as some provider words it."""
+def _names_the_context_window(*, text: str, is_aws_validation_error: bool) -> bool:
+    """Check if an error's text words a refusal of inputs over the model's context window, as some provider words it.
+
+    The Bedrock models' own wordings, ``_BEDROCK_CONTEXT_WINDOW_PATTERNS``, are read only on an AWS ``ValidationException``.
+    """
     lower_text = text.lower()
     if any(pattern in lower_text for pattern in _CONTEXT_WINDOW_PATTERNS):
+        return True
+    if is_aws_validation_error and any(pattern in lower_text for pattern in _BEDROCK_CONTEXT_WINDOW_PATTERNS):
         return True
     return _PROMPT_TOKENS_OVER_MODEL_MAXIMUM.search(lower_text) is not None
 

@@ -12,7 +12,7 @@ from portkey_ai import Portkey
 from portkey_ai._vendor import openai as portkey_vendored_openai
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import UserActionKind, extract_gateway_metadata, extract_openai_metadata
+from pipelex.cogt.inference.error_classification import ProviderLimitVerdict, UserActionKind, extract_gateway_metadata, extract_openai_metadata
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.error_render import render_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
@@ -79,7 +79,7 @@ class TestGatewayThrottleClassification:
         assert metadata.provider_error_code == GatewayThrottleTestData.AZURE_RATE_LIMIT_CODE
         assert metadata.retry_after_seconds == 57
         assert "quota" in metadata.message
-        assert metadata.is_quota_exhaustion is False
+        assert metadata.limit_verdict is ProviderLimitVerdict.RATE_LIMITED
         assert classification.error_code == CoreCode.PROVIDER_RATE_LIMITED
         assert classification.category == InferenceErrorCategory.TRANSIENT
         assert classification.category.is_retryable is True
@@ -133,7 +133,7 @@ class TestGatewayThrottleClassification:
         assert gateway_metadata.provider_error_code == "quota_code_not_in_the_set"
         assert direct_metadata.provider_error_code == GatewayThrottleTestData.OPENAI_QUOTA_CODE
         for metadata in (gateway_metadata, direct_metadata):
-            assert metadata.is_quota_exhaustion is True
+            assert metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED
             assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_QUOTA_EXHAUSTED
 
     @pytest.mark.parametrize(
@@ -162,7 +162,7 @@ class TestGatewayThrottleClassification:
         classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
 
         assert metadata.provider_error_code == error_code
-        assert metadata.is_quota_exhaustion is True
+        assert metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED
         assert classification.error_code == CoreCode.PROVIDER_QUOTA_EXHAUSTED
         assert classification.category == InferenceErrorCategory.CAPACITY
         assert classification.category.is_retryable is False

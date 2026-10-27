@@ -18,6 +18,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
     RUNTIME_CLASSIFIED_ERROR_CODES,
     ProviderErrorMetadata,
+    ProviderLimitVerdict,
     UserActionKind,
     extract_anthropic_metadata,
     extract_azure_metadata,
@@ -100,19 +101,16 @@ def _assert_classified(*, metadata: ProviderErrorMetadata, family: InferenceErro
     assert classification.error_code == expected_error_code
     match expected_error_code:
         case CoreCode.PROVIDER_QUOTA_EXHAUSTED:
-            assert metadata.is_quota_exhaustion is True
-            assert metadata.is_rate_limit is False
+            assert metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED
             assert classification.category == InferenceErrorCategory.CAPACITY
             assert classification.user_action_kind == UserActionKind.CHECK_BILLING
         case CoreCode.PROVIDER_RATE_LIMITED:
-            assert metadata.is_quota_exhaustion is False
-            assert metadata.is_rate_limit is True
+            assert metadata.limit_verdict is ProviderLimitVerdict.RATE_LIMITED
             assert classification.category == InferenceErrorCategory.TRANSIENT
             assert classification.category.is_retryable is True
             assert classification.user_action_kind == UserActionKind.WAIT_AND_RETRY
         case CoreCode() | PipelexErrorCode():
-            assert metadata.is_quota_exhaustion is False
-            assert metadata.is_rate_limit is False
+            assert metadata.limit_verdict is ProviderLimitVerdict.NEITHER
     return classification
 
 

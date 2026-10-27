@@ -1772,10 +1772,6 @@ rationale = "Keyed accessor by the llm_handle; single operand."
 param = "exc"
 rationale = "Positional-Callable tenacity retry predicate: exc is the single operand tenacity passes."
 
-["pipelex/cogt/inference/transport_retry.py::_parse_retry_after"]
-param = "raw_value"
-rationale = "Parses the raw_value; single operand."
-
 ["pipelex/cogt/inference/transport_retry.py::_transport_retry_wait"]
 param = "retry_state"
 rationale = "Positional-Callable tenacity wait strategy: retry_state is the single operand tenacity passes."

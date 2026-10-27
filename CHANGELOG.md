@@ -7,8 +7,12 @@
 - **A direct provider's spent quota is read from its structure, not its wording**: a call with your own keys to OpenAI or a backend on the OpenAI SDK, Anthropic, Google Gemini, Mistral or Amazon Bedrock is a spent quota only on the status, error code or error detail that provider documents for one, and is otherwise retried as `provider.rate_limited`. A 429 whose message mentioned a quota, as Gemini's per-minute throttles do, used to fail at once as `provider.quota_exhausted`. Anthropic's credit-balance and self-set usage-limit refusals, which carry no code, are still read, by their opening words.
 - **Throttles sent on another status than 429 are retried**: OpenRouter's 402 for its in-flight budget, Groq's 498 for its flex tier at capacity, and Bedrock's `ServiceQuotaExceededException`, from Bedrock's SDK or from Claude on Bedrock through the Anthropic SDK, are now `provider.rate_limited` where they failed at once.
 - **Gemini's retry delay is carried**: the delay Gemini gives in its error's `RetryInfo` detail, not in a `Retry-After` header, is now the failure's `retry_after` and is named in its advice.
-- **A delay in milliseconds is read**: a `retry-after-ms` header above zero, which Azure OpenAI sends beside `retry-after`, is now the delay a rate limit carries, read first as the OpenAI and Anthropic SDKs read it, on a call through either SDK, Azure's REST API or a gateway.
+- **A delay in milliseconds is read**: a `retry-after-ms` header above zero, which Azure OpenAI sends beside `retry-after`, is now the delay a rate limit carries, read first as the OpenAI and Anthropic SDKs read it, on a call through either SDK, Azure's REST API or a gateway. The transport retry of a call to Azure's REST API now waits that delay too, where it read `Retry-After` alone.
 - **More of Bedrock's wordings of an input over the window are recognized**: a `ValidationException` saying "Input Tokens Exceeded" (Amazon Nova), "Too many input tokens" (Amazon Titan) or "prompt tokens (N) exceed model maximum (M)" is now `model.context_exceeded` where it was `runtime.unexpected`.
+
+### Removed
+
+- **`ProviderErrorMetadata.is_quota_exhaustion` and `is_rate_limit` (Breaking)**: a plugin reads `ProviderErrorMetadata.limit_verdict` instead, a `ProviderLimitVerdict` of `quota_exhausted`, `rate_limited` or `neither`, the one entry point the classifier reads.
 
 ## [v0.92.3] - 2026-10-27
 

@@ -1,8 +1,8 @@
 """Tests for quota, rate-limit and content-policy detection on ``ProviderErrorMetadata``.
 
-The probes are exposed via the ``ProviderErrorMetadata.is_quota_exhaustion`` /
-``is_throttle_on_another_status`` / ``is_rate_limit`` / ``is_content_policy_violation``
-properties; the helpers backing them are module-private. These tests pin each
+The probes are exposed via the ``ProviderErrorMetadata.limit_verdict`` /
+``is_throttle_on_another_status`` / ``is_content_policy_violation`` properties; the
+helpers backing them are module-private. These tests pin each
 provider's quota rule, which reads the status and the provider's structured code or
 type, never its message, except for Anthropic's spend sentences on a 400, and the
 content-policy phrase matching.
@@ -12,7 +12,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, ProviderLimitVerdict
 from pipelex.cogt.inference.provider_name import ProviderName
 from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData, GatewayThrottleTestData
 
@@ -308,7 +308,7 @@ class TestErrorClassification:
     ) -> None:
         """Discriminate an OpenAI-dialect spent quota from a rate limit by the status and the error code or type alone."""
         metadata = _metadata(ProviderName.OPENAI, error_message, status_code, provider_error_code=provider_error_code, body=body)
-        assert metadata.is_quota_exhaustion == expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "provider_error_code", "body", "expected"),
@@ -319,7 +319,7 @@ class TestErrorClassification:
     ) -> None:
         """Discriminate an Anthropic spent quota or credit by its status, its type, its spend cap's code and its spend sentences on a 400."""
         metadata = _metadata(ProviderName.ANTHROPIC, error_message, status_code, provider_error_code=provider_error_code, body=body)
-        assert metadata.is_quota_exhaustion == expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "expected"),
@@ -338,7 +338,7 @@ class TestErrorClassification:
     ) -> None:
         """A Google spent quota is its 402 or a detail of its body; with no body, every 429 is a rate limit, whatever it says."""
         metadata = _metadata(ProviderName.GOOGLE, error_message, status_code, provider_error_code=provider_error_code)
-        assert metadata.is_quota_exhaustion == expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "expected"),
@@ -346,7 +346,7 @@ class TestErrorClassification:
     )
     def test_is_quota_exhaustion_mistral(self, _topic: str, error_message: str, status_code: int, expected: bool) -> None:
         """A Mistral spent balance is its 402; every 429 is a rate limit, whatever it says."""
-        assert _metadata(ProviderName.MISTRAL, error_message, status_code).is_quota_exhaustion == expected
+        assert (_metadata(ProviderName.MISTRAL, error_message, status_code).limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "provider_error_code", "expected"),
@@ -357,7 +357,7 @@ class TestErrorClassification:
     ) -> None:
         """No Bedrock answer is a spent quota, whatever its code or its words."""
         metadata = _metadata(ProviderName.BEDROCK, error_message, status_code, provider_error_code=provider_error_code)
-        assert metadata.is_quota_exhaustion == expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "provider", "status_code", "provider_error_code", "body", "retry_after_seconds", "expected"),
@@ -384,8 +384,7 @@ class TestErrorClassification:
         )
         assert metadata.is_throttle_on_another_status == expected
         if expected:
-            assert metadata.is_rate_limit is True
-            assert metadata.is_quota_exhaustion is False
+            assert metadata.limit_verdict is ProviderLimitVerdict.RATE_LIMITED
 
     @pytest.mark.parametrize(
         ("_topic", "error_message", "status_code", "provider_error_code", "expected"),
@@ -396,23 +395,28 @@ class TestErrorClassification:
     ) -> None:
         """Discriminate Gateway quota exhaustion from rate limiting by the status and the provider's code alone."""
         metadata = _metadata(ProviderName.GATEWAY, error_message, status_code, provider_error_code=provider_error_code)
-        assert metadata.is_quota_exhaustion == expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) == expected
 
     @pytest.mark.parametrize(
         ("_topic", "provider", "status_code", "provider_error_code", "expected"),
         [
-            ("openai_plain_429", ProviderName.OPENAI, 429, None, True),
-            ("openai_quota_code_429", ProviderName.OPENAI, 429, "insufficient_quota", False),
-            ("google_resource_exhausted_429", ProviderName.GOOGLE, 429, "RESOURCE_EXHAUSTED", True),
-            ("mistral_402", ProviderName.MISTRAL, 402, None, False),
-            ("bedrock_throttling_429", ProviderName.BEDROCK, 429, "ThrottlingException", True),
-            ("anthropic_400", ProviderName.ANTHROPIC, 400, "invalid_request_error", False),
-            ("no_status", ProviderName.OPENAI, None, None, False),
+            ("openai_plain_429", ProviderName.OPENAI, 429, None, ProviderLimitVerdict.RATE_LIMITED),
+            ("openai_quota_code_429", ProviderName.OPENAI, 429, "insufficient_quota", ProviderLimitVerdict.QUOTA_EXHAUSTED),
+            ("google_resource_exhausted_429", ProviderName.GOOGLE, 429, "RESOURCE_EXHAUSTED", ProviderLimitVerdict.RATE_LIMITED),
+            ("mistral_402", ProviderName.MISTRAL, 402, None, ProviderLimitVerdict.QUOTA_EXHAUSTED),
+            ("bedrock_throttling_429", ProviderName.BEDROCK, 429, "ThrottlingException", ProviderLimitVerdict.RATE_LIMITED),
+            ("anthropic_400", ProviderName.ANTHROPIC, 400, "invalid_request_error", ProviderLimitVerdict.NEITHER),
+            ("no_status", ProviderName.OPENAI, None, None, ProviderLimitVerdict.NEITHER),
         ],
     )
-    def test_is_rate_limit(
-        self, _topic: str, provider: ProviderName, status_code: int | None, provider_error_code: str | None, expected: bool
+    def test_limit_verdict(
+        self,
+        _topic: str,
+        provider: ProviderName,
+        status_code: int | None,
+        provider_error_code: str | None,
+        expected: ProviderLimitVerdict,
     ) -> None:
         """Every 429 with no spent-quota signal is a rate limit, and nothing else is unless its provider documents a throttle."""
         metadata = _metadata(provider, "Too many requests", status_code, provider_error_code=provider_error_code)
-        assert metadata.is_rate_limit == expected
+        assert metadata.limit_verdict is expected
