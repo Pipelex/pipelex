@@ -4,8 +4,13 @@
 
 ### Fixed
 
-- **A gateway's rate limit is no longer read as a spent quota**: a 429 relayed by a Portkey-dialect gateway is now `provider.rate_limited`, retried with the provider's `Retry-After`, unless its error code is one the provider documents for a spent quota: OpenAI's `insufficient_quota`, `credit_balance_exhausted`, `organization_spend_limit_exceeded`, `project_spend_limit_exceeded` or `organization_usage_limit_exceeded`. A 429 whose message mentioned a quota, as Azure OpenAI's throttles do, used to fail at once as `provider.quota_exhausted` with advice to add credit. A 402 is still a spent quota.
 - **A direct provider's rate limit is no longer read from its wording**: a call made with your own keys to OpenAI or a backend on the OpenAI SDK, Anthropic, Google Gemini, Mistral or Amazon Bedrock is now a spent quota only on the status and the codes that provider documents for one, and is otherwise `provider.rate_limited`, retried and reported with the delay the provider asked for when it gave one. A 429 whose message mentioned a quota, as Gemini's per-minute throttles do, used to fail at once as `provider.quota_exhausted` with advice to add credit, and so did a Bedrock refusal whose message named a quota or a limit. A spent quota that carries its code, such as OpenAI's `insufficient_quota` or Anthropic's spend cap `enforced_spend_limit_reached`, still fails at once, and so does Anthropic's 400 for a credit balance too low or a usage limit you set, the one case still read from the message, by its opening words, since Anthropic gives it no code. A 402 still means a spent quota, except OpenRouter's 402 with a `Retry-After` header, which it documents as a wait and which is now a rate limit. Bedrock's `ServiceQuotaExceededException`, which AWS documents as a request to send again later, is now retried as a rate limit instead of failing at once as a spent quota, and Gemini's retry delay, which it sends in the error's body rather than as a `Retry-After` header, is now carried on the failure and named in its advice.
+
+## [v0.92.3] - 2026-10-27
+
+### Fixed
+
+- **A gateway's rate limit is no longer read as a spent quota**: a 429 relayed by a Portkey-dialect gateway is now `provider.rate_limited`, retried with the provider's `Retry-After`, unless its error code is one the provider documents for a spent quota: OpenAI's `insufficient_quota`, `credit_balance_exhausted`, `organization_spend_limit_exceeded`, `project_spend_limit_exceeded` or `organization_usage_limit_exceeded`. A 429 whose message mentioned a quota, as Azure OpenAI's throttles do, used to fail at once as `provider.quota_exhausted` with advice to add credit. A 402 is still a spent quota.
 
 ## [v0.92.2] - 2026-10-26
 
