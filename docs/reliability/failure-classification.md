@@ -20,7 +20,7 @@ Only `transient` failures are worth retrying — re-running a call that failed b
 
 ## A spent quota or a rate limit
 
-A spent quota and a rate limit both refuse the call, often with the same HTTP status, and they differ only in what cures them: time cures a rate limit, while only a person, adding credit or raising a quota, cures a spent quota. Pipelex tells them apart from what the provider says structurally, its status and its error code, and never from the words of its message. A gateway relays every provider's prose, and a throttle's message may well mention a quota: Azure OpenAI's, for one, links to its quota-increase page.
+A spent quota and a rate limit both refuse the call, often with the same HTTP status, and they differ only in what cures them: time cures a rate limit, while only a person, adding credit or raising a quota, cures a spent quota. For a failure a gateway relays, Pipelex tells them apart from what the provider says structurally, its status and its error code, and never from the words of its message: a gateway relays every provider's prose, and a throttle's message may well mention a quota, as Azure OpenAI's does by linking to its quota-increase page.
 
 Through a gateway, a `402` is a spent quota, whatever its code says. A `429` is a spent quota only when it carries an error code its provider documents as a spent quota, such as OpenAI's `insufficient_quota`, which Azure OpenAI and the OpenAI-compatible providers relay. Every other `429`, including one with no code at all, is a rate limit: it is `transient`, so it is retried, and if it still fails it reaches you as `provider.rate_limited`, with the delay the provider asked for when it gave one.
 

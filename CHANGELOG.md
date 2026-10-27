@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **A gateway's rate limit is no longer read as a spent quota**: a 429 relayed by a Portkey-dialect gateway is now a spent quota only when the provider's error code is one it documents for a spent quota, such as OpenAI's `insufficient_quota`, and any other 429 is `provider.rate_limited`, retried and carrying the provider's `Retry-After`, where a 429 whose message held a word such as "quota" failed at once as `provider.quota_exhausted` and advised adding credit, as Azure OpenAI's throttles did, since their message links to Azure's quota-increase page. A 402 is still a spent quota, and the message is no longer read.
+- **A gateway's rate limit is no longer read as a spent quota**: a 429 relayed by a Portkey-dialect gateway is now `provider.rate_limited`, retried with the provider's `Retry-After`, unless its error code is one the provider documents for a spent quota, such as OpenAI's `insufficient_quota`. A 429 whose message mentioned a quota, as Azure OpenAI's throttles do, used to fail at once as `provider.quota_exhausted` with advice to add credit. A 402 is still a spent quota.
 
 ## [v0.92.2] - 2026-10-26
 

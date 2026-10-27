@@ -1,15 +1,3 @@
-"""A provider's throttle relayed by a Portkey-dialect gateway, from the wire to the classification.
-
-A gateway relays every provider's prose, so its quota rule reads the status and the
-provider's error code alone. Azure OpenAI answers a deployment's call-rate throttle
-with a 429, its code ``RateLimitReached``, a ``retry-after`` header, and a message
-whose last sentence links to Azure's quota-increase page. A rule reading that message
-for the word "quota" took the throttle for a spent quota: the run failed at once as
-``provider.quota_exhausted``, never retried, and sent a person to add credit. These
-tests pin the whole chain on Azure's own refusal, through each hop that raises a
-gateway's failure: it is a rate limit, repeated within the run, with Azure's delay.
-"""
-
 from __future__ import annotations
 
 import copy
@@ -74,7 +62,12 @@ _HOPS = [
 class TestGatewayThrottleClassification:
     @pytest.mark.parametrize("raise_it", _HOPS)
     def test_azure_s_throttle_is_a_rate_limit_waited_for_the_delay_it_asks(self, raise_it: Callable[..., BaseException]) -> None:
-        """Azure's refusal, verbatim, is a retryable rate limit carrying Azure's 57 seconds, not a spent quota."""
+        """Azure's refusal, verbatim, through each hop that raises a gateway's failure, is a retryable rate limit.
+
+        The gateway's quota rule reads the status and the provider's code alone, so the message's link to Azure's
+        quota-increase page decides nothing: the refusal is ``provider.rate_limited``, repeated within the run, and
+        carries Azure's 57 seconds, where it used to fail at once as ``provider.quota_exhausted``.
+        """
         exc = raise_it(body=GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
 
         metadata = extract_gateway_metadata(exc)
