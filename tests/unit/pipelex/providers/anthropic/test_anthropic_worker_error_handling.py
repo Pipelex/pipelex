@@ -15,6 +15,7 @@ from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCompletionError, 
 from pipelex.cogt.inference.error_classification import UserActionKind
 from pipelex.errors.problem import ProblemView
 from pipelex.providers.anthropic.anthropic_llm_worker import AnthropicLLMWorker
+from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
 from tests.unit.pipelex.providers.anthropic.test_data import AnthropicErrorHandlingTestData
 
 
@@ -24,12 +25,12 @@ def _mock_httpx_response(status_code: int = 429) -> httpx.Response:
     return httpx.Response(status_code=status_code, request=request)
 
 
-def _make_anthropic_rate_limit_error(message: str) -> anthropic.RateLimitError:
-    return anthropic.RateLimitError(message, response=_mock_httpx_response(429), body=None)
+def _make_anthropic_rate_limit_error(message: str, *, body: dict[str, Any] | None = None) -> anthropic.RateLimitError:
+    return anthropic.RateLimitError(message, response=_mock_httpx_response(429), body=body)
 
 
-def _make_anthropic_bad_request_error(message: str) -> anthropic.BadRequestError:
-    return anthropic.BadRequestError(message, response=_mock_httpx_response(400), body=None)
+def _make_anthropic_bad_request_error(message: str, *, body: dict[str, Any] | None = None) -> anthropic.BadRequestError:
+    return anthropic.BadRequestError(message, response=_mock_httpx_response(400), body=body)
 
 
 def _make_anthropic_timeout_error() -> anthropic.APITimeoutError:
@@ -106,7 +107,7 @@ class TestAnthropicWorkerErrorHandling:
     # ---- RateLimitError tests ----
 
     @pytest.mark.parametrize(
-        ("_topic", "error_message", "expected_category", "expected_action_substring"),
+        ("_topic", "error_message", "body", "expected_category", "expected_action_substring"),
         AnthropicErrorHandlingTestData.RATE_LIMIT_CASES,
     )
     async def test_rate_limit(
@@ -114,12 +115,13 @@ class TestAnthropicWorkerErrorHandling:
         mocker: MockerFixture,
         _topic: str,
         error_message: str,
+        body: dict[str, Any] | None,
         expected_category: InferenceErrorCategory,
         expected_action_substring: str | None,
     ) -> None:
-        """RateLimitError is caught and categorized correctly (TRANSIENT or CAPACITY)."""
+        """RateLimitError is TRANSIENT unless its body carries the spend cap's code, which makes it CAPACITY."""
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_rate_limit_error(error_message)
+        sdk_exc = _make_anthropic_rate_limit_error(error_message, body=body)
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
@@ -203,10 +205,10 @@ class TestAnthropicWorkerErrorHandling:
 
     # ---- PermissionDeniedError tests ----
 
-    async def test_permission_denied_quota_is_capacity(self, mocker: MockerFixture) -> None:
-        """PermissionDeniedError with quota message is CAPACITY."""
+    async def test_credit_balance_bad_request_is_capacity(self, mocker: MockerFixture) -> None:
+        """Anthropic's 400 for a spent credit balance, whose sentence is its only signal, is CAPACITY."""
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_permission_denied_error("Your account quota has been exceeded")
+        sdk_exc = _make_anthropic_bad_request_error("Error code: 400", body=DirectProviderQuotaTestData.ANTHROPIC_CREDIT_BALANCE_BODY)
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:
@@ -215,9 +217,9 @@ class TestAnthropicWorkerErrorHandling:
         assert exc_info.value.error_category is InferenceErrorCategory.CAPACITY
 
     async def test_permission_denied_generic_is_configuration(self, mocker: MockerFixture) -> None:
-        """PermissionDeniedError without quota message is CONFIGURATION."""
+        """PermissionDeniedError is CONFIGURATION, even when its words name a quota."""
         worker = _make_worker(mocker)
-        sdk_exc = _make_anthropic_permission_denied_error("You do not have access to this resource")
+        sdk_exc = _make_anthropic_permission_denied_error("Your account quota has been exceeded")
         worker.anthropic_async_client.messages.stream.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:

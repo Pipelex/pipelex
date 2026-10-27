@@ -1608,31 +1608,31 @@ rationale = "Factory from source: builds the result from the inference_model; si
 param = "response"
 rationale = "Extracts/derives from the response; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_error_codes_in_body"]
+param = "body"
+rationale = "Lists the codes and types of one error body, the operand the OpenAI and gateway spent-quota rule reads; single operand."
+
+["pipelex/cogt/inference/error_classification.py::_error_sections"]
+param = "body"
+rationale = "Lists the sections of one error body, the operand its readers error_code_from_body_code_first and _google_detail_entries pass straight through; single operand."
+
+["pipelex/cogt/inference/error_classification.py::_google_detail_entries"]
+param = "body"
+rationale = "Lists the entries of one Google error body's details of one type, the operand its readers _google_retry_delay_seconds and _is_quota_exhaustion_google pass straight through; single operand."
+
+["pipelex/cogt/inference/error_classification.py::_google_error_info_metadata"]
+param = "entry"
+rationale = "Reads the metadata map of one google.rpc.ErrorInfo entry; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::_google_provider_error_code_from_details"]
 param = "details"
 rationale = "Extracts/derives from the details; single operand."
 
+["pipelex/cogt/inference/error_classification.py::_google_retry_delay_seconds"]
+param = "details"
+rationale = "Extracts the retry delay from a Google error's details, as its sibling _google_provider_error_code_from_details reads the status; single operand."
+
 ["pipelex/cogt/inference/error_classification.py::_is_content_policy_violation"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_anthropic"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_aws"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_google"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_mistral"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_openai"]
 param = "error_message"
 rationale = "Predicate on the error_message; single operand."
 
@@ -1771,10 +1771,6 @@ rationale = "Keyed accessor by the llm_handle; single operand."
 ["pipelex/cogt/inference/transport_retry.py::_make_retry_predicate.should_retry"]
 param = "exc"
 rationale = "Positional-Callable tenacity retry predicate: exc is the single operand tenacity passes."
-
-["pipelex/cogt/inference/transport_retry.py::_parse_retry_after"]
-param = "raw_value"
-rationale = "Parses the raw_value; single operand."
 
 ["pipelex/cogt/inference/transport_retry.py::_transport_retry_wait"]
 param = "retry_state"

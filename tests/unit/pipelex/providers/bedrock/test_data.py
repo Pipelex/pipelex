@@ -19,19 +19,21 @@ class BedrockLLMErrorHandlingTestData:
             InferenceErrorCategory.TRANSIENT,
             "run it again",
         ),
+        # Bedrock has no balance to spend: a throttle is a rate limit whatever its words, and AWS documents
+        # `ServiceQuotaExceededException` as resubmittable later
         (
-            "throttling_quota",
+            "throttling_with_quota_wording",
             "ThrottlingException",
             "Account quota limit exceeded for this model",
-            InferenceErrorCategory.CAPACITY,
-            "billing",
+            InferenceErrorCategory.TRANSIENT,
+            "run it again",
         ),
         (
             "service_quota_exceeded",
             "ServiceQuotaExceededException",
             "You have exceeded the service quota for this resource",
-            InferenceErrorCategory.CAPACITY,
-            "billing",
+            InferenceErrorCategory.TRANSIENT,
+            "run it again",
         ),
         (
             "access_denied",

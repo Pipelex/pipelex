@@ -332,7 +332,7 @@ A worker implements the provider half of a call, `_gen_text` or `_extract_pages`
 | Symbol | Module | Role |
 |--------|--------|------|
 | `ProviderErrorMetadata`, `UserAction`, `UserActionKind` | `pipelex.cogt.inference.error_classification` | the structured failure a worker distils, and the advice it carries |
-| `parse_retry_after_seconds`, `error_code_from_body_code_first` | `pipelex.cogt.inference.error_classification` | the parsers a distiller of a plain-HTTP failure shares |
+| `retry_after_seconds_from_headers`, `parse_retry_after_seconds`, `error_code_from_body_code_first` | `pipelex.cogt.inference.error_classification` | the parsers a distiller of a plain-HTTP failure shares: the delay from a response's headers (`retry-after-ms` first when it is above zero, then `Retry-After`), the delay from a lone `Retry-After` value, and the error code of an OpenAI-shaped body, read `code` first |
 | `extract_gateway_metadata` | `pipelex.cogt.inference.error_classification` | the distiller of a Portkey-substrate failure |
 | `ProviderName` | `pipelex.cogt.inference.provider_name` | which provider a distilled failure reports |
 | `classify_inference_error`, `InferenceErrorFamily`, `ClassificationResult` | `pipelex.cogt.inference.error_classify` | the shared Classify step, called with the family of the failed call (`classify_inference_error(metadata, family=InferenceErrorFamily.LLM)`), which picks the category and the registry code together |

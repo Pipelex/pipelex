@@ -14,7 +14,7 @@ import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
-from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, extract_azure_metadata
+from pipelex.cogt.inference.error_classification import ProviderErrorMetadata, ProviderLimitVerdict, extract_azure_metadata
 from pipelex.cogt.inference.error_classify import InferenceErrorFamily, classify_inference_error
 from pipelex.cogt.inference.provider_name import ProviderName
 
@@ -94,29 +94,36 @@ class TestProviderErrorMetadata:
     @pytest.mark.parametrize(
         ("_topic", "provider", "message", "status_code", "provider_error_code", "expected"),
         [
-            ("openai_quota", ProviderName.OPENAI, "You exceeded your current quota", None, None, True),
-            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", None, None, False),
-            ("anthropic_credit_balance", ProviderName.ANTHROPIC, "Your credit balance is too low", None, None, True),
+            ("openai_quota_code_429", ProviderName.OPENAI, "You exceeded your current quota", 429, "insufficient_quota", True),
+            # The words decide nothing: a 429 with no quota code is a rate limit
+            ("openai_quota_wording_429_no_code", ProviderName.OPENAI, "You exceeded your current quota", 429, None, False),
+            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", 429, None, False),
+            ("anthropic_billing_error_402", ProviderName.ANTHROPIC, "Error code: 402", 402, "billing_error", True),
+            # Anthropic's spend sentences are read from the body's message alone, which this metadata does not carry
+            ("anthropic_credit_wording_no_body", ProviderName.ANTHROPIC, "Your credit balance is too low", 400, "invalid_request_error", False),
+            ("google_402_is_quota", ProviderName.GOOGLE, "payment required", 402, None, True),
+            ("google_429_quota_wording", ProviderName.GOOGLE, "Resource has been exhausted (e.g. check quota)", 429, "RESOURCE_EXHAUSTED", False),
             ("mistral_402_is_quota", ProviderName.MISTRAL, "payment required", 402, None, True),
-            ("mistral_429_quota_pattern", ProviderName.MISTRAL, "quota exceeded", 429, None, True),
+            ("mistral_429_quota_wording", ProviderName.MISTRAL, "quota exceeded", 429, None, False),
             ("mistral_429_plain_rate_limit", ProviderName.MISTRAL, "too many requests", 429, None, False),
             ("gateway_402_is_quota", ProviderName.GATEWAY, "payment required", 402, None, True),
             ("azure_never_quota", ProviderName.AZURE, "quota exceeded", 429, None, False),
+            # AWS documents it as resubmittable later: a throttle on its 400, not a spent quota
             (
-                "bedrock_quota_by_aws_code_no_message_hint",
+                "bedrock_service_quota_exceeded_is_a_throttle",
                 ProviderName.BEDROCK,
                 "An error occurred",
                 400,
                 "ServiceQuotaExceededException",
-                True,
+                False,
             ),
             (
-                "bedrock_quota_message_keyword",
+                "bedrock_quota_wording_no_code",
                 ProviderName.BEDROCK,
                 "Service quota exceeded for this model",
                 400,
                 None,
-                True,
+                False,
             ),
             (
                 "bedrock_plain_validation_not_quota",
@@ -128,7 +135,7 @@ class TestProviderErrorMetadata:
             ),
         ],
     )
-    def test_is_quota_exhaustion_dispatches_on_provider(
+    def test_spent_quota_verdict_dispatches_on_provider(
         self,
         _topic: str,
         provider: ProviderName,
@@ -145,7 +152,7 @@ class TestProviderErrorMetadata:
             provider_error_code=provider_error_code,
         )
 
-        assert metadata.is_quota_exhaustion is expected
+        assert (metadata.limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED) is expected
 
     @pytest.mark.parametrize(
         ("_topic", "message", "provider_error_code", "expected"),
@@ -177,6 +184,17 @@ class TestProviderErrorMetadata:
             ("anthropic", "prompt is too long: 208310 tokens > 200000 maximum", None, None, True),
             ("anthropic_with_max_tokens", "input length and `max_tokens` exceed context limit: 197202 + 8192 > 200000", None, None, True),
             ("bedrock", "Input is too long for requested model.", None, None, True),
+            ("bedrock_nova", "Input Tokens Exceeded: Number of input tokens exceeds maximum length.", "ValidationException", None, True),
+            ("bedrock_titan", "Too many input tokens. Max input tokens: 8192, request input token count: 9000", "ValidationException", None, True),
+            ("bedrock_openai_engine", "prompt tokens (300000) exceed model maximum (262144)", "ValidationException", None, True),
+            # Nova's and Titan's words are read on an AWS ValidationException alone: from another provider they may be a throttle
+            ("input_tokens_exceeded_from_another_provider", "Daily input tokens exceeded", None, None, False),
+            ("too_many_input_tokens_from_another_provider", "Too many input tokens", "rate_limit_exceeded", None, False),
+            ("bedrock_nova_wording_on_a_throttle", "Input Tokens Exceeded for this minute", "ThrottlingException", None, False),
+            # The same words about a parameter over its bound, which is the request's fault, not the input's length
+            ("a_parameter_over_the_model_maximum", "max_tokens (200000) exceed model maximum (8192)", "ValidationException", None, False),
+            # Bedrock's throttle, whose "too many tokens" names no window
+            ("bedrock_throttle_wording", "Too many tokens per day, please wait before trying again.", "ThrottlingException", None, False),
             ("gemini", "The input token count (1234567) exceeds the maximum number of tokens allowed (1048576).", None, None, True),
             (
                 "a_parameter_refused",

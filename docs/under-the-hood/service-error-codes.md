@@ -67,7 +67,7 @@ At boot, every plugin's contributions are frozen into one `ServiceErrorVocabular
 
 **Codes are matched on the code alone, with no check on the provider.** A request reaches a service through whichever SDK its protocol calls for, so the provider a failure reports does not identify the service; the code does. A plugin that contributes a code vouches that no vendor emits it, which in practice means the codes live in a namespace of the service's own.
 
-**For a code to reach the classifier, the worker's Extract step must recover it.** The vendor-facing distillers read an OpenAI-shaped error body's `type` before its `code`. A service that renders `{"error": {"type": "invalid_request_error", "code": "<specific_code>"}}` needs its distiller to read `code` first: `error_code_from_body_code_first` in `pipelex.cogt.inference.error_classification` does exactly that, and `parse_retry_after_seconds` beside it reads a `Retry-After` header, for a plugin that distils a plain-HTTP failure itself.
+**For a code to reach the classifier, the worker's Extract step must recover it.** The vendor-facing distillers read an OpenAI-shaped error body's `type` before its `code`. A service that renders `{"error": {"type": "invalid_request_error", "code": "<specific_code>"}}` needs its distiller to read `code` first: `error_code_from_body_code_first` in `pipelex.cogt.inference.error_classification` does exactly that. For a plugin that distils a plain-HTTP failure itself, `retry_after_seconds_from_headers` beside it reads the delay from the response's headers, `retry-after-ms` first when it is above zero and then `Retry-After`, and `parse_retry_after_seconds` reads a lone `Retry-After` value.
 
 ## Fail-loud guarantees
 

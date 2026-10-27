@@ -19,12 +19,13 @@ class MistralLLMErrorHandlingTestData:
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),
+        # Every 429 is a rate limit, the monthly token cap included, whatever its words say; a spent balance answers 402
         (
-            "rate_limit_quota_429",
+            "rate_limit_429_quota_wording",
             429,
             "Rate limit reached: your account quota has been exceeded",
-            InferenceErrorCategory.CAPACITY,
-            "billing",
+            InferenceErrorCategory.TRANSIENT,
+            "run it again",
         ),
         (
             "rate_limit_generic_429",
@@ -87,12 +88,13 @@ class MistralExtractErrorHandlingTestData:
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),
+        # Every 429 is a rate limit, the monthly token cap included, whatever its words say; a spent balance answers 402
         (
-            "rate_limit_quota_429",
+            "rate_limit_429_quota_wording",
             429,
             "Rate limit reached: your account quota has been exceeded",
-            InferenceErrorCategory.CAPACITY,
-            "billing",
+            InferenceErrorCategory.TRANSIENT,
+            "run it again",
         ),
         (
             "rate_limit_generic_429",

@@ -30,11 +30,13 @@ def _mock_httpx_response(status_code: int, headers: dict[str, str] | None = None
     return httpx.Response(status_code=status_code, request=request, headers=headers or {})
 
 
-def _make_openai_rate_limit_error(message: str) -> openai.RateLimitError:
+def _make_openai_rate_limit_error(
+    message: str, *, error_type: str = "rate_limit_error", error_code: str = "rate_limit_exceeded"
+) -> openai.RateLimitError:
     return openai.RateLimitError(
         message,
         response=_mock_httpx_response(429, headers={"x-request-id": "req_rate", "retry-after": "3"}),
-        body={"type": "rate_limit_error", "code": "rate_limit_exceeded", "message": message},
+        body={"type": error_type, "code": error_code, "message": message},
     )
 
 
@@ -120,9 +122,12 @@ class TestOpenAIResponsesWorkerObjectErrorHandling:
         assert metadata.retry_after_seconds == 3.0
         assert metadata.provider_error_code == "rate_limit_error"
 
-    async def test_wrapped_rate_limit_quota_is_capacity(self, mocker: MockerFixture) -> None:
+    async def test_wrapped_billing_code_is_capacity(self, mocker: MockerFixture) -> None:
+        """OpenAI's billing code beside its broad quota type makes the 429 a spent quota."""
         worker = _make_worker(mocker)
-        sdk_exc = _make_openai_rate_limit_error("Error: insufficient_quota — you exceeded your billing limit")
+        sdk_exc = _make_openai_rate_limit_error(
+            "Error: insufficient_quota — you exceeded your billing limit", error_type="insufficient_quota", error_code="credit_balance_exhausted"
+        )
         wrapped = wrap_in_instructor_retry(sdk_exc)
         worker.instructor_for_objects.responses.create_with_completion.side_effect = wrapped  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 

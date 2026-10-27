@@ -114,10 +114,35 @@ class TestRequestWithTransportRetry:
         assert send.call_count == 2
         assert response.status_code == 200
 
+    async def test_honors_azure_s_delay_in_milliseconds(self, mocker: MockerFixture) -> None:
+        """Azure OpenAI's REST answer gives its delay twice; the milliseconds, above zero, are the wait."""
+        sleep_mock = mocker.patch("asyncio.sleep", new_callable=mocker.AsyncMock)
+        send = mocker.AsyncMock(side_effect=[_make_status_error(429, headers={"retry-after-ms": "4500", "retry-after": "5"}), _make_ok_response()])
+
+        await request_with_transport_retry(send_request=send, max_retries=3)
+        sleep_mock.assert_awaited_once_with(4.5)
+
+    @pytest.mark.parametrize(
+        "headers",
+        [
+            pytest.param({"Retry-After": "soon"}, id="unparseable_seconds"),
+            pytest.param({"retry-after-ms": "never"}, id="unparseable_milliseconds"),
+            pytest.param({}, id="no_header"),
+        ],
+    )
+    async def test_a_header_with_no_usable_delay_leaves_the_wait_to_the_backoff(self, mocker: MockerFixture, headers: dict[str, str]) -> None:
+        sleep_mock = mocker.patch("asyncio.sleep", new_callable=mocker.AsyncMock)
+        backoff_mock = mocker.patch("pipelex.cogt.inference.transport_retry._exponential_wait", return_value=0.25)
+        send = mocker.AsyncMock(side_effect=[_make_status_error(429, headers=headers), _make_ok_response()])
+
+        await request_with_transport_retry(send_request=send, max_retries=3)
+        backoff_mock.assert_called_once()
+        sleep_mock.assert_awaited_once_with(0.25)
+
     async def test_naive_retry_after_header_does_not_crash(self, mocker: MockerFixture) -> None:
         mocker.patch("asyncio.sleep", new_callable=mocker.AsyncMock)
-        # A "-0000" HTTP-date is a valid RFC date that parses to a *naive* datetime; the wait
-        # calculation must treat it as unusable and fall back to backoff, not raise TypeError.
+        # A "-0000" HTTP-date is a valid RFC date that parses to a *naive* datetime; the shared
+        # reader takes it as UTC, so a date in the past is no wait at all, and nothing raises.
         send = mocker.AsyncMock(
             side_effect=[
                 _make_status_error(429, headers={"Retry-After": "Wed, 21 Oct 2015 07:28:00 -0000"}),

@@ -11,12 +11,12 @@ uses) rather than hand-rolling a retry loop, and it must only ever wrap a path t
 retry of its own — layering it on top of a retrying SDK would double-retry.
 """
 
-import email.utils
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
 
 import httpx
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
+
+from pipelex.cogt.inference.error_classification import retry_after_seconds_from_headers
 
 # Transient HTTP statuses worth retrying in the default (ambiguous-failure-tolerant) mode — the
 # same floor the provider SDKs apply. Connection-level failures (no HTTP response at all) are
@@ -46,33 +46,18 @@ _MAX_RETRY_AFTER_SECONDS: float = 60.0
 _exponential_wait = wait_random_exponential(multiplier=1.0, max=_MAX_RETRY_AFTER_SECONDS)
 
 
-def _parse_retry_after(raw_value: str | None) -> float | None:
-    """Parse a ``Retry-After`` header value (delta-seconds or HTTP-date) into seconds, or None."""
-    if raw_value is None:
-        return None
-    cleaned = raw_value.strip()
-    if not cleaned:
-        return None
-    if cleaned.isdigit():
-        return float(cleaned)
-    try:
-        parsed_date = email.utils.parsedate_to_datetime(cleaned)
-    except (TypeError, ValueError):
-        return None
-    if parsed_date.tzinfo is None:
-        # A zoneless or "-0000" HTTP-date parses to a naive datetime; subtracting it from an
-        # aware "now" would raise TypeError. Treat such a malformed header as unusable.
-        return None
-    return max((parsed_date - datetime.now(UTC)).total_seconds(), 0.0)
-
-
 def _transport_retry_wait(retry_state: RetryCallState) -> float:
-    """Honor a ``Retry-After`` header when the failure carried one, else full-jitter exponential backoff."""
+    """Honor the delay the failure's headers asked for, else full-jitter exponential backoff.
+
+    The delay is read by ``retry_after_seconds_from_headers``, the reader every Extract step shares: ``retry-after-ms``
+    above zero first, which Azure OpenAI sends, then ``Retry-After``, in seconds or as an HTTP-date. A header that gives
+    no usable delay leaves the wait to the backoff.
+    """
     outcome = retry_state.outcome
     if outcome is not None and outcome.failed:
         exc = outcome.exception()
         if isinstance(exc, httpx.HTTPStatusError):
-            retry_after = _parse_retry_after(exc.response.headers.get("Retry-After"))
+            retry_after = retry_after_seconds_from_headers(headers=exc.response.headers)
             if retry_after is not None:
                 return min(retry_after, _MAX_RETRY_AFTER_SECONDS)
     return _exponential_wait(retry_state)
