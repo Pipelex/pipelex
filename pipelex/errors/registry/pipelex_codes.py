@@ -117,9 +117,15 @@ class BillingCreditExhaustedParams(PipelexErrorParams):
     """The parameters of `pipelex.billing.credit_exhausted`.
 
     The organization is out of credit.
+
+    Attributes:
+        ledger: The credit ledger whose balance refused the operation: the organization's inference credit or
+            its usage credit.
     """
 
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.BILLING_CREDIT_EXHAUSTED
+
+    ledger: Literal["inference", "usage"] | None = None
 
 
 class BillingSubscriptionConflictParams(PipelexErrorParams):

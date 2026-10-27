@@ -71,8 +71,9 @@ codes:
     steps:
       actor: {kind: check_account, detail: "Add credit to the organization, or move it to a plan that includes more, then try again."}
       other: {kind: contact_owner, detail: "Ask the account's owner to add credit to the organization."}
-    params: {}
-    meaning: "The organization's credit is spent. The platform refuses a run before queueing it, and a model call made once the credit has run out is refused as well."
+    params:
+      ledger: {type: enum, values: [inference, usage], optional: true, description: "The credit ledger whose balance refused the operation: the organization's inference credit or its usage credit."}
+    meaning: "The organization's credit is spent. The hosted platform keeps two credit ledgers, inference credit and usage credit, and refuses a run before queueing it while either is at zero or below, naming the ledger that refused it in `params.ledger`. A model call made once the credit has run out is refused as well, and names no ledger."
     what_to_do: "Add credit to the organization, or move it to a plan that includes more, then start the run again."
 
   - code: pipelex.billing.subscription_conflict
