@@ -1624,10 +1624,6 @@ rationale = "Predicate on the error_message; single operand."
 param = "error_message"
 rationale = "Predicate on the error_message; single operand."
 
-["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_gateway"]
-param = "error_message"
-rationale = "Predicate on the error_message; single operand."
-
 ["pipelex/cogt/inference/error_classification.py::_is_quota_exhaustion_google"]
 param = "error_message"
 rationale = "Predicate on the error_message; single operand."
