@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, cast
 
 import anthropic
+import botocore.session
 import httpx
 import openai
 import pytest
@@ -15,6 +16,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
 from pipelex.cogt.inference.error_classification import (
+    RUNTIME_CLASSIFIED_ERROR_CODES,
     ProviderErrorMetadata,
     UserActionKind,
     extract_anthropic_metadata,
@@ -34,6 +36,13 @@ if TYPE_CHECKING:
     from pipelex.errors.error_codes import ErrorCode
 
 _TestData = DirectProviderQuotaTestData
+
+# Every error Bedrock's runtime API declares, with its status, from botocore's own model of the service, so a code AWS
+# adds is covered without editing this list
+_BEDROCK_RUNTIME_ERRORS: list[tuple[str, int]] = sorted(
+    (shape.name, shape.metadata["error"]["httpStatusCode"])
+    for shape in botocore.session.get_session().get_service_model("bedrock-runtime").error_shapes
+)
 
 
 def _response(*, url: str, status_code: int, content: str, headers: dict[str, str] | None = None) -> httpx.Response:
@@ -133,13 +142,21 @@ class TestDirectProviderQuotaClassification:
                 CoreCode.PROVIDER_RATE_LIMITED,
                 2,
             ),
-            # OpenRouter: "A 402 without the header is not a wait-and-retry case"
+            # The limit source decides; the header, when it is missing or unreadable, only leaves the wait to the backoff
             (
                 "openrouter_in_flight_budget_with_no_wait",
                 402,
                 _TestData.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
                 None,
-                CoreCode.PROVIDER_QUOTA_EXHAUSTED,
+                CoreCode.PROVIDER_RATE_LIMITED,
+                None,
+            ),
+            (
+                "openrouter_in_flight_budget_with_an_unreadable_wait",
+                402,
+                _TestData.OPENROUTER_IN_FLIGHT_BUDGET_BODY,
+                {"retry-after": "soon"},
+                CoreCode.PROVIDER_RATE_LIMITED,
                 None,
             ),
             (
@@ -243,6 +260,26 @@ class TestDirectProviderQuotaClassification:
     @pytest.mark.parametrize(
         ("_topic", "status_code", "body", "expected_error_code"),
         [
+            # Billing disabled on the project, read from the ErrorInfo reason whatever the message says
+            ("billing_disabled_403", 403, _TestData.GOOGLE_BILLING_DISABLED_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            # Another reason on the same status is a refused credential, as any 403
+            ("service_disabled_403", 403, _TestData.GOOGLE_SERVICE_DISABLED_BODY, CoreCode.PROVIDER_CREDENTIAL_REFUSED),
+            # A quota whose limit is zero, which no wait cures
+            ("zero_limit_quota_429", 429, _TestData.GOOGLE_ZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            ("zero_quota_value_429", 429, _TestData.GOOGLE_ZERO_QUOTA_VALUE_BODY, CoreCode.PROVIDER_QUOTA_EXHAUSTED),
+            # The same quota at a limit above zero, which a wait cures
+            ("nonzero_limit_quota_429", 429, _TestData.GOOGLE_NONZERO_LIMIT_QUOTA_BODY, CoreCode.PROVIDER_RATE_LIMITED),
+        ],
+    )
+    def test_google_details(self, _topic: str, status_code: int, body: dict[str, Any], expected_error_code: ErrorCode) -> None:
+        """Google's billing and zero-limit refusals are read from the `google.rpc` details of its error, never its words."""
+        metadata = extract_google_metadata(_as_google_raises_it(status_code=status_code, body=body))
+
+        _assert_classified(metadata=metadata, family=InferenceErrorFamily.LLM, expected_error_code=expected_error_code)
+
+    @pytest.mark.parametrize(
+        ("_topic", "status_code", "body", "expected_error_code"),
+        [
             ("capacity_429", 429, _TestData.MISTRAL_CAPACITY_BODY, CoreCode.PROVIDER_RATE_LIMITED),
             # The words name a quota, which the former word list read as a spent one
             ("quota_wording_429", 429, _TestData.MISTRAL_QUOTA_WORDING_BODY, CoreCode.PROVIDER_RATE_LIMITED),
@@ -340,3 +377,30 @@ class TestDirectProviderQuotaClassification:
 
         assert metadata.retry_after_seconds == _TestData.AZURE_RETRY_AFTER_MS_SECONDS
         _assert_classified(metadata=metadata, family=InferenceErrorFamily.IMG_GEN, expected_error_code=CoreCode.PROVIDER_RATE_LIMITED)
+
+    @pytest.mark.parametrize(("aws_error_code", "status_code"), _BEDROCK_RUNTIME_ERRORS)
+    def test_claude_on_bedrock_reads_each_aws_code_as_the_bedrock_worker_does(self, aws_error_code: str, status_code: int) -> None:
+        """An AWS code read from the header reaches only the lookups the Bedrock worker already feeds it to, with the same verdict.
+
+        The header puts no code in front of the service error vocabulary, the content-policy check or the context-window
+        check that Bedrock's own SDK does not already put there, and the runtime classifies none of them itself.
+        """
+        message = "The request was refused."
+        response = _response(
+            url="https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-sonnet-4-5/invoke",
+            status_code=status_code,
+            content=json.dumps({"message": message}),
+            headers={"x-amzn-errortype": f"{aws_error_code}:http://internal.amazon.com/coral/com.amazon.bedrock/"},
+        )
+        client = AnthropicBedrock(aws_region="us-east-1", api_key="unused-in-this-test")
+        claude_metadata = extract_anthropic_metadata(client._make_status_error_from_response(response))  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+        bedrock_metadata = extract_bedrock_metadata(_as_botocore_raises_it(status_code=status_code, error_code=aws_error_code, message=message))
+
+        assert claude_metadata.provider_error_code == bedrock_metadata.provider_error_code == aws_error_code
+        assert aws_error_code not in RUNTIME_CLASSIFIED_ERROR_CODES
+        assert claude_metadata.is_content_policy_violation is False
+        assert claude_metadata.is_context_window_exceeded is False
+        assert claude_metadata.is_model_not_allowed is False
+        claude_verdict = classify_inference_error(claude_metadata, family=InferenceErrorFamily.LLM)
+        bedrock_verdict = classify_inference_error(bedrock_metadata, family=InferenceErrorFamily.LLM)
+        assert (claude_verdict.category, claude_verdict.error_code) == (bedrock_verdict.category, bedrock_verdict.error_code)

@@ -158,6 +158,7 @@ class _TestCases:
         ),
         ("resource_exhausted_wording_429", "Resource has been exhausted (e.g. check quota)", 429, "RESOURCE_EXHAUSTED", False),
         ("billing_wording_429", "Billing quota exceeded for project foo", 429, "RESOURCE_EXHAUSTED", False),
+        # The words decide nothing: a disabled billing account is read from its ErrorInfo reason, which a body carries
         ("billing_account_wording_403", "Billing account is not active", 403, "PERMISSION_DENIED", False),
         ("quota_wording_400", "Quota exceeded for aiplatform.googleapis.com", 400, "INVALID_ARGUMENT", False),
         ("no_status", "", None, None, False),
@@ -205,8 +206,18 @@ class _TestCases:
             2.0,
             True,
         ),
-        # "A 402 without the header is not a wait-and-retry case"
-        ("openrouter_in_flight_budget_with_no_wait", ProviderName.OPENAI, 402, None, _Bodies.OPENROUTER_IN_FLIGHT_BUDGET_BODY["error"], None, False),
+        # The limit source decides; the header is the wait, not the verdict
+        ("openrouter_in_flight_budget_with_no_wait", ProviderName.OPENAI, 402, None, _Bodies.OPENROUTER_IN_FLIGHT_BUDGET_BODY["error"], None, True),
+        # The source is read in every section, past one whose metadata says something else
+        (
+            "openrouter_in_flight_budget_in_the_second_section",
+            ProviderName.OPENAI,
+            402,
+            None,
+            {"error": {"metadata": {"reason": "in_flight_budget_exhausted"}}, "metadata": {"limit_source": "openrouter_in_flight_budget"}},
+            None,
+            True,
+        ),
         (
             "openrouter_insufficient_credits_with_a_wait",
             ProviderName.OPENAI,
@@ -325,7 +336,7 @@ class TestErrorClassification:
     def test_is_quota_exhaustion_google(
         self, _topic: str, error_message: str, status_code: int | None, provider_error_code: str | None, expected: bool
     ) -> None:
-        """A Google spent quota is its 402; every 429 is a rate limit, whatever it says."""
+        """A Google spent quota is its 402 or a detail of its body; with no body, every 429 is a rate limit, whatever it says."""
         metadata = _metadata(ProviderName.GOOGLE, error_message, status_code, provider_error_code=provider_error_code)
         assert metadata.is_quota_exhaustion == expected
 

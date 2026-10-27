@@ -44,9 +44,12 @@ class TestRetryAfterSecondsFromHeaders:
             pytest.param({"Retry-After-Ms": "250"}, 0.25, id="any_case"),
             pytest.param({"retry-after-ms": "soon", "retry-after": "3"}, 3.0, id="unreadable_milliseconds_leave_the_seconds"),
             pytest.param({"retry-after-ms": "-5", "retry-after": "3"}, 3.0, id="negative_milliseconds_leave_the_seconds"),
+            # As in the OpenAI SDK, the milliseconds decide only above zero
+            pytest.param({"retry-after-ms": "0", "retry-after": "30"}, 30.0, id="zero_milliseconds_leave_the_seconds"),
+            pytest.param({"retry-after-ms": "0"}, None, id="zero_milliseconds_alone_read_as_none"),
             pytest.param({"retry-after-ms": "inf"}, None, id="infinite_milliseconds_read_as_none"),
         ],
     )
     def test_reads_the_milliseconds_first(self, headers: dict[str, str] | None, expected_seconds: float | None) -> None:
-        """``retry-after-ms`` decides when it holds a delay, as the OpenAI and Anthropic SDKs read it; ``retry-after`` otherwise."""
+        """``retry-after-ms`` decides when it holds a delay above zero, as the OpenAI and Anthropic SDKs read it; ``retry-after`` otherwise."""
         assert retry_after_seconds_from_headers(headers=None if headers is None else httpx.Headers(headers)) == expected_seconds

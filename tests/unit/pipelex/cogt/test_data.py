@@ -260,6 +260,110 @@ class DirectProviderQuotaTestData:
     # Gemini's 402 for a Prepay balance at zero, which its billing page documents with no body, so only the status is
     # Google's (https://ai.google.dev/gemini-api/docs/billing)
     GOOGLE_PREPAY_DEPLETED_BODY: ClassVar[dict[str, Any]] = {"error": {"code": 402, "message": "Payment required."}}
+    # Google's refusal of a project whose billing account is disabled: the `google.rpc.ErrorInfo` is the BILLING_DISABLED
+    # example of Google's ErrorReason definitions, with the Gemini API's service named
+    # (https://github.com/googleapis/googleapis/blob/master/google/api/error_reason.proto), inside the error envelope every
+    # Google Cloud API answers with (https://google.aip.dev/193); the message is built
+    GOOGLE_BILLING_DISABLED_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "code": 403,
+            "message": "This API method requires billing to be enabled. Please enable billing on project #123 then retry.",
+            "status": "PERMISSION_DENIED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "BILLING_DISABLED",
+                    "domain": "googleapis.com",
+                    "metadata": {"consumer": "projects/123", "service": "generativelanguage.googleapis.com"},
+                }
+            ],
+        }
+    }
+    # The same envelope with another documented reason, SERVICE_DISABLED: the API is off for the project, which the
+    # project's owner turns on, not a billing matter (same source)
+    GOOGLE_SERVICE_DISABLED_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "code": 403,
+            "message": "Generative Language API has not been used in project 123 before or it is disabled.",
+            "status": "PERMISSION_DENIED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "SERVICE_DISABLED",
+                    "domain": "googleapis.com",
+                    "metadata": {"consumer": "projects/123", "service": "generativelanguage.googleapis.com"},
+                }
+            ],
+        }
+    }
+    # Gemini's 429 for a quota whose limit is zero, verbatim from the Gemini developer forum, the project number as posted
+    # (https://discuss.ai.google.dev/t/quota-limits-on-generativelanguage-googleapis-com/108535)
+    GOOGLE_ZERO_LIMIT_QUOTA_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "code": 429,
+            "message": (
+                "Quota exceeded for quota metric 'Generate Content API requests per minute' and limit 'GenerateContent "
+                "request limit per minute for a region' of service 'generativelanguage.googleapis.com' for consumer "
+                "'project_number:MYPROJECTNO'."
+            ),
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "RATE_LIMIT_EXCEEDED",
+                    "domain": "googleapis.com",
+                    "metadata": {
+                        "quota_location": "europe-west1",
+                        "quota_limit": "GenerateContentRequestsPerMinutePerProjectPerRegion",
+                        "quota_unit": "1/min/{project}/{region}",
+                        "consumer": "projects/MYPROJECTNO",
+                        "service": "generativelanguage.googleapis.com",
+                        "quota_limit_value": "0",
+                        "quota_metric": "generativelanguage.googleapis.com/generate_content_requests",
+                    },
+                }
+            ],
+        }
+    }
+    # Built: the same quota at a limit of 60, which a wait cures
+    GOOGLE_NONZERO_LIMIT_QUOTA_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "code": 429,
+            "message": "Quota exceeded for quota metric 'Generate Content API requests per minute'.",
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.ErrorInfo",
+                    "reason": "RATE_LIMIT_EXCEEDED",
+                    "domain": "googleapis.com",
+                    "metadata": {"quota_limit": "GenerateContentRequestsPerMinutePerProjectPerRegion", "quota_limit_value": "60"},
+                }
+            ],
+        }
+    }
+    # Built: a free-tier quota on a model the free tier leaves out, stated by a `google.rpc.QuotaFailure` violation's
+    # `quotaValue`, the enforced quota value, an int64 that protobuf's JSON form writes as a string
+    # (https://github.com/googleapis/googleapis/blob/master/google/rpc/error_details.proto)
+    GOOGLE_ZERO_QUOTA_VALUE_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "code": 429,
+            "message": "You exceeded your current quota, please check your plan and billing details.",
+            "status": "RESOURCE_EXHAUSTED",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                    "violations": [
+                        {
+                            "quotaMetric": "generativelanguage.googleapis.com/generate_content_free_tier_requests",
+                            "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                            "quotaDimensions": {"location": "global", "model": "gemini-2.5-pro"},
+                            "quotaValue": "0",
+                        }
+                    ],
+                }
+            ],
+        }
+    }
 
     # Mistral's capacity refusal on a 429, verbatim from a production log
     # (https://github.com/EOSC-Data-Commons/data-commons-search/issues/7)

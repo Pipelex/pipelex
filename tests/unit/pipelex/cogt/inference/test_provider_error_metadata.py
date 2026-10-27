@@ -187,6 +187,8 @@ class TestProviderErrorMetadata:
             ("bedrock_nova", "Input Tokens Exceeded: Number of input tokens exceeds maximum length.", "ValidationException", None, True),
             ("bedrock_titan", "Too many input tokens. Max input tokens: 8192, request input token count: 9000", "ValidationException", None, True),
             ("bedrock_openai_engine", "prompt tokens (300000) exceed model maximum (262144)", "ValidationException", None, True),
+            # The same words about a parameter over its bound, which is the request's fault, not the input's length
+            ("a_parameter_over_the_model_maximum", "max_tokens (200000) exceed model maximum (8192)", "ValidationException", None, False),
             # Bedrock's throttle, whose "too many tokens" names no window
             ("bedrock_throttle_wording", "Too many tokens per day, please wait before trying again.", "ThrottlingException", None, False),
             ("gemini", "The input token count (1234567) exceeds the maximum number of tokens allowed (1048576).", None, None, True),

@@ -8,8 +8,8 @@ provider-specific branching and no SDK imports.
 
 Every provider-specific nuance has already been normalized into the metadata
 by the Extract step (e.g. Google's ``code`` becomes ``status_code``;
-quota-vs-rate-limit is decided by the ``is_quota_exhaustion`` and ``is_rate_limit``
-properties). The
+quota-vs-rate-limit is decided by the ``limit_verdict``
+property). The
 HTTP status code drives classification; status-less errors dispatch on the
 SDK exception type name.
 
@@ -29,7 +29,7 @@ from mthds.protocol.problem.registry import CoreCode
 from pydantic import BaseModel, model_validator
 
 from pipelex.cogt.exceptions import INFERENCE_FAILURE_CODES, InferenceErrorCategory
-from pipelex.cogt.inference.error_classification import SDKErrorEnvelope, UserActionKind
+from pipelex.cogt.inference.error_classification import ProviderLimitVerdict, SDKErrorEnvelope, UserActionKind
 from pipelex.cogt.inference.service_error_vocabulary import ServiceErrorCode
 from pipelex.errors.error_codes import ErrorCode, error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -311,22 +311,22 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
             is_model_not_allowed=True,
         )
 
-    # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
-    # property and takes precedence over the HTTP status: providers signal it on
-    # different statuses (a 429 with a quota code, a 402, Anthropic's 400 for a
-    # spent credit). Every rule reads the provider's structure, its status and its
-    # code or type; a 429 that carries no quota signal falls through to the arm
-    # below and is a rate limit, as is a throttle a provider documents on another
-    # status: OpenRouter's 402 for its in-flight budget, Bedrock's 400
-    # `ServiceQuotaExceededException`.
-    if metadata.is_quota_exhaustion:
+    # A spent quota or a rate limit is decided once, by the provider-aware
+    # ``limit_verdict``, and takes precedence over the HTTP status: providers signal
+    # a spent quota on different statuses (a 429 with a quota code, a 402, Google's
+    # 403 for disabled billing, Anthropic's 400 for a spent credit), and a throttle
+    # on statuses other than 429 (OpenRouter's 402 for its in-flight budget, Groq's
+    # 498, Bedrock's 400 `ServiceQuotaExceededException`). Every rule reads the
+    # provider's structure; a 429 that carries no quota signal is a rate limit.
+    limit_verdict = metadata.limit_verdict
+    if limit_verdict is ProviderLimitVerdict.QUOTA_EXHAUSTED:
         return ClassificationResult(
             category=InferenceErrorCategory.CAPACITY,
             user_action_kind=UserActionKind.CHECK_BILLING,
             error_code=CoreCode.PROVIDER_QUOTA_EXHAUSTED,
         )
 
-    if metadata.is_rate_limit:
+    if limit_verdict is ProviderLimitVerdict.RATE_LIMITED:
         return ClassificationResult(
             category=InferenceErrorCategory.TRANSIENT,
             user_action_kind=UserActionKind.WAIT_AND_RETRY,
