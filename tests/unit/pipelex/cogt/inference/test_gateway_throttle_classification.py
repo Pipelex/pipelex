@@ -99,17 +99,32 @@ class TestGatewayThrottleClassification:
         assert problem.is_retryable is True
         assert problem.retry_after == 57
 
+    @pytest.mark.parametrize(
+        ("error_type", "error_code"),
+        [
+            pytest.param(None, GatewayThrottleTestData.OPENAI_QUOTA_CODE, id="broad-code"),
+            # OpenAI's billing shape: the cause in `code`, which the Extract step reads before the broad `type`
+            pytest.param(
+                GatewayThrottleTestData.OPENAI_QUOTA_CODE,
+                GatewayThrottleTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
+                id="billing-code-beside-the-broad-type",
+            ),
+        ],
+    )
     @pytest.mark.parametrize("raise_it", _HOPS)
-    def test_the_same_refusal_on_openai_s_quota_code_is_a_spent_quota(self, raise_it: Callable[..., BaseException]) -> None:
+    def test_the_same_refusal_on_openai_s_quota_code_is_a_spent_quota(
+        self, raise_it: Callable[..., BaseException], error_type: str | None, error_code: str
+    ) -> None:
         """The contrast: only the provider's code changes, and the code alone makes the 429 a spent quota."""
         body = copy.deepcopy(GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY)
-        body["error"]["code"] = GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        body["error"]["type"] = error_type
+        body["error"]["code"] = error_code
         exc = raise_it(body=body, retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER)
 
         metadata = extract_gateway_metadata(exc)
         classification = classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN)
 
-        assert metadata.provider_error_code == GatewayThrottleTestData.OPENAI_QUOTA_CODE
+        assert metadata.provider_error_code == error_code
         assert metadata.is_quota_exhaustion is True
         assert classification.error_code == CoreCode.PROVIDER_QUOTA_EXHAUSTED
         assert classification.category == InferenceErrorCategory.CAPACITY

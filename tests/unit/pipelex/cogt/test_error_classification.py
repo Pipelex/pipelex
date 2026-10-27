@@ -100,6 +100,17 @@ class _TestCases:
         ("payment_required_402_any_code", "Payment required", 402, GatewayThrottleTestData.AZURE_RATE_LIMIT_CODE, True),
         ("openai_insufficient_quota_code_429", GatewayThrottleTestData.OPENAI_QUOTA_MESSAGE, 429, GatewayThrottleTestData.OPENAI_QUOTA_CODE, True),
         ("insufficient_quota_code_429_any_message", "random text", 429, GatewayThrottleTestData.OPENAI_QUOTA_CODE, True),
+        # OpenAI's billing codes, each naming the cause of a spent quota in `error.code`
+        (
+            "openai_credit_balance_exhausted_code_429",
+            "Credit balance exhausted",
+            429,
+            GatewayThrottleTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE,
+            True,
+        ),
+        ("openai_organization_spend_limit_code_429", "Organization spend limit reached", 429, "organization_spend_limit_exceeded", True),
+        ("openai_project_spend_limit_code_429", "Project spend limit reached", 429, "project_spend_limit_exceeded", True),
+        ("openai_organization_usage_limit_code_429", "Organization usage limit reached", 429, "organization_usage_limit_exceeded", True),
         (
             "azure_rate_limit_reached_429_linking_its_quota_increase_page",
             GatewayThrottleTestData.AZURE_RATE_LIMIT_MESSAGE,

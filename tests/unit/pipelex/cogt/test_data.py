@@ -55,6 +55,9 @@ class GatewayThrottleTestData:
         "provider": "azure-openai",
     }
 
-    # OpenAI's documented code for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers relay
+    # OpenAI's broad code for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers relay
     OPENAI_QUOTA_CODE: ClassVar[str] = "insufficient_quota"
     OPENAI_QUOTA_MESSAGE: ClassVar[str] = "You exceeded your current quota, please check your plan and billing details."
+    # One of the billing codes OpenAI's error-code guide documents for a 429 in `error.code`, whose `error.type` can
+    # still be `insufficient_quota`
+    OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE: ClassVar[str] = "credit_balance_exhausted"

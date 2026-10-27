@@ -316,9 +316,19 @@ _AWS_QUOTA_PATTERNS: tuple[str, ...] = (
 # decides it, and a gateway's own codes are read from the service error vocabulary before this rule runs.
 _GATEWAY_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
     {
-        # OpenAI's documented code for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers
-        # relay in the same field
+        # OpenAI's codes for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers relay in the
+        # same fields (https://developers.openai.com/api/docs/guides/error-codes). OpenAI names each billing cause in
+        # `error.code` and says `error.type` can still be `insufficient_quota`; the gateway's Extract step reads the
+        # body's code before its type, so the specific codes are listed beside the broad one.
         "insufficient_quota",
+        # no prepaid credits remaining
+        "credit_balance_exhausted",
+        # the organization's enforced spend limit
+        "organization_spend_limit_exceeded",
+        # the project's enforced spend limit
+        "project_spend_limit_exceeded",
+        # the organization's OpenAI-assigned usage limit
+        "organization_usage_limit_exceeded",
     }
 )
 
