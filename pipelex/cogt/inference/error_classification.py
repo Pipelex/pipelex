@@ -1,7 +1,7 @@
 """Helpers for classifying SDK errors into InferenceErrorCategory values.
 
-Pure functions that inspect error messages to discriminate between
-quota exhaustion vs rate limiting, detect content policy violations, and
+Pure functions that inspect error statuses, codes and messages to discriminate
+between quota exhaustion vs rate limiting, detect content policy violations, and
 recover the underlying SDK exception that ``InstructorRetryException``
 wraps when ``instructor`` exhausts its retry loop.
 """
@@ -112,8 +112,10 @@ class ProviderErrorMetadata(BaseModel):
     def is_quota_exhaustion(self) -> bool:
         """Whether this error is a quota/credits exhaustion rather than rate limiting.
 
-        Dispatches on ``provider`` because each provider phrases quota
-        exhaustion differently; Mistral and Gateway also use HTTP 402.
+        Dispatches on ``provider`` because each provider signals quota
+        exhaustion differently; Mistral and Gateway also use HTTP 402. A
+        gateway relays every provider's prose, so its rule reads the status and
+        the provider's error code alone, never the message.
         """
         match self.provider:
             case ProviderName.OPENAI:
@@ -127,7 +129,7 @@ class ProviderErrorMetadata(BaseModel):
             case ProviderName.BEDROCK:
                 return _is_quota_exhaustion_aws(self.message, provider_error_code=self.provider_error_code)
             case ProviderName.GATEWAY:
-                return _is_quota_exhaustion_gateway(self.message, status_code=self.status_code or 0)
+                return _is_quota_exhaustion_gateway(status_code=self.status_code or 0, provider_error_code=self.provider_error_code)
             case (
                 ProviderName.AZURE
                 | ProviderName.FAL
@@ -307,15 +309,17 @@ _AWS_QUOTA_PATTERNS: tuple[str, ...] = (
     "service quota",
 )
 
-_GATEWAY_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota",
-    "billing limit",
-    "billing quota",
-    "insufficient_quota",
-    "insufficient credit",
-    "insufficient funds",
-    "insufficient balance",
-    "credits exhausted",
+# The provider error codes that make a gateway's 429 a spent quota rather than a rate limit. A gateway relays every
+# provider's prose, so the message decides nothing: Azure's throttle links to its quota-increase page, and Google's
+# per-minute limit says "check quota". A code joins this set only when the provider that sends it documents it as a
+# spent quota on a 429, with a comment naming that provider and a test case. A 402 needs no entry, since its status
+# decides it, and a gateway's own codes are read from the service error vocabulary before this rule runs.
+_GATEWAY_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        # OpenAI's documented code for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers
+        # relay in the same field
+        "insufficient_quota",
+    }
 )
 
 
@@ -364,16 +368,19 @@ def _is_quota_exhaustion_aws(error_message: str, *, provider_error_code: str | N
     return any(pattern in lower_message for pattern in _AWS_QUOTA_PATTERNS)
 
 
-def _is_quota_exhaustion_gateway(error_message: str, *, status_code: int) -> bool:
-    """Check if a Portkey/Gateway error indicates quota/credits exhaustion.
+def _is_quota_exhaustion_gateway(*, status_code: int, provider_error_code: str | None) -> bool:
+    """Check if a Portkey/Gateway error indicates quota/credits exhaustion, from its status and its provider code alone.
 
-    HTTP 402 (Payment Required) is a definitive quota signal.
-    HTTP 429 requires message inspection to distinguish quota from rate limiting.
+    HTTP 402 (Payment Required) is a spent quota whatever its code. HTTP 429 is a spent quota only when the provider's
+    error code is one of ``_GATEWAY_QUOTA_ERROR_CODES``; any other 429, one with no code included, is a rate limit,
+    which the classifier's 429 arm reads as ``provider.rate_limited``. The message is never read: a gateway relays
+    every provider's prose, and a word list keeps meeting a new provider's wording. When the structure says nothing
+    either way, a quota read as a rate limit costs some refused calls and some waiting, while a rate limit read as a
+    quota fails the run and sends a person to add credit that cannot help.
     """
     if status_code == 402:
         return True
-    lower_message = error_message.lower()
-    return status_code == 429 and any(pattern in lower_message for pattern in _GATEWAY_QUOTA_PATTERNS)
+    return status_code == 429 and provider_error_code in _GATEWAY_QUOTA_ERROR_CODES
 
 
 def _is_content_policy_violation(error_message: str) -> bool:

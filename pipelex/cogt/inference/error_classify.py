@@ -312,7 +312,9 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
 
     # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
     # property and takes precedence over the HTTP status: providers signal it on
-    # different statuses (OpenAI/Anthropic 429, Mistral/Gateway 402, AWS 400).
+    # different statuses (OpenAI/Anthropic 429, Mistral/Gateway 402, AWS 400). A
+    # gateway's 429 is a quota only on the provider's quota code; any other 429
+    # falls through to the arm below and is a rate limit.
     if metadata.is_quota_exhaustion:
         return ClassificationResult(
             category=InferenceErrorCategory.CAPACITY,
