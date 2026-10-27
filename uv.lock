@@ -3558,7 +3558,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.92.3"
+version = "0.92.4"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
