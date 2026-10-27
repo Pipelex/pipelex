@@ -12,7 +12,7 @@
 
 ### Removed
 
-- **`ProviderErrorMetadata.is_quota_exhaustion` and `is_rate_limit` (Breaking)**: a plugin reads `ProviderErrorMetadata.limit_verdict` instead, a `ProviderLimitVerdict` of `quota_exhausted`, `rate_limited` or `neither`, the one entry point the classifier reads.
+- **`ProviderErrorMetadata.is_quota_exhaustion` (Breaking)**: a plugin reads `ProviderErrorMetadata.limit_verdict` instead, a `ProviderLimitVerdict` of `quota_exhausted`, `rate_limited` or `neither`, the one entry point the classifier reads.
 
 ## [v0.92.3] - 2026-10-27
 
