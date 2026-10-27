@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 
@@ -28,3 +28,36 @@ class ExceptionTestData:
         ("ambiguous_is_an_unknown_outcome", InferenceErrorCategory.AMBIGUOUS, CoreCode.PROVIDER_OUTCOME_UNKNOWN, ProblemDomain.RUNTIME, True),
         ("unknown_keeps_the_fallback", InferenceErrorCategory.UNKNOWN, CoreCode.RUNTIME_UNEXPECTED, ProblemDomain.RUNTIME, False),
     ]
+
+
+class GatewayThrottleTestData:
+    # Azure OpenAI's refusal of a `gpt-image-2` call over its deployment's call rate, verbatim as a run on the hosted API
+    # received it through the gateway, which prefixes the provider's message with the provider's name. Its code is
+    # Azure's rate-limit code, and its last sentence links to Azure's quota-increase page, whose address holds the word
+    # "quota": a rule reading the message for that word took this throttle for a spent quota.
+    AZURE_RATE_LIMIT_MESSAGE: ClassVar[str] = (
+        "azure-openai error: Your requests to gpt-image-2 for gpt-image-2 in East US 2 have exceeded the call rate limit "
+        "for your current AIServices S0 pricing tier. This request was for ImageGenerations_Create under Azure OpenAI API "
+        "version 2025-04-01-preview. Please retry after 57 seconds. To increase your default rate limit, visit: "
+        "https://aka.ms/oai/quotaincrease."
+    )
+    AZURE_RATE_LIMIT_CODE: ClassVar[str] = "RateLimitReached"
+    # The delay the gateway forwards from Azure in the `retry-after` header
+    AZURE_RETRY_AFTER: ClassVar[str] = "57"
+    # The whole body the gateway answered with, at HTTP 429
+    AZURE_RATE_LIMIT_BODY: ClassVar[dict[str, Any]] = {
+        "error": {
+            "message": AZURE_RATE_LIMIT_MESSAGE,
+            "type": None,
+            "param": None,
+            "code": AZURE_RATE_LIMIT_CODE,
+        },
+        "provider": "azure-openai",
+    }
+
+    # OpenAI's broad code for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers relay
+    OPENAI_QUOTA_CODE: ClassVar[str] = "insufficient_quota"
+    OPENAI_QUOTA_MESSAGE: ClassVar[str] = "You exceeded your current quota, please check your plan and billing details."
+    # One of the billing codes OpenAI's error-code guide documents for a 429 in `error.code`, whose `error.type` can
+    # still be `insufficient_quota`
+    OPENAI_CREDIT_BALANCE_EXHAUSTED_CODE: ClassVar[str] = "credit_balance_exhausted"
