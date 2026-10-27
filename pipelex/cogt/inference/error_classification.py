@@ -161,19 +161,21 @@ class ProviderErrorMetadata(BaseModel):
         OpenRouter, an OpenAI-dialect backend, answers a request its in-flight spending budget cannot hold yet with a
         402 whose ``error.metadata.limit_source`` is ``openrouter_in_flight_budget``, and sends a ``Retry-After`` with
         it when the budget frees itself as the running requests settle. Its documentation says that a 402 without that
-        header is not a wait-and-retry case, so both are required. Bedrock answers ``ServiceQuotaExceededException`` on
-        a 400, and AWS documents it as a request over the account's service quota that "you can resubmit later".
+        header is not a wait-and-retry case, so both are required. Groq, another OpenAI-dialect backend, answers a
+        request its flex tier has no capacity for with its own status, 498, and documents retrying it with backoff.
+        Bedrock answers ``ServiceQuotaExceededException`` on a 400, and AWS documents it as a request over the account's
+        service quota that "you can resubmit later"; Claude on Bedrock, called through the Anthropic SDK, carries the
+        same code, read from Bedrock's ``x-amzn-errortype`` header by ``extract_anthropic_metadata``.
         """
         match self.provider:
             case ProviderName.OPENAI:
-                return _is_in_flight_budget_throttle_openrouter(
+                return self.status_code == _GROQ_FLEX_CAPACITY_STATUS_CODE or _is_in_flight_budget_throttle_openrouter(
                     status_code=self.status_code, retry_after_seconds=self.retry_after_seconds, body=self.body
                 )
-            case ProviderName.BEDROCK:
+            case ProviderName.BEDROCK | ProviderName.ANTHROPIC:
                 return self.provider_error_code == _AWS_SERVICE_QUOTA_EXCEEDED_ERROR_CODE
             case (
-                ProviderName.ANTHROPIC
-                | ProviderName.GOOGLE
+                ProviderName.GOOGLE
                 | ProviderName.MISTRAL
                 | ProviderName.GATEWAY
                 | ProviderName.AZURE
@@ -323,6 +325,15 @@ _CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
     # Bedrock's ValidationException, in full: a 400 about one field's length, such as a tool description's, may say
     # "input is too long" of that field alone
     "input is too long for requested model",
+    # Bedrock's ValidationException for the models that word it themselves. Bedrock has no structured signal for an
+    # input over the window, only the model's sentence: Amazon Nova's "Input Tokens Exceeded: Number of input tokens
+    # exceeds maximum length.", Amazon Titan's "Too many input tokens", and the "prompt tokens (N) exceed model maximum
+    # (M)" of the models Bedrock serves through its OpenAI-compatible engine, such as Kimi, each matched the same way
+    # by langchain-aws's `_CONTEXT_OVERFLOW_MARKERS` (libs/aws/langchain_aws/chat_models/bedrock_converse.py). The bare
+    # "too many tokens" is left out on purpose: it is also Bedrock's throttle, "Too many tokens per day".
+    "input tokens exceeded",
+    "too many input tokens",
+    "exceed model maximum",
     # Gemini's INVALID_ARGUMENT
     "exceeds the maximum number of tokens allowed",
 )
@@ -347,6 +358,11 @@ _OPENAI_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
         "organization_usage_limit_exceeded",
     }
 )
+
+# Groq's own status for a request its flex tier has no capacity for, sent with the error `capacity_exceeded`, which it
+# says to retry with jittered backoff (https://console.groq.com/docs/flex-processing). No other OpenAI-dialect backend
+# is known to answer it, and its error's field is not documented, so the status alone decides.
+_GROQ_FLEX_CAPACITY_STATUS_CODE = 498
 
 # OpenRouter's `error.metadata.limit_source` for a 402 that its in-flight spending budget, not the account's balance,
 # caused: the budget frees itself as the running requests settle
@@ -615,6 +631,50 @@ def parse_retry_after_seconds(value: Any) -> float | None:
     return max(delta_seconds, 0.0)
 
 
+def retry_after_seconds_from_headers(*, headers: Any) -> float | None:
+    """Read the delay a provider asked for from a response's headers, in seconds.
+
+    ``retry-after-ms``, a delay in milliseconds, comes first: it is not standard, but Azure OpenAI sends it beside
+    ``retry-after`` on a 429 (https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/provisioned-get-started),
+    it is the more precise of the two, and the OpenAI and Anthropic SDKs read it first for their own retries. A value
+    that is not a finite, non-negative number reads as absent, and ``retry-after`` decides, through
+    ``parse_retry_after_seconds``.
+    """
+    if headers is None:
+        return None
+    retry_after_ms = headers.get("retry-after-ms")
+    if retry_after_ms is not None:
+        try:
+            milliseconds = float(retry_after_ms)
+        except (TypeError, ValueError):
+            pass
+        else:
+            if math.isfinite(milliseconds) and milliseconds >= 0:
+                return milliseconds / 1000
+    return parse_retry_after_seconds(headers.get("retry-after"))
+
+
+# Bedrock's error type header, which its REST-JSON protocol sends on every error answer: Claude on Bedrock, called
+# through the Anthropic SDK, keeps it, while its body carries only a message.
+_AWS_ERROR_TYPE_HEADER = "x-amzn-errortype"
+
+
+def _aws_error_code_from_headers(*, headers: Any) -> str | None:
+    """Read the AWS error code from Bedrock's ``x-amzn-errortype`` header, normalized as botocore normalizes it.
+
+    The header may carry colon-separated data after the code and may name it as a namespaced shape id, as in
+    ``ThrottlingException:http://internal.amazon.com/coral/com.amazon.bedrock/``; botocore's ``RestJSONParser`` keeps
+    what precedes the first colon and follows the last ``#``.
+    """
+    if headers is None:
+        return None
+    error_type = headers.get(_AWS_ERROR_TYPE_HEADER)
+    if not isinstance(error_type, str):
+        return None
+    code = error_type.split(":", 1)[0].rsplit("#", 1)[-1].strip()
+    return code or None
+
+
 def _provider_error_code_from_body(body: Any) -> str | None:
     if not isinstance(body, dict):
         return None
@@ -643,7 +703,7 @@ def extract_openai_metadata(
 
     - ``APIStatusError`` subclasses (``BadRequestError``, ``RateLimitError``,
       ``AuthenticationError`` …) expose ``status_code``, ``request_id``,
-      ``response.headers`` (for ``Retry-After``), and ``body``. The SDK
+      ``response.headers`` (for ``retry-after-ms`` and ``Retry-After``), and ``body``. The SDK
       pre-unwraps ``body["error"]`` so ``body["type"]`` / ``body["code"]``
       sit at the top level — and are also mirrored to ``exc.type`` /
       ``exc.code`` as instance attributes.
@@ -657,10 +717,7 @@ def extract_openai_metadata(
     if not isinstance(request_id, str):
         request_id = None
     response = getattr(exc, "response", None)
-    headers = getattr(response, "headers", None)
-    retry_after_seconds: float | None = None
-    if headers is not None:
-        retry_after_seconds = parse_retry_after_seconds(headers.get("retry-after"))
+    retry_after_seconds = retry_after_seconds_from_headers(headers=getattr(response, "headers", None))
     body = getattr(exc, "body", None)
     # OpenAI's _make_status_error pre-unwraps body["error"] onto exc.type / exc.code,
     # so we read those attributes directly rather than re-parsing the body.
@@ -697,7 +754,8 @@ def extract_anthropic_metadata(
     Tolerates the two exception shapes in the Anthropic SDK:
 
     - ``APIStatusError`` subclasses expose ``status_code``, ``request_id``,
-      ``response.headers`` (for ``Retry-After``) and ``body``.
+      ``response.headers`` (for ``retry-after-ms`` and ``Retry-After``, and, for Claude on Bedrock,
+      ``x-amzn-errortype``, Bedrock's error code) and ``body``.
     - ``APIConnectionError`` / ``APITimeoutError`` expose neither
       ``status_code`` nor ``response``; every status-related field comes back
       as ``None``.
@@ -710,10 +768,10 @@ def extract_anthropic_metadata(
         request_id = None
     response = getattr(exc, "response", None)
     headers = getattr(response, "headers", None)
-    retry_after_seconds: float | None = None
-    if headers is not None:
-        retry_after_seconds = parse_retry_after_seconds(headers.get("retry-after"))
+    retry_after_seconds = retry_after_seconds_from_headers(headers=headers)
     body = getattr(exc, "body", None)
+    # Claude on Bedrock answers with Bedrock's error, whose body holds a message alone and whose code is in a header
+    provider_error_code = _provider_error_code_from_body(body) or _aws_error_code_from_headers(headers=headers)
     return ProviderErrorMetadata(
         provider=ProviderName.ANTHROPIC,
         sdk_exception_type=type(exc).__name__,
@@ -721,7 +779,7 @@ def extract_anthropic_metadata(
         status_code=status_code,
         request_id=request_id,
         retry_after_seconds=retry_after_seconds,
-        provider_error_code=_provider_error_code_from_body(body),
+        provider_error_code=provider_error_code,
         body=body,
     )
 
@@ -950,7 +1008,7 @@ def _build_azure_metadata(response: Any, *, sdk_exception_type: str, message: st
         request_id_value = headers.get("x-ms-request-id") or headers.get("apim-request-id") or headers.get("x-request-id")
         if isinstance(request_id_value, str):
             request_id = request_id_value
-        retry_after_seconds = parse_retry_after_seconds(headers.get("retry-after"))
+        retry_after_seconds = retry_after_seconds_from_headers(headers=headers)
     body, provider_error_code = _parse_response_text_body(response)
     return ProviderErrorMetadata(
         provider=ProviderName.AZURE,
@@ -1065,7 +1123,7 @@ def extract_gateway_metadata(exc: BaseException) -> ProviderErrorMetadata:
         request_id_value = headers.get("x-request-id") or headers.get("x-portkey-trace-id")
         if isinstance(request_id_value, str):
             request_id = request_id_value
-        retry_after_seconds = parse_retry_after_seconds(headers.get("retry-after"))
+        retry_after_seconds = retry_after_seconds_from_headers(headers=headers)
     body: Any = getattr(exc, "body", None)
     provider_error_code = error_code_from_body_code_first(body)
     if provider_error_code is None:

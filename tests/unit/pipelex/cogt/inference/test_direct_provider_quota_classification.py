@@ -7,6 +7,7 @@ import anthropic
 import httpx
 import openai
 import pytest
+from anthropic.lib.bedrock import AnthropicBedrock
 from botocore.exceptions import ClientError
 from google.genai import errors as genai_errors
 from mistralai.client.errors import SDKError
@@ -17,6 +18,7 @@ from pipelex.cogt.inference.error_classification import (
     ProviderErrorMetadata,
     UserActionKind,
     extract_anthropic_metadata,
+    extract_azure_metadata,
     extract_bedrock_metadata,
     extract_google_metadata,
     extract_mistral_metadata,
@@ -148,6 +150,17 @@ class TestDirectProviderQuotaClassification:
                 CoreCode.PROVIDER_QUOTA_EXHAUSTED,
                 2,
             ),
+            # Groq's own status for its flex tier at capacity, which it says to retry with backoff
+            ("groq_flex_capacity_498", 498, _TestData.GROQ_FLEX_CAPACITY_BODY, None, CoreCode.PROVIDER_RATE_LIMITED, None),
+            # Azure OpenAI's throttle, its delay read from the milliseconds before the rounded seconds
+            (
+                "azure_throttle_with_its_delay_in_milliseconds",
+                429,
+                _TestData.OPENAI_RATE_LIMIT_BODY,
+                _TestData.AZURE_RETRY_AFTER_HEADERS,
+                CoreCode.PROVIDER_RATE_LIMITED,
+                _TestData.AZURE_RETRY_AFTER_MS_SECONDS,
+            ),
         ],
     )
     def test_openai_dialect(
@@ -248,8 +261,16 @@ class TestDirectProviderQuotaClassification:
             ("daily_tokens_throttle", 429, "ThrottlingException", _TestData.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE, CoreCode.PROVIDER_RATE_LIMITED),
             # AWS documents it as resubmittable later, so it is a throttle on its 400
             ("service_quota_exceeded", 400, "ServiceQuotaExceededException", _TestData.BEDROCK_SERVICE_QUOTA_MESSAGE, CoreCode.PROVIDER_RATE_LIMITED),
-            # The words name a limit, which the former word list read as a spent quota; the 400 arm reads it now
-            ("input_limit_validation", 400, "ValidationException", _TestData.BEDROCK_INPUT_LIMIT_MESSAGE, CoreCode.RUNTIME_UNEXPECTED),
+            # An input over the model's window, which Bedrock words per model and signals no other way
+            ("nova_input_overflow", 400, "ValidationException", _TestData.BEDROCK_NOVA_INPUT_OVERFLOW_MESSAGE, CoreCode.MODEL_CONTEXT_EXCEEDED),
+            ("titan_input_overflow", 400, "ValidationException", _TestData.BEDROCK_TITAN_INPUT_OVERFLOW_MESSAGE, CoreCode.MODEL_CONTEXT_EXCEEDED),
+            (
+                "openai_engine_input_overflow",
+                400,
+                "ValidationException",
+                _TestData.BEDROCK_OPENAI_ENGINE_INPUT_OVERFLOW_MESSAGE,
+                CoreCode.MODEL_CONTEXT_EXCEEDED,
+            ),
         ],
     )
     def test_bedrock(self, _topic: str, status_code: int, error_code: str, message: str, expected_error_code: ErrorCode) -> None:
@@ -257,3 +278,65 @@ class TestDirectProviderQuotaClassification:
         metadata = extract_bedrock_metadata(_as_botocore_raises_it(status_code=status_code, error_code=error_code, message=message))
 
         _assert_classified(metadata=metadata, family=InferenceErrorFamily.LLM, expected_error_code=expected_error_code)
+
+    @pytest.mark.parametrize(
+        ("_topic", "status_code", "error_type_header", "message", "expected_error_code", "expected_provider_error_code"),
+        [
+            # AWS documents it as resubmittable later: a throttle on its 400, read as the Bedrock worker reads it
+            (
+                "service_quota_exceeded",
+                400,
+                _TestData.BEDROCK_SERVICE_QUOTA_ERROR_TYPE_HEADER,
+                _TestData.BEDROCK_SERVICE_QUOTA_MESSAGE,
+                CoreCode.PROVIDER_RATE_LIMITED,
+                "ServiceQuotaExceededException",
+            ),
+            (
+                "throttling",
+                429,
+                _TestData.BEDROCK_THROTTLING_ERROR_TYPE_HEADER,
+                _TestData.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE,
+                CoreCode.PROVIDER_RATE_LIMITED,
+                "ThrottlingException",
+            ),
+        ],
+    )
+    def test_claude_on_bedrock(
+        self,
+        _topic: str,
+        status_code: int,
+        error_type_header: str,
+        message: str,
+        expected_error_code: ErrorCode,
+        expected_provider_error_code: str,
+    ) -> None:
+        """Claude on Bedrock, through the Anthropic SDK, carries Bedrock's error code in a header, read as on Bedrock."""
+        response = _response(
+            url="https://bedrock-runtime.us-east-1.amazonaws.com/model/anthropic.claude-sonnet-4-5/invoke",
+            status_code=status_code,
+            content=json.dumps({"message": message}),
+            headers={"x-amzn-errortype": error_type_header},
+        )
+        client = AnthropicBedrock(aws_region="us-east-1", api_key="unused-in-this-test")
+        exc = client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
+
+        metadata = extract_anthropic_metadata(exc)
+
+        assert metadata.provider_error_code == expected_provider_error_code
+        _assert_classified(metadata=metadata, family=InferenceErrorFamily.LLM, expected_error_code=expected_error_code)
+
+    def test_azure_rest_reads_the_delay_in_milliseconds(self) -> None:
+        """Azure OpenAI's REST answer, which no SDK wraps, carries its delay in milliseconds before its rounded seconds."""
+        response = _response(
+            url="https://test.openai.azure.com/openai/deployments/gpt-image-1/images/generations",
+            status_code=429,
+            content=json.dumps({"error": {"code": "429", "message": "Requests to the deployment have exceeded the rate limit."}}),
+            headers=_TestData.AZURE_RETRY_AFTER_HEADERS,
+        )
+        with pytest.raises(httpx.HTTPStatusError) as exc_info:
+            response.raise_for_status()
+
+        metadata = extract_azure_metadata(exc_info.value)
+
+        assert metadata.retry_after_seconds == _TestData.AZURE_RETRY_AFTER_MS_SECONDS
+        _assert_classified(metadata=metadata, family=InferenceErrorFamily.IMG_GEN, expected_error_code=CoreCode.PROVIDER_RATE_LIMITED)

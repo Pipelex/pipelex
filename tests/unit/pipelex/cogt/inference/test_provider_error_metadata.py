@@ -184,6 +184,11 @@ class TestProviderErrorMetadata:
             ("anthropic", "prompt is too long: 208310 tokens > 200000 maximum", None, None, True),
             ("anthropic_with_max_tokens", "input length and `max_tokens` exceed context limit: 197202 + 8192 > 200000", None, None, True),
             ("bedrock", "Input is too long for requested model.", None, None, True),
+            ("bedrock_nova", "Input Tokens Exceeded: Number of input tokens exceeds maximum length.", "ValidationException", None, True),
+            ("bedrock_titan", "Too many input tokens. Max input tokens: 8192, request input token count: 9000", "ValidationException", None, True),
+            ("bedrock_openai_engine", "prompt tokens (300000) exceed model maximum (262144)", "ValidationException", None, True),
+            # Bedrock's throttle, whose "too many tokens" names no window
+            ("bedrock_throttle_wording", "Too many tokens per day, please wait before trying again.", "ThrottlingException", None, False),
             ("gemini", "The input token count (1234567) exceeds the maximum number of tokens allowed (1048576).", None, None, True),
             (
                 "a_parameter_refused",

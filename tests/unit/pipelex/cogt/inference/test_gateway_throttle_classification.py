@@ -24,31 +24,31 @@ if TYPE_CHECKING:
 _ORIGIN = "https://gateway.example.com"
 
 
-def _gateway_response(*, body: dict[str, Any], retry_after: str) -> tuple[httpx.Request, httpx.Response]:
+def _gateway_response(*, body: dict[str, Any], retry_after: str, extra_headers: dict[str, str] | None = None) -> tuple[httpx.Request, httpx.Response]:
     request = httpx.Request("POST", f"{_ORIGIN}/v1/images/generations")
     response = httpx.Response(
         status_code=429,
         request=request,
         content=json.dumps(body).encode(),
-        headers={"content-type": "application/json", "retry-after": retry_after},
+        headers={"content-type": "application/json", "retry-after": retry_after, **(extra_headers or {})},
     )
     return request, response
 
 
-def _as_portkey_raises_it(*, body: dict[str, Any], retry_after: str) -> BaseException:
+def _as_portkey_raises_it(*, body: dict[str, Any], retry_after: str, extra_headers: dict[str, str] | None = None) -> BaseException:
     """Build the exception through Portkey's own factory, which keeps only the message string on ``body``."""
-    request, response = _gateway_response(body=body, retry_after=retry_after)
+    request, response = _gateway_response(body=body, retry_after=retry_after, extra_headers=extra_headers)
     client = Portkey(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
     return client._make_status_error_from_response(request=request, response=response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
 
-def _as_portkey_s_vendored_openai_raises_it(*, body: dict[str, Any], retry_after: str) -> BaseException:
+def _as_portkey_s_vendored_openai_raises_it(*, body: dict[str, Any], retry_after: str, extra_headers: dict[str, str] | None = None) -> BaseException:
     """Build the exception through the OpenAI client Portkey vendors, the hop a gateway's image call takes.
 
     Its factory renders the whole body into the message and keeps the ``error`` section on ``body``, which is the
     shape of the refusal's diagnostics on the hosted API.
     """
-    _, response = _gateway_response(body=body, retry_after=retry_after)
+    _, response = _gateway_response(body=body, retry_after=retry_after, extra_headers=extra_headers)
     client = portkey_vendored_openai.OpenAI(api_key="unused-in-this-test", base_url=f"{_ORIGIN}/v1")
     return client._make_status_error_from_response(response)  # ruff: ignore[private-member-access]  # pyright: ignore[reportPrivateUsage]
 
@@ -98,6 +98,20 @@ class TestGatewayThrottleClassification:
         assert problem.code == CoreCode.PROVIDER_RATE_LIMITED
         assert problem.is_retryable is True
         assert problem.retry_after == 57
+
+    @pytest.mark.parametrize("raise_it", _HOPS)
+    def test_azure_s_delay_in_milliseconds_is_read_before_its_seconds(self, raise_it: Callable[..., BaseException]) -> None:
+        """Azure sends its delay twice, in milliseconds and in rounded seconds, and the milliseconds are the wait read."""
+        exc = raise_it(
+            body=GatewayThrottleTestData.AZURE_RATE_LIMIT_BODY,
+            retry_after=GatewayThrottleTestData.AZURE_RETRY_AFTER,
+            extra_headers={"retry-after-ms": GatewayThrottleTestData.AZURE_RETRY_AFTER_MS},
+        )
+
+        metadata = extract_gateway_metadata(exc)
+
+        assert metadata.retry_after_seconds == GatewayThrottleTestData.AZURE_RETRY_AFTER_MS_SECONDS
+        assert classify_inference_error(metadata, family=InferenceErrorFamily.IMG_GEN).error_code == CoreCode.PROVIDER_RATE_LIMITED
 
     @pytest.mark.parametrize(
         ("error_type", "error_code"),

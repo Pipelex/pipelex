@@ -180,7 +180,7 @@ class _TestCases:
     BEDROCK_QUOTA_CASES: ClassVar[list[tuple[str, str, int, str | None, bool]]] = [
         ("daily_tokens_throttle_429", _Bodies.BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE, 429, "ThrottlingException", False),
         ("service_quota_exceeded_400", _Bodies.BEDROCK_SERVICE_QUOTA_MESSAGE, 400, "ServiceQuotaExceededException", False),
-        ("input_limit_validation_400", _Bodies.BEDROCK_INPUT_LIMIT_MESSAGE, 400, "ValidationException", False),
+        ("input_overflow_validation_400", _Bodies.BEDROCK_NOVA_INPUT_OVERFLOW_MESSAGE, 400, "ValidationException", False),
         ("quota_wording_no_code_400", "Service quota exceeded for this account", 400, None, False),
     ]
 
@@ -222,6 +222,12 @@ class _TestCases:
         ("in_flight_budget_from_anthropic", ProviderName.ANTHROPIC, 402, None, _Bodies.OPENROUTER_IN_FLIGHT_BUDGET_BODY, 2.0, False),
         ("bedrock_service_quota_exceeded", ProviderName.BEDROCK, 400, "ServiceQuotaExceededException", None, None, True),
         ("bedrock_throttling_is_a_plain_429", ProviderName.BEDROCK, 429, "ThrottlingException", None, None, False),
+        # Claude on Bedrock, through the Anthropic SDK, carries Bedrock's code from its error-type header
+        ("claude_on_bedrock_service_quota_exceeded", ProviderName.ANTHROPIC, 400, "ServiceQuotaExceededException", None, None, True),
+        ("anthropic_invalid_request_is_no_throttle", ProviderName.ANTHROPIC, 400, "invalid_request_error", None, None, False),
+        # Groq's flex tier at capacity, on its own status
+        ("groq_flex_capacity_498", ProviderName.OPENAI, 498, None, _Bodies.GROQ_FLEX_CAPACITY_BODY["error"], None, True),
+        ("a_498_from_another_dialect", ProviderName.MISTRAL, 498, None, None, None, False),
     ]
 
     CONTENT_POLICY_CASES: ClassVar[list[tuple[str, str, bool]]] = [

@@ -44,6 +44,10 @@ class GatewayThrottleTestData:
     AZURE_RATE_LIMIT_CODE: ClassVar[str] = "RateLimitReached"
     # The delay the gateway forwards from Azure in the `retry-after` header
     AZURE_RETRY_AFTER: ClassVar[str] = "57"
+    # The same delay in milliseconds, the `retry-after-ms` Azure OpenAI sends beside `retry-after` on a 429
+    # (https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/provisioned-get-started); the value is built
+    AZURE_RETRY_AFTER_MS: ClassVar[str] = "56400"
+    AZURE_RETRY_AFTER_MS_SECONDS: ClassVar[float] = 56.4
     # The whole body the gateway answered with, at HTTP 429
     AZURE_RATE_LIMIT_BODY: ClassVar[dict[str, Any]] = {
         "error": {
@@ -273,8 +277,30 @@ class DirectProviderQuotaTestData:
     # Bedrock's throttle for an account whose daily token quota is spent, verbatim from AWS re:Post
     # (https://repost.aws/questions/QUt6wvrkLHQwq6yq52nVADvA/all-bedrock-model-quotas-stuck-at-0-tokens-day-cannot-make-any-api-calls)
     BEDROCK_DAILY_TOKENS_THROTTLE_MESSAGE: ClassVar[str] = "Too many tokens per day, please wait before trying again."
-    # Built: a Bedrock validation refusal whose words name a limit, which the former word list read as a spent quota
-    BEDROCK_INPUT_LIMIT_MESSAGE: ClassVar[str] = "Input token limit exceeded for this model."
+    # Amazon Nova's refusal of an input over its window, as LibreChat's measured table of overflow signatures records it
+    # (https://github.com/LibreChat-AI/agents/blob/main/docs/context-overflow-signatures.md)
+    BEDROCK_NOVA_INPUT_OVERFLOW_MESSAGE: ClassVar[str] = "Input Tokens Exceeded: Number of input tokens exceeds maximum length."
+    # Built around the fragment langchain-aws, LiteLLM and inspect_ai match for Amazon Titan, no full sentence of which
+    # was found
+    BEDROCK_TITAN_INPUT_OVERFLOW_MESSAGE: ClassVar[str] = "Too many input tokens. Max input tokens: 8192, request input token count: 9000"
+    # Built from the pattern LiteLLM reads for the models Bedrock serves through its OpenAI-compatible engine, such as Kimi
+    BEDROCK_OPENAI_ENGINE_INPUT_OVERFLOW_MESSAGE: ClassVar[str] = "prompt tokens (300000) exceed model maximum (262144)"
+    # The header Bedrock's REST-JSON protocol names its error in, with the namespace suffix AWS services append, which
+    # Claude on Bedrock answers through the Anthropic SDK beside a body holding a message alone
+    BEDROCK_SERVICE_QUOTA_ERROR_TYPE_HEADER: ClassVar[str] = "ServiceQuotaExceededException:http://internal.amazon.com/coral/com.amazon.bedrock/"
+    BEDROCK_THROTTLING_ERROR_TYPE_HEADER: ClassVar[str] = "ThrottlingException:http://internal.amazon.com/coral/com.amazon.bedrock/"
+
+    # Groq's refusal when its flex tier has no capacity, sent on its own status, 498, with the error it names
+    # `capacity_exceeded` (https://console.groq.com/docs/flex-processing). Built: Groq does not say which field holds that
+    # name, so it sits in the `type` its error guide shows, and the message is ours; the status alone decides.
+    GROQ_FLEX_CAPACITY_BODY: ClassVar[dict[str, Any]] = {
+        "error": {"message": "Flex tier capacity exceeded, please try again later.", "type": "capacity_exceeded"}
+    }
+
+    # Azure OpenAI's two delay headers on a 429, the milliseconds first, which the OpenAI SDK prefers
+    # (https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/provisioned-get-started)
+    AZURE_RETRY_AFTER_HEADERS: ClassVar[dict[str, str]] = {"retry-after-ms": "4500", "retry-after": "5"}
+    AZURE_RETRY_AFTER_MS_SECONDS: ClassVar[float] = 4.5
     # Bedrock's service-quota refusal, with AWS's documented description
     # (https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html)
     BEDROCK_SERVICE_QUOTA_MESSAGE: ClassVar[str] = (
