@@ -8,7 +8,8 @@ provider-specific branching and no SDK imports.
 
 Every provider-specific nuance has already been normalized into the metadata
 by the Extract step (e.g. Google's ``code`` becomes ``status_code``;
-quota-vs-rate-limit is decided by the ``is_quota_exhaustion`` property). The
+quota-vs-rate-limit is decided by the ``is_quota_exhaustion`` and ``is_rate_limit``
+properties). The
 HTTP status code drives classification; status-less errors dispatch on the
 SDK exception type name.
 
@@ -312,9 +313,12 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
 
     # Quota exhaustion is decided by the provider-aware ``is_quota_exhaustion``
     # property and takes precedence over the HTTP status: providers signal it on
-    # different statuses (OpenAI/Anthropic 429, Mistral/Gateway 402, AWS 400). A
-    # gateway's 429 is a quota only on the provider's quota code; any other 429
-    # falls through to the arm below and is a rate limit.
+    # different statuses (a 429 with a quota code, a 402, Anthropic's 400 for a
+    # spent credit). Every rule reads the provider's structure, its status and its
+    # code or type; a 429 that carries no quota signal falls through to the arm
+    # below and is a rate limit, as is a throttle a provider documents on another
+    # status: OpenRouter's 402 for its in-flight budget, Bedrock's 400
+    # `ServiceQuotaExceededException`.
     if metadata.is_quota_exhaustion:
         return ClassificationResult(
             category=InferenceErrorCategory.CAPACITY,
@@ -322,7 +326,7 @@ def classify_inference_error(metadata: SDKErrorEnvelope, *, family: InferenceErr
             error_code=CoreCode.PROVIDER_QUOTA_EXHAUSTED,
         )
 
-    if status_code == 429:
+    if metadata.is_rate_limit:
         return ClassificationResult(
             category=InferenceErrorCategory.TRANSIENT,
             user_action_kind=UserActionKind.WAIT_AND_RETRY,

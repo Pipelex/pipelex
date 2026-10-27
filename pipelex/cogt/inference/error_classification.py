@@ -1,8 +1,8 @@
 """Helpers for classifying SDK errors into InferenceErrorCategory values.
 
-Pure functions that inspect error statuses, codes and messages to discriminate
-between quota exhaustion vs rate limiting, detect content policy violations, and
-recover the underlying SDK exception that ``InstructorRetryException``
+Pure functions that inspect error statuses and codes to discriminate a spent
+quota from a rate limit, inspect messages to detect content policy violations,
+and recover the underlying SDK exception that ``InstructorRetryException``
 wraps when ``instructor`` exhausts its retry loop.
 """
 
@@ -110,28 +110,73 @@ class ProviderErrorMetadata(BaseModel):
 
     @property
     def is_quota_exhaustion(self) -> bool:
-        """Whether this error is a quota/credits exhaustion rather than rate limiting.
+        """Whether the provider said, in its status or its structured error, that a quota or a credit is spent.
 
-        Dispatches on ``provider`` because each provider signals quota
-        exhaustion differently; Mistral and Gateway also use HTTP 402. A
-        gateway relays every provider's prose, so its rule reads the status and
-        the provider's error code alone, never the message.
+        A spent quota and a rate limit both refuse the call, often on the same status, and differ only in what cures
+        them: time cures a rate limit, and only a person cures a spent quota. Each provider signals a spent quota in its
+        own structure, so the rule dispatches on ``provider`` and reads the provider's status and its error code or
+        type, never the words of its message, with one exception: Anthropic, whose credit-balance and self-set spend
+        limit refusals carry nothing but their sentence on a 400 (see ``_is_quota_exhaustion_anthropic``). When the
+        structure says nothing either way, a 429 is a rate limit (see ``is_rate_limit``). The providers whose arm
+        returns ``False`` reach a spent quota through the classifier's status ladder alone, which reads every 402 as
+        one, or, for Linkup, through its typed exception.
+        """
+        if self.is_throttle_on_another_status:
+            return False
+        status_code = self.status_code or 0
+        match self.provider:
+            case ProviderName.OPENAI:
+                return _is_quota_exhaustion_openai(
+                    status_code=status_code,
+                    provider_error_code=self.provider_error_code,
+                    body_error_code=error_code_from_body_code_first(self.body),
+                )
+            case ProviderName.ANTHROPIC:
+                return _is_quota_exhaustion_anthropic(status_code=status_code, error_type=self.provider_error_code, body=self.body)
+            case ProviderName.GOOGLE | ProviderName.MISTRAL:
+                # Both answer a spent balance with a 402 and every rate limit with a 429, a daily or monthly cap that a
+                # person may have to raise included, so the status alone decides.
+                return status_code == 402
+            case ProviderName.GATEWAY:
+                return _is_quota_exhaustion_gateway(status_code=status_code, provider_error_code=self.provider_error_code)
+            case (
+                ProviderName.BEDROCK
+                | ProviderName.AZURE
+                | ProviderName.FAL
+                | ProviderName.HUGGINGFACE
+                | ProviderName.LINKUP
+                | ProviderName.TYPESAFE
+                | ProviderName.DOCLING
+                | ProviderName.PYPDFIUM2
+            ):
+                # Bedrock is billed to the AWS account, with no balance to spend, and every error AWS calls a quota is a
+                # rate quota: `ThrottlingException` on a 429, and `ServiceQuotaExceededException`, which AWS says can
+                # be resubmitted later and which `is_throttle_on_another_status` reads.
+                return False
+
+    @property
+    def is_throttle_on_another_status(self) -> bool:
+        """Whether the provider documents this refusal, on a status other than 429, as a throttle that a wait cures.
+
+        OpenRouter, an OpenAI-dialect backend, answers a request its in-flight spending budget cannot hold yet with a
+        402 whose ``error.metadata.limit_source`` is ``openrouter_in_flight_budget``, and sends a ``Retry-After`` with
+        it when the budget frees itself as the running requests settle. Its documentation says that a 402 without that
+        header is not a wait-and-retry case, so both are required. Bedrock answers ``ServiceQuotaExceededException`` on
+        a 400, and AWS documents it as a request over the account's service quota that "you can resubmit later".
         """
         match self.provider:
             case ProviderName.OPENAI:
-                return _is_quota_exhaustion_openai(self.message)
-            case ProviderName.ANTHROPIC:
-                return _is_quota_exhaustion_anthropic(self.message)
-            case ProviderName.GOOGLE:
-                return _is_quota_exhaustion_google(self.message)
-            case ProviderName.MISTRAL:
-                return _is_quota_exhaustion_mistral(self.message, status_code=self.status_code or 0)
+                return _is_in_flight_budget_throttle_openrouter(
+                    status_code=self.status_code, retry_after_seconds=self.retry_after_seconds, body=self.body
+                )
             case ProviderName.BEDROCK:
-                return _is_quota_exhaustion_aws(self.message, provider_error_code=self.provider_error_code)
-            case ProviderName.GATEWAY:
-                return _is_quota_exhaustion_gateway(status_code=self.status_code or 0, provider_error_code=self.provider_error_code)
+                return self.provider_error_code == _AWS_SERVICE_QUOTA_EXCEEDED_ERROR_CODE
             case (
-                ProviderName.AZURE
+                ProviderName.ANTHROPIC
+                | ProviderName.GOOGLE
+                | ProviderName.MISTRAL
+                | ProviderName.GATEWAY
+                | ProviderName.AZURE
                 | ProviderName.FAL
                 | ProviderName.HUGGINGFACE
                 | ProviderName.LINKUP
@@ -140,6 +185,17 @@ class ProviderErrorMetadata(BaseModel):
                 | ProviderName.PYPDFIUM2
             ):
                 return False
+
+    @property
+    def is_rate_limit(self) -> bool:
+        """Whether the provider refused the call for a limit that time cures, which the classifier reads as a rate limit.
+
+        Every 429 that carries no spent-quota signal is one, whatever its message says, and so is a throttle a provider
+        documents on another status (see ``is_throttle_on_another_status``).
+        """
+        if self.is_throttle_on_another_status:
+            return True
+        return self.status_code == 429 and not self.is_quota_exhaustion
 
     @property
     def is_model_not_allowed(self) -> bool:
@@ -234,21 +290,6 @@ class UserAction(BaseModel):
     detail: str
 
 
-_OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (
-    "insufficient_quota",
-    "exceeded your current quota",
-)
-
-_ANTHROPIC_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota exceeded",
-    "quota has been",
-    "credit balance",
-    "out of credits",
-    "insufficient credit",
-    "billing limit",
-    "billing issue",
-)
-
 _CONTENT_POLICY_PATTERNS: tuple[str, ...] = (
     "content_policy",
     "content_filter",
@@ -286,40 +327,15 @@ _CONTEXT_WINDOW_PATTERNS: tuple[str, ...] = (
     "exceeds the maximum number of tokens allowed",
 )
 
-_GOOGLE_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota exceeded",
-    "resource has been exhausted",
-    "billing limit",
-    "billing quota",
-    "billing exceeded",
-    "billing account",
-)
-
-_MISTRAL_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota",
-    "billing limit",
-    "billing quota",
-    "out of credits",
-    "insufficient credits",
-)
-
-_AWS_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota",
-    "limit exceeded",
-    "service quota",
-)
-
-# The provider error codes that make a gateway's 429 a spent quota rather than a rate limit. A gateway relays every
-# provider's prose, so the message decides nothing: Azure's throttle links to its quota-increase page, and Google's
-# per-minute limit says "check quota". A code joins this set only when the provider that sends it documents it as a
-# spent quota on a 429, with a comment naming that provider and a test case. A 402 needs no entry, since its status
-# decides it, and a gateway's own codes are read from the service error vocabulary before this rule runs.
-_GATEWAY_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
+# The error codes that make an OpenAI-dialect 429 a spent quota rather than a rate limit, each one OpenAI's error-code
+# guide documents for a billing refusal (https://developers.openai.com/api/docs/guides/error-codes). OpenAI names each
+# billing cause in `error.code` and says `error.type` can still be `insufficient_quota`, so the rule reads both. Every
+# other 429, the rate limits and OpenAI's `slow_down` included, is a rate limit, whatever its message says: "You
+# exceeded your current quota" is also Gemini's wording for its per-minute throttle, which an OpenAI-dialect backend
+# pointed at Google relays.
+_OPENAI_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
     {
-        # OpenAI's codes for a spent quota on a 429, which Azure OpenAI and the OpenAI-compatible providers relay in the
-        # same fields (https://developers.openai.com/api/docs/guides/error-codes). OpenAI names each billing cause in
-        # `error.code` and says `error.type` can still be `insufficient_quota`; the gateway's Extract step reads the
-        # body's code before its type, so the specific codes are listed beside the broad one.
+        # the broad code and type, and the long-standing code of a spent quota
         "insufficient_quota",
         # no prepaid credits remaining
         "credit_balance_exhausted",
@@ -332,50 +348,119 @@ _GATEWAY_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
     }
 )
 
+# OpenRouter's `error.metadata.limit_source` for a 402 that its in-flight spending budget, not the account's balance,
+# caused: the budget frees itself as the running requests settle
+# (https://openrouter.ai/docs/api_reference/limits.md#handling-402-errors).
+_OPENROUTER_IN_FLIGHT_BUDGET_LIMIT_SOURCE = "openrouter_in_flight_budget"
 
-def _is_quota_exhaustion_openai(error_message: str) -> bool:
-    """Check if an OpenAI error message indicates quota/credits exhaustion rather than rate limiting."""
-    lower_message = error_message.lower()
-    return any(pattern in lower_message for pattern in _OPENAI_QUOTA_PATTERNS)
+# Anthropic's error type for a billing refusal, documented on a 402 (https://platform.claude.com/docs/en/api/errors)
+_ANTHROPIC_BILLING_ERROR_TYPE = "billing_error"
+
+# Anthropic's `error.details.error_code` on the 429 its tier's monthly spend cap answers, whose type is
+# `rate_limit_error` like a rate limit's and which carries no `retry-after`
+# (https://platform.claude.com/docs/en/api/rate-limits#reaching-your-spend-cap)
+_ANTHROPIC_SPEND_CAP_ERROR_CODE = "enforced_spend_limit_reached"
+
+# Anthropic's error type for a malformed request, which its credit-balance and self-set spend-limit refusals share
+_ANTHROPIC_INVALID_REQUEST_ERROR_TYPE = "invalid_request_error"
+
+# How Anthropic's 400 `invalid_request_error` refusals for a spent credit or spend limit begin, lowercased. Anthropic
+# sends no structured signal for them: they share their status and type with every malformed request, so their sentence
+# is the only signal, and it is read on that status and type alone, anchored at the message's start.
+_ANTHROPIC_QUOTA_MESSAGE_PREFIXES: tuple[str, ...] = (
+    # The credit balance, documented nowhere; an SDK maintainer confirmed its status and type
+    # (https://github.com/anthropics/anthropic-sdk-typescript/issues/618)
+    "your credit balance is too low",
+    # The organization's and the workspace's own spend limits
+    # (https://platform.claude.com/docs/en/api/rate-limits#setting-your-own-spend-limit)
+    "you have reached your specified api usage limits",
+    "you have reached your specified workspace api usage limits",
+)
+
+# AWS's error code for a request over the account's Bedrock service quota, answered on a 400, which "you can resubmit
+# later" (https://docs.aws.amazon.com/bedrock/latest/APIReference/API_runtime_InvokeModel.html): a throttle, not a
+# spent quota, since Bedrock is billed to the AWS account with no balance to spend.
+_AWS_SERVICE_QUOTA_EXCEEDED_ERROR_CODE = "ServiceQuotaExceededException"
+
+# The provider error codes that make a gateway's 429 a spent quota rather than a rate limit. A gateway relays every
+# provider's prose, so the message decides nothing: Azure's throttle links to its quota-increase page, and Google's
+# per-minute limit says "check quota". A code joins this set only when the provider that sends it documents it as a
+# spent quota on a 429, with a comment naming that provider and a test case. A 402 needs no entry, since its status
+# decides it, and a gateway's own codes are read from the service error vocabulary before this rule runs.
+_GATEWAY_QUOTA_ERROR_CODES: frozenset[str] = frozenset(
+    {
+        # OpenAI's codes, which Azure OpenAI and the OpenAI-compatible providers relay in the same fields. The gateway's
+        # Extract step reads the body's code before its type, so the specific billing codes are there beside the broad
+        # one.
+        *_OPENAI_QUOTA_ERROR_CODES,
+    }
+)
 
 
-def _is_quota_exhaustion_anthropic(error_message: str) -> bool:
-    """Check if an Anthropic error message indicates quota/credits exhaustion rather than rate limiting."""
-    lower_message = error_message.lower()
-    return any(pattern in lower_message for pattern in _ANTHROPIC_QUOTA_PATTERNS)
+def _error_sections(body: Any) -> list[dict[str, Any]]:
+    """The places an error body may hold its fields: its nested ``error`` section first, then its top level.
+
+    Most providers nest their error under ``error``, and the OpenAI client pre-unwraps that section onto the body it
+    keeps, which leaves the fields at the top level.
+    """
+    if not isinstance(body, dict):
+        return []
+    body_dict = cast("dict[str, Any]", body)
+    sections: list[dict[str, Any]] = []
+    error_section = body_dict.get("error")
+    if isinstance(error_section, dict):
+        sections.append(cast("dict[str, Any]", error_section))
+    sections.append(body_dict)
+    return sections
 
 
-def _is_quota_exhaustion_google(error_message: str) -> bool:
-    """Check if a Google error message indicates quota/credits exhaustion rather than rate limiting."""
-    lower_message = error_message.lower()
-    return any(pattern in lower_message for pattern in _GOOGLE_QUOTA_PATTERNS)
+def _is_quota_exhaustion_openai(*, status_code: int, provider_error_code: str | None, body_error_code: str | None) -> bool:
+    """Check if an OpenAI-dialect error is a spent quota, from its status and its error code and type alone.
 
-
-def _is_quota_exhaustion_mistral(error_message: str, *, status_code: int) -> bool:
-    """Check if a Mistral error indicates quota/credits exhaustion.
-
-    HTTP 402 (Payment Required) is a definitive quota signal.
-    HTTP 429 requires message inspection to distinguish quota from rate limiting.
+    A 402 is a spent quota, as OpenRouter answers insufficient credits, except its in-flight budget's throttle, which
+    ``ProviderErrorMetadata.is_quota_exhaustion`` sets aside first. A 429 is a spent quota only when its error code or
+    type is one of ``_OPENAI_QUOTA_ERROR_CODES``. The Extract step keeps the type before the code, so the rule reads
+    both: ``provider_error_code``, the type when there is one, and ``body_error_code``, the code when there is one.
     """
     if status_code == 402:
         return True
-    lower_message = error_message.lower()
-    return status_code == 429 and any(pattern in lower_message for pattern in _MISTRAL_QUOTA_PATTERNS)
+    return status_code == 429 and (provider_error_code in _OPENAI_QUOTA_ERROR_CODES or body_error_code in _OPENAI_QUOTA_ERROR_CODES)
 
 
-def _is_quota_exhaustion_aws(error_message: str, *, provider_error_code: str | None) -> bool:
-    """Check if an AWS error indicates quota/credits exhaustion rather than rate limiting.
+def _is_in_flight_budget_throttle_openrouter(*, status_code: int | None, retry_after_seconds: float | None, body: Any) -> bool:
+    """Check if an OpenAI-dialect 402 is OpenRouter's in-flight budget throttle, sent with the wait that cures it."""
+    if status_code != 402 or retry_after_seconds is None:
+        return False
+    for section in _error_sections(body):
+        error_metadata = section.get("metadata")
+        if isinstance(error_metadata, dict):
+            return cast("dict[str, Any]", error_metadata).get("limit_source") == _OPENROUTER_IN_FLIGHT_BUDGET_LIMIT_SOURCE
+    return False
 
-    AWS botocore puts the canonical signal in the error ``Code`` (e.g.
-    ``ServiceQuotaExceededException``), which ``extract_bedrock_metadata`` surfaces
-    as ``provider_error_code``. Some payloads also echo the situation in the
-    ``Message`` text — we check both so a quota exception with a vague message is
-    still detected.
+
+def _is_quota_exhaustion_anthropic(*, status_code: int, error_type: str | None, body: Any) -> bool:
+    """Check if an Anthropic error is a spent quota or credit, from its status, its error type and its details.
+
+    A 402, or an error of type ``billing_error`` on any status, is a billing refusal. A 429 is a spent quota only when
+    its ``error.details.error_code`` is ``enforced_spend_limit_reached``, the tier's monthly spend cap; every other 429
+    is a rate limit. A 400 of type ``invalid_request_error`` is a spent quota when its message begins with one of
+    ``_ANTHROPIC_QUOTA_MESSAGE_PREFIXES``: Anthropic answers a spent credit balance and a spend limit the organization
+    set itself with nothing but that sentence, so it is the one refusal any rule reads from the provider's words.
+    The details and the message are read from the error body, since the message the SDK renders prefixes them.
     """
-    if provider_error_code == "ServiceQuotaExceededException":
+    if status_code == 402 or error_type == _ANTHROPIC_BILLING_ERROR_TYPE:
         return True
-    lower_message = error_message.lower()
-    return any(pattern in lower_message for pattern in _AWS_QUOTA_PATTERNS)
+    error_sections = _error_sections(body)
+    if not error_sections:
+        return False
+    error_section = error_sections[0]
+    if status_code == 429:
+        details = error_section.get("details")
+        return isinstance(details, dict) and cast("dict[str, Any]", details).get("error_code") == _ANTHROPIC_SPEND_CAP_ERROR_CODE
+    if status_code == 400 and error_type == _ANTHROPIC_INVALID_REQUEST_ERROR_TYPE:
+        error_message = error_section.get("message")
+        return isinstance(error_message, str) and error_message.strip().lower().startswith(_ANTHROPIC_QUOTA_MESSAGE_PREFIXES)
+    return False
 
 
 def _is_quota_exhaustion_gateway(*, status_code: int, provider_error_code: str | None) -> bool:
@@ -675,15 +760,7 @@ def error_code_from_body_code_first(body: Any) -> str | None:
     never reaches the classifier. A body carrying only ``code`` reads identically
     through either precedence.
     """
-    if not isinstance(body, dict):
-        return None
-    body_dict = cast("dict[str, Any]", body)
-    error_section = body_dict.get("error")
-    sections: list[dict[str, Any]] = []
-    if isinstance(error_section, dict):
-        sections.append(cast("dict[str, Any]", error_section))
-    sections.append(body_dict)
-    for section in sections:
+    for section in _error_sections(body):
         code = section.get("code") or section.get("type")
         if isinstance(code, str):
             return code
@@ -748,6 +825,42 @@ def _google_provider_error_code_from_details(details: Any) -> str | None:
     return None
 
 
+# The type URL of the detail in which a Google error states the wait it asks for
+_GOOGLE_RETRY_INFO_TYPE = "type.googleapis.com/google.rpc.RetryInfo"
+
+
+def _google_retry_delay_seconds(details: Any) -> float | None:
+    """Read the wait a Google error asks for from its ``google.rpc.RetryInfo`` detail, in seconds.
+
+    The Gemini API states the wait for a 429 ``RESOURCE_EXHAUSTED`` in its body rather than in a ``Retry-After``
+    header: among the error's ``details``, an entry whose ``@type`` is ``google.rpc.RetryInfo`` carries a
+    ``retryDelay``, a protobuf ``Duration`` in its JSON form, seconds with an ``s`` suffix and up to nine fractional
+    digits (``"33s"``, ``"33.470052706s"``). The nested ``error`` section is read first, then the top level, as for the
+    status. A delay that is not a finite, non-negative number of seconds reads as no delay.
+    """
+    for section in _error_sections(details):
+        entries = section.get("details")
+        if not isinstance(entries, list):
+            continue
+        for entry in cast("list[Any]", entries):
+            if not isinstance(entry, dict):
+                continue
+            entry_dict = cast("dict[str, Any]", entry)
+            if entry_dict.get("@type") != _GOOGLE_RETRY_INFO_TYPE:
+                continue
+            retry_delay = entry_dict.get("retryDelay")
+            if not isinstance(retry_delay, str) or not retry_delay.endswith("s"):
+                return None
+            try:
+                seconds = float(retry_delay.removesuffix("s"))
+            except ValueError:
+                return None
+            if math.isfinite(seconds) and seconds >= 0:
+                return seconds
+            return None
+    return None
+
+
 def extract_google_metadata(
     exc: BaseException, *, validated_type: ValidatedType | None = None, sdk_error_types: SdkErrorTypes | None = None
 ) -> ProviderErrorMetadata:
@@ -768,6 +881,9 @@ def extract_google_metadata(
     - ``response`` may be ``None`` or any of ``httpx.Response`` /
       ``requests.Response`` / ``ReplayResponse``. We read ``x-goog-request-id``
       and ``retry-after`` from ``response.headers`` when present.
+    - The Gemini API states the wait for a 429 in the body's ``google.rpc.RetryInfo``
+      detail rather than in a header, so ``retry_after_seconds`` falls back to its
+      ``retryDelay`` when no ``retry-after`` header gave one.
     """
     code = getattr(exc, "code", None)
     status_code = code if isinstance(code, int) else None
@@ -781,6 +897,8 @@ def extract_google_metadata(
             request_id = request_id_value
         retry_after_seconds = parse_retry_after_seconds(headers.get("retry-after"))
     details = getattr(exc, "details", None)
+    if retry_after_seconds is None:
+        retry_after_seconds = _google_retry_delay_seconds(details)
     return ProviderErrorMetadata(
         provider=ProviderName.GOOGLE,
         sdk_exception_type=_resolve_sdk_exception_type(exc, status_code=status_code),

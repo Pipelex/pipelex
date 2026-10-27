@@ -1,34 +1,48 @@
 """Test data for OpenAI worker error handling tests."""
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pipelex.cogt.exceptions import InferenceErrorCategory
+from tests.unit.pipelex.cogt.test_data import DirectProviderQuotaTestData
 
 
 class OpenAIErrorHandlingTestData:
     """Test cases for OpenAI worker SDK exception handling.
 
-    Each tuple: (topic, error_message, expected_category, expected_user_action_substring_or_none)
+    Each tuple: (topic, error_message, expected_category, expected_user_action_substring_or_none), the rate-limit
+    cases carrying the error body after the message.
     """
 
-    RATE_LIMIT_CASES: ClassVar[list[tuple[str, str, InferenceErrorCategory, str | None]]] = [
+    # (topic, error_message, body, expected_category, expected_user_action_substring_or_none), the body being the error
+    # section the OpenAI client keeps: a 429 is a spent quota on OpenAI's quota code or type alone, whatever its words
+    RATE_LIMIT_CASES: ClassVar[list[tuple[str, str, dict[str, Any] | None, InferenceErrorCategory, str | None]]] = [
         (
             "generic_rate_limit",
             "Rate limit exceeded. Please retry after 20s",
+            DirectProviderQuotaTestData.OPENAI_RATE_LIMIT_BODY["error"],
             InferenceErrorCategory.TRANSIENT,
             "run it again",
         ),
         (
             "quota_insufficient",
             "Error: insufficient_quota - you have exceeded your billing limit",
+            DirectProviderQuotaTestData.OPENAI_INSUFFICIENT_QUOTA_BODY["error"],
             InferenceErrorCategory.CAPACITY,
             "billing",
         ),
         (
-            "quota_exceeded",
-            "You exceeded your current quota, please check your plan",
+            "billing_code_beside_the_broad_type",
+            "Your organization has no prepaid credits remaining.",
+            DirectProviderQuotaTestData.OPENAI_CREDIT_BALANCE_EXHAUSTED_BODY["error"],
             InferenceErrorCategory.CAPACITY,
             "billing",
+        ),
+        (
+            "quota_wording_without_a_quota_code",
+            "You exceeded your current quota, please check your plan",
+            None,
+            InferenceErrorCategory.TRANSIENT,
+            "run it again",
         ),
     ]
 

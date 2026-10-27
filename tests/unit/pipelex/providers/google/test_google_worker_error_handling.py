@@ -269,9 +269,9 @@ class TestGoogleWorkerErrorHandling:
         reason="calls the worker below its public method, whose enrichment names the model and the provider"
     )
     async def test_problem_capacity_not_retryable(self, mocker: MockerFixture) -> None:
-        """The problem of a CAPACITY error invites no retry."""
+        """The problem of a CAPACITY error, Gemini's 402 for a Prepay balance at zero, invites no retry."""
         worker = _make_google_llm_worker(mocker)
-        sdk_exc = _make_google_client_error(code=429, message="Resource has been exhausted (e.g. check quota)")
+        sdk_exc = _make_google_client_error(code=402, message="Payment required.")
         worker.genai_async_client.models.generate_content.side_effect = sdk_exc  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
 
         with pytest.raises(LLMCompletionError) as exc_info:

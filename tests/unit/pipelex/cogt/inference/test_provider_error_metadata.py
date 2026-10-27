@@ -94,29 +94,36 @@ class TestProviderErrorMetadata:
     @pytest.mark.parametrize(
         ("_topic", "provider", "message", "status_code", "provider_error_code", "expected"),
         [
-            ("openai_quota", ProviderName.OPENAI, "You exceeded your current quota", None, None, True),
-            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", None, None, False),
-            ("anthropic_credit_balance", ProviderName.ANTHROPIC, "Your credit balance is too low", None, None, True),
+            ("openai_quota_code_429", ProviderName.OPENAI, "You exceeded your current quota", 429, "insufficient_quota", True),
+            # The words decide nothing: a 429 with no quota code is a rate limit
+            ("openai_quota_wording_429_no_code", ProviderName.OPENAI, "You exceeded your current quota", 429, None, False),
+            ("openai_rate_limit", ProviderName.OPENAI, "Rate limit reached", 429, None, False),
+            ("anthropic_billing_error_402", ProviderName.ANTHROPIC, "Error code: 402", 402, "billing_error", True),
+            # Anthropic's spend sentences are read from the body's message alone, which this metadata does not carry
+            ("anthropic_credit_wording_no_body", ProviderName.ANTHROPIC, "Your credit balance is too low", 400, "invalid_request_error", False),
+            ("google_402_is_quota", ProviderName.GOOGLE, "payment required", 402, None, True),
+            ("google_429_quota_wording", ProviderName.GOOGLE, "Resource has been exhausted (e.g. check quota)", 429, "RESOURCE_EXHAUSTED", False),
             ("mistral_402_is_quota", ProviderName.MISTRAL, "payment required", 402, None, True),
-            ("mistral_429_quota_pattern", ProviderName.MISTRAL, "quota exceeded", 429, None, True),
+            ("mistral_429_quota_wording", ProviderName.MISTRAL, "quota exceeded", 429, None, False),
             ("mistral_429_plain_rate_limit", ProviderName.MISTRAL, "too many requests", 429, None, False),
             ("gateway_402_is_quota", ProviderName.GATEWAY, "payment required", 402, None, True),
             ("azure_never_quota", ProviderName.AZURE, "quota exceeded", 429, None, False),
+            # AWS documents it as resubmittable later: a throttle on its 400, not a spent quota
             (
-                "bedrock_quota_by_aws_code_no_message_hint",
+                "bedrock_service_quota_exceeded_is_a_throttle",
                 ProviderName.BEDROCK,
                 "An error occurred",
                 400,
                 "ServiceQuotaExceededException",
-                True,
+                False,
             ),
             (
-                "bedrock_quota_message_keyword",
+                "bedrock_quota_wording_no_code",
                 ProviderName.BEDROCK,
                 "Service quota exceeded for this model",
                 400,
                 None,
-                True,
+                False,
             ),
             (
                 "bedrock_plain_validation_not_quota",

@@ -63,8 +63,9 @@ class TestBedrockWorkerSemantic:
     @pytest.mark.parametrize(
         ("error_code", "error_message", "status_code", "expected_category", "expected_kind"),
         [
-            ("ServiceQuotaExceededException", "Quota exceeded", 400, InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
-            ("ThrottlingException", "Quota limit exceeded for this account", 429, InferenceErrorCategory.CAPACITY, UserActionKind.CHECK_BILLING),
+            # Bedrock has no balance to spend: none of its answers is a spent quota, whatever its words
+            ("ServiceQuotaExceededException", "Quota exceeded", 400, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
+            ("ThrottlingException", "Quota limit exceeded for this account", 429, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             ("ThrottlingException", "Rate exceeded", 429, InferenceErrorCategory.TRANSIENT, UserActionKind.WAIT_AND_RETRY),
             ("AccessDeniedException", "Not authorized", 403, InferenceErrorCategory.CONFIGURATION, UserActionKind.CHECK_CREDENTIALS),
             ("ValidationException", "Invalid request", 400, InferenceErrorCategory.CONTENT, UserActionKind.CHANGE_INPUT),
