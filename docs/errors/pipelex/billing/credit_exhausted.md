@@ -18,7 +18,7 @@ description: "The organization is out of credit: what the Pipelex error code pip
 
 ## What it means
 
-The organization's credit is spent. The platform refuses a run before queueing it, and a model call made once the credit has run out is refused as well.
+The organization's credit is spent. The hosted platform keeps two credit ledgers, inference credit and usage credit, and refuses a run before queueing it while either is at zero or below, naming the ledger that refused it in `params.ledger`. A model call made once the credit has run out is refused as well, and names no ledger.
 
 ## What to do
 
@@ -41,7 +41,11 @@ The problem's `detail` is written from this template, filled with the occurrence
 
 ## Parameters
 
-This code declares no parameters, so its problems carry no `params`.
+A parameter is present on every occurrence of the code unless it is marked optional, and one marked operator-only reaches only whoever runs the runtime, never a caller.
+
+| Name | Type | Description |
+|---|---|---|
+| `ledger` | one of `inference`, `usage` (optional) | The credit ledger whose balance refused the operation: the organization's inference credit or its usage credit. |
 
 ## See also
 

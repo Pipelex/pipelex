@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.93.1] - 2026-10-28
+
+### Added
+
+- **`pipelex.billing.credit_exhausted` names the credit ledger that ran out**: the code declares an optional `ledger` parameter, `inference` or `usage`, so the hosted platform's refusal of a run says whether the organization's inference credit or its usage credit is spent, and `BillingCreditExhaustedParams` gains the `ledger` field. A model call refused once the credit has run out names no ledger, as before.
+
 ## [v0.93.0] - 2026-10-27
 
 ### Fixed
