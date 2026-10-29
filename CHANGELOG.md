@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **The API server checks a `files` map's blobs last**: as the MTHDS Protocol `2.0.1` orders a map's refusals, a map holding a key the tree's rule refuses, colliding keys or a malformed entry is refused for that before any blob it names is read, where a hash held at another size than its entry states answered `422` `request.invalid`, and a damaged stored blob `500` `pipelex.storage.damaged`, ahead of the key's own refusal.
+
 ## [v0.93.1] - 2026-10-28
 
 ### Added

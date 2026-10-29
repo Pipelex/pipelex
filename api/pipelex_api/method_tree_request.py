@@ -15,20 +15,25 @@ What this module does, in order:
 1. Every limit of this runner on a tree (`MAX_METHOD_TREE_FILES`, `MAX_METHOD_TREE_TOTAL_KIB`,
    `MAX_METHOD_TREE_FILE_KIB`) is checked on the sizes the entries state, before any blob is read: a 422
    `method.package_invalid` whose `reason` names the limit and whose `limit` gives it.
-2. The bytes of every hash entry are read from the runner's blob store, under the caller's scope, at once.
-3. The map is read (`read_file_map`): a refusal of the standard is a 422 `method.package_invalid` whose `reason` is the
+2. A map naming bytes by hash is read once holding no bytes, which applies every rule of the standard but the last: a
+   map breaking any other rule is refused, as step 4 answers it, before the blob store is read. The standard checks a
+   map's keys, then the entries of the keys it admits, and whether the runner holds the bytes a hash entry names last,
+   never for a key it refuses (MTHDS Protocol 2.0.1, "Method files"), so what the blob store holds never decides the
+   refusal of a map the standard refuses for anything else.
+3. The bytes of every hash entry are read from the runner's blob store, under the caller's scope, at once.
+4. The map is read (`read_file_map`): a refusal of the standard is a 422 `method.package_invalid` whose `reason` is the
    refusal's code and whose `path` is the first path it names, except a key leaving the tree, which is the security
    refusal `security.input_path_refused`, and an entry of the wrong shape, which is `request.invalid`; hash entries the
    store does not hold at their stated size are one 422 `request.blobs_missing` whose `missing_blobs` parameter lists
    every such hash.
-4. The files `resources` sends join the tree (`with_resources`), the same bytes under a path the tree holds or a new
+5. The files `resources` sends join the tree (`with_resources`), the same bytes under a path the tree holds or a new
    file at a tree path; other bytes under a path the tree holds are a 422 `request.invalid` naming `resources`.
-5. Python is honored only on a sandbox-hosted deployment: a method holding a `.py` file is refused with a 501
+6. Python is honored only on a sandbox-hosted deployment: a method holding a `.py` file is refused with a 501
    `pipelex.deployment.custom_code_requires_sandbox` before anything is written, and on a sandbox-hosted deployment a
    tree declaring a Python structure class is refused (`MethodStructuresRefusedError`, a 422).
-6. Each tree read in full is recorded in the blob store, its files then its listing, so the next request can send it
+7. Each tree read in full is recorded in the blob store, its files then its listing, so the next request can send it
    by hash, and `POST /v1/blobs/missing` answers its digest with one lookup.
-7. The trees are written out into a temporary directory and held as written (`pipelex.libraries.written_trees`), so
+8. The trees are written out into a temporary directory and held as written (`pipelex.libraries.written_trees`), so
    the load reads them back as written and names their files by their tree paths, then removed when the request ends.
 """
 
@@ -418,6 +423,63 @@ def _refuse_map(*, refusal_error: MethodTreeRefusedError, label: str, field: str
             raise RequestMethodError(msg, file=first_name).with_params(reason=refusal.code, path=first_name) from refusal_error
 
 
+def _refuse_source(*, source_error: TreeSourceError, label: str, field: str) -> NoReturn:
+    """Answer a map the standard's reader cannot take as a source of a tree, such as one nested too deep, as `request.invalid`."""
+    msg = f"{label} is not a method tree. {source_error.message}"
+    raise RunnerRequestError(msg, field=field) from source_error
+
+
+def _is_only_missing_bytes(*, code: TreeRefusalCode) -> bool:
+    """Whether a refusal of a map read holding no bytes says the map breaks no rule but the bytes its hash entries name."""
+    match code:
+        case TreeRefusalCode.MISSING_BLOB:
+            return True
+        case (
+            TreeRefusalCode.SYMBOLIC_LINK
+            | TreeRefusalCode.SPECIAL_FILE
+            | TreeRefusalCode.INVALID_TREE_PATH
+            | TreeRefusalCode.NORMALIZATION_COLLISION
+            | TreeRefusalCode.PATH_COLLISION
+            | TreeRefusalCode.EMPTY_TREE
+            | TreeRefusalCode.LONE_FILE_EXCLUDED
+            | TreeRefusalCode.GITIGNORE_NOT_UTF8
+            | TreeRefusalCode.DUPLICATE_KEY
+            | TreeRefusalCode.EXCLUDED_NAME
+            | TreeRefusalCode.MALFORMED_ENTRY
+            | TreeRefusalCode.REFERENCE_INVALID
+            | TreeRefusalCode.REFERENCE_LEAVES_TREE
+            | TreeRefusalCode.REFERENCE_NOT_A_TREE_PATH
+            | TreeRefusalCode.REFERENCE_NOT_IN_TREE
+            | TreeRefusalCode.REFERENCE_IN_ONE_FILE_TREE
+            | TreeRefusalCode.FUNCTION_NAME_WITHOUT_MODULE
+            | TreeRefusalCode.FUNCTION_NAME_INVALID_SEGMENT
+            | TreeRefusalCode.MODULE_NOT_IN_TREE
+            | TreeRefusalCode.MODULE_AMBIGUOUS
+        ):
+            return False
+
+
+def _refuse_map_before_its_bytes(*, document: str, label: str, field: str) -> None:
+    """Refuse a map that names bytes by hash for any rule it breaks but the holding of those bytes, before any is read.
+
+    The standard checks a map's keys, then the entries of the keys it admits, and whether the receiver holds the bytes
+    each hash entry names last, only for a map that breaks no other rule (MTHDS Protocol 2.0.1, "Method files", and the
+    method tree's "The File Entry"). Reading the blobs first would let what the blob store holds decide the refusal of a
+    map the standard refuses for a key or an entry: a hash held at another size than its entry states would answer
+    `request.invalid`, and a damaged blob a 500, for a map holding `inputs.json`. So the map is read once holding no
+    bytes, which applies every check but the last: a refusal for missing blobs says the map breaks no other rule, and
+    any other refusal is answered here, before the blob store is read. The map is parsed twice, which costs less than
+    the reads it spares a map refused anyway.
+    """
+    try:
+        read_file_map(document)
+    except MethodTreeRefusedError as exc:
+        if not _is_only_missing_bytes(code=exc.refusal.code):
+            _refuse_map(refusal_error=exc, label=label, field=field)
+    except TreeSourceError as exc:
+        _refuse_source(source_error=exc, label=label, field=field)
+
+
 async def _held_blobs(*, blob_store: RunnerBlobStore, stated_sizes: dict[str, set[int]], label: str, field: str) -> BlobStore:
     """The bytes a map's hash entries name that the blob store holds, each read in one request bounded by its stated size.
 
@@ -469,14 +531,14 @@ async def read_request_tree(
             label=label,
         )
         if census.stated_sizes and blob_store is not None:
+            _refuse_map_before_its_bytes(document=document, label=label, field=field)
             held = await _held_blobs(blob_store=blob_store, stated_sizes=census.stated_sizes, label=label, field=field)
     try:
         reading = read_file_map(document, blob_store=held)
     except MethodTreeRefusedError as exc:
         _refuse_map(refusal_error=exc, label=label, field=field)
     except TreeSourceError as exc:
-        msg = f"{label} is not a method tree. {exc.message}"
-        raise RunnerRequestError(msg, field=field) from exc
+        _refuse_source(source_error=exc, label=label, field=field)
     request_tree = RequestTree(tree=reading.tree, contents=reading.contents)
     ensure_tree_within_limits(tree=request_tree, label=label)
     return request_tree
