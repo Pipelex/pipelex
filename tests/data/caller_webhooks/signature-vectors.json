@@ -1,5 +1,5 @@
 {
-  "description": "Known-answer vectors of the caller-webhook signature, specs/pipelex-caller-webhooks.md. Every signature was produced by the Standard Webhooks reference library for Python (PyPI standardwebhooks) and is checked against it by tests/caller_webhooks/test_signature_vectors.py. Each body is the exact text of a call, and what is signed is its UTF-8 encoding: a \\u escape in this file stands for the character itself, which the body carries as raw UTF-8. Timestamps and receiver_clock are Unix seconds. The secrets are synthetic: 32 consecutive byte values, base64-encoded after whsec_.",
+  "description": "Known-answer vectors of the caller-webhook signature, specs/pipelex-caller-webhooks.md. Every signature was produced by the Standard Webhooks reference library for Python (PyPI standardwebhooks) and is checked against it by tests/caller_webhooks/test_signature_vectors.py. Each body is the exact text of a call, and what is signed is its UTF-8 encoding: a \\u escape in this file stands for the character itself, which the body carries as raw UTF-8. Timestamps and receiver_clock are Unix seconds. A verification case's headers are as received: their names in any case, and one of the three absent from a call rejected for missing_header. The secrets are synthetic: 32 consecutive byte values, base64-encoded after whsec_.",
   "spec": "specs/pipelex-caller-webhooks.md",
   "timestamp_tolerance_seconds": 300,
   "signing": [
@@ -90,6 +90,84 @@
       "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-24T16:40:12.250Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/pipe.function_raised\",\"title\":\"The method's function failed\",\"detail\":\"The function 'fonctions.r\u00e9sum\u00e9.summarize' of pipe 'summarize_invoice' raised an error.\",\"code\":\"pipe.function_raised\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Fix the function 'fonctions.r\u00e9sum\u00e9.summarize' so that it does not raise on these inputs, then run the method again.\"},\"params\":{\"pipe\":\"summarize_invoice\",\"function\":\"fonctions.r\u00e9sum\u00e9.summarize\"},\"location\":{\"pipe\":\"summarize_invoice\",\"path\":[\"process_invoice\",\"summarize_invoice\"],\"file\":\"fonctions/r\u00e9sum\u00e9.py\"},\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\"}}}",
       "receiver_clock": 1792860016,
       "verdict": "accepted"
+    },
+    {
+      "name": "title_case_header_names_accepted",
+      "description": "The failed_run call with its header names written Webhook-Id, Webhook-Timestamp and Webhook-Signature: HTTP header names are case-insensitive, so a receiver finds each header whatever the case of its name.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "Webhook-Id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "Webhook-Timestamp": "1792670401",
+        "Webhook-Signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "accepted"
+    },
+    {
+      "name": "timestamp_exactly_five_minutes_old_accepted",
+      "description": "The failed_run call received exactly 300 seconds after its webhook-timestamp: five minutes late is still within the tolerance, which refuses only more than 300 seconds.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670701,
+      "verdict": "accepted"
+    },
+    {
+      "name": "timestamp_exactly_five_minutes_ahead_accepted",
+      "description": "The failed_run call received exactly 300 seconds before its webhook-timestamp by the receiver's clock: five minutes early is still within the tolerance, which refuses only more than 300 seconds.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670101,
+      "verdict": "accepted"
+    },
+    {
+      "name": "webhook_id_missing",
+      "description": "The failed_run call without its webhook-id header: a call missing any of the three headers is rejected before its timestamp or signature is looked at.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "missing_header"
+    },
+    {
+      "name": "webhook_timestamp_missing",
+      "description": "The failed_run call without its webhook-timestamp header: a call missing any of the three headers is rejected before its timestamp or signature is looked at.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "missing_header"
+    },
+    {
+      "name": "webhook_signature_missing",
+      "description": "The failed_run call without its webhook-signature header: a call missing any of the three headers is rejected before its timestamp or signature is looked at.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401"
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "missing_header"
     },
     {
       "name": "wrong_secret",
