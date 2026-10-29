@@ -238,7 +238,7 @@ class TestRunHostedEnvelope:
 
         markdown = capsys.readouterr().err
         assert (
-            "### The run's own problem\n\n#### A pipe's output does not have the declared multiplicity\n\nPipe 'review_topic' produced "
+            "### The run's own problem\n\n#### A step produced a list instead of one result, or the reverse\n\nPipe 'review_topic' produced "
             "an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.\n"
         ) in markdown
         assert "- Code: `pipe.output_multiplicity` (domain method, retry no)" in markdown

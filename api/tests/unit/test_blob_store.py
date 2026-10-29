@@ -10,9 +10,11 @@ per file.
 import asyncio
 import json
 import logging
+from typing import Any
 
 import pytest
 from mthds.method_tree.digest import digest_of_contents, sha256_hex, tree_files_from_contents, tree_listing
+from pipelex.base_exceptions import PipelexError
 from pipelex.tools.log.log_fields import carried_attributes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 from pipelex.tools.storage.s3_storage_provider import S3_MAX_POOL_CONNECTIONS
@@ -28,7 +30,7 @@ from pipelex_api.blob_store import (
     RunnerBlobStore,
     problem_scheme_of,
 )
-from pipelex_api.exceptions import BlobStoreDamagedError, RunnerRequestError
+from pipelex_api.exceptions import BlobStoreDamagedError, RequestMethodError, RunnerRequestError
 from pipelex_api.method_tree_request import RequestTree, read_request_tree
 from tests.unit._problems import problem_of
 
@@ -119,6 +121,11 @@ def _blob_key(data: bytes) -> str:
     return f"{_SCOPE}/blobs/{sha256_hex(data)}"
 
 
+# A blob the store holds, and a hash entry naming it at another size than the one it is held at.
+_LARGE_BLOB = b"x" * 4096
+_HASH_HELD_AT_ANOTHER_SIZE = {"sha256": sha256_hex(_LARGE_BLOB), "size": 10}
+
+
 def _hash_map(entries: dict[str, tuple[bytes, int]]) -> str:
     """A map of file entries naming each file's bytes by hash, at the size given beside them."""
     return json.dumps({tree_path: {"sha256": sha256_hex(data), "size": size} for tree_path, (data, size) in entries.items()})
@@ -207,6 +214,78 @@ class TestRunnerBlobStore:
 
         tree = await read_request_tree(document=_hash_map({"held.txt": (held, len(held))}), blob_store=blob_store, label="The map", field="files")
         assert tree == RequestTree.make_from_contents(contents={"held.txt": held})
+
+    @pytest.mark.parametrize(
+        ("entries", "expected_code", "expected_params"),
+        [
+            pytest.param(
+                {"inputs.json": _HASH_HELD_AT_ANOTHER_SIZE, "main.mthds": "x"},
+                "method.package_invalid",
+                {"reason": "excluded_name", "path": "inputs.json"},
+                id="a key the membership rule never admits, holding the hash",
+            ),
+            pytest.param(
+                {"templates\\card.html": _HASH_HELD_AT_ANOTHER_SIZE, "main.mthds": "x"},
+                "method.package_invalid",
+                {"reason": "invalid_tree_path", "path": "templates\\card.html"},
+                id="a key that is not a tree path, holding the hash",
+            ),
+            pytest.param(
+                {"README.md": "a", "readme.md": "b", "card.html": _HASH_HELD_AT_ANOTHER_SIZE},
+                "method.package_invalid",
+                {"reason": "path_collision", "path": "README.md"},
+                id="colliding keys beside the hash",
+            ),
+            pytest.param(
+                {"notes.txt": {"base64": "e30"}, "card.html": _HASH_HELD_AT_ANOTHER_SIZE},
+                "request.invalid",
+                {"field": "files"},
+                id="a malformed entry beside the hash",
+            ),
+        ],
+    )
+    async def test_a_map_the_standard_refuses_for_a_key_or_an_entry_is_refused_for_it_before_any_blob_is_read(
+        self, entries: dict[str, Any], expected_code: str, expected_params: dict[str, Any]
+    ) -> None:
+        """The bytes a hash entry names are checked last, so a map breaking another rule is refused for it, reading no blob.
+
+        MTHDS Protocol 2.0.1 checks a map's keys, then the entries of the keys it admits, and whether the runner holds the
+        bytes a hash entry names only for a map that breaks no other rule. The blob here is held at another size than its
+        entry states, which a map breaking no other rule answers as `request.invalid` naming the size held: none of these
+        maps gets that answer, and the blob store is never read.
+        """
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
+        await blob_store.store_blob(data=_LARGE_BLOB)
+        storage.sized_keys.clear()
+
+        with pytest.raises(PipelexError) as exc_info:
+            await read_request_tree(document=json.dumps(entries), blob_store=blob_store, label="The `files` map", field="files")
+
+        problem = problem_of(exc_info.value)
+        assert problem["status"] == 422
+        assert problem["code"] == expected_code
+        assert problem["params"] == expected_params
+        assert "(held at" not in problem["diagnostics"]["message"]
+        assert storage.head_reads == []
+        assert storage.sized_keys == []
+        assert storage.loaded_keys == []
+
+    async def test_a_damaged_blob_beside_a_refused_key_is_never_read(self) -> None:
+        """A map refused for a key is answered for it, a 422, even when a blob it names is damaged in storage, a 500."""
+        storage = _CountingStorage()
+        blob_store = RunnerBlobStore(scope=_SCOPE, storage=storage, scheme="memory")
+        data = b"the true bytes"
+        storage.objects[_blob_key(data)] = b"the damaged!!!"
+        document = _hash_map({"inputs.json": (data, len(data)), "card.html": (data, len(data))})
+
+        with pytest.raises(RequestMethodError) as exc_info:
+            await read_request_tree(document=document, blob_store=blob_store, label="The `files` map", field="files")
+
+        problem = problem_of(exc_info.value)
+        assert problem["code"] == "method.package_invalid"
+        assert problem["params"] == {"reason": "excluded_name", "path": "inputs.json"}
+        assert storage.head_reads == []
 
     async def test_bytes_that_do_not_hash_to_their_key_are_a_damaged_stored_file_never_retried(self, caplog: pytest.LogCaptureFixture) -> None:
         """A damaged object does not heal: a retry reads the same bytes, so the verdict is not to retry.
