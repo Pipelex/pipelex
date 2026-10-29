@@ -76,6 +76,8 @@ The receiver rejects a call whose timestamp is more than five minutes from its o
 
 **Rotating the secret.** `CALLER_WEBHOOK_SECRET` holds one secret, or several separated by spaces, the current one first. Every call is signed under each of them, so to rotate, set the new secret first and the old one after it, move the receivers to the new secret, then drop the old one.
 
+**Trust model.** One secret, the operator's, signs every caller webhook the server sends, so any receiver that holds it can sign an event for any run, whoever started it. That suits a server with a single tenant, or with receivers that trust each other. A host that serves several tenants does not hand the secret to them: it receives the events itself and relays them to its tenants under credentials of its own.
+
 ## Delivery
 
 Each URL is delivered on its own and at the same time as the others: one receiver's slowness or failure never delays or fails another's delivery.
