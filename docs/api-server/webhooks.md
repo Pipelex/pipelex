@@ -80,6 +80,7 @@ The receiver rejects a call whose timestamp is more than five minutes from its o
 
 Each URL is delivered on its own and at the same time as the others: one receiver's slowness or failure never delays or fails another's delivery.
 
+- **When it is sent**: last, once the run's results are stored and the deployment's completion target notified, and once per URL. A run that completed but whose results cannot be stored, or whose completion target cannot be notified, ends failed, and its event says so, `failed` with that failure's problem, never `completed`.
 - **What counts as delivered**: a `2xx` answered within 15 seconds of the call being sent. Anything else fails the attempt: another status, a redirect, which the server never follows, a time-out, a connection or TLS failure, and a host whose name resolves to a private, loopback, link-local or metadata address, which the server refuses to connect to and logs as a [security event](logging.md#security-events).
 - **Retries**: a delivery makes three attempts, the second one second after the first failed and the third five seconds after the second, each keeping the delivery's `webhook-id`. A refused address is not tried again.
 - **A delivery failure stays a delivery failure.** It is logged, as a warning naming the receiver's host, the attempts and the reason, and it never fails a run that succeeded nor replaces a run's own failure: the `/execute` response and the run's status are the run's.

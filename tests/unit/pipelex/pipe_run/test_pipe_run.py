@@ -13,6 +13,7 @@ from pipelex.errors.problem import PipelexProblem
 from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event
 from pipelex.errors.security_target import SecurityTargetClass
 from pipelex.pipe_run import caller_webhook_delivery as caller_webhook_delivery_module
+from pipelex.pipe_run import delivery_executor as delivery_executor_module
 from pipelex.pipe_run import pipe_run as pipe_run_module
 from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV, CallerWebhookFailure
 from pipelex.pipe_run.delivery_assignment import CallerWebhookTarget, DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
@@ -308,7 +309,7 @@ class TestPipeRun:
         mock_job.job_metadata = JobMetadata(
             run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-caller-down", storage_scope="test/scope", read_scope=None)
         )
-        execute_spy = mocker.spy(pipe_run_module.DeliveryExecutor, "execute")
+        deliver_spy = mocker.spy(delivery_executor_module, "deliver_caller_webhooks")
         assignment = DeliveryAssignment(caller_webhooks=[CallerWebhookTarget(url=_WEBHOOK_URL)])
 
         if router_error is None:
@@ -317,10 +318,10 @@ class TestPipeRun:
             with pytest.raises(RuntimeError, match="router blew up"):
                 await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment)
 
-        (outcome,) = execute_spy.spy_return.caller_webhooks
+        (outcome,) = deliver_spy.spy_return
         assert outcome.failure == CallerWebhookFailure.HTTP_STATUS
         assert outcome.attempt_count == 3
-        delivery_kwargs = execute_spy.call_args.kwargs
+        delivery_kwargs = deliver_spy.call_args.kwargs
         # The failed run's problem reaches the caller's webhook too, with when the run ended and the run's extras.
         assert (delivery_kwargs["problem"] is None) is (router_error is None)
         assert delivery_kwargs["finished_at"].tzinfo is not None
@@ -456,11 +457,11 @@ class TestPipeRun:
             run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-unbuildable", storage_scope="test/scope", read_scope=None)
         )
 
-        with pytest.raises(_UnbuildableProblemError) as raised, caplog.at_level(logging.ERROR, logger=pipe_run_module.__name__):
+        with pytest.raises(_UnbuildableProblemError) as raised, caplog.at_level(logging.ERROR, logger=delivery_executor_module.__name__):
             await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment)
 
         assert raised.value is run_error
-        fault_records = [record for record in caplog.records if record.getMessage() == pipe_run_module.WEBHOOK_PROBLEM_FAULT_MESSAGE]
+        fault_records = [record for record in caplog.records if record.getMessage() == delivery_executor_module.WEBHOOK_PROBLEM_FAULT_MESSAGE]
         if assignment is None:
             mock_executor_instance.execute.assert_not_called()
             assert fault_records == []

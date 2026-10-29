@@ -7,7 +7,7 @@
 - **`callback_urls` and `pipeline_run_id` on `/v1/execute`**: the API server's blocking run route takes the caller's webhooks, whose events are sent before it answers, and a caller-chosen `pipeline_run_id`, honored as `/v1/start` honors it, a run still in flight under the same id answering `409` `pipelex.run.already_exists`. `PipelexMTHDSProtocol.execute` takes `pipeline_run_id` too.
 - **`COMPLETION_CALLBACK_URL`, the deployment's completion target**: the API server notifies this URL, which may name the run's id with one `{pipeline_run_id}` placeholder, when each `/v1/start` run ends, with the completion notice in the operator's view and its `X-Completion-Signature`. A malformed value stops the server at boot, and a `callback_urls` entry equal to the run's completion URL is notified once, as the completion target.
 - **`pipelex.webhook.secret_not_configured`**: a `422` registry code naming in `setting` the runner setting that holds no secret to sign a caller's webhooks with.
-- **The library delivers caller webhooks**: `DeliveryAssignment.caller_webhooks` lists `CallerWebhookTarget`s, each with the `delivery_id` its calls carry, `DeliveryExecutor.execute` takes the run's `finished_at` and `extras` and returns a `DeliveryReport` of each caller webhook's outcome, and `pipelex.tools.network.standard_webhooks` signs a call in the Standard Webhooks format.
+- **The library delivers caller webhooks**: `DeliveryAssignment.caller_webhooks` lists `CallerWebhookTarget`s, each with the `delivery_id` its calls carry, and `pipelex.tools.network.standard_webhooks` signs a call in the Standard Webhooks format. `DeliveryExecutor` delivers a run in two steps a durable orchestrator may run apart: `execute_host_delivery` stores the results and notifies the host's webhooks, then `execute_caller_delivery` sends the caller's events, last and once, with how the run ended, which `run_ending_after_host_failure` gives when the host step failed. `DeliveryExecutor.execute` runs both, and takes the run's `finished_at` and `extras`.
 
 ### Changed
 
@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **A failed notice to a host's webhook names its reason**: the `pipelex.webhook.delivery_failed` problem a run fails with when one of its host's webhooks cannot be notified carries the `reason` its code requires, `http_status` with the receiver's `receiver_status`, or `unreachable`.
 - **A refused webhook no longer replaces a failed run's own failure**: a delivery destination the SSRF guard refuses after the run failed logs its security event and the delivery's failure, and the run fails with its own error, where the refusal used to be raised in its place.
 
 ## [v0.94.0] - 2026-10-29

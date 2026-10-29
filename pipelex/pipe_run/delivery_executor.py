@@ -7,9 +7,11 @@ from urllib.parse import urlsplit
 
 import httpx
 from kajson.exceptions import KajsonException
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from mthds.protocol.problem.registry import CoreCode
+from pydantic import ValidationError
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
@@ -23,19 +25,21 @@ from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
-from pipelex.pipe_run.caller_webhook_delivery import CallerWebhookOutcome, deliver_caller_webhooks
-from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.pipe_run.caller_webhook_delivery import deliver_caller_webhooks
+from pipelex.pipe_run.delivery_assignment import DeliveryStatus
+from pipelex.pipe_run.exceptions import DeliveryError, PipeJobError, StorageDeliveryError, WebhookDeliveryError
+from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.runtime_hub import get_class_registry, get_storage_provider
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
-from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -43,7 +47,7 @@ if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
-    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
     from pipelex.tools.storage.storage_provider_abstract import StorageKind
 
 
@@ -75,20 +79,95 @@ def _problem_wires_by_view(*, problem: PipelexProblem | None, webhooks: list[Web
     return wires
 
 
-class DeliveryReport(BaseModel):
-    """What a delivery did that its caller may want to read: how each caller webhook's delivery ended.
+WEBHOOK_PROBLEM_FAULT_MESSAGE = "The problem of a failed run could not be built for its webhooks"
+"""The error logged when a failed run's problem raises while it is built for the run's webhooks."""
 
-    A storage failure, or a failure to notify one of the host's own webhooks, raises instead, and a caller webhook's
-    failure never does: it is recorded here and logged, and changes nothing of the run.
+
+def run_problem_of(*, error: Exception, pipeline_run_id: str, request_id: str | None) -> PipelexProblem:
+    """The problem of a failed run that its webhooks receive, in the operator's view, which each webhook projects to its own.
+
+    A Pipelex error carries its own code, and a bare exception stands as a fault of ours, so a webhook still receives
+    an ``error`` object. Delivery never changes how a run fails: this runs while the run's own error, or the delivery's
+    that the run will fail with, is on its way, so building the problem must not raise in its place. A problem that
+    cannot be built is logged as an error, and the webhooks receive ``runtime.unexpected``, as a traced node does
+    (``make_node_problem``).
+
+    Args:
+        error: The error the run fails with.
+        pipeline_run_id: The run's id, which the problem names.
+        request_id: The originating request's id, when there was one.
+
+    Returns:
+        The problem, in the operator's view.
     """
+    failure = error if isinstance(error, PipelexError) else make_unexpected_failure(error=error)
+    try:
+        return failure.to_problem(view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+    except Exception as problem_fault:  # ruff: ignore[blind-except]
+        # Unbounded code: `to_problem` reads hooks overridden across the whole error hierarchy, the errors plugins
+        # define included, and walks the error's cause chain, so what it raises cannot be enumerated. The run's own
+        # error is the one it fails with, so the fault is logged and the webhooks receive a fault of ours.
+        log.error(
+            WEBHOOK_PROBLEM_FAULT_MESSAGE,
+            fields={"failed_error_type": type(error).__name__, **error_fields(exc=problem_fault)},
+        )
+    return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
 
-    model_config = ConfigDict(frozen=True)
 
-    caller_webhooks: list[CallerWebhookOutcome] = Field(default_factory=empty_list_factory_of(CallerWebhookOutcome))
+class RunEnding(NamedTuple):
+    """How a run ended, as its caller's webhooks are told: its status, and a failed run's problem in the operator's view."""
+
+    status: DeliveryStatus
+    problem: PipelexProblem | None
+
+
+def run_ending_after_host_failure(
+    *,
+    status: DeliveryStatus,
+    problem: PipelexProblem | None,
+    host_error: Exception,
+    pipeline_run_id: str,
+    request_id: str | None,
+) -> RunEnding:
+    """How a run ends once the host step of its delivery failed, which its caller's webhooks are told.
+
+    A run that completed fails with the host step's error, a storage failure or a refused or failed notice to one of
+    the host's webhooks, so its caller is told it failed, with that error's problem, never that it completed. A run
+    that had failed keeps its own failure, and its own problem.
+
+    Args:
+        status: How the run ended before the delivery.
+        problem: A failed run's problem, in the operator's view.
+        host_error: What the host step raised.
+        pipeline_run_id: The run's id.
+        request_id: The originating request's id, when there was one.
+
+    Returns:
+        How the run ends.
+    """
+    match status:
+        case DeliveryStatus.COMPLETED:
+            return RunEnding(
+                status=DeliveryStatus.FAILED,
+                problem=run_problem_of(error=host_error, pipeline_run_id=pipeline_run_id, request_id=request_id),
+            )
+        case DeliveryStatus.FAILED:
+            return RunEnding(status=status, problem=problem)
 
 
 class DeliveryExecutor:
-    """Handles the full delivery lifecycle: generate result files, store them, notify webhooks."""
+    """Handles a finished run's delivery, in two steps: the host's, then the caller's.
+
+    The **host step**, :meth:`execute_host_delivery`, generates and stores the result files, then notifies the host's
+    own webhooks, such as a deployment's completion target, and raises when either fails. The **caller step**,
+    :meth:`execute_caller_delivery`, sends each caller webhook the signed ``run.finished`` event and never raises.
+
+    :meth:`execute` runs both in one process, the caller step last and once, after the host step has settled, with the
+    status the run ends with: when the host step fails, a completed run fails with its error, and the caller is told so
+    (:func:`run_ending_after_host_failure`). A durable orchestrator that retries a failed step runs the two as separate
+    steps, the caller step after the host step has settled, so that a retried host step never sends the caller's event
+    again, and the event states how the run ended, the host step's failure included.
+    """
 
     async def execute(
         self,
@@ -102,16 +181,16 @@ class DeliveryExecutor:
         request_id: str | None = None,
         finished_at: datetime | None = None,
         extras: Mapping[str, str] | None = None,
-    ) -> DeliveryReport:
-        """Execute a full delivery: store the result files, notify the host's webhooks, then send the caller's the event.
+    ) -> None:
+        """Execute a full delivery: the host step, then the caller step, last and once.
 
         ``problem`` is a failed run's problem in the operator's view, which each of the host's webhooks receives in its
         own view, and each caller webhook in the caller's (:mod:`pipelex.pipe_run.caller_webhook_delivery`).
 
-        The caller's webhooks are delivered even when one of the host's failed, whose failure is raised once they are.
-        Their own failures never raise: each is logged and returned in the report. ``finished_at`` is when the run
-        ended, the caller's event's ``timestamp``, and the moment the delivery starts when it is not given;
-        ``extras`` are the run's opaque extras, which the security event of a caller webhook's refused destination carries.
+        When the host step fails, the caller's webhooks are told how the run ends, and the host step's error is raised
+        once they were. Their own failures never raise: each is logged. ``finished_at`` is when the run ended, the
+        caller's event's ``timestamp``, and the moment the delivery starts when it is not given; ``extras`` are the
+        run's opaque extras, which the security event of a caller webhook's refused destination carries.
 
         ``request_id`` is the originating API request id (when set). The delivery binds it
         with ``pipeline_run_id`` onto the log context, so every record the delivery emits,
@@ -121,7 +200,64 @@ class DeliveryExecutor:
         """
         run_finished_at = finished_at or datetime.now(UTC)
         with log.context(request_id=request_id, pipeline_run_id=pipeline_run_id):
-            # Step 1: Persist the result files to storage (only on success with output)
+            try:
+                await self.execute_host_delivery(
+                    pipe_output,
+                    storage_scope=storage_scope,
+                    pipeline_run_id=pipeline_run_id,
+                    delivery_assignment=delivery_assignment,
+                    status=status,
+                    problem=problem,
+                    request_id=request_id,
+                )
+            except (DeliveryError, SsrfBlockedError) as host_error:
+                if delivery_assignment.caller_webhooks:
+                    run_ending = run_ending_after_host_failure(
+                        status=status,
+                        problem=problem,
+                        host_error=host_error,
+                        pipeline_run_id=pipeline_run_id,
+                        request_id=request_id,
+                    )
+                    await self.execute_caller_delivery(
+                        pipeline_run_id=pipeline_run_id,
+                        delivery_assignment=delivery_assignment,
+                        status=run_ending.status,
+                        problem=run_ending.problem,
+                        finished_at=run_finished_at,
+                        request_id=request_id,
+                        extras=extras,
+                    )
+                raise
+            await self.execute_caller_delivery(
+                pipeline_run_id=pipeline_run_id,
+                delivery_assignment=delivery_assignment,
+                status=status,
+                problem=problem,
+                finished_at=run_finished_at,
+                request_id=request_id,
+                extras=extras,
+            )
+
+    async def execute_host_delivery(
+        self,
+        pipe_output: PipeOutput | None,
+        *,
+        storage_scope: str,
+        pipeline_run_id: str,
+        delivery_assignment: DeliveryAssignment,
+        status: DeliveryStatus,
+        problem: PipelexProblem | None = None,
+        request_id: str | None = None,
+    ) -> None:
+        """The host step: store a completed run's result files, then notify each of the host's own webhooks.
+
+        Raises:
+            StorageDeliveryError: The result files could not be generated or stored; no webhook was notified.
+            WebhookDeliveryError: One of the host's webhooks could not be notified.
+            SsrfBlockedError: The SSRF guard refused a host webhook's destination.
+        """
+        with log.context(request_id=request_id, pipeline_run_id=pipeline_run_id):
             result_url: str | None = None
             if delivery_assignment.storage is not None and pipe_output is not None:
                 result_url = await self._store_results(
@@ -130,30 +266,43 @@ class DeliveryExecutor:
                     pipeline_run_id=pipeline_run_id,
                     storage=delivery_assignment.storage,
                 )
-
-            caller_outcomes: list[CallerWebhookOutcome] = []
-            try:
-                # Step 2: Notify the host's webhooks with status + result_url (always, even on failure)
-                problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
-                for webhook in delivery_assignment.webhooks:
-                    await self._notify_webhook(
-                        pipeline_run_id=pipeline_run_id,
-                        status=status,
-                        result_url=result_url,
-                        webhook=webhook,
-                        problem_wire=problem_wires.get(webhook.problem_view),
-                    )
-            finally:
-                # Step 3: Send each caller webhook the signed run.finished event, whatever the host's webhooks did.
-                caller_outcomes = await deliver_caller_webhooks(
-                    targets=delivery_assignment.caller_webhooks,
+            problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
+            for webhook in delivery_assignment.webhooks:
+                await self._notify_webhook(
                     pipeline_run_id=pipeline_run_id,
                     status=status,
-                    problem=problem,
-                    finished_at=run_finished_at,
-                    extras=extras,
+                    result_url=result_url,
+                    webhook=webhook,
+                    problem_wire=problem_wires.get(webhook.problem_view),
                 )
-        return DeliveryReport(caller_webhooks=caller_outcomes)
+
+    async def execute_caller_delivery(
+        self,
+        *,
+        pipeline_run_id: str,
+        delivery_assignment: DeliveryAssignment,
+        status: DeliveryStatus,
+        problem: PipelexProblem | None,
+        finished_at: datetime,
+        request_id: str | None = None,
+        extras: Mapping[str, str] | None = None,
+    ) -> None:
+        """The caller step: send each caller webhook the signed ``run.finished`` event, saying how the run ended.
+
+        It never raises: a delivery that fails is logged, and changes nothing of the run. ``status`` and ``problem`` are
+        how the run ends, after the host step (:func:`run_ending_after_host_failure`).
+        """
+        if not delivery_assignment.caller_webhooks:
+            return
+        with log.context(request_id=request_id, pipeline_run_id=pipeline_run_id):
+            await deliver_caller_webhooks(
+                targets=delivery_assignment.caller_webhooks,
+                pipeline_run_id=pipeline_run_id,
+                status=status,
+                problem=problem,
+                finished_at=finished_at,
+                extras=extras,
+            )
 
     # ---- Result file generation ----
 
@@ -575,8 +724,8 @@ class DeliveryExecutor:
             log.info("Webhook delivery completed", fields={"server.address": urlsplit(webhook.url).hostname})
         except httpx.HTTPStatusError as exc:
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: HTTP {exc.response.status_code}"
-            raise WebhookDeliveryError(msg) from exc
+            raise WebhookDeliveryError(msg).with_params(reason="http_status", receiver_status=exc.response.status_code) from exc
         except httpx.RequestError as exc:
             # By the failure's class, never its text, which can quote the caller's webhook URL.
             msg = f"Webhook delivery failed for pipeline_run_id={pipeline_run_id}: {type(exc).__name__}"
-            raise WebhookDeliveryError(msg) from exc
+            raise WebhookDeliveryError(msg).with_params(reason="unreachable") from exc
