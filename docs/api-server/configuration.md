@@ -39,7 +39,8 @@ PIPELEX_ENV=dev
 #
 # The deployment's own completion target, which every /v1/start run notifies
 # when it ends: an absolute http(s) URL that may name the run's id once with
-# `{pipeline_run_id}`. Unset, there is none. A malformed value stops the boot.
+# `{pipeline_run_id}`, in its path or query only. Unset, there is none. A
+# malformed value stops the boot.
 # COMPLETION_CALLBACK_URL=https://ops.example.com/runs/complete/{pipeline_run_id}
 # The HMAC secret of the completion target's X-Completion-Signature, shared with
 # its receiver. Required once COMPLETION_CALLBACK_URL is set: the server refuses

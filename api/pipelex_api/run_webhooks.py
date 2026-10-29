@@ -42,6 +42,9 @@ PIPELINE_RUN_ID_PLACEHOLDER = "{pipeline_run_id}"
 
 _ALLOWED_COMPLETION_SCHEMES = frozenset({"http", "https"})
 
+_PLACEHOLDER_SENTINEL = "pipelexrunidplaceholder"
+"""What the placeholder stands as while the template is parsed: letters a host name may hold, so it shows where it lands."""
+
 
 def completion_callback_template() -> str | None:
     """The deployment's completion target as configured, or None when `COMPLETION_CALLBACK_URL` is unset or empty.
@@ -49,8 +52,9 @@ def completion_callback_template() -> str | None:
     Read at each use, and once when the server starts, so a malformed value stops the boot.
 
     Raises:
-        RunnerMisconfiguredError: The value is not an absolute http or https URL naming a host, holds a fragment, or holds
-            the `{pipeline_run_id}` placeholder more than once (a 500 `runtime.misconfigured` naming the variable).
+        RunnerMisconfiguredError: The value is not an absolute http or https URL naming a host, holds a fragment, holds
+            the `{pipeline_run_id}` placeholder more than once, or anywhere but in its path or its query, since a run's id
+            may be the caller's choice (a 500 `runtime.misconfigured` naming the variable).
     """
     configured = get_optional_env(COMPLETION_CALLBACK_URL_ENV)
     if not configured:
@@ -58,7 +62,14 @@ def completion_callback_template() -> str | None:
     if configured.count(PIPELINE_RUN_ID_PLACEHOLDER) > 1:
         msg = f"Server configuration error: {COMPLETION_CALLBACK_URL_ENV} may hold the placeholder {PIPELINE_RUN_ID_PLACEHOLDER} once at most."
         raise RunnerMisconfiguredError(msg, component=COMPLETION_CALLBACK_URL_ENV)
-    parts = urlsplit(configured.replace(PIPELINE_RUN_ID_PLACEHOLDER, "run"))
+    parts = urlsplit(configured.replace(PIPELINE_RUN_ID_PLACEHOLDER, _PLACEHOLDER_SENTINEL))
+    if _PLACEHOLDER_SENTINEL in parts.scheme.lower() or _PLACEHOLDER_SENTINEL in parts.netloc.lower():
+        # The run's id may be the caller's choice, so it never decides which host the notice, and its signature, go to.
+        msg = (
+            f"Server configuration error: {COMPLETION_CALLBACK_URL_ENV} may hold the placeholder {PIPELINE_RUN_ID_PLACEHOLDER} "
+            "in its path or its query only, never in its scheme, host, port or user."
+        )
+        raise RunnerMisconfiguredError(msg, component=COMPLETION_CALLBACK_URL_ENV)
     if parts.scheme not in _ALLOWED_COMPLETION_SCHEMES or not parts.hostname or parts.fragment:
         msg = (
             f"Server configuration error: {COMPLETION_CALLBACK_URL_ENV} must be an absolute http or https URL without a fragment, "

@@ -273,6 +273,11 @@ class TestCallerWebhooks:
             pytest.param("https:///runs", id="no_host"),
             pytest.param("https://ops.example.com/runs#done", id="fragment"),
             pytest.param("https://ops.example.com/{pipeline_run_id}/{pipeline_run_id}", id="placeholder_twice"),
+            pytest.param("https://{pipeline_run_id}/complete", id="placeholder_as_host"),
+            pytest.param("https://ops.example.com{pipeline_run_id}/complete", id="placeholder_in_host"),
+            pytest.param("https://{pipeline_run_id}@ops.example.com/complete", id="placeholder_as_user"),
+            pytest.param("https://ops.example.com:{pipeline_run_id}/complete", id="placeholder_as_port"),
+            pytest.param("{pipeline_run_id}://ops.example.com/complete", id="placeholder_as_scheme"),
         ],
     )
     def test_a_malformed_completion_target_is_refused(self, monkeypatch: pytest.MonkeyPatch, configured: str) -> None:
@@ -283,6 +288,19 @@ class TestCallerWebhooks:
             completion_callback_template()
 
         assert exc_info.value.component == COMPLETION_CALLBACK_URL_ENV
+
+    @pytest.mark.parametrize(
+        "configured",
+        [
+            pytest.param("https://ops.example.com/runs/complete/{pipeline_run_id}", id="in_path"),
+            pytest.param("https://ops.example.com/runs/complete?run={pipeline_run_id}", id="in_query"),
+            pytest.param("https://ops.example.com/runs/complete", id="none"),
+        ],
+    )
+    def test_the_placeholder_may_sit_in_the_path_or_the_query(self, monkeypatch: pytest.MonkeyPatch, configured: str) -> None:
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, configured)
+
+        assert completion_callback_template() == configured
 
     def test_the_run_id_is_percent_encoded_into_the_completion_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An id the caller chose fills its placeholder as one path segment, never adding a segment or a query."""

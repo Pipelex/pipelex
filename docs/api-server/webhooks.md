@@ -92,7 +92,7 @@ The server signs its calls with the secret of the process that runs the delivery
 
 ## The deployment's completion target
 
-`COMPLETION_CALLBACK_URL` names the operator's own receiver, an absolute `http` or `https` URL which may name the run's id with one `{pipeline_run_id}` placeholder, such as `https://ops.example.com/runs/complete/{pipeline_run_id}`. A malformed value stops the server at boot, and leaving it unset gives the deployment no completion target. When set, every `/start` run notifies it, once, when the run ends; an `/execute` run, which answers with its result, does not.
+`COMPLETION_CALLBACK_URL` names the operator's own receiver, an absolute `http` or `https` URL which may name the run's id with one `{pipeline_run_id}` placeholder, in its path or its query only, since a run's id may be the caller's choice and never decides the host the notice goes to, such as `https://ops.example.com/runs/complete/{pipeline_run_id}`. A malformed value stops the server at boot, and leaving it unset gives the deployment no completion target. When set, every `/start` run notifies it, once, when the run ends; an `/execute` run, which answers with its result, does not.
 
 The target receives a completion notice, not the caller's event:
 
