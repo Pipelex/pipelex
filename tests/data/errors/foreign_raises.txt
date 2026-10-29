@@ -199,4 +199,8 @@ pipelex/tools/misc/file_utils.py | mirror_dir | FileNotFoundError | tooling
 pipelex/tools/misc/file_utils.py | mirror_dir | NotADirectoryError | tooling
 pipelex/tools/misc/file_utils.py | reject_bare_str_or_path | TypeError | invariant
 pipelex/tools/network/ssrf_guard.py | resolve_to_allowed_ips | ConnectTimeout | carrier
+pipelex/tools/network/standard_webhooks.py | decode_webhook_secret | ValueError | caught
+pipelex/tools/network/standard_webhooks.py | decode_webhook_secret | ValueError | caught
+pipelex/tools/network/standard_webhooks.py | decode_webhook_secret | ValueError | caught
+pipelex/tools/network/standard_webhooks.py | sign_webhook | ValueError | invariant
 pipelex/tools/typing/pydantic_utils.py | clean_model_to_dict | TypeError | invariant

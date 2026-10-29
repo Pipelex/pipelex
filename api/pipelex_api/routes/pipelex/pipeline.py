@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import hmac
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, NamedTuple, cast
@@ -16,22 +14,21 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.interpreter_hub import get_current_library_id_or_none
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.libraries.method_tree_listing import MethodTreeListing, scoped_tree_listing
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget, WebhookTarget
 from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
-from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup, release_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol, refuse_method_files
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
 from pipelex.runtime_bridge.exceptions import MissingBundleValidatorError, MissingOrchestratorError
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.runtime_hub import get_bundle_validator_registry, get_orchestrator_registry
-from pipelex.system.environment import get_required_env
 from pipelex.system.storage_scope import LOCAL_STORAGE_SCOPE, SINGLE_TENANT_USER_ID, validate_storage_scope_within_read_scope
 from pydantic import ValidationError
 from typing_extensions import override
@@ -66,10 +63,17 @@ from pipelex_api.openapi_responses import (
     PROBLEM_501_RUN_POLICY,
     PROBLEM_501_START,
 )
-from pipelex_api.problem_view import problem_view_of
 from pipelex_api.request_refusals import WHOLE_BODY_FIELD, callback_url_refusal_in, refused_request_error
 from pipelex_api.routes.pipelex.utils import get_current_iso_timestamp
 from pipelex_api.run_extras_binding import bind_run_extras
+from pipelex_api.run_webhooks import (
+    caller_webhook_urls,
+    ensure_caller_webhooks_signable,
+    ensure_completion_target_configured,
+    execute_delivery_assignment,
+    start_caller_webhook_urls,
+    start_delivery_assignment,
+)
 from pipelex_api.schemas.models import (
     PipelexApiExecuteRequest,
     PipelexApiExecuteResponse,
@@ -89,6 +93,7 @@ if TYPE_CHECKING:
     from mthds.protocol.working_memory import WorkingMemoryAbstract
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.methods.fetching import MethodProvenance
+    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipeline.validation_report import PipelexValidationReport
     from pipelex.plugins.orchestrator_registry import OrchestratorProtocol
@@ -231,21 +236,6 @@ def _resolve_run_scopes(request: Request, *, extras: PipelineApiExtras) -> _RunS
     return _RunScopes(storage_scope=storage_scope, read_scope=read_scope)
 
 
-def _completion_signature(pipeline_run_id: str) -> str:
-    """Compute the HMAC-SHA256 signature for an async completion callback.
-
-    The signer (this server) and the verifier (your callback receiver) must
-    share the same `COMPLETION_CALLBACK_SECRET`. The signature is per-run and
-    the secret never travels — only the one-way hash does.
-    """
-    secret = get_required_env("COMPLETION_CALLBACK_SECRET")
-    return hmac.new(
-        secret.encode("utf-8"),
-        pipeline_run_id.encode("utf-8"),
-        hashlib.sha256,
-    ).hexdigest()
-
-
 def _pipe_output_from_run_output(run_output: PipelexPipeRunOutput) -> PipeOutput:
     """Rehydrate an orchestrator's JSON-safe `PipelexPipeRunOutput` into a typed `PipeOutput`.
 
@@ -357,6 +347,8 @@ class ApiRunner(PipelexMTHDSProtocol):
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
         tree_listing: MethodTreeListing | None = None,
+        pipeline_run_id: str | None = None,
+        callback_urls: list[str] | None = None,
         requested_orchestration_mode: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a method synchronously, dispatching by the resolved `orchestration_mode`.
@@ -383,11 +375,19 @@ class ApiRunner(PipelexMTHDSProtocol):
 
         The method's trees are listed once for the request: the check of its requirements lists them through
         `tree_listing`, or a listing of its own when none is given, and the run loads them from that same listing.
+
+        `pipeline_run_id` is the run's id when the caller chose it, honored as `start` honors it: a run still in
+        flight under the same id refuses this one with a 409 `pipelex.run.already_exists`. `callback_urls` are the
+        caller's webhooks (`pipelex_api.run_webhooks`): each receives the run's signed `run.finished` event when the run
+        ends, before this call returns, and a runner whose operator configured no signing secret refuses them with a
+        422 `pipelex.webhook.secret_not_configured` before anything loads. Their delivery never changes the run's outcome.
         """
         # The route resolves a method sent as `files` into a written tree before it calls this runner, which takes it
         # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
         # base runner refuses it, before any backend is looked up.
         refuse_method_files(files=files)
+        caller_urls = caller_webhook_urls(callback_urls=callback_urls)
+        ensure_caller_webhooks_signable(caller_urls=caller_urls)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
         api_config = get_api_config()
@@ -412,9 +412,10 @@ class ApiRunner(PipelexMTHDSProtocol):
             output_multiplicity=output_multiplicity,
             dynamic_output_concept_ref=dynamic_output_concept_ref,
             extra=extra,
-            delivery_assignment=delivery_assignment,
+            delivery_assignment=execute_delivery_assignment(caller_urls=caller_urls, delivery_assignment=delivery_assignment),
             request_id=request_id,
             tree_listing=listing,
+            pipeline_run_id=pipeline_run_id,
         )
 
     @override
@@ -433,7 +434,6 @@ class ApiRunner(PipelexMTHDSProtocol):
         callback_urls: list[str] | None = None,
         request_id: str | None = None,
         requested_orchestration_mode: str | None = None,
-        callback_problem_view: ProblemView = ProblemView.CALLER,
     ) -> PipelexRunResultStart:
         """Start a method execution asynchronously without waiting for completion.
 
@@ -456,11 +456,12 @@ class ApiRunner(PipelexMTHDSProtocol):
         `pipeline_run_id` is the client-supplied run identifier — this source-available runner
         honors it (protocol: implementations MAY decline it, but then MUST 422;
         we accept it, and `StartAck.pipeline_run_id` echoes it back as authoritative).
-        `callback_urls` is THIS server's extension (completion webhooks) — the wire
-        layer validates it (`PipelineApiExtras`) and passes it here by name.
-        `callback_problem_view` is the view of a failed run's problem those webhooks carry: the
-        view of the request's own reader (`pipelex_api.problem_view`), since a completion webhook
-        is the same answer as the synchronous response, delivered later.
+        `callback_urls` is THIS server's extension (the caller's webhooks) — the wire
+        layer validates it (`PipelineApiExtras`) and passes it here by name. Each URL receives the
+        run's signed `run.finished` event, a failed run's problem in the caller's view, and a runner
+        whose operator configured no signing secret refuses them with a 422 before anything loads.
+        The deployment's own completion target, `COMPLETION_CALLBACK_URL`, is notified beside them,
+        with its own notice and signature (`pipelex_api.run_webhooks`).
         `extra` is the protocol's generic extension slot; this runner's wire
         extras are parsed by the route layer, so nothing reaches it — a
         non-empty value is an in-process misuse and is rejected. `request_id`
@@ -478,6 +479,11 @@ class ApiRunner(PipelexMTHDSProtocol):
             # value here is a fault of the in-process code calling this runner, never the caller's.
             msg = f"ApiRunner defines no extension args beyond its named ones; got {sorted(extra)}."
             raise PipelexUnexpectedError(msg)
+        # The caller's webhooks this runner cannot sign, and a completion target it cannot sign, are refused before
+        # anything else is looked up or loaded.
+        caller_urls = start_caller_webhook_urls(callback_urls=callback_urls, pipeline_run_id=pipeline_run_id)
+        ensure_caller_webhooks_signable(caller_urls=caller_urls)
+        ensure_completion_target_configured()
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here. Then look up the orchestrator and check its async
         # capability: `/start` is fire-and-forget, so a blocking-only orchestrator (direct on the
@@ -502,9 +508,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
         execution_config = self.execution_config or get_config().interpreter.pipeline_execution
+        # The caller's current library, which a run that is not dispatched gives back.
+        prev_library_id = get_current_library_id_or_none()
         # Wire and runtime share the `pipeline_run_id` name (master D1 as
         # revised — the id rename was reversed).
-        pipe_job, resolved_pipeline_run_id, _ = await pipeline_run_setup(
+        pipe_job, resolved_pipeline_run_id, run_library_id = await pipeline_run_setup(
             execution_config=execution_config,
             library_id=self.library_id,
             library_dirs=self.library_dirs,
@@ -534,42 +542,26 @@ class ApiRunner(PipelexMTHDSProtocol):
             tree_listing=tree_listing,
         )
 
-        delivery_assignment = DeliveryAssignment(
-            # NO `key_prefix` — the runtime owns the `results/` leaf.
-            #
-            # This used to say `key_prefix="results"`, from the layout where the
-            # executor built `{user_id}/{key_prefix}{pipeline_run_id}` and the
-            # caller supplied the leaf. It now builds
-            # `{storage_scope}/{key_prefix}results`, so passing it here wrote
-            # every run's output to `<scope>/results/results/` — valid, stable,
-            # and wrong, with nothing failing to say so.
-            #
-            # `key_prefix` remains the caller's slot for an EXTRA level between
-            # the scope and the leaf; it is not where the leaf itself comes from.
-            storage=StorageTarget(),
-            # The completion payload's wire fields (`pipeline_run_id`/`state`,
-            # plus the transitional `status` alias) are written per delivery by
-            # pipelex's DeliveryExecutor — they are reserved keys on
-            # WebhookTarget.payload, so nothing is injected here.
-            webhooks=[
-                WebhookTarget(
-                    url=url,
-                    headers={"X-Completion-Signature": _completion_signature(resolved_pipeline_run_id)},
-                    problem_view=callback_problem_view,
-                )
-                for url in callback_urls
-            ]
-            if callback_urls
-            else [],
-        )
+        # Its results stored (with NO `key_prefix`: the runtime owns the `results/` leaf), the deployment's completion
+        # target notified, then the caller's webhooks sent their event. The completion URL is dropped from the caller's
+        # again now that the run's id is resolved, since the deployment's URL may name it.
+        dispatched = False
+        try:
+            delivery_assignment = start_delivery_assignment(caller_urls=caller_urls, pipeline_run_id=resolved_pipeline_run_id)
 
-        # Dispatch the locally-built job through the resolved mode's orchestrator (looked up and
-        # capability-checked above) via its fire-and-forget `start` arm — the same final dispatch
-        # `run_pipe_via_bridge` performs, but fed the rich PipeJob instead of the lossy
-        # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
-        # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
-        # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            # Dispatch the locally-built job through the resolved mode's orchestrator (looked up and
+            # capability-checked above) via its fire-and-forget `start` arm — the same final dispatch
+            # `run_pipe_via_bridge` performs, but fed the rich PipeJob instead of the lossy
+            # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
+            # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
+            # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
+            dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            dispatched = True
+        finally:
+            if not dispatched:
+                # The run never left this process: what its setup registered is released, its id first of all, so the
+                # caller can submit it again, and the failure propagates.
+                release_run_setup(pipe_job=pipe_job, library_id=run_library_id, prev_library_id=prev_library_id)
 
         return PipelexRunResultStart(
             pipeline_run_id=resolved_pipeline_run_id,
@@ -978,19 +970,19 @@ async def _run_source(*, run_request: RunRequest, body: bytes, blob_scope: str) 
     response_model=PipelexApiExecuteResponse,
     # On top of the composite router's shared 401/413/422/500: a `read_scope` outside the caller's own (403), the
     # `method_ref` package-not-found 404, the provider rate-limit passthrough (429) — `/execute` is the only route that runs inference, so
-    # it is the only one that can be rate-limited upstream — and the custom-code sandbox gate's 501 on a
-    # bundle or a fetched package. NO 409: unlike `/start`, `/execute` takes no client-supplied
-    # `pipeline_run_id` (the base runner generates one per call), so a caller cannot collide with an
-    # in-flight run. Its 500 names, beside the shared one's codes, a damaged blob a `files` map names by hash.
+    # it is the only one that can be rate-limited upstream — the 409 of a client-supplied `pipeline_run_id`
+    # still registered for an in-flight run, as on `/start`, and the custom-code sandbox gate's 501 on a
+    # bundle or a fetched package. Its 500 names, beside the shared one's codes, a damaged blob a `files` map names by hash.
     responses={
         403: PROBLEM_403_READ_SCOPE,
         404: PROBLEM_404_METHOD_PACKAGE,
+        409: PROBLEM_409_DUPLICATE_RUN,
         429: PROBLEM_429,
         500: PROBLEM_500_HELD_BLOBS,
         501: PROBLEM_501_RUN_POLICY,
     },
-    # Documented body = the protocol's RunRequest plus THIS server's own
-    # `orchestration_mode` extension (the route honors a per-request override). The
+    # Documented body = the protocol's RunRequest plus THIS server's own extensions:
+    # `pipeline_run_id`, `callback_urls` and `orchestration_mode` (a policy-gated per-request override). The
     # body is read through the raw Request (plain JSON with the reserved-key
     # refusal — see `_parse_request`), so FastAPI cannot infer a typed body parameter;
     # document it explicitly so the committed OpenAPI artifact (and protocol
@@ -1013,8 +1005,13 @@ async def execute(request: Request) -> JSONResponse:
     regardless of backend (wait-semantics is endpoint-set, never requestable). Pipelex domain
     failures propagate untouched: the global `PipelexError` handler in `pipelex_api.exception_handlers`
     turns them into an RFC 7807 problem response.
+
+    A client-supplied `pipeline_run_id` is honored as `/start` honors it. Each of the `callback_urls` receives the run's
+    signed `run.finished` event before the response is sent; their delivery never changes the response.
     """
     run_request, extras, body = await _parse_request(request)
+    # Webhooks this runner cannot sign are refused before the method is fetched or written.
+    ensure_caller_webhooks_signable(caller_urls=caller_webhook_urls(callback_urls=extras.callback_urls))
     scopes = _resolve_run_scopes(request, extras=extras)
     blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
     async with _run_source(run_request=run_request, body=body, blob_scope=blob_scope) as source:
@@ -1036,6 +1033,8 @@ async def execute(request: Request) -> JSONResponse:
             output_multiplicity=run_request.output_multiplicity,
             dynamic_output_concept_ref=run_request.dynamic_output_concept_ref,
             request_id=request_id_of(request),
+            pipeline_run_id=extras.pipeline_run_id,
+            callback_urls=extras.callback_urls,
             requested_orchestration_mode=extras.orchestration_mode,
         )
     # The response dump carries the full internal usage models on
@@ -1104,9 +1103,16 @@ async def start(
     `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`, the default)
     the in-process orchestrator is blocking-only, so `/start` is HONEST: it refuses with a `501`
     (`runtime.unsupported`) — use `/execute` — rather than silently blocking and acking.
-    The completion callback (`callback_urls` / storage delivery) fires on the async path.
+    The run's delivery (its results stored, the deployment's completion target, the caller's `callback_urls`) runs on the
+    async path when the run ends.
     """
     run_request, extras, body = parsed
+    # Webhooks this runner cannot sign, the caller's or the completion target's, are refused before the method is
+    # fetched or written.
+    ensure_caller_webhooks_signable(
+        caller_urls=start_caller_webhook_urls(callback_urls=extras.callback_urls, pipeline_run_id=extras.pipeline_run_id),
+    )
+    ensure_completion_target_configured()
     scopes = _resolve_run_scopes(request, extras=extras)
     blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
     # The run source is written out only for the synchronous setup phase: `start` builds the
@@ -1139,7 +1145,6 @@ async def start(
             callback_urls=extras.callback_urls,
             request_id=request_id_of(request),
             requested_orchestration_mode=extras.orchestration_mode,
-            callback_problem_view=problem_view_of(request),
         )
     # The ack plus this server's provenance extension: `(address, tag, commit_sha, tree_digest,
     # display_name)` for a `method_ref` run, null otherwise — the caller (and, on hosted, the

@@ -11,14 +11,17 @@ mechanism that prevents first-party spec drift (master plan, eng review):
 - `GET /version` is public (no auth) and returns the `VersionInfo` shape.
 - A client-supplied `pipeline_run_id` on `/start` is honored (master D11 — this
   source-available runner accepts it; `StartAck.pipeline_run_id` echoes it back).
-- The completion-callback E2E (eng-review 5A): `/start` with `callback_urls`
-  delivers a signed POST to a local in-test receiver. The orchestrator is replaced
-  by a fake whose `start` performs the real `DeliveryExecutor` delivery in-process, so
-  the wire bytes (headers + JSON payload) are the production delivery path's.
+- The webhook E2E: `/start` with `callback_urls` on a deployment with a completion
+  target delivers, to a local in-test receiver, the signed `run.finished` event to the
+  caller's URL and the completion notice, with its own signature, to the deployment's
+  target, and never one hop's message or signature to the other. The orchestrator is
+  replaced by a fake whose `start` performs the real `DeliveryExecutor` delivery
+  in-process, so the wire bytes (headers + JSON body) are the production delivery path's.
 """
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import hmac
 import json
@@ -33,6 +36,7 @@ from fastapi import Depends, FastAPI
 from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 from mthds.protocol.protocol import PROTOCOL_VERSION
+from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipeline.pipeline_response import RunState
@@ -42,8 +46,10 @@ from typing_extensions import override
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.routes import router as api_router
 from pipelex_api.routes.version import router as version_router
+from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from pipelex_api.security import verify_api_key
 from tests.unit._constants import VALID_MTHDS
+from tests.unit.test_data import ProblemTestData
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -58,13 +64,13 @@ PROTOCOL_PATHS = {
 
 
 class _CallbackReceiver(BaseHTTPRequestHandler):
-    """Minimal in-test HTTP receiver capturing completion-callback deliveries."""
+    """Minimal in-test HTTP receiver capturing webhook deliveries, by path."""
 
     captured: ClassVar[list[dict[str, Any]]] = []
 
     def do_POST(self) -> None:
         body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-        type(self).captured.append({"headers": dict(self.headers.items()), "body": body})
+        type(self).captured.append({"path": self.path, "headers": {key.lower(): value for key, value in self.headers.items()}, "body": body})
         self.send_response(200)
         self.end_headers()
 
@@ -151,45 +157,48 @@ class TestProtocolConformance:
         assert response.status_code == 422
         assert response.headers["content-type"] == "application/problem+json"
 
-    def test_start_accepts_client_pipeline_run_id_and_delivers_signed_callback(self, mocker: MockerFixture):
-        """D11 + eng-review 5A: `/start` honors the client `pipeline_run_id`, answers 202,
-        and the completion callback reaches the receiver with a valid
-        `X-Completion-Signature` and a payload carrying the protocol `pipeline_run_id`.
+    def test_start_delivers_the_caller_event_and_the_completion_notice_each_to_its_own_hop(self, mocker: MockerFixture):
+        """`/start` honors the client `pipeline_run_id`, answers 202, and delivers two hops that never mix.
 
-        The orchestrator is replaced by a fake whose `start` immediately runs the REAL
-        `DeliveryExecutor` delivery against the captured `DeliveryAssignment`
-        (storage skipped — no pipe output), so headers and payload bytes come
-        from the production delivery code path. The SSRF guards are relaxed for
-        the loopback receiver: the request-time host check in
-        `pipelex_api.schemas.models` and the connect-time guarded transport in
-        `pipelex.pipe_run.delivery_executor` both block loopback by design.
+        The caller's URL receives the signed `run.finished` event (Standard Webhooks headers, verifiable under the caller
+        secret) and no completion signature; the deployment's completion target, `COMPLETION_CALLBACK_URL`, receives the
+        completion notice with its `X-Completion-Signature` and never the caller's event, and is notified once even though
+        the host forwarded its URL among the `callback_urls`.
+
+        The orchestrator is replaced by a fake whose `start` immediately runs the REAL `DeliveryExecutor` delivery against
+        the captured `DeliveryAssignment` (storage skipped — no pipe output), so headers and body bytes come from the
+        production delivery code path. The SSRF guards are relaxed for the loopback receiver: the request-time host check
+        in `pipelex_api.schemas.models` and the connect-time guarded transports of both hops block loopback by design.
         """
         # --- local HTTP receiver -------------------------------------------------
         _CallbackReceiver.captured = []
         server = HTTPServer(("127.0.0.1", 0), _CallbackReceiver)
         server_thread = threading.Thread(target=server.serve_forever, daemon=True)
         server_thread.start()
-        callback_url = f"http://127.0.0.1:{server.server_port}/completion"
+        receiver_base = f"http://127.0.0.1:{server.server_port}"
+        caller_url = f"{receiver_base}/caller-hook"
+        client_pipeline_run_id = "conformance-client-run-0001"
+        completion_url = f"{receiver_base}/runs/complete/{client_pipeline_run_id}"
 
-        # --- relax both SSRF layers for the loopback receiver (test-only) --------
+        # --- relax every SSRF layer for the loopback receiver (test-only) ---------
         mocker.patch("pipelex_api.schemas.models.is_disallowed_host", return_value=False)
         mocker.patch("pipelex.pipe_run.delivery_executor.SsrfGuardedTransport", httpx.AsyncHTTPTransport)
+        mocker.patch("pipelex.pipe_run.caller_webhook_delivery.SsrfGuardedTransport", httpx.AsyncHTTPTransport)
 
-        # The signing secret is pinned HERE rather than relying on the ambient
-        # env: `make agent-test` exports every `.env` key name (including
-        # commented ones) into the child env as EMPTY strings, and
-        # `os.environ.setdefault` in tests/conftest.py cannot replace an
-        # existing empty value.
-        test_secret = "conformance-shared-callback-secret"
-        mocker.patch.dict(os.environ, {"COMPLETION_CALLBACK_SECRET": test_secret})
+        # The secrets are pinned HERE rather than relying on the ambient env: `make agent-test` exports every `.env` key
+        # name (including commented ones) into the child env as EMPTY strings, and `os.environ.setdefault` in
+        # tests/conftest.py cannot replace an existing empty value.
+        completion_secret = "conformance-shared-callback-secret"
+        mocker.patch.dict(
+            os.environ,
+            {
+                "COMPLETION_CALLBACK_SECRET": completion_secret,
+                COMPLETION_CALLBACK_URL_ENV: f"{receiver_base}/runs/complete/{{pipeline_run_id}}",
+                CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET,
+            },
+        )
 
-        # --- fake orchestrator: deliver the completion in-process -----------------
-        # The runner now dispatches the locally-built PipeJob through the hub's
-        # OrchestratorRegistry via its fire-and-forget `start` arm. Stand in a fake orchestrator
-        # whose `start` performs the REAL DeliveryExecutor delivery and returns a
-        # `PipelexPipeDispatchAck` (ids only, workflow_id set), so the delivery wire bytes still
-        # come from the production path without needing a Temporal cluster or the
-        # `pipelex-temporal` plugin.
+        # --- fake orchestrator: deliver in-process --------------------------------
         async def fake_start(*, pipe_job: Any, delivery_assignment: DeliveryAssignment) -> PipelexPipeDispatchAck:
             await DeliveryExecutor().execute(
                 pipe_output=None,
@@ -203,8 +212,8 @@ class TestProtocolConformance:
                 workflow_id="wf-conformance-1",
             )
 
-        # The fake stands in for an async-capable backend so `/start`'s capability gate passes (it
-        # checks `supports_fire_and_forget` BEFORE dispatch — a blocking-only orchestrator would 400).
+        # The fake stands in for an async-capable backend so `/start`'s capability gate passes (it checks
+        # `supports_fire_and_forget` BEFORE dispatch — a blocking-only orchestrator would be refused).
         fake_orchestrator = mocker.MagicMock()
         fake_orchestrator.supports_fire_and_forget = True
         fake_orchestrator.start = mocker.AsyncMock(side_effect=fake_start)
@@ -217,7 +226,6 @@ class TestProtocolConformance:
         register_exception_handlers(app)
         client = TestClient(app)
 
-        client_pipeline_run_id = "conformance-client-run-0001"
         try:
             response = client.post(
                 "/v1/start",
@@ -226,7 +234,8 @@ class TestProtocolConformance:
                     "mthds_contents": [VALID_MTHDS],
                     "inputs": {"text": "hello"},
                     "pipeline_run_id": client_pipeline_run_id,
-                    "callback_urls": [callback_url],
+                    # The host forwards its own completion URL beside the caller's: it is the deployment's hop.
+                    "callback_urls": [caller_url, completion_url],
                 },
             )
         finally:
@@ -247,19 +256,31 @@ class TestProtocolConformance:
         fake_registry.get_optional.assert_called_once_with(mode="direct")
         fake_orchestrator.start.assert_awaited_once()
 
-        # Exactly one delivery reached the receiver.
-        assert len(_CallbackReceiver.captured) == 1
-        delivery = _CallbackReceiver.captured[0]
+        # One delivery per hop, the completion target notified once.
+        deliveries = {delivery["path"]: delivery for delivery in _CallbackReceiver.captured}
+        assert len(_CallbackReceiver.captured) == 2
+        completion_delivery = deliveries[f"/runs/complete/{client_pipeline_run_id}"]
+        caller_delivery = deliveries["/caller-hook"]
 
-        # Signature: HMAC-SHA256(secret, pipeline_run_id) hex digest — the signing scheme
-        # `_completion_signature` implements with the shared
-        # COMPLETION_CALLBACK_SECRET.
-        expected_signature = hmac.new(test_secret.encode("utf-8"), client_pipeline_run_id.encode("utf-8"), hashlib.sha256).hexdigest()
-        assert delivery["headers"].get("X-Completion-Signature") == expected_signature
+        # The completion target: HMAC-SHA256(secret, pipeline_run_id) hex digest, and the completion notice.
+        expected_completion_signature = hmac.new(
+            completion_secret.encode("utf-8"), client_pipeline_run_id.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        assert completion_delivery["headers"].get("x-completion-signature") == expected_completion_signature
+        assert "webhook-signature" not in completion_delivery["headers"]
+        notice = json.loads(completion_delivery["body"])
+        assert notice["pipeline_run_id"] == client_pipeline_run_id
+        assert notice["status"] == RunState.COMPLETED
+        assert "type" not in notice
 
-        # Payload: carries the protocol `pipeline_run_id` (static injection by ApiRunner)
-        # plus the runtime's own delivery fields; `status` is a RunState value.
-        payload = json.loads(delivery["body"])
-        assert payload["pipeline_run_id"] == client_pipeline_run_id
-        assert payload["pipeline_run_id"] == client_pipeline_run_id
-        assert payload["status"] == RunState.COMPLETED
+        # The caller's URL: the signed run.finished event, and never the completion signature.
+        assert "x-completion-signature" not in caller_delivery["headers"]
+        event = json.loads(caller_delivery["body"])
+        assert event["type"] == "run.finished"
+        assert event["attempt"] == 1
+        assert event["data"] == {"pipeline_run_id": client_pipeline_run_id, "status": "completed"}
+        headers = caller_delivery["headers"]
+        assert headers["webhook-id"].startswith("whd_")
+        signed_content = f"{headers['webhook-id']}.{headers['webhook-timestamp']}.".encode() + caller_delivery["body"]
+        mac = hmac.new(ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_KEY, signed_content, hashlib.sha256).digest()
+        assert headers["webhook-signature"] == f"v1,{base64.b64encode(mac).decode('ascii')}"

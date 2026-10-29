@@ -76,6 +76,7 @@ class PipelexErrorCode(StrEnum):
     CONNECTOR_TOOL_NOT_IN_TOOLSET = "pipelex.connector.tool_not_in_toolset"
     ERASURE_INCOMPLETE = "pipelex.erasure.incomplete"
     WEBHOOK_DELIVERY_FAILED = "pipelex.webhook.delivery_failed"
+    WEBHOOK_SECRET_NOT_CONFIGURED = "pipelex.webhook.secret_not_configured"
 
 
 class PipelexErrorParams(BaseModel):
@@ -994,6 +995,21 @@ class WebhookDeliveryFailedParams(PipelexErrorParams):
     receiver_status: int | None = None
 
 
+class WebhookSecretNotConfiguredParams(PipelexErrorParams):
+    """The parameters of `pipelex.webhook.secret_not_configured`.
+
+    This runner has no secret to sign webhooks with.
+
+    Attributes:
+        setting: The setting that holds the runner's webhook signing secret, an environment variable of the
+            runner.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED
+
+    setting: str
+
+
 PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.BILLING_PLAN_LIMIT: BillingPlanLimitParams,
     PipelexErrorCode.BILLING_CREDIT_EXHAUSTED: BillingCreditExhaustedParams,
@@ -1055,6 +1071,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.CONNECTOR_TOOL_NOT_IN_TOOLSET: ConnectorToolNotInToolsetParams,
     PipelexErrorCode.ERASURE_INCOMPLETE: ErasureIncompleteParams,
     PipelexErrorCode.WEBHOOK_DELIVERY_FAILED: WebhookDeliveryFailedParams,
+    PipelexErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED: WebhookSecretNotConfiguredParams,
 }
 """The parameters model of every Pipelex code."""
 
@@ -1751,6 +1768,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Check that the webhook's receiver is reachable and answers with a success status.",
         other_step="change_input",
         other_step_detail="Pass this to the caller, whose webhook receiver refused the delivery or could not be reached.",
+    ),
+    PipelexErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED: PipelexErrorEntry(
+        title="This runner has no secret to sign webhooks with",
+        domain="input",
+        retry="no",
+        status=422,
+        detail="This runner signs no webhooks, because its setting '{setting}' holds no signing secret.",
+        actor_step="change_input",
+        actor_step_detail="Send the request without callback URLs, or ask whoever runs this runner to set '{setting}' to a signing secret.",
+        other_step="change_input",
+        other_step_detail="Pass this to the caller, who asked for webhooks this runner cannot sign until '{setting}' holds a signing secret.",
     ),
 }
 """The title, verdict and templates of every Pipelex code."""

@@ -89,6 +89,31 @@ class StorageDeliveryError(DeliveryError):
     error_code = InheritsCause(fallback=PipelexErrorCode.STORAGE_UNAVAILABLE)
 
 
+class CallerWebhookSecretError(PipelexError):
+    """The secret this process signs a caller's webhooks with is not set, or is not a ``whsec_`` secret.
+
+    Its code is ``runtime.misconfigured``: whoever runs the runtime sets the secret, and the ``component`` the problem
+    names, the setting, is read by the operator alone. A delivery that meets it records the delivery as failed and
+    never fails the run, while a runner that meets it on a request's way in refuses the request before running anything.
+    """
+
+    error_code = CoreCode.RUNTIME_MISCONFIGURED
+
+    def __init__(self, message: str, *, setting: str) -> None:
+        """Build the refusal of the signing secret.
+
+        Args:
+            message: What is wrong with the secret, never the secret itself, for the operator's diagnostics.
+            setting: The setting that holds the secret, the environment variable's name.
+        """
+        super().__init__(message)
+        self.setting = setting
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"component": self.setting}
+
+
 class DryRunError(PipelexError):
     """Raised when a dry run fails. The validation sweep raises it with one failure per pipe whose dry run
     failed, located at the innermost failing pipe that is not allowed to fail, so a controller that failed

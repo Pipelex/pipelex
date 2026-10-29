@@ -1,0 +1,221 @@
+{
+  "description": "Known-answer vectors of the caller-webhook signature, specs/pipelex-caller-webhooks.md. Every signature was produced by the Standard Webhooks reference library for Python (PyPI standardwebhooks) and is checked against it by tests/caller_webhooks/test_signature_vectors.py. Each body is the exact text of a call, and what is signed is its UTF-8 encoding: a \\u escape in this file stands for the character itself, which the body carries as raw UTF-8. Timestamps and receiver_clock are Unix seconds. The secrets are synthetic: 32 consecutive byte values, base64-encoded after whsec_.",
+  "spec": "specs/pipelex-caller-webhooks.md",
+  "timestamp_tolerance_seconds": 300,
+  "signing": [
+    {
+      "name": "failed_run",
+      "description": "A failed run's first attempt under one secret: the run passed its time limit, and data carries its problem in the caller view.",
+      "secrets": [
+        "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+      ],
+      "webhook_id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+      "webhook_timestamp": "1792670401",
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "webhook_signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+    },
+    {
+      "name": "rotation",
+      "description": "A completed run's second attempt during a rotation: one signature per live secret, the current secret's first, separated by one space.",
+      "secrets": [
+        "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+        "whsec_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8="
+      ],
+      "webhook_id": "whd_3f2b9c1e7a4d4e8bb6c51d0e9f8a7b6c_1",
+      "webhook_timestamp": "1792746866",
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-23T09:14:05Z\",\"attempt\":2,\"data\":{\"pipeline_run_id\":\"3f2b9c1e-7a4d-4e8b-b6c5-1d0e9f8a7b6c\",\"status\":\"completed\"}}",
+      "webhook_signature": "v1,G/fOCpEvoS6ufQeE7fHiWW4qzalyf5cx8cfPEDVG2BA= v1,Ykbhe+mXrESBn93B3kpYjEKVyxRsH2zmxNaYbT+EAdE="
+    },
+    {
+      "name": "non_ascii_body",
+      "description": "A failed run whose problem names a file and a function with non-ASCII characters, sent as raw UTF-8 rather than JSON escapes, so the signature covers the UTF-8 bytes of the body.",
+      "secrets": [
+        "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+      ],
+      "webhook_id": "whd_a7e4c2d95b1f4c3a8e6d0f9b2a1c3d5e_0",
+      "webhook_timestamp": "1792860013",
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-24T16:40:12.250Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/pipe.function_raised\",\"title\":\"The method's function failed\",\"detail\":\"The function 'fonctions.r\u00e9sum\u00e9.summarize' of pipe 'summarize_invoice' raised an error.\",\"code\":\"pipe.function_raised\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Fix the function 'fonctions.r\u00e9sum\u00e9.summarize' so that it does not raise on these inputs, then run the method again.\"},\"params\":{\"pipe\":\"summarize_invoice\",\"function\":\"fonctions.r\u00e9sum\u00e9.summarize\"},\"location\":{\"pipe\":\"summarize_invoice\",\"path\":[\"process_invoice\",\"summarize_invoice\"],\"file\":\"fonctions/r\u00e9sum\u00e9.py\"},\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\"}}}",
+      "webhook_signature": "v1,quStPS1n4tcGC8rTSJaBu0Wt5JBdXBgfH3EwkMcWFzQ="
+    }
+  ],
+  "verification": [
+    {
+      "name": "failed_run_accepted",
+      "description": "The failed_run call, verified two seconds after it was sent under the secret that signed it.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "accepted"
+    },
+    {
+      "name": "rotation_accepted_under_the_current_secret",
+      "description": "The rotation call, verified by a receiver that already holds the new secret.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_3f2b9c1e7a4d4e8bb6c51d0e9f8a7b6c_1",
+        "webhook-timestamp": "1792746866",
+        "webhook-signature": "v1,G/fOCpEvoS6ufQeE7fHiWW4qzalyf5cx8cfPEDVG2BA= v1,Ykbhe+mXrESBn93B3kpYjEKVyxRsH2zmxNaYbT+EAdE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-23T09:14:05Z\",\"attempt\":2,\"data\":{\"pipeline_run_id\":\"3f2b9c1e-7a4d-4e8b-b6c5-1d0e9f8a7b6c\",\"status\":\"completed\"}}",
+      "receiver_clock": 1792746867,
+      "verdict": "accepted"
+    },
+    {
+      "name": "rotation_accepted_under_the_previous_secret",
+      "description": "The rotation call, verified by a receiver that still holds the previous secret.",
+      "secret": "whsec_ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+      "headers": {
+        "webhook-id": "whd_3f2b9c1e7a4d4e8bb6c51d0e9f8a7b6c_1",
+        "webhook-timestamp": "1792746866",
+        "webhook-signature": "v1,G/fOCpEvoS6ufQeE7fHiWW4qzalyf5cx8cfPEDVG2BA= v1,Ykbhe+mXrESBn93B3kpYjEKVyxRsH2zmxNaYbT+EAdE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-23T09:14:05Z\",\"attempt\":2,\"data\":{\"pipeline_run_id\":\"3f2b9c1e-7a4d-4e8b-b6c5-1d0e9f8a7b6c\",\"status\":\"completed\"}}",
+      "receiver_clock": 1792746867,
+      "verdict": "accepted"
+    },
+    {
+      "name": "non_ascii_body_accepted",
+      "description": "The non_ascii_body call, verified over the UTF-8 bytes of its body.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_a7e4c2d95b1f4c3a8e6d0f9b2a1c3d5e_0",
+        "webhook-timestamp": "1792860013",
+        "webhook-signature": "v1,quStPS1n4tcGC8rTSJaBu0Wt5JBdXBgfH3EwkMcWFzQ="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-24T16:40:12.250Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/pipe.function_raised\",\"title\":\"The method's function failed\",\"detail\":\"The function 'fonctions.r\u00e9sum\u00e9.summarize' of pipe 'summarize_invoice' raised an error.\",\"code\":\"pipe.function_raised\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Fix the function 'fonctions.r\u00e9sum\u00e9.summarize' so that it does not raise on these inputs, then run the method again.\"},\"params\":{\"pipe\":\"summarize_invoice\",\"function\":\"fonctions.r\u00e9sum\u00e9.summarize\"},\"location\":{\"pipe\":\"summarize_invoice\",\"path\":[\"process_invoice\",\"summarize_invoice\"],\"file\":\"fonctions/r\u00e9sum\u00e9.py\"},\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\"}}}",
+      "receiver_clock": 1792860016,
+      "verdict": "accepted"
+    },
+    {
+      "name": "wrong_secret",
+      "description": "The failed_run call, verified under a secret that did not sign it.",
+      "secret": "whsec_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "rotation_under_an_unrelated_secret",
+      "description": "The rotation call, verified under a secret that is neither of the two that signed it.",
+      "secret": "whsec_QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8=",
+      "headers": {
+        "webhook-id": "whd_3f2b9c1e7a4d4e8bb6c51d0e9f8a7b6c_1",
+        "webhook-timestamp": "1792746866",
+        "webhook-signature": "v1,G/fOCpEvoS6ufQeE7fHiWW4qzalyf5cx8cfPEDVG2BA= v1,Ykbhe+mXrESBn93B3kpYjEKVyxRsH2zmxNaYbT+EAdE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-23T09:14:05Z\",\"attempt\":2,\"data\":{\"pipeline_run_id\":\"3f2b9c1e-7a4d-4e8b-b6c5-1d0e9f8a7b6c\",\"status\":\"completed\"}}",
+      "receiver_clock": 1792746867,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "tampered_attempt",
+      "description": "The failed_run call with its body's attempt changed from 1 to 2: the attempt is under the signature like the rest of the body.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":2,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "reserialized_body",
+      "description": "The failed_run call's body parsed and serialized again with spaces after its separators: the same JSON value, other bytes, so a receiver verifies the raw body it received, never a serialization of its own.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\": \"run.finished\", \"timestamp\": \"2026-10-22T11:59:58Z\", \"attempt\": 1, \"data\": {\"pipeline_run_id\": \"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\", \"status\": \"failed\", \"error\": {\"type\": \"https://mthds.ai/errors/run.timed_out\", \"title\": \"The run passed its time limit\", \"detail\": \"The run did not end within the deployment's run limit of 3600 seconds.\", \"code\": \"run.timed_out\", \"domain\": \"method\", \"retry\": \"no\", \"next_step\": {\"kind\": \"change_method\", \"detail\": \"Make the method do less work per run, so that it ends within 3600 seconds.\"}, \"params\": {\"timeout\": 3600}, \"pipeline_run_id\": \"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "escaped_body",
+      "description": "The non_ascii_body call's body with its non-ASCII characters written as JSON escapes: the same JSON value, other bytes.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_a7e4c2d95b1f4c3a8e6d0f9b2a1c3d5e_0",
+        "webhook-timestamp": "1792860013",
+        "webhook-signature": "v1,quStPS1n4tcGC8rTSJaBu0Wt5JBdXBgfH3EwkMcWFzQ="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-24T16:40:12.250Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/pipe.function_raised\",\"title\":\"The method's function failed\",\"detail\":\"The function 'fonctions.r\\u00e9sum\\u00e9.summarize' of pipe 'summarize_invoice' raised an error.\",\"code\":\"pipe.function_raised\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Fix the function 'fonctions.r\\u00e9sum\\u00e9.summarize' so that it does not raise on these inputs, then run the method again.\"},\"params\":{\"pipe\":\"summarize_invoice\",\"function\":\"fonctions.r\\u00e9sum\\u00e9.summarize\"},\"location\":{\"pipe\":\"summarize_invoice\",\"path\":[\"process_invoice\",\"summarize_invoice\"],\"file\":\"fonctions/r\\u00e9sum\\u00e9.py\"},\"pipeline_run_id\":\"a7e4c2d9-5b1f-4c3a-8e6d-0f9b2a1c3d5e\"}}}",
+      "receiver_clock": 1792860016,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "webhook_id_changed",
+      "description": "The failed_run call's signature presented under another delivery's id: the id is under the signature.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_1",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670403,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "timestamp_header_changed",
+      "description": "The failed_run call's signature presented with a webhook-timestamp one minute later, received within tolerance of that later time: the timestamp is under the signature, so a captured call cannot be refreshed.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670461",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670463,
+      "verdict": "rejected",
+      "refusal": "signature"
+    },
+    {
+      "name": "timestamp_too_old",
+      "description": "The failed_run call received 301 seconds after its webhook-timestamp, more than five minutes late.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670702,
+      "verdict": "rejected",
+      "refusal": "timestamp"
+    },
+    {
+      "name": "timestamp_too_new",
+      "description": "The failed_run call received 301 seconds before its webhook-timestamp, more than five minutes early by the receiver's clock.",
+      "secret": "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+      "headers": {
+        "webhook-id": "whd_8c1f6a523d1e4b7a9f0e2a5c7d9e4b10_0",
+        "webhook-timestamp": "1792670401",
+        "webhook-signature": "v1,gAsBHoYeg+fMmqQdG+V7RYRKWeKchUTGpwKb+KoahCE="
+      },
+      "body": "{\"type\":\"run.finished\",\"timestamp\":\"2026-10-22T11:59:58Z\",\"attempt\":1,\"data\":{\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\",\"status\":\"failed\",\"error\":{\"type\":\"https://mthds.ai/errors/run.timed_out\",\"title\":\"The run passed its time limit\",\"detail\":\"The run did not end within the deployment's run limit of 3600 seconds.\",\"code\":\"run.timed_out\",\"domain\":\"method\",\"retry\":\"no\",\"next_step\":{\"kind\":\"change_method\",\"detail\":\"Make the method do less work per run, so that it ends within 3600 seconds.\"},\"params\":{\"timeout\":3600},\"pipeline_run_id\":\"8c1f6a52-3d1e-4b7a-9f0e-2a5c7d9e4b10\"}}}",
+      "receiver_clock": 1792670100,
+      "verdict": "rejected",
+      "refusal": "timestamp"
+    }
+  ]
+}
