@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from mthds.protocol.problem.registry import CoreCode
@@ -24,6 +25,7 @@ from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enable
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
 from pipelex.tools.log.error_fields import ERROR_CODE_FIELD, ERROR_TYPE_FIELD, error_fields
+from pipelex.tools.network.exceptions import SsrfBlockedError
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -147,8 +149,8 @@ class PipeRun(PipeRunProtocol):
             # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
             status = DeliveryStatus.FAILED
             execution_error = exc
-            # The problem a FAILED webhook receives, built only when a webhook is there to receive it.
-            if delivery_assignment is not None and delivery_assignment.webhooks:
+            # The problem a FAILED webhook receives, the host's or a caller's, built only when a webhook is there to receive it.
+            if delivery_assignment is not None and delivery_assignment.needs_run_problem:
                 problem = _webhook_problem(
                     error=exc,
                     pipeline_run_id=pipeline_run_id,
@@ -173,6 +175,8 @@ class PipeRun(PipeRunProtocol):
             # A security refusal also logs its security event, once, naming the run and never what it refused.
             emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
         finally:
+            # When the run ended, which a caller's webhook event states, taken before the run's tail does its own work.
+            finished_at = datetime.now(UTC)
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 try:
@@ -245,10 +249,17 @@ class PipeRun(PipeRunProtocol):
                         status=status,
                         problem=problem,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
+                        finished_at=finished_at,
+                        extras=pipe_job.job_metadata.run_metadata.extras,
                     )
-                except DeliveryError as delivery_error:
+                except (DeliveryError, SsrfBlockedError) as delivery_error:
+                    # A caller's webhook never raises here: its failures are the delivery's own records. What can is
+                    # the storage, or one of the host's own webhooks, which the SSRF guard may refuse at fire time.
                     if execution_error is None:
                         raise
+                    # The run keeps its own failure. A refusal of the delivery's destination still logs its own security
+                    # event, naming the run, beside the one the run's failure logged if it was a refusal too.
+                    emit_security_event_for_run(error=delivery_error, run_metadata=pipe_job.job_metadata.run_metadata)
                     # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
                     # By its code and class, never its text, which names the caller's webhook URL or the store it wrote to.
                     log.error(

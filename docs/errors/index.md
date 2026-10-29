@@ -182,3 +182,4 @@ The webhooks a caller registers to hear about its runs.
 | Code | Title | Domain | Retry | Status |
 |---|---|---|---|---|
 | [`pipelex.webhook.delivery_failed`](pipelex/webhook/delivery_failed.md) | A webhook was not delivered | `input` | `yes` | `502` |
+| [`pipelex.webhook.secret_not_configured`](pipelex/webhook/secret_not_configured.md) | This runner has no secret to sign webhooks with | `input` | `no` | `422` |

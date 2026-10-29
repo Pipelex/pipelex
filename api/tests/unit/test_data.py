@@ -27,6 +27,10 @@ class ProblemTestData:
     FORWARDED_USER_ID = "22222222-2222-4222-2222-222222222222"
     JWT_USER_ID = "33333333-3333-4333-3333-333333333333"
     CALLBACK_URL = "https://example.com/done"
+    # The caller-webhook contract's synthetic signing secret, the one its known-answer vectors are signed under.
+    SYNTHETIC_CALLER_WEBHOOK_SECRET = "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
+    SYNTHETIC_CALLER_WEBHOOK_KEY = bytes(range(32))
+    COMPLETION_TARGET_TEMPLATE = "https://ops.example.com/runs/complete/{pipeline_run_id}"
 
     # A problem whose code no registry of this server holds, as a newer worker or a stored record carries it, built in
     # the operator's view: its step and its diagnostics name a file of the host that a caller must never read.

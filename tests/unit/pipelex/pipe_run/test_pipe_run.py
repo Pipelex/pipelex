@@ -2,6 +2,7 @@ import logging
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
+import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
@@ -11,8 +12,10 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import PipelexProblem
 from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event
 from pipelex.errors.security_target import SecurityTargetClass
+from pipelex.pipe_run import caller_webhook_delivery as caller_webhook_delivery_module
 from pipelex.pipe_run import pipe_run as pipe_run_module
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
+from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV, CallerWebhookFailure
+from pipelex.pipe_run.delivery_assignment import CallerWebhookTarget, DeliveryAssignment, DeliveryStatus, StorageTarget, WebhookTarget
 from pipelex.pipe_run.exceptions import PipeRouterError, WebhookDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
@@ -22,6 +25,8 @@ from pipelex.tools.network.exceptions import SsrfBlockedError
 _SECURITY_EVENT_LOGGER = "pipelex.errors.security_event"
 
 _WEBHOOK_URL = "https://hooks.example.test/runs"
+
+_CALLER_WEBHOOK_SECRET = "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8="
 
 
 class _UnbuildableProblemError(PipelexError):
@@ -197,7 +202,7 @@ class TestPipeRun:
         reason="raises SSRF refusals built in the test, without the input and the rule their raise sites name"
     )
     async def test_a_run_refused_then_its_webhook_refused_logs_both_refusals(self, mocker: MockerFixture, caplog: pytest.LogCaptureFixture) -> None:
-        """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two refusals of one code, two events."""
+        """A run its input refused, whose FAILED webhook the SSRF guard then refuses: two events, and the run keeps its own failure."""
         input_refusal = SsrfBlockedError("Refusing to connect to 'files.internal.example'.").with_security_target_class(SecurityTargetClass.PRIVATE)
         webhook_refusal = SsrfBlockedError("Refusing to connect to 'hooks.internal.example'.").with_security_target_class(
             SecurityTargetClass.LOOPBACK
@@ -211,10 +216,15 @@ class TestPipeRun:
             run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-both-refused", storage_scope="test/scope", read_scope=None)
         )
 
-        with caplog.at_level(logging.WARNING, logger=_SECURITY_EVENT_LOGGER), pytest.raises(SsrfBlockedError) as exc_info:
+        with caplog.at_level(logging.WARNING), pytest.raises(SsrfBlockedError) as exc_info:
             await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=DeliveryAssignment(storage=StorageTarget()))
 
-        assert exc_info.value is webhook_refusal
+        # The webhook's refusal is the delivery's failure, logged as such, and never replaces the run's own.
+        assert exc_info.value is input_refusal
+        (delivery_record,) = [
+            record for record in caplog.records if record.getMessage() == "The delivery also failed after the pipe execution failed"
+        ]
+        assert vars(delivery_record)["error.type"] == "SsrfBlockedError"
         events = [vars(record) for record in caplog.records if record.getMessage() == SECURITY_EVENT_MESSAGE]
         assert [event["security.target_class"] for event in events] == [SecurityTargetClass.PRIVATE, SecurityTargetClass.LOOPBACK]
         assert [event["error.code"] for event in events] == [CoreCode.SECURITY_INPUT_URL_REFUSED] * 2
@@ -280,6 +290,41 @@ class TestPipeRun:
         assert {key: record_fields[key] for key in expected_fields} == expected_fields
         assert "error.message" not in record_fields
         assert secret not in str(record_fields)
+
+    @pytest.mark.parametrize("router_error", [None, RuntimeError("router blew up")])
+    async def test_a_caller_webhook_s_failure_never_changes_the_run(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, router_error: Exception | None
+    ) -> None:
+        """A caller webhook that cannot be delivered leaves a completed run completed and a failed run with its own failure."""
+        monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, _CALLER_WEBHOOK_SECRET)
+        mocker.patch.object(
+            caller_webhook_delivery_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(lambda _request: httpx.Response(500))
+        )
+        mocker.patch.object(caller_webhook_delivery_module, "sleep", new=mocker.AsyncMock())
+        run_output = mocker.MagicMock()
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=router_error) if router_error else mocker.AsyncMock(return_value=run_output)
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-caller-down", storage_scope="test/scope", read_scope=None)
+        )
+        execute_spy = mocker.spy(pipe_run_module.DeliveryExecutor, "execute")
+        assignment = DeliveryAssignment(caller_webhooks=[CallerWebhookTarget(url=_WEBHOOK_URL)])
+
+        if router_error is None:
+            assert await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment) is run_output
+        else:
+            with pytest.raises(RuntimeError, match="router blew up"):
+                await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment)
+
+        (outcome,) = execute_spy.spy_return.caller_webhooks
+        assert outcome.failure == CallerWebhookFailure.HTTP_STATUS
+        assert outcome.attempt_count == 3
+        delivery_kwargs = execute_spy.call_args.kwargs
+        # The failed run's problem reaches the caller's webhook too, with when the run ended and the run's extras.
+        assert (delivery_kwargs["problem"] is None) is (router_error is None)
+        assert delivery_kwargs["finished_at"].tzinfo is not None
+        assert delivery_kwargs["extras"] == {}
 
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""

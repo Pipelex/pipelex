@@ -47,6 +47,8 @@ Execute a Pipelex pipeline with flexible inputs and wait for completion.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
+- `pipeline_run_id` (string, optional): **Pipelex-API extension on `/execute`.** The run's id, at most 128 characters, chosen by the caller as on `/start`: the response and the run's webhooks carry it, and a run still in flight under the same id refuses the request with a `409` `pipelex.run.already_exists`. When absent, the server generates one.
+- `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends, before the response is sent; their delivery never changes the response. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
 
@@ -99,7 +101,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 
 **Endpoint:** `POST /v1/start`
 
-> **Fire-and-forget is a property of this endpoint, honored only by an async-capable backend.** `orchestration_mode` names only the deployment's backend; `/start` sets `FIRE_AND_FORGET` delivery and requires an orchestrator that can honor it. A Temporal deployment (`orchestration_mode = "temporal"`) enqueues the run and returns immediately with a `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`, the default — see [Configuration → Orchestration mode](configuration.md)) the in-process orchestrator is blocking-only, so `/start` is **HONEST**: it refuses with a `501` `runtime.unsupported` naming the capability `asynchronous execution` — use `POST /v1/execute` — rather than silently running blocking and acking. The completion callback fires on the async path.
+> **Fire-and-forget is a property of this endpoint, honored only by an async-capable backend.** `orchestration_mode` names only the deployment's backend; `/start` sets `FIRE_AND_FORGET` delivery and requires an orchestrator that can honor it. A Temporal deployment (`orchestration_mode = "temporal"`) enqueues the run and returns immediately with a `workflow_id`. On the orchestrator-agnostic base (`orchestration_mode = "direct"`, the default — see [Configuration → Orchestration mode](configuration.md)) the in-process orchestrator is blocking-only, so `/start` is **HONEST**: it refuses with a `501` `runtime.unsupported` naming the capability `asynchronous execution` — use `POST /v1/execute` — rather than silently running blocking and acking. The run's webhooks fire on the async path.
 
 **Request Body:**
 
@@ -134,6 +136,7 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 - `storage_scope` (string, optional): **Pipelex-API extension.** The prefix every object this run writes lands under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `read_scope` (string, optional): **Pipelex-API extension.** The prefix every stored object this run reads must lie under — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
 - `analytics_groups` (dict[str, str], optional): **Pipelex-API extension.** The groups this run's telemetry belongs to, such as `{"organization": "org_acme"}` — see [Host-supplied run context](#host-supplied-run-context-storage_scope-and-analytics_groups).
+- `callback_urls` (list[str], optional): **Pipelex-API extension.** The URLs that each receive the run's signed `run.finished` event once it ends. See [Webhooks](webhooks.md).
 
 **Validation Rules:**
 
@@ -167,11 +170,11 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 
 **Response Fields:**
 
-- `pipeline_run_id` (string): Unique identifier for the run. Use this to correlate callbacks (see below).
+- `pipeline_run_id` (string): Unique identifier for the run. Use this to correlate the run's webhooks (see [Webhooks](webhooks.md)).
 - `created_at` (string): ISO timestamp when the pipeline was started.
 - `state` (string): Always `"STARTED"` from this endpoint — the pipeline is queued, not finished.
 - `finished_at` (null): Always `null`; the pipeline hasn't completed.
-- `main_stuff_name` (null): Always `null`; populated only on the eventual completion callback.
+- `main_stuff_name` (null): Always `null`; the run's result is read once it ends.
 - `pipe_output` (null): Always `null`; the result isn't ready yet.
 - `workflow_id` (string | null): The async orchestrator's workflow ID. A `202` ack is only ever returned by an async-capable backend (e.g. a Temporal flavor), so this carries that orchestrator's id; the in-process `direct` base never acks here — it returns a `501` `runtime.unsupported` instead.
 - `method_provenance` (object | null): `{address, tag, commit_sha, tree_digest, display_name}` for a `method_ref` run — see [Running a method by address](#running-a-method-by-address-method_ref); `null` for runs from inline source or a bundle.
@@ -179,49 +182,9 @@ Start a pipeline execution and get its `pipeline_run_id` back with a `202` ack.
 
 **Errors** follow the same convention as `/execute`: HTTP 4xx/5xx with an [RFC 9457 `application/problem+json`](error-responses.md) body.
 
-#### Async Completion Callbacks (optional)
+#### Webhooks (optional)
 
-`POST /v1/start` accepts an additional optional field in the request body, **`callback_urls`** — a list of HTTP(S) endpoints the server will POST to once the pipeline finishes. This is a **pipelex-api extension**, not part of the MTHDS Protocol (the protocol defines no completion channel; each implementation defines and documents its own extension args). SDK clients pass it through the generic `extra` mapping, e.g. `client.start(..., extra={"callback_urls": [...]})`.
-
-```json
-{
-  "pipe_code": "your_pipeline_code",
-  "inputs": { "input_name": "..." },
-  "callback_urls": ["https://my-app.example.com/pipelex-finished"]
-}
-```
-
-A callback URL is refused before anything runs with a **422** `security.input_url_refused` when its scheme is not `http` or `https`, or when its host is one the runtime's SSRF rule refuses: `localhost`, a cloud metadata name such as `metadata.google.internal` in any case and with or without a trailing dot, or a literal address that is not publicly routable, a loopback, private, link-local, carrier-grade NAT or cloud metadata address among them. A scheme-relative URL, such as `//169.254.169.254/latest/meta-data`, is refused the same way when its host is one the rule refuses. It is the rule the delivery applies again when the webhook fires, resolving the name, and such a refusal also writes a [security event](logging.md#security-events). A callback URL that is not a URL at all, empty, longer than the limit, with no scheme, naming no host, or opening no authority with `//`, such as `example.com:8080/hook` or `localhost:3000/cb`, is a **422** `request.invalid` naming the field `callback_urls` and writes none.
-
-When the pipeline completes, each URL in the list receives a POST carrying:
-
-- A completion notice in the body, not the run's output: `pipeline_run_id`, the delivery `state` (`"COMPLETED"` or `"FAILED"`, also sent under the legacy `status` key), `result_url` (when results were stored: the storage key prefix under which the result files sit, not a fetchable URL) and `error` on failure, the run's problem document in the view of whoever started the run (see [Error Responses](error-responses.md#async-callbacks-webhook-payload)). The receiver reads the results from storage under that prefix.
-- An **`X-Completion-Signature`** header — `HMAC-SHA256(secret, pipeline_run_id)` rendered as a hex digest
-
-**Verifying the signature on the receiver side**
-
-Your callback handler should recompute the same HMAC using its own copy of the shared secret and reject any request that doesn't match. Pseudocode:
-
-```python
-import hmac, hashlib
-
-expected = hmac.new(
-    SHARED_SECRET.encode("utf-8"),
-    pipeline_run_id.encode("utf-8"),
-    hashlib.sha256,
-).hexdigest()
-
-if not hmac.compare_digest(expected, request.headers["X-Completion-Signature"]):
-    return Response(status=401)
-```
-
-The signer (this server) and the verifier (your callback receiver) must share the same secret value. The secret never travels over the wire — only the per-run HMAC does — so even if a callback request is intercepted, the secret stays safe.
-
-**Server-side requirement**
-
-Set the `COMPLETION_CALLBACK_SECRET` environment variable on the API server **only if** you use `callback_urls`. The variable is read lazily — the server boots fine without it, and only requires it when actually signing a callback. If you call `/start` with `callback_urls` and the env var isn't set, you'll get a 500 with `EnvVarNotFoundError: Environment variable 'COMPLETION_CALLBACK_SECRET' is required but not set`.
-
-The receiver-side secret must be the same value. In typical deployments both sides pull from a shared secrets store (AWS Secrets Manager, Vault, etc.).
+`POST /v1/start`, like `POST /v1/execute`, accepts **`callback_urls`**, a **pipelex-api extension**: a list of HTTP(S) endpoints that each receive the signed `run.finished` event when the run ends. The server needs a signing secret, `CALLER_WEBHOOK_SECRET`, to accept them, and a deployment may also configure a completion target of its own, `COMPLETION_CALLBACK_URL`, which every `/start` run notifies. See [Webhooks](webhooks.md) for the event, its signature, the delivery and the completion target.
 
 ---
 
@@ -392,7 +355,7 @@ Both `/execute` and `/start` accept optional fields that describe the run's tena
 
 **`storage_scope`** is the prefix every object the run writes lands under: one to three path-safe segments, onto which the runtime composes its own leaves (`assets/`, `generated/`, `results/`, `payloads/`). Omit it and the run is scoped to the caller's own id, which is right for a single-tenant deployment and wrong for a multi-tenant one: a host serving many tenants must send it. Each segment is one or more characters from `A-Za-z0-9_-`, so an empty segment, a leading or trailing slash, a `.` or `..`, or a fourth segment is refused with a `422` `request.invalid` naming the field `storage_scope`.
 
-**`read_scope`** bounds what the run may read: every `pipelex-storage://` key the run reads, whether an input, a URL a pipe builds or an image it shows a model, must lie under it, and a scoped run reads no local path at all. It follows the same segment rule as `storage_scope`, and the storage scope must be the read scope or lie under it, since a run reads back what it writes: `org_acme` covers `org_acme/method_42/run_7`, while `org_other` does not. Omit it and the run is scoped to the caller's own id when the deployment identifies its callers, which is also where their writes land by default, and unscoped when the deployment is single-tenant. A host serving many tenants must send it: a host that sends its own `storage_scope` but no `read_scope` is refused, since that storage scope lies under no caller's id. A malformed read scope, a storage scope outside it, or the local storage scope `local` beside one is a `422` `request.invalid` naming the field `read_scope`, answered before any method is fetched or library loaded. **On a `jwt` deployment the read scope is bound to the caller**: the caller reaches the runner with its own token rather than through a trusted host, so a read scope it sends must be its token's `user_id` or lie under it, else the request is a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller`, answered before anything is read. Every route taking a `read_scope` applies the same rule (`/v1/validate`, `/v1/resolve`, `/v1/codegen`, `/v1/pipe-io` and `POST /v1/blobs/missing` too), and since the storage scope must lie under the read scope, a `jwt` caller writes only under its own id as well. With `AUTH_MODE=none` and the shared `api_key`, the caller is a trusted host or a single tenant, and the scope it sends is taken as it is. A read the scope does not allow is refused when the run makes it, as the security refusal `security.input_url_refused`, which says where the URL sat without quoting it. On `/execute` it is a `422`. On `/start` it is a synchronous `422` when an input breaks the rule, and a run that ends `FAILED` with that error in its completion callback when a pipe reaches for the URL during the run.
+**`read_scope`** bounds what the run may read: every `pipelex-storage://` key the run reads, whether an input, a URL a pipe builds or an image it shows a model, must lie under it, and a scoped run reads no local path at all. It follows the same segment rule as `storage_scope`, and the storage scope must be the read scope or lie under it, since a run reads back what it writes: `org_acme` covers `org_acme/method_42/run_7`, while `org_other` does not. Omit it and the run is scoped to the caller's own id when the deployment identifies its callers, which is also where their writes land by default, and unscoped when the deployment is single-tenant. A host serving many tenants must send it: a host that sends its own `storage_scope` but no `read_scope` is refused, since that storage scope lies under no caller's id. A malformed read scope, a storage scope outside it, or the local storage scope `local` beside one is a `422` `request.invalid` naming the field `read_scope`, answered before any method is fetched or library loaded. **On a `jwt` deployment the read scope is bound to the caller**: the caller reaches the runner with its own token rather than through a trusted host, so a read scope it sends must be its token's `user_id` or lie under it, else the request is a `403` `auth.forbidden` whose `requirement` is `read_scope_under_caller`, answered before anything is read. Every route taking a `read_scope` applies the same rule (`/v1/validate`, `/v1/resolve`, `/v1/codegen`, `/v1/pipe-io` and `POST /v1/blobs/missing` too), and since the storage scope must lie under the read scope, a `jwt` caller writes only under its own id as well. With `AUTH_MODE=none` and the shared `api_key`, the caller is a trusted host or a single tenant, and the scope it sends is taken as it is. A read the scope does not allow is refused when the run makes it, as the security refusal `security.input_url_refused`, which says where the URL sat without quoting it. On `/execute` it is a `422`. On `/start` it is a synchronous `422` when an input breaks the rule, and a run that ends `FAILED` with that error in its webhooks when a pipe reaches for the URL during the run.
 
 **`analytics_groups`** names the entities the run's telemetry belongs to, as a mapping of group type to group key. The runtime carries it on the run as its opaque `extras` and stamps it on every span of the run as the attribute `pipelex.run.extras`, so every OpenTelemetry exporter receives it, and the deployment's own PostHog stream, when `telemetry.toml` sets `mode = "identified"`, attaches it to each capture as PostHog groups. That is what lets a generation made for one of your customers appear inside that customer's organization instead of under one identity for the whole deployment. The rules are the runtime's own, imported rather than restated here:
 

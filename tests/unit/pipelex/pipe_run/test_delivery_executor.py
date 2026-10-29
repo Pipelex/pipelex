@@ -3,6 +3,7 @@ import logging
 import socket
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture, MockType
@@ -34,14 +35,17 @@ from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none, get_library_manager, scoped_current_library
+from pipelex.pipe_run import caller_webhook_delivery as caller_webhook_delivery_module
 from pipelex.pipe_run import delivery_executor as delivery_executor_module
+from pipelex.pipe_run.caller_webhook_delivery import CallerWebhookOutcome
 from pipelex.pipe_run.delivery_assignment import (
+    CallerWebhookTarget,
     DeliveryAssignment,
     DeliveryStatus,
     StorageTarget,
     WebhookTarget,
 )
-from pipelex.pipe_run.delivery_executor import DeliveryExecutor
+from pipelex.pipe_run.delivery_executor import DeliveryExecutor, DeliveryReport
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.tools.network.exceptions import SsrfBlockedError
@@ -1189,3 +1193,100 @@ class TestDeliveryExecutor:
             )
 
         assert str(exc_info.value) == "Webhook delivery failed for pipeline_run_id=plr-err: ConnectError"
+
+    @pytest.mark.builds_problems_without_required_params(reason="the failed run's problem is built in the test, as its sibling tests build it")
+    async def test_caller_webhooks_are_sent_even_when_a_host_webhook_fails(self, mocker: MockerFixture) -> None:
+        """The host's own webhook failing still raises, but only once each caller webhook was sent its event."""
+        mock_client = mocker.AsyncMock()
+        mock_client.__aenter__ = mocker.AsyncMock(return_value=mock_client)
+        mock_client.__aexit__ = mocker.AsyncMock(return_value=False)
+        mock_client.post = mocker.AsyncMock(side_effect=httpx.ConnectError("Connection refused"))
+        mocker.patch("pipelex.pipe_run.delivery_executor.httpx.AsyncClient", return_value=mock_client)
+        caller_target = CallerWebhookTarget(url="https://caller.example.com/hook")
+        deliver_spy = mocker.patch(
+            "pipelex.pipe_run.delivery_executor.deliver_caller_webhooks",
+            new=mocker.AsyncMock(
+                return_value=[CallerWebhookOutcome(delivery_id=caller_target.delivery_id, server_address="caller.example.com", attempt_count=1)]
+            ),
+        )
+        problem = _make_failed_run_problem()
+        finished_at = datetime(2026, 10, 22, 11, 59, 58, tzinfo=UTC)
+
+        with pytest.raises(WebhookDeliveryError):
+            await DeliveryExecutor().execute(
+                pipe_output=None,
+                storage_scope="test-user",
+                pipeline_run_id="plr-host-down",
+                delivery_assignment=DeliveryAssignment(
+                    webhooks=[WebhookTarget(url="https://completion.example.com/runs")],
+                    caller_webhooks=[caller_target],
+                ),
+                status=DeliveryStatus.FAILED,
+                problem=problem,
+                finished_at=finished_at,
+                extras={"org": "acme"},
+            )
+
+        deliver_spy.assert_awaited_once_with(
+            targets=[caller_target],
+            pipeline_run_id="plr-host-down",
+            status=DeliveryStatus.FAILED,
+            problem=problem,
+            finished_at=finished_at,
+            extras={"org": "acme"},
+        )
+
+    @pytest.mark.builds_problems_without_required_params(reason="the failed run's problem is built in the test, as its sibling tests build it")
+    async def test_the_host_webhook_and_the_caller_webhook_never_mix(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """The host's webhook gets the completion notice with its own headers, the caller's the signed event with none of them."""
+        host_calls: list[httpx.Request] = []
+        caller_calls: list[httpx.Request] = []
+
+        def host_receiver(request: httpx.Request) -> httpx.Response:
+            host_calls.append(request)
+            return httpx.Response(200)
+
+        def caller_receiver(request: httpx.Request) -> httpx.Response:
+            caller_calls.append(request)
+            return httpx.Response(204)
+
+        mocker.patch.object(delivery_executor_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(host_receiver))
+        mocker.patch.object(caller_webhook_delivery_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(caller_receiver))
+        monkeypatch.setenv(caller_webhook_delivery_module.CALLER_WEBHOOK_SECRET_ENV, "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
+
+        report = await DeliveryExecutor().execute(
+            pipe_output=None,
+            storage_scope="test-user",
+            pipeline_run_id="plr-two-hops",
+            delivery_assignment=DeliveryAssignment(
+                webhooks=[WebhookTarget(url="https://completion.example.com/runs", headers={"X-Completion-Signature": "abc123"})],
+                caller_webhooks=[CallerWebhookTarget(url="https://caller.example.com/hook")],
+            ),
+            status=DeliveryStatus.FAILED,
+            problem=_make_failed_run_problem(),
+        )
+
+        (host_call,) = host_calls
+        assert str(host_call.url) == "https://completion.example.com/runs"
+        assert host_call.headers["x-completion-signature"] == "abc123"
+        assert "webhook-signature" not in host_call.headers
+        assert json.loads(host_call.content)["state"] == DeliveryStatus.FAILED
+        (caller_call,) = caller_calls
+        assert "x-completion-signature" not in caller_call.headers
+        assert set(caller_call.headers) >= {"webhook-id", "webhook-timestamp", "webhook-signature"}
+        assert json.loads(caller_call.content)["type"] == "run.finished"
+        assert report == DeliveryReport(
+            caller_webhooks=[
+                CallerWebhookOutcome(delivery_id=caller_call.headers["webhook-id"], server_address="caller.example.com", attempt_count=1)
+            ]
+        )
+
+    async def test_an_empty_report_when_no_caller_webhook_is_assigned(self) -> None:
+        report = await DeliveryExecutor().execute(
+            pipe_output=None,
+            storage_scope="test-user",
+            pipeline_run_id="plr-none",
+            delivery_assignment=DeliveryAssignment(),
+            status=DeliveryStatus.COMPLETED,
+        )
+        assert report == DeliveryReport()

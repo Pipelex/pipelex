@@ -783,6 +783,7 @@ plugins:
         - api-server/mthds-tools.md: "API Server MTHDS Tools"
         - api-server/models.md: "API Server Models"
         - api-server/error-responses.md: "API Server Error Responses"
+        - api-server/webhooks.md: "API Server Webhooks"
         - api-server/logging.md: "API Server Logging"
 
 markdown_extensions:
@@ -1037,6 +1038,7 @@ nav:
     - MTHDS Tools: api-server/mthds-tools.md
     - Models: api-server/models.md
     - Error Responses: api-server/error-responses.md
+    - Webhooks: api-server/webhooks.md
     - Logging: api-server/logging.md
     - Storage Transport (Removed): api-server/storage-transport.md
     - Pipe Builder (Removed): api-server/pipe-builder.md

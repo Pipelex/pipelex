@@ -7,6 +7,7 @@ import pytest
 from pipelex.methods.fetching import FetchedMethodPackage, ensure_package_within_bounds
 from pipelex.methods.method_ref import MethodRef
 from pipelex.methods.package_locator import locate_package_in_clone
+from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.test_extras.required_params_sweep import assert_problems_carried_required_params, spy_on_problem_warnings
@@ -16,6 +17,7 @@ from pytest import FixtureRequest
 from pytest_mock import MockerFixture
 
 from pipelex_api.api_config import get_api_config
+from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV
 from tests.unit._constants import STUB_METHOD_COMMIT_SHA, STUB_METHOD_MANIFEST
 
 
@@ -30,6 +32,17 @@ def problems_carry_their_required_params_fixture(request: FixtureRequest, mocker
     warn_spy = spy_on_problem_warnings(mocker=mocker)
     yield
     assert_problems_carried_required_params(warn_spy=warn_spy, keywords=request.keywords)
+
+
+@pytest.fixture(autouse=True)
+def no_webhook_settings_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Start each test with no completion target and no caller-webhook secret, whatever the shell exports.
+
+    A test that needs either sets it itself, so a developer's environment never decides whether `/start` notifies a
+    completion target or whether a request carrying `callback_urls` is refused.
+    """
+    monkeypatch.delenv(COMPLETION_CALLBACK_URL_ENV, raising=False)
+    monkeypatch.delenv(CALLER_WEBHOOK_SECRET_ENV, raising=False)
 
 
 @pytest.fixture(autouse=True, name="blob_storage")

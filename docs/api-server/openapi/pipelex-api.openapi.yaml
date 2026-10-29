@@ -203,7 +203,12 @@ paths:
 
         failures propagate untouched: the global `PipelexError` handler in `pipelex_api.exception_handlers`
 
-        turns them into an RFC 7807 problem response.'
+        turns them into an RFC 7807 problem response.
+
+
+        A client-supplied `pipeline_run_id` is honored as `/start` honors it. Each of the `callback_urls` receives the run''s
+
+        signed `run.finished` event before the response is sent; their delivery never changes the response.'
       operationId: execute_v1_execute_post
       requestBody:
         content:
@@ -380,6 +385,32 @@ paths:
                     The files make one method tree with the bundles, which the run names by its digest: no file''s bytes travel
                     with the run, each being read where a step uses it. Being retired with `mthds_contents`, and refused by
                     a later release: send these files in the method''s tree, in `files`.'
+                pipeline_run_id:
+                  anyOf:
+                  - type: string
+                    maxLength: 128
+                  - type: 'null'
+                  title: Pipeline Run Id
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol on `/execute`) — the run''s id, chosen
+                    by the caller, as `/start` takes it: the run and its webhooks'' events carry it, and a run still in flight
+                    under the same id refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates
+                    one.'
+                callback_urls:
+                  anyOf:
+                  - items:
+                      type: string
+                    type: array
+                  - type: 'null'
+                  title: Callback Urls
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the caller''s webhooks. When the
+                    run ends, the runner POSTs the run.finished event to each URL, signed in the Standard Webhooks format
+                    under the secret its operator configures (webhook-id, webhook-timestamp and webhook-signature headers):
+                    `type`, `timestamp` (when the run ended), `attempt`, and `data`, the run as the protocol''s status read
+                    serves it (`pipeline_run_id`, `status` `completed` or `failed`, and a failed run''s `error`, a problem
+                    without `status`). It does not carry the run''s output. Each URL is delivered on its own, with a short
+                    retry and no redirect followed, and its failure never changes the run. A runner whose operator configured
+                    no signing secret refuses a request carrying any with a 422 `pipelex.webhook.secret_not_configured`. http/https
+                    only; private, loopback, link-local and cloud-metadata hosts are rejected.'
                 orchestration_mode:
                   anyOf:
                   - type: string
@@ -436,9 +467,9 @@ paths:
 
                 `Request` (plain JSON, parsed by the route), so FastAPI cannot infer the body type; this model documents the
 
-                extensions the route actually honors (`orchestration_mode`, `storage_scope`, `read_scope`, `analytics_groups`,
+                extensions the route actually honors (`pipeline_run_id`, `callback_urls`, `orchestration_mode`, `storage_scope`,
 
-                all parsed by `PipelineApiExtras`).'
+                `read_scope`, `analytics_groups`, all parsed by `PipelineApiExtras`).'
         required: true
       responses:
         '200':
@@ -504,6 +535,13 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/ProblemDocument'
+        '409':
+          description: '`pipelex.run.already_exists` — the submitted `pipeline_run_id` is still registered for an in-flight
+            run. Completed and failed runs free their id, so this only fires for genuinely concurrent duplicates.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDocument'
         '429':
           description: An upstream inference provider rate-limited the run. Passed through from the provider; `Retry-After`
             is set when the provider supplied a hint.
@@ -559,7 +597,10 @@ paths:
 
         (`runtime.unsupported`) — use `/execute` — rather than silently blocking and acking.
 
-        The completion callback (`callback_urls` / storage delivery) fires on the async path.'
+        The run''s delivery (its results stored, the deployment''s completion target, the caller''s `callback_urls`) runs
+        on the
+
+        async path when the run ends.'
       operationId: start_v1_start_post
       requestBody:
         content:
@@ -749,12 +790,15 @@ paths:
                     type: array
                   - type: 'null'
                   title: Callback Urls
-                  description: PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — completion webhooks. When the run
-                    finishes, the runner POSTs a completion notice to each URL, with an X-Completion-Signature header holding
-                    the HMAC-SHA256 of the run id (not of the body). The body carries `pipeline_run_id`, `state` (with the
-                    legacy `status` alias), `result_url` (the storage key prefix of the stored results, when results were
-                    stored) and `error` on failure; it does not carry the run's output. http/https only; private, loopback,
-                    link-local and cloud-metadata hosts are rejected.
+                  description: 'PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the caller''s webhooks. When the
+                    run ends, the runner POSTs the run.finished event to each URL, signed in the Standard Webhooks format
+                    under the secret its operator configures (webhook-id, webhook-timestamp and webhook-signature headers):
+                    `type`, `timestamp` (when the run ended), `attempt`, and `data`, the run as the protocol''s status read
+                    serves it (`pipeline_run_id`, `status` `completed` or `failed`, and a failed run''s `error`, a problem
+                    without `status`). It does not carry the run''s output. Each URL is delivered on its own, with a short
+                    retry and no redirect followed, and its failure never changes the run. A runner whose operator configured
+                    no signing secret refuses a request carrying any with a 422 `pipelex.webhook.secret_not_configured`. http/https
+                    only; private, loopback, link-local and cloud-metadata hosts are rejected.'
                 orchestration_mode:
                   anyOf:
                   - type: string

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import html
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, Awaitable, NamedTuple, cast
 from urllib.parse import urlsplit
 
 import httpx
 from kajson.exceptions import KajsonException
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex import log
 from pipelex.config import get_config
@@ -26,6 +27,7 @@ from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
+from pipelex.pipe_run.caller_webhook_delivery import CallerWebhookOutcome, deliver_caller_webhooks
 from pipelex.pipe_run.exceptions import PipeJobError, StorageDeliveryError, WebhookDeliveryError
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
@@ -33,8 +35,11 @@ from pipelex.runtime_hub import get_class_registry, get_storage_provider
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.pipes.pipe_io_artifacts import PipeIOArtifacts
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -70,6 +75,18 @@ def _problem_wires_by_view(*, problem: PipelexProblem | None, webhooks: list[Web
     return wires
 
 
+class DeliveryReport(BaseModel):
+    """What a delivery did that its caller may want to read: how each caller webhook's delivery ended.
+
+    A storage failure, or a failure to notify one of the host's own webhooks, raises instead, and a caller webhook's
+    failure never does: it is recorded here and logged, and changes nothing of the run.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    caller_webhooks: list[CallerWebhookOutcome] = Field(default_factory=empty_list_factory_of(CallerWebhookOutcome))
+
+
 class DeliveryExecutor:
     """Handles the full delivery lifecycle: generate result files, store them, notify webhooks."""
 
@@ -83,10 +100,18 @@ class DeliveryExecutor:
         status: DeliveryStatus,
         problem: PipelexProblem | None = None,
         request_id: str | None = None,
-    ) -> None:
-        """Execute a full delivery: generate result files, store them, then notify webhooks.
+        finished_at: datetime | None = None,
+        extras: Mapping[str, str] | None = None,
+    ) -> DeliveryReport:
+        """Execute a full delivery: store the result files, notify the host's webhooks, then send the caller's the event.
 
-        ``problem`` is a failed run's problem in the operator's view, which each webhook receives in its own view.
+        ``problem`` is a failed run's problem in the operator's view, which each of the host's webhooks receives in its
+        own view, and each caller webhook in the caller's (:mod:`pipelex.pipe_run.caller_webhook_delivery`).
+
+        The caller's webhooks are delivered even when one of the host's failed, whose failure is raised once they are.
+        Their own failures never raise: each is logged and returned in the report. ``finished_at`` is when the run
+        ended, the caller's event's ``timestamp``, and the moment the delivery starts when it is not given;
+        ``extras`` are the run's opaque extras, which the security event of a caller webhook's refused destination carries.
 
         ``request_id`` is the originating API request id (when set). The delivery binds it
         with ``pipeline_run_id`` onto the log context, so every record the delivery emits,
@@ -94,6 +119,7 @@ class DeliveryExecutor:
         with the workflow logs and the inbound request, whether or not the caller bound
         them already. A ``None`` request id inherits whatever the caller bound.
         """
+        run_finished_at = finished_at or datetime.now(UTC)
         with log.context(request_id=request_id, pipeline_run_id=pipeline_run_id):
             # Step 1: Persist the result files to storage (only on success with output)
             result_url: str | None = None
@@ -105,16 +131,29 @@ class DeliveryExecutor:
                     storage=delivery_assignment.storage,
                 )
 
-            # Step 2: Notify webhooks with status + result_url (always, even on failure)
-            problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
-            for webhook in delivery_assignment.webhooks:
-                await self._notify_webhook(
+            caller_outcomes: list[CallerWebhookOutcome] = []
+            try:
+                # Step 2: Notify the host's webhooks with status + result_url (always, even on failure)
+                problem_wires = _problem_wires_by_view(problem=problem, webhooks=delivery_assignment.webhooks)
+                for webhook in delivery_assignment.webhooks:
+                    await self._notify_webhook(
+                        pipeline_run_id=pipeline_run_id,
+                        status=status,
+                        result_url=result_url,
+                        webhook=webhook,
+                        problem_wire=problem_wires.get(webhook.problem_view),
+                    )
+            finally:
+                # Step 3: Send each caller webhook the signed run.finished event, whatever the host's webhooks did.
+                caller_outcomes = await deliver_caller_webhooks(
+                    targets=delivery_assignment.caller_webhooks,
                     pipeline_run_id=pipeline_run_id,
                     status=status,
-                    result_url=result_url,
-                    webhook=webhook,
-                    problem_wire=problem_wires.get(webhook.problem_view),
+                    problem=problem,
+                    finished_at=run_finished_at,
+                    extras=extras,
                 )
+        return DeliveryReport(caller_webhooks=caller_outcomes)
 
     # ---- Result file generation ----
 
@@ -495,7 +534,7 @@ class DeliveryExecutor:
         webhook: WebhookTarget,
         problem_wire: dict[str, Any] | None = None,
     ) -> None:
-        """POST status, optional result_url, and a failed run's problem to a webhook URL.
+        """POST status, optional result_url, and a failed run's problem to one of the host's own webhooks.
 
         ``problem_wire`` is the problem in the webhook's own view (``WebhookTarget.problem_view``),
         already in its wire form: an operator's webhook, such as a hosted plane's completion

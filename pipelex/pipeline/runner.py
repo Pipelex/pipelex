@@ -289,6 +289,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         delivery_assignment: DeliveryAssignment | None = None,
         request_id: str | None = None,
         tree_listing: MethodTreeListing | None = None,
+        pipeline_run_id: str | None = None,
     ) -> PipelexRunResultExecute:
         """Execute a pipeline and wait for its completion.
 
@@ -347,6 +348,12 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             loaded. A listing serves one run: pass a new one to each
             ``execute``, since the files may change between two runs.
             ``None`` lists the trees for this run.
+        pipeline_run_id:
+            The run's id, when the host chose it, as ``start`` takes it: the run
+            is registered under it, and a run still in flight under the same id
+            refuses this one with ``pipelex.run.already_exists``. ``None`` lets
+            the runtime generate one. An in-process host hook, like
+            ``delivery_assignment``.
 
         Returns:
         -------
@@ -376,7 +383,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         properties: dict[EventProperty, Any]
         # These variables are set in pipeline_run_setup and needed in finally/except blocks
-        pipeline_run_id: str | None = None
+        resolved_pipeline_run_id: str | None = None
         library_id_resolved: str | None = None
         pipe_job: PipeJob | None = None
         # Capture the caller's outer current-library before pipeline_run_setup overwrites it with the
@@ -384,7 +391,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
         # own error-path restore).
         prev_library_id = get_current_library_id_or_none()
         try:
-            pipe_job, pipeline_run_id, library_id_resolved = await pipeline_run_setup(
+            pipe_job, resolved_pipeline_run_id, library_id_resolved = await pipeline_run_setup(
                 execution_config=execution_config,
                 library_id=self.library_id,
                 library_dirs=self.library_dirs,
@@ -405,6 +412,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
                 library_dirs_are_callers=self.library_dirs_are_callers,
                 methods_dirs=self.methods_dirs,
                 submitted_files=self.submitted_files,
+                pipeline_run_id=pipeline_run_id,
                 request_id=request_id,
                 tree_listing=tree_listing,
             )
@@ -426,7 +434,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # before it dispatched: it is logged here, naming the run, and the handler above logs it no more.
             emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
             properties = {
-                EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
+                EventProperty.PIPELINE_RUN_ID: resolved_pipeline_run_id,
                 EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
                 EventProperty.PIPELINE_OUTCOME: Outcome.FAILURE,
             }
@@ -458,14 +466,14 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # Close the tracer if it was opened (cleanup only — the PipeRun is responsible for capturing
             # the graph spec on pipe_output). The tracer is opened whenever graph OR cost reporting is on
             # (costs-only mode opens it with event_log=None), so the close gate must match that condition.
-            if (execution_config.is_generate_graph or execution_config.is_generate_usage) and pipeline_run_id is not None:
+            if (execution_config.is_generate_graph or execution_config.is_generate_usage) and resolved_pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
-                    tracer_manager.close_tracer(pipeline_run_id)
+                    tracer_manager.close_tracer(resolved_pipeline_run_id)
 
             # Clear event log state from the report delegate (direct execution path)
-            if pipeline_run_id is not None:
-                get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+            if resolved_pipeline_run_id is not None:
+                get_report_delegate().clear_event_log(context_key=resolved_pipeline_run_id)
 
             # Free the per-run registry entry so a later run can resubmit the same explicit
             # pipeline_run_id (serial resubmission is a supported scenario; only genuinely
@@ -474,9 +482,9 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
             # direct-mode tracer (keyed by the caller-suppliable pipeline_run_id) from
             # open_tracer's stale-key pop-and-replace healing. The pop is tolerant — when
             # pipeline_run_setup failed it already removed its own registration (and
-            # pipeline_run_id is None here anyway).
-            if pipeline_run_id is not None:
-                get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
+            # the resolved id is None here anyway, so a refused collision never frees the live run's entry).
+            if resolved_pipeline_run_id is not None:
+                get_pipeline_manager().remove_pipeline(pipeline_run_id=resolved_pipeline_run_id)
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
@@ -494,7 +502,7 @@ class PipelexMTHDSProtocol(MTHDSProtocol["PipeOutput"]):
 
         assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {
-            EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
+            EventProperty.PIPELINE_RUN_ID: resolved_pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
             EventProperty.PIPELINE_OUTCOME: Outcome.SUCCESS,
         }

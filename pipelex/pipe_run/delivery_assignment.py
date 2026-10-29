@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from enum import StrEnum
 from typing import Any
 
@@ -22,11 +23,15 @@ _RESERVED_WEBHOOK_PAYLOAD_KEYS: frozenset[str] = frozenset({"state", "pipeline_r
 
 
 class WebhookTarget(BaseModel):
-    """A webhook endpoint to notify on delivery.
+    """A webhook of the host's own, such as a deployment's completion receiver, notified with the completion notice.
 
-    ``problem_view`` is the view the failed run's problem reaches the webhook in, the view of whoever asked for it: the
-    host that builds the target picks it from the identity its boundary authenticated, and a target built with none
-    receives the caller's view, which carries no diagnostics.
+    The notice carries the run's id, its delivery state, the stored results' prefix and a failed run's problem, with
+    the headers the host gives, such as its own signature. A failure to deliver it raises, so a durable orchestrator
+    retries the delivery step. A webhook a run's caller registered is a :class:`CallerWebhookTarget` instead.
+
+    ``problem_view`` is the view the failed run's problem reaches the webhook in, the view of whoever the host built
+    the target for: an operator's receiver reads the operator's view, and a target built with none receives the
+    caller's view, which carries no diagnostics.
     """
 
     url: str
@@ -56,6 +61,33 @@ class WebhookTarget(BaseModel):
         return value
 
 
+DELIVERY_ID_PREFIX = "whd_"
+"""The prefix of a caller webhook's delivery id, the value its calls carry as their ``webhook-id`` header."""
+
+DELIVERY_ID_PATTERN = r"^whd_[A-Za-z0-9_]{1,60}$"
+"""A delivery id: ``whd_`` then ASCII letters, digits and underscores, at most 64 characters in all."""
+
+
+def new_delivery_id() -> str:
+    """A delivery id of its own: ``whd_`` and a random UUID's 32 hexadecimal digits."""
+    return f"{DELIVERY_ID_PREFIX}{uuid.uuid4().hex}"
+
+
+class CallerWebhookTarget(BaseModel):
+    """A URL a run's caller registered, which receives the signed ``run.finished`` event when the run ends.
+
+    Unlike a :class:`WebhookTarget`, the deployment's own hop, a caller's webhook carries no header, payload or view
+    of its host's choosing: the delivery sends the event the caller-webhook contract specifies, the run as its caller's
+    status read serves it, with a failed run's problem in the caller's view, signed in the Standard Webhooks format
+    under the secret the delivering process holds. ``delivery_id`` is the id every attempt of the delivery carries as
+    its ``webhook-id``; it is fixed when the target is built, so a delivery repeated from the same assignment, by a
+    durable orchestrator retrying the delivery step, keeps it.
+    """
+
+    url: str
+    delivery_id: str = Field(default_factory=new_delivery_id, pattern=DELIVERY_ID_PATTERN)
+
+
 class StorageTarget(BaseModel):
     """Storage configuration for persisting pipe output."""
 
@@ -72,12 +104,15 @@ class StorageTarget(BaseModel):
 class DeliveryAssignment(BaseModel):
     """Configures the full delivery behavior for a pipe run.
 
-    Execution order: storage first (persist output), then webhooks (notify consumers).
-    The result_url from storage is automatically injected into webhook payloads.
+    Execution order: storage first (persist output), then the deployment's own webhooks (``webhooks``), then the
+    caller's (``caller_webhooks``), which are delivered even when one of the deployment's failed.
+    The result_url from storage is automatically injected into the deployment's webhook payloads; a caller's event
+    carries no result, which its receiver reads from the run.
     """
 
     storage: StorageTarget | None = None
     webhooks: list[WebhookTarget] = Field(default_factory=empty_list_factory_of(WebhookTarget))
+    caller_webhooks: list[CallerWebhookTarget] = Field(default_factory=empty_list_factory_of(CallerWebhookTarget))
 
     @property
     def has_delivery_target(self) -> bool:
@@ -87,4 +122,9 @@ class DeliveryAssignment(BaseModel):
         persist nothing and notify no one, so a fire-and-forget completion would be
         silently dropped.
         """
-        return self.storage is not None or bool(self.webhooks)
+        return self.storage is not None or bool(self.webhooks) or bool(self.caller_webhooks)
+
+    @property
+    def needs_run_problem(self) -> bool:
+        """Whether a failed run's problem has a webhook to reach, the deployment's or a caller's."""
+        return bool(self.webhooks) or bool(self.caller_webhooks)
