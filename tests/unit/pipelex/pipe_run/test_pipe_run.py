@@ -1,3 +1,5 @@
+import asyncio
+import json
 import logging
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
@@ -326,6 +328,60 @@ class TestPipeRun:
         assert (delivery_kwargs["problem"] is None) is (router_error is None)
         assert delivery_kwargs["finished_at"].tzinfo is not None
         assert delivery_kwargs["extras"] == {}
+
+    async def test_a_cancelled_run_is_never_reported_completed(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A cancelled run ended failed: its completion notice and its caller's event say so, as `run.cancelled`, and
+        the cancellation itself still propagates.
+        """
+        monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, _CALLER_WEBHOOK_SECRET)
+        host_bodies: list[dict[str, Any]] = []
+        caller_bodies: list[dict[str, Any]] = []
+
+        def host_receiver(request: httpx.Request) -> httpx.Response:
+            host_bodies.append(json.loads(request.content))
+            return httpx.Response(200)
+
+        def caller_receiver(request: httpx.Request) -> httpx.Response:
+            caller_bodies.append(json.loads(request.content))
+            return httpx.Response(204)
+
+        mocker.patch.object(delivery_executor_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(host_receiver))
+        mocker.patch.object(caller_webhook_delivery_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(caller_receiver))
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=asyncio.CancelledError())
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-cancelled", storage_scope="test/scope", read_scope=None)
+        )
+        assignment = DeliveryAssignment(
+            webhooks=[WebhookTarget(url="https://completion.example.com/runs")],
+            caller_webhooks=[CallerWebhookTarget(url=_WEBHOOK_URL)],
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await PipeRun(pipe_router=mock_router).run(pipe_job=mock_job, delivery_assignment=assignment)
+
+        (host_body,) = host_bodies
+        assert host_body["state"] == DeliveryStatus.FAILED
+        assert host_body["error"]["code"] == CoreCode.RUN_CANCELLED
+        (caller_body,) = caller_bodies
+        assert caller_body["data"]["status"] == "failed"
+        assert caller_body["data"]["error"]["code"] == CoreCode.RUN_CANCELLED
+
+    async def test_a_delivery_failure_never_replaces_a_cancellation(self, mocker: MockerFixture) -> None:
+        """A cancelled run whose completion notice fails is still cancelled: the cancellation propagates, not the notice's error."""
+        mocker.patch.object(delivery_executor_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(lambda _request: httpx.Response(500)))
+        mock_router = mocker.AsyncMock()
+        mock_router.run = mocker.AsyncMock(side_effect=asyncio.CancelledError())
+        mock_job = mocker.MagicMock()
+        mock_job.job_metadata = JobMetadata(
+            run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-cancelled-down", storage_scope="test/scope", read_scope=None)
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await PipeRun(pipe_router=mock_router).run(
+                pipe_job=mock_job, delivery_assignment=DeliveryAssignment(webhooks=[WebhookTarget(url="https://completion.example.com/runs")])
+            )
 
     async def test_run_success_no_delivery_when_none(self, mocker: MockerFixture) -> None:
         """When delivery_assignment is None, the delivery executor is not called."""

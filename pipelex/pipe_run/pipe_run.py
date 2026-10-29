@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.problem import PipelexProblem
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
 from pipelex.errors.security_event import emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
@@ -57,6 +57,11 @@ def _failure_code(*, error: Exception) -> str:
     if not isinstance(error, PipelexError):
         return CoreCode.RUNTIME_UNEXPECTED
     return reported_failure_code(failure=error)
+
+
+def _cancelled_run_problem(*, pipeline_run_id: str, request_id: str | None) -> PipelexProblem:
+    """The problem a cancelled run's webhooks receive: ``run.cancelled``, since a cancelled run ends failed."""
+    return make_problem(code=CoreCode.RUN_CANCELLED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
 
 
 class PipeRun(PipeRunProtocol):
@@ -212,6 +217,18 @@ class PipeRun(PipeRunProtocol):
                     usage_tally=usage_tally,
                 )
 
+            # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
+            # It ended failed, so its webhooks are told so, as `run.cancelled`, and never that it completed, while the
+            # cancellation itself propagates once the delivery is done.
+            run_was_cancelled = execution_error is None and pipe_output is None
+            if run_was_cancelled:
+                status = DeliveryStatus.FAILED
+                if delivery_assignment is not None and delivery_assignment.needs_run_problem:
+                    problem = _cancelled_run_problem(
+                        pipeline_run_id=pipeline_run_id,
+                        request_id=pipe_job.job_metadata.run_metadata.request_id,
+                    )
+
             if delivery_assignment is not None:
                 log.debug("Executing the delivery", fields={"delivery_status": status})
                 try:
@@ -229,9 +246,9 @@ class PipeRun(PipeRunProtocol):
                 except (DeliveryError, SsrfBlockedError) as delivery_error:
                     # A caller's webhook never raises here: its failures are the delivery's own records. What can is
                     # the storage, or one of the host's own webhooks, which the SSRF guard may refuse at fire time.
-                    if execution_error is None:
+                    if execution_error is None and not run_was_cancelled:
                         raise
-                    # The run keeps its own failure. A refusal of the delivery's destination still logs its own security
+                    # The run keeps its own failure, or its cancellation. A refusal of the delivery's destination still logs its own security
                     # event, naming the run, beside the one the run's failure logged if it was a refusal too.
                     emit_security_event_for_run(error=delivery_error, run_metadata=pipe_job.job_metadata.run_metadata)
                     # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.

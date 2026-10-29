@@ -43,7 +43,7 @@ Each URL receives one POST per attempt, whose body is the `run.finished` event, 
 | `attempt` | Which attempt of the delivery this call is, counted from 1. |
 | `data` | The run as the MTHDS protocol's status read serves it: its `pipeline_run_id`, its `status`, `completed` or `failed`, and a failed run's problem as `error`. |
 
-A failed run's `error` is its problem document in the **caller's view**, whoever started the run: it carries the `code`, `detail`, `retry` and `next_step` the caller reads, and never `diagnostics`. It carries no `status` member, which is the HTTP envelope's. A member with no value is left out rather than written as `null`. The event never carries the run's results: the caller reads a `/execute` run's output from the response, and a `/start` run's results from storage.
+A run that was cancelled before it ended, such as when its server stopped mid-run, ended failed: its event reads `failed`, with the problem `run.cancelled`, and so does the completion notice of the deployment's completion target. A failed run's `error` is its problem document in the **caller's view**, whoever started the run: it carries the `code`, `detail`, `retry` and `next_step` the caller reads, and never `diagnostics`. It carries no `status` member, which is the HTTP envelope's. A member with no value is left out rather than written as `null`. The event never carries the run's results: the caller reads a `/execute` run's output from the response, and a `/start` run's results from storage.
 
 A receiver ignores a member it does not know, and acknowledges an event whose `type` it does not know with a `2xx`.
 

@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- **A cancelled run is never reported completed**: a run cancelled before it ended, which `PipeRun` re-raises the cancellation of, now tells its webhooks, the host's completion notice included, that it failed, with the problem `run.cancelled`, where the notice said `COMPLETED`; a delivery that fails afterwards never replaces the cancellation.
 - **A failed notice to a host's webhook names its reason**: the `pipelex.webhook.delivery_failed` problem a run fails with when one of its host's webhooks cannot be notified carries the `reason` its code requires, `http_status` with the receiver's `receiver_status`, or `unreachable`.
 - **A refused webhook no longer replaces a failed run's own failure**: a delivery destination the SSRF guard refuses after the run failed logs its security event and the delivery's failure, and the run fails with its own error, where the refusal used to be raised in its place.
 
