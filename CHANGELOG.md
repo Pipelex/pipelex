@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.94.0] - 2026-10-29
+## [Unreleased]
 
 ### Added
 
@@ -11,16 +11,24 @@
 
 ### Changed
 
-- **`mthds` and `pipelex-sdk` versions (Breaking)**: The pins move to `mthds==0.26.0`, the release following the MTHDS standard's `v8.0.1`, and `pipelex-sdk==0.57.0`, the release built on it, whose own breaking changes since `0.53.0`, such as `list_runs` and `iterate_runs` taking `method_id` as a keyword-only filter and method-version fields no longer coerced, reach anyone importing `pipelex_sdk` beside pipelex. Everyone downstream inherits those exact versions.
-- **MTHDS standard `8.0.1` and MTHDS Protocol `2.0.1` (Breaking)**: every crate pipelex normalizes, on the command line and on the API server's `POST /v1/resolve`, is stamped `mthds_version: "8.0.1"`, a `METHODS.toml` whose `mthds_version` is exactly `8.0.0` now warns where `>=8.0.1` passes, and `pipelex --version`, `pipelex-agent --version` and `GET /v1/version` report the MTHDS Protocol `2.0.1`. Crate fingerprints do not move.
-- **The problems a run raises carry titles written for whoever follows it**: every problem pipelex emits under a core code a run can raise, in a run's failure, an API server answer or the CLI's error output, carries the title the core error registry `8.0.1` gives it for someone following a run of a method they did not write: `pipe.output_multiplicity` is titled "A step produced a list instead of one result, or the reverse" where it read "A pipe's output does not have the declared multiplicity", and `pipe.output_invalid` "A step's result does not have the structure the method declares". No code, domain, retry verdict, step kind or status changes.
 - **`callback_urls` receive the signed `run.finished` event (Breaking)**: each URL a request to the API server registers receives the caller-webhook contract's event, `type`, `timestamp`, `attempt` and `data`, the run as the protocol's status read serves it with a failed run's problem in the caller's view, signed with the Standard Webhooks headers `webhook-id`, `webhook-timestamp` and `webhook-signature` under the `whsec_` secret or secrets in `CALLER_WEBHOOK_SECRET`. It replaces the completion notice and its `X-Completion-Signature`, which no caller webhook receives any more, so a self-hosted receiver now verifies the Standard Webhooks signature, and a server without `CALLER_WEBHOOK_SECRET` refuses a request carrying `callback_urls` with a `422` `pipelex.webhook.secret_not_configured`. Each URL is delivered on its own, three attempts within 15 seconds each and no redirect followed, and a delivery that fails is logged and never changes the run.
 - **The completion notice goes to `COMPLETION_CALLBACK_URL` alone (Breaking)**: a host that relied on `callback_urls` to receive the completion notice and its `X-Completion-Signature`, as a hosting platform does, sets `COMPLETION_CALLBACK_URL` to its completion URL before taking this release; otherwise its URL is a caller webhook and, on a server without `CALLER_WEBHOOK_SECRET`, every `/v1/start` carrying it is refused. The notice now always carries the operator's view of a failed run's problem, whoever started the run.
 
 ### Fixed
 
-- **The API server checks a `files` map's blobs last**: as the MTHDS Protocol `2.0.1` orders a map's refusals, a map holding a key the tree's rule refuses, colliding keys or a malformed entry is refused for that before any blob it names is read, where a hash held at another size than its entry states answered `422` `request.invalid`, and a damaged stored blob `500` `pipelex.storage.damaged`, ahead of the key's own refusal.
 - **A refused webhook no longer replaces a failed run's own failure**: a delivery destination the SSRF guard refuses after the run failed logs its security event and the delivery's failure, and the run fails with its own error, where the refusal used to be raised in its place.
+
+## [v0.94.0] - 2026-10-29
+
+### Changed
+
+- **`mthds` and `pipelex-sdk` versions (Breaking)**: The pins move to `mthds==0.26.0`, the release following the MTHDS standard's `v8.0.1`, and `pipelex-sdk==0.57.0`, the release built on it, whose own breaking changes since `0.53.0`, such as `list_runs` and `iterate_runs` taking `method_id` as a keyword-only filter and method-version fields no longer coerced, reach anyone importing `pipelex_sdk` beside pipelex. Everyone downstream inherits those exact versions.
+- **MTHDS standard `8.0.1` and MTHDS Protocol `2.0.1` (Breaking)**: every crate pipelex normalizes, on the command line and on the API server's `POST /v1/resolve`, is stamped `mthds_version: "8.0.1"`, a `METHODS.toml` whose `mthds_version` is exactly `8.0.0` now warns where `>=8.0.1` passes, and `pipelex --version`, `pipelex-agent --version` and `GET /v1/version` report the MTHDS Protocol `2.0.1`. Crate fingerprints do not move.
+- **The problems a run raises carry titles written for whoever follows it**: every problem pipelex emits under a core code a run can raise, in a run's failure, an API server answer or the CLI's error output, carries the title the core error registry `8.0.1` gives it for someone following a run of a method they did not write: `pipe.output_multiplicity` is titled "A step produced a list instead of one result, or the reverse" where it read "A pipe's output does not have the declared multiplicity", and `pipe.output_invalid` "A step's result does not have the structure the method declares". No code, domain, retry verdict, step kind or status changes.
+
+### Fixed
+
+- **The API server checks a `files` map's blobs last**: as the MTHDS Protocol `2.0.1` orders a map's refusals, a map holding a key the tree's rule refuses, colliding keys or a malformed entry is refused for that before any blob it names is read, where a hash held at another size than its entry states answered `422` `request.invalid`, and a damaged stored blob `500` `pipelex.storage.damaged`, ahead of the key's own refusal.
 
 ## [v0.93.1] - 2026-10-28
 
