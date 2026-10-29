@@ -11,8 +11,9 @@ The two are different hops and never mix:
   notice nor its signature. The runner signs them under `CALLER_WEBHOOK_SECRET`, so a request carrying any is refused
   with a `422` `pipelex.webhook.secret_not_configured` on a runner whose operator configured none, before anything runs.
 
-A `callback_urls` entry equal to the completion target's URL for the run is the deployment's own hop, sent there by a
-host that also forwards it, and is dropped from the caller's: the target is notified once, with its own notice.
+On `/start`, a `callback_urls` entry equal to the completion target's URL for the run is the deployment's own hop, sent
+there by a host that also forwards it, and is dropped from the caller's: the target is notified once, with its own
+notice. An `/execute` run notifies no completion target, so there every entry is a caller's webhook.
 """
 
 import hashlib
@@ -112,17 +113,32 @@ def completion_signature(*, pipeline_run_id: str) -> str:
     return hmac.new(secret.encode("utf-8"), pipeline_run_id.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def caller_webhook_urls(*, callback_urls: Sequence[str] | None, pipeline_run_id: str | None) -> list[str]:
-    """The caller's webhooks among `callback_urls`: each URL once, in order, without the completion target's own URL.
+def caller_webhook_urls(*, callback_urls: Sequence[str] | None) -> list[str]:
+    """The caller's webhooks of an `/execute` request: each of its `callback_urls` once, in order.
+
+    An `/execute` run notifies no completion target, so every URL it lists is a caller's webhook, the completion target's
+    own URL included: a host that lists it there is sent the caller's event.
+
+    Args:
+        callback_urls: The request's `callback_urls`, already validated by the request model.
+    """
+    if not callback_urls:
+        return []
+    return list(dict.fromkeys(callback_urls))
+
+
+def start_caller_webhook_urls(*, callback_urls: Sequence[str] | None, pipeline_run_id: str | None) -> list[str]:
+    """The caller's webhooks of a `/start` request: each of its `callback_urls` once, in order, without the completion URL.
+
+    A `/start` run notifies the deployment's completion target, so a URL equal to the target's URL for the run is the
+    host forwarding its own hop, which the target's notice reaches, and never a caller's webhook.
 
     Args:
         callback_urls: The request's `callback_urls`, already validated by the request model.
         pipeline_run_id: The run's id, when it is known, which the completion target's URL may name.
     """
-    if not callback_urls:
-        return []
     completion_url = completion_callback_url(pipeline_run_id=pipeline_run_id)
-    return [url for url in dict.fromkeys(callback_urls) if url != completion_url]
+    return [url for url in caller_webhook_urls(callback_urls=callback_urls) if url != completion_url]
 
 
 def ensure_caller_webhooks_signable(*, caller_urls: Sequence[str]) -> None:

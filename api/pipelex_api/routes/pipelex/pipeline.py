@@ -71,6 +71,7 @@ from pipelex_api.run_webhooks import (
     ensure_caller_webhooks_signable,
     ensure_completion_target_configured,
     execute_delivery_assignment,
+    start_caller_webhook_urls,
     start_delivery_assignment,
 )
 from pipelex_api.schemas.models import (
@@ -385,7 +386,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         # as its library directory, so the map reaches the runner only from in-process code, and is refused as the
         # base runner refuses it, before any backend is looked up.
         refuse_method_files(files=files)
-        caller_urls = caller_webhook_urls(callback_urls=callback_urls, pipeline_run_id=pipeline_run_id)
+        caller_urls = caller_webhook_urls(callback_urls=callback_urls)
         ensure_caller_webhooks_signable(caller_urls=caller_urls)
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here, before any library load / run registration. Mirrors start().
@@ -480,7 +481,7 @@ class ApiRunner(PipelexMTHDSProtocol):
             raise PipelexUnexpectedError(msg)
         # The caller's webhooks this runner cannot sign, and a completion target it cannot sign, are refused before
         # anything else is looked up or loaded.
-        caller_urls = caller_webhook_urls(callback_urls=callback_urls, pipeline_run_id=pipeline_run_id)
+        caller_urls = start_caller_webhook_urls(callback_urls=callback_urls, pipeline_run_id=pipeline_run_id)
         ensure_caller_webhooks_signable(caller_urls=caller_urls)
         ensure_completion_target_configured()
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
@@ -1010,9 +1011,7 @@ async def execute(request: Request) -> JSONResponse:
     """
     run_request, extras, body = await _parse_request(request)
     # Webhooks this runner cannot sign are refused before the method is fetched or written.
-    ensure_caller_webhooks_signable(
-        caller_urls=caller_webhook_urls(callback_urls=extras.callback_urls, pipeline_run_id=extras.pipeline_run_id),
-    )
+    ensure_caller_webhooks_signable(caller_urls=caller_webhook_urls(callback_urls=extras.callback_urls))
     scopes = _resolve_run_scopes(request, extras=extras)
     blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
     async with _run_source(run_request=run_request, body=body, blob_scope=blob_scope) as source:
@@ -1111,7 +1110,7 @@ async def start(
     # Webhooks this runner cannot sign, the caller's or the completion target's, are refused before the method is
     # fetched or written.
     ensure_caller_webhooks_signable(
-        caller_urls=caller_webhook_urls(callback_urls=extras.callback_urls, pipeline_run_id=extras.pipeline_run_id),
+        caller_urls=start_caller_webhook_urls(callback_urls=extras.callback_urls, pipeline_run_id=extras.pipeline_run_id),
     )
     ensure_completion_target_configured()
     scopes = _resolve_run_scopes(request, extras=extras)

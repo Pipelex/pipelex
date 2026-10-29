@@ -224,6 +224,32 @@ class TestCallerWebhooks:
         assert set(completion_target.headers) == {"X-Completion-Signature"}
         assert delivery_assignment.caller_webhooks == []
 
+    def test_on_execute_the_completion_url_is_a_callers_webhook(self, mocker: MockerFixture) -> None:
+        """An `/execute` run notifies no completion target, so the target's URL among its `callback_urls` is sent the caller's event."""
+        mocker.patch.dict(
+            "os.environ",
+            {
+                COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE,
+                COMPLETION_CALLBACK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLBACK_SECRET,
+                CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET,
+            },
+        )
+        orchestrator = _register(mocker)
+        received = _receive_caller_events(mocker)
+        completion_url = ProblemTestData.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
+
+        response = _client().post("/v1/execute", json=_run_body(pipeline_run_id=_RUN_ID, callback_urls=[completion_url]))
+
+        assert response.status_code == 200, response.text
+        (delivery_assignment,) = orchestrator.delivery_assignments
+        assert delivery_assignment is not None
+        assert delivery_assignment.webhooks == []
+        assert [target.url for target in delivery_assignment.caller_webhooks] == [completion_url]
+        (call,) = received
+        assert str(call.url) == completion_url
+        assert json.loads(call.content)["type"] == "run.finished"
+        assert "x-completion-signature" not in call.headers
+
     def test_start_without_a_completion_target_notifies_only_the_callers_urls(self, mocker: MockerFixture) -> None:
         """No `COMPLETION_CALLBACK_URL`, no completion target: every `callback_urls` entry is the caller's, signed as such."""
         mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET})
