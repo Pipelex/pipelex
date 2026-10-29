@@ -10,7 +10,9 @@ class RunnerProblems:
     The first three are the answers of pipelex's runner to `POST /v1/execute` in the error contract's acceptance on
     2026-10-17, as both standard clients received them: a run missing a required input, a pipe whose output has another
     multiplicity than the one declared, and a method naming a model the runner serves no backend for, refused before
-    any pipe ran with the fault as its one item. The last is a problem whose items carry suggestions and a suggested fix.
+    any pipe ran with the fault as its one item. The second carries the title the core error registry `8.0.1` gives
+    its code, which reworded it after the acceptance. The last is a problem whose items carry suggestions and a
+    suggested fix.
     """
 
     INPUT_MISSING: ClassVar[str] = (
@@ -21,8 +23,8 @@ class RunnerProblems:
         '["write_slogan"]}, "request_id": "01M55P3J09ADGMD2MW5FSN6S1P"}'
     )
     OUTPUT_MULTIPLICITY: ClassVar[str] = (
-        '{"type": "https://mthds.ai/errors/pipe.output_multiplicity", "title": "A pipe\'s output does not have the declared '
-        'multiplicity", "status": 422, "detail": "Pipe \'review_topic\' produced an output of the multiplicity \'list\', but '
+        '{"type": "https://mthds.ai/errors/pipe.output_multiplicity", "title": "A step produced a list instead of one result, '
+        'or the reverse", "status": 422, "detail": "Pipe \'review_topic\' produced an output of the multiplicity \'list\', but '
         'its output \'ideas\' is declared \'single\'.", "code": "pipe.output_multiplicity", "domain": "method", "retry": "no", '
         '"next_step": {"kind": "change_method", "detail": "Declare the output \'ideas\' as \'list\', or make pipe '
         '\'review_topic\' produce \'single\'."}, "params": {"output": "ideas", "declared": "single", "produced": "list", '
@@ -228,7 +230,7 @@ class StoredRunReports:
     # The run's own problem, as a runner that speaks the problem document stores it, in the operator's view.
     PROBLEM: ClassVar[dict[str, Any]] = {
         "type": "https://mthds.ai/errors/pipe.output_multiplicity",
-        "title": "A pipe's output does not have the declared multiplicity",
+        "title": "A step produced a list instead of one result, or the reverse",
         "detail": "Pipe 'review_topic' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.",
         "code": "pipe.output_multiplicity",
         "domain": "method",

@@ -372,8 +372,10 @@ class _CodeSentences(NamedTuple):
 # withholds, until the standard words that occurrence itself. `security.template_refused` requires `name`, but a name the
 # template looked up from the run's data is the run's input, which no problem carries (`pipelex.tools.jinja2`), so its
 # refusal carries no `name`: its sentences then say what happened without the name, rather than the code's title and the
-# generic step. No raise site is at fault for a parameter withheld by rule, so its absence is not logged
-# (`missing_required_params`); any other parameter the code requires still is.
+# generic step. They are worded as the code's own sentences are: the `other` step is written for whoever follows a run
+# of a method they did not write, so it names the pipe as "the step" it is, as the standard's error registry asks. No
+# raise site is at fault for a parameter withheld by rule, so its absence is not logged (`missing_required_params`); any
+# other parameter the code requires still is.
 _WITHHELD_PARAM_SENTENCES: dict[tuple[str, frozenset[str]], _CodeSentences] = {
     ("security.template_refused", frozenset({"name"})): _CodeSentences(
         detail="A template of pipe '{pipe}' looked a name up from the run's data, and the template sandbox refused that name.",
@@ -381,7 +383,7 @@ _WITHHELD_PARAM_SENTENCES: dict[tuple[str, frozenset[str]], _CodeSentences] = {
             "Change the templates of pipe '{pipe}' so that the run's data no longer chooses the names they look up, then run the method again."
         ),
         other_step_detail=(
-            "Ask the method's owner to change the templates of pipe '{pipe}' so that the run's data no longer chooses the names they look up."
+            "Ask the method's owner to change the templates of the step '{pipe}' so that the run's data no longer chooses the names they look up."
         ),
     ),
 }

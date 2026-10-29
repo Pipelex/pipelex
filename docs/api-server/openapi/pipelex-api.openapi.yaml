@@ -2,8 +2,8 @@
 openapi: 3.1.0
 info:
   title: Pipelex API
-  summary: The source-available Pipelex runner — implements MTHDS Protocol v2.0.0.
-  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v2.0.0 (`POST /execute`, `POST /start`, `POST
+  summary: The source-available Pipelex runner — implements MTHDS Protocol v2.0.1.
+  description: 'This server implements the [MTHDS Protocol](https://mthds.ai) v2.0.1 (`POST /execute`, `POST /start`, `POST
     /validate`, `GET /models`, `GET /version` — marked `x-mthds-protocol: true`) plus the Pipelex API extensions: resolve
     and codegen (`/resolve`, `/codegen`), the pipe I/O route (`/pipe-io`), the model reference check (`/models/check`), and
     editor tooling (`/lint`, `/format`). Contract layering: MTHDS Protocol ⊂ Pipelex API (this server) ⊂ Pipelex hosted API.
