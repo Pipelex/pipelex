@@ -5,7 +5,8 @@
 #   repository, at the commit below. Its `signing` cases are calls as a sender signs them: the runner's test
 #   (`tests/unit/pipelex/tools/network/test_standard_webhooks.py`) signs each one and compares the
 #   `webhook-signature` header byte for byte, so the runner signs exactly as the contract's reference
-#   library does.
+#   library does. Its `verification` cases are calls as a receiver checks them; pipelex only sends caller
+#   webhooks and verifies none, so no test here reads them, and they are copied only to keep the file whole.
 #
 # To refresh it, copy the file from the conformance repository at the commit that last changed it, then
 # update the commit and the digest below. A test fails when the file no longer has the digest recorded here.
@@ -13,8 +14,8 @@
 
 [source]
 repository = "Pipelex/conformance"
-commit = "0dc65ad5ad49977abf02f2cb2e9775904dcb8996"
+commit = "242e162f9b09515f11a95c4e4a19595ad3b28f05"
 
 [files."signature-vectors.json"]
 path = "tests/caller_webhooks/fixtures/signature-vectors.json"
-sha256 = "3fdf17711c7b7681deee0bf4de97be07f47d2b93fac0bf601bc1ec34ddb37088"
+sha256 = "0185db0d6568ea4db61c40eddfefe1a47dd7ebb370dc4161bf759c8a05fd3509"
