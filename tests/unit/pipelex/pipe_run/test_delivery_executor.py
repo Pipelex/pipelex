@@ -1286,7 +1286,11 @@ class TestDeliveryExecutor:
         """The storage and the host's webhook come first, and the caller's event after them, once, saying the run completed."""
         order: list[str] = []
         mock_storage = mocker.AsyncMock()
-        mock_storage.store = mocker.AsyncMock(side_effect=lambda **_kwargs: order.append("storage"))
+
+        def record_store(**_kwargs: object) -> None:
+            order.append("storage")
+
+        mock_storage.store = mocker.AsyncMock(side_effect=record_store)
         mocker.patch("pipelex.pipe_run.delivery_executor.get_storage_provider", return_value=mock_storage)
         mock_output = _make_output_mock(mocker)
         mock_output.working_memory_raw = None
@@ -1357,6 +1361,7 @@ class TestDeliveryExecutor:
 
         host_post.assert_not_called()
         deliver_spy.assert_awaited_once()
+        assert deliver_spy.await_args is not None
         delivery_kwargs = deliver_spy.await_args.kwargs
         assert delivery_kwargs["targets"] == [caller_target]
         assert delivery_kwargs["status"] == DeliveryStatus.FAILED
@@ -1405,6 +1410,7 @@ class TestDeliveryExecutor:
             )
 
         deliver_spy.assert_awaited_once()
+        assert deliver_spy.await_args is not None
         delivery_kwargs = deliver_spy.await_args.kwargs
         assert delivery_kwargs["status"] == DeliveryStatus.FAILED
         problem = delivery_kwargs["problem"]
