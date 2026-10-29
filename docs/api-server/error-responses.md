@@ -192,7 +192,7 @@ Content-Type: application/problem+json
 
 {
   "type": "https://mthds.ai/errors/pipe.output_multiplicity",
-  "title": "A pipe's output does not have the declared multiplicity",
+  "title": "A step produced a list instead of one result, or the reverse",
   "status": 422,
   "detail": "Pipe 'analyze_topic' produced an output of the multiplicity 'list', but its output 'ideas' is declared 'single'.",
   "code": "pipe.output_multiplicity",
