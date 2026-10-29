@@ -107,6 +107,6 @@ if not hmac.compare_digest(expected, request.headers["X-Completion-Signature"]):
     return Response(status=401)
 ```
 
-`COMPLETION_CALLBACK_SECRET` is required once a completion target is set: a `/start` run on a server with a target and without the secret is a `500` `pipelex.config.variable_missing`. Unlike the caller's event, a failure to notify the completion target fails the delivery step, which a durable orchestrator repeats.
+`COMPLETION_CALLBACK_SECRET` is required once a completion target is set: the server refuses to boot with a target and without the secret, and a `/start` that meets that configuration anyway is refused with a `500` `runtime.misconfigured` before its method is fetched or its run set up. Unlike the caller's event, a failure to notify the completion target fails the delivery step, which a durable orchestrator repeats.
 
 A host that forwards its completion URL among a request's `callback_urls`, as it did before the completion target had a setting of its own, is understood: a `callback_urls` entry equal to the run's completion URL is the deployment's hop, notified once with its completion notice, and never treated as a caller's webhook nor signed as one.

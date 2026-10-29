@@ -354,7 +354,7 @@ X-Request-ID: 9f2c1ab3-…
 }
 ```
 
-`pipelex.config.variable_missing` is a code in the `operator` domain: the deployment, not the caller, has to fix it, so the caller's step is to report it. The operator view of the same failure carries the `fix_configuration` step and `diagnostics`, whose `message` names the variable, `Missing required environment variable: COMPLETION_CALLBACK_SECRET`, which no caller reads.
+`pipelex.config.variable_missing` is a code in the `operator` domain: the deployment, not the caller, has to fix it, so the caller's step is to report it. The operator view of the same failure carries the `fix_configuration` step and `diagnostics`, whose `message` names the variable, such as `Missing required environment variable: <NAME>`, which no caller reads.
 
 ### 401 — missing bearer token
 

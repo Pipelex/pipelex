@@ -51,6 +51,8 @@ The `PipeJob` is the universal unit of execution. It carries everything needed t
 
 `PipeJob` is created by `pipeline_run_setup()`, which handles library loading, pipe resolution, working memory initialization, and telemetry setup. For distributed dispatch, a transport-prep step outside open core moves `working_memory` to `working_memory_raw` (deferred hydration) and ensures the crate is attached.
 
+The setup registers the run under its `pipeline_run_id`, opens its library and, when tracing is on, its graph tracer. A host that sets a run up and then cannot hand it over, such as a dispatch to an orchestrator that fails, calls `release_run_setup()` with the job, the library and the caller's current library as the setup found it, which releases all three, so the same `pipeline_run_id` can be submitted again.
+
 !!! warning "Build `PipeRunParams` through its factory"
     `PipeRunParamsFactory.make_run_params()` is the single writer of the fields that carry a run-scoped invariant: `run_mode`, `pipe_stack_limit` and `batch_max_concurrency`. None of the three has a default — for each, a silently-defaulted value would point at the dangerous direction (real spend, an unbounded pipe stack, a fan-out that launches every branch at once), and for `batch_max_concurrency` the would-be default `None` is *also* the resolved value of an authored `max_concurrency = "unbounded"`, so "never written" and "authored unbounded" would be indistinguishable. Constructing `PipeRunParams` by hand and omitting any of them raises a `ValidationError` — at the constructor and at the wire boundary alike.
 

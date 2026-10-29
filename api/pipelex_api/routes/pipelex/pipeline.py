@@ -14,6 +14,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.bundle_validation_failure import BundleValidationFailure
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.interpreter_hub import get_current_library_id_or_none
 from pipelex.libraries.method_load_threads import run_method_load
 from pipelex.libraries.method_requirements import ensure_served_method_requirements_met
 from pipelex.libraries.method_tree_listing import MethodTreeListing, scoped_tree_listing
@@ -21,7 +22,7 @@ from pipelex.pipe_run.exceptions import AsyncExecutionNotEnabledError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_response import PipelexRunResultExecute, PipelexRunResultStart, RunState
-from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup, release_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol, refuse_method_files
 from pipelex.pipeline.validate_bundle_translation import translate_to_validate_bundle_error
 from pipelex.reporting.usage_records import apply_tokens_usage_wire_shape
@@ -68,6 +69,7 @@ from pipelex_api.run_extras_binding import bind_run_extras
 from pipelex_api.run_webhooks import (
     caller_webhook_urls,
     ensure_caller_webhooks_signable,
+    ensure_completion_target_configured,
     execute_delivery_assignment,
     start_delivery_assignment,
 )
@@ -476,9 +478,11 @@ class ApiRunner(PipelexMTHDSProtocol):
             # value here is a fault of the in-process code calling this runner, never the caller's.
             msg = f"ApiRunner defines no extension args beyond its named ones; got {sorted(extra)}."
             raise PipelexUnexpectedError(msg)
-        # The caller's webhooks this runner cannot sign are refused before anything else is looked up or loaded.
+        # The caller's webhooks this runner cannot sign, and a completion target it cannot sign, are refused before
+        # anything else is looked up or loaded.
         caller_urls = caller_webhook_urls(callback_urls=callback_urls, pipeline_run_id=pipeline_run_id)
         ensure_caller_webhooks_signable(caller_urls=caller_urls)
+        ensure_completion_target_configured()
         # Resolve the effective orchestration mode FIRST — a per-request override the deployment
         # policy forbids is refused (422) here. Then look up the orchestrator and check its async
         # capability: `/start` is fire-and-forget, so a blocking-only orchestrator (direct on the
@@ -503,9 +507,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
         execution_config = self.execution_config or get_config().interpreter.pipeline_execution
+        # The caller's current library, which a run that is not dispatched gives back.
+        prev_library_id = get_current_library_id_or_none()
         # Wire and runtime share the `pipeline_run_id` name (master D1 as
         # revised — the id rename was reversed).
-        pipe_job, resolved_pipeline_run_id, _ = await pipeline_run_setup(
+        pipe_job, resolved_pipeline_run_id, run_library_id = await pipeline_run_setup(
             execution_config=execution_config,
             library_id=self.library_id,
             library_dirs=self.library_dirs,
@@ -538,15 +544,23 @@ class ApiRunner(PipelexMTHDSProtocol):
         # Its results stored (with NO `key_prefix`: the runtime owns the `results/` leaf), the deployment's completion
         # target notified, then the caller's webhooks sent their event. The completion URL is dropped from the caller's
         # again now that the run's id is resolved, since the deployment's URL may name it.
-        delivery_assignment = start_delivery_assignment(caller_urls=caller_urls, pipeline_run_id=resolved_pipeline_run_id)
+        dispatched = False
+        try:
+            delivery_assignment = start_delivery_assignment(caller_urls=caller_urls, pipeline_run_id=resolved_pipeline_run_id)
 
-        # Dispatch the locally-built job through the resolved mode's orchestrator (looked up and
-        # capability-checked above) via its fire-and-forget `start` arm — the same final dispatch
-        # `run_pipe_via_bridge` performs, but fed the rich PipeJob instead of the lossy
-        # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
-        # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
-        # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
-        dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            # Dispatch the locally-built job through the resolved mode's orchestrator (looked up and
+            # capability-checked above) via its fire-and-forget `start` arm — the same final dispatch
+            # `run_pipe_via_bridge` performs, but fed the rich PipeJob instead of the lossy
+            # `PipelexPipeRunInput` (which carries no request_id / output_multiplicity /
+            # dynamic_output_concept_ref and skips run registration + telemetry). `start` genuinely
+            # enqueues the job and returns a `PipelexPipeDispatchAck` (ids only) immediately.
+            dispatch_ack = await orchestrator.start(pipe_job=pipe_job, delivery_assignment=delivery_assignment)
+            dispatched = True
+        finally:
+            if not dispatched:
+                # The run never left this process: what its setup registered is released, its id first of all, so the
+                # caller can submit it again, and the failure propagates.
+                release_run_setup(pipe_job=pipe_job, library_id=run_library_id, prev_library_id=prev_library_id)
 
         return PipelexRunResultStart(
             pipeline_run_id=resolved_pipeline_run_id,
@@ -1094,10 +1108,12 @@ async def start(
     async path when the run ends.
     """
     run_request, extras, body = parsed
-    # Webhooks this runner cannot sign are refused before the method is fetched or written.
+    # Webhooks this runner cannot sign, the caller's or the completion target's, are refused before the method is
+    # fetched or written.
     ensure_caller_webhooks_signable(
         caller_urls=caller_webhook_urls(callback_urls=extras.callback_urls, pipeline_run_id=extras.pipeline_run_id),
     )
+    ensure_completion_target_configured()
     scopes = _resolve_run_scopes(request, extras=extras)
     blob_scope = resolve_blob_scope(request, read_scope=scopes.read_scope)
     # The run source is written out only for the synchronous setup phase: `start` builds the

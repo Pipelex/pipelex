@@ -16,6 +16,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from mthds.protocol.problem.registry import CoreCode
+from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -34,7 +35,14 @@ from pipelex_api.api_config import ApiConfig
 from pipelex_api.exception_handlers import register_exception_handlers
 from pipelex_api.exceptions import RunnerMisconfiguredError
 from pipelex_api.routes import router as api_router
-from pipelex_api.run_webhooks import COMPLETION_CALLBACK_URL_ENV, completion_callback_template, completion_callback_url
+from pipelex_api.routes.pipelex import pipeline as pipeline_module
+from pipelex_api.routes.pipelex.pipeline import ApiRunner
+from pipelex_api.run_webhooks import (
+    COMPLETION_CALLBACK_SECRET_ENV,
+    COMPLETION_CALLBACK_URL_ENV,
+    completion_callback_template,
+    completion_callback_url,
+)
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
 from tests.unit.test_data import ProblemTestData
@@ -196,7 +204,13 @@ class TestCallerWebhooks:
 
     def test_the_hosts_completion_url_among_callback_urls_is_the_deployments_hop(self, mocker: MockerFixture) -> None:
         """A host forwarding its completion URL needs no caller secret: the URL is notified once, as the completion target."""
-        mocker.patch.dict("os.environ", {COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE})
+        mocker.patch.dict(
+            "os.environ",
+            {
+                COMPLETION_CALLBACK_URL_ENV: ProblemTestData.COMPLETION_TARGET_TEMPLATE,
+                COMPLETION_CALLBACK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLBACK_SECRET,
+            },
+        )
         orchestrator = _register(mocker, mode="temporal")
         completion_url = ProblemTestData.COMPLETION_TARGET_TEMPLATE.format(pipeline_run_id=_RUN_ID)
 
@@ -251,18 +265,72 @@ class TestCallerWebhooks:
         assert completion_callback_url(pipeline_run_id="run/../x?y") == "https://ops.example.com/runs/complete/run%2F..%2Fx%3Fy"
         assert completion_callback_url(pipeline_run_id=None) is None
 
-    def test_the_server_boot_checks_the_completion_target(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A malformed completion target stops the server at boot, before any request is served."""
+    @pytest.mark.parametrize(
+        ("configured_url", "configured_secret", "refused_setting"),
+        [
+            pytest.param("not a url", ProblemTestData.SYNTHETIC_CALLBACK_SECRET, COMPLETION_CALLBACK_URL_ENV, id="malformed_url"),
+            pytest.param(ProblemTestData.COMPLETION_TARGET_TEMPLATE, "", COMPLETION_CALLBACK_SECRET_ENV, id="no_secret"),
+        ],
+    )
+    def test_the_server_boot_checks_the_completion_target(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, configured_url: str, configured_secret: str, refused_setting: str
+    ) -> None:
+        """A malformed completion target, or one without its signing secret, stops the server at boot, before any request is served."""
         # Imported in-test, as the conformance suite imports the app, so a bad env var fails this test, not the collection.
         from pipelex_api.main import lifespan  # noqa: PLC0415
 
-        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, "not a url")
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, configured_url)
+        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, configured_secret)
         pipelex_make_spy = mocker.patch("pipelex_api.main.Pipelex.make")
 
         async def boot() -> None:
             async with lifespan(FastAPI()):
                 pass
 
-        with pytest.raises(RunnerMisconfiguredError):
+        with pytest.raises(RunnerMisconfiguredError) as exc_info:
             asyncio.run(boot())
+        assert exc_info.value.component == refused_setting
         pipelex_make_spy.assert_not_called()
+
+    def test_a_completion_target_without_its_secret_refuses_start_before_anything_runs(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A completion target the server cannot sign is the operator's fault, answered before the method is fetched or set up."""
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, "")
+        _register(mocker, mode="temporal")
+        run_source_spy = mocker.patch(f"{_PIPELINE_NS}._run_source")
+
+        response = _client().post("/v1/start", json=_run_body())
+
+        problem = assert_problem(response, status=500, code=CoreCode.RUNTIME_MISCONFIGURED)
+        assert "component" not in problem.get("params", {})
+        run_source_spy.assert_not_called()
+
+    def test_the_runner_checks_the_completion_target_before_it_sets_a_run_up(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """An in-process caller of the runner meets the same check, before `pipeline_run_setup` registers anything."""
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, "")
+        _register(mocker, mode="temporal")
+        setup_spy = mocker.patch(f"{_PIPELINE_NS}.pipeline_run_setup")
+
+        with pytest.raises(RunnerMisconfiguredError) as exc_info:
+            asyncio.run(ApiRunner().start(pipe_code="echo", mthds_contents=[VALID_MTHDS], inputs={"text": "hello"}))
+
+        assert exc_info.value.component == COMPLETION_CALLBACK_SECRET_ENV
+        setup_spy.assert_not_called()
+
+    def test_a_run_whose_dispatch_fails_gives_its_id_back(self, mocker: MockerFixture) -> None:
+        """A run set up but never handed over is released, so the caller can start it again under the same id."""
+        orchestrator = _register(mocker, mode="temporal")
+        dispatch_error = PipelexUnexpectedError("The orchestrator could not enqueue the run.")
+        mocker.patch.object(orchestrator, "start", new=mocker.AsyncMock(side_effect=dispatch_error))
+        release_spy = mocker.spy(pipeline_module, "release_run_setup")
+
+        response = _client().post("/v1/start", json=_run_body(pipeline_run_id=_RUN_ID))
+
+        assert_problem(response, status=500, code=CoreCode.RUNTIME_UNEXPECTED)
+        release_spy.assert_called_once()
+        # The id is free again: registering it does not collide with a run left behind.
+        get_pipeline_manager().add_new_pipeline(pipe_code=None, pipeline_run_id=_RUN_ID)
+        get_pipeline_manager().remove_pipeline(pipeline_run_id=_RUN_ID)

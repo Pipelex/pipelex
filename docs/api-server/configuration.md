@@ -42,7 +42,8 @@ PIPELEX_ENV=dev
 # `{pipeline_run_id}`. Unset, there is none. A malformed value stops the boot.
 # COMPLETION_CALLBACK_URL=https://ops.example.com/runs/complete/{pipeline_run_id}
 # The HMAC secret of the completion target's X-Completion-Signature, shared with
-# its receiver. Required once COMPLETION_CALLBACK_URL is set.
+# its receiver. Required once COMPLETION_CALLBACK_URL is set: the server refuses
+# to boot with a completion target and without it.
 # COMPLETION_CALLBACK_SECRET=<shared-with-your-completion-receiver>
 
 # Maximum request body size, in MiB, before the body-size middleware

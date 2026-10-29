@@ -67,6 +67,23 @@ def completion_callback_template() -> str | None:
     return configured
 
 
+def ensure_completion_target_configured() -> None:
+    """Refuse a completion target this server cannot sign or cannot reach: checked at boot, and before a run is set up.
+
+    Raises:
+        RunnerMisconfiguredError: `COMPLETION_CALLBACK_URL` is malformed, or it is set and `COMPLETION_CALLBACK_SECRET`
+            holds no secret to sign its notices with (a 500 `runtime.misconfigured` naming the variable to the operator).
+    """
+    if completion_callback_template() is None:
+        return
+    if not get_optional_env(COMPLETION_CALLBACK_SECRET_ENV):
+        msg = (
+            f"Server configuration error: {COMPLETION_CALLBACK_URL_ENV} is set, and {COMPLETION_CALLBACK_SECRET_ENV} holds no "
+            "secret to sign its completion notices with."
+        )
+        raise RunnerMisconfiguredError(msg, component=COMPLETION_CALLBACK_SECRET_ENV)
+
+
 def completion_callback_url(*, pipeline_run_id: str | None) -> str | None:
     """The completion target's URL for a run, or None when the deployment has none, or names the run's id and it is unknown.
 
