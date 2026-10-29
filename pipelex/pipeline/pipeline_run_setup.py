@@ -552,3 +552,37 @@ async def pipeline_run_setup(
                     else:
                         clear_current_library()
                     library_manager.teardown(library_id=library_id)
+
+
+def release_run_setup(*, pipe_job: PipeJob, library_id: str, prev_library_id: str | None) -> None:
+    """Release what `pipeline_run_setup` registered for a run that will not run from here, such as a failed dispatch.
+
+    A host that sets a run up, then cannot hand it over, releases the run's graph tracer and its event-log state, its
+    registry entry, so the same `pipeline_run_id` can be submitted again, and its library, after restoring the caller's
+    current library as `pipeline_run_setup` found it. A tracer that cannot close is logged rather than raised, so the
+    failure the host is handling keeps propagating, and the rest is released whatever the tracer did.
+
+    Args:
+        pipe_job: The job `pipeline_run_setup` built.
+        library_id: The library `pipeline_run_setup` returned.
+        prev_library_id: The caller's current library before `pipeline_run_setup` ran, None when it had none.
+    """
+    pipeline_run_id = pipe_job.job_metadata.run_metadata.pipeline_run_id
+    try:
+        if pipe_job.job_metadata.trace_context is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                try:
+                    tracer_manager.close_tracer(pipeline_run_id)
+                except OSError as close_error:
+                    # A secondary failure rides as fields with no traceback, for the reason the setup's own teardown gives.
+                    log.error("The graph tracer could not be closed after the run was not dispatched", fields=error_fields(exc=close_error))
+    finally:
+        get_report_delegate().clear_event_log(context_key=pipeline_run_id)
+        # After the tracer, for the reason the setup's own teardown gives: the entry shields the tracer's key until then.
+        get_pipeline_manager().remove_pipeline(pipeline_run_id=pipeline_run_id)
+        if prev_library_id is not None and prev_library_id != library_id:
+            set_current_library(library_id=prev_library_id)
+        else:
+            clear_current_library()
+        get_library_manager().teardown(library_id=library_id)

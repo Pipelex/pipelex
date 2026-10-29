@@ -33,6 +33,7 @@ from pipelex_api.routes import router as api_router
 from pipelex_api.routes.blob_upload import router as blob_upload_router
 from pipelex_api.routes.health import router as health_router
 from pipelex_api.routes.version import router as version_router
+from pipelex_api.run_webhooks import ensure_completion_target_configured
 from pipelex_api.security import get_auth_dependency
 
 
@@ -55,6 +56,10 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
     # only needs `runtime_manager.environment` (from PIPELEX_ENV), which resolves without a
     # live singleton. get_api_config() is @cache'd, so the warm here is reused everywhere.
     boot_orchestrator = resolve_boot_orchestrator(get_api_config())
+    # A malformed completion target, or one without its signing secret, stops the boot too, rather than failing every
+    # `/start` once the server is up. The caller-webhook secret is not checked here: a runner without one serves every
+    # request but those with callback_urls.
+    ensure_completion_target_configured()
     Pipelex.make(integration_mode=IntegrationMode.FASTAPI, boot_orchestrator=boot_orchestrator)
     try:
         yield

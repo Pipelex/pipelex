@@ -27,12 +27,25 @@ JWT_SECRET_KEY=your-jwt-secret # used when AUTH_MODE=jwt
 # (see "Pipelex configuration files" below). Defaults to "dev" when unset.
 PIPELEX_ENV=dev
 
-# Required ONLY if you use POST /v1/start with `callback_urls`
-# (see pipe-run.md → "Async Completion Callbacks"). HMAC secret shared between
-# this server (signs callbacks) and your callback receiver (verifies them).
-# Read lazily — the server boots without it; the env var is only required at
-# the moment a callback signature is computed.
-# COMPLETION_CALLBACK_SECRET=<shared-with-your-callback-receiver>
+# ── Webhooks (see webhooks.md) ─────────────────────────────────────────────
+# The secret the caller's webhooks (`callback_urls` on /v1/execute and /v1/start)
+# are signed with, in the Standard Webhooks format: one `whsec_` secret, or
+# several separated by spaces during a rotation, the current one first. Unset,
+# the server refuses a request carrying `callback_urls` with a 422
+# pipelex.webhook.secret_not_configured; requests without them never need it.
+# Read when a request needs it. Set it on every process that runs deliveries,
+# a Temporal worker included.
+# CALLER_WEBHOOK_SECRET=whsec_<base64-of-at-least-24-random-bytes>
+#
+# The deployment's own completion target, which every /v1/start run notifies
+# when it ends: an absolute http(s) URL that may name the run's id once with
+# `{pipeline_run_id}`, in its path or query only. Unset, there is none. A
+# malformed value stops the boot.
+# COMPLETION_CALLBACK_URL=https://ops.example.com/runs/complete/{pipeline_run_id}
+# The HMAC secret of the completion target's X-Completion-Signature, shared with
+# its receiver. Required once COMPLETION_CALLBACK_URL is set: the server refuses
+# to boot with a completion target and without it.
+# COMPLETION_CALLBACK_SECRET=<shared-with-your-completion-receiver>
 
 # Maximum request body size, in MiB, before the body-size middleware
 # rejects with 413. Defaults to 100 MiB. Raise it for larger documents,

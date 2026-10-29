@@ -351,6 +351,24 @@ class StartRequest(RunRequest):
     pipeline_run_id: str | None = Field(default=None, max_length=128)
 
 
+_CALLBACK_URLS_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the caller's webhooks. When the run ends, the runner "
+    "POSTs the run.finished event to each URL, signed in the Standard Webhooks format under the secret its operator "
+    "configures (webhook-id, webhook-timestamp and webhook-signature headers): `type`, `timestamp` (when the run "
+    "ended), `attempt`, and `data`, the run as the protocol's status read serves it (`pipeline_run_id`, `status` "
+    "`completed` or `failed`, and a failed run's `error`, a problem without `status`). It does not carry the run's "
+    "output. Each URL is delivered on its own, with a short retry and no redirect followed, and its failure never "
+    "changes the run. A runner whose operator configured no signing secret refuses a request carrying any with a 422 "
+    "`pipelex.webhook.secret_not_configured`. http/https only; private, loopback, link-local and cloud-metadata hosts "
+    "are rejected."
+)
+
+_EXECUTE_PIPELINE_RUN_ID_DESCRIPTION = (
+    "PIPELEX-API EXTENSION (not part of the MTHDS Protocol on `/execute`) — the run's id, chosen by the caller, as "
+    "`/start` takes it: the run and its webhooks' events carry it, and a run still in flight under the same id "
+    "refuses this one with a 409 `pipelex.run.already_exists`. Omit it and the runner generates one."
+)
+
 _STORAGE_SCOPE_DESCRIPTION = (
     "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — the host-supplied prefix every object "
     "this run writes lands under. One to three path-safe segments (e.g. `tenant/run` or "
@@ -448,10 +466,11 @@ def _refused_host_error(*, host: str) -> CallbackUrlRefusedError:
 class PipelineApiExtras(BaseModel):
     """Validates the API-server-only fields on `/execute` and `/start` requests.
 
-    `pipeline_run_id` is the protocol's optional start arg; `callback_urls` is
-    THIS server's extension (the MTHDS Protocol defines no completion channel —
-    extension args are defined and handled by the implementation that owns
-    them). The upstream protocol models don't know about `callback_urls`.
+    `pipeline_run_id` is the protocol's optional start arg, which this server honors
+    on `/execute` too; `callback_urls` is THIS server's extension, the caller's
+    webhooks (the MTHDS Protocol defines no completion channel — extension args
+    are defined and handled by the implementation that owns them). The upstream
+    protocol models don't know about `callback_urls`.
 
     `storage_scope`, `read_scope` and `analytics_groups` are the host-computed run
     context: data a multi-tenant host knows about its own tenancy and sends in the
@@ -566,18 +585,7 @@ class PipelexApiStartRequest(StartRequest):
     ones it implements itself. Wire validation happens in `PipelineApiExtras`.
     """
 
-    callback_urls: list[str] | None = Field(
-        default=None,
-        description=(
-            "PIPELEX-API EXTENSION (not part of the MTHDS Protocol) — completion webhooks. "
-            "When the run finishes, the runner POSTs a completion notice to each URL, with an "
-            "X-Completion-Signature header holding the HMAC-SHA256 of the run id (not of the body). "
-            "The body carries `pipeline_run_id`, `state` (with the legacy `status` alias), `result_url` "
-            "(the storage key prefix of the stored results, when results were stored) and `error` on "
-            "failure; it does not carry the run's output. http/https only; private, loopback, link-local "
-            "and cloud-metadata hosts are rejected."
-        ),
-    )
+    callback_urls: list[str] | None = Field(default=None, description=_CALLBACK_URLS_DESCRIPTION)
     orchestration_mode: str | None = Field(default=None, description=_ORCHESTRATION_MODE_DESCRIPTION)
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_READ_SCOPE_DESCRIPTION)
@@ -589,10 +597,12 @@ class PipelexApiExecuteRequest(RunRequest):
 
     Used only to publish the OpenAPI request schema: `/execute` reads the body through the raw
     `Request` (plain JSON, parsed by the route), so FastAPI cannot infer the body type; this model documents the
-    extensions the route actually honors (`orchestration_mode`, `storage_scope`, `read_scope`, `analytics_groups`,
-    all parsed by `PipelineApiExtras`).
+    extensions the route actually honors (`pipeline_run_id`, `callback_urls`, `orchestration_mode`, `storage_scope`,
+    `read_scope`, `analytics_groups`, all parsed by `PipelineApiExtras`).
     """
 
+    pipeline_run_id: str | None = Field(default=None, max_length=128, description=_EXECUTE_PIPELINE_RUN_ID_DESCRIPTION)
+    callback_urls: list[str] | None = Field(default=None, description=_CALLBACK_URLS_DESCRIPTION)
     orchestration_mode: str | None = Field(default=None, description=_ORCHESTRATION_MODE_DESCRIPTION)
     storage_scope: str | None = Field(default=None, description=_STORAGE_SCOPE_DESCRIPTION)
     read_scope: str | None = Field(default=None, description=_READ_SCOPE_DESCRIPTION)

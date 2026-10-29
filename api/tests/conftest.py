@@ -4,8 +4,8 @@ from collections.abc import Generator
 import pytest
 from pipelex.test_extras.usage_stats_isolation import turn_usage_stats_off_for_the_session, usage_stats_guarded
 
-# Set a placeholder for COMPLETION_CALLBACK_SECRET so tests that exercise /start
-# never depend on the developer's shell env. CAVEAT: `make` test targets export
+# Set a placeholder for COMPLETION_CALLBACK_SECRET so tests that give /start a completion
+# target never depend on the developer's shell env. CAVEAT: `make` test targets export
 # every `.env` key NAME into the child env (including commented-out ones) as
 # EMPTY strings, and `setdefault` cannot replace an existing empty value — so
 # tests that verify the callback signature must pin the secret themselves via

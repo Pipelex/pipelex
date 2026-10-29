@@ -31,6 +31,7 @@ BundleClosureEmptyError | method.not_found
 BundleElaboratorError | method.schema_violation
 BundleResourceNotNamedError | request.invalid
 BundleResourcePathError | one of security.input_path_refused, request.invalid
+CallerWebhookSecretError | runtime.misconfigured
 CodegenError | pipelex.codegen.output_conflict
 CodegenLockError | one of pipelex.codegen.lock_invalid, pipelex.codegen.lock_unsupported
 CodegenStampError | runtime.unexpected

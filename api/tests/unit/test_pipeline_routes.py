@@ -15,6 +15,7 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.errors.problem import MISSING_REQUIRED_PARAMS_MESSAGE, ProblemView
+from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV
 from pipelex.pipeline.pipeline_response import PipelexRunResultStart, RunState
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.storage_scope import SINGLE_TENANT_USER_ID
@@ -29,6 +30,7 @@ from pipelex_api.middleware import REQUEST_ID_HEADER, RequestIdMiddleware
 from pipelex_api.routes.pipelex.pipeline import router as pipeline_router
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
+from tests.unit.test_data import ProblemTestData
 
 
 def _build_client(mocker: MockerFixture, *, with_request_id_middleware: bool = False) -> tuple[TestClient, Any, Any]:
@@ -240,6 +242,8 @@ class TestPipelineRoutes:
         assert execute_mock.await_args.kwargs["inputs"] == inputs
 
     def test_start_happy_path_returns_202(self, mocker: MockerFixture):
+        # `callback_urls` needs a signing secret on the runner, which the route checks before it starts the run.
+        mocker.patch.dict("os.environ", {CALLER_WEBHOOK_SECRET_ENV: ProblemTestData.SYNTHETIC_CALLER_WEBHOOK_SECRET})
         client, _, start_mock = _build_client(mocker)
         response = client.post(
             "/v1/start",

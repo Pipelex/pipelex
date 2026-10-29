@@ -1049,3 +1049,18 @@ codes:
       receiver_status: {type: integer, optional: true, description: "The HTTP status the receiver answered with, when it answered."}
     meaning: "A caller's webhook receiver answered with an error status, or could not be reached. The failure is recorded on the delivery, never on the run, and the platform repeats the delivery on its own."
     what_to_do: "Fix the receiver so that it answers with a `2xx` status. The platform repeats the delivery, so nothing needs to be sent again."
+
+  - code: pipelex.webhook.secret_not_configured
+    title: "This runner has no secret to sign webhooks with"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "This runner signs no webhooks, because its setting '{setting}' holds no signing secret."
+    steps:
+      actor: {kind: change_input, detail: "Send the request without callback URLs, or ask whoever runs this runner to set '{setting}' to a signing secret."}
+      other: {kind: change_input, detail: "Pass this to the caller, who asked for webhooks this runner cannot sign until '{setting}' holds a signing secret."}
+    params:
+      setting: {type: identifier, description: "The setting that holds the runner's webhook signing secret, an environment variable of the runner."}
+    meaning: "The request registered callback URLs, and a self-hosted runner signs every call it makes to them with a secret its operator configures, so that the receiver can tell the call is genuine. This runner has none, so it refuses the request before running anything rather than send calls nobody can verify."
+    what_to_do: "Send the request without `callback_urls` and read the run's outcome from the response, or ask whoever runs the runner to set the setting `params.setting` names to a `whsec_` secret, which the receiver verifies the calls with."

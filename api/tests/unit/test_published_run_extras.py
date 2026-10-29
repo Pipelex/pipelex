@@ -8,13 +8,11 @@ send it, and nothing else fails.
 
 from pipelex_api.schemas.models import PipelexApiExecuteRequest, PipelexApiStartRequest, PipelineApiExtras
 
-# `/execute` generates its own run id and delivers nothing asynchronously, so it reads neither.
-_START_ONLY_EXTRAS = {"pipeline_run_id", "callback_urls"}
-
 
 class TestPublishedRunExtras:
     def test_start_request_publishes_every_extra(self) -> None:
         assert set(PipelineApiExtras.model_fields) <= set(PipelexApiStartRequest.model_fields)
 
-    def test_execute_request_publishes_every_extra_it_reads(self) -> None:
-        assert set(PipelineApiExtras.model_fields) - _START_ONLY_EXTRAS <= set(PipelexApiExecuteRequest.model_fields)
+    def test_execute_request_publishes_every_extra(self) -> None:
+        """`/execute` reads every extension `/start` reads, its caller-chosen run id and its caller webhooks included."""
+        assert set(PipelineApiExtras.model_fields) <= set(PipelexApiExecuteRequest.model_fields)

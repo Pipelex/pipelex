@@ -96,6 +96,36 @@ class CallbackUrlRefusedError(PipelexError, ValueError):
         return make_location(field="callback_urls")
 
 
+class CallerWebhookSecretNotConfiguredError(PipelexError):
+    """A request registering callback URLs on a runner whose operator configured no secret to sign its webhooks with.
+
+    The runner signs every call it makes to a caller's webhook, so it refuses the request before running anything rather
+    than send calls nobody can verify. Its code, ``pipelex.webhook.secret_not_configured``, names the ``setting`` to the
+    caller too, since it is the deployment's to set and the caller's to ask for, and the problem is located at the field
+    ``callback_urls``.
+    """
+
+    error_code = PipelexErrorCode.WEBHOOK_SECRET_NOT_CONFIGURED
+
+    def __init__(self, message: str, *, setting: str) -> None:
+        """Build the refusal.
+
+        Args:
+            message: What the runner lacks, for the operator's diagnostics.
+            setting: The setting that holds the signing secret, the environment variable's name.
+        """
+        super().__init__(message)
+        self.setting = setting
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"setting": self.setting}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(field="callback_urls")
+
+
 class RunnerRequestError(PipelexError):
     """A request the runner refuses at its own boundary, before it reads a method or runs anything.
 
