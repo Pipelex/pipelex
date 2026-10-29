@@ -1,5 +1,5 @@
 {
-  "version": "8.0.0",
+  "version": "8.0.1",
   "base_url": "https://mthds.ai/errors",
   "extension_prefixes": [
     {
@@ -479,10 +479,10 @@
           "items": {
             "type": "sha256"
           },
-          "description": "Each hash of the request that the runner does not hold, in lowercase hexadecimal."
+          "description": "Each hash the request's `files` names that the runner does not hold, in lowercase hexadecimal."
         }
       },
-      "meaning": "A hash entry of the request's `files` names bytes this runner does not hold, or the runner keeps no blob store at all, so it cannot assemble the method's tree. This is the protocol's own refusal of hash entries.",
+      "meaning": "A hash entry of the request's `files` names bytes this runner does not hold, or the runner keeps no blob store at all, so it cannot assemble the method's tree. This is the protocol's own refusal of hash entries, and the last check of a map: a runner answers it only for a `files` map that breaks no other rule of the method tree's file entries, and never checks the hash entry of a key it refuses.",
       "what_to_do": "Read `params.missing_blobs`. To a runner whose `GET /version` declares `blob_store: true`, upload each listed blob as `POST /blobs/missing` says; to any other runner, send each listed file inline. Then send the request again.",
       "see": [
         {
@@ -714,7 +714,7 @@
     },
     {
       "code": "input.wrong_concept",
-      "title": "An input is not the declared concept",
+      "title": "An input is not of the kind the method declares",
       "domain": "input",
       "retry": "no",
       "raised_as": "problem",
@@ -755,7 +755,7 @@
     },
     {
       "code": "input.wrong_multiplicity",
-      "title": "An input has the wrong number of items",
+      "title": "An input has the wrong form or the wrong number of items",
       "domain": "input",
       "retry": "no",
       "raised_as": "problem",
@@ -768,7 +768,7 @@
         },
         "other": {
           "kind": "change_input",
-          "detail": "Pass this to the caller, who must give the input '{input}' with the multiplicity the method declares."
+          "detail": "Pass this to the caller, who must give the input '{input}' as the method declares it: one item, a list, or a list of a set length."
         }
       },
       "params": {
@@ -806,7 +806,7 @@
     },
     {
       "code": "input.invalid",
-      "title": "An input does not fit its concept's structure",
+      "title": "An input does not have the structure the method declares",
       "domain": "input",
       "retry": "no",
       "raised_as": "problem",
@@ -2590,7 +2590,7 @@
     },
     {
       "code": "pipe.output_multiplicity",
-      "title": "A pipe's output does not have the declared multiplicity",
+      "title": "A step produced a list instead of one result, or the reverse",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2603,7 +2603,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to make the output '{output}' of pipe '{pipe}' match its declared multiplicity."
+          "detail": "Ask the method's owner to make the step '{pipe}' produce its output '{output}' as one item or as a list, as the method declares it."
         }
       },
       "params": {
@@ -2647,7 +2647,7 @@
     },
     {
       "code": "pipe.output_invalid",
-      "title": "A pipe's output does not fit its concept",
+      "title": "A step's result does not have the structure the method declares",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2660,7 +2660,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to make pipe '{pipe}' produce an output that fits its concept."
+          "detail": "Ask the method's owner to make the step '{pipe}' produce a result with the structure the method declares."
         }
       },
       "params": {
@@ -2691,7 +2691,7 @@
     },
     {
       "code": "pipe.function_raised",
-      "title": "The method's function raised",
+      "title": "The method's function failed",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2704,7 +2704,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to fix the function '{function}' of pipe '{pipe}'."
+          "detail": "Ask the method's owner to fix the function '{function}' of the step '{pipe}'."
         }
       },
       "params": {
@@ -2769,7 +2769,7 @@
     },
     {
       "code": "pipe.template_render_failed",
-      "title": "A template failed to render",
+      "title": "A template in the method could not be filled in",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2782,7 +2782,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to fix the template of pipe '{pipe}'."
+          "detail": "Ask the method's owner to fix the template of the step '{pipe}'."
         }
       },
       "params": {
@@ -2806,7 +2806,7 @@
     },
     {
       "code": "pipe.template_budget_exceeded",
-      "title": "A template exceeded its render budget",
+      "title": "A template in the method tried to do more than it may",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2819,7 +2819,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to make the template of pipe '{pipe}' do less in one render."
+          "detail": "Ask the method's owner to make the template of the step '{pipe}' do less."
         }
       },
       "params": {
@@ -2862,7 +2862,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to map every value of the condition of pipe '{pipe}'."
+          "detail": "Ask the method's owner to give the condition of the step '{pipe}' an outcome for every value it can take."
         }
       },
       "params": {
@@ -2919,7 +2919,7 @@
     },
     {
       "code": "pipe.binding_failed",
-      "title": "A binding step could not bind its value",
+      "title": "A step could not find a field in the value it reads",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2932,7 +2932,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to fix the binding '{binding}' of pipe '{pipe}'."
+          "detail": "Ask the method's owner to fix how the step '{pipe}' reads '{binding}'."
         }
       },
       "params": {
@@ -2960,7 +2960,7 @@
     },
     {
       "code": "pipe.input_unresolved",
-      "title": "A pipe could not read a value it needs",
+      "title": "A step could not read a value it needs",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -2997,7 +2997,7 @@
     },
     {
       "code": "pipe.forced_input_absent",
-      "title": "A forced input was absent",
+      "title": "A value the method counts on was missing",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -3010,7 +3010,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to handle the absence of '{variable}' in pipe '{pipe}'."
+          "detail": "Ask the method's owner to handle a missing '{variable}' in the step '{pipe}'."
         }
       },
       "params": {
@@ -3034,7 +3034,7 @@
     },
     {
       "code": "pipe.prompt_empty",
-      "title": "A pipe's prompt is empty",
+      "title": "A step's prompt came out empty",
       "domain": "input",
       "retry": "no",
       "raised_as": "problem",
@@ -3047,7 +3047,7 @@
         },
         "other": {
           "kind": "change_input",
-          "detail": "Pass this to the caller, whose inputs leave the prompt of pipe '{pipe}' empty."
+          "detail": "Pass this to the caller, whose inputs leave the prompt of the step '{pipe}' empty."
         }
       },
       "params": {
@@ -3070,7 +3070,7 @@
     },
     {
       "code": "pipe.stack_overflow",
-      "title": "The run nested pipes deeper than the limit",
+      "title": "The run nested its steps deeper than the limit",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -3083,7 +3083,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to stop the method's pipes from nesting without end."
+          "detail": "Ask the method's owner to stop the method's steps from calling each other without end."
         }
       },
       "params": {
@@ -3302,7 +3302,7 @@
     },
     {
       "code": "model.output_truncated",
-      "title": "The answer was cut at the method's token cap",
+      "title": "The model's answer was cut off at the method's length limit",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -3315,7 +3315,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to raise the step's token cap."
+          "detail": "Ask the method's owner to raise the step's length limit."
         }
       },
       "params": {
@@ -3343,7 +3343,7 @@
     },
     {
       "code": "model.output_schema_mismatch",
-      "title": "The model's structured output did not match its schema",
+      "title": "The model's answer did not have the expected structure",
       "domain": "runtime",
       "retry": "yes",
       "raised_as": "problem",
@@ -4099,7 +4099,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to change the URL pipe '{pipe}' names."
+          "detail": "Ask the method's owner to change the URL the step '{pipe}' names."
         }
       },
       "params": {
@@ -4209,7 +4209,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to change the path pipe '{pipe}' names."
+          "detail": "Ask the method's owner to change the path the step '{pipe}' names."
         }
       },
       "params": {
@@ -4233,7 +4233,7 @@
     },
     {
       "code": "security.template_refused",
-      "title": "A template was refused by the template sandbox",
+      "title": "A template in the method reached for something it may not use",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -4246,7 +4246,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to remove '{name}' from the templates of pipe '{pipe}'."
+          "detail": "Ask the method's owner to remove '{name}' from the templates of the step '{pipe}'."
         }
       },
       "params": {
@@ -4264,7 +4264,7 @@
     },
     {
       "code": "security.schema_refused",
-      "title": "An output schema was refused",
+      "title": "The method declares an output structure the runtime refuses",
       "domain": "method",
       "retry": "no",
       "raised_as": "problem",
@@ -4277,7 +4277,7 @@
         },
         "other": {
           "kind": "contact_owner",
-          "detail": "Ask the method's owner to remove the extensions from the concept '{concept}'."
+          "detail": "Ask the method's owner to remove the code that the output structure '{concept}' carries."
         }
       },
       "params": {
