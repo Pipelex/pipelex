@@ -117,6 +117,10 @@
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
+         <loc>https://docs.pipelex.com/latest/api-server/webhooks/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
          <loc>https://docs.pipelex.com/latest/building-methods/configure-ai-llm-to-optimize-methods/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
@@ -646,6 +650,10 @@
     </url>
     <url>
          <loc>https://docs.pipelex.com/latest/errors/pipelex/webhook/delivery_failed/</loc>
+         <lastmod>2026-10-29</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.pipelex.com/latest/errors/pipelex/webhook/secret_not_configured/</loc>
          <lastmod>2026-10-29</lastmod>
     </url>
     <url>
