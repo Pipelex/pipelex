@@ -19,7 +19,7 @@ notice. An `/execute` run notifies no completion target, so there every entry is
 import hashlib
 import hmac
 from collections.abc import Sequence
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 from pipelex.errors.problem import ProblemView
 from pipelex.pipe_run.caller_webhook_delivery import CALLER_WEBHOOK_SECRET_ENV, caller_webhook_secret_keys, is_caller_webhook_secret_set
@@ -149,7 +149,24 @@ def start_caller_webhook_urls(*, callback_urls: Sequence[str] | None, pipeline_r
         pipeline_run_id: The run's id, when it is known, which the completion target's URL may name.
     """
     completion_url = completion_callback_url(pipeline_run_id=pipeline_run_id)
-    return [url for url in caller_webhook_urls(callback_urls=callback_urls) if url != completion_url]
+    return [url for url in caller_webhook_urls(callback_urls=callback_urls) if not _is_completion_url(url=url, completion_url=completion_url)]
+
+
+def _is_completion_url(*, url: str, completion_url: str | None) -> bool:
+    """Whether a callback URL is the completion target's own, compared as URLs rather than as texts.
+
+    The target's URL holds the run's id percent-encoded, while a host forwarding it may write the id as it is, so the
+    two are compared with their scheme and host in lower case and their path and query decoded: `order 42` and
+    `order%2042` name the same hop.
+    """
+    if completion_url is None:
+        return False
+    return _comparable_url(url) == _comparable_url(completion_url)
+
+
+def _comparable_url(url: str) -> tuple[str, str, str, str, str]:
+    parts = urlsplit(url)
+    return (parts.scheme.lower(), parts.netloc.lower(), unquote(parts.path), unquote(parts.query), unquote(parts.fragment))
 
 
 def ensure_caller_webhooks_signable(*, caller_urls: Sequence[str]) -> None:
@@ -191,7 +208,7 @@ def start_delivery_assignment(*, caller_urls: Sequence[str], pipeline_run_id: st
     return DeliveryAssignment(
         storage=StorageTarget(),
         webhooks=webhooks,
-        caller_webhooks=[CallerWebhookTarget(url=url) for url in caller_urls if url != completion_url],
+        caller_webhooks=[CallerWebhookTarget(url=url) for url in caller_urls if not _is_completion_url(url=url, completion_url=completion_url)],
     )
 
 

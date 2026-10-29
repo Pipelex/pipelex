@@ -42,6 +42,8 @@ from pipelex_api.run_webhooks import (
     COMPLETION_CALLBACK_URL_ENV,
     completion_callback_template,
     completion_callback_url,
+    start_caller_webhook_urls,
+    start_delivery_assignment,
 )
 from tests.unit._constants import VALID_MTHDS
 from tests.unit._problems import assert_problem
@@ -301,6 +303,24 @@ class TestCallerWebhooks:
         monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, configured)
 
         assert completion_callback_template() == configured
+
+    @pytest.mark.parametrize(
+        "forwarded_url",
+        [
+            pytest.param("https://ops.example.com/runs/complete/order 42", id="id_as_it_is"),
+            pytest.param("https://ops.example.com/runs/complete/order%2042", id="id_percent_encoded"),
+            pytest.param("HTTPS://OPS.example.com/runs/complete/order%2042", id="scheme_and_host_in_capitals"),
+        ],
+    )
+    def test_the_forwarded_completion_url_is_recognised_however_its_id_is_written(self, monkeypatch: pytest.MonkeyPatch, forwarded_url: str) -> None:
+        """The target's URL holds the id percent-encoded, and a host forwarding it may not: both name the same hop."""
+        monkeypatch.setenv(COMPLETION_CALLBACK_URL_ENV, ProblemTestData.COMPLETION_TARGET_TEMPLATE)
+        monkeypatch.setenv(COMPLETION_CALLBACK_SECRET_ENV, ProblemTestData.SYNTHETIC_CALLBACK_SECRET)
+
+        assert start_caller_webhook_urls(callback_urls=[forwarded_url, _CALLER_URL], pipeline_run_id="order 42") == [_CALLER_URL]
+        delivery_assignment = start_delivery_assignment(caller_urls=[forwarded_url, _CALLER_URL], pipeline_run_id="order 42")
+        assert [target.url for target in delivery_assignment.webhooks] == ["https://ops.example.com/runs/complete/order%2042"]
+        assert [target.url for target in delivery_assignment.caller_webhooks] == [_CALLER_URL]
 
     def test_the_run_id_is_percent_encoded_into_the_completion_url(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """An id the caller chose fills its placeholder as one path segment, never adding a segment or a query."""
