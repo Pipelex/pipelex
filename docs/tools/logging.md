@@ -563,7 +563,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `delivery_id` | string | The id of a caller webhook's delivery, `whd_…`, which every attempt of it carries as its `webhook-id` header |
 | `delivery_count` | integer | The number of caller webhooks a delivery was to send the run's event to |
 | `attempt_count` | integer | The number of calls a caller webhook's delivery step sent, none when nothing could be signed; the calls a host's earlier runs of the step sent are not counted |
-| `event_attempt` | integer | The `attempt` a caller webhook's call carried in its `run.finished` event, counted across a host's runs of the delivery step; on a line about a whole delivery, the last call's |
+| `event_attempt` | integer | The `attempt` a caller webhook's call carried in its `run.finished` event, counted across a host's runs of the delivery step when the host passes its own attempt at it; on a line about a whole delivery, the last call's |
 | `delivery_failure` | string | Why a caller webhook's delivery, or one attempt of it, failed: `http_status`, `timeout`, `unreachable`, `refused_address` or `secret_unavailable` |
 | `storage_scheme` | string or `null` | The kind of storage a deployment's storage provider is, as a `pipelex.storage.*` problem names it: `s3`, `local`; `null` for a storage plugin whose kind the registry does not list |
 | `blob_sha256` | string | The SHA-256 a blob is stored under in the API server's blob store, in lowercase hex: its content's hash, never its content |

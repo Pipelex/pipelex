@@ -17,12 +17,13 @@ This is the self-hosted sender of the caller-webhook contract (Pipelex's conform
   :data:`ATTEMPTS_PER_STEP` attempts at each URL. A destination the SSRF guard refuses logs its security event and is
   not tried again. A delivery that fails is logged and returned as its outcome, and never raises: it changes neither
   the run's outcome nor any other delivery.
-- **The attempt number.** ``attempt`` counts every call sent under a delivery's ``webhook-id``, across a host's retries
-  of the step. A host that runs the step again for the same run, as a durable orchestrator does when the process
-  running it was lost, passes its own attempt at the step as ``host_attempt``, counted from 1, and the step numbers its
-  calls after every call the earlier steps could have made (:func:`first_attempt_of_step`). The number therefore
-  increases and never repeats under one ``webhook-id``, though it skips the numbers of calls a step ended without
-  making, such as those of a step whose process was lost.
+- **The attempt number.** Within one step, ``attempt`` increases from 1. A host that runs the step again for the same
+  run, as a durable orchestrator does when the process running it was lost, continues the count by passing its own
+  attempt at the step as ``host_attempt``, counted from 1: the step numbers its calls after every call the earlier
+  steps could have made (:func:`first_attempt_of_step`), so the number keeps increasing under one ``webhook-id``,
+  though it skips the numbers of calls a step ended without making, such as those of a step whose process was lost. A
+  host that passes none numbers each step from 1 again, so ``attempt`` is informational: a receiver deduplicates on
+  ``webhook-id`` and never relies on ``attempt`` being unique or without gaps.
 """
 
 from __future__ import annotations
@@ -74,7 +75,8 @@ RETRY_WAITS_SECONDS: tuple[float, ...] = (1.0, 5.0)
 
 ATTEMPTS_PER_STEP = len(RETRY_WAITS_SECONDS) + 1
 """How many attempts one delivery step makes at each URL at most: the first, then one after each wait of
-:data:`RETRY_WAITS_SECONDS`. A host's retry of the step numbers its attempts after that many per earlier step."""
+:data:`RETRY_WAITS_SECONDS`. A host's retry of the step that passes its own attempt numbers its calls after that many
+per earlier step (:func:`first_attempt_of_step`)."""
 
 
 class EndedRunStatus(StrEnum):
@@ -220,7 +222,8 @@ def run_finished_body(*, finished_at: str, attempt: int, data: Mapping[str, Any]
 
     Args:
         finished_at: When the run ended, as :func:`event_timestamp` writes it.
-        attempt: Which attempt of the delivery the call is, from 1, counted across a host's retries of the step.
+        attempt: Which attempt of the delivery the call is, from 1, counted across a host's retries of the step when the
+            host passes its own attempt at it (:func:`first_attempt_of_step`).
         data: The run as its caller's status read serves it (:func:`run_finished_data`).
 
     Returns:
