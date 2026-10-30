@@ -136,6 +136,7 @@ pipelex/pipe_operators/search/pipe_search_blueprint.py | PipeSearchBlueprint.val
 pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlueprint.validate_inputs | ValueError | validator
 pipelex/pipe_operators/structure/pipe_structure_blueprint.py | PipeStructureBlueprint.validate_output | ValueError | validator
+pipelex/pipe_run/caller_webhook_delivery.py | first_attempt_of_step | ValueError | invariant
 pipelex/providers/anthropic/anthropic_factory.py | AnthropicFactory._make_document_block_param | TypeError | invariant
 pipelex/providers/anthropic/anthropic_factory.py | AnthropicFactory._make_image_block_param | TypeError | invariant
 pipelex/providers/azure_rest/azure_img_gen_worker.py | AzureImgGenWorker.__init__ | NotImplementedError | invariant
