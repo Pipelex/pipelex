@@ -286,11 +286,21 @@ class DeliveryExecutor:
         finished_at: datetime,
         request_id: str | None = None,
         extras: Mapping[str, str] | None = None,
+        host_attempt: int = 1,
     ) -> None:
         """The caller step: send each caller webhook the signed ``run.finished`` event, saying how the run ended.
 
-        It never raises: a delivery that fails is logged, and changes nothing of the run. ``status`` and ``problem`` are
+        A delivery that fails is logged, never raised, and changes nothing of the run. ``status`` and ``problem`` are
         how the run ends, after the host step (:func:`run_ending_after_host_failure`).
+
+        ``host_attempt`` is the host's own attempt at this step, counted from 1. A durable orchestrator that runs the
+        step again for the same run, after the process running it was lost, passes its attempt number, so that each
+        event's ``attempt`` continues after every call its earlier attempts could have sent and never repeats under the
+        event's ``webhook-id``, though it may skip numbers (:func:`~pipelex.pipe_run.caller_webhook_delivery.first_attempt_of_step`).
+        The default, 1, suits a host that runs the step once, as :meth:`execute` does.
+
+        Raises:
+            ValueError: ``host_attempt`` is below 1 while the run has caller webhooks; nothing is sent.
         """
         if not delivery_assignment.caller_webhooks:
             return
@@ -302,6 +312,7 @@ class DeliveryExecutor:
                 problem=problem,
                 finished_at=finished_at,
                 extras=extras,
+                host_attempt=host_attempt,
             )
 
     # ---- Result file generation ----

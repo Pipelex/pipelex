@@ -1222,6 +1222,7 @@ class TestDeliveryExecutor:
                 extras={"org": "acme"},
             )
 
+        # The one-process delivery runs the caller step once, as the host's first attempt at it.
         deliver_spy.assert_awaited_once_with(
             targets=[caller_target],
             pipeline_run_id="plr-host-down",
@@ -1229,6 +1230,7 @@ class TestDeliveryExecutor:
             problem=problem,
             finished_at=finished_at,
             extras={"org": "acme"},
+            host_attempt=1,
         )
 
     @pytest.mark.builds_problems_without_required_params(reason="the failed run's problem is built in the test, as its sibling tests build it")
@@ -1423,7 +1425,9 @@ class TestDeliveryExecutor:
 
     @pytest.mark.builds_problems_without_required_params(reason="the failed run's problem is built in the test, as its sibling tests build it")
     async def test_the_caller_step_runs_on_its_own_for_a_durable_orchestrator(self, mocker: MockerFixture) -> None:
-        """The caller step is callable alone, after a host step a durable orchestrator ran as its own step."""
+        """The caller step is callable alone, after a host step a durable orchestrator ran as its own step, and passes on
+        the orchestrator's own attempt at it, so a step run again continues its events' attempt count.
+        """
         deliver_spy = mocker.patch.object(delivery_executor_module, "deliver_caller_webhooks", new=mocker.AsyncMock())
         caller_target = CallerWebhookTarget(url="https://caller.example.com/hook")
         problem = _make_failed_run_problem()
@@ -1444,6 +1448,7 @@ class TestDeliveryExecutor:
             status=run_ending.status,
             problem=run_ending.problem,
             finished_at=finished_at,
+            host_attempt=2,
         )
 
         deliver_spy.assert_awaited_once_with(
@@ -1453,4 +1458,28 @@ class TestDeliveryExecutor:
             problem=problem,
             finished_at=finished_at,
             extras=None,
+            host_attempt=2,
         )
+
+    async def test_the_caller_step_refuses_a_host_attempt_below_one(self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A host attempt below 1 is the orchestrator's fault: the caller step raises it rather than log it, and sends nothing."""
+        caller_calls: list[httpx.Request] = []
+
+        def caller_receiver(request: httpx.Request) -> httpx.Response:
+            caller_calls.append(request)
+            return httpx.Response(204)
+
+        mocker.patch.object(caller_webhook_delivery_module, "SsrfGuardedTransport", return_value=httpx.MockTransport(caller_receiver))
+        monkeypatch.setenv(caller_webhook_delivery_module.CALLER_WEBHOOK_SECRET_ENV, "whsec_AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
+
+        with pytest.raises(ValueError, match="counted from 1"):
+            await DeliveryExecutor().execute_caller_delivery(
+                pipeline_run_id="plr-durable",
+                delivery_assignment=DeliveryAssignment(caller_webhooks=[CallerWebhookTarget(url="https://caller.example.com/hook")]),
+                status=DeliveryStatus.COMPLETED,
+                problem=None,
+                finished_at=datetime(2026, 10, 22, 11, 59, 58, tzinfo=UTC),
+                host_attempt=0,
+            )
+
+        assert caller_calls == []

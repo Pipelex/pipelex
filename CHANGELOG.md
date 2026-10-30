@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A caller webhook's `attempt` no longer restarts when its delivery step runs again**: `DeliveryExecutor.execute_caller_delivery` and `deliver_caller_webhooks` take a keyword-only `host_attempt`, the host's own attempt at the caller step counted from 1, and number the step's calls after every call its earlier attempts could have made, `ATTEMPTS_PER_STEP` per URL each, so under one `webhook-id` the event's `attempt` increases and never repeats, though it skips the numbers of calls a lost attempt never made. A durable orchestrator that retries the step passes its attempt number; the default of 1 leaves a single run of the step numbered as before, and a value below 1 raises `ValueError` before anything is sent. The delivery's log lines also carry `event_attempt`, the `attempt` the call carried.
+
 ## [v0.95.0] - 2026-10-29
 
 ### Added
