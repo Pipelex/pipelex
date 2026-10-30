@@ -13,9 +13,17 @@ This is the self-hosted sender of the caller-webhook contract (Pipelex's conform
   signature ever travels with a run's job.
 - **The delivery.** Every URL is delivered on its own and at the same time as the others, with a short retry: an attempt
   succeeds on a ``2xx`` answered within :data:`ATTEMPT_BUDGET_SECONDS`, redirects are never followed, and a failed
-  attempt is tried again after each wait of :data:`RETRY_WAITS_SECONDS`. A destination the SSRF guard refuses logs its
-  security event and is not tried again. A delivery that fails is logged and returned as its outcome, and never raises:
-  it changes neither the run's outcome nor any other delivery.
+  attempt is tried again after each wait of :data:`RETRY_WAITS_SECONDS`, so one delivery step makes at most
+  :data:`ATTEMPTS_PER_STEP` attempts at each URL. A destination the SSRF guard refuses logs its security event and is
+  not tried again. A delivery that fails is logged and returned as its outcome, and never raises: it changes neither
+  the run's outcome nor any other delivery.
+- **The attempt number.** Within one step, ``attempt`` increases from 1. A host that runs the step again for the same
+  run, as a durable orchestrator does when the process running it was lost, continues the count by passing its own
+  attempt at the step as ``host_attempt``, counted from 1: the step numbers its calls after every call the earlier
+  steps could have made (:func:`first_attempt_of_step`), so the number keeps increasing under one ``webhook-id``,
+  though it skips the numbers of calls a step ended without making, such as those of a step whose process was lost. A
+  host that passes none numbers each step from 1 again, so ``attempt`` is informational: a receiver deduplicates on
+  ``webhook-id`` and never relies on ``attempt`` being unique or without gaps.
 """
 
 from __future__ import annotations
@@ -63,7 +71,12 @@ ATTEMPT_BUDGET_SECONDS = 15.0
 """How long an attempt may take, from the call being sent to the receiver's answer, before it counts as failed."""
 
 RETRY_WAITS_SECONDS: tuple[float, ...] = (1.0, 5.0)
-"""The waits before the second attempt and each later one: three attempts in all, within the run's delivery step."""
+"""The waits before the second attempt and each later one, within the run's delivery step."""
+
+ATTEMPTS_PER_STEP = len(RETRY_WAITS_SECONDS) + 1
+"""How many attempts one delivery step makes at each URL at most: the first, then one after each wait of
+:data:`RETRY_WAITS_SECONDS`. A host's retry of the step that passes its own attempt numbers its calls after that many
+per earlier step (:func:`first_attempt_of_step`)."""
 
 
 class EndedRunStatus(StrEnum):
@@ -94,7 +107,8 @@ class CallerWebhookOutcome(BaseModel):
     Attributes:
         delivery_id: The delivery's id, its calls' ``webhook-id``.
         server_address: The receiver's host, never its whole URL, which may carry a credential.
-        attempt_count: How many calls were sent, none when the event could not be signed.
+        attempt_count: How many calls this delivery step sent, none when the event could not be signed. The calls a
+            host's earlier steps sent under the same ``webhook-id`` are not counted.
         failure: Why the delivery failed, or ``None`` when the receiver acknowledged it.
         receiver_status: The status the receiver answered the last attempt with, when it answered outside ``2xx``.
     """
@@ -180,12 +194,36 @@ def run_finished_data(*, pipeline_run_id: str, status: DeliveryStatus, problem: 
             }
 
 
+def first_attempt_of_step(*, host_attempt: int) -> int:
+    """The ``attempt`` that a delivery step's first call to each URL carries, given the host's attempt at the step.
+
+    Each step makes at most :data:`ATTEMPTS_PER_STEP` attempts at a URL, so numbering a step's calls after that many
+    per earlier step keeps ``attempt`` increasing under one ``webhook-id`` across a host's retries, never repeated,
+    though it skips the numbers of calls an earlier step ended without making.
+
+    Args:
+        host_attempt: The host's own attempt at the caller-delivery step, counted from 1.
+
+    Returns:
+        ``(host_attempt - 1) * ATTEMPTS_PER_STEP + 1``: 1 on the host's first attempt, ``ATTEMPTS_PER_STEP + 1`` on its
+        second.
+
+    Raises:
+        ValueError: ``host_attempt`` is below 1.
+    """
+    if host_attempt < 1:
+        msg = f"A host's attempt at the caller-delivery step is counted from 1, so it cannot be {host_attempt}."
+        raise ValueError(msg)
+    return (host_attempt - 1) * ATTEMPTS_PER_STEP + 1
+
+
 def run_finished_body(*, finished_at: str, attempt: int, data: Mapping[str, Any]) -> bytes:
     """The bytes of one call's body: the ``run.finished`` event as compact JSON, characters outside ASCII as UTF-8.
 
     Args:
         finished_at: When the run ended, as :func:`event_timestamp` writes it.
-        attempt: Which attempt of the delivery the call is, from 1.
+        attempt: Which attempt of the delivery the call is, from 1, counted across a host's retries of the step when the
+            host passes its own attempt at it (:func:`first_attempt_of_step`).
         data: The run as its caller's status read serves it (:func:`run_finished_data`).
 
     Returns:
@@ -203,6 +241,7 @@ async def deliver_caller_webhooks(
     problem: PipelexProblem | None,
     finished_at: datetime,
     extras: Mapping[str, str] | None = None,
+    host_attempt: int = 1,
 ) -> list[CallerWebhookOutcome]:
     """Send each caller webhook the run's ``run.finished`` event, each on its own, and return how each delivery ended.
 
@@ -217,10 +256,17 @@ async def deliver_caller_webhooks(
         problem: A failed run's problem, in any view; the event carries its caller view.
         finished_at: When the run ended.
         extras: The run's opaque extras, which the security event of a refused destination carries.
+        host_attempt: The host's own attempt at this delivery step, counted from 1. A host that runs the step again for
+            the same run passes its attempt number, so each event's ``attempt`` continues after every call the earlier
+            steps could have sent (:func:`first_attempt_of_step`). The default, 1, suits a host that runs it once.
 
     Returns:
         The outcome of each delivery, in the order of ``targets``.
+
+    Raises:
+        ValueError: ``host_attempt`` is below 1, refused before any secret is read or any call sent.
     """
+    first_attempt = first_attempt_of_step(host_attempt=host_attempt)
     if not targets:
         return []
     try:
@@ -249,7 +295,15 @@ async def deliver_caller_webhooks(
     async with httpx.AsyncClient(transport=SsrfGuardedTransport(), follow_redirects=False, timeout=ATTEMPT_BUDGET_SECONDS) as client:
         outcomes = await asyncio.gather(
             *(
-                _deliver_one(client=client, target=target, data=data, finished_at=finished_at_text, secret_keys=secret_keys, extras=extras)
+                _deliver_one(
+                    client=client,
+                    target=target,
+                    data=data,
+                    finished_at=finished_at_text,
+                    secret_keys=secret_keys,
+                    extras=extras,
+                    first_attempt=first_attempt,
+                )
                 for target in targets
             )
         )
@@ -264,18 +318,26 @@ async def _deliver_one(
     finished_at: str,
     secret_keys: Sequence[bytes],
     extras: Mapping[str, str] | None,
+    first_attempt: int,
 ) -> CallerWebhookOutcome:
-    """Deliver the event to one caller webhook, with the short retry, and return how the delivery ended."""
+    """Deliver the event to one caller webhook, with the short retry, and return how the delivery ended.
+
+    ``first_attempt`` is the ``attempt`` the step's first call carries (:func:`first_attempt_of_step`), and each later
+    call of the step carries the next number.
+    """
     server_address = urlsplit(target.url).hostname
     attempt_count = 0
+    # The `attempt` of the last call sent, one below the step's first before any call is sent.
+    event_attempt = first_attempt - 1
     failure: CallerWebhookFailure | None = None
     receiver_status: int | None = None
     for wait_seconds in (0.0, *RETRY_WAITS_SECONDS):
         if wait_seconds:
             await sleep(wait_seconds)
         attempt_count += 1
+        event_attempt += 1
         receiver_status = None
-        body = run_finished_body(finished_at=finished_at, attempt=attempt_count, data=data)
+        body = run_finished_body(finished_at=finished_at, attempt=event_attempt, data=data)
         webhook_timestamp = str(int(time()))
         headers = {
             "content-type": "application/json",
@@ -306,7 +368,12 @@ async def _deliver_one(
             if response.is_success:
                 log.info(
                     "A caller webhook was delivered",
-                    fields={"delivery_id": target.delivery_id, "server.address": server_address, "attempt_count": attempt_count},
+                    fields={
+                        "delivery_id": target.delivery_id,
+                        "server.address": server_address,
+                        "attempt_count": attempt_count,
+                        "event_attempt": event_attempt,
+                    },
                 )
                 return CallerWebhookOutcome(delivery_id=target.delivery_id, server_address=server_address, attempt_count=attempt_count)
             failure = CallerWebhookFailure.HTTP_STATUS
@@ -317,6 +384,7 @@ async def _deliver_one(
                 delivery_id=target.delivery_id,
                 server_address=server_address,
                 attempt_count=attempt_count,
+                event_attempt=event_attempt,
                 failure=failure,
                 receiver_status=receiver_status,
             ),
@@ -329,6 +397,7 @@ async def _deliver_one(
             delivery_id=target.delivery_id,
             server_address=server_address,
             attempt_count=attempt_count,
+            event_attempt=event_attempt,
             failure=failure,
             receiver_status=receiver_status,
         ),
@@ -347,14 +416,19 @@ def _failure_fields(
     delivery_id: str,
     server_address: str | None,
     attempt_count: int,
+    event_attempt: int,
     failure: CallerWebhookFailure,
     receiver_status: int | None,
 ) -> dict[str, Any]:
-    """The fields of a line about a failed attempt or delivery, the receiver's status only when it answered."""
+    """The fields of a line about a failed attempt or delivery, the receiver's status only when it answered.
+
+    ``attempt_count`` is how many calls the step has sent, and ``event_attempt`` the ``attempt`` the last of them carried.
+    """
     fields: dict[str, Any] = {
         "delivery_id": delivery_id,
         "server.address": server_address,
         "attempt_count": attempt_count,
+        "event_attempt": event_attempt,
         "delivery_failure": failure,
     }
     if receiver_status is not None:

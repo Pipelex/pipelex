@@ -154,7 +154,9 @@ class TestCallerWebhookDelivery:
     async def test_every_attempt_keeps_the_delivery_id_and_signs_its_own_timestamp(
         self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A retry keeps `webhook-id` and `data`, counts `attempt`, and is signed anew at its own send time, under every live secret."""
+        """A retry keeps `webhook-id` and `data`, counts `attempt` from 1 when the host names no attempt of its own, and is
+        signed anew at its own send time, under every live secret.
+        """
         monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, f"{_SECRET} {_PREVIOUS_SECRET}")
         answers = iter([httpx.Response(503), httpx.Response(500), httpx.Response(200)])
         calls = _route_calls(mocker, handler=lambda _request: next(answers))
@@ -182,6 +184,104 @@ class TestCallerWebhookDelivery:
             assert _verifies(request=call, secret_key=_SECRET_KEY)
             assert _verifies(request=call, secret_key=_PREVIOUS_SECRET_KEY)
             assert call.headers["webhook-signature"].count(" ") == 1
+
+    @pytest.mark.parametrize(
+        ("host_attempt", "expected_attempts"),
+        [
+            pytest.param(1, [1, 2, 3], id="first_host_attempt"),
+            pytest.param(2, [4, 5, 6], id="second_host_attempt"),
+            pytest.param(3, [7, 8, 9], id="third_host_attempt"),
+        ],
+    )
+    async def test_a_step_numbers_its_attempts_after_the_hosts_earlier_steps(
+        self,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+        host_attempt: int,
+        expected_attempts: list[int],
+    ) -> None:
+        """A step's calls carry increasing numbers that start after every call the host's earlier steps could have made,
+        while `attempt_count` counts this step's calls alone and the log lines name the number each call carried.
+        """
+        monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, _SECRET)
+        calls = _route_calls(mocker, handler=lambda _request: httpx.Response(503))
+        _no_waits(mocker)
+
+        with caplog.at_level(logging.DEBUG, logger=delivery_module.__name__):
+            (outcome,) = await deliver_caller_webhooks(
+                targets=[CallerWebhookTarget(url=_UP_URL)],
+                pipeline_run_id=_RUN_ID,
+                status=DeliveryStatus.COMPLETED,
+                problem=None,
+                finished_at=_FINISHED_AT,
+                host_attempt=host_attempt,
+            )
+
+        assert [json.loads(call.content)["attempt"] for call in calls] == expected_attempts
+        assert outcome.attempt_count == 3
+        assert outcome.failure == CallerWebhookFailure.HTTP_STATUS
+        attempt_records = [record for record in caplog.records if record.getMessage() == "A caller webhook attempt failed"]
+        assert [vars(record).get("event_attempt") for record in attempt_records] == expected_attempts
+        assert [vars(record).get("attempt_count") for record in attempt_records] == [1, 2, 3]
+        (failure_record,) = [record for record in caplog.records if record.getMessage() == "A caller webhook could not be delivered"]
+        assert vars(failure_record).get("event_attempt") == expected_attempts[-1]
+        assert vars(failure_record).get("attempt_count") == 3
+
+    async def test_a_step_run_again_never_repeats_an_attempt_under_its_webhook_id(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A host that runs the step again, its first run lost after a call was acknowledged, continues the count under the
+        same `webhook-id`: increasing, never repeated, and skipping the calls the first run never made.
+        """
+        monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, _SECRET)
+        answers = iter([httpx.Response(200), httpx.Response(503), httpx.Response(204)])
+        calls = _route_calls(mocker, handler=lambda _request: next(answers))
+        _no_waits(mocker)
+        target = CallerWebhookTarget(url=_UP_URL)
+
+        outcomes: list[CallerWebhookOutcome] = []
+        with caplog.at_level(logging.INFO, logger=delivery_module.__name__):
+            for host_attempt in (1, 2):
+                outcomes += await deliver_caller_webhooks(
+                    targets=[target],
+                    pipeline_run_id=_RUN_ID,
+                    status=DeliveryStatus.COMPLETED,
+                    problem=None,
+                    finished_at=_FINISHED_AT,
+                    host_attempt=host_attempt,
+                )
+
+        assert {call.headers["webhook-id"] for call in calls} == {target.delivery_id}
+        assert [json.loads(call.content)["attempt"] for call in calls] == [1, 4, 5]
+        assert [outcome.attempt_count for outcome in outcomes] == [1, 2]
+        assert all(outcome.is_delivered for outcome in outcomes)
+        delivered_records = [record for record in caplog.records if record.getMessage() == "A caller webhook was delivered"]
+        assert [vars(record).get("event_attempt") for record in delivered_records] == [1, 5]
+        assert [vars(record).get("attempt_count") for record in delivered_records] == [1, 2]
+
+    @pytest.mark.parametrize("host_attempt", [0, -1])
+    @pytest.mark.parametrize("urls", [pytest.param([_UP_URL], id="one_target"), pytest.param([], id="no_target")])
+    async def test_a_host_attempt_below_one_is_refused_before_anything_is_sent(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, host_attempt: int, urls: list[str]
+    ) -> None:
+        """The host's attempt is counted from 1: anything lower is the host's fault, refused before a secret is read."""
+        monkeypatch.setenv(CALLER_WEBHOOK_SECRET_ENV, _SECRET)
+        calls = _route_calls(mocker, handler=lambda _request: httpx.Response(200))
+        secret_spy = mocker.spy(delivery_module, "caller_webhook_secret_keys")
+
+        with pytest.raises(ValueError, match="counted from 1"):
+            await deliver_caller_webhooks(
+                targets=[CallerWebhookTarget(url=url) for url in urls],
+                pipeline_run_id=_RUN_ID,
+                status=DeliveryStatus.COMPLETED,
+                problem=None,
+                finished_at=_FINISHED_AT,
+                host_attempt=host_attempt,
+            )
+
+        assert calls == []
+        secret_spy.assert_not_called()
 
     async def test_each_url_is_delivered_on_its_own(
         self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
@@ -378,6 +478,6 @@ class TestCallerWebhookDelivery:
 
     async def test_the_caller_delivery_waits_little(self) -> None:
         """The short schedule stays well inside the run's delivery step: three attempts, at most a minute in all."""
-        attempts = len(delivery_module.RETRY_WAITS_SECONDS) + 1
-        assert attempts == 3
+        attempts = delivery_module.ATTEMPTS_PER_STEP
+        assert attempts == len(delivery_module.RETRY_WAITS_SECONDS) + 1 == 3
         assert delivery_module.ATTEMPT_BUDGET_SECONDS * attempts + sum(delivery_module.RETRY_WAITS_SECONDS) <= 60
