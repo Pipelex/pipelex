@@ -130,7 +130,7 @@ dev = [
   "mypy==1.19.1",
   "pipelex-tools>=0.7.2",
   "pyright==1.1.411",
-  "pylint==4.0.4",
+  "pylint==4.0.9",
   "pytest>=9.0.3",
   "pytest-asyncio>=0.24.0",
   "pytest-cov>=6.1.1",
