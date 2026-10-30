@@ -160,13 +160,16 @@ class DeliveryExecutor:
 
     The **host step**, :meth:`execute_host_delivery`, generates and stores the result files, then notifies the host's
     own webhooks, such as a deployment's completion target, and raises when either fails. The **caller step**,
-    :meth:`execute_caller_delivery`, sends each caller webhook the signed ``run.finished`` event and never raises.
+    :meth:`execute_caller_delivery`, sends each caller webhook the signed ``run.finished`` event: a delivery that fails
+    never raises, and the step raises ``ValueError`` only for a ``host_attempt`` below 1 while the run has caller
+    webhooks, a fault of the host's.
 
     :meth:`execute` runs both in one process, the caller step last and once, after the host step has settled, with the
     status the run ends with: when the host step fails, a completed run fails with its error, and the caller is told so
     (:func:`run_ending_after_host_failure`). A durable orchestrator that retries a failed step runs the two as separate
     steps, the caller step after the host step has settled, so that a retried host step never sends the caller's event
-    again, and the event states how the run ended, the host step's failure included.
+    again, and the event states how the run ended, the host step's failure included. When it retries the caller step,
+    it passes its retry number as ``host_attempt``, counted from 1, never a counter that starts at 0.
     """
 
     async def execute(
@@ -293,11 +296,12 @@ class DeliveryExecutor:
         A delivery that fails is logged, never raised, and changes nothing of the run. ``status`` and ``problem`` are
         how the run ends, after the host step (:func:`run_ending_after_host_failure`).
 
-        ``host_attempt`` is the host's own attempt at this step, counted from 1. A durable orchestrator that runs the
-        step again for the same run, after the process running it was lost, passes its attempt number, so that each
-        event's ``attempt`` continues after every call its earlier attempts could have sent and never repeats under the
-        event's ``webhook-id``, though it may skip numbers (:func:`~pipelex.pipe_run.caller_webhook_delivery.first_attempt_of_step`).
-        The default, 1, suits a host that runs the step once, as :meth:`execute` does.
+        ``host_attempt`` is the host's own attempt at this step, counted from 1, never from 0. A durable orchestrator
+        that runs the step again for the same run, after the process running it was lost, passes its attempt number, so
+        that each event's ``attempt`` continues after every call its earlier attempts could have sent and never repeats
+        under the event's ``webhook-id``, though it may skip numbers
+        (:func:`~pipelex.pipe_run.caller_webhook_delivery.first_attempt_of_step`). The default, 1, suits a host that runs
+        the step once, as :meth:`execute` does, and numbers each run of the step from 1.
 
         Raises:
             ValueError: ``host_attempt`` is below 1 while the run has caller webhooks; nothing is sent.
