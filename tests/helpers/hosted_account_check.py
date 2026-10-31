@@ -114,9 +114,15 @@ def dotenv_findings(*, dotenv_sources: Mapping[str, Path]) -> list[Finding]:
     ]
 
 
+def _host_of(url: str) -> str | None:
+    """The URL's host, lowercased by `urlsplit` and without the root's trailing dot, which names the same host in DNS."""
+    hostname = urlsplit(url.strip()).hostname
+    return hostname.removesuffix(".") if hostname else hostname
+
+
 def is_production(*, base_url: str) -> bool:
-    """Whether the origin is the production API's host, whatever its scheme, port or case."""
-    return urlsplit(base_url.strip()).hostname == urlsplit(PRODUCTION_BASE_URL).hostname
+    """Whether the origin is the production API's host, whatever its scheme, port, case or trailing dot."""
+    return _host_of(base_url) == _host_of(PRODUCTION_BASE_URL)
 
 
 def production_finding(*, base_url: str | None, environ: Mapping[str, str]) -> Finding | None:

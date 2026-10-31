@@ -148,6 +148,8 @@ class TestHostedAccountCheck:
         [
             ("unset", None, "PIPELEX_BASE_URL is not set, so the cases would run on the production API (https://api.pipelex.com)"),
             ("named", "https://API.pipelex.com/", "PIPELEX_BASE_URL names the production API (https://api.pipelex.com/)"),
+            ("trailing dot", "https://api.pipelex.com.", "PIPELEX_BASE_URL names the production API (https://api.pipelex.com.)"),
+            ("trailing dot over http", "http://api.pipelex.com.:80", "PIPELEX_BASE_URL names the production API (http://api.pipelex.com.:80)"),
         ],
     )
     def test_production_is_refused_before_any_request_unless_asked_for(self, topic: str, base_url: str | None, expected_fragment: str) -> None:
