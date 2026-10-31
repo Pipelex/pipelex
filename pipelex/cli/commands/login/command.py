@@ -4,13 +4,13 @@ The browser flow opens the Pipelex app's `/auth/cli` page with the port of a one
 `state` value; the app mints a key for the signed-in account and sends the browser back to the listener with the key
 and the same `state`. `--paste` takes a key created in the app instead, for a machine with no local browser. Either way
 the key must start with `plx_sk_`, is checked against the hosted API (`GET /v1/me`), and is saved to the home `.env` as
-`PIPELEX_API_KEY`: refused when the hosted API refuses it, saved with a warning when it could not be checked. The key is
-never printed.
+`PIPELEX_API_KEY`: refused when the hosted API refuses it, saved with a warning when it could not be checked. The base
+URL it was checked against is saved beside it when the file alone would pair it with another API. The key is never
+printed.
 """
 
 import webbrowser
 from enum import StrEnum
-from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 
 import typer
@@ -19,7 +19,7 @@ from rich.markup import escape
 from rich.prompt import Prompt
 
 from pipelex.cli.commands.init.credentials import get_global_env_path
-from pipelex.cli.commands.login.api_key_store import find_shadowing_env_file, save_pipelex_api_key
+from pipelex.cli.commands.login.api_key_store import SavedApiKey, find_base_url_env_file, find_shadowing_env_file, save_pipelex_api_key
 from pipelex.cli.commands.login.loopback import CallbackRefusal, LoopbackListener
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
@@ -35,8 +35,37 @@ LOGIN_TIMEOUT_SECONDS = 300
 PIPELEX_APP_URL_ENV_KEY = "PIPELEX_APP_URL"
 #: The app's page that mints a key for the command line.
 CLI_AUTH_PATH = "/auth/cli"
+#: The command that signs in through the browser.
+LOGIN_COMMAND = "pipelex login"
 #: The command for a machine with no local browser.
 LOGIN_PASTE_COMMAND = "pipelex login --paste"
+
+
+class KeySource(StrEnum):
+    """Where the key a login checks came from."""
+
+    #: The app minted it for this login and handed it back through the loopback listener.
+    BROWSER = "browser"
+    #: The person pasted a key they created in the app.
+    PASTE = "paste"
+
+    @property
+    def is_minted_by_this_login(self) -> bool:
+        """Whether this login made the key exist, so a key it does not save is a live key nobody holds."""
+        match self:
+            case KeySource.BROWSER:
+                return True
+            case KeySource.PASTE:
+                return False
+
+    @property
+    def login_command(self) -> str:
+        """The command that gets a key the same way again."""
+        match self:
+            case KeySource.BROWSER:
+                return LOGIN_COMMAND
+            case KeySource.PASTE:
+                return LOGIN_PASTE_COMMAND
 
 
 class LoginOutcome(StrEnum):
@@ -96,29 +125,76 @@ def build_cli_auth_url(*, app_origin: str, callback_port: int, state: str) -> st
     return f"{app_origin}{CLI_AUTH_PATH}?{query}"
 
 
-def _save_or_report(*, console: Console, api_key: str) -> Path | None:
+def _unused_key_sentence(*, app_origin: str) -> str:
+    """What a browser login says of a key the app minted for it and that it did not save."""
+    return f"The key this login received went unused: revoke it on the Developer page of the Pipelex app ({escape(app_origin)})"
+
+
+def _run_again(*, source: KeySource) -> str:
+    """The end of an advice line: the command to run again, in the console's markup."""
+    return f"[cyan]{source.login_command}[/cyan] [dim]again.[/dim]"
+
+
+def _save_or_report(*, console: Console, api_key: str, checked_base_url: str | None, source: KeySource, app_origin: str) -> SavedApiKey | None:
     """Save the key to the home `.env`, or say why it could not be, never quoting the key.
 
     Returns:
-        The file it was saved to, or `None` when the file could not be written.
+        Where it was saved and what was saved beside it, or `None` when the file could not be written.
     """
     try:
-        return save_pipelex_api_key(api_key=api_key)
+        return save_pipelex_api_key(api_key=api_key, checked_base_url=checked_base_url)
     except OSError as exc:
         console.print(f"[red]The key could not be saved to {escape(str(get_global_env_path()))}: {escape(str(exc))}. Nothing was saved.[/red]")
-        console.print(
-            "[dim]The key this login received went unused: revoke it in the Pipelex app, make that file writable, "
-            "then run[/dim] [cyan]pipelex login[/cyan] [dim]again.[/dim]"
-        )
+        if source.is_minted_by_this_login:
+            advice = f"{_unused_key_sentence(app_origin=app_origin)}, make that file writable, then run"
+        else:
+            advice = "The key you pasted was not saved: make that file writable, then run"
+        console.print(f"[dim]{advice}[/dim] {_run_again(source=source)}")
         return None
 
 
-def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
+def _describe_expected_api(*, shown_base_url: str) -> str:
+    """The API a refused key had to belong to, saying where its base URL was set."""
+    env_file = find_base_url_env_file()
+    if env_file is not None:
+        return f"the API the {PIPELEX_BASE_URL_ENV_KEY} in {escape(str(env_file))} names, {shown_base_url}"
+    if get_optional_env(PIPELEX_BASE_URL_ENV_KEY) is not None:
+        return f"the API {PIPELEX_BASE_URL_ENV_KEY} names, {shown_base_url}"
+    return f"the hosted API, {shown_base_url}, used when {PIPELEX_BASE_URL_ENV_KEY} is not set"
+
+
+def _saved_as(*, saved: SavedApiKey) -> str:
+    """How the key was saved, for the line that says where."""
+    if saved.saved_base_url is None:
+        return f"as {PIPELEX_API_KEY_ENV_KEY}"
+    return f"as {PIPELEX_API_KEY_ENV_KEY}, beside {PIPELEX_BASE_URL_ENV_KEY} for {escape(redact_url_for_display(url=saved.saved_base_url))}"
+
+
+def _say_saved_base_url(*, console: Console, saved: SavedApiKey, source: KeySource) -> None:
+    """Say what saving the base URL beside the key changes, or that it could not be saved."""
+    if saved.saved_base_url is not None:
+        console.print(
+            f"[dim]{PIPELEX_BASE_URL_ENV_KEY} is saved with the key, so every command that loads {escape(str(saved.env_path))} "
+            f"sends the key to {escape(redact_url_for_display(url=saved.saved_base_url))}, from any shell: the file wins over "
+            f"a {PIPELEX_BASE_URL_ENV_KEY} your shell exports. Change or remove that line to use another API.[/dim]"
+        )
+    if saved.unsaved_base_url is not None:
+        console.print(
+            f"[yellow]⚠ The key was checked against {escape(redact_url_for_display(url=saved.unsaved_base_url))}, but "
+            f"{PIPELEX_BASE_URL_ENV_KEY} could not be saved beside it: a .env file cannot hold that value unquoted, since it "
+            "holds whitespace, a quote, #, $ or a backslash. A command that does not set it sends the key to another API: "
+            f"correct {PIPELEX_BASE_URL_ENV_KEY}, then run {source.login_command} again.[/yellow]"
+        )
+
+
+def check_and_save_api_key(*, console: Console, api_key: str, source: KeySource, app_origin: str) -> LoginOutcome:
     """Check a key's format, then ask the hosted API about it, and save it unless it is malformed or refused.
 
     Args:
         console: Where to say what happened, never quoting the key.
         api_key: The key the browser handed back or the person pasted.
+        source: Where the key came from, which decides whether a key left unsaved must be revoked.
+        app_origin: The Pipelex app the key came from, where a key left unsaved is revoked.
 
     Returns:
         `SAVED` when the hosted API accepted it, `SAVED_UNCHECKED` when it could not be checked, `REFUSED` when it is
@@ -139,30 +215,36 @@ def check_and_save_api_key(*, console: Console, api_key: str) -> LoginOutcome:
     match check.verdict:
         case ApiKeyVerdict.REFUSED:
             console.print(f"[red]The hosted API at {shown_base_url} refused the key (HTTP {check.http_status}). Nothing was saved.[/red]")
-            console.print(
-                f"[dim]Check that the key is current and belongs to the API {PIPELEX_BASE_URL_ENV_KEY} names "
-                "(https://api.pipelex.com when it is unset), then run pipelex login again.[/dim]"
-            )
+            expected_api = _describe_expected_api(shown_base_url=shown_base_url)
+            if source.is_minted_by_this_login:
+                # The app minted the key for this login, so a refusal leaves a live key in the account that nobody holds.
+                console.print(f"[dim]{_unused_key_sentence(app_origin=app_origin)}.[/dim]")
+                advice = f"Check that the Pipelex app ({escape(app_origin)}) and {expected_api} belong to the same deployment, then run"
+            else:
+                advice = f"Check that the key is current and belongs to {expected_api}, then run"
+            console.print(f"[dim]{advice}[/dim] {_run_again(source=source)}")
             return LoginOutcome.REFUSED
         case ApiKeyVerdict.ACCEPTED:
-            env_path = _save_or_report(console=console, api_key=api_key)
-            if env_path is None:
+            saved = _save_or_report(console=console, api_key=api_key, checked_base_url=check.base_url or None, source=source, app_origin=app_origin)
+            if saved is None:
                 return LoginOutcome.NOT_SAVED
             account = f" as {escape(check.account_email)}" if check.account_email else ""
             console.print(
-                f"[green]✓[/green] Logged in{account}. Your Pipelex API key is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY}."
+                f"[green]✓[/green] Logged in{account}. Your Pipelex API key is saved to {escape(str(saved.env_path))} {_saved_as(saved=saved)}."
             )
+            _say_saved_base_url(console=console, saved=saved, source=source)
             warn_about_shadowing_env_file(console=console)
             return LoginOutcome.SAVED
         case ApiKeyVerdict.UNCHECKED:
-            env_path = _save_or_report(console=console, api_key=api_key)
-            if env_path is None:
+            saved = _save_or_report(console=console, api_key=api_key, checked_base_url=check.base_url or None, source=source, app_origin=app_origin)
+            if saved is None:
                 return LoginOutcome.NOT_SAVED
             console.print(
                 f"[yellow]⚠ Could not check the key: {escape(check.reason or 'no answer')}. "
-                f"It is saved to {escape(str(env_path))} as {PIPELEX_API_KEY_ENV_KEY} anyway: "
-                "run pipelex login again if a hosted run refuses it.[/yellow]"
+                f"It is saved to {escape(str(saved.env_path))} {_saved_as(saved=saved)} anyway: "
+                f"run {source.login_command} again if a hosted run refuses it.[/yellow]"
             )
+            _say_saved_base_url(console=console, saved=saved, source=source)
             warn_about_shadowing_env_file(console=console)
             return LoginOutcome.SAVED_UNCHECKED
 
@@ -233,7 +315,7 @@ def login_with_browser(*, console: Console, timeout_seconds: float | None = None
             f"and run[/dim] [cyan]{LOGIN_PASTE_COMMAND}[/cyan][dim].[/dim]"
         )
         return LoginOutcome.NO_KEY
-    return check_and_save_api_key(console=console, api_key=api_key)
+    return check_and_save_api_key(console=console, api_key=api_key, source=KeySource.BROWSER, app_origin=app_origin)
 
 
 def login_with_paste(*, console: Console) -> LoginOutcome:
@@ -257,7 +339,7 @@ def login_with_paste(*, console: Console) -> LoginOutcome:
     if not api_key.strip():
         console.print("[red]No key was entered. Nothing was saved.[/red]")
         return LoginOutcome.NO_KEY
-    return check_and_save_api_key(console=console, api_key=api_key)
+    return check_and_save_api_key(console=console, api_key=api_key, source=KeySource.PASTE, app_origin=app_origin)
 
 
 def login_cmd(*, paste: bool = False) -> None:

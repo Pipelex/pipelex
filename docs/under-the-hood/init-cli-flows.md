@@ -313,7 +313,7 @@ On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is 
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
-| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and the single-entry `set_env_file_entry()` the sign-in saves its key with |
+| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and `set_env_file_entries()`, which the sign-in saves its key with, and the base URL it was checked against when needed, in one write |
 | `pipelex/cli/commands/init/ide_extension.py` | IDE extension suggestion: `suggest_extension_install_if_needed()` |
 | `pipelex/cli/commands/init/ui/types.py` | `InitFocus` enum definition |
 
