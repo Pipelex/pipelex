@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`pipelex login --label <name>`**: a browser login can name its key, and the Pipelex app then replaces your key of that label in your active organization, the old key stopping working, or creates one of that label when you hold none, so repeated logins under one label keep one key where each login added a `Pipelex CLI` key. A label is trimmed, then 1 to 64 characters, with no control character and not starting with `plx_sk_`, and any other is refused before the browser opens; `--paste` takes no `--label`, and the command a failed login says to run again names the label.
+- **`pipelex login` names the key's organization**: the line saying where the key was saved names the organization it acts for, where its runs are billed, by name and id as `GET /v1/me` states them, or by id alone when the platform holds no name; a hosted API that states no organization leaves it out and never stops the login, and a control character it sends is shown as `�`. `ApiKeyCheck` carries it as `organization`, a `KeyOrganization`.
+
 ### Fixed
 
 - **`pipelex login` saves the base URL its key was checked against**: when the key was checked against another API than the one `~/.pipelex/.env` names on its own, its `PIPELEX_BASE_URL` or else `https://api.pipelex.com`, the login writes that `PIPELEX_BASE_URL` beside the key in the same write and says so, where it saved the key alone, so a command started without the login shell's `PIPELEX_BASE_URL` sent a development key to `https://api.pipelex.com` and was refused. A refusal now names the `.env` file that set the base URL it was checked against, when one did.

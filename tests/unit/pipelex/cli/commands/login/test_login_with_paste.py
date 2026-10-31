@@ -33,6 +33,24 @@ class TestLoginWithPaste:
         assert saved_key(home=pipelex_home) == TEST_KEY
         assert TEST_KEY not in output.getvalue()
 
+    def test_a_label_with_paste_is_refused_before_anything_is_asked(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        """A pasted key keeps the label it was created with, so a label cannot apply to it."""
+        prompt = mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
+        check = patch_check(mocker, check=ACCEPTED)
+        browser_open = mocker.patch("pipelex.cli.commands.login.command.webbrowser.open")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            login_cmd(paste=True, label="nightly import")
+
+        assert exc_info.value.exit_code == 1
+        prompt.assert_not_called()
+        check.assert_not_called()
+        browser_open.assert_not_called()
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert "--paste takes no --label: a label names the key a browser login creates or replaces" in printed
+        assert f"or {LOGIN_PASTE_COMMAND} without --label" in printed
+
     def test_a_pasted_key_the_hosted_api_refuses_is_not_saved(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
         mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
         patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=API_URL, http_status=403))

@@ -1,8 +1,8 @@
 """Whether a Pipelex API key looks like one, and whether the hosted API accepts it.
 
 `pipelex login` checks a key before it saves it, and `pipelex init` reads whether one is already set, so both go
-through here: the format check needs no network, and the hosted check asks the hosted API who the key belongs to
-(`GET /v1/me`) through the one client factory. No CLI import, so either CLI can use it.
+through here: the format check needs no network, and the hosted check asks the hosted API who the key belongs to, and
+which organization it acts for (`GET /v1/me`), through the one client factory. No CLI import, so either CLI can use it.
 """
 
 import asyncio
@@ -14,6 +14,7 @@ from mthds.protocol.exceptions import PipelineRequestError
 from pipelex_sdk.client import PipelexAPIClient
 from pipelex_sdk.errors import ApiResponseError, ApiUnreachableError
 from pipelex_sdk.product_models import UserProfile
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.hosted.client_factory import make_hosted_client, redact_url_for_display
 from pipelex.hosted.exceptions import HostedBaseUrlError
@@ -40,12 +41,25 @@ class ApiKeyVerdict(StrEnum):
     UNCHECKED = "unchecked"
 
 
+class KeyOrganization(BaseModel):
+    """The organization an accepted key acts for, as the `organization` member of `GET /v1/me` states it.
+
+    `name` is `None` when the platform holds no record of the organization, as of one still being set up.
+    """
+
+    model_config = ConfigDict(frozen=True, strict=True, extra="ignore")
+
+    org_id: str = Field(min_length=1)
+    name: str | None = None
+
+
 class ApiKeyCheck(NamedTuple):
     """The outcome of asking the hosted API who a key belongs to.
 
     `http_status` is the refusal's status (401 or 403) when the key was refused, and the status of an answer that
     neither accepted nor refused it. `reason` says why the key could not be checked, for a warning; it never quotes
-    the key. `account_email` names the account an accepted key belongs to, when the hosted API said.
+    the key. `account_email` names the account an accepted key belongs to, and `organization` the organization it acts
+    for, each when the hosted API said.
     """
 
     verdict: ApiKeyVerdict
@@ -53,11 +67,29 @@ class ApiKeyCheck(NamedTuple):
     http_status: int | None = None
     reason: str | None = None
     account_email: str | None = None
+    organization: KeyOrganization | None = None
 
 
 async def _get_profile(*, client: PipelexAPIClient) -> UserProfile:
     async with client:
         return await client.get_me()
+
+
+def _read_organization(*, profile: UserProfile) -> KeyOrganization | None:
+    """The organization the profile says the key acts for, or `None` when it does not say.
+
+    pipelex-sdk's `UserProfile` keeps the members it does not name, `organization` among them, as extras. A platform
+    that predates the member omits it, a request acting for no organization states it `null`, and a member that is not
+    the contract's shape is read as unsaid too: which organization a key acts for is shown, never checked, so it never
+    decides a login.
+    """
+    stated = (profile.model_extra or {}).get("organization")
+    if stated is None:
+        return None
+    try:
+        return KeyOrganization.model_validate(stated)
+    except ValidationError:
+        return None
 
 
 def check_pipelex_api_key(*, api_key: str) -> ApiKeyCheck:
@@ -71,7 +103,7 @@ def check_pipelex_api_key(*, api_key: str) -> ApiKeyCheck:
         api_key: The key to check, sent as the bearer token of this one request.
 
     Returns:
-        The verdict, the base URL asked, and the status, the reason or the account.
+        The verdict, the base URL asked, and the status, the reason, or the account and its organization.
     """
     try:
         client = make_hosted_client(api_key=api_key)
@@ -103,4 +135,9 @@ def check_pipelex_api_key(*, api_key: str) -> ApiKeyCheck:
             base_url=base_url,
             reason=f"the hosted API at {redact_url_for_display(url=base_url)} did not answer with an account ({type(exc).__name__})",
         )
-    return ApiKeyCheck(verdict=ApiKeyVerdict.ACCEPTED, base_url=base_url, account_email=profile.email)
+    return ApiKeyCheck(
+        verdict=ApiKeyVerdict.ACCEPTED,
+        base_url=base_url,
+        account_email=profile.email,
+        organization=_read_organization(profile=profile),
+    )
