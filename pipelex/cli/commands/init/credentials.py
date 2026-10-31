@@ -1,11 +1,14 @@
 """Credential prompting and persistent storage for the init command."""
 
 import os
+import re
 import stat
 from pathlib import Path
 from typing import Any, cast
 
-from dotenv import dotenv_values, set_key
+from dotenv import dotenv_values
+from dotenv.main import rewrite, with_warn_for_invalid_lines
+from dotenv.parser import parse_stream
 from rich.console import Console
 from rich.markup import escape
 from rich.prompt import Prompt
@@ -13,6 +16,11 @@ from rich.prompt import Prompt
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+
+# A value a `.env` reader gives back exactly when it is written unquoted: whitespace would be trimmed or start a
+# comment, a quote would open a quoted value, `$` would start a variable expansion, and a backslash may be read as an
+# escape by another reader of the same file, such as the workshop's.
+_UNQUOTED_ENV_VALUE_PATTERN = re.compile(r"[^\s'\"#$\\]*")
 
 
 def get_global_env_path() -> Path:
@@ -69,25 +77,58 @@ def write_env_file(env_path: Path, *, entries: dict[str, str]) -> None:
     env_path.chmod(stat.S_IRUSR | stat.S_IWUSR)
 
 
-def set_env_file_entry(*, env_path: Path, key: str, value: str) -> None:
-    """Set one entry of a .env file, keeping every other line as it is, comments included.
+def is_unquoted_env_value(*, value: str) -> bool:
+    """Whether a `.env` file holds this value written unquoted, exactly as it is: no whitespace, quote, `#`, `$` or backslash."""
+    return _UNQUOTED_ENV_VALUE_PATTERN.fullmatch(value) is not None
 
-    Creates the file and its parent directories when missing. Every assignment of `key` already in the file, an
-    `export` one included, is replaced by `key=value`, so no later line can shadow it. The file is readable and
-    writable by its owner only (mode 0600), before and after the write, so the value never sits in a file others can read.
-    A `.env` that is a symlink, as a dotfiles setup makes it, stays one: the write goes to the file it points to.
+
+def set_env_file_entries(*, env_path: Path, entries: dict[str, str]) -> None:
+    """Set entries of a .env file in one write, keeping every other line as it is, comments included.
+
+    Creates the file and its parent directories when missing. Every assignment of each key already in the file, an
+    `export` one included, is replaced where it stands by `key=value`, so no later line can shadow it, and a key the file
+    does not assign is appended. The new content goes to a temporary file in the same directory, which then replaces the
+    file, so a reader never sees one entry written without the others. The file is readable and writable by its owner
+    only (mode 0600), before and after the write, so a value never sits in a file others can read. A `.env` that is a
+    symlink, as a dotfiles setup makes it, stays one: the write goes to the file it points to.
 
     Args:
         env_path: Path to the .env file.
-        key: The variable to set.
-        value: Its value, written unquoted: the caller passes a value with no whitespace, quote, `#` or backslash.
+        entries: The variables to set and their values, each written unquoted: every value must pass
+            `is_unquoted_env_value`.
+
+    Raises:
+        ValueError: If a value cannot be written unquoted, before anything is written.
     """
+    for key, value in entries.items():
+        if not is_unquoted_env_value(value=value):
+            # The message never quotes the value: it may be a secret.
+            msg = f"The value for {key} cannot be written unquoted to a .env file"
+            raise ValueError(msg)
     env_path.parent.mkdir(parents=True, exist_ok=True)
     owner_only = stat.S_IRUSR | stat.S_IWUSR
     if env_path.is_file():
         # The rewrite keeps the mode it finds, so tighten it first rather than after.
         env_path.chmod(owner_only)
-    set_key(env_path, key, value, quote_mode="never", follow_symlinks=True)
+    # This is python-dotenv's own `set_key` loop, taking several keys in one rewrite: `rewrite`, `parse_stream` and
+    # `with_warn_for_invalid_lines` are its internal helpers rather than its public surface, so a python-dotenv release
+    # that moves or reshapes them breaks this write, which the credential and login tests exercise directly.
+    with rewrite(env_path, encoding="utf-8", follow_symlinks=True) as (source, dest):
+        assigned: set[str] = set()
+        missing_newline = False
+        for mapping in with_warn_for_invalid_lines(parse_stream(source)):
+            if mapping.key is not None and mapping.key in entries:
+                dest.write(f"{mapping.key}={entries[mapping.key]}\n")
+                assigned.add(mapping.key)
+                missing_newline = False
+            else:
+                dest.write(mapping.original.string)
+                missing_newline = not mapping.original.string.endswith("\n")
+        appended = [key for key in entries if key not in assigned]
+        if appended and missing_newline:
+            dest.write("\n")
+        for key in appended:
+            dest.write(f"{key}={entries[key]}\n")
     env_path.chmod(owner_only)
 
 

@@ -10,7 +10,7 @@ from rich.console import Console
 
 from pipelex.cli.commands.login.command import PIPELEX_APP_URL_ENV_KEY
 from pipelex.system.environment import PIPELEX_HOME_ENV_KEY
-from tests.helpers.pipelex_api_key_env import isolate_pipelex_api_key
+from tests.helpers.pipelex_api_key_env import isolate_pipelex_api_key, isolate_pipelex_base_url
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 
 @pytest.fixture
 def pipelex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A home configuration directory of the test's own, an empty working directory, and no key in the environment.
+    """A home configuration directory of the test's own, an empty working directory, and no key or base URL in the environment.
 
     The working directory matters: the runtime loads its `.env` after the home one, so a key set there would be reported.
     """
@@ -31,6 +31,7 @@ def pipelex_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setenv(PIPELEX_HOME_ENV_KEY, str(home))
     monkeypatch.delenv(PIPELEX_APP_URL_ENV_KEY, raising=False)
     isolate_pipelex_api_key(monkeypatch)
+    isolate_pipelex_base_url(monkeypatch)
     return home
 
 

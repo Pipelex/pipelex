@@ -18,6 +18,7 @@ api/pipelex_api/openapi_schema.py | _apply_schema_renames | ValueError | invaria
 api/pipelex_api/schemas/models.py | _ensure_mthds_file_within_bytes_limit | ValueError | validator
 pipelex/base_exceptions.py | PipelexError.__init_subclass__ | TypeError | invariant
 pipelex/base_exceptions.py | PipelexError.with_error_code | ValueError | invariant
+pipelex/cli/commands/init/credentials.py | set_env_file_entries | ValueError | invariant
 pipelex/cli/commands/init/ui/setup_path_ui.py | _option_number | ValueError | invariant
 pipelex/codegen/stamp.py | _reject_json_constant | ValueError | carrier
 pipelex/cogt/content_generation/content_generator.py | ContentGenerator.make_render_page_views | ValueError | invariant

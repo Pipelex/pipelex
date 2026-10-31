@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 import typer
 
-from pipelex.cli.commands.login.command import login_cmd
+from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND, login_cmd
 from pipelex.hosted.api_key_check import ApiKeyCheck, ApiKeyVerdict
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
 from tests.helpers.login_browser import ACCEPTED, API_URL, TEST_KEY, patch_check, saved_key
@@ -33,6 +33,24 @@ class TestLoginWithPaste:
         assert saved_key(home=pipelex_home) == TEST_KEY
         assert TEST_KEY not in output.getvalue()
 
+    def test_a_label_with_paste_is_refused_before_anything_is_asked(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        """A pasted key keeps the label it was created with, so a label cannot apply to it."""
+        prompt = mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
+        check = patch_check(mocker, check=ACCEPTED)
+        browser_open = mocker.patch("pipelex.cli.commands.login.command.webbrowser.open")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            login_cmd(paste=True, label="nightly import")
+
+        assert exc_info.value.exit_code == 1
+        prompt.assert_not_called()
+        check.assert_not_called()
+        browser_open.assert_not_called()
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert "--paste takes no --label: a label names the key a browser login creates or replaces" in printed
+        assert f"or {LOGIN_PASTE_COMMAND} without --label" in printed
+
     def test_a_pasted_key_the_hosted_api_refuses_is_not_saved(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
         mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
         patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=API_URL, http_status=403))
@@ -41,7 +59,13 @@ class TestLoginWithPaste:
             login_cmd(paste=True)
 
         assert saved_key(home=pipelex_home) is None
-        assert "HTTP 403" in output.getvalue()
+        # Rich wraps long lines at spaces; joining the words back reads the message as written
+        printed = " ".join(output.getvalue().split())
+        assert "HTTP 403" in printed
+        # The person created the key in the app and still holds it: this login made no key that needs revoking.
+        assert "revoke" not in printed.lower()
+        assert "Check that the key is current" in printed
+        assert f"{LOGIN_PASTE_COMMAND} again" in printed
 
     def test_a_working_directory_env_that_would_shadow_the_saved_key_is_named(
         self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
@@ -58,16 +82,16 @@ class TestLoginWithPaste:
         assert "remove" in printed.lower()
         assert TEST_KEY not in printed
 
-    @pytest.mark.parametrize("unwritable", ["set_key_raises", "read_only_home"])
-    def test_a_key_that_cannot_be_saved_exits_1_and_says_it_went_unused(
+    @pytest.mark.parametrize("unwritable", ["rewrite_raises", "read_only_home"])
+    def test_a_key_that_cannot_be_saved_exits_1_and_says_it_was_not_saved(
         self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, unwritable: str
     ) -> None:
         mocker.patch("pipelex.cli.commands.login.command.Prompt.ask", return_value=TEST_KEY)
         patch_check(mocker, check=ACCEPTED)
         env_path = pipelex_home / ".env"
-        if unwritable == "set_key_raises":
+        if unwritable == "rewrite_raises":
             mocker.patch(
-                "pipelex.cli.commands.init.credentials.set_key",
+                "pipelex.cli.commands.init.credentials.rewrite",
                 side_effect=PermissionError(13, "Permission denied", str(env_path)),
             )
         else:
@@ -87,7 +111,8 @@ class TestLoginWithPaste:
         printed = " ".join(output.getvalue().split())
         assert str(env_path) in printed
         assert "Permission denied" in printed
-        assert "revoke" in printed.lower()
+        assert f"The key you pasted was not saved: make that file writable, then run {LOGIN_PASTE_COMMAND} again." in printed
+        assert "revoke" not in printed.lower()
         assert TEST_KEY not in printed
 
     @pytest.mark.parametrize("answer", ["", "   "])
