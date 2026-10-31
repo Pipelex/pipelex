@@ -10,6 +10,7 @@ URL it was checked against is saved beside it when the file alone would pair it 
 the key acts for is named when the hosted API states it. The key is never printed.
 """
 
+import os
 import shlex
 import unicodedata
 import webbrowser
@@ -82,7 +83,10 @@ class KeySource(StrEnum):
             case KeySource.BROWSER:
                 if label is None:
                     return LOGIN_COMMAND
-                return f"{LOGIN_COMMAND} {LABEL_OPTION} {shlex.quote(label)}"
+                quoted = quote_for_shell(value=label, windows=os.name == "nt")
+                if quoted is None:
+                    return f"{LOGIN_COMMAND} {LABEL_OPTION} <the same label>"
+                return f"{LOGIN_COMMAND} {LABEL_OPTION} {quoted}"
             case KeySource.PASTE:
                 return LOGIN_PASTE_COMMAND
 
@@ -136,6 +140,30 @@ def resolve_app_origin() -> str:
         )
         raise PipelexCLIError(msg).with_error_code(PipelexErrorCode.CONFIG_INVALID)
     return origin
+
+
+def quote_for_shell(*, value: str, windows: bool) -> str | None:
+    """A value quoted as one argument of a command to copy into this machine's shell, or `None` when no quoting carries it.
+
+    POSIX shells take `shlex.quote`'s single quotes. On Windows, cmd.exe and PowerShell both group an argument in double
+    quotes, inside which cmd.exe reads `&`, `|`, `<`, `>` and `^` literally, but cmd.exe still expands `%` there and
+    PowerShell `$` and the backtick, and neither can hold a `"`: a value holding one of those has no quoting both shells
+    read as written, so the command is not offered for copying.
+    """
+    if not windows:
+        return shlex.quote(value)
+    if any(character in value for character in '"%$`'):
+        return None
+    return f'"{value}"'
+
+
+def _printable(*, text: str) -> str:
+    """Text the hosted API sent, safe to print.
+
+    Each control character, an escape sequence's ESC among them, is shown as U+FFFD, and the console's markup is escaped:
+    Rich strips a few control characters from what it prints, but not ESC.
+    """
+    return escape("".join("\ufffd" if unicodedata.category(character) == "Cc" else character for character in text))
 
 
 def trim_key_label(*, label: str) -> str:
@@ -235,8 +263,8 @@ def _acts_for(*, organization: KeyOrganization | None) -> str:
     if organization is None:
         return ""
     if organization.name:
-        return f" acts for the organization {escape(organization.name)} ({escape(organization.org_id)}) and"
-    return f" acts for the organization {escape(organization.org_id)} and"
+        return f" acts for the organization {_printable(text=organization.name)} ({_printable(text=organization.org_id)}) and"
+    return f" acts for the organization {_printable(text=organization.org_id)} and"
 
 
 def _say_saved_base_url(*, console: Console, saved: SavedApiKey, login_command: str) -> None:
@@ -306,7 +334,7 @@ def check_and_save_api_key(*, console: Console, api_key: str, source: KeySource,
             )
             if saved is None:
                 return LoginOutcome.NOT_SAVED
-            account = f" as {escape(check.account_email)}" if check.account_email else ""
+            account = f" as {_printable(text=check.account_email)}" if check.account_email else ""
             console.print(
                 f"[green]✓[/green] Logged in{account}. Your Pipelex API key{_acts_for(organization=check.organization)} "
                 f"is saved to {escape(str(saved.env_path))} {_saved_as(saved=saved)}."

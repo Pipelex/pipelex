@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from io import StringIO
 from typing import TYPE_CHECKING
@@ -126,7 +127,8 @@ class TestLoginWithBrowser:
 
         assert saved_key(home=pipelex_home) is None
         printed = " ".join(output.getvalue().split())
-        assert "pipelex login --label 'nightly import' again." in printed
+        expected = '"nightly import"' if os.name == "nt" else "'nightly import'"
+        assert f"pipelex login --label {expected} again." in printed
 
     def test_a_key_the_hosted_api_refuses_is_not_saved_and_is_named_for_revoking(
         self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
@@ -332,7 +334,8 @@ class TestLoginWithBrowser:
             login_cmd(label="qa.dev.lab.builder")
 
         printed = " ".join(output.getvalue().split())
-        assert "Run pipelex login --label qa.dev.lab.builder again" in printed
+        expected = '"qa.dev.lab.builder"' if os.name == "nt" else "qa.dev.lab.builder"
+        assert f"Run pipelex login --label {expected} again" in printed
         assert saved_key(home=pipelex_home) is None
 
     @pytest.mark.usefixtures("pipelex_home")

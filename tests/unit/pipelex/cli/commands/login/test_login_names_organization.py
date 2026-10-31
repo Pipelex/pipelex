@@ -72,3 +72,25 @@ class TestLoginNamesOrganization:
         check_and_save_api_key(console=Console(file=buffer, width=400), api_key=TEST_KEY, source=KeySource.BROWSER, app_origin=APP_URL)
 
         assert "acts for the organization [bold]Lab[/bold] (org_01BRACKETS)" in buffer.getvalue()
+
+    @pytest.mark.usefixtures("pipelex_home")
+    def test_control_characters_the_hosted_api_sends_never_reach_the_terminal(self, mocker: MockerFixture) -> None:
+        """An escape sequence in an organization's name or the account's email is shown as U+FFFD, never sent to the terminal."""
+        mocker.patch(
+            "pipelex.cli.commands.login.command.check_pipelex_api_key",
+            return_value=ApiKeyCheck(
+                verdict=ApiKeyVerdict.ACCEPTED,
+                base_url=API_URL,
+                account_email="ada\x1bc@example.com",
+                organization=KeyOrganization(org_id="org_01ESC\x07", name="Acme\x1b[31mRED\x1bMUP"),
+            ),
+        )
+        buffer = StringIO()
+
+        check_and_save_api_key(console=Console(file=buffer, width=400), api_key=TEST_KEY, source=KeySource.BROWSER, app_origin=APP_URL)
+
+        printed = buffer.getvalue()
+        assert "\x1b" not in printed
+        assert "\x07" not in printed
+        assert "Logged in as ada\ufffdc@example.com" in printed
+        assert "acts for the organization Acme\ufffd[31mRED\ufffdMUP (org_01ESC\ufffd)" in printed

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:577b681ab835e96c395dc63421f32c949a92ccc7e55aea096e6d351545de1925"
+digest = "sha256:1db7494428d04abed9341af9e93d19aa1079826e493193aa309dc30576995689"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-31T15:11:31Z"
-rationale = "real-catch: pipelex login takes --label, trimmed as JavaScript trims and held to 1 to 64 code points, with no control character and not starting with plx_sk_, as the workshop's login holds it; --paste takes no --label, the retry advice names the label, and the saved line names the key's organization from GET /v1/me. docs/tools/cli/login.md says so, including the page's Create the key / Replace the key confirmation; pipelex/cli/agent_cli/CLAUDE.md does not describe the login."
+reviewed_at = "2026-10-31T15:24:38Z"
+rationale = "real-catch: the retry command of a labelled login quotes the label for the machine's shell (double quotes on Windows, none offered when no quoting carries it), and control characters the hosted API sends are printed as U+FFFD; docs/tools/cli/login.md says both. pipelex/cli/agent_cli/CLAUDE.md does not describe the login."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -101,7 +101,7 @@ rationale = "real-catch: pipelex login takes --label, trimmed as JavaScript trim
 "pipelex/cli/commands/init/ui/types.py" = "blob:e263802d8e9c9f9687435de1eb992afa5336544f"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/api_key_store.py" = "blob:8406111e7148188ae4ca3fff0cfb4ad7e00550d8"
-"pipelex/cli/commands/login/command.py" = "blob:1c29ea292f39e13259b373af0bb4040cfe07ca70"
+"pipelex/cli/commands/login/command.py" = "blob:88aef98ab88c8480add133f3151f31e440758a18"
 "pipelex/cli/commands/login/loopback.py" = "blob:9b71130a529d7414712acfc6d17e52c5f17bbe13"
 "pipelex/cli/commands/migrate_cmd.py" = "blob:3839424ccbf1c7f8e7af8a7f124a062cba18cece"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"

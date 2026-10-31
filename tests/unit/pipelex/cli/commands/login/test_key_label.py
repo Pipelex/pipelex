@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
-from pipelex.cli.commands.login.command import KEY_LABEL_MAX_LENGTH, build_cli_auth_url, key_label_refusal, trim_key_label
+from pipelex.cli.commands.login.command import KEY_LABEL_MAX_LENGTH, build_cli_auth_url, key_label_refusal, quote_for_shell, trim_key_label
 
 APP_URL = "https://app.test"
 STATE = "a-state_value.0~"
@@ -84,3 +84,21 @@ class TestKeyLabel:
     )
     def test_a_label_that_cannot_be_sent_is_refused_saying_why(self, raw: str, expected: str) -> None:
         assert key_label_refusal(label=trim_key_label(label=raw)) == expected
+
+    @pytest.mark.parametrize(
+        ("label", "posix", "windows"),
+        [
+            ("qa.dev.lab.builder", "qa.dev.lab.builder", '"qa.dev.lab.builder"'),
+            ("my laptop", "'my laptop'", '"my laptop"'),
+            ("Lab & whoami", "'Lab & whoami'", '"Lab & whoami"'),
+            ("it's a <lab> | ^", "'it'\"'\"'s a <lab> | ^'", '"it\'s a <lab> | ^"'),
+            # cmd.exe expands `%` and PowerShell `$` and the backtick inside double quotes, and neither holds a `"`.
+            ("100%", "100%", None),
+            ("$HOME lab", "'$HOME lab'", None),
+            ("lab`n", "'lab`n'", None),
+            ('say "hi"', "'say \"hi\"'", None),
+        ],
+    )
+    def test_the_retry_label_is_quoted_for_the_shell_it_is_copied_into(self, label: str, posix: str, windows: str | None) -> None:
+        assert quote_for_shell(value=label, windows=False) == posix
+        assert quote_for_shell(value=label, windows=True) == windows
