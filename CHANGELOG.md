@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`get_dotenv_source`**: `pipelex.system.environment.get_dotenv_source(env_var=…)` names the `.env` file, the home one or the working directory's, whose value of a variable replaced the one the process was started with when pipelex was first imported, or `None` when the variable still holds what the process was handed, so a caller that must use exactly the key it was given can tell when a saved one replaced it.
+
 ## [v0.95.1] - 2026-10-30
 
 ### Fixed
