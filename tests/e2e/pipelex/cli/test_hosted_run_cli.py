@@ -2,7 +2,7 @@
 
 Every case spawns the real `pipelex` or `pipelex-agent` binary against a live hosted API, so a run spends
 hosted credits. That is why the `pipelex_api` marker keeps the module out of `make agent-test`, of CI and of the
-default pytest selection, and why it is skipped when `PIPELEX_API_KEY` is unset. The cases act as one test account,
+default pytest selection, and why it is skipped when `PIPELEX_API_KEY` is unset and no `.env` file set it. The cases act as one test account,
 whose key, origin and expectations the Pipelex team hands over with `test-account run` (QA Builder in QA Runtime, on
 the dev plane):
 
@@ -33,8 +33,7 @@ import pytest
 
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 from pipelex.test_extras.usage_stats_isolation import usage_stats_off_environment
-from pipelex.tools.misc.placeholder import value_is_placeholder
-from tests.helpers.hosted_account_check import DOC, current_dotenv_sources, require_hosted_account
+from tests.helpers.hosted_account_check import DOC, current_dotenv_sources, no_key_handed_over, require_hosted_account
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
@@ -60,12 +59,12 @@ output      = "Text"
 prompt      = "Repeat $text in capitals."
 """
 
-#: A placeholder, which CI sets so that modules import, is no key.
-_API_KEY_IS_SET = bool(os.environ.get(PIPELEX_API_KEY_ENV_KEY)) and not value_is_placeholder(os.environ.get(PIPELEX_API_KEY_ENV_KEY))
-
 pytestmark = [
     pytest.mark.pipelex_api,
-    pytest.mark.skipif(not _API_KEY_IS_SET, reason=f"{PIPELEX_API_KEY_ENV_KEY} is not set: hand it over with `test-account run` ({DOC})"),
+    pytest.mark.skipif(
+        no_key_handed_over(environ=os.environ, dotenv_sources=current_dotenv_sources()),
+        reason=f"{PIPELEX_API_KEY_ENV_KEY} is not set: hand it over with `test-account run` ({DOC})",
+    ),
 ]
 
 

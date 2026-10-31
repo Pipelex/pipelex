@@ -30,6 +30,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY, redact_url_for_display
 from pipelex.system.environment import get_dotenv_source
+from pipelex.tools.misc.placeholder import value_is_placeholder
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -284,7 +285,7 @@ def hosted_account_findings(
             )
         )
     api_key = environ.get(key_env)
-    if not api_key:
+    if not api_key and key_env not in dotenv_sources:
         findings.append(Finding(message=f"{key_env} is not set"))
     if findings or not api_key:
         return findings
@@ -307,6 +308,16 @@ def stop_message(findings: Sequence[Finding]) -> str:
         f"The Pipelex team hands them their key with `{TEST_ACCOUNT_RUN_COMMAND}`, which sets {PIPELEX_API_KEY_ENV_KEY}, "
         f"{PIPELEX_BASE_URL_ENV_KEY} and the key's expectations; see {DOC}."
     )
+
+
+def no_key_handed_over(*, environ: Mapping[str, str], dotenv_sources: Mapping[str, Path], key_env: str = PIPELEX_API_KEY_ENV_KEY) -> bool:
+    """Whether the hosted cases are skipped: the key is unset, empty or a placeholder, and no `.env` file set it.
+
+    A key a `.env` file replaced, even with an empty line or a placeholder, is not skipped: the check then names the file,
+    where a skip would end a run handed a real key green with nothing run.
+    """
+    api_key = environ.get(key_env)
+    return (not api_key or value_is_placeholder(api_key)) and key_env not in dotenv_sources
 
 
 def current_dotenv_sources(*, key_env: str = PIPELEX_API_KEY_ENV_KEY) -> dict[str, Path]:

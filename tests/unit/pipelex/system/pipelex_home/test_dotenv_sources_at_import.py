@@ -42,50 +42,59 @@ UNNAMED = "PIPELEX_DOTENV_TEST_UNNAMED"
 NAMES = (REPLACED_BY_HOME, REPLACED_BY_BOTH, SET_WITHOUT_PROCESS_VALUE, SET_TO_THE_SAME_VALUE, UNNAMED, PIPELEX_HOME_ENV_KEY)
 
 
+def _import_report(*, tmp_path: Path, relative_home: bool) -> dict[str, dict[str, str | None]]:
+    """Import pipelex with a home `.env` and a working directory's `.env` over a process environment of known values.
+
+    Both files name `PIPELEX_HOME`, whose process value is the home directory, given relative to the working directory
+    when `relative_home` is set.
+    """
+    pipelex_home = tmp_path / "home" / ".pipelex"
+    pipelex_home.mkdir(parents=True)
+    (pipelex_home / ".env").write_text(
+        f"{REPLACED_BY_HOME}=from-the-home\n{REPLACED_BY_BOTH}=from-the-home\n{PIPELEX_HOME_ENV_KEY}={tmp_path / 'elsewhere'}\n",
+        encoding="utf-8",
+    )
+    working_dir = tmp_path / "project"
+    working_dir.mkdir()
+    (working_dir / ".env").write_text(
+        f"{REPLACED_BY_BOTH}=from-the-project\n{SET_WITHOUT_PROCESS_VALUE}=from-the-project\n{SET_TO_THE_SAME_VALUE}=as-exported\n"
+        f"{PIPELEX_HOME_ENV_KEY}={tmp_path / 'elsewhere'}\n",
+        encoding="utf-8",
+    )
+    env = {name: value for name, value in os.environ.items() if name not in NAMES}
+    env.update(
+        {
+            "HOME": str(tmp_path / "home"),
+            "USERPROFILE": str(tmp_path / "home"),
+            PIPELEX_HOME_ENV_KEY: str(Path("..") / "home" / ".pipelex") if relative_home else str(pipelex_home),
+            REPLACED_BY_HOME: "as-exported",
+            REPLACED_BY_BOTH: "as-exported",
+            SET_TO_THE_SAME_VALUE: "as-exported",
+            UNNAMED: "as-exported",
+        }
+    )
+    try:
+        result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
+            [sys.executable, "-c", _IMPORT_SCRIPT, *NAMES],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=SUBPROCESS_TIMEOUT_SECONDS,
+            env=env,
+            cwd=working_dir,
+        )
+    except subprocess.TimeoutExpired as exc:
+        msg = f"importing pipelex did not finish within {SUBPROCESS_TIMEOUT_SECONDS}s"
+        raise AssertionError(msg) from exc
+    assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
+    parsed: dict[str, dict[str, str | None]] = json.loads(result.stdout.strip().splitlines()[-1])
+    return parsed
+
+
 class TestDotenvSourcesAtImport:
     @pytest.fixture
     def report(self, tmp_path: Path) -> dict[str, dict[str, str | None]]:
-        """Import pipelex with a home `.env` and a working directory's `.env` over a process environment of known values."""
-        pipelex_home = tmp_path / "home" / ".pipelex"
-        pipelex_home.mkdir(parents=True)
-        (pipelex_home / ".env").write_text(
-            f"{REPLACED_BY_HOME}=from-the-home\n{REPLACED_BY_BOTH}=from-the-home\n{PIPELEX_HOME_ENV_KEY}={tmp_path / 'elsewhere'}\n",
-            encoding="utf-8",
-        )
-        working_dir = tmp_path / "project"
-        working_dir.mkdir()
-        (working_dir / ".env").write_text(
-            f"{REPLACED_BY_BOTH}=from-the-project\n{SET_WITHOUT_PROCESS_VALUE}=from-the-project\n{SET_TO_THE_SAME_VALUE}=as-exported\n",
-            encoding="utf-8",
-        )
-        env = {name: value for name, value in os.environ.items() if name not in NAMES}
-        env.update(
-            {
-                "HOME": str(tmp_path / "home"),
-                "USERPROFILE": str(tmp_path / "home"),
-                PIPELEX_HOME_ENV_KEY: str(pipelex_home),
-                REPLACED_BY_HOME: "as-exported",
-                REPLACED_BY_BOTH: "as-exported",
-                SET_TO_THE_SAME_VALUE: "as-exported",
-                UNNAMED: "as-exported",
-            }
-        )
-        try:
-            result = subprocess.run(  # ruff: ignore[subprocess-without-shell-equals-true]
-                [sys.executable, "-c", _IMPORT_SCRIPT, *NAMES],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=SUBPROCESS_TIMEOUT_SECONDS,
-                env=env,
-                cwd=working_dir,
-            )
-        except subprocess.TimeoutExpired as exc:
-            msg = f"importing pipelex did not finish within {SUBPROCESS_TIMEOUT_SECONDS}s"
-            raise AssertionError(msg) from exc
-        assert result.returncode == 0, f"stdout={result.stdout}\nstderr={result.stderr}"
-        parsed: dict[str, dict[str, str | None]] = json.loads(result.stdout.strip().splitlines()[-1])
-        return parsed
+        return _import_report(tmp_path=tmp_path, relative_home=False)
 
     def test_each_replaced_variable_names_the_file_holding_its_value(self, report: dict[str, dict[str, str | None]], tmp_path: Path) -> None:
         """The last file to name a variable holds its value; a variable the process did not hold counts as replaced."""
@@ -103,3 +112,10 @@ class TestDotenvSourcesAtImport:
         assert report[SET_TO_THE_SAME_VALUE] == {"value": "as-exported", "source": None}
         assert report[UNNAMED] == {"value": "as-exported", "source": None}
         assert report[PIPELEX_HOME_ENV_KEY] == {"value": str(tmp_path / "home" / ".pipelex"), "source": None}
+
+    def test_a_relative_home_pinned_at_import_has_no_source(self, tmp_path: Path) -> None:
+        """The relative value comes back absolute, the process's own made absolute, which no `.env` that names it set."""
+        report = _import_report(tmp_path=tmp_path, relative_home=True)
+
+        assert report[PIPELEX_HOME_ENV_KEY] == {"value": str((tmp_path / "home" / ".pipelex").resolve()), "source": None}
+        assert report[REPLACED_BY_HOME]["source"] == str((tmp_path / "home" / ".pipelex" / ".env").resolve())

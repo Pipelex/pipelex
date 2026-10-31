@@ -5,7 +5,7 @@ description: "How pipelex's hosted end-to-end tests get their Pipelex API key, c
 
 # Hosted End-to-End Tests
 
-`tests/e2e/pipelex/cli/test_hosted_run_cli.py` spawns the real `pipelex` and `pipelex-agent` binaries against a live hosted Pipelex API: it runs published methods on it by flag and by configured default, uploads a local input file, and checks that `--base-url` wins over `PIPELEX_BASE_URL`. Every case spends hosted credit, so the module carries the `pipelex_api` marker, which keeps it out of `make agent-test`, out of CI and out of the default pytest selection. It is selected with `-m pipelex_api` (`make test-pipelex-api` runs every test that carries the marker), and it is skipped when `PIPELEX_API_KEY` is unset.
+`tests/e2e/pipelex/cli/test_hosted_run_cli.py` spawns the real `pipelex` and `pipelex-agent` binaries against a live hosted Pipelex API: it runs published methods on it by flag and by configured default, uploads a local input file, and checks that `--base-url` wins over `PIPELEX_BASE_URL`. Every case spends hosted credit, so the module carries the `pipelex_api` marker, which keeps it out of `make agent-test`, out of CI and out of the default pytest selection. It is selected with `-m pipelex_api` (`make test-pipelex-api` runs every test that carries the marker), and it is skipped when `PIPELEX_API_KEY` is unset, empty or a placeholder and no `.env` file set it: a key a `.env` file replaced, even with an empty line, is checked instead, so the check below names the file.
 
 ## Where its account comes from
 

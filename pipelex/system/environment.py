@@ -58,8 +58,11 @@ def _load_dotenv_files() -> dict[str, Path]:
     for env_path in (home_dir / ".env", Path(".env")):
         if not env_path.is_file():
             continue
-        # `load_dotenv` sets every variable the file gives a value, so these are the ones it sets.
-        setters.update({key: env_path.resolve() for key, value in dotenv_values(env_path).items() if value is not None})
+        # `load_dotenv` sets every variable the file gives a value, so these are the ones it sets, but for `PIPELEX_HOME`,
+        # whose process value is restored below: a relative one comes back absolute, which no file set.
+        setters.update(
+            {key: env_path.resolve() for key, value in dotenv_values(env_path).items() if value is not None and key != PIPELEX_HOME_ENV_KEY}
+        )
         load_dotenv(dotenv_path=str(env_path), override=True)
 
     if configured_home is None:

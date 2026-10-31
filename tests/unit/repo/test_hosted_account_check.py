@@ -12,6 +12,7 @@ from tests.helpers.hosted_account_check import (
     current_dotenv_sources,
     fetch_me,
     hosted_account_findings,
+    no_key_handed_over,
     require_hosted_account,
     stop_message,
 )
@@ -244,6 +245,28 @@ class TestHostedAccountCheck:
         )
 
         assert answer == expected, topic
+
+    @pytest.mark.parametrize(
+        ("topic", "api_key", "replaced_by_a_dotenv", "skipped"),
+        [
+            ("no key", None, False, True),
+            ("a placeholder", "placeholder-for-PIPELEX_API_KEY", False, True),
+            ("a key", HostedAccountCheckTestData.API_KEY, False, False),
+            ("an empty line in a .env over a key", "", True, False),
+            ("a placeholder in a .env over a key", "placeholder-for-PIPELEX_API_KEY", True, False),
+        ],
+    )
+    def test_the_cases_are_skipped_only_when_no_key_was_handed_over(
+        self, topic: str, api_key: str | None, replaced_by_a_dotenv: bool, skipped: bool, tmp_path: Path
+    ) -> None:
+        """A key a `.env` replaced, even with nothing, is checked rather than skipped, so the check can name the file."""
+        environ = _environ(PIPELEX_API_KEY=api_key)
+        dotenv_sources = {"PIPELEX_API_KEY": tmp_path / ".env"} if replaced_by_a_dotenv else {}
+
+        assert no_key_handed_over(environ=environ, dotenv_sources=dotenv_sources) is skipped, topic
+        if replaced_by_a_dotenv:
+            findings = hosted_account_findings(environ=environ, dotenv_sources=dotenv_sources, fetch=_answer(body=_me()))
+            assert [finding.message.split(" holds ")[0] for finding in findings] == ["PIPELEX_API_KEY"]
 
     def test_the_dotenv_sources_are_read_for_every_variable_the_cases_read(self, tmp_path: Path, mocker: MockerFixture) -> None:
         dotenv_path = tmp_path / ".env"
