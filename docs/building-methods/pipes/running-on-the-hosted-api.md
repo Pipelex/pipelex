@@ -25,7 +25,7 @@ from pipelex_sdk.client import PipelexAPIClient
 async def main() -> None:
     async with PipelexAPIClient() as client:
         results = await client.start_and_wait(
-            method_ref="github.com/Pipelex/methods/text_stats@v0.1.7",
+            method_ref="github.com/Pipelex/methods/text_stats@v0.2.0",
             inputs={"text": "Hello world. Second sentence."},
         )
     print(results.pipeline_run_id)
@@ -95,7 +95,7 @@ from mthds.protocol.problem.registry import RetryVerdict
 from pipelex_sdk.errors import PipelexRequestError
 
 try:
-    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
+    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.2.0", inputs={"text": "Hello world."})
 except PipelexRequestError as exc:
     match exc.problem.effective_retry:
         case RetryVerdict.OUTCOME_UNKNOWN:

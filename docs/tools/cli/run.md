@@ -180,7 +180,7 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
 
 # Run a published method on the hosted Pipelex API, which resolves the address itself
-pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello world."}'
 
 # Run a method stored on the hosted platform, by its catalog id
 pipelex run method mt_abc123 --hosted --inputs data.json

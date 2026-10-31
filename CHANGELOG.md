@@ -6,6 +6,10 @@
 
 - **`get_dotenv_source`**: `pipelex.system.environment.get_dotenv_source(env_var=…)` names the `.env` file, the home one or the working directory's, whose value of a variable replaced the one the process was started with when pipelex was first imported, or `None` when the variable still holds what the process was handed, so a caller that must use exactly the key it was given can tell when a saved one replaced it.
 
+### Fixed
+
+- **The `text_stats` examples run again**: the examples of `pipelex run method --help`, `pipelex-agent run method --help` and the hosted-run docs name `github.com/Pipelex/methods/text_stats@v0.2.0`, whose `PipeFunc` names its function by import path, instead of `@v0.1.7`, whose flat function name the language now refuses with `method.schema_violation`.
+
 ## [v0.95.1] - 2026-10-30
 
 ### Fixed

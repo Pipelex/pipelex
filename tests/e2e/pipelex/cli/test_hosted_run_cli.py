@@ -40,7 +40,8 @@ PIPELEX_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex"
 PIPELEX_AGENT_BIN = REPO_ROOT / ".venv" / "bin" / "pipelex-agent"
 SAMPLE_PDF = REPO_ROOT / "tests" / "data" / "documents" / "John-Doe-CV.pdf"
 
-TEXT_STATS_REF = "github.com/Pipelex/methods/text_stats@v0.1.7"
+#: v0.2.0 is the first tag whose PipeFunc names its function by import path; the runtime refuses the flat name earlier tags use.
+TEXT_STATS_REF = "github.com/Pipelex/methods/text_stats@v0.2.0"
 DOCUMENTS_REF = "github.com/Pipelex/methods/documents@v0.1.7"
 TEXT_INPUTS = '{"text": "Hello world. A second sentence follows."}'
 #: An origin nothing listens on: a run that reached it would fail, so a run that succeeds went elsewhere.
