@@ -66,6 +66,68 @@ class TestLoginWithBrowser:
         assert set(parse_qs(parts.query)) == {"callback_port", "state"}
         assert saved_key(home=pipelex_home) == TEST_KEY
 
+    def test_a_label_is_passed_to_the_app_trimmed(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ACCEPTED)
+
+        login_cmd(label="  qa.dev.lab.builder ")
+        browser.join()
+
+        query = parse_qs(urlsplit(browser.opened_urls[0]).query)
+        assert set(query) == {"callback_port", "state", "label"}
+        assert query["label"] == ["qa.dev.lab.builder"]
+        assert saved_key(home=pipelex_home) == TEST_KEY
+        printed = " ".join(output.getvalue().split())
+        assert 'it replaces your key labelled "qa.dev.lab.builder" in your active organization, or creates it when you hold none' in printed
+
+    @pytest.mark.parametrize(
+        ("label", "reason"),
+        [
+            ("", "is empty once trimmed"),
+            ("   ", "is empty once trimmed"),
+            ("x" * 65, "is longer than 64 characters"),
+            ("ci\x85", "holds a control character"),
+            ("plx_sk_0123abcdef", "starts with plx_sk_"),
+        ],
+    )
+    def test_a_label_that_cannot_be_sent_opens_nothing(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, label: str, reason: str
+    ) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        check = patch_check(mocker, check=ACCEPTED)
+        listener = mocker.patch("pipelex.cli.commands.login.command.LoopbackListener")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            login_cmd(label=label)
+
+        assert exc_info.value.exit_code == 1
+        assert browser.opened_urls == []
+        listener.assert_not_called()
+        check.assert_not_called()
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert f"The key label {reason}" in printed
+        assert "Nothing was opened or saved" in printed
+        assert "plx_sk_0123abcdef" not in printed
+
+    def test_a_refusal_after_a_labelled_login_names_the_label_to_run_again_with(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        """Running `pipelex login` again without the label would add a key rather than replace the labelled one."""
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=API_URL, http_status=401))
+
+        with pytest.raises(typer.Exit):
+            login_cmd(label="nightly import")
+        browser.join()
+
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert "pipelex login --label 'nightly import' again." in printed
+
     def test_a_key_the_hosted_api_refuses_is_not_saved_and_is_named_for_revoking(
         self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
     ) -> None:
@@ -258,6 +320,19 @@ class TestLoginWithBrowser:
 
         assert exc_info.value.exit_code == 1
         assert LOGIN_PASTE_COMMAND in output.getvalue()
+        assert saved_key(home=pipelex_home) is None
+
+    def test_the_timeout_of_a_labelled_login_names_the_label_to_run_again_with(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        patch_browser(mocker, browser=BrowserStandIn(api_key=None))
+        mocker.patch("pipelex.cli.commands.login.command.LOGIN_TIMEOUT_SECONDS", 0.2)
+
+        with pytest.raises(typer.Exit):
+            login_cmd(label="qa.dev.lab.builder")
+
+        printed = " ".join(output.getvalue().split())
+        assert "Run pipelex login --label qa.dev.lab.builder again" in printed
         assert saved_key(home=pipelex_home) is None
 
     @pytest.mark.usefixtures("pipelex_home")
