@@ -10,7 +10,7 @@ Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.mak
 
 ## The Key and the Origin
 
-The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`.
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`. To tell whether one of the files replaced a variable your process was given, `get_dotenv_source(env_var="PIPELEX_API_KEY")` from `pipelex.system.environment` returns the path of the file whose value the variable now holds, or `None` when it holds the value the process was started with.
 
 ## Running a Method
 
@@ -25,7 +25,7 @@ from pipelex_sdk.client import PipelexAPIClient
 async def main() -> None:
     async with PipelexAPIClient() as client:
         results = await client.start_and_wait(
-            method_ref="github.com/Pipelex/methods/text_stats@v0.1.7",
+            method_ref="github.com/Pipelex/methods/text_stats@v0.2.0",
             inputs={"text": "Hello world. Second sentence."},
         )
     print(results.pipeline_run_id)
@@ -95,7 +95,7 @@ from mthds.protocol.problem.registry import RetryVerdict
 from pipelex_sdk.errors import PipelexRequestError
 
 try:
-    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
+    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.2.0", inputs={"text": "Hello world."})
 except PipelexRequestError as exc:
     match exc.problem.effective_retry:
         case RetryVerdict.OUTCOME_UNKNOWN:

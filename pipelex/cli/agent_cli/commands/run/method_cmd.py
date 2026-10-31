@@ -119,7 +119,7 @@ def run_method_cmd(
         pipelex-agent run method my-method
         pipelex-agent run method my-method --pipe custom_pipe
         pipelex-agent run method my-method --dry-run --mock-inputs
-        pipelex-agent run method github.com/Pipelex/methods/text_stats@v0.1.7 --runner hosted --inputs '{"text": "Hello"}'
+        pipelex-agent run method github.com/Pipelex/methods/text_stats@v0.2.0 --runner hosted --inputs '{"text": "Hello"}'
     """
     use_agent_cli_error_format(error_format=error_format, output_format=output_format)
 
