@@ -20,7 +20,7 @@ The command checks the account first, then runs the tests with:
 - `PIPELEX_API_KEY`, the account's key in that organization;
 - `PIPELEX_BASE_URL`, the dev plane's origin;
 - the key's expectations, `PIPELEX_API_KEY_EXPECTED_ORG_ID`, `PIPELEX_API_KEY_EXPECTED_ROLE` and `PIPELEX_API_KEY_EXPECTED_EMAIL`: the organization's id, the account's role there and its email, as `GET /v1/me` should state them;
-- `DO_NOT_TRACK=1`, so nothing the tests start reports anonymous usage statistics.
+- `DO_NOT_TRACK=1`, the common opt-out from usage statistics, set for anything a test starts.
 
 Anyone else exports the same variables for an account of their own, its expectations being what `GET /v1/me` states for its key, and sets `DO_NOT_TRACK=1`:
 
@@ -36,12 +36,14 @@ export DO_NOT_TRACK=1
 
 Each case then runs its subprocess in a hermetic home, with an environment built from nothing but that key, that origin and no provider key, so the developer's own `~/.pipelex` is never read.
 
+No usage statistics leave either way, and `DO_NOT_TRACK` is not what stops them: the pytest session turns them off before the first test, and each subprocess's environment, which inherits nothing, turns them off again through `usage_stats_off_environment()` (`pipelex/test_extras/usage_stats_isolation.py`). That call is what keeps the commands the cases start quiet, so it stays in `_hosted_env`.
+
 ## What it checks before the first case
 
 Before the first case, `require_hosted_account` (`tests/helpers/hosted_account_check.py`) checks, in this order:
 
 1. **That no variable it reads came from a `.env` file.** pipelex loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`) and then the working directory's `.env` over the environment it was started with, so a key saved by `pipelex login` would silently replace the one handed over. The check asks `pipelex.system.environment.get_dotenv_source` about `PIPELEX_API_KEY`, `PIPELEX_BASE_URL`, the three expectations and `PIPELEX_HOSTED_E2E_ALLOW_PRODUCTION`, and names the file that set each one that was replaced.
-2. **That the origin is not the production API.** Without `PIPELEX_BASE_URL` the runs would go to `https://api.pipelex.com`, so an unset origin and one on that host are refused unless `PIPELEX_HOSTED_E2E_ALLOW_PRODUCTION=1` asks for production on purpose.
+2. **That the origin is not the production API.** Without `PIPELEX_BASE_URL` the runs would go to `https://api.pipelex.com`, so an unset origin and one on that host, whatever its scheme, port, case or trailing dot, are refused unless `PIPELEX_HOSTED_E2E_ALLOW_PRODUCTION=1` asks for production on purpose.
 3. **That the key's three expectations are set.** A run without them is refused, its message naming `test-account run`.
 4. **That `GET /v1/me`, asked with the key, states what they expect**: `organization.org_id` equal to `PIPELEX_API_KEY_EXPECTED_ORG_ID`, `organization.role_in_org` equal to `PIPELEX_API_KEY_EXPECTED_ROLE`, and `email` equal to `PIPELEX_API_KEY_EXPECTED_EMAIL` ignoring case.
 
