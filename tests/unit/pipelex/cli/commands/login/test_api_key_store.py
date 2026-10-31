@@ -132,6 +132,23 @@ class TestApiKeyStore:
         assert saved == SavedApiKey(env_path=env_path)
         assert env_path.read_text(encoding="utf-8").splitlines() == ["OTHER=1", *file_content.splitlines(), f"{PIPELEX_API_KEY_ENV_KEY}={TEST_KEY}"]
 
+    def test_a_base_url_that_refers_to_a_shell_variable_is_replaced_by_the_checked_one(
+        self, pipelex_home: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """`${DEV_API_URL}` resolves to the checked API only where the login shell sets it, so the file alone does not name that API."""
+        monkeypatch.setenv("DEV_API_URL", DEV_API_URL)
+        pipelex_home.mkdir()
+        env_path = pipelex_home / ".env"
+        env_path.write_text(f"{PIPELEX_BASE_URL_ENV_KEY}=${{DEV_API_URL}}\n", encoding="utf-8")
+
+        saved = save_pipelex_api_key(api_key=TEST_KEY, checked_base_url=DEV_API_URL)
+
+        assert saved == SavedApiKey(env_path=env_path, saved_base_url=DEV_API_URL)
+        assert env_path.read_text(encoding="utf-8").splitlines() == [
+            f"{PIPELEX_BASE_URL_ENV_KEY}={DEV_API_URL}",
+            f"{PIPELEX_API_KEY_ENV_KEY}={TEST_KEY}",
+        ]
+
     def test_the_key_and_its_base_url_are_written_in_one_write(self, mocker: MockerFixture, pipelex_home: Path) -> None:
         """A reader of the file, the workshop included, never sees the key paired with the API the file named before."""
         write = mocker.spy(api_key_store, "set_env_file_entries")

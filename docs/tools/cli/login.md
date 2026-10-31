@@ -45,7 +45,7 @@ PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pip
 
 A command started without that shell's variables, such as a new terminal or an app launched from the desktop, then sends the key to the API it belongs to, where it would have sent it to `https://api.pipelex.com` and been refused. The Pipelex workshop (`@pipelex/mcp`) reads and writes the same file under the same rule.
 
-Since `~/.pipelex/.env` wins over your shell, a `PIPELEX_BASE_URL` exported afterwards no longer changes where Pipelex commands send the saved key, and a later `pipelex login` checks its key against the file's API too. To use another API, change or remove the `PIPELEX_BASE_URL` line in that file first, then log in again. A base URL that holds whitespace, a quote, `#`, `$` or a backslash cannot be written to a `.env` file unquoted, so it is left out, with a warning.
+Since `~/.pipelex/.env` wins over your shell, a `PIPELEX_BASE_URL` exported afterwards no longer changes where Pipelex commands send the saved key, and a later `pipelex login` checks its key against the file's API too. To use another API, change or remove the `PIPELEX_BASE_URL` line in that file first, then log in again. A `PIPELEX_BASE_URL` in the file that refers to another variable, such as `${DEV_API_URL}`, names an API only where that variable is set, so the login replaces it with the URL that checked the key. A base URL that holds whitespace, a quote, `#`, `$` or a backslash cannot be written to a `.env` file unquoted, so it is left out, with a warning.
 
 ## Paste a Key Instead
 

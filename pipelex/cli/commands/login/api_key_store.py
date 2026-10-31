@@ -70,7 +70,9 @@ def base_url_to_save(*, checked_base_url: str, file_values: dict[str, str | None
 
     Args:
         checked_base_url: The base URL the key was checked against.
-        file_values: The home `.env` as the runtime reads it.
+        file_values: The home `.env` as written, its `${…}` references left unexpanded: a value that refers to another
+            variable resolves against the environment of each process that loads the file, so it never matches the
+            checked base URL, and the concrete one replaces it.
     """
     file_base_url = file_values.get(PIPELEX_BASE_URL_ENV_KEY)
     from_file_alone = HOSTED_API_DEFAULT_BASE_URL if file_base_url is None else file_base_url
@@ -97,8 +99,9 @@ def save_pipelex_api_key(*, api_key: str, checked_base_url: str | None) -> Saved
     saved_base_url: str | None = None
     unsaved_base_url: str | None = None
     if checked_base_url:
-        # Read now, after the check, so a base URL another program wrote to the file meanwhile is decided on too.
-        file_values = dotenv_values(env_path) if env_path.is_file() else {}
+        # Read now, after the check, so a base URL another program wrote to the file meanwhile is decided on too, and
+        # unexpanded, so a variable only the login shell sets cannot make the file look as if it named the checked API.
+        file_values = dotenv_values(env_path, interpolate=False) if env_path.is_file() else {}
         base_url = base_url_to_save(checked_base_url=checked_base_url, file_values=file_values)
         if base_url is not None:
             if is_unquoted_env_value(value=base_url):

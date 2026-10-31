@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:cb315f5692a420919d61da5248367847cfd900f006e2a191f9e48a06cb4290c1"
+digest = "sha256:66fe641c145352caf6fd5e01ef306a4068f85ac47679213410e9855bd8474d2d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-31T13:25:08Z"
-rationale = "real-catch: pipelex login now saves PIPELEX_BASE_URL beside the key when the file alone names another API, names the env file behind a refusal's base URL, says to revoke a refused browser key, and titles its callback page Key received; docs/tools/cli/login.md and run.md now say so, while pipelex/cli/agent_cli/CLAUDE.md does not describe the login. Re-acked after a comment and a branch reshaped without changing behaviour."
+reviewed_at = "2026-10-31T13:33:41Z"
+rationale = "real-catch: the review's fix decides whether to save the base URL from the home .env as written, unexpanded, so a  line is replaced by the checked URL; docs/tools/cli/login.md now says so."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -100,7 +100,7 @@ rationale = "real-catch: pipelex login now saves PIPELEX_BASE_URL beside the key
 "pipelex/cli/commands/init/ui/setup_path_ui.py" = "blob:49a2a1333eca05aa58589e1f2a4b9b9af47eb740"
 "pipelex/cli/commands/init/ui/types.py" = "blob:e263802d8e9c9f9687435de1eb992afa5336544f"
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
-"pipelex/cli/commands/login/api_key_store.py" = "blob:9f18a46bc603b9849d41f912864c351abd9dee58"
+"pipelex/cli/commands/login/api_key_store.py" = "blob:8406111e7148188ae4ca3fff0cfb4ad7e00550d8"
 "pipelex/cli/commands/login/command.py" = "blob:c95aa22caa237636712b55de85fa255624003009"
 "pipelex/cli/commands/login/loopback.py" = "blob:9b71130a529d7414712acfc6d17e52c5f17bbe13"
 "pipelex/cli/commands/migrate_cmd.py" = "blob:3839424ccbf1c7f8e7af8a7f124a062cba18cece"
