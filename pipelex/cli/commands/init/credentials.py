@@ -110,6 +110,9 @@ def set_env_file_entries(*, env_path: Path, entries: dict[str, str]) -> None:
     if env_path.is_file():
         # The rewrite keeps the mode it finds, so tighten it first rather than after.
         env_path.chmod(owner_only)
+    # This is python-dotenv's own `set_key` loop, taking several keys in one rewrite: `rewrite`, `parse_stream` and
+    # `with_warn_for_invalid_lines` are its internal helpers rather than its public surface, so a python-dotenv release
+    # that moves or reshapes them breaks this write, which the credential and login tests exercise directly.
     with rewrite(env_path, encoding="utf-8", follow_symlinks=True) as (source, dest):
         assigned: set[str] = set()
         missing_newline = False
@@ -127,17 +130,6 @@ def set_env_file_entries(*, env_path: Path, entries: dict[str, str]) -> None:
         for key in appended:
             dest.write(f"{key}={entries[key]}\n")
     env_path.chmod(owner_only)
-
-
-def set_env_file_entry(*, env_path: Path, key: str, value: str) -> None:
-    """Set one entry of a .env file, as `set_env_file_entries` sets several.
-
-    Args:
-        env_path: Path to the .env file.
-        key: The variable to set.
-        value: Its value, written unquoted: it must pass `is_unquoted_env_value`.
-    """
-    set_env_file_entries(env_path=env_path, entries={key: value})
 
 
 def read_env_file_value(*, env_path: Path, key: str) -> str | None:

@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.commands.init.credentials import set_env_file_entry
+from pipelex.cli.commands.init.credentials import set_env_file_entries
 from pipelex.cli.commands.login import api_key_store
 from pipelex.cli.commands.login.api_key_store import (
     SavedApiKey,
@@ -180,9 +180,9 @@ class TestApiKeyStore:
     def test_the_env_file_giving_the_base_url_is_found(
         self, pipelex_home: Path, home_sets_it: bool, working_dir_sets_it: bool, expected: str | None
     ) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key="OTHER", value="1")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={"OTHER": "1"})
         if home_sets_it:
-            set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_BASE_URL_ENV_KEY, value=DEV_API_URL)
+            set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_BASE_URL_ENV_KEY: DEV_API_URL})
         Path(".env").write_text(f"{PIPELEX_BASE_URL_ENV_KEY}={DEV_API_URL}\n" if working_dir_sets_it else "OTHER=1\n", encoding="utf-8")
 
         found = find_base_url_env_file()
@@ -195,13 +195,13 @@ class TestApiKeyStore:
         assert find_pipelex_api_key() is None
 
     def test_the_environment_wins(self, pipelex_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
         monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "plx_sk_exported")
 
         assert find_pipelex_api_key() == "plx_sk_exported"
 
     def test_the_saved_key_is_found_when_the_environment_has_none(self, pipelex_home: Path) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
 
         assert find_pipelex_api_key() == "plx_sk_saved"
 
@@ -222,14 +222,14 @@ class TestApiKeyStore:
 
     def test_an_empty_key_in_the_environment_is_no_key_even_with_one_saved(self, pipelex_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """An empty `PIPELEX_API_KEY=` in the working directory's `.env` is what the next process sends, so it is no key."""
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
         Path(".env").write_text(f"{PIPELEX_API_KEY_ENV_KEY}=\n", encoding="utf-8")
         monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "")
 
         assert find_pipelex_api_key() is None
 
     def test_no_working_directory_env_shadows_nothing(self, pipelex_home: Path) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
 
         assert find_shadowing_env_file() is None
 
@@ -245,7 +245,7 @@ class TestApiKeyStore:
         self, pipelex_home: Path, project_line: str, saved: str | None, sets_empty_value: bool
     ) -> None:
         if saved is not None:
-            set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value=saved)
+            set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: saved})
         Path(".env").write_text(f"OTHER=1\n{project_line}\n", encoding="utf-8")
 
         shadow = find_shadowing_env_file()
@@ -266,13 +266,13 @@ class TestApiKeyStore:
         self, pipelex_home: Path, project_content: str, saved: str | None
     ) -> None:
         if saved is not None:
-            set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value=saved)
+            set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: saved})
         Path(".env").write_text(project_content, encoding="utf-8")
 
         assert find_shadowing_env_file() is None
 
     def test_the_home_env_is_not_its_own_shadow(self, pipelex_home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: ""})
         monkeypatch.chdir(pipelex_home)
 
         assert find_shadowing_env_file() is None

@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:66fe641c145352caf6fd5e01ef306a4068f85ac47679213410e9855bd8474d2d"
+digest = "sha256:f349210c6f08691297ce14e9386b4f78d5b58a3943eb4adf5343045c23ef316d"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-31T13:33:41Z"
-rationale = "real-catch: the review's fix decides whether to save the base URL from the home .env as written, unexpanded, so a  line is replaced by the checked URL; docs/tools/cli/login.md now says so."
+reviewed_at = "2026-10-31T14:08:27Z"
+rationale = "real-catch: pipelex login saves PIPELEX_BASE_URL beside the key when the home .env, read as written without expanding its variable references, names another API; a refusal names the env file behind its base URL and asks to revoke a refused browser key; the callback page reads Key received. docs/tools/cli/login.md and run.md say so, and pipelex/cli/agent_cli/CLAUDE.md does not describe the login."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -87,7 +87,7 @@ rationale = "real-catch: the review's fix decides whether to save the base URL f
 "pipelex/cli/commands/init/backends.py" = "blob:0cc3543c78f832149ebbbf3cc8beafee619e4f63"
 "pipelex/cli/commands/init/command.py" = "blob:4747c1b9dff00163ca5cd48595ea8545a3b02b4b"
 "pipelex/cli/commands/init/config_files.py" = "blob:8345ae46e7f77a6f49f526ed20c8dd8263f118f3"
-"pipelex/cli/commands/init/credentials.py" = "blob:91bfbbb473b6521093003d9c788fe5a5c85618fc"
+"pipelex/cli/commands/init/credentials.py" = "blob:4f011f033afce57ef5c41adc43e05785248111b3"
 "pipelex/cli/commands/init/ide_extension.py" = "blob:9f0ec1494c07062246ecc906bc55b7f2cf95c715"
 "pipelex/cli/commands/init/init_usage_stats.py" = "blob:fca415ba8fef02967cef142f0011a016990274e2"
 "pipelex/cli/commands/init/routing.py" = "blob:c73927deb99804556cb545cdaa6eabf8d1fc3450"
