@@ -104,10 +104,12 @@ class _CallbackHandler(BaseHTTPRequestHandler):
             )
             return
         server.api_key = api_keys[0]
+        # The key is checked and saved only after this page is served, so the page cannot say the login worked: the
+        # terminal says whether it did.
         self._send_page(
             status=HTTPStatus.OK,
-            heading="Logged in",
-            body="pipelex login received your key. You can close this tab and return to your terminal.",
+            heading="Key received",
+            body="pipelex login received your key and is checking it. You can close this tab: your terminal says whether it was saved.",
         )
 
     def _send_page(self, *, status: HTTPStatus, heading: str, body: str) -> None:

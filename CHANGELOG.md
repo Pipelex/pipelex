@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`pipelex login` saves the base URL its key was checked against**: when the key was checked against another API than the one `~/.pipelex/.env` names on its own, its `PIPELEX_BASE_URL` or else `https://api.pipelex.com`, the login writes that `PIPELEX_BASE_URL` beside the key in the same write and says so, where it saved the key alone, so a command started without the login shell's `PIPELEX_BASE_URL` sent a development key to `https://api.pipelex.com` and was refused. A refusal now names the `.env` file that set the base URL it was checked against, when one did.
+- **`pipelex login` says to revoke a browser key it did not save**: when the hosted API refuses the key the browser login just received, the command says it went unused and to revoke it on the Developer page of the Pipelex app, as it already did when the key could not be written, and a pasted key it could not save is no longer called unused. The browser page the key is handed back on is titled "Key received" where it read "Logged in", since the key is checked and saved after it.
+
 ## [v0.95.1] - 2026-10-30
 
 ### Fixed
