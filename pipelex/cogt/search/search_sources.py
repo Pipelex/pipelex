@@ -1,22 +1,29 @@
 """A sourced answer lists each of its sources once.
 
-A search provider can list one address more than once among the sources of a sourced answer: the same
-page cited for two passages of the answer, or once with a fragment (`#section`) and once without. The
-search worker keeps the first entry for each address and drops the others, in the provider's order,
-comparing addresses with their fragment removed, since a fragment names a place in a page and not another
-page. Every search worker's answer passes through here, so every provider gets the same rule.
+A search provider can list one page more than once among the sources of a sourced answer, under addresses
+that differ only in how they are written: `https://www.example.com/a` and `https://example.com/a`, the
+same page over `http` and `https`, with and without a trailing `/`, or with and without a fragment
+(`#section`). The search worker keeps the first entry for each page and drops the others, in the
+provider's order, and the entry it keeps keeps its original address. Two addresses name the same page when
+they are equal once each is reduced to its comparison key: `http` and `https` count as one scheme, the host
+is lowercased and loses one leading `www.`, the fragment is dropped, one trailing `/` is dropped from the
+path unless the path is `/` alone (a web address written with no path having the path `/`), and the query is
+kept as it is. The rule is stated in the `PipeSearch`
+documentation, so a consumer that deduplicates on display can apply the same one. Every search worker's
+answer passes through here, so every provider gets it.
 
-When the search asked for inline citations, the answer numbers them `[1]`, `[2]`, … from 1, read here as
-positions in the provider's list of sources, the only list its response carries; the provider's SDK
-documents the flag that asks for them but not their format, so that reading is this module's. Dropping an entry moves
-every later entry up, so each citation is renumbered to the position its source holds in the shortened
-list, and a citation of a dropped duplicate points at the entry kept for its address. Text inside a
-Markdown code span or a fenced code block is code rather than a citation and is never renumbered, and a
-number that names no entry of the provider's list is left as written.
+When the search asked for inline citations, the answer numbers them `[1]`, `[2]`, … as positions in the
+provider's list of sources, counted from 1 in the order they arrive: Linkup documents its inline references
+as corresponding to the sources in its response, and a real answer's citations support their sentences only
+under that reading. Dropping an entry moves every later entry up, so each citation is renumbered to the
+position its source holds in the shortened list, and a citation of a dropped duplicate points at the entry
+kept for its page. Text inside a Markdown code span or a fenced code block is code rather than a citation and
+is never renumbered, and a number that names no entry of the provider's list is left as written.
 """
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
+from urllib.parse import urlsplit
 
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 
@@ -27,6 +34,18 @@ _CITATION_PATTERN = re.compile(r"\[([0-9]+)\]")
 _BACKTICK_RUN_PATTERN = re.compile(r"`+")
 _FENCE_OPENING_PATTERN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 _MAX_FENCE_INDENT = 3
+_WEB_SCHEMES = frozenset({"http", "https"})
+_WEB_SCHEME_KEY = "http"
+_WWW_PREFIX = "www."
+
+
+class _PageKey(NamedTuple):
+    """What two addresses of the same page share, once the ways of writing that address are set aside."""
+
+    scheme: str
+    netloc: str
+    path: str
+    query: str
 
 
 def deduplicate_search_sources(*, search_result: SearchResultContent, renumber_citations: bool) -> SearchResultContent:
@@ -39,19 +58,19 @@ def deduplicate_search_sources(*, search_result: SearchResultContent, renumber_c
             in the answer is the answer's own text and stays as written.
 
     Returns:
-        The same result when no address repeats, or a copy listing each address once, at its first
-        position, with its citations renumbered when `renumber_citations` is set.
+        The same result when no page repeats, or a copy listing each page once, at its first position and
+        under its first address, with its citations renumbered when `renumber_citations` is set.
     """
     kept_sources: list[DocumentContent] = []
-    kept_position_by_address: dict[str, int] = {}
+    kept_position_by_page: dict[_PageKey, int] = {}
     new_position_by_old_position: dict[int, int] = {}
     for old_index, source in enumerate(search_result.sources):
-        address = _address_without_fragment(url=source.url)
-        kept_position = kept_position_by_address.get(address)
+        page_key = _page_key(url=source.url)
+        kept_position = kept_position_by_page.get(page_key)
         if kept_position is None:
             kept_sources.append(source)
             kept_position = len(kept_sources)
-            kept_position_by_address[address] = kept_position
+            kept_position_by_page[page_key] = kept_position
         new_position_by_old_position[old_index + 1] = kept_position
 
     if len(kept_sources) == len(search_result.sources):
@@ -63,9 +82,32 @@ def deduplicate_search_sources(*, search_result: SearchResultContent, renumber_c
     return search_result.model_copy(update={"answer": answer, "sources": kept_sources})
 
 
-def _address_without_fragment(*, url: str) -> str:
+def _page_key(*, url: str) -> _PageKey:
+    """Reduce an address to the key two addresses of the same page share.
+
+    `http` and `https` count as one scheme, the host is lowercased and loses one leading `www.`, the
+    fragment is dropped, one trailing `/` is dropped from the path unless the path is `/` alone, and the
+    query is kept as it is. A web address written with no path has the path `/`, as a URL parser reads
+    it. Any other scheme, the user information and the port are kept as written.
+    """
     # A URL's fragment starts at its first `#`, which cannot appear unescaped anywhere before it
-    return url.partition("#")[0]
+    address = url.partition("#")[0]
+    try:
+        parts = urlsplit(address)
+    except ValueError:
+        # An address the parser refuses, such as a malformed IPv6 host, only matches itself
+        return _PageKey(scheme="", netloc="", path=address, query="")
+
+    scheme = _WEB_SCHEME_KEY if parts.scheme in _WEB_SCHEMES else parts.scheme
+    user_info, at_sign, host_and_port = parts.netloc.rpartition("@")
+    host_and_port = host_and_port.lower().removeprefix(_WWW_PREFIX)
+    path = parts.path
+    if not path and scheme == _WEB_SCHEME_KEY:
+        # A web address written with no path names its site's root, which is the path `/`
+        path = "/"
+    elif len(path) > 1 and path.endswith("/"):
+        path = path[:-1]
+    return _PageKey(scheme=scheme, netloc=f"{user_info}{at_sign}{host_and_port}", path=path, query=parts.query)
 
 
 def _renumber_citations(*, answer: str, new_position_by_old_position: dict[int, int]) -> str:

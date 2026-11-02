@@ -36,7 +36,7 @@ def _linkup_worker(mocker: MockerFixture) -> LinkupSearchWorker:
             sources=[
                 LinkupSource(name="Alpha", url=ALPHA_URL, snippet="Alpha's finding"),
                 LinkupSource(name="Beta", url=BETA_URL, snippet="Beta's agreement"),
-                LinkupSource(name="Alpha", url=f"{ALPHA_URL}#methods", snippet="Alpha's methods"),
+                LinkupSource(name="Alpha", url="http://www.alpha.example.com/report/#methods", snippet="Alpha's methods"),
             ],
         )
     )
@@ -72,7 +72,7 @@ class TestLinkupSearchSourceDedup:
         include_inline_citations: bool,
         expected_answer: str,
     ) -> None:
-        """The entry repeating an address, here with a fragment, is dropped; citations are renumbered only when the search asked for them."""
+        """The entry naming the first page again, written another way, is dropped; citations are renumbered only when asked for."""
         worker = _linkup_worker(mocker)
         search_job = SearchJobFactory.make_search_job(
             "what does Alpha find",
