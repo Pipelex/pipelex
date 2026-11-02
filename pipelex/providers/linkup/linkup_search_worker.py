@@ -1,6 +1,8 @@
 import html
 import json
+import re
 from datetime import date
+from html.entities import html5
 from typing import Any
 
 from linkup import (
@@ -32,6 +34,29 @@ from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.providers.linkup.linkup_exceptions import LinkupSearchEmptyResultError, LinkupSearchResponseError
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+# A complete HTML character reference, ending in `;`: named (`&amp;`), decimal (`&#39;`) or hexadecimal (`&#x27;`)
+_CHARACTER_REFERENCE = re.compile(r"&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);")
+_NO_BREAK_SPACE = "\u00a0"
+
+
+def _decoded_character_reference(match: re.Match[str]) -> str:  # kw-only: ignore — ``re.sub`` calls its replacement positionally
+    reference = match.group(0)
+    if reference.startswith("&#") or reference[1:] in html5:
+        return html.unescape(reference)
+    # A name HTML does not define is left as written: `html.unescape` would decode its longest legacy prefix,
+    # turning `&notable;` into `¬able;`.
+    return reference
+
+
+def _plain_text_title(*, name: str) -> str:
+    """Decode, once, the HTML character references Linkup can leave in a source's name, into the plain text consumers draw.
+
+    Only a complete reference is decoded, one ending in `;`. `html.unescape` on the whole name would also apply HTML's
+    legacy rules for a reference written without its `;`, turning a title such as `Health &notable` into `Health ¬able`
+    and `R&D &copy editing` into `R&D © editing`. A no-break space, which `&nbsp;` decodes to, becomes an ordinary space.
+    """
+    return _CHARACTER_REFERENCE.sub(_decoded_character_reference, name).replace(_NO_BREAK_SPACE, " ")
 
 
 class LinkupSearchWorker(SearchWorkerAbstract):
@@ -99,11 +124,11 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             sources.append(
                 DocumentContent(
                     # Linkup can hand a source's name over with the HTML character references of the page it
-                    # was read from still encoded (`Requirements &amp; SAP Integration`), so it is decoded once
-                    # into the plain text every consumer draws. The snippet is the page's extracted text, in
-                    # which no reference has been seen, so it is left as sent: decoding it would turn a
-                    # reference the page itself quotes, as an HTML tutorial does, into the character it names.
-                    title=html.unescape(source.name),
+                    # was read from still encoded (`Requirements &amp; SAP Integration`), so it is decoded into
+                    # plain text. The snippet is the page's extracted text, in which no reference has been seen,
+                    # so it is left as sent: decoding it would turn a reference the page itself quotes, as an
+                    # HTML tutorial does, into the character it names.
+                    title=_plain_text_title(name=source.name),
                     url=source.url,
                     public_url=source.url,
                     snippet=source.snippet,
