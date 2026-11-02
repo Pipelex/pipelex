@@ -8,6 +8,7 @@ from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, 
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_job import SearchJob
+from pipelex.cogt.search.search_sources import deduplicate_search_sources
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.job_metadata import UnitJobId
@@ -65,7 +66,11 @@ class SearchWorkerAbstract(InferenceWorkerAbstract):
                 if self.reporting_delegate:
                     self.reporting_delegate.report_inference_job(inference_job=search_job)
 
-        return result
+        # Every provider's answer passes here, so each lists its sources once whichever provider listed one twice
+        return deduplicate_search_sources(
+            search_result=result,
+            renumber_citations=search_job.job_params.search_setting.include_inline_citations,
+        )
 
     async def search_structured(
         self,

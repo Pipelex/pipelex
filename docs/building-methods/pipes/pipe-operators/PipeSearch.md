@@ -15,6 +15,8 @@ The output is a `SearchResult` (or a concept that refines it), which contains:
 -   `answer`: The synthesized answer text from the search
 -   `sources`: A list of sources, each with a `title`, `url`, and optional `snippet`
 
+Each source is listed once. When the provider lists the same address more than once, comparing addresses without their fragment (`#section`), the first entry is kept, the order of the provider's list is kept, and the other entries are dropped. When the answer cites its sources inline, as `[1]` or `[2][3]`, each citation is renumbered to the position its source holds in the shortened list, so it still points at the source it named, and a citation of a dropped entry points at the entry kept for its address. Numbers inside code spans and code blocks, and a number that names no source, are left as written.
+
 Every input the pipe declares must be read by the `prompt`, and every variable the prompt reads must be declared in `inputs`. Validation refuses an input the prompt never reads as `extraneous_input_variable`, naming the input, so you either reference it in the prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
 
 ## Configuration
