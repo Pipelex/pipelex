@@ -1,3 +1,4 @@
+import html
 import json
 from datetime import date
 from typing import Any
@@ -97,7 +98,12 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         for source in response.sources:
             sources.append(
                 DocumentContent(
-                    title=source.name,
+                    # Linkup can hand a source's name over with the HTML character references of the page it
+                    # was read from still encoded (`Requirements &amp; SAP Integration`), so it is decoded once
+                    # into the plain text every consumer draws. The snippet is the page's extracted text, in
+                    # which no reference has been seen, so it is left as sent: decoding it would turn a
+                    # reference the page itself quotes, as an HTML tutorial does, into the character it names.
+                    title=html.unescape(source.name),
                     url=source.url,
                     public_url=source.url,
                     snippet=source.snippet,
