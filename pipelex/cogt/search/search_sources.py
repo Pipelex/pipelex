@@ -17,23 +17,33 @@ provider's list of sources, counted from 1 in the order they arrive: Linkup docu
 as corresponding to the sources in its response, and a real answer's citations support their sentences only
 under that reading. Dropping an entry moves every later entry up, so each citation is renumbered to the
 position its source holds in the shortened list, and a citation of a dropped duplicate points at the entry
-kept for its page. Text inside a Markdown code span or a fenced code block is code rather than a citation and
-is never renumbered, and a number that names no entry of the provider's list is left as written.
+kept for its page. A number that names no entry of the provider's list is left as written, and so is a number
+inside code, as CommonMark reads the answer: the answer is parsed with the parser that renders it
+(`markdown_parser.py`), so a code block, fenced or indented, is code at any depth of block quotes and lists,
+and so is a code span, which opens on a run of backticks not escaped by a backslash, closes on the next run of
+the same length, and never runs past the paragraph, heading, list item or table cell it opens in.
 """
 
 import re
-from typing import TYPE_CHECKING, NamedTuple
+from bisect import bisect_right
+from enum import StrEnum
+from itertools import groupby
+from typing import TYPE_CHECKING, Final, NamedTuple
 from urllib.parse import urlsplit
 
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.tools.markdown.markdown_parser import LINE_ENDING, get_markdown_parser
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.document_content import DocumentContent
 
 _CITATION_PATTERN = re.compile(r"\[([0-9]+)\]")
 _BACKTICK_RUN_PATTERN = re.compile(r"`+")
-_FENCE_OPENING_PATTERN = re.compile(r"^ {0,3}(`{3,}|~{3,})")
-_MAX_FENCE_INDENT = 3
+_BACKSLASH = "\\"
+# markdown-it cuts a table row into its cells at each `|` that does not directly follow a backslash, before it
+# reads the code spans of each cell
+_TABLE_CELL_SEPARATOR = "|"
+_TABLE_CELL_SEPARATOR_PATTERN = re.compile(r"(?<!\\)\|")
 _WEB_SCHEMES = frozenset({"http", "https"})
 _WEB_SCHEME_KEY = "http"
 _WWW_PREFIX = "www."
@@ -46,6 +56,34 @@ class _PageKey(NamedTuple):
     netloc: str
     path: str
     query: str
+
+
+class _BlockKind(StrEnum):
+    """What CommonMark reads a block of the answer's lines as, which decides where a citation can stand in it."""
+
+    # A fenced or indented code block, whose lines are all code
+    CODE = "code"
+    # One block of text, such as a paragraph or a heading, whose code spans stay inside it
+    TEXT = "text"
+    # One row of a table, each of whose cells is a block of text of its own
+    TABLE_ROW = "table_row"
+
+
+class _LineBlock(NamedTuple):
+    """The block a line of the answer belongs to, told apart from the blocks around it by its first line."""
+
+    kind: _BlockKind
+    first_line: int
+
+
+# The parsed tokens that claim lines of the answer for a block, by token type; a table row's `tr_open` comes
+# before the tokens of its cells, which share its line
+_BLOCK_KIND_BY_TOKEN_TYPE: Final[dict[str, _BlockKind]] = {
+    "fence": _BlockKind.CODE,
+    "code_block": _BlockKind.CODE,
+    "tr_open": _BlockKind.TABLE_ROW,
+    "inline": _BlockKind.TEXT,
+}
 
 
 def deduplicate_search_sources(*, search_result: SearchResultContent, renumber_citations: bool) -> SearchResultContent:
@@ -111,95 +149,116 @@ def _page_key(*, url: str) -> _PageKey:
 
 
 def _renumber_citations(*, answer: str, new_position_by_old_position: dict[int, int]) -> str:
+    """Renumber the answer's citations outside its code, as CommonMark reads the answer.
+
+    Each run of lines that one block holds is renumbered on its own: a code block's lines are left as
+    written, a block of text is renumbered outside its code spans, a table row cell by cell, and lines no
+    block holds, such as blank lines, are renumbered as they are. The lines keep their line endings.
+    """
+    # A line ends where markdown-it ends one, so the lines are counted as its tokens' `map` counts them
+    line_bounds = [0, *(line_ending.end() for line_ending in LINE_ENDING.finditer(answer)), len(answer)]
     renumbered_parts: list[str] = []
-    for segment, is_code_block in _split_fenced_code_blocks(text=answer):
-        if is_code_block:
-            renumbered_parts.append(segment)
-        else:
-            renumbered_parts.append(_renumber_outside_code_spans(text=segment, new_position_by_old_position=new_position_by_old_position))
+    run_start = 0
+    for block, block_lines in groupby(_block_of_each_line(answer=answer, line_count=len(line_bounds) - 1)):
+        run_end = run_start + len(list(block_lines))
+        renumbered_parts.append(
+            _renumber_block(
+                text=answer[line_bounds[run_start] : line_bounds[run_end]],
+                block=block,
+                new_position_by_old_position=new_position_by_old_position,
+            )
+        )
+        run_start = run_end
     return "".join(renumbered_parts)
 
 
-def _split_fenced_code_blocks(*, text: str) -> list[tuple[str, bool]]:
-    """Cut the text into runs of lines, each flagged as a fenced code block or not, which join back into the text.
+def _block_of_each_line(*, answer: str, line_count: int) -> list[_LineBlock | None]:
+    """The block each line of the answer belongs to, as the parser that renders the answer reads it, or `None`.
 
-    A fence opens on a line indented by at most three spaces with three or more backticks or tildes, and
-    closes on a line of the same character at least as long, as in CommonMark; a fence never closed runs
-    to the end of the text.
+    A line belongs to the first token that claims it, in the parser's order, so a table row's line belongs to
+    the row rather than to its cells; a line no token claims, such as a blank line, a table's delimiter row or
+    a link reference definition, belongs to no block.
     """
-    segments: list[tuple[str, bool]] = []
-    current_lines: list[str] = []
-    opening_fence: str | None = None
-    for line in text.splitlines(keepends=True):
-        if opening_fence is None:
-            fence = _opening_fence(line=line)
-            if fence is None:
-                current_lines.append(line)
-                continue
-            if current_lines:
-                segments.append(("".join(current_lines), False))
-            current_lines = [line]
-            opening_fence = fence
-        else:
-            current_lines.append(line)
-            if _closes_fence(line=line, opening_fence=opening_fence):
-                segments.append(("".join(current_lines), True))
-                current_lines = []
-                opening_fence = None
-    if current_lines:
-        segments.append(("".join(current_lines), opening_fence is not None))
-    return segments
+    block_of_each_line: list[_LineBlock | None] = [None] * line_count
+    for token in get_markdown_parser().parse(answer):
+        block_kind = _BLOCK_KIND_BY_TOKEN_TYPE.get(token.type)
+        if block_kind is None or token.map is None:
+            continue
+        first_line, end_line = token.map
+        block = _LineBlock(kind=block_kind, first_line=first_line)
+        for line_index in range(first_line, end_line):
+            if block_of_each_line[line_index] is None:
+                block_of_each_line[line_index] = block
+    return block_of_each_line
 
 
-def _opening_fence(*, line: str) -> str | None:
-    fence_match = _FENCE_OPENING_PATTERN.match(line)
-    if fence_match is None:
-        return None
-    fence = fence_match.group(1)
-    # A backtick fence's info string holds no backtick: such a line opens a code span, not a block
-    if fence.startswith("`") and "`" in line[fence_match.end() :]:
-        return None
-    return fence
-
-
-def _closes_fence(*, line: str, opening_fence: str) -> bool:
-    content = line.rstrip("\r\n").rstrip(" \t")
-    fence = content.lstrip(" ")
-    if len(content) - len(fence) > _MAX_FENCE_INDENT:
-        return False
-    return len(fence) >= len(opening_fence) and fence == opening_fence[0] * len(fence)
+def _renumber_block(*, text: str, block: _LineBlock | None, new_position_by_old_position: dict[int, int]) -> str:
+    """Renumber the citations of the lines one block holds, or of lines that no block holds when `block` is `None`."""
+    if block is None:
+        return _renumber_prose(text=text, new_position_by_old_position=new_position_by_old_position)
+    match block.kind:
+        case _BlockKind.CODE:
+            return text
+        case _BlockKind.TEXT:
+            return _renumber_outside_code_spans(text=text, new_position_by_old_position=new_position_by_old_position)
+        case _BlockKind.TABLE_ROW:
+            renumbered_cells: list[str] = []
+            for cell in _TABLE_CELL_SEPARATOR_PATTERN.split(text):
+                renumbered_cells.append(_renumber_outside_code_spans(text=cell, new_position_by_old_position=new_position_by_old_position))
+            return _TABLE_CELL_SEPARATOR.join(renumbered_cells)
 
 
 def _renumber_outside_code_spans(*, text: str, new_position_by_old_position: dict[int, int]) -> str:
-    """Renumber the citations of a text outside its code spans.
+    """Renumber the citations of one block of text outside its code spans.
 
     A code span opens on a run of backticks and closes on the next run of exactly the same length, as in
-    CommonMark; a run with no such closer is literal text.
+    CommonMark; a run with no such closer is literal text. A backtick that follows an odd number of
+    backslashes is escaped, so it is literal text and the rest of its run is a run of its own, while a closer
+    is never escaped, since a backslash escapes nothing inside a code span.
     """
+    backtick_runs = list(_BACKTICK_RUN_PATTERN.finditer(text))
+    # The indices of the runs of each length, in the text's order, so an opener's closer is found without reading on
+    run_indices_by_length: dict[int, list[int]] = {}
+    for run_index, backtick_run in enumerate(backtick_runs):
+        run_indices_by_length.setdefault(len(backtick_run.group(0)), []).append(run_index)
+
     renumbered_parts: list[str] = []
     prose_start = 0
-    search_start = 0
-    while (opening_run := _BACKTICK_RUN_PATTERN.search(text, search_start)) is not None:
-        closing_run = _closing_backtick_run(text=text, opening_run=opening_run)
-        if closing_run is None:
-            search_start = opening_run.end()
-            continue
-        renumbered_parts.append(
-            _renumber_prose(text=text[prose_start : opening_run.start()], new_position_by_old_position=new_position_by_old_position)
+    run_index = 0
+    while run_index < len(backtick_runs):
+        opening_run = backtick_runs[run_index]
+        opening_start = opening_run.start()
+        if _follows_odd_backslashes(text=text, position=opening_start):
+            opening_start += 1
+        closing_index = _closing_run_index(
+            run_indices=run_indices_by_length.get(opening_run.end() - opening_start, []),
+            opening_index=run_index,
         )
-        renumbered_parts.append(text[opening_run.start() : closing_run.end()])
-        prose_start = closing_run.end()
-        search_start = closing_run.end()
+        if closing_index is None:
+            run_index += 1
+            continue
+        renumbered_parts.append(_renumber_prose(text=text[prose_start:opening_start], new_position_by_old_position=new_position_by_old_position))
+        prose_start = backtick_runs[closing_index].end()
+        renumbered_parts.append(text[opening_start:prose_start])
+        run_index = closing_index + 1
     renumbered_parts.append(_renumber_prose(text=text[prose_start:], new_position_by_old_position=new_position_by_old_position))
     return "".join(renumbered_parts)
 
 
-def _closing_backtick_run(*, text: str, opening_run: re.Match[str]) -> re.Match[str] | None:
-    run_length = len(opening_run.group(0))
-    for candidate_run in _BACKTICK_RUN_PATTERN.finditer(text, opening_run.end()):
-        if len(candidate_run.group(0)) == run_length:
-            return candidate_run
-    return None
+def _follows_odd_backslashes(*, text: str, position: int) -> bool:
+    """Whether the character at `position` follows an odd number of backslashes, the last of which escapes it."""
+    backslashes_start = position
+    while backslashes_start > 0 and text[backslashes_start - 1] == _BACKSLASH:
+        backslashes_start -= 1
+    return (position - backslashes_start) % 2 == 1
+
+
+def _closing_run_index(*, run_indices: list[int], opening_index: int) -> int | None:
+    """The first of `run_indices`, the indices of the runs as long as an opener, that comes after the opener."""
+    later_position = bisect_right(run_indices, opening_index)
+    if later_position == len(run_indices):
+        return None
+    return run_indices[later_position]
 
 
 def _renumber_prose(*, text: str, new_position_by_old_position: dict[int, int]) -> str:

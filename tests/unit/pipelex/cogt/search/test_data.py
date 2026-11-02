@@ -6,6 +6,9 @@ ALPHA_URL = "https://alpha.example.com/report"
 BETA_URL = "https://beta.example.org/article"
 GAMMA_URL = "https://gamma.example.net/notes"
 
+# One page listed twice, then another: a citation `[3]` becomes `[2]` and `[2]` becomes `[1]`.
+ALPHA_TWICE_THEN_BETA: list[tuple[str, str]] = [(ALPHA_URL, "Alpha"), (ALPHA_URL, "Alpha again"), (BETA_URL, "Beta")]
+
 # Sources of a real Linkup sourced answer, in the order they arrived: positions 4 and 5 name one page, with
 # and without `www.`, under the same title. Titles and public addresses only.
 REAL_RUN_SOURCES: list[tuple[str, str]] = [
@@ -201,6 +204,126 @@ class SearchSourcesTestData:
             True,
             [1, 3],
             "Beta [2]:\n\n```\nitems[3]\n",
+        ),
+        (
+            "quote_nested_tilde_fence",
+            ALPHA_TWICE_THEN_BETA,
+            "Beta indexes it [3]:\n\n> ~~~python\n> items[3]\n> ~~~\n\nAlpha agrees [2].",
+            True,
+            [1, 3],
+            "Beta indexes it [2]:\n\n> ~~~python\n> items[3]\n> ~~~\n\nAlpha agrees [1].",
+        ),
+        (
+            "quote_nested_backtick_fence_closed_by_a_longer_fence",
+            ALPHA_TWICE_THEN_BETA,
+            "> ```\n> items[3]\n> ````\n\nBeta [3].",
+            True,
+            [1, 3],
+            "> ```\n> items[3]\n> ````\n\nBeta [2].",
+        ),
+        (
+            "list_nested_tilde_fence_at_indent_4",
+            ALPHA_TWICE_THEN_BETA,
+            "Beta's steps [3]:\n\n- Outer\n  - Inner:\n\n    ~~~python\n    items[3]\n    ~~~\n\nAlpha agrees [2].\n",
+            True,
+            [1, 3],
+            "Beta's steps [2]:\n\n- Outer\n  - Inner:\n\n    ~~~python\n    items[3]\n    ~~~\n\nAlpha agrees [1].\n",
+        ),
+        (
+            "indented_code_block",
+            ALPHA_TWICE_THEN_BETA,
+            "Beta indexes it [3]:\n\n    items[3]\n\nAlpha agrees [2].\n",
+            True,
+            [1, 3],
+            "Beta indexes it [2]:\n\n    items[3]\n\nAlpha agrees [1].\n",
+        ),
+        (
+            "unclosed_fence_ends_with_its_list_item",
+            ALPHA_TWICE_THEN_BETA,
+            "1. Run:\n   ```bash\n   ls items[3]\n\nBeta [3] and Alpha [2].\n",
+            True,
+            [1, 3],
+            "1. Run:\n   ```bash\n   ls items[3]\n\nBeta [2] and Alpha [1].\n",
+        ),
+        (
+            "stray_backtick_across_paragraphs",
+            ALPHA_TWICE_THEN_BETA,
+            "Press the ` key, says Beta [3].\n\nAlpha agrees [2].\n\nAnother ` here [3].\n",
+            True,
+            [1, 3],
+            "Press the ` key, says Beta [2].\n\nAlpha agrees [1].\n\nAnother ` here [2].\n",
+        ),
+        (
+            "stray_backtick_across_list_items",
+            ALPHA_TWICE_THEN_BETA,
+            "- The ` key [3]\n- Cited [2]\n- Another ` key [3]\n",
+            True,
+            [1, 3],
+            "- The ` key [2]\n- Cited [1]\n- Another ` key [2]\n",
+        ),
+        (
+            "stray_backtick_across_table_rows",
+            ALPHA_TWICE_THEN_BETA,
+            "| Key | Note |\n| --- | --- |\n| ` | Beta [3] |\n| x | Alpha [2] |\n| ` | Beta again [3] |\n",
+            True,
+            [1, 3],
+            "| Key | Note |\n| --- | --- |\n| ` | Beta [2] |\n| x | Alpha [1] |\n| ` | Beta again [2] |\n",
+        ),
+        (
+            "stray_backtick_across_table_cells",
+            ALPHA_TWICE_THEN_BETA,
+            "| Key | Source | Note |\n| --- | --- | --- |\n| Open ` | Beta [3] | close ` |\n",
+            True,
+            [1, 3],
+            "| Key | Source | Note |\n| --- | --- | --- |\n| Open ` | Beta [2] | close ` |\n",
+        ),
+        (
+            "stray_backtick_before_a_later_code_span",
+            ALPHA_TWICE_THEN_BETA,
+            "Press the backtick (`) key [3].\n\nAlpha agrees [2].\n\nThen run `ls` [3].",
+            True,
+            [1, 3],
+            "Press the backtick (`) key [2].\n\nAlpha agrees [1].\n\nThen run `ls` [2].",
+        ),
+        (
+            "escaped_backtick_opens_no_code_span",
+            ALPHA_TWICE_THEN_BETA,
+            "Escape it as \\` and cite Beta [3]; a literal backslash before code reads \\\\`items[3]`.",
+            True,
+            [1, 3],
+            "Escape it as \\` and cite Beta [2]; a literal backslash before code reads \\\\`items[3]`.",
+        ),
+        (
+            "escaped_backtick_leaves_the_rest_of_its_run",
+            ALPHA_TWICE_THEN_BETA,
+            "Write \\``items[3]` as Beta does [3].",
+            True,
+            [1, 3],
+            "Write \\``items[3]` as Beta does [2].",
+        ),
+        (
+            "crlf_line_endings_kept",
+            ALPHA_TWICE_THEN_BETA,
+            "Beta indexes it [3]:\r\n\r\n    items[3]\r\n\r\n> ~~~\r\n> rows[3]\r\n> ~~~\r\n\r\nAlpha agrees [2].\r\n",
+            True,
+            [1, 3],
+            "Beta indexes it [2]:\r\n\r\n    items[3]\r\n\r\n> ~~~\r\n> rows[3]\r\n> ~~~\r\n\r\nAlpha agrees [1].\r\n",
+        ),
+        (
+            "mixed_line_endings_kept",
+            ALPHA_TWICE_THEN_BETA,
+            "Beta indexes it [3]:\r\r    items[3]\n\r\n> ~~~\r> rows[3]\n> ~~~\r\n\rAlpha agrees [2].",
+            True,
+            [1, 3],
+            "Beta indexes it [2]:\r\r    items[3]\n\r\n> ~~~\r> rows[3]\n> ~~~\r\n\rAlpha agrees [1].",
+        ),
+        (
+            "line_separator_is_no_line_ending",
+            ALPHA_TWICE_THEN_BETA,
+            "Alpha agrees [2].\n\n    items[3]\n\nBeta [3].\n",
+            True,
+            [1, 3],
+            "Alpha agrees [1].\n\n    items[3]\n\nBeta [2].\n",
         ),
         (
             "citations_not_requested",

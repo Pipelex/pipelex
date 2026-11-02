@@ -25,7 +25,10 @@ Each source is listed once. When the provider lists the same page more than once
 
 So `https://www.example.com/guide/` and `http://example.com/guide#intro` name the same page, while `https://example.com/guide` and `https://example.com/docs/guide` are two pages.
 
-The answer cites its sources inline as `[1]`, `[2][3]`, and so on, numbered from 1 in the order of the provider's list. Each citation is renumbered to the position its source holds in the shortened list, so it still points at the source it named, and a citation of a dropped entry points at the entry kept for its page. Numbers inside code spans and code blocks, and a number that names no source, are left as written.
+The answer cites its sources inline as `[1]`, `[2][3]`, and so on, numbered from 1 in the order of the provider's list. Each citation is renumbered to the position its source holds in the shortened list, so it still points at the source it named, and a citation of a dropped entry points at the entry kept for its page. A number that names no source is left as written, and so are numbers inside code spans and code blocks, as CommonMark reads them:
+
+-   A code block is fenced with backticks or tildes, or indented, and it is code wherever it stands, inside block quotes and lists included.
+-   A code span opens on a run of backticks and closes on the next run of the same length. It never runs past the paragraph, heading, list item or table cell it opens in, and a backtick escaped with a backslash (`` \` ``) opens none.
 
 Every input the pipe declares must be read by the `prompt`, and every variable the prompt reads must be declared in `inputs`. Validation refuses an input the prompt never reads as `extraneous_input_variable`, naming the input, so you either reference it in the prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
 
