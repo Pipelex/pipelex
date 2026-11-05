@@ -194,6 +194,52 @@ main_pipe = "Not A Valid Pipe Code!"
 description = "A customer"
 """
 
+# A concept field named like the type it holds, which once made `/validate` answer an internal error: the generated
+# structure class annotated the field `date` with its own `FieldInfo`. It now validates.
+DATE_FIELD_NAMED_DATE_MTHDS = """\
+domain = "repro_date_field"
+main_pipe = "read_day"
+
+[concept.Day]
+description = "A day"
+
+[concept.Day.structure]
+date = { type = "date", description = "The day", required = true }
+
+[pipe.read_day]
+type = "PipeLLM"
+description = "Read a day"
+inputs = { text = "Text" }
+output = "Day"
+prompt = "Read the day from: $text"
+"""
+
+# A concept field named like the Python class of the concept it holds, the one name a generated structure class cannot
+# take: an invalid verdict whose one item names the concept and the field.
+FIELD_NAMED_LIKE_ITS_CLASS_MTHDS = """\
+domain = "shadowing_refs"
+main_pipe = "read_visit"
+
+[concept.Person]
+description = "A person"
+
+[concept.Person.structure]
+name = { type = "text", description = "The person's name", required = true }
+
+[concept.Visit]
+description = "A visit"
+
+[concept.Visit.structure]
+shadowing_refs__Person = { type = "concept", concept_ref = "Person", description = "Who came", required = true }
+
+[pipe.read_visit]
+type = "PipeLLM"
+description = "Read a visit"
+inputs = { text = "Text" }
+output = "Visit"
+prompt = "Read the visit from: $text"
+"""
+
 # Multi-file batches mirroring pipelex's additive-multi-file-library E2E fixtures
 # (`tests/e2e/pipelex/pipes/additive_multi_file_library/` in the pipelex repo) — the same
 # scenarios the protocol-alignment baseline snapshots were captured from. Copied, not read

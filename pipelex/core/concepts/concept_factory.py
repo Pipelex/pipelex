@@ -288,6 +288,37 @@ class ConceptFactory:
         return f"{domain_code}.{concept_code}"
 
     @classmethod
+    def _structure_generation_refusal(
+        cls,
+        *,
+        message: str,
+        generation_error: ConceptStructureGeneratorError,
+        domain_code: str,
+        concept_code: str,
+    ) -> ConceptFactoryError:
+        """The refusal of a concept whose structure class could not be generated, naming the concept and what went wrong.
+
+        A structure the generator refuses on purpose carries its own `finding`. A class that fails to build for any other
+        reason, such as an exception the generated module raised, is described by the class of that exception alone: its
+        text quotes the generated code, and stays in the operator's message.
+
+        Args:
+            message: The operator's message
+            generation_error: The generator's refusal
+            domain_code: The domain of the concept
+            concept_code: The code of the concept
+
+        Returns:
+            The refusal, which a validation answers as a verdict naming the concept
+        """
+        finding = generation_error.given_params.get("finding")
+        if not isinstance(finding, str):
+            cause = generation_error.__cause__
+            finding = f"generating its Python class raised {type(cause).__name__}" if cause is not None else "its Python class could not be generated"
+        concept_ref = cls.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_code)
+        return ConceptFactoryError(message).with_params(concept=concept_ref, finding=finding)
+
+    @classmethod
     def make_concept_ref_with_domain_from_concept_ref_or_code(cls, *, domain_code: str, concept_ref_or_code: str) -> str:
         input_domain_and_code = cls.make_domain_and_concept_code_from_concept_ref_or_code(
             concept_ref_or_code=concept_ref_or_code,
@@ -394,7 +425,7 @@ class ConceptFactory:
             )
         except ConceptStructureGeneratorError as exc:
             msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain_code}': {exc}"
-            raise ConceptFactoryError(msg) from exc
+            raise cls._structure_generation_refusal(message=msg, generation_error=exc, domain_code=domain_code, concept_code=concept_code) from exc
 
         # Register the generated class
         get_class_registry().register_class(the_generated_class)
@@ -436,7 +467,7 @@ class ConceptFactory:
             )
         except ConceptStructureGeneratorError as exc:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
-            raise ConceptFactoryError(msg) from exc
+            raise cls._structure_generation_refusal(message=msg, generation_error=exc, domain_code=domain_code, concept_code=concept_code) from exc
         # Register the generated class
         get_class_registry().register_class(the_generated_class)
 
@@ -482,7 +513,9 @@ class ConceptFactory:
                     f"Error generating structure class for concept '{concept_code}' "
                     f"with cross-package refines '{current_refine}' in domain '{domain_code}': {exc}"
                 )
-                raise ConceptFactoryError(msg) from exc
+                raise cls._structure_generation_refusal(
+                    message=msg, generation_error=exc, domain_code=domain_code, concept_code=concept_code
+                ) from exc
 
             get_class_registry().register_class(the_generated_class)
             return StructureNameAndRefine(structure_class_name=qualified_class_name, refine_string=current_refine)
@@ -512,7 +545,7 @@ class ConceptFactory:
                 f"Error generating structure class for concept '{concept_code}' refining '{refined_structure_class_name}' "
                 f"in domain '{domain_code}': {exc}"
             )
-            raise ConceptFactoryError(msg) from exc
+            raise cls._structure_generation_refusal(message=msg, generation_error=exc, domain_code=domain_code, concept_code=concept_code) from exc
 
         # Register the generated class
         get_class_registry().register_class(the_generated_class)
