@@ -16,6 +16,10 @@
 - **The `text_stats` examples run again**: the examples of `pipelex run method --help`, `pipelex-agent run method --help` and the hosted-run docs name `github.com/Pipelex/methods/text_stats@v0.2.0`, whose `PipeFunc` names its function by import path, instead of `@v0.1.7`, whose flat function name the language now refuses with `method.schema_violation`.
 - **`PipeSearch` lists each source once**: a `SearchResult`'s `sources` keep the first entry for each page, with its original address, and drop the entries the search provider repeated, two addresses naming one page when they match with `http` and `https` counted as one scheme, the host lowercased without one leading `www.`, no fragment, and no trailing `/` on a path other than `/`, the query kept as it is. An inline citation in the answer, such as `[5]`, is renumbered to the position its source holds in the shortened list, so it still points at the source it named, while numbers inside code spans and code blocks as CommonMark reads them, in block quotes and lists too, and a number that names no source, are left as written.
 
+### Security
+
+- **`uv.lock` and the `dev` extra moved past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` image installs from now holds patched `certifi`, `msgpack`, `pyasn1`, `black` and the `opentelemetry` family at 1.45.2, a development checkout also gets a patched `setuptools` through the `docling` extra, and the `dev` extra pins `pylint==4.0.10` where it pinned 4.0.4. No runtime requirement of the `pipelex` wheel moved, so an application installing it picks these releases up through its own resolution.
+
 ## [v0.95.1] - 2026-10-30
 
 ### Fixed
