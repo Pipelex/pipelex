@@ -78,7 +78,7 @@ class _CallbackHandler(BaseHTTPRequestHandler):
 
     timeout = _REQUEST_READ_TIMEOUT_SECONDS
 
-    def do_GET(self) -> None:
+    def do_GET(self) -> None:  # pylint: disable=invalid-name  # BaseHTTPRequestHandler dispatch name
         server = cast("_LoopbackServer", self.server)
         parsed = urlsplit(self.path)
         if parsed.path != CALLBACK_PATH:
