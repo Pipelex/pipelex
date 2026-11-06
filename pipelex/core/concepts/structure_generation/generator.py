@@ -1,11 +1,10 @@
 import ast
+import builtins
 import textwrap
 from datetime import date, datetime, time
-from enum import Enum
-from typing import Any, Literal, cast
+from typing import Any, cast
 
 from mthds.protocol.problem.registry import CoreCode
-from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
@@ -14,7 +13,6 @@ from pipelex.core.concepts.resolved_fields import ResolvedField, ResolvedType, R
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs import non_null_any
-from pipelex.core.stuffs.non_null_any import NonNullAny
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.system.registries.class_registry_access import get_class_registry
 
@@ -26,6 +24,18 @@ _WRAP_WIDTH = 120  # conservative: leaves headroom for indentation and syntax ov
 # The annotation of an open field that never holds nothing, imported by name in the generated code.
 _NON_NULL_ANY_MODULE = non_null_any.__name__
 _NON_NULL_ANY_NAME = "NonNullAny"
+
+# The modules every generated module imports from, whatever its fields, and the names it imports from each.
+_SEEDED_IMPORTS: dict[str, tuple[str, ...]] = {
+    "typing": ("Any", "Literal"),
+    "enum": ("Enum",),
+    "pipelex.core.stuffs.structured_content": ("StructuredContent",),
+    "pydantic": ("Field",),
+}
+
+# What leads the alias of a module-level name a field shadows. No field name starts with an underscore
+# (`structure_field_name_refusal`), so an alias spelled this way can never be shadowed in turn.
+_SHADOWED_NAME_ALIAS_PREFIX = "_"
 
 
 class StructureGenerator:
@@ -39,13 +49,13 @@ class StructureGenerator:
                 (refs without a domain prefix, e.g. "ColorPalette") to their
                 domain-qualified structure class name.
         """
-        self.imports = {
-            "from typing import Any, Literal",
-            "from enum import Enum",
-            "from pipelex.core.stuffs.structured_content import StructuredContent",
-            "from pydantic import Field",
-        }
+        self.imports = {f"from {module} import {', '.join(names)}" for module, names in _SEEDED_IMPORTS.items()}
         self.local_domain = local_domain
+        # The names of the fields of the class being generated, which its body must never read a module-level name by.
+        self._field_names: frozenset[str] = frozenset()
+        # The classes the class being generated refers to by forward reference, by name, each with the concept ref it was
+        # spelled from.
+        self._forward_refs: dict[str, str] = {}
 
     def generate_from_structure_blueprint(
         self,
@@ -70,10 +80,15 @@ class StructureGenerator:
             ConceptStructureGeneratorError: If the generated code is not syntactically correct or does not inherit from the required base class
 
         """
+        # Every module-level name the class body reads is spelled so that none of these fields shadows it.
+        self._field_names = frozenset(structure_blueprint)
+        self._forward_refs = {}
+
         # Generate the class
         class_code = self._generate_class_source_code_from_blueprint(
             class_name=class_name, structure_blueprint=structure_blueprint, base_class_name=base_class_name, description=description
         )
+        self._refuse_fields_named_like_forward_refs(class_name=class_name)
 
         # Generate the complete module with a header comment
         imports_section = "\n".join(sorted(self.imports))
@@ -143,6 +158,62 @@ class StructureGenerator:
     # Private methods
     ############################################################
 
+    def _refuse_fields_named_like_forward_refs(self, *, class_name: str) -> None:
+        """Refuse a field named like a class the generated class refers to by forward reference.
+
+        A forward reference is a string pydantic resolves by name when it builds the class, reading the class namespace
+        first, where every field is bound to its `FieldInfo`. So a field named like the class it or another field refers
+        to (`repro__Person`, the class of the concept `repro.Person`) would be read in place of that class. Unlike a
+        module-level name, which `_class_body_name` imports under an alias, the name of a forward reference is the key
+        the loaded classes are found by, so no alias can stand for it, and such a field is refused.
+
+        Raises:
+            ConceptStructureGeneratorError: When a field has the name of a class the generated class refers to, its
+                `finding` naming the field and the concept.
+        """
+        shadowed_class_names = sorted(self._field_names & self._forward_refs.keys())
+        if not shadowed_class_names:
+            return
+        findings = [
+            f"its field '{shadowed_class_name}' has the name of the Python class of the concept '{self._forward_refs[shadowed_class_name]}', "
+            "which the structure refers to"
+            for shadowed_class_name in shadowed_class_names
+        ]
+        finding = "; ".join(findings)
+        msg = f"Cannot generate the structure class '{class_name}': {finding}."
+        raise ConceptStructureGeneratorError(msg).with_params(finding=finding)
+
+    def _class_body_name(self, *, module: str, name: str) -> str:
+        """The spelling by which the class body reads the module-level `name` from `module`, registering its import.
+
+        A field is bound in the class namespace by its own assignment, and Python evaluates a field's annotation after
+        that assignment. So a field named like a module-level name the class body reads would shadow that name for its
+        own annotation and for every line after it: `date: date = Field(...)` annotates the field with its own
+        `FieldInfo`, and a field named `Field`, `str` or `TextContent` breaks the fields declared after it. Every name the
+        class body reads from a module, the builtins included, goes through here, and one a field of the class shadows
+        is imported under an alias led by an underscore, which no field name can start with. A name no field shadows
+        keeps its own spelling, so the module of a class whose fields shadow nothing is unchanged.
+
+        Args:
+            module: The module the name is imported from, `builtins` for a builtin
+            name: The name the class body reads
+
+        Returns:
+            The spelling to write in the class body: `name`, or its alias when a field of the class shadows it
+        """
+        spelling = self._class_body_spelling(name=name)
+        if spelling != name:
+            self.imports.add(f"from {module} import {name} as {spelling}")
+        elif module != builtins.__name__ and name not in _SEEDED_IMPORTS.get(module, ()):
+            self.imports.add(f"from {module} import {name}")
+        return spelling
+
+    def _class_body_spelling(self, *, name: str) -> str:
+        """The spelling by which the class body reads the module-level `name`: its alias when a field shadows it, else itself."""
+        if name in self._field_names:
+            return f"{_SHADOWED_NAME_ALIAS_PREFIX}{name}"
+        return name
+
     def _escape_string_for_python(self, value: str) -> str:
         """Escape a string value for safe inclusion in generated Python code.
 
@@ -182,13 +253,13 @@ class StructureGenerator:
         # `repr()` module-qualifies temporal values ("datetime.datetime(...)"/"datetime.date(...)"),
         # but the generated code imports the bare classes ("from datetime import date/datetime"), so
         # the qualified form raises AttributeError at eval. Rebuild via fromisoformat() — a lossless,
-        # offset-preserving round-trip that uses those imported bare names. (datetime is a date subclass.)
+        # offset-preserving round-trip that uses those imported names. (datetime is a date subclass.)
         if isinstance(value, datetime):
-            return f'datetime.fromisoformat("{value.isoformat()}")'
+            return f'{self._class_body_name(module="datetime", name="datetime")}.fromisoformat("{value.isoformat()}")'
         if isinstance(value, date):
-            return f'date.fromisoformat("{value.isoformat()}")'
+            return f'{self._class_body_name(module="datetime", name="date")}.fromisoformat("{value.isoformat()}")'
         if isinstance(value, time):
-            return f'time.fromisoformat("{value.isoformat()}")'
+            return f'{self._class_body_name(module="datetime", name="time")}.fromisoformat("{value.isoformat()}")'
         if isinstance(value, list):
             value_list = cast("list[Any]", value)
             formatted_items = [self._format_default_value(item) for item in value_list]
@@ -313,11 +384,10 @@ class StructureGenerator:
                 python_type = f'"{python_type[1:-1]} | None"'
             else:
                 python_type = f"{python_type} | None"
-        elif python_type == "Any":
+        elif python_type == self._class_body_spelling(name="Any"):
             # `Any` admits `None` by itself, so an open field that never holds nothing (one naming
             # `native.Anything`, or of an unspecified type) takes the annotation that refuses it.
-            self.imports.add(f"from {_NON_NULL_ANY_MODULE} import {_NON_NULL_ANY_NAME}")
-            python_type = _NON_NULL_ANY_NAME
+            python_type = self._class_body_name(module=_NON_NULL_ANY_MODULE, name=_NON_NULL_ANY_NAME)
 
         # Generate Field parameters (default/... first, then description)
         field_params = [self._format_field_description(resolved_field.description)]
@@ -338,43 +408,49 @@ class StructureGenerator:
         else:
             field_params.insert(0, "default=None")
 
-        field_call = f"Field({', '.join(field_params)})"
+        field_call = f"{self._class_body_name(module='pydantic', name='Field')}({', '.join(field_params)})"
         return f"    {resolved_field.name}: {python_type} = {field_call}"
 
     def _python_type_from_resolved(self, resolved_type: ResolvedType) -> str:
         """Map a neutral resolved type to a Python type annotation, accumulating the imports it needs."""
         match resolved_type.kind:
             case ResolvedTypeKind.TEXT:
-                return "str"
+                return self._class_body_name(module=builtins.__name__, name="str")
             case ResolvedTypeKind.NUMBER:
-                return "float"
+                return self._class_body_name(module=builtins.__name__, name="float")
             case ResolvedTypeKind.INTEGER:
-                return "int"
+                return self._class_body_name(module=builtins.__name__, name="int")
             case ResolvedTypeKind.BOOLEAN:
-                return "bool"
+                return self._class_body_name(module=builtins.__name__, name="bool")
             case ResolvedTypeKind.DATE:
-                self.imports.add("from datetime import date")
-                return "date"
+                return self._class_body_name(module="datetime", name="date")
             case ResolvedTypeKind.DATETIME:
-                self.imports.add("from datetime import datetime")
-                return "datetime"
+                return self._class_body_name(module="datetime", name="datetime")
             case ResolvedTypeKind.TIME:
-                self.imports.add("from datetime import time")
-                return "time"
+                return self._class_body_name(module="datetime", name="time")
             case ResolvedTypeKind.LITERAL:
                 choices = resolved_type.choices or []
-                return f"Literal[{', '.join(self._escape_string_for_python(choice) for choice in choices)}]"
+                literal = self._class_body_name(module="typing", name="Literal")
+                return f"{literal}[{', '.join(self._escape_string_for_python(choice) for choice in choices)}]"
             case ResolvedTypeKind.CONCEPT:
                 return self._python_type_for_concept(resolved_type)
             case ResolvedTypeKind.LIST:
-                item_type = self._python_type_from_resolved(resolved_type.item) if resolved_type.item else "Any"
-                return f"list[{item_type}]"
+                item_type = self._python_type_from_resolved(resolved_type.item) if resolved_type.item else self._any_annotation()
+                return f"{self._class_body_name(module=builtins.__name__, name='list')}[{item_type}]"
             case ResolvedTypeKind.DICT:
-                key_type = self._python_type_from_resolved(resolved_type.key) if resolved_type.key else "str"
-                value_type = self._python_type_from_resolved(resolved_type.value) if resolved_type.value else "Any"
-                return f"dict[{key_type}, {value_type}]"
+                key_type = (
+                    self._python_type_from_resolved(resolved_type.key)
+                    if resolved_type.key
+                    else self._class_body_name(module=builtins.__name__, name="str")
+                )
+                value_type = self._python_type_from_resolved(resolved_type.value) if resolved_type.value else self._any_annotation()
+                return f"{self._class_body_name(module=builtins.__name__, name='dict')}[{key_type}, {value_type}]"
             case ResolvedTypeKind.ANY:
-                return "Any"
+                return self._any_annotation()
+
+    def _any_annotation(self) -> str:
+        """The annotation of a value of any type, `Any`, spelled so that no field of the class shadows it."""
+        return self._class_body_name(module="typing", name="Any")
 
     def _python_type_for_concept(self, resolved_type: ResolvedType) -> str:
         """Resolve a CONCEPT node to a Python type annotation.
@@ -387,7 +463,7 @@ class StructureGenerator:
         """
         concept_ref = resolved_type.concept_ref
         if not concept_ref:
-            return "Any"
+            return self._any_annotation()
 
         if resolved_type.is_native:
             native_concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
@@ -398,18 +474,19 @@ class StructureGenerator:
             if native_code is not None:
                 structure_class = native_code.structure_class
                 if structure_class:
-                    self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
-                    return structure_class.__name__
+                    return self._class_body_name(module=structure_class.__module__, name=structure_class.__name__)
                 # `native.Anything` has no content class: a field holding it holds any value, and a forward
                 # reference to its code would name a class no namespace has.
-                return "Any"
+                return self._any_annotation()
 
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
         if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref):
-            qualified_name = make_qualified_structure_class_name(domain_code=parsed_ref.domain_path, concept_code=concept_code)
-            return f'"{qualified_name}"'
-        return f'"{concept_code}"'
+            referenced_class_name = make_qualified_structure_class_name(domain_code=parsed_ref.domain_path, concept_code=concept_code)
+        else:
+            referenced_class_name = concept_code
+        self._forward_refs[referenced_class_name] = concept_ref
+        return f'"{referenced_class_name}"'
 
     def _validate_execution(
         self,
@@ -419,30 +496,12 @@ class StructureGenerator:
         base_class_name: str | None = None,
     ) -> type:
         """Validate that the code executes and creates the expected class."""
-        # exec_globals with basic types but let native class imports execute naturally
-        # This ensures we use the same class objects for inheritance checks
-        exec_globals: dict[str, Any] = {
-            "__builtins__": __builtins__,
-            # Provide these directly as they're used in generated code but not imported from pipelex
-            "date": date,
-            "datetime": datetime,
-            "time": time,
-            "Enum": Enum,
-            "Any": Any,
-            "Literal": Literal,
-            "Field": Field,
-            _NON_NULL_ANY_NAME: NonNullAny,
-        }
-
-        # Add all native content classes to exec_globals so they're available during validation
-        # This is needed because exec() with separate globals/locals puts imports in locals,
-        # but class annotations look in globals
-        for native_code in NativeConceptCode:
-            structure_class = native_code.structure_class
-            if structure_class:
-                exec_globals[structure_class.__name__] = structure_class
-
-        validation_code = python_code
+        # The module runs in one namespace, its globals, as a module does: the names its imports bind there are the
+        # ones its class body reads, so the class is checked against the very imports the module declares, aliased
+        # ones included. Run with separate globals and locals, the imports would land in the locals, which a class
+        # body never reads. `__name__` stays unset, so the class's `__module__` is `builtins`, which marks a
+        # generated class as importable from no module.
+        exec_namespace: dict[str, Any] = {"__builtins__": __builtins__}
 
         # If a custom base class is specified that's not a native class, get it from the registry
         if base_class_name:
@@ -452,17 +511,16 @@ class StructureGenerator:
                 if custom_base_class is None:
                     msg = f"Base class '{base_class_name}' not found in native classes or class registry"
                     raise ConceptStructureValidationError(msg)
-                exec_globals[base_class_name] = custom_base_class  # type: ignore[assignment]
+                exec_namespace[base_class_name] = custom_base_class
 
-        exec_locals: dict[str, Any] = {}
-        exec(validation_code, exec_globals, exec_locals)
+        exec(python_code, exec_namespace)
 
         # Verify the expected class was created
-        if expected_class_name not in exec_locals:
+        if expected_class_name not in exec_namespace:
             msg = f"Expected class '{expected_class_name}' not found in generated code"
             raise ConceptStructureValidationError(msg)
 
-        the_class = exec_locals[expected_class_name]
+        the_class = exec_namespace[expected_class_name]
 
         # Verify it's actually a class
         if not isinstance(the_class, type):

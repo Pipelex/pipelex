@@ -939,3 +939,81 @@ inputs = { doc = "Text" }
 output = "Text"
 steps = [{ pipe = "github.com/org/pkg->remote.process", result = "result" }]
 """
+
+
+class ShadowingFieldNamesTestData:
+    """Bundles whose concept structures name a field like a name the generated structure class relies on."""
+
+    # The bundle that got an internal error from the hosted `/v1/validate`: a field named `date`, typed `date`, whose
+    # generated class annotated the field with its own `FieldInfo`.
+    DATE_FIELD_DOMAIN: ClassVar[str] = "repro_date_field"
+    DATE_FIELD_CLASS_NAME: ClassVar[str] = "repro_date_field__Day"
+    DATE_FIELD_MTHDS: ClassVar[str] = """
+domain = "repro_date_field"
+main_pipe = "read_day"
+
+[concept.Day]
+description = "A day"
+
+[concept.Day.structure]
+date = { type = "date", description = "The day", required = true }
+
+[pipe.read_day]
+type = "PipeLLM"
+description = "Read a day"
+inputs = { text = "Text" }
+output = "Day"
+prompt = "Read the day from: $text"
+"""
+
+    # A concept whose fields shadow several names its class body reads: builtins, `Field`, `datetime`, a native class.
+    SEVERAL_NAMES_MTHDS: ClassVar[str] = """
+domain = "shadowing_names"
+main_pipe = "read_entry"
+
+[concept.Entry]
+description = "A journal entry"
+
+[concept.Entry.structure]
+str = { type = "text", description = "The entry's title", required = true }
+Field = { type = "text", description = "The field of the entry", required = true }
+datetime = { type = "datetime", description = "When it was written", required = true }
+TextContent = { type = "concept", concept_ref = "native.Text", description = "The entry's body", required = true }
+note = { type = "text", description = "A note on the entry" }
+
+[pipe.read_entry]
+type = "PipeLLM"
+description = "Read a journal entry"
+inputs = { text = "Text" }
+output = "Entry"
+prompt = "Read the journal entry from: $text"
+"""
+
+    # A field named like the Python class of the concept a field of the structure refers to, which is refused.
+    FORWARD_REF_FIELD_MTHDS: ClassVar[str] = """
+domain = "shadowing_refs"
+main_pipe = "read_visit"
+
+[concept.Person]
+description = "A person"
+
+[concept.Person.structure]
+name = { type = "text", description = "The person's name", required = true }
+
+[concept.Visit]
+description = "A visit"
+
+[concept.Visit.structure]
+shadowing_refs__Person = { type = "concept", concept_ref = "Person", description = "Who came", required = true }
+
+[pipe.read_visit]
+type = "PipeLLM"
+description = "Read a visit"
+inputs = { text = "Text" }
+output = "Visit"
+prompt = "Read the visit from: $text"
+"""
+    FORWARD_REF_FIELD_CONCEPT: ClassVar[str] = "shadowing_refs.Visit"
+    FORWARD_REF_FIELD_FINDING: ClassVar[str] = (
+        "its field 'shadowing_refs__Person' has the name of the Python class of the concept 'shadowing_refs.Person', which the structure refers to"
+    )
