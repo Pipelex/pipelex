@@ -8,6 +8,11 @@
 - **`pipelex login` names the key's organization**: the line saying where the key was saved names the organization it acts for, where its runs are billed, by name and id as `GET /v1/me` states them, or by id alone when the platform holds no name; a hosted API that states no organization leaves it out and never stops the login, and a control character it sends is shown as `�`. `ApiKeyCheck` carries it as `organization`, a `KeyOrganization`.
 - **`get_dotenv_source`**: `pipelex.system.environment.get_dotenv_source(env_var=…)` names the `.env` file, the home one or the working directory's, whose value of a variable replaced the one the process was started with when pipelex was first imported, or `None` when the variable still holds what the process was handed, so a caller that must use exactly the key it was given can tell when a saved one replaced it.
 
+### Changed
+
+- **Pillow and Docling floors (Breaking)**: pipelex now requires `pillow>=13.0.0`, and its `docling` extra requires `docling>=2.142.0`, the first Docling release whose own dependencies allow Pillow 13. An environment that pins Docling below 2.142.0, or that holds a package capping Pillow below 13, such as the current `gradio`, no longer resolves beside pipelex.
+- **Docling's extracted text**: the `docling` extra now requires Docling 2.142.0 or later, so an environment that moves up to a newer Docling with this release may see the text `docling-extract-text` extracts differ slightly: Docling 2.148, which the repository's own lock now holds, renders list bullets and markers as `·` where 2.137 gave `•` and changes some spacing in OCR'd scans.
+
 ### Fixed
 
 - **`PipeSearch` source titles read as plain text**: a `SearchResult` source's `title` has the complete HTML character references Linkup sent, those ending in `;`, decoded once, so it holds `Requirements & SAP Integration` where it held `Requirements &amp; SAP Integration`, and a no-break space becomes an ordinary space. Text that only resembles a reference, such as `R&D &copy editing`, is kept as written, and so is the source's `snippet`.
@@ -19,7 +24,8 @@
 
 ### Security
 
-- **`uv.lock` and the `dev` extra moved past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` image installs from now holds patched `certifi`, `msgpack`, `pyasn1`, `black` and the `opentelemetry` family at 1.45.2, a development checkout also gets a patched `setuptools` through the `docling` extra, and the `dev` extra pins `pylint==4.0.10` where it pinned 4.0.4. No runtime requirement of the `pipelex` wheel moved, so an application installing it picks these releases up through its own resolution.
+- **`uv.lock` and the `dev` extra moved past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` image installs from now holds patched `certifi`, `msgpack`, `pyasn1`, `black` and the `opentelemetry` family at 1.45.2, a development checkout also gets a patched `setuptools` through the `docling` extra, and the `dev` extra pins `pylint==4.0.10` where it pinned 4.0.4. Of the `pipelex` wheel's runtime requirements only the Pillow and Docling floors moved, so an application installing it picks these other releases up through its own resolution.
+- **Pillow 13.0.0**: pipelex now requires Pillow 13.0.0, and the lock the `pipelex/pipelex-api` image installs from holds it, which fixes the critical advisories in Pillow's image decoding, among them heap buffer overflows in JPEG and FlashPix decoding and stale native storage reused by multi-frame loaders, that `PipeDocGen`'s built-in PDF engine reached when it decoded an image a document names.
 
 ## [v0.95.1] - 2026-10-30
 
