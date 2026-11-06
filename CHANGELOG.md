@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.96.0] - 2026-11-06
+
+### Highlights
+
+**pipelex moves to Pillow 13, past the critical advisories in Pillow's image decoding.** The Pillow floor and the `docling` extra's floor rise with it, and the lock the `pipelex/pipelex-api` image installs from moves past the open Dependabot alerts. `pipelex login` can also name its key with `--label`, names the organization the key acts for, and saves the base URL it checked the key against.
 
 ### Added
 
