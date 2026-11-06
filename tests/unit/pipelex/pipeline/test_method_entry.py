@@ -8,7 +8,7 @@ from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pipelex.errors.problem import ProblemView
 from pipelex.mthds_parsing.exceptions import MthdsParserError
 from pipelex.pipeline.exceptions import MethodEntryError
-from pipelex.pipeline.method_entry import read_method_candidates, select_method_entry, select_named_pipe
+from pipelex.pipeline.method_entry import read_method_candidates, read_method_manifest, select_method_entry, select_named_pipe
 from pipelex.validation_error_types import PipeValidationErrorType
 
 
@@ -25,14 +25,15 @@ prompt      = "Summarize $text"
 """
 
 
-def _manifest(*, main_pipe: str | None, exports: dict[str, list[str]]) -> str:
+def _manifest(*, main_pipe: str | None, exports: dict[str, list[str]], categories: list[str] | None = None) -> str:
     main_pipe_line = f'main_pipe = "{main_pipe}"\n' if main_pipe else ""
+    categories_line = f"categories = {categories!r}\n".replace("'", '"') if categories is not None else ""
     exports_text = "".join(f"\n[exports.{domain}]\npipes = {pipes!r}\n".replace("'", '"') for domain, pipes in exports.items())
     return f"""[package]
 address = "github.com/pipelex-tests/entry"
 version = "1.0.0"
 description = "A method whose entry is selected"
-{main_pipe_line}{exports_text}"""
+{main_pipe_line}{categories_line}{exports_text}"""
 
 
 def _write(*, directory: Path, files: dict[str, str]) -> Path:
@@ -160,6 +161,41 @@ class TestMethodEntry:
         assert problem.domain != ProblemDomain.OPERATOR
         # The refusal gives every parameter its code requires: the pipes to choose from, the missing one, the ambiguous one.
         assert problem.to_wire().get("params") == expected_params
+
+    def test_a_manifest_declaring_categories_names_the_entry(self, tmp_path: Path) -> None:
+        """A catalog's categories are the manifest's to declare: the method starts where it says, the values read as written."""
+        _write(
+            directory=tmp_path,
+            files={
+                "METHODS.toml": _manifest(main_pipe="extract", exports={"entry_steps": ["extract"]}, categories=["human-resources", "general"]),
+                "steps/extract.mthds": _bundle(domain="entry_steps", pipe_code="extract", main_pipe=None),
+            },
+        )
+        tree = list_method_tree(tmp_path)
+
+        entry = select_method_entry(tree=tree)
+        manifest = read_method_manifest(tree=tree)
+
+        assert entry.pipe_ref == "entry_steps.extract"
+        assert entry.tree_path == "steps/extract.mthds"
+        assert manifest is not None
+        assert manifest.categories == ["human-resources", "general"]
+
+    def test_a_category_breaking_the_standards_pattern_is_an_entry_refusal(self, tmp_path: Path) -> None:
+        """The standard's pattern is the one rule a declared category answers to, and the refusal is the method's own to read."""
+        _write(
+            directory=tmp_path,
+            files={
+                "METHODS.toml": _manifest(main_pipe="extract", exports={"entry_steps": ["extract"]}, categories=["Human Resources"]),
+                "steps/extract.mthds": _bundle(domain="entry_steps", pipe_code="extract", main_pipe=None),
+            },
+        )
+
+        with pytest.raises(MethodEntryError, match=r"The METHODS\.toml of the method at .* cannot be read") as exc_info:
+            select_method_entry(tree=list_method_tree(tmp_path))
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.METHOD_PACKAGE_INVALID
 
     def test_a_manifest_that_does_not_validate_is_an_entry_refusal(self, tmp_path: Path) -> None:
         """A manifest the lister can read but the standard refuses, here one with no address, gives no entry."""

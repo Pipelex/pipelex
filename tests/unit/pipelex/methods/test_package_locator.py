@@ -15,13 +15,17 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 
-def _write_manifest(package_dir: Path, *, address: str, name: str | None = None, main_pipe: str | None = None) -> None:
+def _write_manifest(
+    package_dir: Path, *, address: str, name: str | None = None, main_pipe: str | None = None, categories: list[str] | None = None
+) -> None:
     package_dir.mkdir(parents=True, exist_ok=True)
     lines = ["[package]", f'address = "{address}"', 'version = "0.1.0"', 'description = "A test package."']
     if name is not None:
         lines.insert(1, f'name = "{name}"')
     if main_pipe is not None:
         lines.append(f'main_pipe = "{main_pipe}"')
+    if categories is not None:
+        lines.append(f"categories = {categories!r}".replace("'", '"'))
     (package_dir / "METHODS.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
     (package_dir / "core.mthds").write_text("# placeholder", encoding="utf-8")
 
@@ -137,6 +141,24 @@ class TestPackageLocator:
 
         with pytest.raises(MethodPackageNotFoundError, match=re.escape("broken/METHODS.toml")):
             locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/acme/broken")
+
+    def test_a_manifest_declaring_categories_is_located_rather_than_skipped(self, tmp_path: Path) -> None:
+        """The scan skips a manifest it cannot parse, so a refused key would read as a package the repository does not hold."""
+        _write_manifest(tmp_path, address="github.com/acme/legal-tools", categories=["legal", "general"])
+
+        scan = scan_packages_in_clone(clone_root=tmp_path)
+        located = locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/acme/legal-tools")
+
+        assert scan.skipped_manifests == []
+        assert located.package_dir == tmp_path
+        assert located.manifest.categories == ["legal", "general"]
+
+    def test_a_category_breaking_the_standards_pattern_is_reported_on_miss(self, tmp_path: Path) -> None:
+        """A manifest the standard refuses for an ill-formed category is skipped, and named when the location misses."""
+        _write_manifest(tmp_path / "broken", address="github.com/acme/broken", name="broken", categories=["Not A Slug"])
+
+        with pytest.raises(MethodPackageNotFoundError, match=re.escape("broken/METHODS.toml")):
+            locate_package_in_clone(clone_root=tmp_path, requested_address="github.com/acme/broken/broken")
 
     def test_scan_skips_git_directory(self, tmp_path: Path) -> None:
         """Manifests under .git/ are not candidates."""

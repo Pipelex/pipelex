@@ -50,6 +50,7 @@ pipes = ["compute_weighted_score"]
 | `license` | No | License string such as `MIT` |
 | `main_pipe` | No | Optional main pipe code |
 | `mthds_version` | No | Required MTHDS version constraint |
+| `categories` | No | The categories a catalog can offer the method under, like tags, as lowercase slugs such as `human-resources`. An entry that does not match `^[a-z0-9]+(-[a-z0-9]+)*$` refuses the manifest, while a value no catalog knows never does |
 
 ## Exports and Visibility
 

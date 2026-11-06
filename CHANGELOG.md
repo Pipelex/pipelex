@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`categories` in a `METHODS.toml`**: a method whose manifest declares the optional `categories` key of `[package]` now loads, validates and runs, on the command line and on the API server, where the manifest used to be refused for an unknown key. An entry that does not match `^[a-z0-9]+(-[a-z0-9]+)*$` refuses the manifest as `method.package_invalid`, while a repeated entry or a value no catalog knows never does.
+
+### Changed
+
+- **`mthds` and `pipelex-sdk` versions, MTHDS standard 8.1.0 (Breaking)**: the pins move to `mthds==0.27.0`, the release following the MTHDS standard's `v8.1.0`, and `pipelex-sdk==0.60.0`, the release built on it, whose removal of `list_method_copies`, `MethodCopyPage` and `MethodCopyMarker` reaches anyone importing `pipelex_sdk` beside pipelex. A crate pipelex normalizes is stamped `mthds_version` `8.1.0`, and a `METHODS.toml` declaring an exact `8.0.1` or a `~8.0.0` now warns that the engine does not satisfy it; the core error codes did not change and `protocol_version` stays `2.0.1`. Everyone downstream inherits those exact versions.
+
 ## [v0.96.0] - 2026-11-06
 
 ### Highlights
