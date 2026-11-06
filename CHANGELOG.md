@@ -11,7 +11,7 @@
 ### Changed
 
 - **Pillow and Docling floors (Breaking)**: pipelex now requires `pillow>=13.0.0`, and its `docling` extra requires `docling>=2.142.0`, the first Docling release whose own dependencies allow Pillow 13. An environment that pins Docling below 2.142.0, or that holds a package capping Pillow below 13, such as the current `gradio`, no longer resolves beside pipelex.
-- **Docling's extracted text**: the `docling` extra now installs Docling 2.148, so the text `docling-extract-text` extracts may differ slightly from earlier releases, in list bullets and markers (`·` where it gave `•`) and in some spacing of OCR'd scans.
+- **Docling's extracted text**: the `docling` extra now requires Docling 2.142.0 or later, so an environment that moves up to a newer Docling with this release may see the text `docling-extract-text` extracts differ slightly: Docling 2.148, which the repository's own lock now holds, renders list bullets and markers as `·` where 2.137 gave `•` and changes some spacing in OCR'd scans.
 
 ### Fixed
 
