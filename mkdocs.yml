@@ -771,6 +771,7 @@ plugins:
         - contribute/generate-projection-corpus.md: "Projection Fixture Corpus"
         - contribute/typescript-emission-gates.md: "TypeScript Emission Gates"
         - contribute/api-server.md: "The API Server"
+        - contribute/hosted-end-to-end-tests.md: "Hosted End-to-End Tests"
         - migration-ledger.md: "Migration Ledger"
         - changelog.md: "Changelog"
         API Server:
@@ -1024,6 +1025,7 @@ nav:
     - Projection Fixture Corpus: contribute/generate-projection-corpus.md
     - TypeScript Emission Gates: contribute/typescript-emission-gates.md
     - The API Server: contribute/api-server.md
+    - Hosted End-to-End Tests: contribute/hosted-end-to-end-tests.md
     - Migration Ledger: migration-ledger.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md

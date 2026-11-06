@@ -263,14 +263,27 @@ def login_command(
             help="Paste a key created in the Pipelex app instead of opening a browser (for a remote machine or CI)",
         ),
     ] = False,
+    label: Annotated[
+        str | None,
+        typer.Option(
+            "--label",
+            help=(
+                "Name the key: the app replaces your key of that label in your active organization, or creates one with it "
+                "when you hold none, instead of adding a key labelled 'Pipelex CLI' (1 to 64 characters, no control characters; "
+                "not with --paste)"
+            ),
+            show_default=False,
+        ),
+    ] = None,
 ) -> None:
     """Get a Pipelex API key and save it to the .env in the home configuration directory (~/.pipelex/.env, or PIPELEX_HOME) as PIPELEX_API_KEY.
 
-    Opens the Pipelex app in your browser, which hands a new key back to this command on a local port. The key is checked
-    with the hosted API before it is saved, and never printed. PIPELEX_APP_URL aims the command at another Pipelex app,
-    PIPELEX_BASE_URL at another hosted API.
+    Opens the Pipelex app in your browser, which hands a new key back to this command on a local port once you confirm
+    it there. The key is checked with the hosted API before it is saved, and never printed; the command names the
+    organization the key acts for. PIPELEX_APP_URL aims the command at another Pipelex app, PIPELEX_BASE_URL at another
+    hosted API.
     """
-    login_cmd(paste=paste)
+    login_cmd(paste=paste, label=label)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")

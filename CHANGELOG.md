@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.96.0] - 2026-11-06
+
+### Highlights
+
+**pipelex moves to Pillow 13, past the critical advisories in Pillow's image decoding.** The Pillow floor and the `docling` extra's floor rise with it, and the lock the `pipelex/pipelex-api` image installs from moves past the open Dependabot alerts. `pipelex login` can also name its key with `--label`, names the organization the key acts for, and saves the base URL it checked the key against.
+
+### Added
+
+- **`pipelex login --label <name>`**: a browser login can name its key, and the Pipelex app then replaces your key of that label in your active organization, the old key stopping working, or creates one of that label when you hold none, so repeated logins under one label keep one key where each login added a `Pipelex CLI` key. A label is trimmed, then 1 to 64 characters, with no control character and not starting with `plx_sk_`, and any other is refused before the browser opens; `--paste` takes no `--label`, and the command a failed login says to run again names the label.
+- **`pipelex login` names the key's organization**: the line saying where the key was saved names the organization it acts for, where its runs are billed, by name and id as `GET /v1/me` states them, or by id alone when the platform holds no name; a hosted API that states no organization leaves it out and never stops the login, and a control character it sends is shown as `�`. `ApiKeyCheck` carries it as `organization`, a `KeyOrganization`.
+- **`get_dotenv_source`**: `pipelex.system.environment.get_dotenv_source(env_var=…)` names the `.env` file, the home one or the working directory's, whose value of a variable replaced the one the process was started with when pipelex was first imported, or `None` when the variable still holds what the process was handed, so a caller that must use exactly the key it was given can tell when a saved one replaced it.
+
+### Changed
+
+- **Pillow and Docling floors (Breaking)**: pipelex now requires `pillow>=13.0.0`, and its `docling` extra requires `docling>=2.142.0`, the first Docling release whose own dependencies allow Pillow 13. An environment that pins Docling below 2.142.0, or that holds a package capping Pillow below 13, such as the current `gradio`, no longer resolves beside pipelex.
+- **Docling's extracted text**: the `docling` extra now requires Docling 2.142.0 or later, so an environment that moves up to a newer Docling with this release may see the text `docling-extract-text` extracts differ slightly: Docling 2.148, which the repository's own lock now holds, renders list bullets and markers as `·` where 2.137 gave `•` and changes some spacing in OCR'd scans.
+
+### Fixed
+
+- **`PipeSearch` source titles read as plain text**: a `SearchResult` source's `title` has the complete HTML character references Linkup sent, those ending in `;`, decoded once, so it holds `Requirements & SAP Integration` where it held `Requirements &amp; SAP Integration`, and a no-break space becomes an ordinary space. Text that only resembles a reference, such as `R&D &copy editing`, is kept as written, and so is the source's `snippet`.
+- **`pipelex login` saves the base URL its key was checked against**: when the key was checked against another API than the one `~/.pipelex/.env` names on its own, its `PIPELEX_BASE_URL` or else `https://api.pipelex.com`, the login writes that `PIPELEX_BASE_URL` beside the key in the same write and says so, where it saved the key alone, so a command started without the login shell's `PIPELEX_BASE_URL` sent a development key to `https://api.pipelex.com` and was refused. A refusal now names the `.env` file that set the base URL it was checked against, when one did.
+- **`pipelex login` says to revoke a browser key it did not save**: when the hosted API refuses the key the browser login just received, the command says it went unused and to revoke it on the Developer page of the Pipelex app, as it already did when the key could not be written, and a pasted key it could not save is no longer called unused. The browser page the key is handed back on is titled "Key received" where it read "Logged in", since the key is checked and saved after it.
+- **The `text_stats` examples run again**: the examples of `pipelex run method --help`, `pipelex-agent run method --help` and the hosted-run docs name `github.com/Pipelex/methods/text_stats@v0.2.0`, whose `PipeFunc` names its function by import path, instead of `@v0.1.7`, whose flat function name the language now refuses with `method.schema_violation`.
+- **A structure field may be named like a type**: a concept whose structure names a field like a name read by the structure class the runtime builds for the concept, such as `date = { type = "date", ... }`, `str`, `list`, `Field` or `TextContent`, now validates and runs, that class importing each such name under an alias, where the field hid that name and validation refused the bundle with a `method.concept_invalid` error that named no concept. A field named like the Python class of a concept the structure refers to, `<domain>__<Concept>`, is refused, and that refusal, like any other failure to build a concept's structure class, is an invalid verdict whose `method.concept_invalid` item names the concept and the cause in its `concept` and `finding`. `pipelex codegen` does not alias these names yet, so the Python types its `python-structures` and `python-pydantic` targets write for a structure with a field named like a type still fail at import.
+- **`PipeSearch` lists each source once**: a `SearchResult`'s `sources` keep the first entry for each page, with its original address, and drop the entries the search provider repeated, two addresses naming one page when they match with `http` and `https` counted as one scheme, the host lowercased without one leading `www.`, no fragment, and no trailing `/` on a path other than `/`, the query kept as it is. An inline citation in the answer, such as `[5]`, is renumbered to the position its source holds in the shortened list, so it still points at the source it named, while numbers inside code spans and code blocks as CommonMark reads them, in block quotes and lists too, and a number that names no source, are left as written.
+
+### Security
+
+- **`uv.lock` and the `dev` extra moved past the open Dependabot alerts**: the lock the `pipelex/pipelex-api` image installs from now holds patched `certifi`, `msgpack`, `pyasn1`, `black` and the `opentelemetry` family at 1.45.2, a development checkout also gets a patched `setuptools` through the `docling` extra, and the `dev` extra pins `pylint==4.0.10` where it pinned 4.0.4. Of the `pipelex` wheel's runtime requirements only the Pillow and Docling floors moved, so an application installing it picks these other releases up through its own resolution.
+- **Pillow 13.0.0**: pipelex now requires Pillow 13.0.0, and the lock the `pipelex/pipelex-api` image installs from holds it, which fixes the critical advisories in Pillow's image decoding, among them heap buffer overflows in JPEG and FlashPix decoding and stale native storage reused by multi-frame loaders, that `PipeDocGen`'s built-in PDF engine reached when it decoded an image a document names.
+
 ## [v0.95.1] - 2026-10-30
 
 ### Fixed

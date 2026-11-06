@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 
 from pipelex import log
 from pipelex.system.exceptions import EnvVarNotFoundError
@@ -34,7 +34,7 @@ def get_pipelex_home_dir() -> Path:
     return Path(configured_home).expanduser().resolve()
 
 
-def _load_dotenv_files() -> None:
+def _load_dotenv_files() -> dict[str, Path]:
     """Load the home `.env`, then the project's `.env` from the working directory, which wins.
 
     `PIPELEX_HOME` is read from the process environment only. The home `.env` is found through it,
@@ -42,24 +42,57 @@ def _load_dotenv_files() -> None:
     its credentials from another: whatever either file says about it is discarded. A relative value
     is pinned to the absolute path it resolves to at import, so that a later change of directory, or
     a subprocess started from elsewhere, finds the same home directory as this load did.
+
+    Returns:
+        Each variable whose value now differs from the one the process was started with, a variable
+        it did not hold included, mapped to the file that set the value it holds: the last of the two
+        to name it. No value is kept.
     """
     configured_home = os.environ.get(PIPELEX_HOME_ENV_KEY)
     home_dir = get_pipelex_home_dir()
     if configured_home and not Path(configured_home).is_absolute():
         configured_home = str(home_dir)
 
-    home_env_path = home_dir / ".env"
-    if home_env_path.is_file():
-        load_dotenv(dotenv_path=str(home_env_path), override=True)
-    load_dotenv(dotenv_path=".env", override=True)
+    process_environment = dict(os.environ)
+    setters: dict[str, Path] = {}
+    for env_path in (home_dir / ".env", Path(".env")):
+        if not env_path.is_file():
+            continue
+        # `load_dotenv` sets every variable the file gives a value, so these are the ones it sets, but for `PIPELEX_HOME`,
+        # whose process value is restored below: a relative one comes back absolute, which no file set.
+        setters.update(
+            {key: env_path.resolve() for key, value in dotenv_values(env_path).items() if value is not None and key != PIPELEX_HOME_ENV_KEY}
+        )
+        load_dotenv(dotenv_path=str(env_path), override=True)
 
     if configured_home is None:
         os.environ.pop(PIPELEX_HOME_ENV_KEY, None)
     else:
         os.environ[PIPELEX_HOME_ENV_KEY] = configured_home
 
+    return {key: env_path for key, env_path in setters.items() if os.environ.get(key) != process_environment.get(key)}
 
-_load_dotenv_files()
+
+# Each variable a `.env` file changed when this module was first imported, with the file that set it (`get_dotenv_source`).
+_DOTENV_SOURCES = _load_dotenv_files()
+
+
+def get_dotenv_source(*, env_var: str) -> Path | None:
+    """The `.env` file whose value of `env_var` replaced the process environment's when pipelex was first imported.
+
+    The runtime loads the home `.env` and then the working directory's over the environment it was started with,
+    so a key saved in either wins over the one a caller exported. A caller that must use exactly what it was handed,
+    a test acting as a given account above all, asks here whether that happened.
+
+    Args:
+        env_var: The variable's name.
+
+    Returns:
+        The absolute path of the file that set the variable's current value, when a `.env` set it to a value the
+        process environment did not hold, as when the process did not hold the variable at all; `None` when the
+        variable holds what the process was started with. A later change to the environment is not tracked.
+    """
+    return _DOTENV_SOURCES.get(env_var)
 
 
 def get_required_env(key: str) -> str:

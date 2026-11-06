@@ -53,7 +53,7 @@ The fetched clone is temporary: it lives in a system temp directory and is delet
 With `--hosted` (or `[run] execution = "hosted"`), `pipelex run method <ref>` fetches nothing: the address goes to the hosted Pipelex API as a method reference, and the hosted runner locates and fetches the package itself, under the same grammar and the same manifest-identity rule. The entry pipe is still the manifest's `main_pipe` unless `--pipe` names another, outputs still land in `./results/` under your working directory, and a relative `--inputs` path resolves against the working directory, since there is no local clone to anchor it to. `-L` is refused, because the hosted API loads no local library alongside an address. See [Running on the Hosted API](run.md#running-on-the-hosted-api).
 
 ```bash
-pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello world."}'
 ```
 
 ## Python in fetched methods: the hosted rule

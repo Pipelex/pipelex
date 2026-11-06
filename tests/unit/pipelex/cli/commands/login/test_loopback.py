@@ -23,6 +23,17 @@ def _get(*, port: int, path: str) -> int:
         connection.close()
 
 
+def _get_page(*, port: int, path: str) -> tuple[int, str]:
+    """Send one GET to the listener and return the status and the page it answered."""
+    connection = http.client.HTTPConnection(LOOPBACK_HOST, port, timeout=5)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        return response.status, response.read().decode("utf-8")
+    finally:
+        connection.close()
+
+
 def _callback_path(*, api_key: str | None, state: str | None) -> str:
     params = {name: value for name, value in (("api_key", api_key), ("state", state)) if value is not None}
     return f"{CALLBACK_PATH}?{urlencode(params)}"
@@ -64,6 +75,25 @@ class TestLoopbackListener:
 
         assert api_key == TEST_KEY
         assert browser.statuses == [200]
+
+    def test_the_page_a_handed_over_key_gets_says_it_was_received_not_that_the_login_worked(self) -> None:
+        """The key is checked and saved after the page is served, so a key the hosted API refuses must not leave the browser saying "Logged in"."""
+        pages: list[tuple[int, str]] = []
+        with LoopbackListener() as listener:
+            path = _callback_path(api_key=TEST_KEY, state=listener.state)
+            thread = threading.Thread(target=lambda: pages.append(_get_page(port=listener.port, path=path)), daemon=True)
+            thread.start()
+            api_key = listener.wait_for_api_key(timeout_seconds=10)
+            thread.join(timeout=10)
+
+        assert api_key == TEST_KEY
+        assert len(pages) == 1
+        status, page = pages[0]
+        assert status == 200
+        assert "<h1>Key received</h1>" in page
+        assert "Logged in" not in page
+        assert "terminal" in page
+        assert TEST_KEY not in page
 
     @pytest.mark.parametrize("state", ["not-the-state", None, ""])
     def test_a_callback_with_a_wrong_or_missing_state_is_refused_and_the_wait_goes_on(self, state: str | None) -> None:

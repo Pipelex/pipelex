@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit
 from pipelex.cli.commands.init.credentials import read_env_file_value
 from pipelex.cli.commands.login.loopback import CALLBACK_PATH, LOOPBACK_HOST
 from pipelex.hosted.api_key_check import ApiKeyCheck, ApiKeyVerdict
-from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
+from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -69,3 +69,8 @@ def patch_check(mocker: MockerFixture, *, check: ApiKeyCheck) -> MockType:
 def saved_key(*, home: Path) -> str | None:
     """The key saved in a home configuration directory's `.env`."""
     return read_env_file_value(env_path=home / ".env", key=PIPELEX_API_KEY_ENV_KEY)
+
+
+def saved_base_url(*, home: Path) -> str | None:
+    """The base URL saved in a home configuration directory's `.env`."""
+    return read_env_file_value(env_path=home / ".env", key=PIPELEX_BASE_URL_ENV_KEY)

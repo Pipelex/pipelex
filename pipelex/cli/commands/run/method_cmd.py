@@ -144,7 +144,7 @@ def run_method_cmd(
         pipelex run method my-method --inputs data.json
         pipelex run method my-method --dry-run
         pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
-        pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello"}'
+        pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello"}'
         pipelex run method mt_abc123 --hosted --inputs data.json
     """
     validate_run_flag_combination(dry_run=dry_run, mock_usage=mock_usage, mock_inputs=mock_inputs)

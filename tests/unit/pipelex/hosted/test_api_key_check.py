@@ -10,7 +10,7 @@ import pytest
 from pipelex_sdk.client import PipelexAPIClient
 from typing_extensions import override
 
-from pipelex.hosted.api_key_check import ApiKeyVerdict, check_pipelex_api_key, is_well_formed_pipelex_api_key
+from pipelex.hosted.api_key_check import ApiKeyVerdict, KeyOrganization, check_pipelex_api_key, is_well_formed_pipelex_api_key
 from pipelex.hosted.client_factory import PIPELEX_BASE_URL_ENV_KEY
 from tests.helpers.pipelex_api_key_env import isolate_pipelex_api_key
 
@@ -103,6 +103,46 @@ class TestApiKeyCheck:
         assert check.base_url == API_URL
         assert [request.url.path for request in requests.received] == ["/v1/me"]
         assert requests.received[0].headers["Authorization"] == f"Bearer {TEST_KEY}"
+
+    @pytest.mark.parametrize(
+        ("organization", "expected"),
+        [
+            (
+                {"org_id": "org_01ANALYTICAL", "name": "Analytical Engines", "role_in_org": "member"},
+                KeyOrganization(org_id="org_01ANALYTICAL", name="Analytical Engines"),
+            ),
+            ({"org_id": "org_01SETTINGUP", "name": None, "role_in_org": "admin"}, KeyOrganization(org_id="org_01SETTINGUP", name=None)),
+            ({"org_id": "org_01NONAME"}, KeyOrganization(org_id="org_01NONAME", name=None)),
+            (None, None),
+            # Not the contract's shape: read as unsaid, never as a reason to refuse the key or leave it unchecked.
+            ("org_01ANALYTICAL", None),
+            ({"name": "Analytical Engines"}, None),
+            ({"org_id": "", "name": "Analytical Engines"}, None),
+            ({"org_id": 42, "name": "Analytical Engines"}, None),
+        ],
+    )
+    def test_an_accepted_key_names_the_organization_it_acts_for_when_stated(
+        self,
+        mocker: MockerFixture,
+        organization: object,
+        expected: KeyOrganization | None,
+    ) -> None:
+        body = {**PROFILE, "organization": organization, "api_key": None}
+        _patch_client(mocker, handler=lambda request: httpx.Response(200, json=body, request=request))
+
+        check = check_pipelex_api_key(api_key=TEST_KEY)
+
+        assert check.verdict == ApiKeyVerdict.ACCEPTED
+        assert check.account_email == "ada@example.com"
+        assert check.organization == expected
+
+    def test_a_platform_that_predates_the_organization_member_names_none(self, mocker: MockerFixture) -> None:
+        _patch_client(mocker, handler=lambda request: httpx.Response(200, json=PROFILE, request=request))
+
+        check = check_pipelex_api_key(api_key=TEST_KEY)
+
+        assert check.verdict == ApiKeyVerdict.ACCEPTED
+        assert check.organization is None
 
     @pytest.mark.parametrize("status", [401, 403])
     def test_a_401_or_a_403_refuses_the_key(self, mocker: MockerFixture, status: int) -> None:

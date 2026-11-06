@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from pipelex.cli.commands.init.credentials import set_env_file_entry
+from pipelex.cli.commands.init.credentials import set_env_file_entries
 from pipelex.cli.commands.init.setup_path import ensure_pipelex_api_key
 from pipelex.cli.commands.login.command import LoginOutcome
 from pipelex.hosted.client_factory import PIPELEX_API_KEY_ENV_KEY
@@ -37,7 +37,7 @@ class TestEnsurePipelexApiKey:
     def test_a_working_directory_env_that_shadows_the_saved_key_is_named(
         self, mocker: MockerFixture, pipelex_home: Path, monkeypatch: pytest.MonkeyPatch, recorded_console: RecordedConsole
     ) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
         Path(".env").write_text(f"{PIPELEX_API_KEY_ENV_KEY}=plx_sk_project\n", encoding="utf-8")
         monkeypatch.setenv(PIPELEX_API_KEY_ENV_KEY, "plx_sk_project")
         login = mocker.patch("pipelex.cli.commands.init.setup_path.login_with_browser")
@@ -52,7 +52,7 @@ class TestEnsurePipelexApiKey:
         assert "plx_sk_saved" not in printed
 
     def test_a_saved_key_skips_the_login(self, mocker: MockerFixture, pipelex_home: Path, recorded_console: RecordedConsole) -> None:
-        set_env_file_entry(env_path=pipelex_home / ".env", key=PIPELEX_API_KEY_ENV_KEY, value="plx_sk_saved")
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_API_KEY_ENV_KEY: "plx_sk_saved"})
         login = mocker.patch("pipelex.cli.commands.init.setup_path.login_with_browser")
 
         ensure_pipelex_api_key(console=recorded_console.console, interactive=True)

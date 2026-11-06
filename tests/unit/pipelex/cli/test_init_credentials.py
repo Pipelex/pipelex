@@ -6,12 +6,16 @@ import os
 import stat
 from typing import TYPE_CHECKING
 
+import pytest
 from rich.console import Console
 
+from pipelex.cli.commands.init import credentials
 from pipelex.cli.commands.init.credentials import (
     get_required_vars_for_enabled_backends,
+    is_unquoted_env_value,
     prompt_credentials,
     read_env_file,
+    set_env_file_entries,
     write_env_file,
 )
 
@@ -245,3 +249,38 @@ class TestInitCredentials:
         mock_console: MockType = mocker.MagicMock()
         prompt_credentials(console=mock_console, backends_toml_path=backends_toml)
         mock_prompt.assert_not_called()
+
+    def test_set_env_file_entries_writes_every_entry_in_one_rewrite(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Each assignment is replaced where it stands, a missing one is appended after a last line without its newline, every other line is kept."""
+        env_path = tmp_path / ".env"
+        env_path.write_text("# mine\nFIRST=old\nOTHER='kept as written'\nexport FIRST=older\nLAST=1", encoding="utf-8")
+        env_path.chmod(0o644)
+        rewrite = mocker.spy(credentials, "rewrite")
+
+        set_env_file_entries(env_path=env_path, entries={"FIRST": "new", "SECOND": "added"})
+
+        rewrite.assert_called_once()
+        assert env_path.read_text(encoding="utf-8").splitlines() == [
+            "# mine",
+            "FIRST=new",
+            "OTHER='kept as written'",
+            "FIRST=new",
+            "LAST=1",
+            "SECOND=added",
+        ]
+        assert stat.S_IMODE(env_path.stat().st_mode) == 0o600
+
+    @pytest.mark.parametrize("value", ["has space", "a#b", "it's", 'say"', "${HOME}", "back\\slash"])
+    def test_set_env_file_entries_refuses_a_value_it_cannot_write_unquoted_before_writing(self, tmp_path: Path, value: str) -> None:
+        env_path = tmp_path / ".env"
+        env_path.write_text("KEPT=1\n", encoding="utf-8")
+
+        assert is_unquoted_env_value(value=value) is False
+        with pytest.raises(ValueError, match="SECOND"):
+            set_env_file_entries(env_path=env_path, entries={"FIRST": "fine", "SECOND": value})
+
+        assert env_path.read_text(encoding="utf-8") == "KEPT=1\n"
+
+    @pytest.mark.parametrize("value", ["", "plx_sk_abc-DEF.1~_", "https://api-dev.pipelex.com", "http://[::1]:8080"])
+    def test_a_value_without_whitespace_quotes_or_markup_is_written_unquoted(self, value: str) -> None:
+        assert is_unquoted_env_value(value=value) is True

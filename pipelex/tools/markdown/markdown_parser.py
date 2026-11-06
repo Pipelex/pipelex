@@ -54,8 +54,8 @@ _TOKEN_MARKUP_UNITS: Final = 48
 _ESCAPE_FACTOR: Final = 6
 
 # markdown-it's line endings (its `normalize` rule), and nothing else: `str.splitlines` would also break at
-# characters markdown-it keeps inside a line.
-_LINE_ENDING: Final = re.compile(r"\r\n?|\n")
+# characters markdown-it keeps inside a line. A text cut at these has the lines a parsed token's `map` counts.
+LINE_ENDING: Final = re.compile(r"\r\n?|\n")
 
 # What a table's delimiter row is made of, once its container's indentation and `>` markers are left out.
 _DELIMITER_ROW_CHARACTERS: Final = frozenset("|-: \t")
@@ -211,7 +211,7 @@ def table_cells_bound(*, markdown_text: str) -> int:
     total = 0
     # Read from the bottom: the lines under the current one, down to the next blank line.
     lines_below = 0
-    for line in reversed(_LINE_ENDING.split(markdown_text)):
+    for line in reversed(LINE_ENDING.split(markdown_text)):
         if not line.strip():
             lines_below = 0
             continue

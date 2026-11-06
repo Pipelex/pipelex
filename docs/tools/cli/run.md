@@ -180,7 +180,7 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
 
 # Run a published method on the hosted Pipelex API, which resolves the address itself
-pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello world."}'
 
 # Run a method stored on the hosted platform, by its catalog id
 pipelex run method mt_abc123 --hosted --inputs data.json
@@ -196,7 +196,7 @@ Where a run executes is decided in this order:
 2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
 3. Local.
 
-The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
+The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. When the key was checked against another API than the one that file names on its own, the login saves that `PIPELEX_BASE_URL` beside the key, so the key goes to the API it belongs to from any shell. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
 
 **The `.env` files win over your shell.** Each `.env` file Pipelex loads replaces the variables it sets, so for `PIPELEX_API_KEY`, `PIPELEX_BASE_URL` or any other variable, the working directory's `.env` wins over `~/.pipelex/.env`, which wins over a value exported in your shell: an exported value is read only when neither file sets the variable. To replace the saved key, run `pipelex login` again; to use another key, or another origin, in one directory, set it in that directory's `.env`.
 

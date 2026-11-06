@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import stat
 from io import StringIO
 from typing import TYPE_CHECKING
@@ -11,9 +12,16 @@ import pytest
 import typer
 from rich.console import Console
 
+from pipelex.cli.commands.init.credentials import set_env_file_entries
 from pipelex.cli.commands.login.command import LOGIN_PASTE_COMMAND, PIPELEX_APP_URL_ENV_KEY, LoginOutcome, login_cmd, login_with_browser
 from pipelex.hosted.api_key_check import ApiKeyCheck, ApiKeyVerdict
-from tests.helpers.login_browser import ACCEPTED, API_URL, TEST_KEY, BrowserStandIn, patch_browser, patch_check, saved_key
+from pipelex.hosted.client_factory import HOSTED_API_DEFAULT_BASE_URL, PIPELEX_API_KEY_ENV_KEY, PIPELEX_BASE_URL_ENV_KEY
+from pipelex.urls import URLs
+from tests.helpers.login_browser import ACCEPTED, API_URL, TEST_KEY, BrowserStandIn, patch_browser, patch_check, saved_base_url, saved_key
+from tests.helpers.pipelex_api_key_env import isolate_pipelex_base_url
+
+DEV_APP_URL = "https://app-dev.test"
+DEV_API_URL = "https://api-dev.test"
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -59,7 +67,73 @@ class TestLoginWithBrowser:
         assert set(parse_qs(parts.query)) == {"callback_port", "state"}
         assert saved_key(home=pipelex_home) == TEST_KEY
 
-    def test_a_key_the_hosted_api_refuses_is_not_saved(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+    def test_a_label_is_passed_to_the_app_trimmed(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ACCEPTED)
+
+        login_cmd(label="  qa.dev.lab.builder ")
+        browser.join()
+
+        query = parse_qs(urlsplit(browser.opened_urls[0]).query)
+        assert set(query) == {"callback_port", "state", "label"}
+        assert query["label"] == ["qa.dev.lab.builder"]
+        assert saved_key(home=pipelex_home) == TEST_KEY
+        printed = " ".join(output.getvalue().split())
+        assert 'it replaces your key labelled "qa.dev.lab.builder" in your active organization, or creates it when you hold none' in printed
+
+    @pytest.mark.parametrize(
+        ("label", "reason"),
+        [
+            ("", "is empty once trimmed"),
+            ("   ", "is empty once trimmed"),
+            ("x" * 65, "is longer than 64 characters"),
+            ("ci\x85", "holds a control character"),
+            ("plx_sk_0123abcdef", "starts with plx_sk_"),
+        ],
+    )
+    def test_a_label_that_cannot_be_sent_opens_nothing(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, label: str, reason: str
+    ) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        check = patch_check(mocker, check=ACCEPTED)
+        listener = mocker.patch("pipelex.cli.commands.login.command.LoopbackListener")
+
+        with pytest.raises(typer.Exit) as exc_info:
+            login_cmd(label=label)
+
+        assert exc_info.value.exit_code == 1
+        assert browser.opened_urls == []
+        listener.assert_not_called()
+        check.assert_not_called()
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert f"The key label {reason}" in printed
+        assert "Nothing was opened or saved" in printed
+        assert "plx_sk_0123abcdef" not in printed
+
+    def test_a_refusal_after_a_labelled_login_names_the_label_to_run_again_with(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        """Running `pipelex login` again without the label would add a key rather than replace the labelled one."""
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=API_URL, http_status=401))
+
+        with pytest.raises(typer.Exit):
+            login_cmd(label="nightly import")
+        browser.join()
+
+        assert saved_key(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        expected = '"nightly import"' if os.name == "nt" else "'nightly import'"
+        assert f"pipelex login --label {expected} again." in printed
+
+    def test_a_key_the_hosted_api_refuses_is_not_saved_and_is_named_for_revoking(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        """The app minted the key for this login, so a refused key is a live key nobody holds: the command says to revoke it."""
         browser = BrowserStandIn(api_key=TEST_KEY)
         patch_browser(mocker, browser=browser)
         patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=API_URL, http_status=401))
@@ -70,8 +144,125 @@ class TestLoginWithBrowser:
 
         assert exc_info.value.exit_code == 1
         assert saved_key(home=pipelex_home) is None
-        assert "HTTP 401" in output.getvalue()
-        assert TEST_KEY not in output.getvalue()
+        assert (pipelex_home / ".env").exists() is False
+        # Rich wraps long lines at spaces; joining the words back reads the message as written
+        printed = " ".join(output.getvalue().split())
+        assert "HTTP 401" in printed
+        assert "Nothing was saved" in printed
+        assert f"The key this login received went unused: revoke it on the Developer page of the Pipelex app ({URLs.app})" in printed
+        assert f"the hosted API, {API_URL}, used when {PIPELEX_BASE_URL_ENV_KEY} is not set" in printed
+        assert TEST_KEY not in printed
+
+    def test_a_refusal_names_the_env_file_whose_base_url_the_key_was_checked_against(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        """A base URL saved by an earlier login wins over the shell, so the refusal says which file to change."""
+        set_env_file_entries(env_path=pipelex_home / ".env", entries={PIPELEX_BASE_URL_ENV_KEY: DEV_API_URL})
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=DEV_API_URL, http_status=401))
+
+        with pytest.raises(typer.Exit):
+            login_cmd()
+        browser.join()
+
+        printed = " ".join(output.getvalue().split())
+        assert f"the API the {PIPELEX_BASE_URL_ENV_KEY} in {pipelex_home / '.env'} names, {DEV_API_URL}" in printed
+        assert f"Pipelex app ({URLs.app})" in printed
+        assert "same deployment" in printed
+        assert saved_key(home=pipelex_home) is None
+
+    def test_a_refusal_names_the_shell_variable_when_no_env_file_sets_the_base_url(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        isolate_pipelex_base_url(monkeypatch, value=DEV_API_URL)
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.REFUSED, base_url=DEV_API_URL, http_status=403))
+
+        with pytest.raises(typer.Exit):
+            login_cmd()
+        browser.join()
+
+        printed = " ".join(output.getvalue().split())
+        assert f"the API {PIPELEX_BASE_URL_ENV_KEY} names, {DEV_API_URL}" in printed
+        assert saved_key(home=pipelex_home) is None
+
+    def test_a_checked_base_url_a_env_file_cannot_hold_is_left_out_with_a_warning(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        unquotable = "https://api dev.test"
+        isolate_pipelex_base_url(monkeypatch, value=unquotable)
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(
+            mocker,
+            check=ApiKeyCheck(verdict=ApiKeyVerdict.UNCHECKED, base_url=unquotable, reason="the hosted API could not be reached"),
+        )
+
+        login_cmd()
+        browser.join()
+
+        assert saved_key(home=pipelex_home) == TEST_KEY
+        assert saved_base_url(home=pipelex_home) is None
+        printed = " ".join(output.getvalue().split())
+        assert f"{PIPELEX_BASE_URL_ENV_KEY} could not be saved beside it" in printed
+        assert "holds whitespace, a quote, #, $ or a backslash" in printed
+        assert f"as {PIPELEX_API_KEY_ENV_KEY} anyway" in printed
+        assert TEST_KEY not in printed
+
+    def test_the_base_url_the_shell_exports_is_saved_beside_the_key(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A later process without the shell's `PIPELEX_BASE_URL` reads the file alone, so the file must pair the key with the API that checked it."""
+        monkeypatch.setenv(PIPELEX_APP_URL_ENV_KEY, DEV_APP_URL)
+        isolate_pipelex_base_url(monkeypatch, value=DEV_API_URL)
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.ACCEPTED, base_url=DEV_API_URL, account_email="ada@example.com"))
+
+        login_cmd()
+        browser.join()
+
+        assert (pipelex_home / ".env").read_text(encoding="utf-8").splitlines() == [
+            f"{PIPELEX_API_KEY_ENV_KEY}={TEST_KEY}",
+            f"{PIPELEX_BASE_URL_ENV_KEY}={DEV_API_URL}",
+        ]
+        printed = " ".join(output.getvalue().split())
+        assert f"beside {PIPELEX_BASE_URL_ENV_KEY} for {DEV_API_URL}" in printed
+        assert f"{PIPELEX_BASE_URL_ENV_KEY} is saved with the key" in printed
+        assert TEST_KEY not in printed
+
+    def test_a_key_checked_against_the_hosted_api_is_saved_alone(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ApiKeyCheck(verdict=ApiKeyVerdict.ACCEPTED, base_url=HOSTED_API_DEFAULT_BASE_URL, account_email="ada@example.com"))
+
+        login_cmd()
+        browser.join()
+
+        assert saved_key(home=pipelex_home) == TEST_KEY
+        assert saved_base_url(home=pipelex_home) is None
+        assert PIPELEX_BASE_URL_ENV_KEY not in output.getvalue()
+
+    def test_a_key_that_cannot_be_saved_is_named_for_revoking(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
+        browser = BrowserStandIn(api_key=TEST_KEY)
+        patch_browser(mocker, browser=browser)
+        patch_check(mocker, check=ACCEPTED)
+        mocker.patch(
+            "pipelex.cli.commands.init.credentials.rewrite",
+            side_effect=PermissionError(13, "Permission denied", str(pipelex_home / ".env")),
+        )
+
+        with pytest.raises(typer.Exit) as exc_info:
+            login_cmd()
+        browser.join()
+
+        assert exc_info.value.exit_code == 1
+        printed = " ".join(output.getvalue().split())
+        assert "Permission denied" in printed
+        assert f"revoke it on the Developer page of the Pipelex app ({URLs.app})" in printed
+        assert TEST_KEY not in printed
 
     def test_a_key_that_could_not_be_checked_is_saved_with_a_warning(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
         browser = BrowserStandIn(api_key=TEST_KEY)
@@ -85,8 +276,14 @@ class TestLoginWithBrowser:
         browser.join()
 
         assert saved_key(home=pipelex_home) == TEST_KEY
-        assert "Could not check the key" in output.getvalue()
-        assert "could not be reached" in output.getvalue()
+        # The key was meant for the API it could not reach, as the workshop's login pairs an unchecked key too.
+        assert saved_base_url(home=pipelex_home) == API_URL
+        # Rich wraps long lines at spaces; joining the words back reads the message as written
+        printed = " ".join(output.getvalue().split())
+        assert "Could not check the key" in printed
+        assert "could not be reached" in printed
+        assert f"as {PIPELEX_API_KEY_ENV_KEY}, beside {PIPELEX_BASE_URL_ENV_KEY} for {API_URL} anyway" in printed
+        assert f"{PIPELEX_BASE_URL_ENV_KEY} is saved with the key" in printed
 
     def test_a_value_that_is_not_a_pipelex_api_key_is_refused_unchecked(self, mocker: MockerFixture, pipelex_home: Path, output: StringIO) -> None:
         browser = BrowserStandIn(api_key="sk-not-a-pipelex-key")
@@ -125,6 +322,20 @@ class TestLoginWithBrowser:
 
         assert exc_info.value.exit_code == 1
         assert LOGIN_PASTE_COMMAND in output.getvalue()
+        assert saved_key(home=pipelex_home) is None
+
+    def test_the_timeout_of_a_labelled_login_names_the_label_to_run_again_with(
+        self, mocker: MockerFixture, pipelex_home: Path, output: StringIO
+    ) -> None:
+        patch_browser(mocker, browser=BrowserStandIn(api_key=None))
+        mocker.patch("pipelex.cli.commands.login.command.LOGIN_TIMEOUT_SECONDS", 0.2)
+
+        with pytest.raises(typer.Exit):
+            login_cmd(label="qa.dev.lab.builder")
+
+        printed = " ".join(output.getvalue().split())
+        expected = '"qa.dev.lab.builder"' if os.name == "nt" else "qa.dev.lab.builder"
+        assert f"Run pipelex login --label {expected} again" in printed
         assert saved_key(home=pipelex_home) is None
 
     @pytest.mark.usefixtures("pipelex_home")
