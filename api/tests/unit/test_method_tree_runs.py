@@ -53,6 +53,18 @@ version = "0.1.0"
 description = "A dependency a request sends beside its method."
 """
 
+_MANIFEST_DECLARING_CATEGORIES = """\
+[package]
+address = "github.com/acme/greeting"
+version = "1.0.0"
+description = "A method a catalog offers under its categories."
+main_pipe = "greet"
+categories = ["human-resources", "general"]
+
+[exports.greeting]
+pipes = ["greet"]
+"""
+
 _NOTES = b"Some notes \xe2\x80\x94 kept with the method"
 _ICON = b"\x89PNG\r\n\x1a\n not text"
 
@@ -131,6 +143,27 @@ class TestMethodTreeRuns:
         body = response.json()
         assert body["state"] == "COMPLETED"
         assert "Hello world" in _run_output(body)
+
+    def test_a_method_whose_manifest_declares_categories_runs(self, mocker: MockerFixture) -> None:
+        """Every template's manifest declares categories, so the runner reads past them and starts where the manifest says."""
+        client = _build_client(mocker)
+        files = {"METHODS.toml": _MANIFEST_DECLARING_CATEGORIES, "greet.mthds": _GREET_MTHDS}
+
+        response = client.post("/v1/execute", json={"files": files, "inputs": {"text": "world"}})
+
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["state"] == "COMPLETED"
+        assert "Hello world" in _run_output(body)
+
+    def test_a_category_breaking_the_standards_pattern_refuses_the_run_naming_the_manifest(self, mocker: MockerFixture) -> None:
+        client = _build_client(mocker)
+        files = {"METHODS.toml": _MANIFEST_DECLARING_CATEGORIES.replace('"general"', '"Not A Slug"'), "greet.mthds": _GREET_MTHDS}
+
+        response = client.post("/v1/execute", json={"files": files, "inputs": {"text": "world"}})
+
+        problem = assert_problem(response, status=422, code="method.package_invalid")
+        assert problem["params"] == {"reason": "manifest_invalid", "path": "METHODS.toml"}
 
     def test_a_hash_the_runner_does_not_hold_is_a_422_naming_it(self, mocker: MockerFixture) -> None:
         client = _build_client(mocker)

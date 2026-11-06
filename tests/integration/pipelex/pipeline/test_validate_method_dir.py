@@ -38,6 +38,18 @@ template = "HEY $text"
 
 _BROKEN_PYTHON = b"def ok():\n    return 1\n\n\ndef oops(:\n    pass\n"
 
+_MANIFEST_DECLARING_CATEGORIES = b"""\
+[package]
+address = "github.com/pipelex-tests/greeting"
+version = "1.0.0"
+description = "A method a catalog offers under its categories"
+main_pipe = "greet"
+categories = ["human-resources", "general"]
+
+[exports.greeting]
+pipes = ["greet"]
+"""
+
 
 @pytest.fixture(name="held_tree")
 def held_tree_fixture(tmp_path: Path) -> Generator[Path, None, None]:
@@ -84,6 +96,16 @@ class TestValidateMethodDir:
 
     async def test_the_graph_is_the_trees_entry_pipe(self, held_tree: Path) -> None:
         report = await validate_bundles_in_process(method_dir=held_tree, library_dirs_are_callers=True)
+
+        assert report.graph_spec is not None
+        assert report.graph_spec.pipeline_ref.domain == "greeting"
+        assert report.graph_spec.pipeline_ref.main_pipe == "greet"
+
+    async def test_a_tree_whose_manifest_declares_categories_validates_from_its_entry_pipe(self, tmp_path: Path) -> None:
+        """The load and the entry rule both read the manifest, and neither stops at the categories a catalog offers it under."""
+        tree, method_dir = _written(tmp_path=tmp_path, contents={"METHODS.toml": _MANIFEST_DECLARING_CATEGORIES, "greet.mthds": _GREET_MTHDS})
+        with WRITTEN_METHOD_TREES.holding(tree=tree):
+            report = await validate_bundles_in_process(method_dir=method_dir, library_dirs_are_callers=True)
 
         assert report.graph_spec is not None
         assert report.graph_spec.pipeline_ref.domain == "greeting"

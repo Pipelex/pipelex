@@ -77,6 +77,7 @@ class TestTomlInputsBuild:
                 str(staged),
                 "--inputs",
                 str(inputs_toml),
+                "--local",
                 "--dry-run",
                 "--no-save-working-memory",
                 "--no-save-main-stuff",
