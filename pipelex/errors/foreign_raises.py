@@ -188,25 +188,25 @@ class _ForeignRaiseVisitor(ast.NodeVisitor):
         self._scopes: list[ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef] = []
 
     @override
-    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._scopes.append(node)
         self.generic_visit(node)
         self._scopes.pop()
 
     @override
-    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._scopes.append(node)
         self.generic_visit(node)
         self._scopes.pop()
 
     @override
-    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         self._scopes.append(node)
         self.generic_visit(node)
         self._scopes.pop()
 
     @override
-    def visit_Raise(self, node: ast.Raise) -> None:
+    def visit_Raise(self, node: ast.Raise) -> None:  # pylint: disable=invalid-name  # ast.NodeVisitor dispatch name
         if node.exc is None:
             return
         class_name = _raised_class_name(node.exc)

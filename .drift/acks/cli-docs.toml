@@ -1,8 +1,8 @@
 contract = "cli-docs"
-digest = "sha256:b4ad209a4d83ae60c08bf1012efc64a038c6cc5c0cf8019069d33e092bc2ce79"
+digest = "sha256:9fbb95632997a86c4e875fd437dfca650b9b73c48b97b0ca543f748bc9014e99"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-31T17:59:04Z"
-rationale = "real-catch: the run-method help examples named text_stats@v0.1.7, which the hosted runtime refuses for its flat PipeFunc function name; docs/tools/cli/run.md and run-by-address.md named the same tag and now name v0.2.0 with the help. pipelex/cli/agent_cli/CLAUDE.md names no method tag."
+reviewed_at = "2026-11-05T23:02:46Z"
+rationale = "clean-pass: the trigger change adds a pylint invalid-name suppression comment to BaseHTTPRequestHandler.do_GET in the login loopback; no CLI surface, flag, message or behaviour moved, so docs/tools/cli/ and pipelex/cli/agent_cli/CLAUDE.md need no change."
 
 [trigger_files]
 "pipelex/cli/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
@@ -102,7 +102,7 @@ rationale = "real-catch: the run-method help examples named text_stats@v0.1.7, w
 "pipelex/cli/commands/login/__init__.py" = "blob:e69de29bb2d1d6434b8b29ae775ad8c2e48c5391"
 "pipelex/cli/commands/login/api_key_store.py" = "blob:8406111e7148188ae4ca3fff0cfb4ad7e00550d8"
 "pipelex/cli/commands/login/command.py" = "blob:88aef98ab88c8480add133f3151f31e440758a18"
-"pipelex/cli/commands/login/loopback.py" = "blob:9b71130a529d7414712acfc6d17e52c5f17bbe13"
+"pipelex/cli/commands/login/loopback.py" = "blob:239daf3b1a3467489fe171cca2cc736752df888c"
 "pipelex/cli/commands/migrate_cmd.py" = "blob:3839424ccbf1c7f8e7af8a7f124a062cba18cece"
 "pipelex/cli/commands/plugins_cmd.py" = "blob:9657b713c3650ff4a929e92ae68af453d896393e"
 "pipelex/cli/commands/resolve_cmd.py" = "blob:88237df0f048bbf5a02e585baef932bfc355e1ee"
