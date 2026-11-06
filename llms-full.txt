@@ -3076,6 +3076,8 @@ Each field can specify:
 
 Field names must be valid Python identifiers and cannot be Python keywords; generated Python projections use them as model attributes.
 
+A field may share its name with a Python type or with a name the generated class uses, such as `date = { type = "date", ... }`, `str`, `list` or `Field`: the structure class Pipelex builds for the concept when it loads the method imports every such name under an alias (`date: _date = Field(...)`), so the field neither hides its own type nor the types of the fields after it. The Python targets of [`pipelex codegen`](../../under-the-hood/codegen-projections.md), `python-structures` and `python-pydantic`, do not alias these names yet, so for a structure with such a field they write Python types that fail at import; the `ts-zod` target, which writes each field as an object key, is unaffected. The one name a structure cannot take is the name Pipelex gives the Python class of a concept the structure refers to, `<domain>__<Concept>` (a field named `shop__Item` in a structure that holds a `shop.Item`): validation refuses it with a `method.concept_invalid` error naming the concept and the field.
+
 !!! warning "The key set is closed"
 
     The keys above are the only ones a structure field accepts, and anything else is rejected at validation. A typo (`descrption`), a hopeful constraint the language does not carry (`minimum = 0`, `unit = "kg"`), or a misspelled `hints` all fail the bundle instead of being dropped.
@@ -5731,7 +5733,7 @@ Use the client directly: it has no Pipelex wrapper, and it needs no `Pipelex.mak
 
 ## The Key and the Origin
 
-The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`.
+The client reads its key from `PIPELEX_API_KEY` and its origin from `PIPELEX_BASE_URL`, falling back to `https://api.pipelex.com`. Both can also be passed to the constructor, as `api_key=` and `base_url=`. The client reads the process environment only. To use a key saved in `~/.pipelex/.env`, as `pipelex run --hosted` does, import `pipelex.system.environment` before creating the client: importing it loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`), then a `.env` in the working directory. Each of those files replaces the variables it sets, so a `PIPELEX_API_KEY` or `PIPELEX_BASE_URL` set in one of them wins over the same variable already in the process environment, whether exported in your shell or set by your program before the import. To use a key of your own whatever the files say, pass it to the constructor as `api_key=`. To tell whether one of the files replaced a variable your process was given, `get_dotenv_source(env_var="PIPELEX_API_KEY")` from `pipelex.system.environment` returns the path of the file whose value the variable now holds, or `None` when it holds the value the process was started with.
 
 ## Running a Method
 
@@ -5746,7 +5748,7 @@ from pipelex_sdk.client import PipelexAPIClient
 async def main() -> None:
     async with PipelexAPIClient() as client:
         results = await client.start_and_wait(
-            method_ref="github.com/Pipelex/methods/text_stats@v0.1.7",
+            method_ref="github.com/Pipelex/methods/text_stats@v0.2.0",
             inputs={"text": "Hello world. Second sentence."},
         )
     print(results.pipeline_run_id)
@@ -5816,7 +5818,7 @@ from mthds.protocol.problem.registry import RetryVerdict
 from pipelex_sdk.errors import PipelexRequestError
 
 try:
-    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.1.7", inputs={"text": "Hello world."})
+    started = await client.start(method_ref="github.com/Pipelex/methods/text_stats@v0.2.0", inputs={"text": "Hello world."})
 except PipelexRequestError as exc:
     match exc.problem.effective_retry:
         case RetryVerdict.OUTCOME_UNKNOWN:
@@ -8100,6 +8102,21 @@ The output is a `SearchResult` (or a concept that refines it), which contains:
 
 -   `answer`: The synthesized answer text from the search
 -   `sources`: A list of sources, each with a `title`, `url`, and optional `snippet`
+
+Each source is listed once. When the provider lists the same page more than once, the first entry is kept with its original address, the order of the provider's list is kept, and the other entries are dropped. Two sources name the same page when their addresses are equal after these steps:
+
+-   `http` and `https` count as the same scheme.
+-   The host is lowercased, and one leading `www.` is dropped.
+-   The fragment (`#section`) is dropped.
+-   One trailing `/` is dropped from the path, unless the path is `/` alone. An address written with no path, such as `https://example.com`, has the path `/`.
+-   The query (`?page=2`) is kept as it is.
+
+So `https://www.example.com/guide/` and `http://example.com/guide#intro` name the same page, while `https://example.com/guide` and `https://example.com/docs/guide` are two pages.
+
+The answer cites its sources inline as `[1]`, `[2][3]`, and so on, numbered from 1 in the order of the provider's list. Each citation is renumbered to the position its source holds in the shortened list, so it still points at the source it named, and a citation of a dropped entry points at the entry kept for its page. A number that names no source is left as written, and so are numbers inside code spans and code blocks, as CommonMark reads them:
+
+-   A code block is fenced with backticks or tildes, or indented, and it is code wherever it stands, inside block quotes and lists included.
+-   A code span opens on a run of backticks and closes on the next run of the same length. It never runs past the paragraph, heading, list item or table cell it opens in, and a backtick escaped with a backslash (`` \` ``) opens none.
 
 Every input the pipe declares must be read by the `prompt`, and every variable the prompt reads must be declared in `inputs`. Validation refuses an input the prompt never reads as `extraneous_input_variable`, naming the input, so you either reference it in the prompt or remove it from `inputs`; an undeclared variable is refused as `missing_input_variable`.
 
@@ -10559,6 +10576,7 @@ pipelex-agent init -g --config '{"execution": "hosted"}'
 
 ```bash
 pipelex login
+pipelex login --label "my laptop"
 pipelex login --paste
 ```
 
@@ -10567,17 +10585,18 @@ pipelex login --paste
 ## What It Does
 
 1. It opens the Pipelex app in your browser, on a page that creates a key for the command line, and prints the same link in case the browser does not open. When no browser can be opened at all, it says so at once: open the link in a browser on this machine, or press Ctrl-C and run `pipelex login --paste`. Sign in, or create an account, on that page.
-2. The app hands the new key back to `pipelex login`, which waits for it on a port of `127.0.0.1` it opened for this one login. It waits up to five minutes.
-3. It checks the key: the key must start with `plx_sk_`, and the hosted API must accept it, which it asks by reading the account the key belongs to.
-4. It saves the key as `PIPELEX_API_KEY` in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), the file Pipelex loads into its environment at startup.
+2. The page shows the organization the key will act for, where its runs are billed, and creates nothing until you confirm with one click: **Create the key**, or **Replace the key** when the login names the label of a key you already hold there (see [Name the Key](#name-the-key)). The key acts for your active organization in the app; to use another one, switch to it in the app, then log in again.
+3. The app hands the new key back to `pipelex login`, which waits for it on a port of `127.0.0.1` it opened for this one login. It waits up to five minutes, signing in and confirming included. The browser then shows "Key received": the key is checked and saved after that page, so the terminal, not the browser, says whether the login worked.
+4. It checks the key: the key must start with `plx_sk_`, and the hosted API must accept it, which it asks by reading the account the key belongs to.
+5. It saves the key as `PIPELEX_API_KEY` in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), the file Pipelex loads into its environment at startup, with the `PIPELEX_BASE_URL` it was checked against when that file would otherwise send it to another API (see [The Key Keeps Its API](#the-key-keeps-its-api)).
 
 The key is never printed. The `.env` file is readable and writable by you only (mode `0600`), and every other line in it, your provider keys and comments included, is kept as it was. A `PIPELEX_API_KEY` already in the file is replaced.
 
 **The check decides what is saved:**
 
-- When the hosted API accepts the key, it is saved, and the command says which account it belongs to.
-- When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status.
-- When the key cannot be checked, because the hosted API cannot be reached, answers anything else, or `PIPELEX_BASE_URL` is not an origin, it is saved anyway, with a warning saying why it was not checked.
+- When the hosted API accepts the key, it is saved, and the command says which account it belongs to and which organization it acts for, by name and id (`org_…`): `Logged in as ada@example.com. Your Pipelex API key acts for the organization Analytical Engines (org_…) and is saved to …`. An organization the platform holds no name for, as one still being set up, is named by its id alone, and a hosted API that does not say, such as an older one, leaves the organization out; neither stops the login. A control character in what the hosted API sends, such as the escape that starts a terminal sequence, is shown as `�` rather than sent to your terminal.
+- When the hosted API refuses it (HTTP 401 or 403), nothing is saved and the command exits with code `1`, naming the status and the API the key had to belong to, with the `.env` file that set its `PIPELEX_BASE_URL` when one did. The app created a browser login's key for that login, so a refused one is a live key nobody holds: the command says to revoke it on the Developer page of the Pipelex app. Such a refusal usually means `PIPELEX_APP_URL` and `PIPELEX_BASE_URL` name different deployments. A pasted key is still yours, so the command only says to check that it is current and belongs to that API.
+- When the key cannot be checked, because the hosted API cannot be reached, answers anything else, or `PIPELEX_BASE_URL` is not an origin, it is saved anyway, with a warning saying why it was not checked. It keeps the API it was meant for as an accepted key does, unless `PIPELEX_BASE_URL` is not an origin, in which case the file's base URL is left as it is.
 - A value that does not start with `plx_sk_` is refused before any check.
 
 **A `.env` in the working directory wins.** Pipelex loads the `.env` of the directory a command runs in after `~/.pipelex/.env`, so a `PIPELEX_API_KEY` line there, even an empty one, is what commands run in that directory send. When that file sets another value than the key just saved, `pipelex login` names it, without printing either value: remove the line from it. Both files also win over your shell, since each `.env` Pipelex loads replaces the variables it sets: a `PIPELEX_API_KEY` exported in your shell is read only when neither file sets it.
@@ -10586,13 +10605,37 @@ The key is never printed. The `.env` file is readable and writable by you only (
 
 When no key arrives in time, the command exits with code `1` and names `pipelex login --paste`.
 
+## Name the Key
+
+```bash
+pipelex login --label "my laptop"
+```
+
+Without `--label`, each browser login adds a key, labelled `Pipelex CLI`, or `Pipelex CLI` followed by the date and time once you already hold a key of that name, so repeated logins pile up keys on the Developer page of the app. With `--label`, the login names its key: when you already hold a key of that label in your active organization, the app replaces it, the old key stopping working as the new one is created with the same label, and otherwise it creates a key of that label. Logging in again under the same label, on the same machine or for the same job, therefore keeps one key. Labels are shared with the keys you create on the Developer page, so a login can also replace one made there; it only ever replaces a key of your own, never another member's.
+
+A label is trimmed of leading and trailing spaces, then holds 1 to 64 characters, as on the Developer page. It holds no control character, such as a tab or a line break, since the platform stores some of them otherwise than the login names them and the terminal would print them, and it does not start with `plx_sk_`, since a key given as a label would travel in plain text in the printed link and in your browser's history. Any other label is refused before the browser opens, with the reason, and the command exits with code `1`; the workshop's `pipelex login` (`@pipelex/mcp`) holds a label to the same rule. When the login fails afterwards, the command it tells you to run again names the same label, quoted for your shell, since logging in again without it would add a key rather than replace the labelled one. On Windows, a label holding `"`, `%`, `$` or a backtick has no quoting both cmd.exe and PowerShell read as written, so the command names `<the same label>` instead.
+
+`--label` applies to the key a browser login creates, so `--paste` takes none: a pasted key already exists, with the label it was created with, and the command refuses the two together, before it asks for anything, with exit code `1`.
+
+## The Key Keeps Its API
+
+A key belongs to one Pipelex deployment. When the key was checked against another API than the one `~/.pipelex/.env` names on its own, its `PIPELEX_BASE_URL` or else `https://api.pipelex.com`, the login writes that `PIPELEX_BASE_URL` beside the key, in the same write, and says so. This happens when you log in with `PIPELEX_BASE_URL` exported in your shell, or set in the working directory's `.env`, as for a development plane:
+
+```bash
+PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pipelex.com pipelex login
+```
+
+A command started without that shell's variables, such as a new terminal or an app launched from the desktop, then sends the key to the API it belongs to, where it would have sent it to `https://api.pipelex.com` and been refused. The Pipelex workshop (`@pipelex/mcp`) reads and writes the same file under the same rule.
+
+Since `~/.pipelex/.env` wins over your shell, a `PIPELEX_BASE_URL` exported afterwards no longer changes where Pipelex commands send the saved key, and a later `pipelex login` checks its key against the file's API too. To use another API, change or remove the `PIPELEX_BASE_URL` line in that file first, then log in again. A `PIPELEX_BASE_URL` in the file that refers to another variable, such as `${DEV_API_URL}`, names an API only where that variable is set, so the login replaces it with the URL that checked the key. A base URL that holds whitespace, a quote, `#`, `$` or a backslash cannot be written to a `.env` file unquoted, so it is left out, with a warning.
+
 ## Paste a Key Instead
 
 ```bash
 pipelex login --paste
 ```
 
-On a machine where no browser can reach a local port, such as a remote server over SSH or a CI job, create a key in the Pipelex app on any machine, then paste it at the prompt. The key is not shown as you type. It goes through the same check and is saved the same way.
+On a machine where no browser can reach a local port, such as a remote server over SSH or a CI job, create a key in the Pipelex app on any machine, then paste it at the prompt. The key is not shown as you type. It goes through the same check and is saved the same way. Name the key when you create it in the app, since `--label` is refused with `--paste`.
 
 In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret of the job. The job's value is read as long as no `.env` file Pipelex loads, in the home configuration directory or in the working directory, sets the variable.
 
@@ -10605,18 +10648,12 @@ In CI, you can also skip the file entirely and set `PIPELEX_API_KEY` as a secret
 
 A `PIPELEX_APP_URL` that is not an origin is refused before anything opens. A `PIPELEX_BASE_URL` that is not one is only met when the key is checked, after the browser has handed it back or the key was pasted: the key cannot be checked, so it is saved anyway, with a warning that names `PIPELEX_BASE_URL` and what an origin looks like, and the command exits with code `0`. Correct the value before a hosted run uses it.
 
-Most people never set either; they point the command at a development or staging plane, for instance:
-
-```bash
-PIPELEX_APP_URL=https://app-dev.pipelex.com PIPELEX_BASE_URL=https://api-dev.pipelex.com pipelex login
-```
-
-Set them in `~/.pipelex/.env` to keep them for every command. Once a `.env` file Pipelex loads sets one of them, that file wins over a value given on the command line as above, which is then ignored: change the value in the file instead.
+Most people never set either; they point the command at a development or staging plane, as [The Key Keeps Its API](#the-key-keeps-its-api) shows. The login saves `PIPELEX_BASE_URL` in `~/.pipelex/.env` itself when the key needs it; set `PIPELEX_APP_URL` there yourself to keep it for every login. Once a `.env` file Pipelex loads sets one of them, that file wins over a value given on the command line, which is then ignored: change the value in the file instead.
 
 ## Exit Codes
 
 - `0`: a key was saved, checked or not.
-- `1`: nothing was saved: no key arrived in time, none was pasted, the value was not a Pipelex API key, the hosted API refused it, `PIPELEX_APP_URL` is not an origin, or the `.env` could not be written. In that last case the command names the file and the error; the key it received went unused, so revoke it in the Pipelex app and run `pipelex login` again once the file can be written.
+- `1`: nothing was saved: no key arrived in time, none was pasted, the value was not a Pipelex API key, the hosted API refused it, `PIPELEX_APP_URL` is not an origin, the label was refused or given with `--paste`, or the `.env` could not be written. In that last case the command names the file and the error. A key a browser login received and did not save, refused or unwritable, went unused: revoke it on the Developer page of the Pipelex app, then run `pipelex login` again. A pasted key that could not be saved is still yours to paste again once the file can be written.
 
 ## Related
 
@@ -11358,7 +11395,7 @@ pipelex run method invoice_extractor --inputs invoice_data.json
 pipelex run method github.com/Pipelex/methods/documents@v0.1.0 --pipe extract_document_text
 
 # Run a published method on the hosted Pipelex API, which resolves the address itself
-pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello world."}'
 
 # Run a method stored on the hosted platform, by its catalog id
 pipelex run method mt_abc123 --hosted --inputs data.json
@@ -11374,7 +11411,7 @@ Where a run executes is decided in this order:
 2. `[run] execution` in `.pipelex/pipelex.toml` (`"local"` or `"hosted"`; the project's file over the one in `~/.pipelex/`), which [`pipelex init`](init.md#where-your-runs-execute) writes from your answer, see [Run Configuration](../../configuration/config-practical/run-config.md).
 3. Local.
 
-The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
+The key is read from `PIPELEX_API_KEY`. [`pipelex login`](login.md) gets a key through your browser and saves it in `~/.pipelex/.env` (or in the `.env` of the directory `PIPELEX_HOME` names), which Pipelex loads at startup, followed by the `.env` of the working directory when there is one. When the key was checked against another API than the one that file names on its own, the login saves that `PIPELEX_BASE_URL` beside the key, so the key goes to the API it belongs to from any shell. The run goes to `--base-url` when given, else to `PIPELEX_BASE_URL`, else to `https://api.pipelex.com`. Either value must be an origin, `scheme://host[:port]` with `http` or `https` and no path such as `/v1`; anything else is refused before a request is sent, naming the setting it came from.
 
 **The `.env` files win over your shell.** Each `.env` file Pipelex loads replaces the variables it sets, so for `PIPELEX_API_KEY`, `PIPELEX_BASE_URL` or any other variable, the working directory's `.env` wins over `~/.pipelex/.env`, which wins over a value exported in your shell: an exported value is read only when neither file sets the variable. To replace the saved key, run `pipelex login` again; to use another key, or another origin, in one directory, set it in that directory's `.env`.
 
@@ -11550,7 +11587,7 @@ The fetched clone is temporary: it lives in a system temp directory and is delet
 With `--hosted` (or `[run] execution = "hosted"`), `pipelex run method <ref>` fetches nothing: the address goes to the hosted Pipelex API as a method reference, and the hosted runner locates and fetches the package itself, under the same grammar and the same manifest-identity rule. The entry pipe is still the manifest's `main_pipe` unless `--pipe` names another, outputs still land in `./results/` under your working directory, and a relative `--inputs` path resolves against the working directory, since there is no local clone to anchor it to. `-L` is refused, because the hosted API loads no local library alongside an address. See [Running on the Hosted API](run.md#running-on-the-hosted-api).
 
 ```bash
-pipelex run method github.com/Pipelex/methods/text_stats@v0.1.7 --hosted --inputs '{"text": "Hello world."}'
+pipelex run method github.com/Pipelex/methods/text_stats@v0.2.0 --hosted --inputs '{"text": "Hello world."}'
 ```
 
 ## Python in fetched methods: the hosted rule
@@ -21115,7 +21152,7 @@ On the hosted path only, `ensure_pipelex_api_key()` runs last, so every file is 
 | `pipelex/cli/commands/init/backends.py` | Backend customization: `customize_backends_config()`, `get_selected_backend_keys()` |
 | `pipelex/cli/commands/init/routing.py` | Routing customization: `customize_routing_profile()` |
 | `pipelex/cli/commands/init/telemetry.py` | Telemetry setup: `setup_telemetry()` |
-| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and the single-entry `set_env_file_entry()` the sign-in saves its key with |
+| `pipelex/cli/commands/init/credentials.py` | Credential prompting: `prompt_credentials()`, `write_env_file()`, `read_env_file()`, and `set_env_file_entries()`, which the sign-in saves its key with, and the base URL it was checked against when needed, in one write |
 | `pipelex/cli/commands/init/ide_extension.py` | IDE extension suggestion: `suggest_extension_install_if_needed()` |
 | `pipelex/cli/commands/init/ui/types.py` | `InitFocus` enum definition |
 
@@ -24323,7 +24360,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.95.1` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.96.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -26729,6 +26766,59 @@ A pipelex release publishes three artifacts under its one version, all from `.gi
 A failed publish is retried with "Re-run failed jobs" on the release run, which re-runs only what failed. A version Docker Hub already serves is never built again, because a rebuild would be a different image under the same tag: a retry that finds it there only moves `latest`, when the version is the newest stable release, and confirms the tags. The image can also be published on its own with `gh workflow run publish-docker-hub.yml --ref <branch> -f version=X.Y.Z`, which helps when the fix is a change to that workflow file, which a re-run would not pick up: dispatched from the branch carrying the fix, it still builds the commit the tag names. Such a fix must use only actions the organization's Actions policy allows, or GitHub rejects the whole workflow at startup and nothing publishes; pull-request CI never loads these workflows, so [`make check-actions-allowlist`](actions-allowlist.md) checks every workflow against the policy's mirror on each pull request.
 
 What the release needs configured on GitHub and PyPI: the `DOCKER_HUB_TOKEN` secret on the repository, a token for the `pipelex` Docker Hub account that can push the image; and a PyPI trusted publisher for the `pipelex-api` project with owner `Pipelex`, repository `pipelex`, workflow `publish-pypi.yml` and environment `pypi`, the same as `pipelex`'s.
+
+
+## Hosted End-to-End Tests
+
+# Hosted End-to-End Tests
+
+`tests/e2e/pipelex/cli/test_hosted_run_cli.py` spawns the real `pipelex` and `pipelex-agent` binaries against a live hosted Pipelex API: it runs published methods on it by flag and by configured default, uploads a local input file, and checks that `--base-url` wins over `PIPELEX_BASE_URL`. Every case spends hosted credit, so the module carries the `pipelex_api` marker, which keeps it out of `make agent-test`, out of CI and out of the default pytest selection. It is selected with `-m pipelex_api` (`make test-pipelex-api` runs every test that carries the marker), and it is skipped when `PIPELEX_API_KEY` is unset, empty or a placeholder and no `.env` file set it: a key a `.env` file replaced, even with an empty line, is checked instead, so the check below names the file.
+
+## Where its account comes from
+
+The cases act as one test account, so that what they spend and leave behind lands in an organization kept for them. The Pipelex team runs them as its QA Builder account in its QA Runtime organization on the dev plane, whose key its `test-account run` command hands over:
+
+```bash
+test-account run pipelex-hosted-e2e -- .venv/bin/pytest -m pipelex_api tests/e2e/pipelex/cli/test_hosted_run_cli.py
+```
+
+The command checks the account first, then runs the tests with:
+
+- `PIPELEX_API_KEY`, the account's key in that organization;
+- `PIPELEX_BASE_URL`, the dev plane's origin;
+- the key's expectations, `PIPELEX_API_KEY_EXPECTED_ORG_ID`, `PIPELEX_API_KEY_EXPECTED_ROLE` and `PIPELEX_API_KEY_EXPECTED_EMAIL`: the organization's id, the account's role there and its email, as `GET /v1/me` should state them;
+- `DO_NOT_TRACK=1`, the common opt-out from usage statistics, set for anything a test starts.
+
+Anyone else exports the same variables for an account of their own, its expectations being what `GET /v1/me` states for its key, and sets `DO_NOT_TRACK=1`:
+
+```bash
+export PIPELEX_API_KEY=<the key>
+export PIPELEX_BASE_URL=<the API origin, such as https://api.pipelex.com>
+export PIPELEX_API_KEY_EXPECTED_ORG_ID=<organization.org_id>
+export PIPELEX_API_KEY_EXPECTED_ROLE=<organization.role_in_org>
+export PIPELEX_API_KEY_EXPECTED_EMAIL=<email>
+export DO_NOT_TRACK=1
+.venv/bin/pytest -m pipelex_api tests/e2e/pipelex/cli/test_hosted_run_cli.py
+```
+
+Each case then runs its subprocess in a hermetic home, with an environment built from nothing but that key, that origin and no provider key, so the developer's own `~/.pipelex` is never read.
+
+No usage statistics leave either way, and `DO_NOT_TRACK` is not what stops them: the pytest session turns them off before the first test, and each subprocess's environment, which inherits nothing, turns them off again through `usage_stats_off_environment()` (`pipelex/test_extras/usage_stats_isolation.py`). That call is what keeps the commands the cases start quiet, so it stays in `_hosted_env`.
+
+## What it checks before the first case
+
+Before the first case, `require_hosted_account` (`tests/helpers/hosted_account_check.py`) checks, in this order:
+
+1. **That no variable it reads came from a `.env` file.** pipelex loads `~/.pipelex/.env` (or the one in `PIPELEX_HOME`) and then the working directory's `.env` over the environment it was started with, so a key saved by `pipelex login` would silently replace the one handed over. The check asks `pipelex.system.environment.get_dotenv_source` about `PIPELEX_API_KEY`, `PIPELEX_BASE_URL`, the three expectations and `PIPELEX_HOSTED_E2E_ALLOW_PRODUCTION`, and names the file that set each one that was replaced.
+2. **That the origin is not the production API.** Without `PIPELEX_BASE_URL` the runs would go to `https://api.pipelex.com`, so an unset origin and one on that host, whatever its scheme, port, case or trailing dot, are refused unless `PIPELEX_HOSTED_E2E_ALLOW_PRODUCTION=1` asks for production on purpose.
+3. **That the key's three expectations are set.** A run without them is refused, its message naming `test-account run`.
+4. **That `GET /v1/me`, asked with the key, states what they expect**: `organization.org_id` equal to `PIPELEX_API_KEY_EXPECTED_ORG_ID`, `organization.role_in_org` equal to `PIPELEX_API_KEY_EXPECTED_ROLE`, and `email` equal to `PIPELEX_API_KEY_EXPECTED_EMAIL` ignoring case.
+
+Nothing is sent before the first three hold. Any finding stops the whole session once, with every finding, each naming the variable, the value found and the value expected. A platform whose `/v1/me` answers without the `organization` member is reported as "the platform does not state the key's organization yet" and stops the session too: it is never a pass. An account, organization or role that differs from what the expectations say is restored by the owner of the test-account registry the expectations come from, never by a test: the cases do not change who the key belongs to.
+
+## Fixtures
+
+The cases need no fixture of their own in the organization: the methods are the public `github.com/Pipelex/methods` packages at a pinned tag, which the hosted API fetches itself, and the one input file is uploaded by the run that uses it.
 
 
 ## Migration Ledger
