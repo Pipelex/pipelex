@@ -2757,7 +2757,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.26.0"
+version = "0.27.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -2766,9 +2766,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2f/26/0173b04ac75c4ac1fb10d795a705a3d992ff98890883ba1ba17003b7cfa4/mthds-0.26.0.tar.gz", hash = "sha256:bf7e0c7e6570b10a681800c626aefffd0b47617d9516f84716d192d66100204e", size = 525171, upload-time = "2026-10-29T12:14:12.731Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/7b/ec/8cc725347045aa5cff8aedc2beeb792f9e6414b085f79184d30d5519dbf2/mthds-0.27.0.tar.gz", hash = "sha256:d52c1cef2be207c6028605a31e741dd555e18bc59115a8b8c0077518a94d7930", size = 528929, upload-time = "2026-11-06T22:21:42.17Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bd/09/16beda6f93ed401dc70745bd1ae0c4eba396d04c04ea476f8c6297b9d36c/mthds-0.26.0-py3-none-any.whl", hash = "sha256:63963aebc2a4dd8705a0ff0aa4f91c1f9ed621112b4b5d5c880e2e6531decee5", size = 210738, upload-time = "2026-10-29T12:14:11.103Z" },
+    { url = "https://files.pythonhosted.org/packages/a4/be/983de55a7d9e62407189991392f639a39b861526833e80bb1962fcc63e29/mthds-0.27.0-py3-none-any.whl", hash = "sha256:68fcdf9f426574446a212f0a95eb75a90b2a297e310cc0c196e22b10c3a5ab59", size = 211143, upload-time = "2026-11-06T22:21:40.323Z" },
 ]
 
 [[package]]
@@ -3566,7 +3566,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.96.0"
+version = "0.97.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3745,7 +3745,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["dynamodb", "s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = "==0.26.0" },
+    { name = "mthds", specifier = "==0.27.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
@@ -3755,7 +3755,7 @@ requires-dist = [
     { name = "opentelemetry-semantic-conventions", specifier = ">=0.59b0" },
     { name = "packaging", specifier = ">=24.0" },
     { name = "pillow", specifier = ">=13.0.0" },
-    { name = "pipelex-sdk", specifier = "==0.57.0" },
+    { name = "pipelex-sdk", specifier = "==0.60.0" },
     { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.7.2" },
     { name = "pipelex-tools-py", specifier = ">=0.1.3" },
     { name = "polyfactory", specifier = ">=2.21.0" },
@@ -3867,7 +3867,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "pipelex-sdk"
-version = "0.57.0"
+version = "0.60.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
@@ -3875,9 +3875,9 @@ dependencies = [
     { name = "pydantic" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/5a/37/237c6b4cb671ba181cc770a4929a57a142c6ba958d375db55762e418582d/pipelex_sdk-0.57.0.tar.gz", hash = "sha256:0e8226ef8b2a0688d79f18ef27d70f513fb0eb474b6246cd059321493c24c44b", size = 764192, upload-time = "2026-10-29T13:00:47.106Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/0e/4f/7a574650d31f193f378f8020236aaf86b014a6c9f53b93b1f4be971b1091/pipelex_sdk-0.60.0.tar.gz", hash = "sha256:ca2cc0a057db0552177778c04fab45c08afad58fda1298254f0de44ea2a40ab4", size = 821786, upload-time = "2026-11-06T22:47:15.635Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/15/b7/d7a9a8729a2b9c78488b4a9107375576e5e108dc4a93a53bd46bdad08a99/pipelex_sdk-0.57.0-py3-none-any.whl", hash = "sha256:f1b3df0dbe0b0564b08967af974b8fb4b8d43e33401462205beda421eab1bdbd", size = 289719, upload-time = "2026-10-29T13:00:45.556Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/88/96e6284ac728adb0a77c3ca3672772b769088c595e25e3fee9d5e8e528b0/pipelex_sdk-0.60.0-py3-none-any.whl", hash = "sha256:4e5f995801e2988ba5bab33a2980aa5e08ad476758565c537a3315e1844591d2", size = 305170, upload-time = "2026-11-06T22:47:13.746Z" },
 ]
 
 [[package]]

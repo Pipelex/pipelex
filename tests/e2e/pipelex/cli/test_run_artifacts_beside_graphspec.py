@@ -42,6 +42,7 @@ class TestRunArtifactsBesideGraphspec:
                 "probe_single",
                 "-L",
                 str(staged),
+                "--local",
                 "--dry-run",
                 "--mock-inputs",
                 "--graph",
