@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.97.0] - 2026-11-07
+
+### Highlights
+
+**pipelex runs a method whose manifest declares categories.** It moves to `mthds` 0.27.0, which follows the MTHDS standard's `v8.1.0`, and to `pipelex-sdk` 0.60.0, so a catalog can offer a method under the categories its `METHODS.toml` names.
 
 ### Added
 
