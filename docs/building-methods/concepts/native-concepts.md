@@ -198,12 +198,13 @@ At the start of every run, before any pipe runs, the runtime establishes the for
 
 - A file given as a `data:` URL, a local path or a `pipelex-storage://` reference is identified from its first bytes. The identified type replaces any declared one, so a `data:image/png` URL holding a PDF is a PDF. An Office file whose bytes show only that it is a zip archive is known by its declared type or by its file name's extension (`.docx`, `.pptx`, `.xlsx`), and otherwise its format is unknown.
 - A file the bytes do not identify, such as plain text, Markdown, CSV or HTML, keeps the type it was declared with.
-- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked: the provider receives it as it is.
+- An `http(s)` URL is not fetched before the run, so its format is the type it was declared with, and only that type is checked. An `http(s)` URL with no declared type is not checked against what the model reads: the provider receives it as it is.
 
 The run is then refused, with an input error naming the input, when:
 
 - an `Image` input holds a file that is not an image, whatever reads it;
 - a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
+- a document input known not to be a PDF is certain to reach a `PipeExtract` that asks for page views, which are drawn from a PDF whatever the step's model reads. A URL with no declared type is refused the same way when that step's model reads no PDF, since nothing it reads can give page views. See [Page views need a PDF](../pipes/pipe-operators/PipeExtract.md#page-views-need-a-pdf).
 
 The check follows each input through the steps of the method: the items of a batch, the fields of a structured input, and what a binding step or a dotted `batch_over` binds, so a Word transcript at `cases[1].transcripts[0]`, batched through `batch_over = "cases.transcripts"` over a list of cases, is refused before the run. A list a binding gathers from a field that is not itself a list, such as `cases.attachment` over a list of cases, is not followed, and a step that reads its items refuses a file when it gets to it.
 

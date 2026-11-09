@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode, ProblemDomain
+from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ExtractInputFormatError
 from pipelex.config import get_config
@@ -122,6 +123,38 @@ description = "Extract one transcript"
 inputs = { transcript = "Document" }
 output = "Page[]"
 model = "pypdfium2-extract-pdf"
+"""
+
+
+_PAGE_VIEWS_MTHDS = """
+domain = "consumer_check_page_views"
+description = "Extract a document and draw its page views"
+
+[pipe.views_of_word_reader]
+type = "PipeExtract"
+description = "Draw the page views of a file its model reads as Word"
+inputs = { report = "Document" }
+output = "Page[]"
+model = "docling-extract-text"
+page_views = true
+
+[pipe.no_views_of_word_reader]
+type = "PipeExtract"
+description = "Extract the same file, with no page views"
+inputs = { report = "Document" }
+output = "Page[]"
+model = "docling-extract-text"
+
+[pipe.maybe_views]
+type = "PipeCondition"
+description = "Draw the page views when asked to"
+inputs = { mode = "Text", report = "Document" }
+output = "Page[]"
+expression = "mode"
+default_outcome = "fail"
+
+[pipe.maybe_views.outcomes]
+extract = "views_of_word_reader"
 """
 
 
@@ -350,3 +383,73 @@ class TestPipelineRunSetupConsumerCheck:
         extract_refusal = _find_in_cause_chain(exc_info.value, error_class=ExtractInputFormatError)
         assert extract_refusal is not None, f"expected an ExtractInputFormatError in the cause chain, got {exc_info.value!r}"
         assert "Input 'transcript' is a Word document (.docx)" in str(extract_refusal)
+
+    async def test_page_views_of_a_word_file_are_refused_even_by_a_model_reading_word_files(self):
+        """Only `asks_for_page_views` can refuse here, since docling reads the Word file: the walk records it from the pipe."""
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            await pipeline_run_setup(
+                storage_scope="test/scope",
+                read_scope=None,
+                user_id="test-user",
+                execution_config=execution_config,
+                mthds_contents=[_PAGE_VIEWS_MTHDS],
+                pipe_code="views_of_word_reader",
+                inputs={"report": _data_url(mime_type="application/octet-stream", raw_bytes=DOCX_BYTES)},
+            )
+
+        assert exc_info.value.message == (
+            "Input 'report' is a Word document (.docx): pipe 'views_of_word_reader' asks for page views, which are drawn from a PDF. "
+            "Give a PDF, or remove page_views from the step."
+        )
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+        assert problem.to_wire().get("params") == {"input": "report", "format": "docx", "model": "pypdfium2"}, problem.to_wire()
+
+    @pytest.mark.parametrize(
+        ("pipe_code", "raw_bytes", "mime_type"),
+        [
+            pytest.param("views_of_word_reader", PDF_BYTES, "application/pdf", id="page-views-of-a-pdf"),
+            pytest.param("no_views_of_word_reader", DOCX_BYTES, "application/octet-stream", id="no-page-views-of-a-word-file"),
+        ],
+    )
+    async def test_what_page_views_can_be_drawn_from_passes_setup(self, pipe_code: str, raw_bytes: bytes, mime_type: str):
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+
+        pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
+            storage_scope="test/scope",
+            read_scope=None,
+            user_id="test-user",
+            execution_config=execution_config,
+            mthds_contents=[_PAGE_VIEWS_MTHDS],
+            pipe_code=pipe_code,
+            inputs={"report": _data_url(mime_type=mime_type, raw_bytes=raw_bytes)},
+        )
+
+        assert pipe_job.pipe.code == pipe_code
+
+    async def test_page_views_behind_a_condition_are_refused_by_the_step_before_any_extraction(self, mocker: MockerFixture):
+        extract_worker_call = mocker.patch("pipelex.cogt.content_generation.content_generator.extract_gen_pages_and_store", new=mocker.AsyncMock())
+        execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
+
+        pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
+            storage_scope="test/scope",
+            read_scope=None,
+            user_id="test-user",
+            execution_config=execution_config,
+            mthds_contents=[_PAGE_VIEWS_MTHDS],
+            pipe_code="maybe_views",
+            inputs={
+                "mode": TextContent(text="extract"),
+                "report": _data_url(mime_type="application/octet-stream", raw_bytes=DOCX_BYTES),
+            },
+        )
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await get_pipe_router().run(pipe_job=pipe_job)
+
+        extract_refusal = _find_in_cause_chain(exc_info.value, error_class=ExtractInputFormatError)
+        assert extract_refusal is not None, f"expected an ExtractInputFormatError in the cause chain, got {exc_info.value!r}"
+        assert "Input 'report' is a Word document (.docx), and page views are drawn from a PDF." in str(extract_refusal)
+        extract_worker_call.assert_not_called()

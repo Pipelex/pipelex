@@ -278,23 +278,28 @@ class ContentGenerator(ContentGeneratorProtocol):
             extract_job_params=extract_job_params,
             extract_job_config=extract_job_config,
         )
-        page_contents = await extract_gen_pages_and_store(
-            extract_assignment=extract_assignment,
-            generated_content_factory=self._generated_content_factory,
-        )
-        if extract_job_params and extract_job_params.should_include_page_views:
-            page_view_contents: list[ImageContent] = []
+        # Page views are drawn first, because they cost no inference and the extraction does: a file PDFium cannot open,
+        # which is all that can judge one whose format nothing established, fails here before the extraction is paid for.
+        page_view_contents: list[ImageContent] = []
+        if extract_job_params.should_include_page_views:
             if extract_input.document_uri:
                 page_view_contents = await self.make_render_page_views(
                     extract_input=extract_input,
                     extract_handle=extract_handle,
-                    job_metadata=job_metadata,
+                    # A copy, because the render stamps its own job label on the metadata it is given, and the extraction
+                    # that follows reports its usage under this one.
+                    job_metadata=job_metadata.model_copy(),
                     cogt_run_params=cogt_run_params,
                     extract_job_params=extract_job_params,
                     extract_job_config=extract_job_config,
                 )
             elif extract_input.image_uri:
                 page_view_contents = [ImageContent(url=extract_input.image_uri)]
+        page_contents = await extract_gen_pages_and_store(
+            extract_assignment=extract_assignment,
+            generated_content_factory=self._generated_content_factory,
+        )
+        if extract_job_params.should_include_page_views:
             if len(page_view_contents) != len(page_contents):
                 msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
                 raise ExtractJobFailureError(msg).with_error_code(CoreCode.PROVIDER_RESPONSE_INVALID)

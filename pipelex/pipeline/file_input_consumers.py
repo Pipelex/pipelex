@@ -27,7 +27,8 @@ resolving sub-pipes through the hub:
   extract choice resolves to. A `PipeLLM` consumes the documents its prompt references by variable
   path, and reads its resolved model's document types. A `PipeJudge` consumes the documents its prompt
   references by variable path, as a PipeLLM does, and reads its resolved judgment model's document
-  types. A waterfall reads a format when any of its members reads it.
+  types. A waterfall reads a format when any of its members reads it. A `PipeExtract` that asks for
+  page views also needs a PDF, whatever its model reads, since page views are drawn from one.
 
 The walk depends only on the library and the model deck, never on the input values.
 """
@@ -39,6 +40,7 @@ from typing import Final, NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError
+from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_RENDERER
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
@@ -63,7 +65,7 @@ from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
 from pipelex.pipeline.input_normalizer import IdentifiedFileInput
 from pipelex.runtime_hub import get_model_deck
-from pipelex.tools.misc.filetype_utils import describe_file_format, describe_format_keys
+from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_file_format, describe_format_keys
 from pipelex.tools.uri.resolved_uri import UriKind
 
 # The segment of a consumed path that stands for any item of a list: `("transcripts", "[]")`
@@ -76,6 +78,11 @@ _MAX_PRESET_HOPS: Final[int] = 8
 
 # How a refusal names a web-page model's declaration among the formats it reads.
 _WEB_PAGE_INPUT: Final[str] = "web_page"
+
+# The advice of a refusal, by what the file or the step must change.
+_FORMAT_ADVICE: Final[str] = "Give a file in a format its model reads, or use a model that reads this format."
+_PAGE_VIEWS_MODEL_ADVICE: Final[str] = "Use a model that reads PDFs, or remove page_views from the step."
+_PAGE_VIEWS_FILE_AND_MODEL_ADVICE: Final[str] = "Give a PDF to a model that reads PDFs, or remove page_views from the step."
 
 # What a variable of the current frame stands for: the path, from an entry input slot, of the
 # value it holds. `{"transcript": ("transcripts", "[]")}` inside a batch over `transcripts`.
@@ -126,6 +133,9 @@ class FileInputConsumer(BaseModel):
 
     is_conditional: bool
     """Whether the consumer is reached through a condition or a liftable step, so it may not run at all."""
+
+    asks_for_page_views: bool
+    """Whether the consumer also draws its file's pages as images, which only a PDF allows, whatever its model reads."""
 
     @property
     def model_type(self) -> ModelType:
@@ -199,14 +209,23 @@ def collect_file_input_consumers(entry_pipe: PipeAbstract) -> dict[str, list[Fil
     return consumers_by_slot
 
 
-def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs: list[IdentifiedFileInput]) -> None:
-    """Refuse a run whose file inputs are certain to reach a consumer that cannot read their format.
+class _ConsumerRefusal(NamedTuple):
+    """Why a consumer cannot take a file, as the run's refusal states it."""
 
-    Each file input with a known format is compared with the certain consumers that cover it: a
-    consumer reached through a condition or a liftable step may never run, and one whose model could
-    not be resolved is opaque, so both are left to the operator's own check. A web-page model given
-    an http(s) URL fetches the page itself, so it is not compared. Every violation is collected and
-    reported together.
+    sentence: str
+    advice: str
+    format_param: str
+    model_param: str | None
+
+
+def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs: list[IdentifiedFileInput]) -> None:
+    """Refuse a run whose file inputs are certain to reach a consumer that cannot take them.
+
+    Each file input is compared with the certain consumers that cover it: a consumer reached through a condition or a
+    liftable step may never run, so it is left to the operator's own check. A consumer that asks for page views needs a
+    PDF whatever its model reads; beyond that, a file of a known format is compared with what the model reads, a model
+    that could not be resolved being opaque, and a web-page model given an http(s) URL fetching the page itself. Every
+    violation is collected and reported together.
 
     Args:
         entry_pipe: The pipe the run starts from. Its library must be loaded.
@@ -214,42 +233,87 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
             (`collect_file_inputs`).
 
     Raises:
-        PipelineInputFormatUnsupportedError: If any file input is certain to reach a consumer whose
-            model does not read its format.
+        PipelineInputFormatUnsupportedError: If any file input is certain to reach a consumer that cannot take it.
     """
-    known_file_inputs = [file_input for file_input in file_inputs if file_input.format_key is not None]
-    if not known_file_inputs:
+    if not file_inputs:
         return
     consumers_by_slot = collect_file_input_consumers(entry_pipe)
-    violations: list[str] = []
+    refusals: list[_ConsumerRefusal] = []
     # The code's parameters name one violation, the first, which the message lists among the others: its file is named
     # by the root input, as `input`, and the path down to it, as the location's `field`.
-    first_violation: tuple[IdentifiedFileInput, dict[str, str | None]] | None = None
-    for file_input in known_file_inputs:
-        format_key = file_input.format_key
-        if format_key is None:
-            continue
+    first_violation: tuple[IdentifiedFileInput, _ConsumerRefusal] | None = None
+    for file_input in file_inputs:
         slot_name = str(file_input.path[0])
         for consumer in consumers_by_slot.get(slot_name, []):
-            if consumer.is_conditional or consumer.readable_formats is None or not consumer.covers(file_input_path=file_input.path):
+            if consumer.is_conditional or not consumer.covers(file_input_path=file_input.path):
                 continue
-            if consumer.reads_web_pages and _is_http_url(uri_kind=file_input.uri_kind):
+            refusal = _page_views_refusal(file_input=file_input, consumer=consumer) or _format_refusal(file_input=file_input, consumer=consumer)
+            if refusal is None:
                 continue
-            if format_key in consumer.readable_formats:
-                continue
-            violations.append(
-                f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
-                f"pipe '{consumer.pipe_code}' {consumer.verb_phrase} model '{consumer.model}', "
-                f"which reads {describe_format_keys(format_keys=consumer.listed_formats)}."
-            )
+            refusals.append(refusal)
             if first_violation is None:
-                first_violation = (file_input, {"format": format_key, "model": consumer.model})
+                first_violation = (file_input, refusal)
     if first_violation is not None:
-        msg = " ".join([*violations, "Give a file in a format its model reads, or use a model that reads this format."])
-        violating_input, violation_params = first_violation
+        msg = " ".join([*(refusal.sentence for refusal in refusals), *dict.fromkeys(refusal.advice for refusal in refusals)])
+        violating_input, first_refusal = first_violation
         raise PipelineInputFormatUnsupportedError(msg, input_name=str(violating_input.path[0]), field=violating_input.display_path).with_params(
-            **violation_params
+            format=first_refusal.format_param, model=first_refusal.model_param
         )
+
+
+def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> _ConsumerRefusal | None:
+    """Why a consumer asking for page views cannot draw them from this file, `None` when it can or may.
+
+    A file of a known format other than PDF cannot. A PDF can and a file of unknown format, a URL that declares no type
+    above all, may, unless the consumer's model reads no PDF: that step gives page views for nothing it reads, whatever
+    the file declares.
+    """
+    if not consumer.asks_for_page_views:
+        return None
+    format_key = file_input.format_key
+    reads_no_pdf = consumer.readable_formats is not None and PDF_FORMAT_KEY not in consumer.readable_formats
+    if format_key is not None and format_key != PDF_FORMAT_KEY:
+        return _ConsumerRefusal(
+            sentence=(
+                f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
+                f"pipe '{consumer.pipe_code}' asks for page views, which are drawn from a PDF."
+            ),
+            advice=_PAGE_VIEWS_FILE_AND_MODEL_ADVICE if reads_no_pdf else PAGE_VIEWS_FILE_ADVICE,
+            format_param=format_key,
+            model_param=consumer.model if reads_no_pdf else PAGE_VIEWS_RENDERER,
+        )
+    if not reads_no_pdf:
+        return None
+    return _ConsumerRefusal(
+        sentence=(
+            f"Input '{file_input.display_path}': pipe '{consumer.pipe_code}' asks for page views, which are drawn from a PDF, "
+            f"and model '{consumer.model}' reads {describe_format_keys(format_keys=consumer.listed_formats)}."
+        ),
+        advice=_PAGE_VIEWS_MODEL_ADVICE,
+        format_param=format_key or UNKNOWN_FILE_TYPE,
+        model_param=consumer.model,
+    )
+
+
+def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> _ConsumerRefusal | None:
+    """Why this consumer's model cannot read this file, `None` when it can or when that cannot be known."""
+    format_key = file_input.format_key
+    if format_key is None or consumer.readable_formats is None:
+        return None
+    if consumer.reads_web_pages and _is_http_url(uri_kind=file_input.uri_kind):
+        return None
+    if format_key in consumer.readable_formats:
+        return None
+    return _ConsumerRefusal(
+        sentence=(
+            f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
+            f"pipe '{consumer.pipe_code}' {consumer.verb_phrase} model '{consumer.model}', "
+            f"which reads {describe_format_keys(format_keys=consumer.listed_formats)}."
+        ),
+        advice=_FORMAT_ADVICE,
+        format_param=format_key,
+        model_param=consumer.model,
+    )
 
 
 def _is_http_url(*, uri_kind: UriKind) -> bool:
@@ -508,6 +572,7 @@ def _record_extract_consumer(*, pipe_extract: PipeExtract, frame: _Frame, is_con
             readable_formats=readable_formats,
             reads_web_pages=reads_web_pages,
             is_conditional=is_conditional,
+            asks_for_page_views=pipe_extract.should_include_page_views,
         )
     )
 
@@ -583,6 +648,7 @@ def _record_document_consumers(
                 readable_formats=readable_formats,
                 reads_web_pages=False,
                 is_conditional=is_conditional,
+                asks_for_page_views=False,
             )
         )
 

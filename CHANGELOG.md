@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.97.1] - 2026-11-09
+
+### Fixed
+
+- **`page_views` on a file that is not a PDF**: a `PipeExtract` asking for page views of a Word, Excel or PowerPoint file, a web page or any other file known not to be a PDF, or using a model that reads no PDF on a URL that declares a PDF or no type, is now refused with `input.file_type_unsupported` before the run starts, or at the step before the extraction is paid for when a condition may skip it or an earlier step produced the document. A file of unknown format is opened as a PDF before the extraction, and one that does not open, or holds a page that cannot be drawn, fails with `input.file_unreadable` instead of a raw PDFium error.
+
 ## [v0.97.0] - 2026-11-07
 
 ### Highlights

@@ -13,7 +13,8 @@ from functools import partial
 from typing import TYPE_CHECKING
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
-from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.exceptions import ExtractInputFormatError
+from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_RENDERER, ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.models.model_deck import resolve_deck_choice
@@ -24,6 +25,7 @@ from pipelex.kernel.extract_results import ExtractResult
 from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, describe_file_format, format_key_from_mime_type
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.page_content import PageContent
@@ -71,6 +73,29 @@ def build_extract_job_params(
     )
 
 
+def _refuse_page_views_of_a_known_non_pdf(*, extract_input: ExtractInput, extract_job_params: ExtractJobParams) -> None:
+    """Refuse page views on a document known not to be a PDF, before the extraction is paid for.
+
+    Run setup refuses what is certain before the run; this catches the rest, a step reached through a condition or a
+    document a previous step produced. An unknown format is left to the renderer. An image is its own page view.
+
+    Raises:
+        ExtractInputFormatError: If page views are asked of a document whose format is known and is not PDF.
+    """
+    if not extract_job_params.should_include_page_views or extract_input.document_uri is None:
+        return
+    format_key = format_key_from_mime_type(mime_type=extract_input.mime_type)
+    if format_key is None or format_key == PDF_FORMAT_KEY:
+        return
+    subject = f"Input '{extract_input.input_name}' is" if extract_input.input_name else "The file to extract is"
+    file_format = describe_file_format(format_key=format_key, mime_type=extract_input.mime_type)
+    msg = f"{subject} {file_format}, and page views are drawn from a PDF. {PAGE_VIEWS_FILE_ADVICE}"
+    refusal = ExtractInputFormatError(msg).with_params(format=format_key, model=PAGE_VIEWS_RENDERER)
+    if extract_input.input_name:
+        refusal = refusal.with_params(input=extract_input.input_name)
+    raise refusal
+
+
 async def run_extract(
     *,
     memory: WorkingMemory,
@@ -90,6 +115,7 @@ async def run_extract(
     and image-generation paths.
     """
     with job_metadata.log_context():
+        _refuse_page_views_of_a_known_non_pdf(extract_input=extract_input, extract_job_params=extract_job_params)
         page_contents = await get_content_generator().make_extract_pages(
             extract_input=extract_input,
             cogt_run_params=cogt_run_params,

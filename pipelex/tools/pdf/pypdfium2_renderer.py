@@ -15,6 +15,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
+from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -154,23 +155,38 @@ class PyPdfium2Renderer:
     _pdfium_lock: asyncio.Lock = asyncio.Lock()  # shared per process
 
     # ---- internal blocking helper ------------------------------------
-    # TODO: Needs UT
     @staticmethod
     def _render_pdf_pages_sync(pdf_input: PdfInput, *, scale: float) -> list[Image.Image]:
-        pdf_doc = pdfium.PdfDocument(pdf_input)
+        try:
+            pdf_doc = pdfium.PdfDocument(pdf_input)
+        except pdfium.PdfiumError as exc:
+            msg = f"The file could not be opened as a PDF ({exc}). Page views are drawn from a PDF."
+            raise PdfDocumentUnreadableError(msg) from exc
         images: list[Image.Image] = []
-        for index in range(len(pdf_doc)):
-            page = pdf_doc[index]
+        try:
+            for index in range(len(pdf_doc)):
+                try:
+                    page = pdf_doc[index]
+                except pdfium.PdfiumError as exc:
+                    # A damaged file opens and then fails here: PDFium cannot load a page its page tree counts and does not hold.
+                    msg = f"Page {index + 1} of the PDF could not be drawn ({exc})."
+                    raise PdfDocumentUnreadableError(msg) from exc
+                # Checked rather than caught: for a page with no area pypdfium2 raises the same ValueError as for a bad
+                # scale, which is the step's fault and not the file's.
+                if page.get_width() <= 0 or page.get_height() <= 0:
+                    msg = f"Page {index + 1} of the PDF could not be drawn (the page has no area)."
+                    raise PdfDocumentUnreadableError(msg)
 
-            pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                scale=scale,  # pyright: ignore[reportArgumentType]
-                force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
-                rev_byteorder=True,  # so we get RGBA
-            ).to_pil()
+                pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    scale=scale,  # pyright: ignore[reportArgumentType]
+                    force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
+                    rev_byteorder=True,  # so we get RGBA
+                ).to_pil()
 
-            images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
-            page.close()
-        pdf_doc.close()
+                images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
+                page.close()
+        finally:
+            pdf_doc.close()
         return images
 
     # TODO: Needs UT

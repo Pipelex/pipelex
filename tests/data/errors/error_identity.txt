@@ -255,6 +255,7 @@ OpenAIClientFactoryError | pipelex.config.invalid
 OptionalValueAbsentError | pipe.forced_input_absent
 OutputShapeUnavailableError | request.unsupported
 OutputStructureSchemaError | method.concept_invalid
+PdfDocumentUnreadableError | input.file_unreadable
 PipeComposeError | inherits cause, else pipe.output_invalid
 PipeComposeFactoryError | one of method.template_invalid, method.schema_violation
 PipeComposeTemplateError | method.template_invalid

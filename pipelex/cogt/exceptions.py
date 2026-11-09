@@ -875,7 +875,9 @@ class ExtractCapabilityError(CogtError):
 
 
 class ExtractInputFormatError(CogtError):
-    """The file given to an extraction has a known format that the extract model does not read.
+    """The file given to an extraction has a known format that the step cannot take.
+
+    Its model does not read the format, or the step asks for page views, which are drawn from a PDF.
 
     The input's fault, ``input.file_type_unsupported``: the model is fixed by the method and reads the
     formats it declares, while the file changes from run to run, and the person who can act is the
