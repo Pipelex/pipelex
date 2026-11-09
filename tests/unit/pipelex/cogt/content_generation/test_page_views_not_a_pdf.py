@@ -143,6 +143,25 @@ class TestPageViewsNotAPdf:
 
         extract.assert_not_called()
 
+    async def test_drawing_the_page_views_first_leaves_the_extraction_its_own_job_label(self, mocker: MockerFixture):
+        """The extraction reports its usage under the metadata it carries, which the render must not relabel."""
+        labels: dict[str, str | None] = {}
+
+        def _render(*, render_assignment: Any, **_kwargs: Any) -> list[ImageContent]:
+            labels["render"] = render_assignment.job_metadata.content_generation_job_id
+            return [ImageContent(url="pipelex-storage://view.png")]
+
+        def _extract(*, extract_assignment: Any, **_kwargs: Any) -> list[PageContent]:
+            labels["extract"] = extract_assignment.job_metadata.content_generation_job_id
+            return [PageContent(text_and_images=TextAndImagesContent(text=TextContent(text="page")))]
+
+        mocker.patch("pipelex.cogt.content_generation.content_generator.render_page_views_and_store", new=mocker.AsyncMock(side_effect=_render))
+        mocker.patch("pipelex.cogt.content_generation.content_generator.extract_gen_pages_and_store", new=mocker.AsyncMock(side_effect=_extract))
+
+        await _make_extract_pages(content_generator=_content_generator(mocker))
+
+        assert labels == {"render": "make_render_page_views", "extract": "make_extract_pages"}
+
     async def test_page_views_are_rendered_before_the_extraction_and_attached_to_its_pages(self, mocker: MockerFixture):
         calls: list[str] = []
         page = PageContent(text_and_images=TextAndImagesContent(text=TextContent(text="page")))

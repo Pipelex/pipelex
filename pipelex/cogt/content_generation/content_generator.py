@@ -286,7 +286,9 @@ class ContentGenerator(ContentGeneratorProtocol):
                 page_view_contents = await self.make_render_page_views(
                     extract_input=extract_input,
                     extract_handle=extract_handle,
-                    job_metadata=job_metadata,
+                    # A copy, because the render stamps its own job label on the metadata it is given, and the extraction
+                    # that follows reports its usage under this one.
+                    job_metadata=job_metadata.model_copy(),
                     cogt_run_params=cogt_run_params,
                     extract_job_params=extract_job_params,
                     extract_job_config=extract_job_config,

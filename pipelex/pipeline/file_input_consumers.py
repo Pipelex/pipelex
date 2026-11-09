@@ -82,6 +82,7 @@ _WEB_PAGE_INPUT: Final[str] = "web_page"
 # The advice of a refusal, by what the file or the step must change.
 _FORMAT_ADVICE: Final[str] = "Give a file in a format its model reads, or use a model that reads this format."
 _PAGE_VIEWS_MODEL_ADVICE: Final[str] = "Use a model that reads PDFs, or remove page_views from the step."
+_PAGE_VIEWS_FILE_AND_MODEL_ADVICE: Final[str] = "Give a PDF to a model that reads PDFs, or remove page_views from the step."
 
 # What a variable of the current frame stands for: the path, from an entry input slot, of the
 # value it holds. `{"transcript": ("transcripts", "[]")}` inside a batch over `transcripts`.
@@ -270,17 +271,18 @@ def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputC
     if not consumer.asks_for_page_views:
         return None
     format_key = file_input.format_key
+    reads_no_pdf = consumer.readable_formats is not None and PDF_FORMAT_KEY not in consumer.readable_formats
     if format_key is not None and format_key != PDF_FORMAT_KEY:
         return _ConsumerRefusal(
             sentence=(
                 f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
                 f"pipe '{consumer.pipe_code}' asks for page views, which are drawn from a PDF."
             ),
-            advice=PAGE_VIEWS_FILE_ADVICE,
+            advice=_PAGE_VIEWS_FILE_AND_MODEL_ADVICE if reads_no_pdf else PAGE_VIEWS_FILE_ADVICE,
             format_param=format_key,
-            model_param=PAGE_VIEWS_RENDERER,
+            model_param=consumer.model if reads_no_pdf else PAGE_VIEWS_RENDERER,
         )
-    if consumer.readable_formats is None or PDF_FORMAT_KEY in consumer.readable_formats:
+    if not reads_no_pdf:
         return None
     return _ConsumerRefusal(
         sentence=(
