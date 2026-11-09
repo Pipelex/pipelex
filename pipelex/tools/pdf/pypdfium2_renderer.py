@@ -167,17 +167,21 @@ class PyPdfium2Renderer:
             for index in range(len(pdf_doc)):
                 try:
                     page = pdf_doc[index]
-
-                    pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                        scale=scale,  # pyright: ignore[reportArgumentType]
-                        force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
-                        rev_byteorder=True,  # so we get RGBA
-                    ).to_pil()
-                except (pdfium.PdfiumError, ValueError) as exc:
-                    # A damaged file opens and then fails here: PDFium cannot load a page its page tree counts and does
-                    # not hold, and pypdfium2 raises a ValueError for a page with no area to draw.
+                except pdfium.PdfiumError as exc:
+                    # A damaged file opens and then fails here: PDFium cannot load a page its page tree counts and does not hold.
                     msg = f"Page {index + 1} of the PDF could not be drawn ({exc})."
                     raise PdfDocumentUnreadableError(msg) from exc
+                # Checked rather than caught: for a page with no area pypdfium2 raises the same ValueError as for a bad
+                # scale, which is the step's fault and not the file's.
+                if page.get_width() <= 0 or page.get_height() <= 0:
+                    msg = f"Page {index + 1} of the PDF could not be drawn (the page has no area)."
+                    raise PdfDocumentUnreadableError(msg)
+
+                pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                    scale=scale,  # pyright: ignore[reportArgumentType]
+                    force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
+                    rev_byteorder=True,  # so we get RGBA
+                ).to_pil()
 
                 images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
                 page.close()

@@ -50,12 +50,12 @@ def _job_metadata() -> JobMetadata:
     return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_page_views_not_a_pdf"))
 
 
-def _render_assignment(*, input_name: str | None, document_uri: str = DOCX_DATA_URL) -> RenderPageViewsAssignment:
+def _render_assignment(*, input_name: str | None, document_uri: str = DOCX_DATA_URL, page_views_dpi: int = 72) -> RenderPageViewsAssignment:
     return RenderPageViewsAssignment(
         job_metadata=_job_metadata(),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
         document_uri=document_uri,
-        page_views_dpi=72,
+        page_views_dpi=page_views_dpi,
         input_name=input_name,
     )
 
@@ -114,6 +114,16 @@ class TestPageViewsNotAPdf:
 
         problem = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
         assert problem.get("params") == {"input": "report", "file_type": "pdf", "reason": "pdf_load_failed"}, problem
+
+    async def test_a_dpi_the_renderer_refuses_is_not_blamed_on_the_file(self, mocker: MockerFixture):
+        """The file is a sound PDF, so the caller must not be told to give another one."""
+        sound_pdf = _pdf_data_url(objects={1: PDF_CATALOG, 2: b"<</Type/Pages/Kids[3 0 R]/Count 1>>", 3: PDF_PAGE})
+
+        with pytest.raises(ValueError, match="Crop exceeds page dimensions"):
+            await render_page_views_and_store(
+                render_assignment=_render_assignment(input_name="report", document_uri=sound_pdf, page_views_dpi=-100),
+                generated_content_factory=mocker.MagicMock(),
+            )
 
     async def test_a_url_no_input_gave_names_no_input(self, mocker: MockerFixture):
         with pytest.raises(PdfDocumentUnreadableError) as exc_info:
