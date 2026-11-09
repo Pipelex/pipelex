@@ -57,12 +57,18 @@ Extraction presets are defined in your model deck configuration and can include 
 | `inputs`                    | Fixed  | The value must be of concept `Document` or `Image` (or a concept that refines one of them). For web page extraction, the Document holds a web URL.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the extraction operation. Use `Page[]`.                                  | Yes      |
 | `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
-| `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
-| `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `72`.                                 | No       |
+| `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Only a PDF has pages to draw: see [Page views need a PDF](#page-views-need-a-pdf). Defaults to `false`. | No       |
+| `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views. Defaults to `72`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
 | `render_js`                 | boolean | For web-page extraction: if `true`, the extraction backend renders JavaScript before fetching the page content. Defaults to `false`. *Note: Only honored by backends that support headless rendering.* | No       |
 | `include_raw_html`          | boolean | For web-page extraction: if `true`, the extracted `Page` populates its `raw_html` field with the fetched page's HTML. Defaults to `false`. | No       |
 | `model`                       | string  | The Extract model choice by name, setting, or preset to use (e.g., `"mistral-document-ai-2505"`, `"@default-extract-document"`). Defaults to the model specified in the global config. | No       |
+
+### Page views need a PDF
+
+Page views are drawn from a PDF, whatever the step's `model` reads, so a `Document` that holds a Word, Excel or PowerPoint file, or a web page, gives no page views. An `Image` input is its own single page view, and refuses `page_views` when a method declares it.
+
+A file known not to be a PDF is refused before anything is paid for: before the run starts when the step is certain to run, and at the step, before the extraction call, when a condition may skip it or the document comes from an earlier step. A step whose model reads no PDF, such as `linkup-fetch`, is refused before the run starts for a URL that declares no type. Any other file of unknown format, usually a URL that declares no type, is opened as a PDF, and a file that does not open fails the step with `input.file_unreadable`.
 
 ### Example: Processing a PDF
 

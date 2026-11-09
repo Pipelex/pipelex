@@ -15,6 +15,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
+from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -157,7 +158,11 @@ class PyPdfium2Renderer:
     # TODO: Needs UT
     @staticmethod
     def _render_pdf_pages_sync(pdf_input: PdfInput, *, scale: float) -> list[Image.Image]:
-        pdf_doc = pdfium.PdfDocument(pdf_input)
+        try:
+            pdf_doc = pdfium.PdfDocument(pdf_input)
+        except pdfium.PdfiumError as exc:
+            msg = f"The file could not be opened as a PDF ({exc}). Page views are drawn from a PDF."
+            raise PdfDocumentUnreadableError(msg) from exc
         images: list[Image.Image] = []
         for index in range(len(pdf_doc)):
             page = pdf_doc[index]

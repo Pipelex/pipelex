@@ -1,10 +1,18 @@
-from typing import Self
+from typing import Final, Self
 
 from pydantic import BaseModel, model_validator
 
 from pipelex.cogt.extract.exceptions import ExtractInputError
+from pipelex.cogt.inference.provider_name import ProviderName
 from pipelex.tools.typing.validation_utils import has_exactly_one_among_attributes_from_list
 from pipelex.tools.uri.uri_read_scope import UriReference
+
+# What draws a document's page views. A refusal names it as the model that cannot take the file, since the rule is the
+# renderer's and holds whatever the extraction's own model reads.
+PAGE_VIEWS_RENDERER: Final[str] = ProviderName.PYPDFIUM2.value
+
+# The advice of a refusal to draw page views from a file known not to be a PDF.
+PAGE_VIEWS_FILE_ADVICE: Final[str] = "Give a PDF, or remove page_views from the step."
 
 
 class ExtractInput(BaseModel):

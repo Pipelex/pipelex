@@ -220,6 +220,9 @@ _ZIP_BASED_DOCUMENT_MIME_PREFIXES: Final[tuple[str, ...]] = (
 # The family every image type belongs to, which is how models declare that they read images.
 IMAGE_FORMAT_KEY: Final[str] = "image"
 
+# The one format page views can be drawn from.
+PDF_FORMAT_KEY: Final[str] = "pdf"
+
 _FORMAT_KEY_DESCRIPTIONS: Final[dict[str, str]] = {
     "pdf": "a PDF document",
     "docx": "a Word document",
