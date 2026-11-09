@@ -3,6 +3,7 @@ from typing import Any, Self
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
+from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE
 from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.system.exceptions import ToolError
 
@@ -17,7 +18,7 @@ class PdfDocumentUnreadableError(ToolError):
     """
 
     error_code = CoreCode.INPUT_FILE_UNREADABLE
-    user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail="Give a PDF, or remove page_views from the step.")
+    user_action = UserAction(kind=UserActionKind.CHANGE_INPUT, detail=PAGE_VIEWS_FILE_ADVICE)
 
     def __init__(self, message: str):
         super().__init__(message)

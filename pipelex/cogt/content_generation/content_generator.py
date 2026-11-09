@@ -278,8 +278,8 @@ class ContentGenerator(ContentGeneratorProtocol):
             extract_job_params=extract_job_params,
             extract_job_config=extract_job_config,
         )
-        # Page views are drawn first, because they are free and the extraction is not: a file PDFium cannot open, which
-        # is all that can judge one whose format nothing established, fails here before the extraction is paid for.
+        # Page views are drawn first, because they cost no inference and the extraction does: a file PDFium cannot open,
+        # which is all that can judge one whose format nothing established, fails here before the extraction is paid for.
         page_view_contents: list[ImageContent] = []
         if extract_job_params.should_include_page_views:
             if extract_input.document_uri:

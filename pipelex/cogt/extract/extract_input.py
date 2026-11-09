@@ -9,7 +9,7 @@ from pipelex.tools.uri.uri_read_scope import UriReference
 
 # What draws a document's page views. A refusal names it as the model that cannot take the file, since the rule is the
 # renderer's and holds whatever the extraction's own model reads.
-PAGE_VIEWS_RENDERER: Final[str] = ProviderName.PYPDFIUM2.value
+PAGE_VIEWS_RENDERER: Final[str] = ProviderName.PYPDFIUM2
 
 # The advice of a refusal to draw page views from a file known not to be a PDF.
 PAGE_VIEWS_FILE_ADVICE: Final[str] = "Give a PDF, or remove page_views from the step."

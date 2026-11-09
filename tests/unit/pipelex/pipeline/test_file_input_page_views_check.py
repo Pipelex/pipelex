@@ -108,7 +108,7 @@ class TestFileInputPageViewsCheck:
         assert exc_info.value.to_problem(view=ProblemView.CALLER).to_wire().get("params") == {
             "input": "report",
             "format": "unknown",
-            "model": "pypdfium2",
+            "model": "linkup-fetch",
         }
 
     def test_a_url_of_unknown_format_passes_when_the_model_reads_pdfs(self, mocker: MockerFixture):

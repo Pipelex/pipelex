@@ -287,7 +287,7 @@ def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputC
         ),
         advice=_PAGE_VIEWS_MODEL_ADVICE,
         format_param=UNKNOWN_FILE_TYPE,
-        model_param=PAGE_VIEWS_RENDERER,
+        model_param=consumer.model,
     )
 
 
