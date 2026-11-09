@@ -39,9 +39,11 @@ Each extract model declares the file formats it reads, and a `PipeExtract` step 
 
 A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, or choose a model that reads it. When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).
 
+A step that asks for page views needs a PDF whatever its model reads, since page views are drawn from one: see [Page views need a PDF](../building-methods/pipes/pipe-operators/PipeExtract.md#page-views-need-a-pdf).
+
 ## Key Capabilities
 
-- **Page view generation** — High-fidelity image rendering of extracted pages via pypdfium2
+- **Page view generation** — High-fidelity image rendering of the pages of a PDF via pypdfium2
 - **Embedded image extraction** — Capture images found within documents
 - **Layout analysis** — Structured extraction of complex document layouts
 - **Table recognition** — Automatic table detection and extraction

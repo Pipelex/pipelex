@@ -14,6 +14,7 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 
 
 async def render_page_views_and_store(
@@ -34,10 +35,15 @@ async def render_page_views_and_store(
     from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # ruff: ignore[import-outside-top-level]
 
     with fetching_for_input(input_name=render_assignment.input_name):
-        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(
-            pdf_uri=render_assignment.document_uri,
-            dpi=render_assignment.page_views_dpi,
-        )
+        try:
+            page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(
+                pdf_uri=render_assignment.document_uri,
+                dpi=render_assignment.page_views_dpi,
+            )
+        except PdfDocumentUnreadableError as exc:
+            if render_assignment.input_name is not None:
+                exc.with_input(input_name=render_assignment.input_name)
+            raise
     image_contents: list[ImageContent] = []
     for page_view_image in page_view_images:
         raw_details = GeneratedImageRawDetails.make_from_pil_image(
