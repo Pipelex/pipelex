@@ -111,6 +111,22 @@ class TestFileInputPageViewsCheck:
             "model": "linkup-fetch",
         }
 
+    def test_a_url_declared_as_a_pdf_is_refused_when_the_model_reads_no_pdf(self, mocker: MockerFixture):
+        """A web-page model skips the format check on an http(s) URL and returns one page for a whole file."""
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            _check(
+                mocker=mocker,
+                consumer=_consumer(asks_for_page_views=True, readable_formats=frozenset(), reads_web_pages=True, model="linkup-fetch"),
+                file_input=_file_input(mime_type=PDF_MIME, uri_kind=UriKind.HTTP_URL),
+            )
+
+        assert exc_info.value.message.endswith("Use a model that reads PDFs, or remove page_views from the step.")
+        assert exc_info.value.to_problem(view=ProblemView.CALLER).to_wire().get("params") == {
+            "input": "report",
+            "format": "pdf",
+            "model": "linkup-fetch",
+        }
+
     def test_a_url_of_unknown_format_passes_when_the_model_reads_pdfs(self, mocker: MockerFixture):
         """It may be a PDF, and setup never fetches a URL: the renderer's own refusal is what judges it."""
         _check(

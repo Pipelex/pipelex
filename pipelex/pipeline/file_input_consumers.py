@@ -263,19 +263,21 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
 def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> _ConsumerRefusal | None:
     """Why a consumer asking for page views cannot draw them from this file, `None` when it can or may.
 
-    A PDF can, and a file of a known format is not one. A file of unknown format, a URL that declares no type above
-    all, may be one, unless the consumer's model reads no PDF: that step can give page views for nothing it reads.
+    A file of a known format other than PDF cannot. A PDF can and a file of unknown format, a URL that declares no type
+    above all, may, unless the consumer's model reads no PDF: that step gives page views for nothing it reads, whatever
+    the file declares.
     """
-    if not consumer.asks_for_page_views or file_input.format_key == PDF_FORMAT_KEY:
+    if not consumer.asks_for_page_views:
         return None
-    if file_input.format_key is not None:
+    format_key = file_input.format_key
+    if format_key is not None and format_key != PDF_FORMAT_KEY:
         return _ConsumerRefusal(
             sentence=(
-                f"Input '{file_input.display_path}' is {describe_file_format(format_key=file_input.format_key, mime_type=file_input.mime_type)}: "
+                f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
                 f"pipe '{consumer.pipe_code}' asks for page views, which are drawn from a PDF."
             ),
             advice=PAGE_VIEWS_FILE_ADVICE,
-            format_param=file_input.format_key,
+            format_param=format_key,
             model_param=PAGE_VIEWS_RENDERER,
         )
     if consumer.readable_formats is None or PDF_FORMAT_KEY in consumer.readable_formats:
@@ -286,7 +288,7 @@ def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputC
             f"and model '{consumer.model}' reads {describe_format_keys(format_keys=consumer.listed_formats)}."
         ),
         advice=_PAGE_VIEWS_MODEL_ADVICE,
-        format_param=UNKNOWN_FILE_TYPE,
+        format_param=format_key or UNKNOWN_FILE_TYPE,
         model_param=consumer.model,
     )
 

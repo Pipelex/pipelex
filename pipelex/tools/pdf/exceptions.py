@@ -9,7 +9,7 @@ from pipelex.system.exceptions import ToolError
 
 
 class PdfDocumentUnreadableError(ToolError):
-    """PDFium could not open a file it was asked to draw page views from.
+    """PDFium could not open a file it was asked to draw page views from, or could not draw one of its pages.
 
     Page views are drawn from a PDF, so a file of any other format lands here, as does a damaged or password-protected
     PDF. It is what catches a file whose format nothing established, a URL that declares no type above all, which run
@@ -26,7 +26,7 @@ class PdfDocumentUnreadableError(ToolError):
         self.input_name: str | None = None
 
     def with_input(self, *, input_name: str) -> Self:
-        """Name, where it is caught, the input whose file could not be opened.
+        """Name, where it is caught, the input whose file could not be read.
 
         Returns:
             This error, so that the catch site can re-raise it.

@@ -155,7 +155,6 @@ class PyPdfium2Renderer:
     _pdfium_lock: asyncio.Lock = asyncio.Lock()  # shared per process
 
     # ---- internal blocking helper ------------------------------------
-    # TODO: Needs UT
     @staticmethod
     def _render_pdf_pages_sync(pdf_input: PdfInput, *, scale: float) -> list[Image.Image]:
         try:
@@ -164,18 +163,26 @@ class PyPdfium2Renderer:
             msg = f"The file could not be opened as a PDF ({exc}). Page views are drawn from a PDF."
             raise PdfDocumentUnreadableError(msg) from exc
         images: list[Image.Image] = []
-        for index in range(len(pdf_doc)):
-            page = pdf_doc[index]
+        try:
+            for index in range(len(pdf_doc)):
+                try:
+                    page = pdf_doc[index]
 
-            pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                scale=scale,  # pyright: ignore[reportArgumentType]
-                force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
-                rev_byteorder=True,  # so we get RGBA
-            ).to_pil()
+                    pil_img: Image.Image = page.render(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                        scale=scale,  # pyright: ignore[reportArgumentType]
+                        force_bitmap_format=FPDFBitmap_BGRA,  # always 4-channel
+                        rev_byteorder=True,  # so we get RGBA
+                    ).to_pil()
+                except (pdfium.PdfiumError, ValueError) as exc:
+                    # A damaged file opens and then fails here: PDFium cannot load a page its page tree counts and does
+                    # not hold, and pypdfium2 raises a ValueError for a page with no area to draw.
+                    msg = f"Page {index + 1} of the PDF could not be drawn ({exc})."
+                    raise PdfDocumentUnreadableError(msg) from exc
 
-            images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
-            page.close()
-        pdf_doc.close()
+                images.append(pil_img)  # pyright: ignore[reportUnknownArgumentType]
+                page.close()
+        finally:
+            pdf_doc.close()
         return images
 
     # TODO: Needs UT

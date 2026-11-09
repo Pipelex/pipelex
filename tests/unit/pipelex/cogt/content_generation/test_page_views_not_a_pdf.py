@@ -26,17 +26,35 @@ from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from tests.cases import DocumentTestCases
 
 DOCX_DATA_URL = "data:application/octet-stream;base64," + base64.b64encode(Path(DocumentTestCases.DOCX_FILE_PATH_1).read_bytes()).decode("ascii")
+PDF_CATALOG = b"<</Type/Catalog/Pages 2 0 R>>"
+PDF_PAGE = b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>"
+
+
+def _pdf_data_url(*, objects: dict[int, bytes]) -> str:
+    """A PDF of exactly these objects, with a sound cross-reference table so that PDFium opens it whatever its pages hold."""
+    body = bytearray(b"%PDF-1.7\n")
+    offsets: dict[int, int] = {}
+    for number, content in objects.items():
+        offsets[number] = len(body)
+        body += f"{number} 0 obj\n".encode() + content + b"\nendobj\n"
+    xref_offset = len(body)
+    size = max(objects) + 1
+    body += f"xref\n0 {size}\n0000000000 65535 f \n".encode()
+    for number in range(1, size):
+        body += f"{offsets[number]:010d} 00000 n \n".encode()
+    body += f"trailer\n<</Size {size}/Root 1 0 R>>\nstartxref\n{xref_offset}\n%%EOF\n".encode()
+    return "data:application/pdf;base64," + base64.b64encode(bytes(body)).decode("ascii")
 
 
 def _job_metadata() -> JobMetadata:
     return JobMetadata(run_metadata=RunMetadata(storage_scope="test/scope", read_scope=None, user_id="u", pipeline_run_id="run_page_views_not_a_pdf"))
 
 
-def _render_assignment(*, input_name: str | None) -> RenderPageViewsAssignment:
+def _render_assignment(*, input_name: str | None, document_uri: str = DOCX_DATA_URL) -> RenderPageViewsAssignment:
     return RenderPageViewsAssignment(
         job_metadata=_job_metadata(),
         cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
-        document_uri=DOCX_DATA_URL,
+        document_uri=document_uri,
         page_views_dpi=72,
         input_name=input_name,
     )
@@ -72,6 +90,30 @@ class TestPageViewsNotAPdf:
         assert problem.get("params") == {"input": "report", "file_type": "pdf", "reason": "pdf_load_failed"}, problem
         assert "Page views are drawn from a PDF" in exc_info.value.message
         assert "Data format error" in exc_info.value.message
+
+    @pytest.mark.parametrize(
+        "objects",
+        [
+            pytest.param({1: PDF_CATALOG, 2: b"<</Type/Pages/Kids[3 0 R]/Count 2>>", 3: PDF_PAGE}, id="a-page-the-file-counts-and-does-not-hold"),
+            pytest.param(
+                {
+                    1: PDF_CATALOG,
+                    2: b"<</Type/Pages/Kids[3 0 R]/Count 1>>",
+                    3: b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 100 100]/CropBox[200 200 300 300]>>",
+                },
+                id="a-page-with-no-area-to-draw",
+            ),
+        ],
+    )
+    async def test_a_pdf_that_opens_and_cannot_be_drawn_is_an_unreadable_input(self, mocker: MockerFixture, objects: dict[int, bytes]):
+        with pytest.raises(PdfDocumentUnreadableError, match=r"^Page \d+ of the PDF could not be drawn") as exc_info:
+            await render_page_views_and_store(
+                render_assignment=_render_assignment(input_name="report", document_uri=_pdf_data_url(objects=objects)),
+                generated_content_factory=mocker.MagicMock(),
+            )
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
+        assert problem.get("params") == {"input": "report", "file_type": "pdf", "reason": "pdf_load_failed"}, problem
 
     async def test_a_url_no_input_gave_names_no_input(self, mocker: MockerFixture):
         with pytest.raises(PdfDocumentUnreadableError) as exc_info:
