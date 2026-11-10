@@ -29,6 +29,7 @@ import httpx
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.document_conversion.converter_version_cache import ConverterVersionCache
 from pipelex.tools.document_conversion.document_converter_protocol import (
     PDF_MAGIC,
     ConvertedPdf,
@@ -109,7 +110,7 @@ class GotenbergConverter(DocumentConverterProtocol):
             unavailable_retry_delays_seconds: The pauses before each new attempt when an answer says nothing about the file.
         """
         self._base_url = base_url.rstrip("/")
-        self._converter_version = configured_version or None
+        self._version_cache = ConverterVersionCache(known_version=configured_version or None)
         self._timeout = httpx.Timeout(
             connect=_CONNECT_TIMEOUT_SECONDS, read=timeout_seconds, write=_WRITE_TIMEOUT_SECONDS, pool=_POOL_TIMEOUT_SECONDS
         )
@@ -129,13 +130,18 @@ class GotenbergConverter(DocumentConverterProtocol):
 
     @override
     async def get_converter_version(self) -> str:
-        if self._converter_version is not None:
-            return self._converter_version
+        return await self._version_cache.get_or_fetch(fetch=self._fetch_version)
+
+    async def _fetch_version(self) -> str:
+        """Ask Gotenberg its version, pausing and asking again while it says nothing.
+
+        Raises:
+            DocumentConverterUnavailableError: Every attempt's answer said nothing.
+        """
         nb_pauses = 0
         while True:
             outcome = await self._ask_version_once()
             if isinstance(outcome, str):
-                self._converter_version = outcome
                 return outcome
             await self._pause_or_give_up(answer=outcome, nb_pauses=nb_pauses)
             nb_pauses += 1

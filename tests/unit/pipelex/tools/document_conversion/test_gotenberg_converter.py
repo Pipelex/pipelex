@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 
 import httpx
@@ -110,6 +111,30 @@ class TestGotenbergConverter:
         assert first.converter_version == "8.99.0"
         assert second.converter_version == "8.99.0"
         assert len(gotenberg.version_requests) == 1
+
+    async def test_callers_starting_at_once_ask_gotenberg_its_version_once(self) -> None:
+        version_requests: list[httpx.Request] = []
+
+        async def answer_version_slowly(request: httpx.Request) -> httpx.Response:
+            version_requests.append(request)
+            # The others start while the first waits for its answer.
+            await asyncio.sleep(0.01)
+            return httpx.Response(200, text="8.99.0\n")
+
+        converter = GotenbergConverter(
+            base_url=BASE_URL,
+            configured_version=None,
+            timeout_seconds=360,
+            budget_seconds=BUDGET_SECONDS,
+            max_source_bytes=MAX_SOURCE_BYTES,
+            transport=httpx.MockTransport(answer_version_slowly),
+            unavailable_retry_delays_seconds=NO_PAUSES,
+        )
+
+        versions = await asyncio.gather(*(converter.get_converter_version() for _ in range(5)))
+
+        assert versions == ["8.99.0"] * 5
+        assert len(version_requests) == 1
 
     async def test_a_version_gotenberg_cannot_give_is_the_converter_unavailable(self) -> None:
         def refuse_everything(request: httpx.Request) -> httpx.Response:

@@ -56,6 +56,8 @@ class _FakeSoffice:
                 process.returncode = 1
                 process.communicate = self.mocker.AsyncMock(return_value=(b"Error: source file could not be loaded\n", None))
             case _:
+                # Still running until killed.
+                process.returncode = None
 
                 async def never_finish() -> tuple[bytes, None]:
                     await asyncio.sleep(60)
@@ -146,3 +148,35 @@ class TestSofficeConverter:
         with pytest.raises(DocumentConverterUnavailableError) as exc_info:
             await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="odt")
         assert exc_info.value.resolve_error_code() == CoreCode.RUNTIME_UNAVAILABLE
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows has no process groups to kill; the process alone is killed there")
+    async def test_a_cancelled_conversion_kills_and_reaps_the_process_group_and_leaves_no_directory(self, mocker: MockerFixture) -> None:
+        fake_soffice = _install(mocker=mocker, mode="hang")
+        killpg = mocker.patch(f"{_MODULE}.os.killpg")
+        converter = _make_converter()
+
+        conversion = asyncio.create_task(converter.convert_to_pdf(data=SOURCE_BYTES, format_key="docx"))
+        for _ in range(200):
+            if fake_soffice.conversion_process is not None:
+                break
+            await asyncio.sleep(0.01)
+        await asyncio.sleep(0.01)
+        conversion.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await conversion
+
+        killpg.assert_called_once_with(PROCESS_PID, signal.SIGKILL)
+        assert fake_soffice.conversion_process is not None
+        fake_soffice.conversion_process.wait.assert_awaited_once()
+        conversion_command = next(command for command in fake_soffice.commands if "--convert-to" in command)
+        work_dir = Path(conversion_command[conversion_command.index("--outdir") + 1]).parent
+        assert not work_dir.exists()
+
+    async def test_callers_starting_at_once_ask_soffice_its_version_once(self, mocker: MockerFixture) -> None:
+        fake_soffice = _install(mocker=mocker, mode="convert")
+        converter = _make_converter()
+
+        versions = await asyncio.gather(*(converter.get_converter_version() for _ in range(5)))
+
+        assert set(versions) == {"LibreOffice 24.8.4.2 bb3cfa12c7b1bf994ecc5649a80400d06cd71002"}
+        assert len(fake_soffice.commands) == 1

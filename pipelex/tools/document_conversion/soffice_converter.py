@@ -13,15 +13,18 @@ launcher alone would leave it running.
 import asyncio
 import contextlib
 import os
+import shutil
 import signal
 import sys
 import tempfile
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from time import monotonic
 
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.document_conversion.converter_version_cache import ConverterVersionCache
 from pipelex.tools.document_conversion.document_converter_protocol import (
     PDF_MAGIC,
     ConvertedPdf,
@@ -53,26 +56,37 @@ class SofficeConverter(DocumentConverterProtocol):
         """Set up the backend; `soffice` is first run by the first conversion or version request.
 
         Args:
-            binary_path: The `soffice` executable, already found.
+            binary_path: The `soffice` executable, already found, as an absolute path.
             timeout_seconds: How long one conversion may run before its process group is killed.
             max_source_bytes: The largest file converted; a larger one is refused before anything runs.
         """
         self._binary_path = binary_path
         self._timeout_seconds = timeout_seconds
         self._max_source_bytes = max_source_bytes
-        self._converter_version: str | None = None
+        self._version_cache = ConverterVersionCache(known_version=None)
 
     @property
     @override
     def converter_name(self) -> str:
         return SOFFICE_CONVERTER_NAME
 
+    @property
+    def binary_path(self) -> Path:
+        """The `soffice` executable this backend runs."""
+        return self._binary_path
+
     @override
     async def get_converter_version(self) -> str:
-        if self._converter_version is not None:
-            return self._converter_version
-        with tempfile.TemporaryDirectory(prefix="pipelex-soffice-") as work_dir_name:
-            outcome = await self._run(arguments=["--version"], work_dir=Path(work_dir_name))
+        return await self._version_cache.get_or_fetch(fetch=self._fetch_version)
+
+    async def _fetch_version(self) -> str:
+        """The first line `soffice --version` prints.
+
+        Raises:
+            DocumentConverterUnavailableError: `soffice` could not be started, or printed no version.
+        """
+        async with _temporary_work_dir() as work_dir:
+            outcome = await self._run(arguments=["--version"], work_dir=work_dir)
         if outcome is None:
             msg = f"soffice did not print its version within {self._timeout_seconds:.0f} seconds."
             raise DocumentConverterUnavailableError(msg)
@@ -81,7 +95,6 @@ class SofficeConverter(DocumentConverterProtocol):
         if return_code != 0 or not version:
             msg = f"soffice did not print its version: exit code {return_code}, output {output[:_OUTPUT_EXCERPT_CHARS]!r}."
             raise DocumentConverterUnavailableError(msg)
-        self._converter_version = version
         return version
 
     @override
@@ -97,12 +110,10 @@ class SofficeConverter(DocumentConverterProtocol):
             )
         converter_version = await self.get_converter_version()
 
-        with tempfile.TemporaryDirectory(prefix="pipelex-soffice-") as work_dir_name:
-            work_dir = Path(work_dir_name)
+        async with _temporary_work_dir() as work_dir:
             source_path = work_dir / f"{_SOURCE_STEM}.{normalized_format_key}"
-            source_path.write_bytes(data)
             output_dir = work_dir / "out"
-            output_dir.mkdir()
+            await asyncio.to_thread(_write_source, source_path=source_path, data=data, output_dir=output_dir)
             started = monotonic()
             outcome = await self._run(
                 arguments=["--headless", "--norestore", "--convert-to", "pdf", "--outdir", str(output_dir), str(source_path)],
@@ -119,11 +130,10 @@ class SofficeConverter(DocumentConverterProtocol):
                     size=round(elapsed),
                 )
             return_code, output = outcome
-            pdf_path = output_dir / f"{_SOURCE_STEM}.pdf"
-            if not pdf_path.is_file():
-                msg = f"soffice produced no PDF: exit code {return_code}, output {output[:_OUTPUT_EXCERPT_CHARS]!r}."
-                raise DocumentUnreadableByConverterError(msg, format_key=normalized_format_key)
-            pdf_bytes = pdf_path.read_bytes()
+            pdf_bytes = await asyncio.to_thread(_read_pdf_if_written, pdf_path=output_dir / f"{_SOURCE_STEM}.pdf")
+        if pdf_bytes is None:
+            msg = f"soffice produced no PDF: exit code {return_code}, output {output[:_OUTPUT_EXCERPT_CHARS]!r}."
+            raise DocumentUnreadableByConverterError(msg, format_key=normalized_format_key)
         if not pdf_bytes.startswith(PDF_MAGIC):
             msg = f"soffice wrote {len(pdf_bytes)} bytes that are not a PDF."
             raise DocumentConverterAnswerError(msg)
@@ -132,6 +142,9 @@ class SofficeConverter(DocumentConverterProtocol):
 
     async def _run(self, *, arguments: list[str], work_dir: Path) -> tuple[int, str] | None:
         """Run `soffice` with a fresh profile under `work_dir`, its exit code and output, or None when it was killed.
+
+        The process group is killed and reaped whenever the run ends with the process still alive: at the timeout, and
+        when the task awaiting it is cancelled or anything else interrupts it, so no LibreOffice outlives its caller.
 
         Raises:
             DocumentConverterUnavailableError: The executable could not be started.
@@ -154,12 +167,39 @@ class SofficeConverter(DocumentConverterProtocol):
         try:
             stdout, _ = await asyncio.wait_for(process.communicate(), timeout=self._timeout_seconds)
         except TimeoutError:
-            _kill_process_group(process=process)
-            await process.wait()
             return None
+        finally:
+            if process.returncode is None:
+                _kill_process_group(process=process)
+                # Shielded, so a second cancellation does not leave the killed process unreaped.
+                await asyncio.shield(process.wait())
         output = stdout.decode("utf-8", errors="replace") if stdout else ""
         return_code = process.returncode if process.returncode is not None else -1
         return return_code, output
+
+
+@contextlib.asynccontextmanager
+async def _temporary_work_dir() -> AsyncGenerator[Path, None]:
+    """A temporary directory of one conversion, made and removed in a worker thread, removed however the work ends."""
+    work_dir = Path(await asyncio.to_thread(tempfile.mkdtemp, prefix="pipelex-soffice-"))
+    try:
+        yield work_dir
+    finally:
+        # Shielded, so a cancelled conversion still leaves no directory behind.
+        await asyncio.shield(asyncio.to_thread(shutil.rmtree, work_dir, ignore_errors=True))
+
+
+def _write_source(*, source_path: Path, data: bytes, output_dir: Path) -> None:
+    """Write the file to convert and make the directory `soffice` writes its PDF to."""
+    source_path.write_bytes(data)
+    output_dir.mkdir()
+
+
+def _read_pdf_if_written(*, pdf_path: Path) -> bytes | None:
+    """The PDF `soffice` wrote, or None when it wrote none."""
+    if not pdf_path.is_file():
+        return None
+    return pdf_path.read_bytes()
 
 
 def _kill_process_group(*, process: asyncio.subprocess.Process) -> None:

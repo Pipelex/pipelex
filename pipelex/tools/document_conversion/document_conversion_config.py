@@ -1,7 +1,7 @@
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
 
@@ -28,6 +28,18 @@ class GotenbergConversionConfig(ConfigModel):
     # Gotenberg's own budget for one conversion, queue included: its `--api-timeout`. A connection that ends with no
     # answer after it is the file outrunning its budget; before it, the converter going away.
     budget_seconds: Annotated[float, Field(gt=0)]
+
+    @model_validator(mode="after")
+    def _validate_timeout_outlasts_budget(self) -> Self:
+        # The client tells a file that outran the budget from a converter gone away by when the connection ended, so it
+        # must still be waiting when the budget runs out: a timeout at or under the budget reads every slow file as gone.
+        if self.timeout_seconds <= self.budget_seconds:
+            msg = (
+                f"[runtime.document_conversion.gotenberg] timeout_seconds ({self.timeout_seconds:g}) must exceed budget_seconds "
+                f"({self.budget_seconds:g}), Gotenberg's own budget for a conversion."
+            )
+            raise ValueError(msg)
+        return self
 
 
 class SofficeConversionConfig(ConfigModel):

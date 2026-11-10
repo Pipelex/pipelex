@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
+from pydantic import ValidationError
 from pytest_mock import MockerFixture
 
 from pipelex.errors.problem import ProblemView
@@ -59,6 +60,24 @@ class TestDocumentConverterFactory:
         assert isinstance(converter, SofficeConverter)
         which.assert_called_once_with("soffice")
 
+    def test_a_relative_soffice_path_is_made_absolute(self, mocker: MockerFixture) -> None:
+        mocker.patch("pipelex.tools.document_conversion.document_converter_factory.shutil.which", return_value="tools/soffice")
+
+        converter = make_optional_document_converter_from_config(config=_config(backend="soffice", soffice_binary="tools/soffice"))
+
+        assert isinstance(converter, SofficeConverter)
+        assert converter.binary_path == (Path.cwd() / "tools" / "soffice").resolve()
+        assert converter.binary_path.is_absolute()
+
+    @pytest.mark.parametrize("timeout_seconds", [120, 60])
+    def test_a_gotenberg_timeout_not_past_its_budget_is_refused(self, timeout_seconds: float) -> None:
+        table = _packaged_table()
+        table["gotenberg"]["timeout_seconds"] = timeout_seconds
+        table["gotenberg"]["budget_seconds"] = 120
+
+        with pytest.raises(ValidationError, match=r"timeout_seconds .* must exceed budget_seconds"):
+            DocumentConversionConfig.model_validate(table)
+
     @pytest.mark.parametrize(
         ("backend", "gotenberg_url", "soffice_binary"),
         [
@@ -66,8 +85,23 @@ class TestDocumentConverterFactory:
             ("gotenberg", "   ", "soffice"),
             ("soffice", "", "no-such-soffice-binary-anywhere"),
             ("soffice", "", ""),
+            ("gotenberg", "localhost:3000", "soffice"),
+            ("gotenberg", "banana", "soffice"),
+            ("gotenberg", "ftp://gotenberg:3000", "soffice"),
+            ("gotenberg", "http://", "soffice"),
+            ("gotenberg", "http://gotenberg:port", "soffice"),
         ],
-        ids=["gotenberg-without-url", "gotenberg-blank-url", "soffice-not-found", "soffice-blank-binary"],
+        ids=[
+            "gotenberg-without-url",
+            "gotenberg-blank-url",
+            "soffice-not-found",
+            "soffice-blank-binary",
+            "gotenberg-url-without-scheme",
+            "gotenberg-url-not-a-url",
+            "gotenberg-url-not-http",
+            "gotenberg-url-without-host",
+            "gotenberg-url-bad-port",
+        ],
     )
     def test_a_backend_named_but_unusable_is_misconfigured(self, backend: str, gotenberg_url: str, soffice_binary: str) -> None:
         config = _config(backend=backend, gotenberg_url=gotenberg_url, soffice_binary=soffice_binary)
