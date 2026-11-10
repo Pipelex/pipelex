@@ -29,6 +29,7 @@ from pipelex.system.exceptions import InvocationPathError
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext, make_trace_id_prefix
+from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in __init__ annotations
 from pipelex.tracing.trace_events import (
     BatchAggregateEvent,
@@ -39,6 +40,7 @@ from pipelex.tracing.trace_events import (
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
+    FileConvertedEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSkippedEvent,
@@ -987,6 +989,48 @@ class GraphTracer(GraphTracerProtocol):
                     sequence=self._next_event_sequence(),
                     node_id=node_id,
                     execution_data=execution_data,
+                )
+            )
+
+    @override
+    def register_file_conversion(
+        self,
+        *,
+        node_id: str,
+        input_name: str | None,
+        format_key: str,
+        readable_pdf: ReadablePdf,
+    ) -> None:
+        """Record that a step reads an Office file as its PDF, as a `file_converted` event on the step's node.
+
+        Nothing of the graph depends on it: the event is for the trace's readers, the page count explaining what the
+        step is billed on. Like the execution data of a node, it is recorded only on a node this tracer started.
+        """
+        if not self._is_active:
+            return
+        node_data = self._nodes.get(node_id)
+        if node_data is None:
+            return
+        if self._event_log is not None:
+            self._emit_event(
+                FileConvertedEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    writer_id=self._event_writer_id(),
+                    workflow_id=self._workflow_id,
+                    attempt=self._attempt,
+                    lineage=list(self._lineage),
+                    path=node_data.path,
+                    mode=self._run_mode,
+                    timestamp=datetime.now(UTC),
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    input_name=input_name,
+                    format_key=format_key,
+                    origin=readable_pdf.origin,
+                    converter_name=readable_pdf.converter_name,
+                    converter_version=readable_pdf.converter_version,
+                    page_count=readable_pdf.page_count,
+                    conversion_seconds=readable_pdf.conversion_seconds,
                 )
             )
 

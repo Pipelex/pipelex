@@ -18,6 +18,7 @@ from pipelex.graph.graphspec import MAX_STACK_LENGTH, EdgeKind, IOSpec, NodeKind
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobCategory, JobMetadata, RunMetadata, UnitJobId
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
 from pipelex.tracing import trace_events as trace_events_module
 from pipelex.tracing.trace_events import (
     AnyTraceEvent,
@@ -29,6 +30,7 @@ from pipelex.tracing.trace_events import (
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
+    FileConvertedEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSkippedEvent,
@@ -260,6 +262,20 @@ class TestTraceEvents:
                 "tokens_usage": _Shared.make_llm_tokens_usage(),
             },
         ),
+        (
+            "file_converted",
+            TraceEventKind.FILE_CONVERTED,
+            {
+                "node_id": _Shared.NODE_ID,
+                "input_name": "report",
+                "format_key": "docx",
+                "origin": PdfOrigin.MADE,
+                "converter_name": "gotenberg",
+                "converter_version": "gotenberg-8.17.3",
+                "page_count": 3,
+                "conversion_seconds": 1.5,
+            },
+        ),
     ]
 
     EVENT_CLASSES: ClassVar[dict[TraceEventKind, type[TraceEvent]]] = {
@@ -277,6 +293,7 @@ class TestTraceEvents:
         TraceEventKind.CONDITION_RESOLVED: ConditionResolvedEvent,
         TraceEventKind.EXECUTION_DATA: ExecutionDataEvent,
         TraceEventKind.USAGE_REPORT: UsageReportEvent,
+        TraceEventKind.FILE_CONVERTED: FileConvertedEvent,
     }
 
     @pytest.mark.parametrize(
