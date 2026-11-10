@@ -4,6 +4,7 @@ from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.cogt.content_generation.assignment_models import (
+    DocumentConversionAssignment,
     ExtractAssignment,
     ImgGenAssignment,
     JudgmentAssignment,
@@ -17,6 +18,7 @@ from pipelex.cogt.content_generation.assignment_models import (
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.doc_gen_generate import render_document_and_store
+from pipelex.cogt.content_generation.document_conversion_generate import readable_pdf_of_document
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages_and_store
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list_and_store, img_gen_single_image_and_store
@@ -43,6 +45,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -255,6 +258,26 @@ class ContentGenerator(ContentGeneratorProtocol):
             render_assignment=render_assignment,
             generated_content_factory=self._generated_content_factory,
         )
+
+    @override
+    @update_job_metadata
+    async def make_readable_pdf(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        source_uri: str,
+        format_key: str,
+        input_name: str | None,
+    ) -> ReadablePdf:
+        conversion_assignment = DocumentConversionAssignment(
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+            source_uri=source_uri,
+            format_key=format_key,
+            input_name=input_name,
+        )
+        return await readable_pdf_of_document(conversion_assignment=conversion_assignment)
 
     @override
     @update_job_metadata

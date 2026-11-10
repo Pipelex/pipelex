@@ -138,6 +138,16 @@ class DocumentFormatNotConvertibleError(ToolError):
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
+class KeptPdfConflictError(ToolError):
+    """The key a run keeps a PDF under, named by its source's hash, holds an object that is not a printed-pages PDF.
+
+    Nothing but the runtime writes there, and PDFs are written create-only, so it cannot be replaced: a fault of the
+    deployment's storage, not of the input.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class DocumentConverterMisconfiguredError(ToolError):
     """The configured conversion backend cannot be used: a Gotenberg URL missing, or a `soffice` binary not found.
 

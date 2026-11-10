@@ -180,6 +180,7 @@ JudgmentModelMissingError | model.unspecified
 JudgmentModelNotFoundError | model.unavailable
 JudgmentOutputFieldsError | runtime.unexpected
 JudgmentRefusedError | model.content_refused
+KeptPdfConflictError | runtime.unexpected
 KitError | runtime.unexpected
 KitIndexLoadingError | runtime.unexpected
 LLMCapabilityError | one of model.capability_unsupported, model.context_exceeded

@@ -189,6 +189,18 @@ class PyPdfium2Renderer:
             pdf_doc.close()
         return images
 
+    @staticmethod
+    def _count_pdf_pages_sync(*, pdf_input: PdfInput) -> int:
+        try:
+            pdf_doc = pdfium.PdfDocument(pdf_input)
+        except pdfium.PdfiumError as exc:
+            msg = f"The file could not be opened as a PDF ({exc})."
+            raise PdfDocumentUnreadableError(msg) from exc
+        try:
+            return len(pdf_doc)
+        finally:
+            pdf_doc.close()
+
     # TODO: Needs UT
     @staticmethod
     def _extract_text_from_pdf_pages_sync(pdf_input: PdfInput) -> list[str]:
@@ -285,6 +297,15 @@ class PyPdfium2Renderer:
         """Render *one* page and return PNG bytes."""
         async with self._pdfium_lock:
             return await asyncio.to_thread(self._render_pdf_pages_sync, pdf_input, scale=scale)
+
+    async def count_pdf_pages(self, *, pdf_input: PdfInput) -> int:
+        """The number of pages of a PDF, read without drawing any of them.
+
+        Raises:
+            PdfDocumentUnreadableError: PDFium could not open the file as a PDF.
+        """
+        async with self._pdfium_lock:
+            return await asyncio.to_thread(self._count_pdf_pages_sync, pdf_input=pdf_input)
 
     async def extract_text_from_pdf_pages(self, pdf_input: PdfInput) -> list[str]:
         """Extract text from all pages of a PDF."""
