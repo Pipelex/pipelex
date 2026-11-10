@@ -302,7 +302,7 @@ async def read_document_as_pdf(
             "A step reads an Office file as its PDF",
             fields={
                 "pipe_code": job_metadata.pipe_code,
-                "input_name": input_name,
+                "input_path": input_name,
                 "format_key": format_key,
                 "origin": readable_pdf.origin,
                 "converter_version": readable_pdf.converter_version,
