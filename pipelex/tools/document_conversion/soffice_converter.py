@@ -20,6 +20,7 @@ import tempfile
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from time import monotonic
+from typing import NamedTuple
 
 from typing_extensions import override
 
@@ -47,6 +48,18 @@ SOFFICE_CONVERTER_NAME = "soffice"
 _SOURCE_STEM = "document"
 # How much of `soffice`'s output a failure quotes in the operator's diagnostics.
 _OUTPUT_EXCERPT_CHARS = 500
+# How the line `soffice --version` prints its version on starts, such as `LibreOffice 24.8.4.2 bb3cfa1…`.
+_VERSION_LINE_PREFIX = "LibreOffice"
+# How a line `soffice` prints that is not its version starts, lowercased: a warning or an error.
+_NOT_A_VERSION_LINE_PREFIXES = ("warning", "error")
+
+
+class _SofficeRun(NamedTuple):
+    """How a run of `soffice` ended: its exit code, its standard output, and its standard error when kept apart."""
+
+    return_code: int
+    output: str
+    error_output: str
 
 
 class SofficeConverter(DocumentConverterProtocol):
@@ -80,20 +93,26 @@ class SofficeConverter(DocumentConverterProtocol):
         return await self._version_cache.get_or_fetch(fetch=self._fetch_version)
 
     async def _fetch_version(self) -> str:
-        """The first line `soffice --version` prints.
+        """The version line `soffice --version` prints on its standard output.
+
+        Its standard error is kept apart, since LibreOffice prints warnings there, such as one about `javaldx`, which
+        would otherwise be stamped on every PDF as the converter's version. The line starting with `LibreOffice` is the
+        version; a build that names itself otherwise has its first line of standard output taken instead.
 
         Raises:
             DocumentConverterUnavailableError: `soffice` could not be started, or printed no version.
         """
         async with _temporary_work_dir() as work_dir:
-            outcome = await self._run(arguments=["--version"], work_dir=work_dir)
+            outcome = await self._run(arguments=["--version"], work_dir=work_dir, is_error_output_apart=True)
         if outcome is None:
             msg = f"soffice did not print its version within {self._timeout_seconds:.0f} seconds."
             raise DocumentConverterUnavailableError(msg)
-        return_code, output = outcome
-        version = output.strip().splitlines()[0].strip() if output.strip() else ""
-        if return_code != 0 or not version:
-            msg = f"soffice did not print its version: exit code {return_code}, output {output[:_OUTPUT_EXCERPT_CHARS]!r}."
+        version = _version_line(output=outcome.output)
+        if outcome.return_code != 0 or version is None:
+            msg = (
+                f"soffice did not print its version: exit code {outcome.return_code}, "
+                f"output {outcome.output[:_OUTPUT_EXCERPT_CHARS]!r}, error output {outcome.error_output[:_OUTPUT_EXCERPT_CHARS]!r}."
+            )
             raise DocumentConverterUnavailableError(msg)
         return version
 
@@ -118,6 +137,7 @@ class SofficeConverter(DocumentConverterProtocol):
             outcome = await self._run(
                 arguments=["--headless", "--norestore", "--convert-to", "pdf", "--outdir", str(output_dir), str(source_path)],
                 work_dir=work_dir,
+                is_error_output_apart=False,
             )
             elapsed = monotonic() - started
             if outcome is None:
@@ -129,7 +149,8 @@ class SofficeConverter(DocumentConverterProtocol):
                     limit=round(self._timeout_seconds),
                     size=round(elapsed),
                 )
-            return_code, output = outcome
+            return_code = outcome.return_code
+            output = outcome.output
             pdf_bytes = await asyncio.to_thread(_read_pdf_if_written, pdf_path=output_dir / f"{_SOURCE_STEM}.pdf")
         if pdf_bytes is None:
             msg = f"soffice produced no PDF: exit code {return_code}, output {output[:_OUTPUT_EXCERPT_CHARS]!r}."
@@ -140,8 +161,11 @@ class SofficeConverter(DocumentConverterProtocol):
         log.debug(f"Converted a {normalized_format_key} file with soffice in {elapsed:.1f} seconds")
         return ConvertedPdf(pdf_bytes=pdf_bytes, converter_name=SOFFICE_CONVERTER_NAME, converter_version=converter_version)
 
-    async def _run(self, *, arguments: list[str], work_dir: Path) -> tuple[int, str] | None:
-        """Run `soffice` with a fresh profile under `work_dir`, its exit code and output, or None when it was killed.
+    async def _run(self, *, arguments: list[str], work_dir: Path, is_error_output_apart: bool) -> _SofficeRun | None:
+        """Run `soffice` with a fresh profile under `work_dir`, how it ended, or None when it was killed.
+
+        With `is_error_output_apart`, its standard error is read apart from its standard output; otherwise both are read
+        as one output, in the order they were printed, and the error output is empty.
 
         The process group is killed and reaped whenever the run ends with the process still alive: at the timeout, and
         when the task awaiting it is cancelled or anything else interrupts it, so no LibreOffice outlives its caller.
@@ -156,7 +180,7 @@ class SofficeConverter(DocumentConverterProtocol):
                 *command,
                 stdin=asyncio.subprocess.DEVNULL,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
+                stderr=asyncio.subprocess.PIPE if is_error_output_apart else asyncio.subprocess.STDOUT,
                 cwd=work_dir,
                 # A process group of its own, so the timeout kills the child doing the work too.
                 start_new_session=True,
@@ -165,7 +189,7 @@ class SofficeConverter(DocumentConverterProtocol):
             msg = f"soffice could not be started: {type(exc).__name__}."
             raise DocumentConverterUnavailableError(msg) from exc
         try:
-            stdout, _ = await asyncio.wait_for(process.communicate(), timeout=self._timeout_seconds)
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=self._timeout_seconds)
         except TimeoutError:
             return None
         finally:
@@ -174,8 +198,25 @@ class SofficeConverter(DocumentConverterProtocol):
                 # Shielded, so a second cancellation does not leave the killed process unreaped.
                 await asyncio.shield(process.wait())
         output = stdout.decode("utf-8", errors="replace") if stdout else ""
+        error_output = stderr.decode("utf-8", errors="replace") if stderr else ""
         return_code = process.returncode if process.returncode is not None else -1
-        return return_code, output
+        return _SofficeRun(return_code=return_code, output=output, error_output=error_output)
+
+
+def _version_line(*, output: str) -> str | None:
+    """The line of `soffice --version`'s standard output naming its version, or None when it printed none.
+
+    The line starting with `LibreOffice`, or for a build naming itself otherwise its first line that is not a warning
+    or an error.
+    """
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    for line in lines:
+        if line.startswith(_VERSION_LINE_PREFIX):
+            return line
+    for line in lines:
+        if not line.lower().startswith(_NOT_A_VERSION_LINE_PREFIXES):
+            return line
+    return None
 
 
 @contextlib.asynccontextmanager

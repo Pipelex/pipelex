@@ -172,6 +172,43 @@ class TestSofficeConverter:
         work_dir = Path(conversion_command[conversion_command.index("--outdir") + 1]).parent
         assert not work_dir.exists()
 
+    @pytest.mark.skipif(sys.platform == "win32", reason="The fake soffice is a shell script")
+    @pytest.mark.parametrize(
+        ("script_body", "expected_version"),
+        [
+            pytest.param(
+                'echo "Warning: failed to launch javaldx - java may not function correctly" >&2\necho "LibreOffice 24.8.4.2 bb3cfa1"\n',
+                "LibreOffice 24.8.4.2 bb3cfa1",
+                id="a-warning-on-standard-error-is-not-the-version",
+            ),
+            pytest.param(
+                'echo "Warning: failed to launch javaldx - java may not function correctly"\necho "LibreOffice 7.6.7.2 dd47e4b"\n',
+                "LibreOffice 7.6.7.2 dd47e4b",
+                id="a-warning-before-the-version-on-standard-output-is-skipped",
+            ),
+            pytest.param('echo "Collabora Office 24.04.13.2"\n', "Collabora Office 24.04.13.2", id="a-build-naming-itself-otherwise"),
+        ],
+    )
+    async def test_the_version_is_the_line_naming_it_whatever_soffice_warns_first(
+        self, tmp_path: Path, script_body: str, expected_version: str
+    ) -> None:
+        fake_binary = tmp_path / "soffice"
+        fake_binary.write_text(f"#!/bin/sh\n{script_body}")
+        fake_binary.chmod(0o755)
+        converter = SofficeConverter(binary_path=fake_binary, timeout_seconds=30, max_source_bytes=MAX_SOURCE_BYTES)
+
+        assert await converter.get_converter_version() == expected_version
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="The fake soffice is a shell script")
+    async def test_a_soffice_printing_only_a_warning_is_unavailable(self, tmp_path: Path) -> None:
+        fake_binary = tmp_path / "soffice"
+        fake_binary.write_text('#!/bin/sh\necho "Warning: failed to launch javaldx - java may not function correctly" >&2\n')
+        fake_binary.chmod(0o755)
+        converter = SofficeConverter(binary_path=fake_binary, timeout_seconds=30, max_source_bytes=MAX_SOURCE_BYTES)
+
+        with pytest.raises(DocumentConverterUnavailableError):
+            await converter.get_converter_version()
+
     async def test_callers_starting_at_once_ask_soffice_its_version_once(self, mocker: MockerFixture) -> None:
         fake_soffice = _install(mocker=mocker, mode="convert")
         converter = _make_converter()
