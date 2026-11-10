@@ -2,10 +2,13 @@ from collections.abc import Collection, Sequence
 from typing import Any
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
+from pipelex.cogt.content_generation.content_generator import ContentGenerator
 from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentBase64, PromptDocumentUri
+from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.exceptions import ExtractInputFormatError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_setting import ExtractSetting
@@ -16,6 +19,7 @@ from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.errors.problem import ProblemView
 from pipelex.kernel.document_conversion_ops import (
     DocumentReading,
     readable_document_for_step,
@@ -28,9 +32,12 @@ from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.document_conversion.exceptions import DocumentUnreadableByConverterError
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf
+from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 _MODULE = "pipelex.kernel.document_conversion_ops"
+_GENERATE_MODULE = "pipelex.cogt.content_generation.document_conversion_generate"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 PDF_MIME = "application/pdf"
@@ -236,6 +243,35 @@ class TestDocumentConversionOps:
 
         assert readable_documents == documents
         make_readable_pdf.assert_not_called()
+
+    async def test_a_data_url_input_that_does_not_convert_names_its_input(self, mocker: MockerFixture):
+        """An Office data URL left inline, relocation being off, still names its input when the converter refuses it."""
+        _wire(mocker=mocker, formats_by_model=[PDF_ONLY])
+        mocker.patch(f"{_MODULE}.get_content_generator", return_value=ContentGenerator(generated_content_factory=mocker.MagicMock()))
+        mocker.patch(f"{_GENERATE_MODULE}.get_storage_provider", return_value=InMemoryStorageProvider(root={}))
+        converter = mocker.MagicMock()
+        converter.convert_to_pdf = mocker.AsyncMock(
+            side_effect=DocumentUnreadableByConverterError("The converter could not read it.", format_key="xlsx")
+        )
+        mocker.patch(f"{_GENERATE_MODULE}.get_optional_document_converter", return_value=converter)
+        config: Any = mocker.MagicMock()
+        config.runtime.document_conversion.max_source_bytes = 50_000_000
+        mocker.patch(f"{_GENERATE_MODULE}.get_config", return_value=config)
+        mocker.patch.object(PromptDocumentBase64, "known_mime_type", return_value=XLSX_MIME)
+        document = PromptDocumentFactory.make_prompt_document(uri=f"data:{XLSX_MIME};base64,UEsDBA==", input_name="budget")
+
+        with pytest.raises(DocumentUnreadableByConverterError) as exc_info:
+            await readable_prompt_documents(
+                documents=[document],
+                model_reference="pdf-only-model",
+                model_type=ModelType.LLM,
+                job_metadata=_job_metadata(),
+                cogt_run_params=_run_params(),
+            )
+
+        wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("code") == CoreCode.INPUT_FILE_UNREADABLE
+        assert wire.get("params") == {"input": "budget", "file_type": "xlsx", "reason": "conversion_failed"}, wire
 
     async def test_an_inline_spreadsheet_is_converted_from_its_data_url_and_names_no_input(self, mocker: MockerFixture):
         make_readable_pdf = _wire(mocker=mocker, formats_by_model=[PDF_ONLY])

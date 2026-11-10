@@ -253,7 +253,7 @@ async def readable_prompt_documents(
                     input_name = document.input_name
                 case PromptDocumentBase64():
                     source_uri = f"data:{document.known_mime_type() or ''};base64,{document.base64_data}"
-                    input_name = None
+                    input_name = document.input_name
                 case PromptDocumentBinary():
                     readable_documents.append(document)
                     continue

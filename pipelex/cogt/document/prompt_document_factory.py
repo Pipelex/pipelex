@@ -33,8 +33,8 @@ class PromptDocumentFactory:
             mime_type: The document's MIME type, as run setup established it or the caller declared it.
                 For inline bytes it refines what the bytes alone identify; a data URL's own type is
                 the fallback.
-            input_name: The input the document came from, as a caller writes it, which a failed fetch of its URL
-                names (only used with a uri other than a data URL, which nothing fetches)
+            input_name: The input the document came from, as a caller writes it, which a failed fetch of its URL or a
+                failed conversion of its data URL names (only used with a uri)
 
         Returns:
             A PromptDocument instance (PromptDocumentUri, PromptDocumentBase64, or PromptDocumentBinary)
@@ -52,7 +52,7 @@ class PromptDocumentFactory:
             extracted = extract_base64_str_from_base64_url_if_possible(uri)
             if extracted is not None:
                 extracted_base64_data, data_url_mime_type = extracted
-                return PromptDocumentBase64(base64_data=extracted_base64_data, mime_type=mime_type or data_url_mime_type)
+                return PromptDocumentBase64(base64_data=extracted_base64_data, mime_type=mime_type or data_url_mime_type, input_name=input_name)
             return PromptDocumentUri(uri=uri, mime_type=mime_type, input_name=input_name)
         msg = "PromptDocumentFactory requires one of: uri, base64_data, or raw_bytes"
         raise PromptDocumentFactoryError(msg)

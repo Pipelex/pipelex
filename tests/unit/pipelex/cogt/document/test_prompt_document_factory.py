@@ -56,6 +56,13 @@ class TestPromptDocumentFactory:
         assert isinstance(result, PromptDocumentBase64)
         assert result.base64_data == "JVBERi0xLjQK"
 
+    def test_a_data_url_keeps_the_input_it_came_from(self) -> None:
+        """A conversion of the data URL that fails names that input, as a failed fetch of a URL does."""
+        result = PromptDocumentFactory.make_prompt_document(uri="data:application/pdf;base64,JVBERi0xLjQK", input_name="annexes[2]")
+
+        assert isinstance(result, PromptDocumentBase64)
+        assert result.input_name == "annexes[2]"
+
     def test_make_with_mime_type(self) -> None:
         """Test creating PromptDocumentUri with explicit mime_type."""
         result = PromptDocumentFactory.make_prompt_document(
