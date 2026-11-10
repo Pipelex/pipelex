@@ -9,7 +9,8 @@ What Gotenberg's answers mean was measured for the platform's converter (pipelex
 - **A first `400`, `422`, `500` or `504`** is tried once more: a LibreOffice engine dying mid-conversion answers
   exactly as a damaged file does, and the same file then converts. A second one is the file's own,
   `input.file_unreadable`.
-- **`413`** is the file too large and **`503`** the conversion out of its budget, both `input.too_large` and final.
+- **`413`** is the file too large, under a limit of the converter's own it does not say, and **`503`** the conversion
+  out of its budget, both `input.too_large` and final.
 - **`429`**, a connection refused, or one dropped before the converter's budget, says nothing about the file: tried
   again a few times, spaced, then `runtime.unavailable`. So is any other status, such as a `404` from a converter
   that moved.
@@ -256,10 +257,9 @@ class GotenbergConverter(DocumentConverterProtocol):
                 msg = "The converter's queue is full (429)."
                 return _RetryableAnswer(kind=_RetryableAnswerKind.UNAVAILABLE, message=msg)
             case HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
-                msg = f"The converter refused the file of {data_size} bytes as too large (413)."
-                raise DocumentTooLargeToConvertError(
-                    msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=self._max_source_bytes, size=data_size
-                )
+                # Under a limit of the converter's own, which it does not say: the runtime's cap was checked before sending.
+                msg = f"The converter refused the file of {data_size} bytes as too large (413), under a limit of its own."
+                raise DocumentTooLargeToConvertError(msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=None, size=data_size)
             case HTTPStatus.SERVICE_UNAVAILABLE:
                 msg = (
                     f"The conversion ran past its time limit of {self._budget_seconds:.0f} seconds: "

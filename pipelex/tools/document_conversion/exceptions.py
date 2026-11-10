@@ -78,24 +78,38 @@ class DocumentUnreadableByConverterError(DocumentConversionError):
 class DocumentTooLargeToConvertError(DocumentConversionError):
     """The file is past what the converter takes, in bytes, or took longer to convert than the converter allows.
 
-    The source past `max_source_bytes`, or Gotenberg's `413`, is a size in bytes. Gotenberg's `503`, a connection the
-    converter dropped after its budget, or `soffice` killed at its timeout is a time in seconds, which the message
-    names as the limit, and the problem's `limit` and `size` are then seconds.
+    `input.too_large` words its occurrence as a size reaching a limit, `limit` and `size` two integers with no unit, so
+    the problem carries them only when they are a size in bytes the runtime knows:
+
+    - **The source past `max_source_bytes`**, refused before it is sent: `limit` and `size` in bytes.
+    - **Gotenberg's `413`**: the converter refused the body under a limit of its own, which the runtime does not know,
+      so the problem carries the file's `size` and withholds `limit`.
+    - **A conversion out of time**, Gotenberg's `503`, a connection the converter dropped after its budget, or `soffice`
+      killed at its timeout: the bound and the time spent are seconds, which the code's sentence would read as a size,
+      so the problem withholds both and its sentence says the file was too large or too slow to process. The message,
+      which the operator reads, names the seconds.
+
+    `pipelex.errors.problem` words the occurrences that withhold `limit`, or `limit` and `size`, without them.
     """
 
     error_code = CoreCode.INPUT_TOO_LARGE
 
-    def __init__(self, message: str, *, format_key: str, limit_kind: ConversionLimitKind, limit: int, size: int):
+    def __init__(self, message: str, *, format_key: str, limit_kind: ConversionLimitKind, limit: int | None, size: int):
         super().__init__(message, format_key=format_key)
         self.limit_kind = limit_kind
-        # The bound the file passed, in bytes or in seconds as `limit_kind` says.
+        # The bound the file passed, in bytes or in seconds as `limit_kind` says, or None when the converter did not say it.
         self.limit = limit
         # How far the file went, in the same unit: its size, or how long the conversion ran before it was stopped.
         self.size = size
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        return {"input": self.input_name, "limit": self.limit, "size": self.size}
+        match self.limit_kind:
+            case ConversionLimitKind.BYTES:
+                # A `limit` of None is left out, and the problem withholds it.
+                return {"input": self.input_name, "limit": self.limit, "size": self.size}
+            case ConversionLimitKind.SECONDS:
+                return {"input": self.input_name}
 
 
 class DocumentConverterUnavailableError(ToolError):

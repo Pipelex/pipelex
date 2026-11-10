@@ -191,7 +191,10 @@ class TestGotenbergConverter:
         problem = exc_info.value.with_input(input_name="budget").to_problem(view=ProblemView.CALLER)
         assert problem.code == CoreCode.INPUT_TOO_LARGE
         assert problem.params is not None
-        assert problem.params.as_wire() == {"input": "budget", "limit": MAX_SOURCE_BYTES, "size": len(SOURCE_BYTES)}
+        # The converter's own limit is not known, and the runtime's was checked before sending: no limit is invented.
+        assert exc_info.value.limit is None
+        assert problem.params.as_wire() == {"input": "budget", "size": len(SOURCE_BYTES)}
+        assert problem.detail == f"The input 'budget' reaches {len(SOURCE_BYTES)}, past what the step that reads it accepts."
 
     async def test_a_503_is_the_conversion_out_of_time_and_final(self, mocker: MockerFixture) -> None:
         _patch_elapsed(mocker=mocker, elapsed=124.0)
@@ -207,6 +210,12 @@ class TestGotenbergConverter:
         assert error.limit_kind == ConversionLimitKind.SECONDS
         assert (error.limit, error.size) == (120, 124)
         assert "time limit of 120 seconds" in error.message
+        # Seconds would read as a size in the code's sentence: the problem withholds them and says the file was too slow.
+        problem = error.with_input(input_name="budget").to_problem(view=ProblemView.CALLER)
+        assert problem.params is not None
+        assert problem.params.as_wire() == {"input": "budget"}
+        assert problem.detail == "The input 'budget' is too large for the step that reads it, in size or in the time it takes to process."
+        assert problem.next_step.detail == "Make the input 'budget' smaller or simpler, then send the request again."
 
     async def test_a_429_is_tried_again_after_a_pause(self) -> None:
         gotenberg = _ScriptedGotenberg(answers=[_status(429), _pdf()])
