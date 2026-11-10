@@ -61,6 +61,7 @@ from pipelex.pipeline.validate_bundle_translation import (
     translate_to_validate_bundle_error,
     withholding_host_library_files,
 )
+from pipelex.runtime_hub import get_optional_document_converter
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -531,7 +532,22 @@ async def prepare_pipe_job(
         )
         # Refuse the run now, rather than at the step that would fail mid-run, when a file input is
         # certain to reach a pipe whose model cannot read its format.
-        check_file_inputs_against_consumers(entry_pipe=pipe, file_inputs=collect_file_inputs(working_memory))
+        foreseen_conversions = check_file_inputs_against_consumers(
+            entry_pipe=pipe,
+            file_inputs=collect_file_inputs(working_memory),
+            can_convert_documents=get_optional_document_converter() is not None,
+        )
+        # Setup only says it: each step decides again when it runs, and converts then.
+        for foreseen_conversion in foreseen_conversions:
+            log.info(
+                "A step will read an Office file as its PDF",
+                fields={
+                    "input_path": foreseen_conversion.input_path,
+                    "pipe_code": foreseen_conversion.pipe_code,
+                    "format_key": foreseen_conversion.format_key,
+                    "reason": foreseen_conversion.reason,
+                },
+            )
 
     # Build the library crate from all accumulated blueprints for Temporal dispatch.
     library_crate = get_library_manager().get_crate(library_id=library_id)

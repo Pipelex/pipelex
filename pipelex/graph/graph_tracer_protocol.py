@@ -11,6 +11,7 @@ from pipelex.system.exceptions import InvocationPathError
 from pipelex.system.execution_chain import ExecutionAttempt
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in setup signature
 
 
@@ -368,6 +369,24 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_file_conversion(
+        self,
+        *,
+        node_id: str,
+        input_name: str | None,
+        format_key: str,
+        readable_pdf: ReadablePdf,
+    ) -> None:
+        """Register that a step reads an Office file as its PDF, kept or made, before its model is called.
+
+        Args:
+            node_id: The node of the step that reads the document.
+            input_name: The document's input path or prompt variable, None for a document no input names.
+            format_key: The original's format, such as `docx`.
+            readable_pdf: The PDF the step reads, and what made it.
+        """
+        ...
+
 
 class GraphTracerNoOp(GraphTracerProtocol):
     """No-operation implementation of GraphTracerProtocol.
@@ -447,6 +466,17 @@ class GraphTracerNoOp(GraphTracerProtocol):
         *,
         node_id: str,
         execution_data: dict[str, Any],
+    ) -> None:
+        pass
+
+    @override
+    def register_file_conversion(
+        self,
+        *,
+        node_id: str,
+        input_name: str | None,
+        format_key: str,
+        readable_pdf: ReadablePdf,
     ) -> None:
         pass
 

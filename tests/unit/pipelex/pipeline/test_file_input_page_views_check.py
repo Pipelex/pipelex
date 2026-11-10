@@ -1,21 +1,29 @@
 """Run setup refuses a file a step asking for page views is certain to fail on, whatever that step's model reads.
 
 Page views are drawn from a PDF by PDFium, so the rule is the renderer's and not the model's: a Word file given to a
-model that reads Word files is still refused. The walk over the entry pipe has its own tests; here the consumers are
-given, and only the comparison with the file inputs is exercised.
+model that reads Word files is still refused, unless the runtime has a document converter, which gives the step the
+file's PDF. The walk over the entry pipe has its own tests; here the consumers are given, and only the comparison with
+the file inputs is exercised.
 """
 
 import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.errors.problem import ProblemView
+from pipelex.kernel.document_conversion_ops import ConversionReason
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
-from pipelex.pipeline.file_input_consumers import FileConsumerKind, FileInputConsumer, check_file_inputs_against_consumers
+from pipelex.pipeline.file_input_consumers import (
+    FileConsumerKind,
+    FileInputConsumer,
+    ForeseenConversion,
+    check_file_inputs_against_consumers,
+)
 from pipelex.pipeline.input_normalizer import FileInputKind, IdentifiedFileInput
 from pipelex.tools.uri.resolved_uri import UriKind
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 PDF_MIME = "application/pdf"
+XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 HTML_MIME = "text/html"
 WORD_READING_FORMATS = frozenset({"pdf", "docx"})
 PDF_ONLY_FORMATS = frozenset({"pdf"})
@@ -28,15 +36,18 @@ def _consumer(
     reads_web_pages: bool = False,
     is_conditional: bool = False,
     model: str | None = "some-model",
+    formats_read_by_every_model: frozenset[str] | None = None,
+    kind: FileConsumerKind = FileConsumerKind.EXTRACT,
 ) -> FileInputConsumer:
     return FileInputConsumer(
         slot_name="report",
         consumed_path=("report",),
         pipe_ref="domain.extract_report",
         pipe_code="extract_report",
-        kind=FileConsumerKind.EXTRACT,
+        kind=kind,
         model=model,
         readable_formats=readable_formats,
+        formats_read_by_every_model=readable_formats if formats_read_by_every_model is None else formats_read_by_every_model,
         reads_web_pages=reads_web_pages,
         is_conditional=is_conditional,
         asks_for_page_views=asks_for_page_views,
@@ -47,9 +58,11 @@ def _file_input(*, mime_type: str | None, uri_kind: UriKind = UriKind.PIPELEX_ST
     return IdentifiedFileInput(path=("report",), kind=FileInputKind.DOCUMENT, uri_kind=uri_kind, mime_type=mime_type)
 
 
-def _check(*, mocker: MockerFixture, consumer: FileInputConsumer, file_input: IdentifiedFileInput) -> None:
+def _check(
+    *, mocker: MockerFixture, consumer: FileInputConsumer, file_input: IdentifiedFileInput, can_convert_documents: bool = False
+) -> list[ForeseenConversion]:
     mocker.patch("pipelex.pipeline.file_input_consumers.collect_file_input_consumers", return_value={"report": [consumer]})
-    check_file_inputs_against_consumers(entry_pipe=mocker.MagicMock(), file_inputs=[file_input])
+    return check_file_inputs_against_consumers(entry_pipe=mocker.MagicMock(), file_inputs=[file_input], can_convert_documents=can_convert_documents)
 
 
 class TestFileInputPageViewsCheck:
@@ -63,7 +76,7 @@ class TestFileInputPageViewsCheck:
 
         message = exc_info.value.message
         assert "Input 'report' is a Word document (.docx): pipe 'extract_report' asks for page views, which are drawn from a PDF." in message
-        assert message.endswith("Give a PDF, or remove page_views from the step.")
+        assert message.endswith("Give a PDF, remove page_views from the step, or configure a document converter.")
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
         assert wire.get("params") == {"input": "report", "format": "docx", "model": "pypdfium2"}, wire
 
@@ -183,9 +196,126 @@ class TestFileInputPageViewsCheck:
         )
 
         with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
-            check_file_inputs_against_consumers(entry_pipe=mocker.MagicMock(), file_inputs=[_file_input(mime_type=DOCX_MIME)])
+            check_file_inputs_against_consumers(
+                entry_pipe=mocker.MagicMock(), file_inputs=[_file_input(mime_type=DOCX_MIME)], can_convert_documents=False
+            )
 
         message = exc_info.value.message
         assert message.endswith(
-            "Give a file in a format its model reads, or use a model that reads this format. Give a PDF, or remove page_views from the step."
+            "Give a file in a format its model reads, use a model that reads this format, or configure a document converter. "
+            "Give a PDF, remove page_views from the step, or configure a document converter."
         )
+
+    def test_a_refusal_no_converter_would_avoid_does_not_mention_one(self, mocker: MockerFixture):
+        """A model that reads no PDF is not helped by a PDF."""
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            _check(
+                mocker=mocker,
+                consumer=_consumer(asks_for_page_views=False, readable_formats=frozenset({"png"}), kind=FileConsumerKind.LLM_DOCUMENT),
+                file_input=_file_input(mime_type=DOCX_MIME),
+            )
+
+        assert exc_info.value.message.endswith("Give a file in a format its model reads, or use a model that reads this format.")
+
+
+class TestFileInputConversionCheck:
+    """With a document converter, run setup accepts the Office files a step will read as their PDF, and returns them."""
+
+    def test_page_views_of_a_word_file_are_accepted_and_foreseen(self, mocker: MockerFixture):
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=True, readable_formats=WORD_READING_FORMATS),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == [
+            ForeseenConversion(input_path="report", pipe_code="extract_report", format_key="docx", reason=ConversionReason.PAGE_VIEWS)
+        ]
+
+    def test_page_views_with_an_unresolved_model_are_accepted(self, mocker: MockerFixture):
+        """An opaque model may read the PDF: the step finds out."""
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=True, readable_formats=None, model=None),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert [conversion.reason for conversion in foreseen] == [ConversionReason.PAGE_VIEWS]
+
+    def test_page_views_for_a_model_that_reads_no_pdf_are_still_refused(self, mocker: MockerFixture):
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            _check(
+                mocker=mocker,
+                consumer=_consumer(asks_for_page_views=True, readable_formats=frozenset({"docx"})),
+                file_input=_file_input(mime_type=DOCX_MIME),
+                can_convert_documents=True,
+            )
+
+        assert exc_info.value.message.endswith("Give a PDF to a model that reads PDFs, or remove page_views from the step.")
+
+    def test_page_views_at_a_conditional_step_for_a_model_that_reads_no_pdf_are_left_to_the_step(self, mocker: MockerFixture):
+        """Setup neither refuses nor foresees a conversion there: the step, by the same rule, keeps the original and refuses."""
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=True, readable_formats=frozenset({"docx"}), is_conditional=True),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == []
+
+    def test_a_spreadsheet_given_to_a_model_that_reads_pdfs_is_accepted_and_foreseen(self, mocker: MockerFixture):
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=False, readable_formats=PDF_ONLY_FORMATS, kind=FileConsumerKind.LLM_DOCUMENT),
+            file_input=_file_input(mime_type=XLSX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == [
+            ForeseenConversion(input_path="report", pipe_code="extract_report", format_key="xlsx", reason=ConversionReason.MODEL_FORMAT)
+        ]
+
+    def test_a_waterfall_whose_member_reads_only_pdfs_foresees_a_conversion(self, mocker: MockerFixture):
+        """One member reads Word files and the other only PDFs: whichever serves, the step reads the PDF."""
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=False, readable_formats=WORD_READING_FORMATS, formats_read_by_every_model=PDF_ONLY_FORMATS),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert [conversion.reason for conversion in foreseen] == [ConversionReason.MODEL_FORMAT]
+
+    def test_a_word_file_every_model_reads_is_not_converted(self, mocker: MockerFixture):
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=False, readable_formats=WORD_READING_FORMATS),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == []
+
+    def test_a_model_that_reads_no_pdf_is_still_refused_a_spreadsheet(self, mocker: MockerFixture):
+        with pytest.raises(PipelineInputFormatUnsupportedError) as exc_info:
+            _check(
+                mocker=mocker,
+                consumer=_consumer(asks_for_page_views=False, readable_formats=frozenset({"png"}), kind=FileConsumerKind.LLM_DOCUMENT),
+                file_input=_file_input(mime_type=XLSX_MIME),
+                can_convert_documents=True,
+            )
+
+        assert exc_info.value.message.endswith("Give a file in a format its model reads, or use a model that reads this format.")
+
+    def test_a_conditional_consumer_foresees_nothing(self, mocker: MockerFixture):
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=True, readable_formats=PDF_ONLY_FORMATS, is_conditional=True),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == []

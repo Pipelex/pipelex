@@ -13,6 +13,8 @@ PAGE_VIEWS_RENDERER: Final[str] = ProviderName.PYPDFIUM2
 
 # The advice of a refusal to draw page views from a file known not to be a PDF.
 PAGE_VIEWS_FILE_ADVICE: Final[str] = "Give a PDF, or remove page_views from the step."
+# The same advice for an Office file the runtime would convert to PDF, had it a document converter.
+PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE: Final[str] = "Give a PDF, remove page_views from the step, or configure a document converter."
 
 
 class ExtractInput(BaseModel):

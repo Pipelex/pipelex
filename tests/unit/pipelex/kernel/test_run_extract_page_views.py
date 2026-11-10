@@ -66,7 +66,8 @@ class TestRunExtractPageViews:
 
         make_extract_pages.assert_not_called()
         assert exc_info.value.message == (
-            "Input 'report' is a Word document (.docx), and page views are drawn from a PDF. Give a PDF, or remove page_views from the step."
+            "Input 'report' is a Word document (.docx), and page views are drawn from a PDF. "
+            "Give a PDF, remove page_views from the step, or configure a document converter."
         )
         assert exc_info.value.to_problem(view=ProblemView.CALLER).to_wire().get("params") == {
             "input": "report",

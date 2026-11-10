@@ -507,6 +507,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `established_value`, `incoming_value` | string | The value a domain's metadata field already holds, which is kept, and the different one a later declaration gives |
 | `stuff_name` | string | The name a stuff has in working memory |
 | `variable_path` | string | A dotted path into working memory, as a pipe's inputs name it: `invoice.total` |
+| `input_path` | string or `null` | A run's input as a caller writes it, an item of a list input included: `report`, `annexes[2]`; `null` for a document no input names |
 | `variable_names` | list of strings | The names a pipe's inputs give their variables, as a list: the absent inputs a pipe run was skipped for |
 | `library_id` | string | The library a load or a lookup runs in |
 | `caller` | string | The entry point a shared helper logs on behalf of, as the label it passes: `API validate` |
@@ -538,6 +539,11 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `timeout_seconds` | integer | A call's timeout, in seconds, as the configuration sets it: a configured limit, not a measured duration, which `duration_ms` names |
 | `inference_job_type` | string | An inference job's class: `LLMJob`, `ImgGenJob` |
 | `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
+| `format_key` | string | A file's format, as the extension the runtime knows it by, lowercase: `docx`, `xlsx` |
+| `origin` | string | Where the PDF a step reads in place of an Office file came from: `kept`, found at its key, or `made`, converted by the step |
+| `converter_version` | string or `null` | The `converter-version` a PDF is stamped with: `gotenberg-8.40.0`; `null` for a kept PDF held by a storage provider that keeps no metadata |
+| `page_count` | integer | The number of pages of a document, what a step reading it is billed on |
+| `reason` | string | Why something happens, as a word of the line's own vocabulary: for a step run setup expects to read an Office file as its PDF, `page_views` or `model_format` |
 | `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |
 | `cost_usd` | number | What an inference call cost, in US dollars, as the cost engine prices the usage it reported |
 | `duration_ms` | number | How long a unit of work took, in milliseconds |

@@ -18,6 +18,7 @@ from pydantic import BaseModel
 
 from pipelex.cogt.content_generation import assignment_models
 from pipelex.cogt.content_generation.assignment_models import (
+    DocumentConversionAssignment,
     ExtractAssignment,
     ImgGenAssignment,
     JudgmentAssignment,
@@ -62,6 +63,7 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     TemplatingAssignment: set(),
     ExtractAssignment: {"extract_input.image_uri", "extract_input.document_uri"},
     RenderPageViewsAssignment: {"document_uri"},
+    DocumentConversionAssignment: {"source_uri"},
     # A section's blocks hold blocks again: the walk names the images inside one section and stops where a section would enclose itself.
     # A template file is a method file, named by its tree's digest and read through the method file store, never by a URI.
     RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url"},
@@ -178,6 +180,15 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
             page_views_dpi=72,
         ),
         {"pipelex-storage://s/doc.pdf"},
+    ),
+    DocumentConversionAssignment: (
+        DocumentConversionAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            source_uri="pipelex-storage://s/report.docx",
+            format_key="docx",
+        ),
+        {"pipelex-storage://s/report.docx"},
     ),
     RenderDocumentAssignment: (
         RenderDocumentAssignment(

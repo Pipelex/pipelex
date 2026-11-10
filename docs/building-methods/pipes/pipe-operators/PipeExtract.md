@@ -66,9 +66,9 @@ Extraction presets are defined in your model deck configuration and can include 
 
 ### Page views need a PDF
 
-Page views are drawn from a PDF, whatever the step's `model` reads, so a `Document` that holds a Word, Excel or PowerPoint file, or a web page, gives no page views. An `Image` input is its own single page view, and refuses `page_views` when a method declares it.
+Page views are drawn from a PDF, whatever the step's `model` reads, so a `Document` that holds a web page gives no page views. A Word, Excel or PowerPoint file gives them only when the runtime has a document converter and the step's model reads PDFs: the step then reads the file's PDF, for its page views and for its extraction alike, so both cover the same pages (see [Office File Conversion](../../../features/office-file-conversion.md)). An `Image` input is its own single page view, and refuses `page_views` when a method declares it.
 
-A file known not to be a PDF is refused before anything is paid for: before the run starts when the step is certain to run, and at the step, before the extraction call, when a condition may skip it or the document comes from an earlier step. A step whose model reads no PDF, such as `linkup-fetch`, is refused before the run starts for a URL that declares a PDF or no type. Any other file of unknown format, usually a URL that declares no type, is opened as a PDF, and a file that does not open, or holds a page that cannot be drawn, fails the step with `input.file_unreadable`.
+A file known not to be a PDF, and that the runtime does not convert, is refused before anything is paid for: before the run starts when the step is certain to run, and at the step, before the extraction call, when a condition may skip it or the document comes from an earlier step. A step whose model reads no PDF, such as `linkup-fetch`, is refused before the run starts for a URL that declares a PDF or no type. Any other file of unknown format, usually a URL that declares no type, is opened as a PDF, and a file that does not open, or holds a page that cannot be drawn, fails the step with `input.file_unreadable`.
 
 ### Example: Processing a PDF
 

@@ -17,9 +17,10 @@ version = 1
 description = """
 User-facing configuration docs must track the config model and the shipped defaults, and a change \
 to that model must be answered in the migration ledgers — including the domain narrowing no \
-fingerprint can see, because it lives in a validator rather than in an annotation. The four live \
+fingerprint can see, because it lives in a validator rather than in an annotation. The live \
 sites: KitConfig._validate_targets, DryRunConfig.validate_image_urls, \
-ImgGenConfig.validate_quality_mapping, LLMConfig.validate_effort_to_budget_mapping.\
+ImgGenConfig.validate_quality_mapping, LLMConfig.validate_effort_to_budget_mapping, \
+GotenbergConversionConfig._validate_timeout_outlasts_budget.\
 """
 # The config model tree is rooted in system/configuration/ but several documented
 # submodels are defined in their own packages — they trigger too, and so does the log-level
@@ -38,11 +39,12 @@ triggers = [
   "pipelex/tools/network/network_config.py",
   "pipelex/tools/secrets/secrets_config.py",
   "pipelex/tools/storage/storage_config.py",
+  "pipelex/tools/document_conversion/document_conversion_config.py",
   "pipelex/pipelex.toml",
 ]
 # Three kinds of target, not one. The docs are the user-facing prose. The ledgers are where a
-# shape change is answered, and the two source files are there because they hold the four
-# validators above: a validator that narrows a value domain is semantic residue the fingerprint
+# shape change is answered, and the source files are there because they hold the validators
+# above: a validator that narrows a value domain is semantic residue the fingerprint
 # projection cannot record, so the coverage gate calls the change additive and the review list is
 # the only place the obligation can land. Reviewing them means asking, of the change that opened
 # this contract, whether it narrowed a domain, and if it did, whether an `unsafe` entry carrying
@@ -56,6 +58,7 @@ review = [
   "pipelex/migration/ledgers/",
   "pipelex/system/configuration/configs.py",
   "pipelex/cogt/config_cogt.py",
+  "pipelex/tools/document_conversion/document_conversion_config.py",
 ]
 # `make tb` only. `check-ledger` and `check-migration-schemas` already gate `make check` and CI,
 # so re-running them here would add the unstaged-file hard error without adding a guarantee.

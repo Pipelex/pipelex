@@ -14,6 +14,7 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_reference_specs import resolve_model_specs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.interpreter_hub import get_library_manager, get_required_pipe
@@ -445,7 +446,7 @@ prompt = "Compare these transcripts: $transcripts, given their summaries: $summa
         assert _summary(consumers["transcripts"]) == [("compare_transcripts", "transcripts", False), ("summarize_transcript", "transcripts[]", False)]
         expected_formats: set[str] = set()
         for llm_setting in (resolve_llm_setting_for_text(), resolve_llm_setting_for_object()):
-            for model_spec in file_input_consumers_module.resolve_model_specs(model_reference=llm_setting.model, model_type=ModelType.LLM):
+            for model_spec in resolve_model_specs(model_reference=llm_setting.model, model_type=ModelType.LLM):
                 expected_formats |= model_spec.supported_document_types
         for consumer in consumers["transcripts"]:
             assert consumer.kind == FileConsumerKind.LLM_DOCUMENT

@@ -111,3 +111,27 @@ class TestInMemoryStorageProvider:
 
         assert await provider.load(uri=uri1) == data1
         assert await provider.load(uri=uri2) == data2
+
+    async def test_metadata_round_trips_lowercase_and_follows_the_last_write(self) -> None:
+        provider = InMemoryStorageProvider()
+        uri = await provider.store(
+            data=b"%PDF-", key="scope/report.docx.pdf", metadata={"Converter-Version": "0.1.0", "export-options": "printed-pages"}
+        )
+
+        assert await provider.load_metadata(uri=uri) == {"converter-version": "0.1.0", "export-options": "printed-pages"}
+
+        await provider.store(data=b"%PDF- again", key="scope/report.docx.pdf")
+        assert await provider.load_metadata(uri=uri) == {}
+
+    async def test_store_if_absent_keeps_the_metadata_of_the_object_already_there(self) -> None:
+        provider = InMemoryStorageProvider()
+        assert await provider.store_if_absent(data=b"%PDF-", key="scope/report.docx.pdf", metadata={"converter-version": "0.1.0"}) is True
+        assert await provider.store_if_absent(data=b"other", key="scope/report.docx.pdf", metadata={"converter-version": "9.9.9"}) is False
+
+        assert await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/report.docx.pdf") == {"converter-version": "0.1.0"}
+
+    async def test_load_metadata_of_a_missing_object_raises_not_found(self) -> None:
+        provider = InMemoryStorageProvider()
+
+        with pytest.raises(StorageFileNotFoundError):
+            await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/missing.pdf")
