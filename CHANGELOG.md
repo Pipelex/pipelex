@@ -1,5 +1,20 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Office files read as PDFs, `[runtime.document_conversion]`**: with `backend = "gotenberg"` (a Gotenberg container at `gotenberg.url`) or `backend = "soffice"` (LibreOffice on this machine, for development and tests, no isolation), a `PipeExtract`, `PipeLLM` or `PipeJudge` step reads the PDF of a `.docx`, `.xlsx`, `.pptx`, `.doc`, `.xls`, `.ppt`, `.odt`, `.ods` or `.odp` file when it asks for page views, or when a model that may serve it, any waterfall member included, does not read the format while some reads PDFs; run setup accepts such a file where it refused it, and the step's output and later steps still see the Office file. The PDF is kept create-only beside a source in storage at `<source key>.pdf`, or under the run's storage scope as `<sha256>.<format>.pdf`, with `converter-version` and `export-options: printed-pages` metadata, and reused; the default `backend = "none"` changes nothing, and a backend named but unusable stops the boot with `runtime.misconfigured`.
+- **`file_converted` trace event**: each document a step reads as its PDF writes a `FileConvertedEvent` on the step's node before the model is called, carrying `input_name`, `format_key`, `origin` (`kept` or `made`), `converter_name`, `converter_version`, `page_count` and `conversion_seconds`, so a step that fails after a conversion still records it. `GraphTracerProtocol` gains `register_file_conversion`, which a custom tracer implements.
+- **`make_readable_pdf`, a content-generator leaf**: finding or making the PDF a step reads is a leaf of `ContentGeneratorProtocol`, which a host runtime dispatches as an activity; its default body raises `runtime.misconfigured`, so a host whose content generator does not implement it fails a step needing a PDF loudly, and a deployment with no converter is unaffected.
+
+### Changed
+
+- **Storage object metadata (Breaking)**: `StorageProviderAbstract.store` and `store_if_absent` take `metadata`, string pairs kept beside the object whose keys and values must be ASCII and keys non-empty, else `StorageInvalidMetadataError`, and `load_metadata(uri)` reads them back, keys lowercase, without the bytes; the S3, GCS, in-memory and local providers keep them, the local one in a hidden `.<name>.metadata.json` file beside the file. A provider keeps metadata by overriding the new hooks `_store_with_metadata`, `_store_if_absent_with_metadata` and `_load_metadata`, whose defaults drop it and answer `None`, so a plugin overriding only the existing hooks keeps working without metadata, while one overriding `store` or `store_if_absent` themselves must accept the `metadata` keyword, which the runtime now passes when it keeps a PDF.
+- **`input.too_large` may withhold `limit` and `size` (Breaking)**: a conversion refused by the converter's own size limit carries the file's `size` and no `limit`, and one that ran out of time carries neither, its detail saying the input is too large in size or in the time it takes to process, so a consumer reading `limit` or `size` off this code must allow either to be absent.
+- **Refusals of an Office file name the converter**: without a document converter, an `input.file_type_unsupported` refusal that a converter would have avoided, at run setup or at a `PipeExtract` step asking for page views, now advises configuring one beside giving another file or using another model.
+- **`resolve_model_specs` and the run-setup file check (Breaking)**: `resolve_model_specs` moved from `pipelex.pipeline.file_input_consumers` to `pipelex.cogt.models.model_reference_specs`, and `check_file_inputs_against_consumers` takes a required `can_convert_documents` and returns the `ForeseenConversion`s it accepted, which setup logs.
+
 ## [v0.97.1] - 2026-11-09
 
 ### Fixed

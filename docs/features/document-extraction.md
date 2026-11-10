@@ -37,9 +37,13 @@ Each extract model declares the file formats it reads, and a `PipeExtract` step 
 | Mistral OCR (`mistral-ocr` and its versions) | PDF and images |
 | `linkup-fetch` (Linkup) | Web pages, fetched from their URL |
 
-A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, or choose a model that reads it. When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).
+A file in a format the step's model does not read is refused before the run starts, with an input error that names the input, its format, the step, the model and the formats that model reads. Give the file in a format the model reads, choose a model that reads it, or, for an Office file, configure a document converter (see [Office Files and Page Views](#office-files-and-page-views)). When the step can only be reached through a condition, the run starts, and the step refuses the file the same way when it gets to it. See [File formats are checked before the run](../building-methods/concepts/native-concepts.md#file-formats-are-checked-before-the-run).
 
 A step that asks for page views needs a PDF whatever its model reads, since page views are drawn from one: see [Page views need a PDF](../building-methods/pipes/pipe-operators/PipeExtract.md#page-views-need-a-pdf).
+
+## Office Files and Page Views
+
+When the runtime has a document converter (`[runtime.document_conversion]`, off by default), a `PipeExtract` step reads the PDF of a Word, Excel or PowerPoint file in two cases. A step that asks for page views always reads the PDF, whatever its model reads, and its extraction reads that same PDF, so the page views and the extracted pages match one for one. A step without page views reads the PDF when a model that may serve it, any member of a waterfall included, does not read the file's format while some model that may serve it reads PDFs: with `@default-extract-document`, whose models read PDF and images, a Word file is converted, while `docling-extract-text`, which reads Word itself, is given the original. Each converted file is recorded in the run's trace with the PDF's page count, which is what the extraction is billed on. See [Office File Conversion](office-file-conversion.md) for the converters, what a conversion drops and where the PDF is kept.
 
 ## Key Capabilities
 
@@ -58,4 +62,5 @@ Include PDFs directly in your prompts using `@variable` syntax. PipeLLM automati
 ## Related Documentation
 
 - [PipeExtract](../building-methods/pipes/pipe-operators/PipeExtract.md) - Operator reference and MTHDS fields
+- [Office File Conversion](office-file-conversion.md) - When a step reads an Office file as its PDF
 - [Generic document extraction](https://github.com/Pipelex/pipelex-cookbook/tree/main/methods/extract_generic) - A cookbook method that returns each page of any document as Markdown, including the text inside its images and diagrams

@@ -192,6 +192,8 @@ class DocumentContent(StuffContent):
 
 Which document formats a method can take depends on the models that read them: a `PipeExtract` step reads the formats its extract model declares, and a `PipeLLM` step the document formats its model declares. A Word document works with an extract model that reads Word files, and fails with one that reads only PDF.
 
+**When a run converts an Office file.** A runtime with a document converter configured (`[runtime.document_conversion]`, off by default) hands a step the PDF of a Word, Excel or PowerPoint file, in its Office Open XML, legacy or OpenDocument form, when a model that may serve the step does not read the file's format and some model that may serve it reads PDFs, every member of a waterfall counting, or when a `PipeExtract` step asks for page views. Only the model's input changes: the `Document` keeps its Office file, and the step's output and every later step see it as it was given. The PDF holds the file's printed pages, so comments, hidden sheets and speaker notes do not reach the model. See [Office File Conversion](../../features/office-file-conversion.md).
+
 ### File formats are checked before the run
 
 At the start of every run, before any pipe runs, the runtime establishes the format of each image and document input, including the items of a list and the fields of a structured input:
@@ -205,6 +207,8 @@ The run is then refused, with an input error naming the input, when:
 - an `Image` input holds a file that is not an image, whatever reads it;
 - a document input is certain to reach a step whose model does not read its format: for example, Word transcripts batched into a `PipeExtract` whose extract model reads only PDF. The error names each input, its format, the step, the model and the formats that model reads.
 - a document input known not to be a PDF is certain to reach a `PipeExtract` that asks for page views, which are drawn from a PDF whatever the step's model reads. A URL with no declared type is refused the same way when that step's model reads no PDF, since nothing it reads can give page views. See [Page views need a PDF](../pipes/pipe-operators/PipeExtract.md#page-views-need-a-pdf).
+
+When the runtime has a document converter, an Office file that such a step would read as its PDF, as described under [DocumentContent](#documentcontent), is not refused: the run starts, and its log says which step will read which input as a PDF. Without a converter, a refusal that a converter would have avoided says so in its advice.
 
 The check follows each input through the steps of the method: the items of a batch, the fields of a structured input, and what a binding step or a dotted `batch_over` binds, so a Word transcript at `cases[1].transcripts[0]`, batched through `batch_over = "cases.transcripts"` over a list of cases, is refused before the run. A list a binding gathers from a field that is not itself a list, such as `cases.attachment` over a list of cases, is not followed, and a step that reads its items refuses a file when it gets to it.
 
