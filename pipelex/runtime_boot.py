@@ -111,6 +111,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.document_conversion.document_converter_factory import make_optional_document_converter_from_config
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.log.error_fields import error_fields
@@ -583,6 +584,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_config = get_config().runtime.storage
             storage_provider = storage_provider_registry.get_required(method=storage_config.method)(storage_config)
         self.runtime_hub.set_storage_provider(storage_provider)
+        # The document converter, off unless [runtime.document_conversion] names a backend. Built here so a backend
+        # named but unusable fails the boot with runtime.misconfigured, not the first Office file a step reads.
+        self.runtime_hub.set_document_converter(
+            document_converter=make_optional_document_converter_from_config(config=get_config().runtime.document_conversion)
+        )
 
         # Keyless boot forces every run to DRY — applied at runtime_hub.resolve_run_mode_for_boot,
         # which every run-params factory calls (the pipe tier's PipeRunParamsFactory.make_run_params

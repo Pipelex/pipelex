@@ -1016,6 +1016,86 @@
       "default": "aws_access",
       "open_node": false
     },
+    "runtime.document_conversion": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.document_conversion.backend": {
+      "value_type": "enum",
+      "required": true,
+      "enum_members": [
+        "gotenberg",
+        "none",
+        "soffice"
+      ],
+      "default": "none",
+      "open_node": false
+    },
+    "runtime.document_conversion.gotenberg": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.document_conversion.gotenberg.budget_seconds": {
+      "value_type": "float",
+      "required": true,
+      "default": 120,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
+    "runtime.document_conversion.gotenberg.timeout_seconds": {
+      "value_type": "float",
+      "required": true,
+      "default": 360,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
+    "runtime.document_conversion.gotenberg.url": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.document_conversion.gotenberg.version": {
+      "value_type": "str",
+      "required": true,
+      "default": "",
+      "open_node": false
+    },
+    "runtime.document_conversion.max_source_bytes": {
+      "value_type": "int",
+      "required": true,
+      "default": 50000000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
+    "runtime.document_conversion.soffice": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.document_conversion.soffice.binary": {
+      "value_type": "str",
+      "required": true,
+      "default": "soffice",
+      "open_node": false
+    },
+    "runtime.document_conversion.soffice.timeout_seconds": {
+      "value_type": "float",
+      "required": true,
+      "default": 120,
+      "open_node": false,
+      "constraints": {
+        "gt": 0
+      }
+    },
     "runtime.log": {
       "value_type": "table",
       "required": true,

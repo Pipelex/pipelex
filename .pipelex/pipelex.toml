@@ -99,6 +99,35 @@ is_fetch_ssrf_guard_enabled = true
 method = "env"
 
 ####################################################################################################
+# Document Conversion Config
+####################################################################################################
+
+# Converting an Office file (docx, xlsx, pptx, doc, xls, ppt, odt, ods, odp) to PDF when a step's
+# model cannot read it, or when the step asks for page views. "none" converts nothing; "gotenberg"
+# posts the file to a Gotenberg container (what a server reading other people's files runs);
+# "soffice" runs LibreOffice on this machine (for development, no isolation).
+[runtime.document_conversion]
+backend = "none"
+# The largest file handed to the converter, in bytes
+max_source_bytes = 50_000_000
+
+[runtime.document_conversion.gotenberg]
+# The container's base URL, such as "http://localhost:3000"
+url = ""
+# The version stamped on the PDFs; empty asks Gotenberg's /version
+version = ""
+# How long to wait for Gotenberg's answer: a hostile file can hold a connection about six minutes
+timeout_seconds = 360
+# Gotenberg's own budget for a conversion, its --api-timeout
+budget_seconds = 120
+
+[runtime.document_conversion.soffice]
+# The soffice executable: a name on the PATH or a path
+binary = "soffice"
+# How long one conversion may run before it is killed
+timeout_seconds = 120
+
+####################################################################################################
 # Log Config
 ####################################################################################################
 

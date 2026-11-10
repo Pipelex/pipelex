@@ -48,6 +48,7 @@ from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.class_registry_access import get_class_registry as _get_active_class_registry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
 from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 from pipelex.tools.misc.rich_extra import require_rich
@@ -112,6 +113,8 @@ class RuntimeHub:
         self._console_print_stream: TextIO | None = None
         self._secrets_provider: SecretsProviderAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
+        # The converter `[runtime.document_conversion]` names, None when it names none; set at every boot.
+        self._document_converter: DocumentConverterProtocol | None = None
         # Where an activity reads a method file, by its tree's digest: the local store unless a plugin claims
         # HubSlot.METHOD_FILE_STORE for a host whose activities run apart from the process that listed the trees.
         self._method_file_store: MethodFileStoreProtocol = LOCAL_METHOD_FILES
@@ -275,6 +278,9 @@ class RuntimeHub:
     def set_storage_provider(self, storage_provider: StorageProviderAbstract | None):
         self._storage_provider = storage_provider
 
+    def set_document_converter(self, *, document_converter: DocumentConverterProtocol | None) -> None:
+        self._document_converter = document_converter
+
     def set_method_file_store(self, *, method_file_store: MethodFileStoreProtocol) -> None:
         self._method_file_store = method_file_store
 
@@ -393,6 +399,9 @@ class RuntimeHub:
             msg = "StorageProvider is not initialized"
             raise RuntimeError(msg)
         return self._storage_provider
+
+    def get_optional_document_converter(self) -> DocumentConverterProtocol | None:
+        return self._document_converter
 
     def get_method_file_store(self) -> MethodFileStoreProtocol:
         return self._method_file_store
@@ -516,6 +525,11 @@ def get_secrets_provider() -> SecretsProviderAbstract:
 
 def get_storage_provider() -> StorageProviderAbstract:
     return get_runtime_hub().get_storage_provider()
+
+
+def get_optional_document_converter() -> DocumentConverterProtocol | None:
+    """The converter that makes the PDF of an Office file a step reads, None when `[runtime.document_conversion]` names none."""
+    return get_runtime_hub().get_optional_document_converter()
 
 
 def get_method_file_store() -> MethodFileStoreProtocol:

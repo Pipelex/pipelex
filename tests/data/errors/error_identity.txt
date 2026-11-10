@@ -67,6 +67,13 @@ DocGenEngineMissingError | pipelex.docgen.engine_unavailable
 DocGenHandleNotFoundError | pipelex.config.invalid
 DocGenModelCapabilityError | model.capability_unsupported
 DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, security.method_url_refused
+DocumentConversionError | abstract
+DocumentConverterAnswerError | runtime.unexpected
+DocumentConverterMisconfiguredError | runtime.misconfigured
+DocumentConverterUnavailableError | runtime.unavailable
+DocumentFormatNotConvertibleError | runtime.unexpected
+DocumentTooLargeToConvertError | input.too_large
+DocumentUnreadableByConverterError | input.file_unreadable
 DomainCodeError | method.schema_violation
 DomainFactoryError | runtime.unexpected
 DomainLibraryError | runtime.unexpected

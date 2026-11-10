@@ -34,6 +34,22 @@ is_fetch_ssrf_guard_enabled = true
 [runtime.secrets]
 method = "env" # env (built-in); an external plugin may add e.g. vault
 
+# Converting an Office file to PDF when a step's model cannot read it, or the step asks for page views.
+# "none" converts nothing; "gotenberg" posts to a Gotenberg container; "soffice" runs LibreOffice on this machine.
+[runtime.document_conversion]
+backend = "none"
+max_source_bytes = 50_000_000
+
+[runtime.document_conversion.gotenberg]
+url = ""
+version = ""
+timeout_seconds = 360
+budget_seconds = 120
+
+[runtime.document_conversion.soffice]
+binary = "soffice"
+timeout_seconds = 120
+
 ####################################################################################################
 # Log config
 ####################################################################################################
