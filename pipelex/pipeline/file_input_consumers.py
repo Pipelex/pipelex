@@ -33,7 +33,7 @@ resolving sub-pipes through the hub:
 The walk depends only on the library and the model deck, never on the input values.
 
 **Office files.** When the runtime has a document converter, an Office file is accepted where the step would read its
-PDF instead (`pipelex.kernel.document_conversion_ops`, whose rule this check mirrors): by a consumer asking for page
+PDF instead (`conversion_reason_for_step` in `pipelex.kernel.document_conversion_ops`, the rule the step applies too): by a consumer asking for page
 views whose model may read a PDF, and by one whose models may not all read the file's format and some of which read
 PDFs. The check returns those conversions, which setup only logs: the step decides again when it runs, and converts
 then. Without a converter, a refusal a converter would have avoided says so.
@@ -54,6 +54,7 @@ from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKi
 from pipelex.cogt.models.model_reference_specs import resolve_model_specs
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe
+from pipelex.kernel.document_conversion_ops import ConversionReason, conversion_reason_for_step
 from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
@@ -72,7 +73,6 @@ from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
 from pipelex.pipeline.input_normalizer import IdentifiedFileInput
 from pipelex.runtime_hub import get_model_deck
-from pipelex.tools.document_conversion.document_converter_protocol import is_convertible_format_key
 from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_file_format, describe_format_keys
 from pipelex.tools.uri.resolved_uri import UriKind
 
@@ -227,13 +227,6 @@ def collect_file_input_consumers(entry_pipe: PipeAbstract) -> dict[str, list[Fil
     return consumers_by_slot
 
 
-class ConversionReason(StrEnum):
-    """Why a step will read an Office file as its PDF."""
-
-    PAGE_VIEWS = "page_views"
-    MODEL_FORMAT = "model_format"
-
-
 class ForeseenConversion(NamedTuple):
     """An Office file run setup expects a step to read as its PDF, which setup logs and the step decides again."""
 
@@ -323,23 +316,15 @@ def check_file_inputs_against_consumers(
 def _conversion_reason(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> ConversionReason | None:
     """Why the consumer would read this file as its PDF given a document converter, `None` when it would not.
 
-    The step's own rule (`readable_document_for_step`), from what the walk knows: an Office file is read as its PDF by a
-    consumer asking for page views, unless its model is known to read no PDF, and by one whose models may not all read
-    the file's format while some read PDFs. A model that could not be resolved converts nothing but page views.
+    The step's own rule, `conversion_reason_for_step`, applied to what the walk knows of the consumer's models, so a file
+    setup accepts is one the step converts, and a file whose page views setup refuses is never converted at the step.
     """
-    format_key = file_input.format_key
-    if format_key is None or not is_convertible_format_key(format_key=format_key):
-        return None
-    readable_formats = consumer.readable_formats
-    if consumer.asks_for_page_views:
-        if readable_formats is not None and PDF_FORMAT_KEY not in readable_formats:
-            return None
-        return ConversionReason.PAGE_VIEWS
-    if readable_formats is None or PDF_FORMAT_KEY not in readable_formats:
-        return None
-    if format_key in (consumer.formats_read_by_every_model or frozenset[str]()):
-        return None
-    return ConversionReason.MODEL_FORMAT
+    return conversion_reason_for_step(
+        format_key=file_input.format_key,
+        formats_read_by_some_model=consumer.readable_formats,
+        formats_read_by_every_model=consumer.formats_read_by_every_model,
+        asks_for_page_views=consumer.asks_for_page_views,
+    )
 
 
 def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer, converter_would_help: bool) -> _ConsumerRefusal | None:

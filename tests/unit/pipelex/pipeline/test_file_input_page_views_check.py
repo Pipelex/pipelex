@@ -10,9 +10,9 @@ import pytest
 from pytest_mock import MockerFixture
 
 from pipelex.errors.problem import ProblemView
+from pipelex.kernel.document_conversion_ops import ConversionReason
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
 from pipelex.pipeline.file_input_consumers import (
-    ConversionReason,
     FileConsumerKind,
     FileInputConsumer,
     ForeseenConversion,
@@ -254,6 +254,17 @@ class TestFileInputConversionCheck:
             )
 
         assert exc_info.value.message.endswith("Give a PDF to a model that reads PDFs, or remove page_views from the step.")
+
+    def test_page_views_at_a_conditional_step_for_a_model_that_reads_no_pdf_are_left_to_the_step(self, mocker: MockerFixture):
+        """Setup neither refuses nor foresees a conversion there: the step, by the same rule, keeps the original and refuses."""
+        foreseen = _check(
+            mocker=mocker,
+            consumer=_consumer(asks_for_page_views=True, readable_formats=frozenset({"docx"}), is_conditional=True),
+            file_input=_file_input(mime_type=DOCX_MIME),
+            can_convert_documents=True,
+        )
+
+        assert foreseen == []
 
     def test_a_spreadsheet_given_to_a_model_that_reads_pdfs_is_accepted_and_foreseen(self, mocker: MockerFixture):
         foreseen = _check(

@@ -6,6 +6,7 @@ from pytest_mock import MockerFixture
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentBase64, PromptDocumentUri
+from pipelex.cogt.exceptions import ExtractInputFormatError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -47,6 +48,7 @@ READABLE_PDF = ReadablePdf(
 WORD_AND_PDF = {"docx", "pdf"}
 PDF_ONLY = {"pdf"}
 IMAGES_ONLY = {"png", "jpg"}
+WORD_ONLY = {"docx"}
 
 
 def _job_metadata(*, traced: bool = False) -> JobMetadata:
@@ -99,6 +101,8 @@ class TestDocumentConversionOps:
             pytest.param("xlsx", [IMAGES_ONLY], False, DocumentReading.ORIGINAL, id="a-model-reading-no-pdf-keeps-the-original"),
             pytest.param("docx", [], False, DocumentReading.ORIGINAL, id="an-unresolved-model-keeps-the-original"),
             pytest.param("docx", [], True, DocumentReading.PDF, id="an-unresolved-model-still-gets-page-views"),
+            pytest.param("docx", [WORD_ONLY], True, DocumentReading.ORIGINAL, id="page-views-for-a-model-reading-no-pdf-keep-the-original"),
+            pytest.param("docx", [WORD_ONLY, PDF_ONLY], True, DocumentReading.PDF, id="page-views-for-a-waterfall-with-a-pdf-member"),
             pytest.param("pdf", [IMAGES_ONLY], True, DocumentReading.ORIGINAL, id="a-pdf-is-never-converted"),
             pytest.param(None, [PDF_ONLY], True, DocumentReading.ORIGINAL, id="an-unknown-format-is-left-alone"),
         ],
@@ -250,3 +254,34 @@ class TestDocumentConversionOps:
         assert make_readable_pdf.call_args.kwargs["source_uri"] == f"data:{XLSX_MIME};base64,UEsDBA=="
         assert make_readable_pdf.call_args.kwargs["format_key"] == "xlsx"
         assert make_readable_pdf.call_args.kwargs["input_name"] is None
+
+    @pytest.mark.parametrize("has_converter", [True, False])
+    async def test_page_views_for_a_model_reading_no_pdf_are_refused_before_any_conversion(self, mocker: MockerFixture, has_converter: bool):
+        """A step reached through a condition, which run setup leaves to the step, converts nothing a PDF would not help.
+
+        Its model reads Word files but no PDF, so the page views it asks for cannot be drawn whatever it is given: the step
+        refuses them as it did before conversion existed, and its advice does not offer a converter.
+        """
+        make_readable_pdf = _wire(mocker=mocker, formats_by_model=[WORD_ONLY], has_converter=has_converter)
+        content_generator = mocker.MagicMock()
+        content_generator.make_extract_pages = mocker.AsyncMock(return_value=[])
+        mocker.patch("pipelex.kernel.extract_ops.get_content_generator", return_value=content_generator)
+        extract_setting = ExtractSetting(model="word-only-extractor")
+
+        with pytest.raises(ExtractInputFormatError) as exc_info:
+            await run_extract(
+                memory=WorkingMemoryFactory.make_empty(),
+                extract_input=ExtractInput(document_uri=DOCX_URI, mime_type=DOCX_MIME, input_name="report"),
+                extract_setting=extract_setting,
+                extract_job_params=build_extract_job_params(extract_setting=extract_setting, should_include_page_views=True),
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                job_metadata=_job_metadata(),
+                cogt_run_params=_run_params(),
+                result_name="pages",
+            )
+
+        make_readable_pdf.assert_not_called()
+        content_generator.make_extract_pages.assert_not_called()
+        assert exc_info.value.message == (
+            "Input 'report' is a Word document (.docx), and page views are drawn from a PDF. Give a PDF, or remove page_views from the step."
+        )

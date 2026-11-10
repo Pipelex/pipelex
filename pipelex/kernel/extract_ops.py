@@ -26,7 +26,6 @@ from pipelex.kernel.extract_results import ExtractResult
 from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
-from pipelex.tools.document_conversion.document_converter_protocol import is_convertible_format_key
 from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, describe_file_format, format_key_from_mime_type
 
 if TYPE_CHECKING:
@@ -75,11 +74,13 @@ def build_extract_job_params(
     )
 
 
-def _refuse_page_views_of_a_known_non_pdf(*, extract_input: ExtractInput, extract_job_params: ExtractJobParams) -> None:
+def _refuse_page_views_of_a_known_non_pdf(*, extract_input: ExtractInput, extract_job_params: ExtractJobParams, converter_would_help: bool) -> None:
     """Refuse page views on a document known not to be a PDF, before the extraction is paid for.
 
     Run setup refuses what is certain before the run; this catches the rest, a step reached through a condition or a
-    document a previous step produced. An unknown format is left to the renderer. An image is its own page view.
+    document a previous step produced. An unknown format is left to the renderer. An image is its own page view. An
+    Office file reaches it when the runtime has no converter, `converter_would_help` then saying so in the advice, or
+    when no model of the step reads PDFs, which a converter would not change.
 
     Raises:
         ExtractInputFormatError: If page views are asked of a document whose format is known and is not PDF.
@@ -91,8 +92,7 @@ def _refuse_page_views_of_a_known_non_pdf(*, extract_input: ExtractInput, extrac
         return
     subject = f"Input '{extract_input.input_name}' is" if extract_input.input_name else "The file to extract is"
     file_format = describe_file_format(format_key=format_key, mime_type=extract_input.mime_type)
-    # Reached with an Office file only when the runtime has no converter: a converter would have drawn them from its PDF.
-    advice = PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE if is_convertible_format_key(format_key=format_key) else PAGE_VIEWS_FILE_ADVICE
+    advice = PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE if converter_would_help else PAGE_VIEWS_FILE_ADVICE
     msg = f"{subject} {file_format}, and page views are drawn from a PDF. {advice}"
     refusal = ExtractInputFormatError(msg).with_params(format=format_key, model=PAGE_VIEWS_RENDERER)
     if extract_input.input_name:
@@ -129,7 +129,11 @@ async def run_extract(
             cogt_run_params=cogt_run_params,
         )
         if not readable_input.reads_pdf:
-            _refuse_page_views_of_a_known_non_pdf(extract_input=readable_input.extract_input, extract_job_params=extract_job_params)
+            _refuse_page_views_of_a_known_non_pdf(
+                extract_input=readable_input.extract_input,
+                extract_job_params=extract_job_params,
+                converter_would_help=readable_input.converter_would_help,
+            )
         page_contents = await get_content_generator().make_extract_pages(
             extract_input=readable_input.extract_input,
             cogt_run_params=cogt_run_params,

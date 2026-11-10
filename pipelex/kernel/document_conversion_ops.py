@@ -2,12 +2,14 @@
 
 A step whose models cannot all read an Office file, or that asks for page views, reads the file's PDF instead, when the
 runtime has a document converter (`[runtime.document_conversion]`). One function decides, for every consumer:
-`readable_document_for_step` answers the original when the original's format is not one the runtime converts, or when
-every model that may serve the step reads it and no page views are asked for; otherwise it answers the PDF. "Every
-model that may serve" is the resolved model for a handle or an alias and every member for a waterfall, the rule run
-setup's walk uses (`pipelex.cogt.models.model_reference_specs`), so a waterfall whose later member reads only PDFs
-never receives a Word file. A PDF helps no model that reads none, so a step whose models read no PDF keeps the original
-unless it asks for page views, which are drawn from a PDF whatever the model reads.
+`conversion_reason_for_step`, which run setup's check applies too, so the two cannot disagree. It answers the original
+when the original's format is not one the runtime converts, when no model that may serve the step reads PDFs, since a
+PDF helps no model that reads none, or when every model that may serve the step reads the format and no page views are
+asked for; otherwise it answers the PDF. "Every model that may serve" is the resolved model for a handle or an alias
+and every member for a waterfall, the rule run setup's walk uses (`pipelex.cogt.models.model_reference_specs`), so a
+waterfall whose later member reads only PDFs never receives a Word file. Page views are drawn from a PDF whatever the
+model reads, so a step asking for them reads the PDF whenever some model of the step reads PDFs; when none does, the
+step keeps the original and refuses its page views before any conversion is paid for.
 
 **Where it runs.** Where each consumer builds its model input, before the existing checks: in `run_extract` before the
 page-view refusal, and after a `PipeLLM`'s or a `PipeJudge`'s prompt has resolved its documents, before the worker
@@ -72,30 +74,81 @@ def convertible_format_key(*, mime_type: str | None) -> str | None:
     return format_key
 
 
+class ConversionReason(StrEnum):
+    """Why a step reads an Office file as its PDF."""
+
+    PAGE_VIEWS = "page_views"
+    MODEL_FORMAT = "model_format"
+
+
+def conversion_reason_for_step(
+    *,
+    format_key: str | None,
+    formats_read_by_some_model: Collection[str] | None,
+    formats_read_by_every_model: Collection[str] | None,
+    asks_for_page_views: bool,
+) -> ConversionReason | None:
+    """Why a step would read a document as its PDF, given a document converter; None when it reads the original.
+
+    The one rule run setup's check and the step both apply, so that a file setup accepts is the file the step converts
+    and a file setup refuses is never converted first:
+
+    - **Page views** are drawn from a PDF whatever the model reads, so a step asking for them reads the PDF, unless no
+      model that may serve it reads PDFs: the step then keeps the original, and its page-view refusal stands before any
+      conversion is paid for. A model that could not be resolved may read PDFs, so it converts.
+    - **Otherwise** the step reads the PDF when some model that may serve it reads PDFs while not every one reads the
+      file's format. A model that could not be resolved converts nothing.
+
+    Args:
+        format_key: The document's format key, as run setup established it; None when unknown, which converts nothing.
+        formats_read_by_some_model: The format keys at least one model that may serve the step reads, a waterfall's
+            members all counted; None when the step's model could not be resolved.
+        formats_read_by_every_model: The format keys every model that may serve the step reads; None when unresolved.
+        asks_for_page_views: Whether the step draws the document's pages as images.
+
+    Returns:
+        Why the step reads the PDF, or None when it reads the original.
+    """
+    if format_key is None or not is_convertible_format_key(format_key=format_key):
+        return None
+    if asks_for_page_views:
+        if formats_read_by_some_model is not None and PDF_FORMAT_KEY not in formats_read_by_some_model:
+            return None
+        return ConversionReason.PAGE_VIEWS
+    if formats_read_by_some_model is None or PDF_FORMAT_KEY not in formats_read_by_some_model:
+        return None
+    if format_key.lower() in (formats_read_by_every_model or frozenset[str]()):
+        return None
+    return ConversionReason.MODEL_FORMAT
+
+
 def readable_document_for_step(
     *, format_key: str | None, readable_formats_by_model: Sequence[Collection[str]], asks_for_page_views: bool
 ) -> DocumentReading:
-    """Whether a step reads a document as itself or as its PDF.
+    """Whether a step reads a document as itself or as its PDF, by `conversion_reason_for_step`.
 
     Args:
         format_key: The document's format key, as run setup established it; None when unknown.
         readable_formats_by_model: The format keys each model that may serve the step reads, one collection per model;
-            empty when the step's model could not be resolved, which leaves the document as it is.
+            empty when the step's model could not be resolved.
         asks_for_page_views: Whether the step draws the document's pages as images, which only a PDF allows.
 
     Returns:
-        The PDF for a document of a format the runtime converts that some model may not read, or whose pages are drawn;
-        the original otherwise.
+        The PDF for a document of a format the runtime converts that some model reading PDFs may not read, or whose
+        pages are drawn while some model reads PDFs; the original otherwise.
     """
-    if format_key is None or not is_convertible_format_key(format_key=format_key):
-        return DocumentReading.ORIGINAL
-    if asks_for_page_views:
-        return DocumentReading.PDF
-    if not readable_formats_by_model:
-        return DocumentReading.ORIGINAL
-    if all(format_key in readable_formats for readable_formats in readable_formats_by_model):
-        return DocumentReading.ORIGINAL
-    if not any(PDF_FORMAT_KEY in readable_formats for readable_formats in readable_formats_by_model):
+    formats_read_by_some_model: frozenset[str] | None = None
+    formats_read_by_every_model: frozenset[str] | None = None
+    if readable_formats_by_model:
+        formats_read_by_some_model = frozenset[str]().union(*readable_formats_by_model)
+        formats_read_by_every_model = frozenset[str](readable_formats_by_model[0]).intersection(*readable_formats_by_model[1:])
+    conversion_reason = conversion_reason_for_step(
+        format_key=format_key,
+        formats_read_by_some_model=formats_read_by_some_model,
+        formats_read_by_every_model=formats_read_by_every_model,
+        asks_for_page_views=asks_for_page_views,
+    )
+    if conversion_reason is None:
         return DocumentReading.ORIGINAL
     return DocumentReading.PDF
 
@@ -117,11 +170,13 @@ class ReadableExtractInput(NamedTuple):
     """The extraction's input as the step's model reads it, and whether the step reads its document as a PDF.
 
     `reads_pdf` is True in a dry run too when a live run would convert, which a dry run never does: the step's own
-    refusal of page views drawn from a non-PDF then has nothing to refuse.
+    refusal of page views drawn from a non-PDF then has nothing to refuse. `converter_would_help` is True when the step
+    would have read the document's PDF had the runtime a document converter, so a refusal can say to configure one.
     """
 
     extract_input: ExtractInput
     reads_pdf: bool
+    converter_would_help: bool = False
 
 
 async def readable_extract_input(
@@ -141,7 +196,7 @@ async def readable_extract_input(
     with job_metadata.log_context():
         document_uri = extract_input.document_uri
         format_key = convertible_format_key(mime_type=extract_input.mime_type)
-        if document_uri is None or format_key is None or get_optional_document_converter() is None:
+        if document_uri is None or format_key is None:
             return ReadableExtractInput(extract_input=extract_input, reads_pdf=False)
         reading = readable_document_for_step(
             format_key=format_key,
@@ -150,6 +205,8 @@ async def readable_extract_input(
         )
         if not reading.is_pdf:
             return ReadableExtractInput(extract_input=extract_input, reads_pdf=False)
+        if get_optional_document_converter() is None:
+            return ReadableExtractInput(extract_input=extract_input, reads_pdf=False, converter_would_help=True)
         if cogt_run_params.run_mode.is_dry:
             return ReadableExtractInput(extract_input=extract_input, reads_pdf=True)
         readable_pdf = await read_document_as_pdf(
