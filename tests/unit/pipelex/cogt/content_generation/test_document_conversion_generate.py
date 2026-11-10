@@ -32,6 +32,7 @@ from pipelex.tools.document_conversion.exceptions import (
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
+from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 
 _MODULE = "pipelex.cogt.content_generation.document_conversion_generate"
@@ -235,7 +236,8 @@ class TestDocumentConversionGenerate:
         assert storage.root[SCOPED_KEY] == PDF_BYTES
         assert storage.root[BESIDE_KEY] == UNOPENABLE_PDF_BYTES
 
-    async def test_a_pdf_kept_under_the_run_that_does_not_open_fails_as_a_conversion_naming_the_input(self, mocker: MockerFixture):
+    async def test_a_pdf_kept_under_the_run_that_does_not_open_is_a_fault_of_the_storage_not_of_the_file(self, mocker: MockerFixture):
+        """Only the runtime writes the run's own key, so the person is not told their file is damaged."""
         converter = _StubConverter()
         storage = _wire(mocker=mocker, converter=converter)
         await _keep_pdf(
@@ -243,13 +245,13 @@ class TestDocumentConversionGenerate:
         )
         data_url = f"data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,{base64.b64encode(DOCX_BYTES).decode()}"
 
-        with pytest.raises(DocumentUnreadableByConverterError) as exc_info:
+        with pytest.raises(KeptPdfConflictError) as exc_info:
             await readable_pdf_of_document(conversion_assignment=_assignment(source_uri=data_url, input_name="cv"))
 
         assert converter.calls == []
+        assert isinstance(exc_info.value.__cause__, PdfDocumentUnreadableError)
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
-        assert wire.get("code") == CoreCode.INPUT_FILE_UNREADABLE
-        assert wire.get("params") == {"input": "cv", "file_type": "docx", "reason": "conversion_failed"}, wire
+        assert wire.get("code") == CoreCode.RUNTIME_UNEXPECTED
 
     async def test_a_file_outside_storage_is_kept_under_the_run_and_reused_by_its_hash(self, mocker: MockerFixture):
         converter = _StubConverter()

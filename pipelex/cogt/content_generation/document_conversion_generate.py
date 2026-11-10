@@ -12,7 +12,8 @@ goes back, so its bytes never cross a host runtime's boundary.
    provider keeping none answers, is taken for a printed-pages PDF of unknown version, so a plugin storage still reuses
    its PDFs. An object there that says another export, or that PDFium cannot open, is not this PDF and cannot be
    replaced, since PDFs are written create-only: a source in storage then has its PDF kept under the run's storage
-   scope instead, as a source outside storage does. The run's own key holding such an object fails the step.
+   scope instead, as a source outside storage does. The run's own key holding such an object fails the step as a
+   fault of the storage, `runtime.unexpected`, since only the runtime writes there.
 2. **Otherwise a conversion.** A source in storage is sized first, and one past `max_source_bytes` fails as too large
    without being read; any other source is read, and the converter refuses it past the same size before sending it.
    The PDF's pages are counted with pypdfium2, and the PDF is written create-only with `content_type="application/pdf"`
@@ -48,7 +49,6 @@ from pipelex.tools.document_conversion.exceptions import (
     DocumentConverterMisconfiguredError,
     DocumentFormatNotConvertibleError,
     DocumentTooLargeToConvertError,
-    DocumentUnreadableByConverterError,
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf, pdf_key_of, scoped_pdf_key
@@ -87,13 +87,12 @@ async def readable_pdf_of_document(*, conversion_assignment: DocumentConversionA
         UriReadRefusedError: The run's read scope does not allow reading the source.
         DocumentConverterMisconfiguredError: This process has no converter, though the step asked for a conversion.
         DocumentFormatNotConvertibleError: The format is not one the runtime converts, which the step checks first.
-        DocumentUnreadableByConverterError: The converter could not read the file, or the PDF kept under the run's own
-            key does not open.
+        DocumentUnreadableByConverterError: The converter could not read the file.
         DocumentTooLargeToConvertError: The file is past `max_source_bytes` or the converter's size, or ran out of time.
         DocumentConverterUnavailableError: The converter is busy or unreachable.
         DocumentConverterAnswerError: The converter answered something that is not a PDF PDFium opens.
         KeptPdfConflictError: The run's own key, or the key a concurrent writer won, holds an object that is not a
-            printed-pages PDF.
+            printed-pages PDF PDFium opens.
         RemoteFileFetchError: The source could not be fetched.
     """
     authorize_assignment_reads(job_metadata=conversion_assignment.job_metadata, uri_references=conversion_assignment.referenced_uris())
@@ -169,12 +168,10 @@ async def readable_pdf_of_document(*, conversion_assignment: DocumentConversionA
             try:
                 return await _kept_readable_pdf(storage_provider=storage_provider, pdf_key=pdf_key, kept_state=kept_state)
             except PdfDocumentUnreadableError as exc:
-                # The run's own key cannot be replaced either, so the step cannot have a PDF of this file.
-                msg = f"The PDF kept for this run's file of the format '{format_key}' does not open, and it cannot be replaced."
-                unreadable = DocumentUnreadableByConverterError(msg, format_key=format_key)
-                if input_name is not None:
-                    unreadable.with_input(input_name=input_name)
-                raise unreadable from exc
+                # Only the runtime writes the run's own key, and it cannot be replaced: a fault of the storage, not of
+                # the input, whose file is not to be called damaged.
+                msg = f"The PDF a run keeps for a file of the format '{format_key}' does not open, and it cannot be replaced."
+                raise KeptPdfConflictError(msg) from exc
         case _KeptLookup.FOREIGN:
             msg = f"The key a run keeps the PDF of input '{input_name}' under holds an object that is not a printed-pages PDF."
             raise KeptPdfConflictError(msg)
