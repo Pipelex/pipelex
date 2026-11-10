@@ -45,6 +45,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.cogt.models.model_reference_specs import resolve_model_specs
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe
 from pipelex.kernel.extract_ops import resolve_extract_setting
@@ -322,50 +323,6 @@ def _is_http_url(*, uri_kind: UriKind) -> bool:
             return True
         case UriKind.LOCAL_PATH | UriKind.PIPELEX_STORAGE | UriKind.BASE64_DATA_URL:
             return False
-
-
-def resolve_model_specs(*, model_reference: str, model_type: ModelType) -> list[InferenceModelSpec]:
-    """The model specs a model reference can be served by: one for a handle or an alias, every available member for a waterfall.
-
-    A preset is not resolved here: the caller resolves a step's choice to a setting first. A member
-    the deck does not serve (its backend is disabled) is skipped, since no run could use it either.
-    An unresolvable reference gives no spec.
-    """
-    return _resolve_model_specs(model_reference=model_reference, model_type=model_type, visited=frozenset())
-
-
-def _resolve_model_specs(*, model_reference: str, model_type: ModelType, visited: frozenset[str]) -> list[InferenceModelSpec]:
-    if model_reference in visited:
-        return []
-    visited |= {model_reference}
-    try:
-        reference = ModelReference.parse(model_reference)
-    except ModelReferenceParseError:
-        return []
-    model_deck = get_model_deck()
-    aliases, waterfalls = model_deck.get_aliases_and_waterfalls_for_type(model_type)
-    alias_target: str | None = None
-    waterfall_members: list[str] | None = None
-    match reference.kind:
-        case ModelReferenceKind.PRESET:
-            return []
-        case ModelReferenceKind.ALIAS:
-            alias_target = aliases.get(reference.name)
-        case ModelReferenceKind.WATERFALL:
-            waterfall_members = waterfalls.get(reference.name)
-        case ModelReferenceKind.HANDLE:
-            # A handle served as another type only does not stop the lookup: this type's alias or
-            # waterfall of the same name is tried next, as the deck's own lookup does.
-            if model_spec := model_deck.inference_models.get(model_type=model_type, handle=reference.name):
-                return [model_spec]
-            alias_target = aliases.get(reference.name)
-            waterfall_members = None if alias_target else waterfalls.get(reference.name)
-    if alias_target:
-        return _resolve_model_specs(model_reference=alias_target, model_type=model_type, visited=visited)
-    model_specs: list[InferenceModelSpec] = []
-    for member in waterfall_members or []:
-        model_specs.extend(_resolve_model_specs(model_reference=member, model_type=model_type, visited=visited))
-    return model_specs
 
 
 def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting: frozenset[str], consumers: list[FileInputConsumer]) -> None:
