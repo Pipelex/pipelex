@@ -5,7 +5,12 @@ from typing import ClassVar, Literal, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.tools.storage.exceptions import StorageChecksumMismatchError, StorageFileNotFoundError, StorageInvalidKeyError
+from pipelex.tools.storage.exceptions import (
+    StorageChecksumMismatchError,
+    StorageFileNotFoundError,
+    StorageInvalidKeyError,
+    StorageInvalidMetadataError,
+)
 
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
 
@@ -37,7 +42,8 @@ class StorageProviderAbstract(ABC):
     that keeps metadata overrides `_store_with_metadata`, `_store_if_absent_with_metadata` and `_load_metadata`, as the
     ones Pipelex ships do. One that does not, a storage plugin written before metadata existed included, keeps working
     unchanged: what it is handed is not stored, and `load_metadata` answers None for an object it holds. Keys are read
-    back lowercase, as S3 returns them, so a caller writes them lowercase; keys and values are ASCII, as S3 requires.
+    back lowercase, as S3 returns them, so a caller writes them lowercase; keys are non-empty and keys and values are
+    ASCII, as S3 requires, which `store` and `store_if_absent` check for every provider before anything is stored.
 
     A subclass holding a client open between operations overrides ``teardown`` to close it.
 
@@ -202,8 +208,12 @@ class StorageProviderAbstract(ABC):
 
         Returns:
             Full URI with PIPELEX_STORAGE_SCHEME prefix.
+
+        Raises:
+            StorageInvalidMetadataError: If a metadata key is empty, or a key or value is not ASCII.
         """
         uri = self._add_scheme(key)
+        _check_metadata(metadata=metadata, key=key)
         await self._store_with_metadata(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=metadata)
         return uri
 
@@ -274,8 +284,10 @@ class StorageProviderAbstract(ABC):
         Raises:
             StorageInvalidKeyError: If the key includes the scheme prefix.
             StorageChecksumMismatchError: If `data` does not hash to `checksum_sha256_hex`.
+            StorageInvalidMetadataError: If a metadata key is empty, or a key or value is not ASCII.
         """
         self._add_scheme(key)
+        _check_metadata(metadata=metadata, key=key)
         if checksum_sha256_hex is not None and hashlib.sha256(data).hexdigest() != checksum_sha256_hex:
             msg = f"The bytes to store under '{key}' do not hash to the checksum {checksum_sha256_hex!r} given with them: nothing was stored."
             raise StorageChecksumMismatchError(msg)
@@ -389,3 +401,17 @@ class StorageProviderAbstract(ABC):
         Returns:
             Human-readable link for debugging/display.
         """
+
+
+def _check_metadata(*, metadata: Mapping[str, str] | None, key: str) -> None:
+    """Refuse metadata some provider cannot keep, so every provider refuses what S3 would.
+
+    Raises:
+        StorageInvalidMetadataError: If a metadata key is empty, or a key or value is not ASCII.
+    """
+    if not metadata:
+        return
+    for meta_key, meta_value in metadata.items():
+        if not meta_key or not meta_key.isascii() or not meta_value.isascii():
+            msg = f"The metadata to store under '{key}' holds the key {meta_key!r}: metadata keys are non-empty, and keys and values ASCII."
+            raise StorageInvalidMetadataError(msg)

@@ -361,6 +361,7 @@ StorageFileNotFoundError | one of pipelex.storage.not_found, runtime.unexpected
 StorageGcpCredentialsError | pipelex.config.file_missing
 StorageGcpError | one of pipelex.storage.unavailable, pipelex.config.credential_refused
 StorageInvalidKeyError | runtime.unexpected
+StorageInvalidMetadataError | runtime.unexpected
 StorageInvalidUriError | one of security.input_path_refused, security.method_url_refused, runtime.unexpected
 StorageLocalError | runtime.misconfigured
 StorageNotConfiguredError | pipelex.storage.not_configured

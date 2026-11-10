@@ -63,6 +63,16 @@ class StorageInvalidKeyError(StorageError):
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
 
+class StorageInvalidMetadataError(StorageError):
+    """Raised when the metadata handed to a write is not what every provider can keep: an empty key, or a key or value that is not ASCII.
+
+    The caller writes the metadata, so it is a bug of the caller, refused before anything is stored by any provider,
+    as S3 would refuse it.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class StorageChecksumMismatchError(StorageError):
     """Raised when the bytes a create-only write was handed do not hash to the checksum it was handed with them.
 

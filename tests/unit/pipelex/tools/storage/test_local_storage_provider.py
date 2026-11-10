@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,7 @@ from pytest_mock import MockerFixture
 from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
     StorageInvalidKeyError,
+    StorageInvalidMetadataError,
     StorageInvalidUriError,
     StorageLocalError,
 )
@@ -307,3 +309,83 @@ class TestLocalStorageProvider:
 
         with pytest.raises(StorageFileNotFoundError):
             await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/missing.pdf")
+
+    @staticmethod
+    def _fail_sidecar_renames(*, mocker: MockerFixture) -> None:
+        """Make every rename onto a sidecar fail, as a full or read-only directory would, and every other rename work."""
+        real_replace = Path.replace
+
+        def replace_unless_sidecar(self: Path, target: Path) -> Path:
+            if Path(target).name.endswith(".metadata.json"):
+                msg = "No space left on device"
+                raise OSError(msg)
+            return real_replace(self, target)
+
+        mocker.patch.object(Path, "replace", autospec=True, side_effect=replace_unless_sidecar)
+
+    async def test_a_store_whose_sidecar_cannot_be_published_leaves_no_file_without_its_metadata(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+        await provider.store(data=b"%PDF- old", key=key, metadata={"converter-version": "0.1.0"})
+        self._fail_sidecar_renames(mocker=mocker)
+
+        with pytest.raises(StorageLocalError):
+            await provider.store(data=b"%PDF- new", key=key, metadata={"converter-version": "0.2.0"})
+
+        # Neither the new bytes beside the old metadata, nor the new bytes without metadata: the key is empty.
+        assert list((tmp_path / "scope").iterdir()) == []
+
+    async def test_a_create_whose_sidecar_cannot_be_published_frees_the_key_for_the_next_attempt(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+        self._fail_sidecar_renames(mocker=mocker)
+
+        with pytest.raises(StorageLocalError):
+            await provider.store_if_absent(data=b"%PDF-", key=key, metadata={"converter-version": "0.1.0"})
+
+        assert list((tmp_path / "scope").iterdir()) == []
+        mocker.stopall()
+        assert await provider.store_if_absent(data=b"%PDF-", key=key, metadata={"converter-version": "0.1.0"}) is True
+        assert await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") == {"converter-version": "0.1.0"}
+
+    async def test_writers_of_one_key_at_once_leave_bytes_beside_their_own_metadata(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+
+        for _ in range(5):
+            await asyncio.gather(
+                *(
+                    provider.store(data=f"%PDF- from writer {index_writer}".encode(), key=key, metadata={"writer": str(index_writer)})
+                    for index_writer in range(12)
+                )
+            )
+            stored = await provider.load(uri=uri)
+            metadata = await provider.load_metadata(uri=uri)
+            assert metadata is not None
+            assert stored == f"%PDF- from writer {metadata['writer']}".encode()
+
+    async def test_writers_of_one_key_on_several_threads_leave_bytes_beside_their_own_metadata(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+        uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
+
+        def store_from_a_thread(index_writer: int) -> None:
+            for _ in range(20):
+                asyncio.run(provider.store(data=f"%PDF- from writer {index_writer}".encode(), key=key, metadata={"writer": str(index_writer)}))
+
+        await asyncio.gather(*(asyncio.to_thread(store_from_a_thread, index_writer) for index_writer in range(4)))
+
+        metadata = await provider.load_metadata(uri=uri)
+        assert metadata is not None
+        assert await provider.load(uri=uri) == f"%PDF- from writer {metadata['writer']}".encode()
+
+    async def test_metadata_that_is_not_ascii_is_refused_before_anything_is_stored(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+
+        with pytest.raises(StorageInvalidMetadataError):
+            await provider.store(data=b"%PDF-", key="scope/a.pdf", metadata={"converter-version": "0.1.0 \u2014 beta"})
+        with pytest.raises(StorageInvalidMetadataError):
+            await provider.store_if_absent(data=b"%PDF-", key="scope/b.pdf", metadata={"": "empty key"})
+
+        assert not (tmp_path / "scope").exists()
