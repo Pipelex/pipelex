@@ -14,17 +14,19 @@ from typing import TYPE_CHECKING
 
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.exceptions import ExtractInputFormatError
-from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_RENDERER, ExtractInput
+from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE, PAGE_VIEWS_RENDERER, ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.models.model_deck import resolve_deck_choice
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
+from pipelex.kernel.document_conversion_ops import readable_extract_input
 from pipelex.kernel.extract_results import ExtractResult
 from pipelex.kernel.memory_ops import store_result
 from pipelex.runtime_hub import get_content_generator, get_model_deck
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.document_conversion.document_converter_protocol import is_convertible_format_key
 from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, describe_file_format, format_key_from_mime_type
 
 if TYPE_CHECKING:
@@ -89,7 +91,9 @@ def _refuse_page_views_of_a_known_non_pdf(*, extract_input: ExtractInput, extrac
         return
     subject = f"Input '{extract_input.input_name}' is" if extract_input.input_name else "The file to extract is"
     file_format = describe_file_format(format_key=format_key, mime_type=extract_input.mime_type)
-    msg = f"{subject} {file_format}, and page views are drawn from a PDF. {PAGE_VIEWS_FILE_ADVICE}"
+    # Reached with an Office file only when the runtime has no converter: a converter would have drawn them from its PDF.
+    advice = PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE if is_convertible_format_key(format_key=format_key) else PAGE_VIEWS_FILE_ADVICE
+    msg = f"{subject} {file_format}, and page views are drawn from a PDF. {advice}"
     refusal = ExtractInputFormatError(msg).with_params(format=format_key, model=PAGE_VIEWS_RENDERER)
     if extract_input.input_name:
         refusal = refusal.with_params(input=extract_input.input_name)
@@ -115,9 +119,19 @@ async def run_extract(
     and image-generation paths.
     """
     with job_metadata.log_context():
-        _refuse_page_views_of_a_known_non_pdf(extract_input=extract_input, extract_job_params=extract_job_params)
-        page_contents = await get_content_generator().make_extract_pages(
+        # An Office file the extraction's models may not all read, or whose page views are asked for, is read as its PDF
+        # when the runtime converts documents: the page views and the extraction then read the same file.
+        readable_input = await readable_extract_input(
             extract_input=extract_input,
+            model_reference=extract_setting.model,
+            asks_for_page_views=extract_job_params.should_include_page_views,
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+        )
+        if not readable_input.reads_pdf:
+            _refuse_page_views_of_a_known_non_pdf(extract_input=readable_input.extract_input, extract_job_params=extract_job_params)
+        page_contents = await get_content_generator().make_extract_pages(
+            extract_input=readable_input.extract_input,
             cogt_run_params=cogt_run_params,
             extract_handle=extract_setting.model,
             job_metadata=job_metadata,

@@ -50,6 +50,7 @@ from pipelex.core.stuffs.non_null_any import class_field_may_hold_nothing, field
 from pipelex.core.stuffs.rating_content import RatingContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.yes_no_content import YesNoContent
+from pipelex.kernel.document_conversion_ops import readable_prompt_documents
 from pipelex.kernel.exceptions import JudgmentOutputFieldsError
 from pipelex.kernel.judgment_results import JudgmentResult, MultiJudgmentResult, QuestionJudgment
 from pipelex.kernel.memory_ops import store_result
@@ -336,7 +337,15 @@ async def _ask_judgment(
     with job_metadata.log_context():
         with locating_template_refusal(template_field="prompt"):
             assembled_prompt = await assemble_user_prompt(prompt_content=prompt_content, context_provider=memory, templating_style=templating_style)
-        judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=assembled_prompt.documents)
+        # An Office file a model that may serve the judgment cannot read is handed over as its PDF, in its place.
+        readable_documents = await readable_prompt_documents(
+            documents=assembled_prompt.documents,
+            model_reference=judgment_setting.model,
+            model_type=ModelType.JUDGMENT,
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+        )
+        judgment_prompt = JudgmentPrompt(text=assembled_prompt.text, images=assembled_prompt.images, documents=readable_documents)
         context = memory.generate_context()
         asked_questions: dict[str, JudgmentQuestion] = {}
         for question_key, question in questions.items():
