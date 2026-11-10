@@ -1,9 +1,11 @@
 import os
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
 
+from pipelex.runtime_hub import get_runtime_hub
 from pipelex.tools.document_conversion.document_converter_protocol import DocumentConverterProtocol
 from pipelex.tools.document_conversion.gotenberg_converter import GotenbergConverter
 from pipelex.tools.document_conversion.soffice_converter import SofficeConverter
@@ -37,3 +39,15 @@ def document_converter(request: pytest.FixtureRequest) -> DocumentConverterProto
                 budget_seconds=120,
                 max_source_bytes=_MAX_SOURCE_BYTES,
             )
+
+
+@pytest.fixture
+def runtime_document_converter(document_converter: DocumentConverterProtocol) -> Iterator[DocumentConverterProtocol]:
+    """The backend set on the runtime hub, as `[runtime.document_conversion]` would set it, and the hub restored after."""
+    runtime_hub = get_runtime_hub()
+    previous_converter = runtime_hub.get_optional_document_converter()
+    runtime_hub.set_document_converter(document_converter=document_converter)
+    try:
+        yield document_converter
+    finally:
+        runtime_hub.set_document_converter(document_converter=previous_converter)
