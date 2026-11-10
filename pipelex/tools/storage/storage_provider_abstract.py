@@ -1,5 +1,6 @@
 import hashlib
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import ClassVar, Literal, NamedTuple
 
 from mthds.protocol.problem.registry import CoreCode
@@ -30,6 +31,13 @@ class StorageProviderAbstract(ABC):
         - _load_with_metadata(key): Load data with MIME type by key (without scheme)
         - _store(data, key, content_type, checksum_sha256_hex): Store data
         - public_url(uri): Return human-readable link for URI
+
+    **Object metadata.** `store` and `store_if_absent` take an optional `metadata`, a few string pairs kept beside the
+    object, and `load_metadata` reads them back without the body; a kept PDF records what made it this way. A provider
+    that keeps metadata overrides `_store_with_metadata`, `_store_if_absent_with_metadata` and `_load_metadata`, as the
+    ones Pipelex ships do. One that does not, a storage plugin written before metadata existed included, keeps working
+    unchanged: what it is handed is not stored, and `load_metadata` answers None for an object it holds. Keys are read
+    back lowercase, as S3 returns them, so a caller writes them lowercase; keys and values are ASCII, as S3 requires.
 
     A subclass holding a client open between operations overrides ``teardown`` to close it.
 
@@ -167,7 +175,15 @@ class StorageProviderAbstract(ABC):
         stored_data = await self._load_with_metadata(key)
         return len(stored_data.data)
 
-    async def store(self, data: bytes, *, key: str, content_type: str | None = None, checksum_sha256_hex: str | None = None) -> str:
+    async def store(
+        self,
+        data: bytes,
+        *,
+        key: str,
+        content_type: str | None = None,
+        checksum_sha256_hex: str | None = None,
+        metadata: Mapping[str, str] | None = None,
+    ) -> str:
         """Store data and return full URI with scheme.
 
         A provider whose storage can check a write's checksum, as S3 can, sends the bytes' SHA-256 with every write, so
@@ -181,13 +197,38 @@ class StorageProviderAbstract(ABC):
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data (used by cloud providers).
             checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, when the caller has it, or None.
+            metadata: String pairs to keep beside the object, replacing any it had, or None for none. A provider that
+                keeps no metadata ignores them.
 
         Returns:
             Full URI with PIPELEX_STORAGE_SCHEME prefix.
         """
         uri = self._add_scheme(key)
-        await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
+        await self._store_with_metadata(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=metadata)
         return uri
+
+    async def _store_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,  # ruff: ignore[unused-method-argument] - dropped by a provider keeping none
+    ) -> None:
+        """Store data and the metadata kept beside it.
+
+        This default stores the data alone, through `_store`, so a provider that keeps no metadata, an external storage
+        plugin included, keeps working: the metadata is dropped. A provider that keeps metadata overrides it.
+
+        Args:
+            data: The bytes to store.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the data.
+            checksum_sha256_hex: The SHA-256 of `data`, or None, handed on to `_store`.
+            metadata: String pairs to keep beside the object, or None for none.
+        """
+        await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
 
     @abstractmethod
     async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
@@ -209,6 +250,7 @@ class StorageProviderAbstract(ABC):
         key: str,
         content_type: str | None = None,
         checksum_sha256_hex: str | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> bool:
         """Create the object at `key` unless one exists there, and say whether this call created it.
 
@@ -223,6 +265,8 @@ class StorageProviderAbstract(ABC):
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the data (used by cloud providers).
             checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, or None to send no checksum.
+            metadata: String pairs to keep beside the object this call creates, or None for none. An object already at
+                the key keeps its own. A provider that keeps no metadata ignores them.
 
         Returns:
             True when this call created the object, False when the key already held one.
@@ -235,6 +279,35 @@ class StorageProviderAbstract(ABC):
         if checksum_sha256_hex is not None and hashlib.sha256(data).hexdigest() != checksum_sha256_hex:
             msg = f"The bytes to store under '{key}' do not hash to the checksum {checksum_sha256_hex!r} given with them: nothing was stored."
             raise StorageChecksumMismatchError(msg)
+        return await self._store_if_absent_with_metadata(
+            data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=metadata
+        )
+
+    async def _store_if_absent_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,  # ruff: ignore[unused-method-argument] - dropped by a provider keeping none
+    ) -> bool:
+        """Create the object at `key`, with the metadata kept beside it, unless one exists there.
+
+        This default creates the object alone, through `_store_if_absent`, so a provider that keeps no metadata, an
+        external storage plugin included, keeps working: the metadata is dropped. A provider that keeps metadata
+        overrides it, and writes the metadata only with an object this call creates.
+
+        Args:
+            data: The bytes to store, already checked against `checksum_sha256_hex`.
+            key: Storage key (without scheme prefix).
+            content_type: Optional MIME type for the data.
+            checksum_sha256_hex: The SHA-256 of `data`, or None.
+            metadata: String pairs to keep beside the object, or None for none.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+        """
         return await self._store_if_absent(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
 
     async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
@@ -261,6 +334,41 @@ class StorageProviderAbstract(ABC):
             await self._store(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex)
             return True
         return False
+
+    async def load_metadata(self, uri: str) -> Mapping[str, str] | None:
+        """The metadata kept beside a stored object, read without its bytes where the provider can.
+
+        Args:
+            uri: Full URI including PIPELEX_STORAGE_SCHEME prefix.
+
+        Returns:
+            The object's metadata, its keys lowercase, empty when it was stored with none; None when the provider keeps
+            no metadata, which says nothing about what made the object.
+
+        Raises:
+            StorageFileNotFoundError: If no object exists at the URI.
+        """
+        key = self._strip_scheme(uri)
+        return await self._load_metadata(key)
+
+    async def _load_metadata(self, key: str) -> Mapping[str, str] | None:
+        """The metadata kept beside an object, by key.
+
+        This default keeps none: it checks the object exists, through `_load_size`, and answers None, so a provider that
+        keeps no metadata, an external storage plugin included, keeps working. A provider that keeps metadata overrides
+        it, answering the keys lowercase.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object's metadata, or None when the provider keeps none.
+
+        Raises:
+            StorageFileNotFoundError: If no object exists at the key.
+        """
+        await self._load_size(key)
+        return None
 
     def teardown(self) -> None:
         """Release what the provider keeps open between operations, such as a client and its connections.

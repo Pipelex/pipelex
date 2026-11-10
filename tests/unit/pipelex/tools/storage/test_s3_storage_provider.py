@@ -737,3 +737,47 @@ class TestS3StorageProvider:
         assert checksum_sha256_header_value(sha256_hex=hashlib.sha256(data).hexdigest()) == base64.b64encode(hashlib.sha256(data).digest()).decode(
             "ascii"
         )
+
+    async def test_store_and_store_if_absent_send_the_metadata_as_user_metadata(
+        self,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        """The metadata goes as the PUT's `Metadata`, which S3 keeps as `x-amz-meta-*` beside the object."""
+        metadata = {"converter-version": "0.1.0", "export-options": "printed-pages"}
+
+        await s3_provider_no_signed_urls.store(data=b"%PDF-", key="scope/report.docx.pdf", content_type="application/pdf", metadata=metadata)
+        await s3_provider_no_signed_urls.store_if_absent(data=b"%PDF-", key="scope/other.xlsx.pdf", metadata=metadata)
+
+        put_calls = mock_aiobotocore["client"].put_object.await_args_list
+        assert [call.kwargs["Metadata"] for call in put_calls] == [metadata, metadata]
+        assert put_calls[1].kwargs["IfNoneMatch"] == "*"
+
+    async def test_load_metadata_reads_the_user_metadata_of_a_head_request_lowercase(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(
+            return_value={"ContentLength": 12, "Metadata": {"Converter-Version": "0.1.0", "export-options": "printed-pages"}}
+        )
+
+        metadata = await s3_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/report.docx.pdf")
+
+        assert metadata == {"converter-version": "0.1.0", "export-options": "printed-pages"}
+        mock_aiobotocore["client"].head_object.assert_called_once_with(Bucket=S3_TEST_BUCKET, Key="scope/report.docx.pdf")
+
+    async def test_load_metadata_of_an_object_stored_with_none_is_empty_and_of_a_missing_one_not_found(
+        self,
+        mocker: MockerFixture,
+        s3_provider_no_signed_urls: S3StorageProvider,
+        mock_aiobotocore: dict[str, Any],
+    ) -> None:
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(return_value={"ContentLength": 12})
+        assert await s3_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/plain.pdf") == {}
+
+        missing = ClientError({"Error": {"Code": "404", "Message": "Not Found"}}, "HeadObject")
+        mock_aiobotocore["client"].head_object = mocker.AsyncMock(side_effect=missing)
+        with pytest.raises(StorageFileNotFoundError, match=r"scope/missing\.pdf"):
+            await s3_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/missing.pdf")

@@ -3,7 +3,7 @@ import base64
 import importlib.util
 import threading
 from asyncio import sleep
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Mapping
 from concurrent.futures import Future
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
 from typing import Any, ClassVar
@@ -388,15 +388,8 @@ class S3StorageProvider(StorageProviderAbstract):
             msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
             raise StorageS3Error(msg) from exc
 
-    @override
-    async def _load_size(self, key: str) -> int:
-        """The size of an S3 object, read with a HEAD request instead of its bytes.
-
-        Args:
-            key: Storage key (without scheme prefix).
-
-        Returns:
-            The object's `ContentLength`.
+    async def _head_object(self, key: str) -> dict[str, Any]:
+        """The answer of a HEAD request on an S3 object: its length, type and metadata, without its bytes.
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
@@ -410,7 +403,7 @@ class S3StorageProvider(StorageProviderAbstract):
 
         client = await self._client()
         try:
-            response = await client.head_object(Bucket=self._bucket_name, Key=key)
+            response: dict[str, Any] = await client.head_object(Bucket=self._bucket_name, Key=key)
         except ClientError as exc:
             error_code = (exc.response.get("Error") or {}).get("Code", "Unknown")
             # A HEAD answer has no body, so a missing object comes back as the bare status code.
@@ -425,12 +418,64 @@ class S3StorageProvider(StorageProviderAbstract):
         except BotoCoreError as exc:
             msg = f"S3 backend error for key '{key}': {type(exc).__name__}"
             raise StorageS3Error(msg) from exc
+        return response
+
+    @override
+    async def _load_size(self, key: str) -> int:
+        """The size of an S3 object, read with a HEAD request instead of its bytes.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object's `ContentLength`.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageS3Error: If the S3 operation fails (any other ClientError or BotoCoreError).
+        """
+        response = await self._head_object(key)
         content_length: int = response["ContentLength"]
         return content_length
 
     @override
+    async def _load_metadata(self, key: str) -> Mapping[str, str]:
+        """The user metadata of an S3 object, read with a HEAD request instead of its bytes, keys lowercase as S3 answers them.
+
+        Args:
+            key: Storage key (without scheme prefix).
+
+        Returns:
+            The object's `x-amz-meta-*` pairs, empty when it was stored with none.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageS3Error: If the S3 operation fails (any other ClientError or BotoCoreError).
+        """
+        response = await self._head_object(key)
+        object_metadata: dict[str, str] = response.get("Metadata") or {}
+        return {meta_key.lower(): meta_value for meta_key, meta_value in object_metadata.items()}
+
+    @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> None:
-        """Store bytes to an S3 object, with S3 checking their SHA-256.
+        """Store bytes to an S3 object, with S3 checking their SHA-256, and no metadata.
+
+        Raises:
+            StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
+        """
+        await self._store_with_metadata(data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=None)
+
+    @override
+    async def _store_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,
+    ) -> None:
+        """Store bytes to an S3 object, with S3 checking their SHA-256, and its user metadata.
 
         The PUT carries the SHA-256, so S3 refuses a body that arrived damaged, as a `BadDigest`, and keeps the
         checksum beside the object, where a `HeadObject` with `ChecksumMode=ENABLED` reads it.
@@ -441,6 +486,7 @@ class S3StorageProvider(StorageProviderAbstract):
             content_type: Optional MIME type for the object.
             checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, or None for botocore to compute it as
                 it sends the bytes.
+            metadata: String pairs sent as the object's `x-amz-meta-*` user metadata, or None for none.
 
         Raises:
             StorageS3Error: If the S3 operation fails (any ClientError or BotoCoreError).
@@ -460,6 +506,8 @@ class S3StorageProvider(StorageProviderAbstract):
             }
             if content_type:
                 put_params["ContentType"] = content_type
+            if metadata:
+                put_params["Metadata"] = dict(metadata)
             put_params.update(_checksum_sha256_put_params(checksum_sha256_hex=checksum_sha256_hex))
             await client.put_object(**put_params)
         except client.exceptions.NoSuchBucket as exc:
@@ -478,7 +526,29 @@ class S3StorageProvider(StorageProviderAbstract):
 
     @override
     async def _store_if_absent(self, *, data: bytes, key: str, content_type: str | None, checksum_sha256_hex: str | None) -> bool:
-        """Create an S3 object unless one exists at the key, with S3 checking the condition and the checksum.
+        """Create an S3 object unless one exists at the key, with no metadata.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageS3Error: If the S3 operation fails.
+        """
+        return await self._store_if_absent_with_metadata(
+            data=data, key=key, content_type=content_type, checksum_sha256_hex=checksum_sha256_hex, metadata=None
+        )
+
+    @override
+    async def _store_if_absent_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,
+    ) -> bool:
+        """Create an S3 object and its user metadata unless one exists at the key, with S3 checking the condition and the checksum.
 
         The PUT carries `If-None-Match: *`, so S3 writes it only when the key holds no object and answers `412`
         otherwise, which is the key already held. It carries the SHA-256, as `x-amz-checksum-sha256` when the caller
@@ -497,6 +567,7 @@ class S3StorageProvider(StorageProviderAbstract):
             content_type: Optional MIME type for the object.
             checksum_sha256_hex: The SHA-256 of `data` in lowercase hexadecimal, sent for S3 to check, or None for
                 botocore to compute it as it sends the bytes.
+            metadata: String pairs sent as the object's `x-amz-meta-*` user metadata, or None for none.
 
         Returns:
             True when this call created the object, False when the key already held one.
@@ -518,6 +589,8 @@ class S3StorageProvider(StorageProviderAbstract):
         }
         if content_type:
             put_params["ContentType"] = content_type
+        if metadata:
+            put_params["Metadata"] = dict(metadata)
         put_params.update(_checksum_sha256_put_params(checksum_sha256_hex=checksum_sha256_hex))
 
         retry_delays = CONDITIONAL_CONFLICT_RETRY_DELAYS_SECONDS

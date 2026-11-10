@@ -1,5 +1,6 @@
 import asyncio
 import importlib.util
+from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, ClassVar
@@ -199,8 +200,8 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return await asyncio.to_thread(self._load_head_sync, key, nb_bytes=nb_bytes)
 
-    def _load_size_sync(self, key: str) -> int:
-        """Synchronous implementation of the size read for use with to_thread.
+    def _get_existing_blob_sync(self, key: str) -> Any:
+        """The blob at `key` with its metadata fetched, not its bytes.
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
@@ -218,14 +219,24 @@ class GcpStorageProvider(StorageProviderAbstract):
             # Fetches the object's metadata alone, None when there is no such object.
             blob = bucket.get_blob(key)
         except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
-            msg = f"Failed to read the size of the GCS object '{key}': {exc}"
+            msg = f"Failed to read the metadata of the GCS object '{key}': {exc}"
             raise StorageGcpError(msg).with_error_code(PipelexErrorCode.CONFIG_CREDENTIAL_REFUSED) from exc
         except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
-            msg = f"Failed to read the size of the GCS object '{key}': {exc}"
+            msg = f"Failed to read the metadata of the GCS object '{key}': {exc}"
             raise StorageGcpError(msg) from exc
         if blob is None:
             msg = f"Object not found in GCS: '{key}'"
             raise StorageFileNotFoundError(msg).with_params(scheme=self.storage_kind)
+        return blob
+
+    def _load_size_sync(self, key: str) -> int:
+        """Synchronous implementation of the size read for use with to_thread.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        blob = self._get_existing_blob_sync(key)
         size: int = blob.size
         return size
 
@@ -239,13 +250,38 @@ class GcpStorageProvider(StorageProviderAbstract):
         """
         return await asyncio.to_thread(self._load_size_sync, key)
 
-    def _store_sync(self, data: bytes, *, key: str, content_type: str | None) -> None:
+    def _load_metadata_sync(self, key: str) -> Mapping[str, str]:
+        """Synchronous implementation of the metadata read for use with to_thread.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        blob = self._get_existing_blob_sync(key)
+        blob_metadata: dict[str, str] = blob.metadata or {}
+        return {meta_key.lower(): meta_value for meta_key, meta_value in blob_metadata.items()}
+
+    @override
+    async def _load_metadata(self, key: str) -> Mapping[str, str]:
+        """The custom metadata of a GCS object, read without its bytes, keys lowercase.
+
+        Returns:
+            The object's custom metadata, empty when it was stored with none.
+
+        Raises:
+            StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._load_metadata_sync, key)
+
+    def _store_sync(self, data: bytes, *, key: str, content_type: str | None, metadata: Mapping[str, str] | None) -> None:
         """Synchronous implementation of store for use with to_thread.
 
         Args:
             data: The bytes to store.
             key: Storage key (without scheme prefix).
             content_type: Optional MIME type for the object.
+            metadata: String pairs to keep as the object's custom metadata, or None for none.
 
         Raises:
             StorageGcpError: If the GCS operation fails.
@@ -260,6 +296,8 @@ class GcpStorageProvider(StorageProviderAbstract):
 
         try:
             blob = bucket.blob(key)
+            if metadata:
+                blob.metadata = dict(metadata)
             blob.upload_from_string(data, content_type=content_type)
         except (Forbidden, Unauthorized) as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Failed to store object to GCS: '{key}': {exc}"
@@ -282,9 +320,26 @@ class GcpStorageProvider(StorageProviderAbstract):
         Raises:
             StorageGcpError: If the GCS operation fails.
         """
-        await asyncio.to_thread(self._store_sync, data, key=key, content_type=content_type)
+        await asyncio.to_thread(self._store_sync, data, key=key, content_type=content_type, metadata=None)
 
-    def _store_if_absent_sync(self, *, data: bytes, key: str, content_type: str | None) -> bool:
+    @override
+    async def _store_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,
+    ) -> None:
+        """Store bytes to a GCS object with its custom metadata.
+
+        Raises:
+            StorageGcpError: If the GCS operation fails.
+        """
+        await asyncio.to_thread(self._store_sync, data, key=key, content_type=content_type, metadata=metadata)
+
+    def _store_if_absent_sync(self, *, data: bytes, key: str, content_type: str | None, metadata: Mapping[str, str] | None) -> bool:
         """Synchronous implementation of the create-only store for use with to_thread.
 
         Raises:
@@ -301,6 +356,8 @@ class GcpStorageProvider(StorageProviderAbstract):
 
         try:
             blob = bucket.blob(key)
+            if metadata:
+                blob.metadata = dict(metadata)
             # Generation 0 matches only an object that does not exist, so GCS creates it or answers 412.
             blob.upload_from_string(data, content_type=content_type, if_generation_match=0)
         except PreconditionFailed:  # pyright: ignore[reportUnknownVariableType]
@@ -333,7 +390,27 @@ class GcpStorageProvider(StorageProviderAbstract):
         Raises:
             StorageGcpError: If the GCS operation fails.
         """
-        return await asyncio.to_thread(self._store_if_absent_sync, data=data, key=key, content_type=content_type)
+        return await asyncio.to_thread(self._store_if_absent_sync, data=data, key=key, content_type=content_type, metadata=None)
+
+    @override
+    async def _store_if_absent_with_metadata(
+        self,
+        *,
+        data: bytes,
+        key: str,
+        content_type: str | None,
+        checksum_sha256_hex: str | None,
+        metadata: Mapping[str, str] | None,
+    ) -> bool:
+        """Create a GCS object with its custom metadata unless one exists at the key, with GCS checking the condition.
+
+        Returns:
+            True when this call created the object, False when the key already held one.
+
+        Raises:
+            StorageGcpError: If the GCS operation fails.
+        """
+        return await asyncio.to_thread(self._store_if_absent_sync, data=data, key=key, content_type=content_type, metadata=metadata)
 
     def _make_public_url(self, key: str) -> str:
         """Build a public URL for a GCS object.

@@ -254,3 +254,56 @@ class TestLocalStorageProvider:
 
         assert (tmp_path / key).read_bytes() == b"payload"
         assert [path.name for path in (tmp_path / "blobs").iterdir()] == ["one.bin"]
+
+    async def test_metadata_round_trips_through_a_hidden_sidecar(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+
+        uri = await provider.store(
+            data=b"%PDF-", key="scope/report.docx.pdf", metadata={"Converter-Version": "0.1.0", "export-options": "printed-pages"}
+        )
+
+        assert await provider.load_metadata(uri=uri) == {"converter-version": "0.1.0", "export-options": "printed-pages"}
+        assert sorted(path.name for path in (tmp_path / "scope").iterdir()) == [".report.docx.pdf.metadata.json", "report.docx.pdf"]
+        assert await provider.load(uri=uri) == b"%PDF-"
+
+    async def test_a_file_stored_again_without_metadata_loses_its_sidecar(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        uri = await provider.store(data=b"%PDF-", key="scope/report.docx.pdf", metadata={"converter-version": "0.1.0"})
+
+        await provider.store(data=b"%PDF- again", key="scope/report.docx.pdf")
+
+        assert await provider.load_metadata(uri=uri) == {}
+        assert [path.name for path in (tmp_path / "scope").iterdir()] == ["report.docx.pdf"]
+
+    async def test_store_if_absent_writes_the_sidecar_only_with_the_file_it_creates(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+
+        assert await provider.store_if_absent(data=b"%PDF-", key=key, metadata={"converter-version": "0.1.0"}) is True
+        assert await provider.store_if_absent(data=b"other", key=key, metadata={"converter-version": "9.9.9"}) is False
+
+        assert await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") == {"converter-version": "0.1.0"}
+
+    async def test_a_stale_sidecar_is_not_read_as_the_metadata_of_a_new_file(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+        key = "scope/report.docx.pdf"
+        await provider.store(data=b"%PDF-", key=key, metadata={"converter-version": "0.1.0"})
+        (tmp_path / key).unlink()
+
+        assert await provider.store_if_absent(data=b"%PDF- new", key=key) is True
+
+        assert await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}{key}") == {}
+
+    async def test_a_key_naming_a_sidecar_is_refused(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+
+        with pytest.raises(StorageInvalidUriError, match="reserved"):
+            await provider.store(data=b"{}", key="scope/.report.docx.pdf.metadata.json")
+        with pytest.raises(StorageInvalidUriError, match="reserved"):
+            await provider.load(uri=f"{PIPELEX_STORAGE_SCHEME}scope/.report.docx.pdf.metadata.json")
+
+    async def test_load_metadata_of_a_missing_file_raises_not_found(self, tmp_path: Path) -> None:
+        provider = LocalStorageProvider(root_path=tmp_path)
+
+        with pytest.raises(StorageFileNotFoundError):
+            await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/missing.pdf")
