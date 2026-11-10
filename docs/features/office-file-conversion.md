@@ -34,9 +34,9 @@ Every value above except `backend` and `url` is the default. [Document Conversio
 
 A backend that is named but cannot be used stops Pipelex at startup with `runtime.misconfigured`, rather than at the first Office file a run reads: a Gotenberg backend whose `url` is empty or is not an absolute `http` or `https` URL naming a host, or a `soffice` binary that is not found. A Gotenberg container that is down at startup is not a misconfiguration; a step that needs it then fails as the converter being unavailable. A Gotenberg `timeout_seconds` that does not exceed `budget_seconds` is refused when the configuration loads, with `pipelex.config.invalid`.
 
-## The two backends
+## The backends
 
-Both backends drive LibreOffice and make the same export: the document's printed pages, as it would print on paper.
+Each backend drives LibreOffice and makes the same export: the document's printed pages, as it would print on paper.
 
 - **Gotenberg** posts the file to a [Gotenberg](https://gotenberg.dev) container over HTTP (`POST <url>/forms/libreoffice/convert`), always named `document.<extension>` so that nothing of a person's file name reaches the converter's logs. This is the backend for a server: a server that reads other people's files runs Gotenberg in a container of its own, which keeps a hostile file away from the process running Pipelex, its files and its credentials. For a quick local container, run `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
 - **soffice** runs LibreOffice's `soffice --headless --convert-to pdf` on this machine, once per conversion, in a temporary directory with a fresh LibreOffice profile, and kills its whole process group at the timeout. It is meant for a developer's machine and for tests. It is **not an isolation boundary**: `soffice` reads the file with the rights of the process that runs Pipelex, so never use it on a server that converts files you did not write.
@@ -60,7 +60,7 @@ The budget is `budget_seconds`, which must match the container's own `--api-time
 
 ## Which steps convert, and why
 
-Three kinds of step hand a document to a model, and only they convert: a `PipeExtract` step, and the documents a `PipeLLM` or a `PipeJudge` prompt references. Every other step, and the working memory, see the Office file as it was given.
+Only the steps that hand a document to a model convert: a `PipeExtract` step, and the documents a `PipeLLM` or a `PipeJudge` prompt references. Every other step, and the working memory, see the Office file as it was given.
 
 A step reads an Office file as its PDF when the runtime has a converter and either of these holds:
 

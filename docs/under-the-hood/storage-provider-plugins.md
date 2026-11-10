@@ -173,7 +173,7 @@ Each built-in provider makes the condition atomic in its storage: S3 sends `If-N
 
 Metadata keys must be non-empty, and keys and values ASCII, as S3 requires. `store` and `store_if_absent` check this for every provider before anything is stored, and refuse other metadata with `StorageInvalidMetadataError` (`runtime.unexpected`, since the caller wrote it), so a method that works on one provider never fails on S3 for its metadata alone. Keys are read back lowercase, as S3 returns them, so a caller writes them lowercase.
 
-A provider that keeps metadata overrides three hooks:
+A provider that keeps metadata overrides these hooks:
 
 - `_store_with_metadata(*, data, key, content_type, checksum_sha256_hex, metadata)`, which `store` calls;
 - `_store_if_absent_with_metadata(*, data, key, content_type, checksum_sha256_hex, metadata)`, which `store_if_absent` calls once the checksum is checked, and which writes the metadata only with an object it creates;
