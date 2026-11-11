@@ -15,6 +15,10 @@
 - **Refusals of an Office file name the converter**: without a document converter, an `input.file_type_unsupported` refusal that a converter would have avoided, at run setup or at a `PipeExtract` step asking for page views, now advises configuring one beside giving another file or using another model.
 - **`resolve_model_specs` and the run-setup file check (Breaking)**: `resolve_model_specs` moved from `pipelex.pipeline.file_input_consumers` to `pipelex.cogt.models.model_reference_specs`, and `check_file_inputs_against_consumers` takes a required `can_convert_documents` and returns the `ForeseenConversion`s it accepted, which setup logs; their `ConversionReason` comes from `pipelex.kernel.document_conversion_ops`, whose `conversion_reason_for_step` is the one rule setup and the step apply.
 
+### Security
+
+- **oauthlib 4.0.1**: the lock the `pipelex/pipelex-api` image installs from moves `oauthlib`, which the `google` extra pulls in through `google-auth-oauthlib`, past an advisory in the device-authorization flow of an OAuth server. The `pipelex` wheel's requirements are unchanged, so an application installing it picks the release up through its own resolution.
+
 ## [v0.97.1] - 2026-11-09
 
 ### Fixed
