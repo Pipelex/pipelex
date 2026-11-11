@@ -151,7 +151,9 @@ class KeptPdfConflictError(ToolError):
 class DocumentConverterMisconfiguredError(ToolError):
     """The configured conversion backend cannot be used: a Gotenberg URL missing, or a `soffice` binary not found.
 
-    Raised at boot, so the operator learns it when the runtime starts rather than at the first Office file.
+    Raised at boot, so the operator learns it when the runtime starts rather than at the first Office file. Also raised
+    by the first conversion through a Gotenberg that answers a PDF without naming its version in `Gotenberg-Version`,
+    which only a Gotenberg older than 8.39.0, or a proxy stripping the header, does: nothing is sent at boot to tell.
     """
 
     error_code = CoreCode.RUNTIME_MISCONFIGURED

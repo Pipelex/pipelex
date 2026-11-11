@@ -36,7 +36,6 @@ def make_optional_document_converter_from_config(*, config: DocumentConversionCo
                 raise DocumentConverterMisconfiguredError(msg)
             return GotenbergConverter(
                 base_url=gotenberg_url,
-                configured_version=gotenberg_config.version.strip() or None,
                 timeout_seconds=gotenberg_config.timeout_seconds,
                 budget_seconds=gotenberg_config.budget_seconds,
                 max_source_bytes=config.max_source_bytes,

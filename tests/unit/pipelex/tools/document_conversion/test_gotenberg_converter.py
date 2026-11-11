@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Callable
 
 import httpx
@@ -10,12 +9,14 @@ from pipelex.errors.problem import ProblemView
 from pipelex.tools.document_conversion.exceptions import (
     ConversionLimitKind,
     DocumentConverterAnswerError,
+    DocumentConverterMisconfiguredError,
     DocumentConverterUnavailableError,
     DocumentFormatNotConvertibleError,
     DocumentTooLargeToConvertError,
     DocumentUnreadableByConverterError,
 )
 from pipelex.tools.document_conversion.gotenberg_converter import (
+    CONVERTER_VERSION_HEADER,
     GOTENBERG_CONVERTER_NAME,
     UNAVAILABLE_RETRY_DELAYS_SECONDS,
     GotenbergConverter,
@@ -27,22 +28,23 @@ SOURCE_BYTES = b"PK\x03\x04 an office file"
 BUDGET_SECONDS = 120.0
 MAX_SOURCE_BYTES = 1_000
 NO_PAUSES = (0.0, 0.0, 0.0)
+GOTENBERG_VERSION = "9.2.0"
 
 Answer = httpx.Response | Exception
 
 
 class _ScriptedGotenberg:
-    """A Gotenberg that answers each conversion post with the next answer of its script, and its version with `8.99.0`."""
+    """A Gotenberg that answers each request with the next answer of its script, and keeps every request it was sent."""
 
     def __init__(self, *, answers: list[Answer]) -> None:
         self.answers = list(answers)
         self.convert_requests: list[httpx.Request] = []
-        self.version_requests: list[httpx.Request] = []
+        self.other_requests: list[httpx.Request] = []
 
     def handle(self, request: httpx.Request) -> httpx.Response:
-        if request.url.path == "/version":
-            self.version_requests.append(request)
-            return httpx.Response(200, text="8.99.0\n")
+        if request.url.path != "/forms/libreoffice/convert":
+            self.other_requests.append(request)
+            return httpx.Response(404, text="not a route this test expects")
         self.convert_requests.append(request)
         answer = self.answers.pop(0)
         if isinstance(answer, Exception):
@@ -53,12 +55,10 @@ class _ScriptedGotenberg:
 def _make_converter(
     *,
     gotenberg: _ScriptedGotenberg,
-    configured_version: str | None = "doc-convert-0.1.0",
     unavailable_retry_delays_seconds: tuple[float, ...] = NO_PAUSES,
 ) -> GotenbergConverter:
     return GotenbergConverter(
         base_url=f"{BASE_URL}/",
-        configured_version=configured_version,
         timeout_seconds=360,
         budget_seconds=BUDGET_SECONDS,
         max_source_bytes=MAX_SOURCE_BYTES,
@@ -67,8 +67,10 @@ def _make_converter(
     )
 
 
-def _pdf() -> httpx.Response:
-    return httpx.Response(200, content=PDF_BYTES)
+def _pdf(*, version: str | None = GOTENBERG_VERSION) -> httpx.Response:
+    """A `200` carrying the PDF, naming `version` in its `Gotenberg-Version` header, or no version when None."""
+    headers = {CONVERTER_VERSION_HEADER: version} if version is not None else {}
+    return httpx.Response(200, content=PDF_BYTES, headers=headers)
 
 
 def _status(status: int) -> httpx.Response:
@@ -91,7 +93,7 @@ class TestGotenbergConverter:
 
         assert converted.pdf_bytes == PDF_BYTES
         assert converted.converter_name == GOTENBERG_CONVERTER_NAME
-        assert converted.converter_version == "doc-convert-0.1.0"
+        assert converted.converter_version == GOTENBERG_VERSION
         assert len(gotenberg.convert_requests) == 1
         request = gotenberg.convert_requests[0]
         assert request.method == "POST"
@@ -99,61 +101,46 @@ class TestGotenbergConverter:
         body = request.read()
         assert b'name="files"; filename="document.docx"' in body
         assert SOURCE_BYTES in body
-        assert gotenberg.version_requests == []
+        # The version comes with the PDF: nothing else is asked.
+        assert gotenberg.other_requests == []
 
-    async def test_without_a_configured_version_gotenberg_is_asked_once(self) -> None:
-        gotenberg = _ScriptedGotenberg(answers=[_pdf(), _pdf()])
-        converter = _make_converter(gotenberg=gotenberg, configured_version=None)
+    async def test_each_pdf_is_stamped_with_the_version_its_own_answer_names(self) -> None:
+        """A converter redeployed between two conversions stamps the second PDF with its new version, as the platform does."""
+        gotenberg = _ScriptedGotenberg(answers=[_pdf(version="9.2.0"), _pdf(version=" 9.3.1 ")])
+        converter = _make_converter(gotenberg=gotenberg)
 
         first = await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="xlsx")
         second = await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="pptx")
 
-        assert first.converter_version == "8.99.0"
-        assert second.converter_version == "8.99.0"
-        assert len(gotenberg.version_requests) == 1
+        assert first.converter_version == "9.2.0"
+        assert second.converter_version == "9.3.1"
+        assert gotenberg.other_requests == []
 
-    async def test_callers_starting_at_once_ask_gotenberg_its_version_once(self) -> None:
-        version_requests: list[httpx.Request] = []
+    async def test_a_retried_conversion_is_stamped_with_the_version_of_the_answer_that_carried_the_pdf(self) -> None:
+        gotenberg = _ScriptedGotenberg(answers=[httpx.Response(500, headers={CONVERTER_VERSION_HEADER: "9.2.0"}), _pdf(version="9.3.1")])
+        converter = _make_converter(gotenberg=gotenberg)
 
-        async def answer_version_slowly(request: httpx.Request) -> httpx.Response:
-            version_requests.append(request)
-            # The others start while the first waits for its answer.
-            await asyncio.sleep(0.01)
-            return httpx.Response(200, text="8.99.0\n")
+        converted = await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="docx")
 
-        converter = GotenbergConverter(
-            base_url=BASE_URL,
-            configured_version=None,
-            timeout_seconds=360,
-            budget_seconds=BUDGET_SECONDS,
-            max_source_bytes=MAX_SOURCE_BYTES,
-            transport=httpx.MockTransport(answer_version_slowly),
-            unavailable_retry_delays_seconds=NO_PAUSES,
-        )
+        assert converted.converter_version == "9.3.1"
 
-        versions = await asyncio.gather(*(converter.get_converter_version() for _ in range(5)))
+    @pytest.mark.parametrize("version", [None, "", "   "], ids=["no-header", "empty", "blank"])
+    async def test_a_pdf_whose_answer_names_no_version_is_a_misconfigured_converter_and_final(self, version: str | None) -> None:
+        """Gotenberg before 8.39.0, or a proxy stripping the header, answers so: a fault of the deployment, for its operator."""
+        gotenberg = _ScriptedGotenberg(answers=[_pdf(version=version)])
+        converter = _make_converter(gotenberg=gotenberg)
 
-        assert versions == ["8.99.0"] * 5
-        assert len(version_requests) == 1
-
-    async def test_a_version_gotenberg_cannot_give_is_the_converter_unavailable(self) -> None:
-        def refuse_everything(request: httpx.Request) -> httpx.Response:
-            msg = "connection refused"
-            raise httpx.ConnectError(msg, request=request)
-
-        converter = GotenbergConverter(
-            base_url=BASE_URL,
-            configured_version=None,
-            timeout_seconds=360,
-            budget_seconds=BUDGET_SECONDS,
-            max_source_bytes=MAX_SOURCE_BYTES,
-            transport=httpx.MockTransport(refuse_everything),
-            unavailable_retry_delays_seconds=NO_PAUSES,
-        )
-
-        with pytest.raises(DocumentConverterUnavailableError) as exc_info:
+        with pytest.raises(DocumentConverterMisconfiguredError) as exc_info:
             await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="docx")
-        assert exc_info.value.resolve_error_code() == CoreCode.RUNTIME_UNAVAILABLE
+
+        assert len(gotenberg.convert_requests) == 1
+        error = exc_info.value
+        assert CONVERTER_VERSION_HEADER in error.message
+        assert "Gotenberg 8.39.0 or later" in error.message
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == CoreCode.RUNTIME_MISCONFIGURED
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.params == {"component": "runtime.document_conversion"}
 
     @pytest.mark.parametrize("status", [400, 422, 500, 504])
     async def test_a_first_unreadable_answer_is_tried_once_more(self, status: int) -> None:

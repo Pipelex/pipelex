@@ -48,7 +48,8 @@ class ConvertedPdf:
     pdf_bytes: bytes
     # The backend that converted it, `gotenberg` or `soffice`.
     converter_name: str
-    # The converter's version, the `converter-version` the kept PDF is stamped with.
+    # The version of the converter that made it, the `converter-version` the kept PDF is stamped with: for Gotenberg the
+    # `Gotenberg-Version` header of the answer that carried the PDF, for `soffice` what `soffice --version` printed.
     converter_version: str
 
 
@@ -65,14 +66,6 @@ class DocumentConverterProtocol(Protocol):
         """The backend's name, `gotenberg` or `soffice`."""
         ...
 
-    async def get_converter_version(self) -> str:
-        """The version of the converter this backend drives, read once and kept.
-
-        Raises:
-            DocumentConverterUnavailableError: The converter could not be asked for its version.
-        """
-        ...
-
     async def convert_to_pdf(self, *, data: bytes, format_key: str) -> ConvertedPdf:
         """The PDF of `data`, an Office file of the format `format_key`, one of `CONVERTIBLE_FORMAT_KEYS`.
 
@@ -81,5 +74,7 @@ class DocumentConverterProtocol(Protocol):
             DocumentTooLargeToConvertError: The file is past the converter's size, or its conversion ran out of time.
             DocumentConverterUnavailableError: The converter is busy or unreachable.
             DocumentConverterAnswerError: The converter answered something that is not a PDF.
+            DocumentConverterMisconfiguredError: The converter cannot be used as deployed, such as a Gotenberg that
+                does not name its version.
         """
         ...

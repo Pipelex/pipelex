@@ -85,7 +85,8 @@ async def readable_pdf_of_document(*, conversion_assignment: DocumentConversionA
 
     Raises:
         UriReadRefusedError: The run's read scope does not allow reading the source.
-        DocumentConverterMisconfiguredError: This process has no converter, though the step asked for a conversion.
+        DocumentConverterMisconfiguredError: This process has no converter, though the step asked for a conversion, or
+            its Gotenberg answered a PDF without naming its version.
         DocumentFormatNotConvertibleError: The format is not one the runtime converts, which the step checks first.
         DocumentUnreadableByConverterError: The converter could not read the file.
         DocumentTooLargeToConvertError: The file is past `max_source_bytes` or the converter's size, or ran out of time.
