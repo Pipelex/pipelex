@@ -127,7 +127,11 @@ class DocumentConverterUnavailableError(ToolError):
 
 
 class DocumentConverterAnswerError(ToolError):
-    """The converter said it converted the file but answered something that is not a PDF: a fault of the converter."""
+    """The converter said it converted the file but answered something that cannot be kept: a fault of the converter.
+
+    Either the answer is not a PDF, or it is one whose answer names no version, which Gotenberg names on every answer
+    in its `Gotenberg-Version` header, so that a PDF kept unstamped would say nothing of what made it.
+    """
 
     error_code = CoreCode.RUNTIME_UNEXPECTED
 

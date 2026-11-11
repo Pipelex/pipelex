@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **The Gotenberg backend stamps each PDF with its answer's `Gotenberg-Version` (Breaking)**: a PDF the Gotenberg backend makes is stamped, as its `converter-version` metadata and in the `file_converted` trace event, with the version Gotenberg names in the `Gotenberg-Version` header of the answer that carried it, the value the platform's preview worker stamps, so a converter redeployed under a running process no longer has its PDFs stamped with the version asked at startup, and a `200` whose answer names no version fails the step with `runtime.unexpected`. The `version` key of `[runtime.document_conversion.gotenberg]` is gone, and `DocumentConverterProtocol` loses `get_converter_version()`, which a custom converter no longer implements, its version travelling on each `ConvertedPdf`. **Migration:** run `pipelex migrate`, which deletes the key from the file on disk (ledger entry `pipelex-config@9`).
+
 ## [v0.98.0] - 2026-11-11
 
 ### Highlights

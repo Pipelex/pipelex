@@ -5,7 +5,10 @@ reads the extension for the format, and nothing of a person's file name has a re
 What Gotenberg's answers mean was measured for the platform's converter (pipelex-server's
 `doc-convert/docs/operations.md`), and this backend reads them as the platform's `DocConvertClient` does:
 
-- **A `200`** is the PDF, checked to start like one.
+- **A `200`** is the PDF, checked to start like one, and stamped with the version Gotenberg names in the
+  `Gotenberg-Version` header of that same answer. Read off the answer that carried the PDF, it is the version of the
+  process that converted the file, whatever was deployed since, and the very value the platform's preview worker stamps
+  on the PDF it keeps at the same key. A PDF whose answer names no version is a fault of the converter, never taken.
 - **A first `400`, `422`, `500` or `504`** is tried once more: a LibreOffice engine dying mid-conversion answers
   exactly as a damaged file does, and the same file then converts. A second one is the file's own,
   `input.file_unreadable`.
@@ -30,7 +33,6 @@ import httpx
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.tools.document_conversion.converter_version_cache import ConverterVersionCache
 from pipelex.tools.document_conversion.document_converter_protocol import (
     PDF_MAGIC,
     ConvertedPdf,
@@ -49,7 +51,8 @@ from pipelex.tools.document_conversion.exceptions import (
 GOTENBERG_CONVERTER_NAME = "gotenberg"
 
 _CONVERT_PATH = "/forms/libreoffice/convert"
-_VERSION_PATH = "/version"
+# The header Gotenberg names its own version in, on every answer, such as `9.2.0`: the `converter-version` of its PDFs.
+CONVERTER_VERSION_HEADER = "Gotenberg-Version"
 
 # Short, so a converter between tasks costs an attempt seconds and not minutes: the file is posted only once connected.
 _CONNECT_TIMEOUT_SECONDS = 10.0
@@ -92,7 +95,6 @@ class GotenbergConverter(DocumentConverterProtocol):
         self,
         *,
         base_url: str,
-        configured_version: str | None,
         timeout_seconds: float,
         budget_seconds: float,
         max_source_bytes: int,
@@ -103,7 +105,6 @@ class GotenbergConverter(DocumentConverterProtocol):
 
         Args:
             base_url: The container's base URL, such as `http://localhost:3000`.
-            configured_version: The version to stamp on its PDFs, or None to ask Gotenberg's `GET /version`.
             timeout_seconds: How long to wait for Gotenberg's answer to one post.
             budget_seconds: Gotenberg's own budget for a conversion, its `--api-timeout`.
             max_source_bytes: The largest file posted; a larger one is refused before anything is sent.
@@ -111,7 +112,6 @@ class GotenbergConverter(DocumentConverterProtocol):
             unavailable_retry_delays_seconds: The pauses before each new attempt when an answer says nothing about the file.
         """
         self._base_url = base_url.rstrip("/")
-        self._version_cache = ConverterVersionCache(known_version=configured_version or None)
         self._timeout = httpx.Timeout(
             connect=_CONNECT_TIMEOUT_SECONDS, read=timeout_seconds, write=_WRITE_TIMEOUT_SECONDS, pool=_POOL_TIMEOUT_SECONDS
         )
@@ -128,38 +128,6 @@ class GotenbergConverter(DocumentConverterProtocol):
     def _make_client(self) -> httpx.AsyncClient:
         # One client per operation: a backend lives for the process, and an activity may run each step on another loop.
         return httpx.AsyncClient(transport=self._transport, timeout=self._timeout)
-
-    @override
-    async def get_converter_version(self) -> str:
-        return await self._version_cache.get_or_fetch(fetch=self._fetch_version)
-
-    async def _fetch_version(self) -> str:
-        """Ask Gotenberg its version, pausing and asking again while it says nothing.
-
-        Raises:
-            DocumentConverterUnavailableError: Every attempt's answer said nothing.
-        """
-        nb_pauses = 0
-        while True:
-            outcome = await self._ask_version_once()
-            if isinstance(outcome, str):
-                return outcome
-            await self._pause_or_give_up(answer=outcome, nb_pauses=nb_pauses)
-            nb_pauses += 1
-
-    async def _ask_version_once(self) -> str | _RetryableAnswer:
-        """Gotenberg's version as `GET /version` answers it, or why it did not."""
-        async with self._make_client() as client:
-            try:
-                response = await client.get(f"{self._base_url}{_VERSION_PATH}")
-            except httpx.TransportError as exc:
-                msg = f"The converter could not be asked its version: {type(exc).__name__}."
-                return _RetryableAnswer(kind=_RetryableAnswerKind.UNAVAILABLE, message=msg)
-        version = response.text.strip()
-        if response.status_code != HTTPStatus.OK or not version:
-            msg = f"The converter answered its version request with status {response.status_code}."
-            return _RetryableAnswer(kind=_RetryableAnswerKind.UNAVAILABLE, message=msg)
-        return version
 
     async def _pause_or_give_up(self, *, answer: _RetryableAnswer, nb_pauses: int) -> None:
         """Pause before the next attempt after an answer that said nothing about the file, or give up after the last.
@@ -184,14 +152,12 @@ class GotenbergConverter(DocumentConverterProtocol):
             raise DocumentTooLargeToConvertError(
                 msg, format_key=normalized_format_key, limit_kind=ConversionLimitKind.BYTES, limit=self._max_source_bytes, size=len(data)
             )
-        converter_version = await self.get_converter_version()
-
         nb_unreadable_answers = 0
         nb_pauses = 0
         while True:
             outcome = await self._post_once(data=data, format_key=normalized_format_key)
-            if isinstance(outcome, bytes):
-                return ConvertedPdf(pdf_bytes=outcome, converter_name=GOTENBERG_CONVERTER_NAME, converter_version=converter_version)
+            if isinstance(outcome, ConvertedPdf):
+                return outcome
             match outcome.kind:
                 case _RetryableAnswerKind.UNREADABLE:
                     nb_unreadable_answers += 1
@@ -202,12 +168,13 @@ class GotenbergConverter(DocumentConverterProtocol):
                     await self._pause_or_give_up(answer=outcome, nb_pauses=nb_pauses)
                     nb_pauses += 1
 
-    async def _post_once(self, *, data: bytes, format_key: str) -> bytes | _RetryableAnswer:
-        """Post the file once: the PDF, or an answer worth another attempt.
+    async def _post_once(self, *, data: bytes, format_key: str) -> ConvertedPdf | _RetryableAnswer:
+        """Post the file once: the PDF and the version its answer names, or an answer worth another attempt.
 
         Raises:
             DocumentTooLargeToConvertError: The file is too large, or its conversion outran its budget.
-            DocumentConverterAnswerError: The converter answered `200` with something that is not a PDF.
+            DocumentConverterAnswerError: The converter answered `200` with something that is not a PDF, or with a PDF
+                whose answer names no version.
         """
         files = {"files": (f"document.{format_key}", data, "application/octet-stream")}
         started = monotonic()
@@ -238,12 +205,12 @@ class GotenbergConverter(DocumentConverterProtocol):
         msg = f"The connection ended with no answer {elapsed:.0f} seconds in, before the converter's budget: {type(exc).__name__}."
         return _RetryableAnswer(kind=_RetryableAnswerKind.UNAVAILABLE, message=msg)
 
-    def _read_answer(self, *, response: httpx.Response, elapsed: float, data_size: int, format_key: str) -> bytes | _RetryableAnswer:
-        """The PDF of a `200`, or an answer worth another attempt.
+    def _read_answer(self, *, response: httpx.Response, elapsed: float, data_size: int, format_key: str) -> ConvertedPdf | _RetryableAnswer:
+        """The PDF of a `200` and the version its answer names, or an answer worth another attempt.
 
         Raises:
             DocumentTooLargeToConvertError: The file is too large, or its conversion ran out of time.
-            DocumentConverterAnswerError: A `200` that is not a PDF.
+            DocumentConverterAnswerError: A `200` that is not a PDF, or whose answer names no version.
         """
         status = response.status_code
         log.debug(f"Gotenberg answered status {status} after {elapsed:.1f} seconds with {len(response.content)} bytes")
@@ -252,7 +219,11 @@ class GotenbergConverter(DocumentConverterProtocol):
                 if not response.content.startswith(PDF_MAGIC):
                     msg = f"The converter answered 200 with {len(response.content)} bytes that are not a PDF."
                     raise DocumentConverterAnswerError(msg)
-                return response.content
+                converter_version = response.headers.get(CONVERTER_VERSION_HEADER, "").strip()
+                if not converter_version:
+                    msg = f"The converter answered a PDF without naming its version in the {CONVERTER_VERSION_HEADER} header."
+                    raise DocumentConverterAnswerError(msg)
+                return ConvertedPdf(pdf_bytes=response.content, converter_name=GOTENBERG_CONVERTER_NAME, converter_version=converter_version)
             case HTTPStatus.TOO_MANY_REQUESTS:
                 msg = "The converter's queue is full (429)."
                 return _RetryableAnswer(kind=_RetryableAnswerKind.UNAVAILABLE, message=msg)

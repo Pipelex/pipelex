@@ -21,7 +21,6 @@ max_source_bytes = 50_000_000
 
 [runtime.document_conversion.gotenberg]
 url = "http://localhost:3000"
-version = ""
 timeout_seconds = 360
 budget_seconds = 120
 
@@ -41,7 +40,10 @@ Each backend drives LibreOffice and makes the same export: the document's printe
 - **Gotenberg** posts the file to a [Gotenberg](https://gotenberg.dev) container over HTTP (`POST <url>/forms/libreoffice/convert`), always named `document.<extension>` so that nothing of a person's file name reaches the converter's logs. This is the backend for a server: a server that reads other people's files runs Gotenberg in a container of its own, which keeps a hostile file away from the process running Pipelex, its files and its credentials. For a quick local container, run `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
 - **soffice** runs LibreOffice's `soffice --headless --convert-to pdf` on this machine, once per conversion, in a temporary directory with a fresh LibreOffice profile, and kills its whole process group at the timeout. It is meant for a developer's machine and for tests. It is **not an isolation boundary**: `soffice` reads the file with the rights of the process that runs Pipelex, so never use it on a server that converts files you did not write.
 
-The version each backend reports is stamped on the PDFs it makes. Gotenberg's is the configured `version` when one is set, and otherwise what the container's `GET /version` answers; `soffice`'s is the line of `soffice --version`'s standard output that starts with `LibreOffice`, so a warning LibreOffice prints first, such as one about `javaldx`, is never taken for it. Each is read once and kept for the life of the process.
+Each PDF is stamped with the version of the converter that made it, as its `converter-version` metadata:
+
+- **Gotenberg's** is the version the container names in the `Gotenberg-Version` header of the very answer that carried the PDF, such as `9.2.0`. Read off each conversion's answer, it is the version of the process that converted the file, so a container redeployed while Pipelex runs stamps the PDFs it makes from then on with its new version. It is also the value the Pipelex platform's preview worker stamps on the PDF it keeps at the same key, so the two writers of a `<source key>.pdf` speak the same vocabulary. A `200` whose answer names no version is a fault of the converter, `runtime.unexpected`, and its PDF is never kept.
+- **soffice's** is the line of `soffice --version`'s standard output that starts with `LibreOffice`, so a warning LibreOffice prints first, such as one about `javaldx`, is never taken for it. It is read once and kept for the life of the process.
 
 ### How Gotenberg's answers are read
 
@@ -49,7 +51,7 @@ A LibreOffice engine dying in the middle of a conversion answers exactly as a da
 
 | Gotenberg answers | What the backend does |
 |---|---|
-| `200` with a PDF | Uses it. A `200` that is not a PDF is a fault of the converter, `runtime.unexpected`. |
+| `200` with a PDF | Uses it, stamped with its `Gotenberg-Version` header. A `200` that is not a PDF, or whose answer names no version, is a fault of the converter, `runtime.unexpected`, never retried. |
 | `400`, `422`, `500` or `504` | Posts the file once more at once; a second such answer means the file is unreadable, `input.file_unreadable`. |
 | `413` | The file is too large for the converter, `input.too_large`, final. |
 | `503` | The conversion ran out of its budget, `input.too_large`, final. |

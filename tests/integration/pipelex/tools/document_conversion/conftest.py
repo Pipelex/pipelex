@@ -34,7 +34,6 @@ def document_converter(request: pytest.FixtureRequest) -> DocumentConverterProto
                 pytest.skip(f"no Gotenberg container: set {DocumentConversionTestData.GOTENBERG_URL_ENV_VAR}")
             return GotenbergConverter(
                 base_url=gotenberg_url,
-                configured_version=None,
                 timeout_seconds=360,
                 budget_seconds=120,
                 max_source_bytes=_MAX_SOURCE_BYTES,

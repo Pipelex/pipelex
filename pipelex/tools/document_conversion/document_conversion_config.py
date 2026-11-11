@@ -15,13 +15,14 @@ class DocumentConversionBackend(StrEnum):
 
 
 class GotenbergConversionConfig(ConfigModel):
-    """`[runtime.document_conversion.gotenberg]`: a Gotenberg container reached over HTTP."""
+    """`[runtime.document_conversion.gotenberg]`: a Gotenberg container reached over HTTP.
+
+    There is no version to set: a PDF is stamped with the version Gotenberg names in the `Gotenberg-Version` header of
+    the answer that carried it, as the platform's preview worker stamps the PDF it keeps at the same key.
+    """
 
     # The container's base URL, such as `http://localhost:3000`. Empty is unset, which a boot naming this backend refuses.
     url: str
-    # The version stamped on the PDFs this backend makes. Empty asks Gotenberg's `GET /version` once; the hosted worker
-    # sets its converter image's own version, as the platform's preview worker stamps it.
-    version: str
     # How long the client waits for Gotenberg's answer. A hostile file can hold a connection about six minutes before
     # Gotenberg's hard timeout closes it, so this allows for more.
     timeout_seconds: Annotated[float, Field(gt=0)]

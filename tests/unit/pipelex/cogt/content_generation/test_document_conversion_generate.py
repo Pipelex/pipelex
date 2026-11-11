@@ -58,9 +58,6 @@ class _StubConverter:
     def converter_name(self) -> str:
         return "gotenberg"
 
-    async def get_converter_version(self) -> str:
-        return CONVERTER_VERSION
-
     async def convert_to_pdf(self, *, data: bytes, format_key: str) -> ConvertedPdf:
         self.calls.append(format_key)
         if self._error is not None:

@@ -93,7 +93,9 @@ class TestOfficeFilesAtTheStep:
         assert made.pdf_uri == kept.pdf_uri == f"pipelex-storage://{source_key}.pdf"
         assert (made.origin, kept.origin) == (PdfOrigin.MADE, PdfOrigin.KEPT)
         assert made.converter_name == runtime_document_converter.converter_name
-        assert made.converter_version == kept.converter_version == await runtime_document_converter.get_converter_version()
+        # The kept PDF is read back with the version the conversion stamped on it.
+        assert made.converter_version
+        assert made.converter_version == kept.converter_version
         assert (made.page_count, kept.page_count) == (office_file.page_count, office_file.page_count)
         assert made.conversion_seconds is not None
         assert kept.conversion_seconds is None

@@ -114,8 +114,6 @@ max_source_bytes = 50_000_000
 [runtime.document_conversion.gotenberg]
 # The container's base URL, such as "http://localhost:3000"
 url = ""
-# The version stamped on the PDFs; empty asks Gotenberg's /version
-version = ""
 # How long to wait for Gotenberg's answer: a hostile file can hold a connection about six minutes
 timeout_seconds = 360
 # Gotenberg's own budget for a conversion, its --api-timeout
