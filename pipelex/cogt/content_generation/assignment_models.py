@@ -170,6 +170,24 @@ class RenderPageViewsAssignment(BaseModel):
         return [UriReference(uri=self.document_uri, position="the document to render as page views")]
 
 
+class DocumentConversionAssignment(BaseModel):
+    """Serializable unit for the PDF a step reads in place of an Office file: found kept, or made by a conversion.
+
+    ``format_key`` is the source's format as run setup established it, one the runtime converts; ``input_name`` is the
+    document's input path or prompt variable, which a failed conversion names.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    source_uri: str
+    format_key: str
+    input_name: str | None = None
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URL the leaf reads for this assignment: the Office file it converts, or whose kept PDF it looks up."""
+        return [UriReference(uri=self.source_uri, position="the document to convert to PDF")]
+
+
 class RenderDocumentAssignment(BaseModel):
     """Serializable unit for a single document print: the composed document and the engine that prints it.
 

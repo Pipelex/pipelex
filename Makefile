@@ -41,10 +41,10 @@ TS_TOOLCHAIN_ZOD_VERSION ?= 4.5.4
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or judgment)) and not (pipelex_api or document_conversion)"
 # The selection the sharded CI job runs. Shared by gha-tests and store-test-durations so the map
 # can never be balanced against a different set of tests than the one it is measured from.
-GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)"
+GHA_PYTEST_MARKERS := "(dry_runnable or not inference) and not (gha_disabled or pipelex_api or document_conversion)"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -158,6 +158,8 @@ make agent-test               - Run unit tests, silent on success, output on fai
 make api-agent-check          - The api/ server's own gate: its install, ruff, pyright, mypy, OpenAPI and vendored-kit drift checks
 make api-agent-test           - The api/ server's unit tests, in its own environment
 make agent-test-debug         - Debug variant: cleanup + outer timeout + live log; use when agent-test hangs or fails opaquely
+make test-document-conversion - Convert Office files through soffice and Gotenberg (PIPELEX_TEST_GOTENBERG_URL); a missing backend skips
+make tdc                      - Shorthand -> test-document-conversion
 make atd                      - Shorthand -> agent-test-debug
 make ts-toolchain             - Install the pinned prettier + zod the TypeScript emission gates need
 make test-ts-gates            - Run the codegen tests with that toolchain, where the node gates may not skip
@@ -625,7 +627,7 @@ codex-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled or document_conversion)" || [ $$? = 5 ]
 
 # SPLITS/GROUP thread pytest-split through for CI sharding: each shard runs one
 # GROUP of the tests, balanced by the committed .test_durations file, and still
@@ -905,6 +907,16 @@ test-pipelex-api: env
 
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
+
+# The document converter's integration tests, which need soffice on the PATH (or PIPELEX_TEST_SOFFICE_BINARY) or a
+# Gotenberg container at PIPELEX_TEST_GOTENBERG_URL, such as `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
+# Excluded from every other run, as the tests needing the Pipelex API are; a backend not present is skipped.
+test-document-conversion: env
+	$(call PRINT_TITLE,"Document conversion integration testing")
+	$(VENV_PYTEST) -m "document_conversion" -o log_level=WARNING --tb=short -q -rs tests/integration/pipelex/tools/document_conversion
+
+tdc: test-document-conversion
+	@echo "> done: tdc = test-document-conversion"
 
 agent-test: env
 	@echo "• Running unit tests..."

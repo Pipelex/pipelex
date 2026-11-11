@@ -13,6 +13,7 @@ from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.trace_context import TraceContext
+from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_protocol import EventLogProtocol  # ruff: ignore[typing-only-first-party-import] - used in open_tracer signature
 
@@ -379,6 +380,29 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         if tracer is None:
             return
         tracer.register_execution_data(node_id=node_id, execution_data=execution_data)
+
+    def register_file_conversion(
+        self,
+        *,
+        lookup_key: str,
+        node_id: str,
+        input_name: str | None,
+        format_key: str,
+        readable_pdf: ReadablePdf,
+    ) -> None:
+        """Register that a step reads an Office file as its PDF, kept or made.
+
+        Args:
+            lookup_key: The tracer lookup key (graph_id or workflow_id).
+            node_id: The node of the step that reads the document.
+            input_name: The document's input path or prompt variable, None for a document no input names.
+            format_key: The original's format, such as `docx`.
+            readable_pdf: The PDF the step reads, and what made it.
+        """
+        tracer = self._get_tracer(lookup_key)
+        if tracer is None:
+            return
+        tracer.register_file_conversion(node_id=node_id, input_name=input_name, format_key=format_key, readable_pdf=readable_pdf)
 
     def on_pipe_end_skipped(
         self,

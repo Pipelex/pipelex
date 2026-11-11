@@ -87,12 +87,17 @@ class PromptDocumentUri(BaseModel):
 
 
 class PromptDocumentBase64(BaseModel):
-    """A prompt document as base64-encoded string."""
+    """A prompt document as base64-encoded string.
+
+    ``input_name`` is the input the document came from, as a caller writes it, when the prompt reads it from one: a
+    data URL the input holds becomes this document, and a conversion of it that fails names that input.
+    """
 
     kind: Literal["base64"] = "base64"
     base64_data: str
     mime_type: str | None = None
     """The type run setup established or the data URL declared, which refines what the bytes alone identify."""
+    input_name: str | None = None
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_base64(self.base64_data)

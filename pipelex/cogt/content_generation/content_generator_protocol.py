@@ -18,6 +18,8 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.system.job_metadata import JobMetadata
+from pipelex.tools.document_conversion.exceptions import DocumentConverterMisconfiguredError
+from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -142,6 +144,31 @@ class ContentGeneratorProtocol(Protocol):
     ) -> Coroutine[Any, Any, DocumentContent]:
         """Print a `PipeDocGen` step's composed document on the engine `doc_gen_setting` names and store it: the step's print stage."""
         ...
+
+    def make_readable_pdf(
+        self,
+        *,
+        job_metadata: JobMetadata,  # ruff: ignore[unused-method-argument] - the default refuses whatever it is given
+        cogt_run_params: CogtRunParams,  # ruff: ignore[unused-method-argument]
+        source_uri: str,  # ruff: ignore[unused-method-argument]
+        format_key: str,  # ruff: ignore[unused-method-argument]
+        input_name: str | None,  # ruff: ignore[unused-method-argument]
+    ) -> Coroutine[Any, Any, ReadablePdf]:
+        """The PDF a step reads in place of an Office file: the one kept beside it, or one converted and kept.
+
+        A leaf operation, since it reads and writes storage and calls the converter: a host runtime's content generator
+        dispatches it as it dispatches every other leaf. This body is what a content generator gets that does not
+        implement it, a host runtime's included until it does: the step asked for a conversion its orchestrator cannot
+        run, a fault of the deployment, which configured a converter its orchestrator cannot reach.
+
+        Raises:
+            DocumentConverterMisconfiguredError: This content generator does not convert documents.
+        """
+        msg = (
+            f"The content generator '{type(self).__name__}' cannot convert Office files to PDF, and a document converter is configured: "
+            "unset [runtime.document_conversion] backend, or run on an orchestrator whose content generator converts."
+        )
+        raise DocumentConverterMisconfiguredError(msg)
 
     def make_extract_pages(
         self,

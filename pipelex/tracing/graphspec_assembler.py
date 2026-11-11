@@ -49,6 +49,7 @@ from pipelex.tracing.trace_events import (
     ControllerOutputEvent,
     EdgeEvent,
     ExecutionDataEvent,
+    FileConvertedEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSkippedEvent,
@@ -293,6 +294,10 @@ class _AssemblerState:
             elif isinstance(event, BatchFannedOutEvent):
                 # A batch's width is for the readers following a run while it goes on: the graph already holds its
                 # items, as the batch's children.
+                pass
+            elif isinstance(event, FileConvertedEvent):
+                # A conversion is for the trace's readers, who explain a step's pages and bill with it: the graph does not
+                # draw it yet.
                 pass
             else:
                 log.warning("A trace event of a type the assembler does not handle was dropped", fields={"trace_event_type": type(event).__name__})

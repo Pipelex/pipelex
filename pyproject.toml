@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.97.1"
+version = "0.98.0"
 description = "Execute composable AI methods declared in the MTHDS open standard"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -302,9 +302,9 @@ norecursedirs = [
 ]
 addopts = [
   "--import-mode=importlib",
-  "-ra",                                                                               # Show all test outcomes (including skips)
+  "-ra",                                                                                                      # Show all test outcomes (including skips)
   "-m",
-  "not (inference or llm or img_gen or extract or search or judgment or pipelex_api)",
+  "not (inference or llm or img_gen or extract or search or judgment or pipelex_api or document_conversion)",
 ]
 asyncio_default_fixture_loop_scope = "session"
 xfail_strict = true
@@ -327,6 +327,7 @@ markers = [
   "codex_disabled: tests that should not run in Codex",
   "dry_runnable: tests that can be run in dry-run mode",
   "pipelex_api: tests that require access to the Pipelex API",
+  "document_conversion: tests that convert Office files through soffice or a Gotenberg container (PIPELEX_TEST_GOTENBERG_URL), skipped for a backend not present",
   "builds_problems_without_required_params(reason): the test builds a problem lacking a parameter its code requires on purpose, which the sweep of tests/unit/conftest.py otherwise fails",
 ]
 

@@ -215,7 +215,8 @@ class TestPipelineRunSetupConsumerCheck:
                 f"Input 'transcripts[{index}]' is a Word document (.docx): pipe 'extract_transcript' extracts it "
                 "with model 'pypdfium2-extract-pdf', which reads PDF." in message
             )
-        assert message.endswith("Give a file in a format its model reads, or use a model that reads this format.")
+        # A Word file is an Office file, which a document converter would have given the PDF extractor as a PDF.
+        assert message.endswith("Give a file in a format its model reads, use a model that reads this format, or configure a document converter.")
 
     async def test_a_pdf_among_the_transcripts_is_not_named(self):
         execution_config = get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False)
@@ -401,7 +402,7 @@ class TestPipelineRunSetupConsumerCheck:
 
         assert exc_info.value.message == (
             "Input 'report' is a Word document (.docx): pipe 'views_of_word_reader' asks for page views, which are drawn from a PDF. "
-            "Give a PDF, or remove page_views from the step."
+            "Give a PDF, remove page_views from the step, or configure a document converter."
         )
         problem = exc_info.value.to_problem(view=ProblemView.CALLER)
         assert problem.code == CoreCode.INPUT_FILE_TYPE_UNSUPPORTED

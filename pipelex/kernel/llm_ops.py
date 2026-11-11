@@ -35,6 +35,7 @@ from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.kernel.document_conversion_ops import readable_prompt_documents
 from pipelex.kernel.llm_prompt_content import LlmPromptContent, assemble_llm_prompt
 from pipelex.kernel.llm_results import LlmObjectResult, LlmTextResult, StructuringPath
 from pipelex.kernel.memory_ops import store_result
@@ -301,6 +302,9 @@ async def run_llm_text(
             extra_params=extra_params,
             templating_style=templating_style,
         )
+        llm_prompt = await _with_readable_documents(
+            llm_prompt=llm_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
+        )
         generated_text = await get_content_generator().make_llm_text(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
@@ -358,6 +362,9 @@ async def run_llm_object(
             extra_params=extra_params,
             templating_style=templating_style,
         )
+        llm_prompt = await _with_readable_documents(
+            llm_prompt=llm_prompt, llm_setting=llm_setting, job_metadata=job_metadata, cogt_run_params=cogt_run_params
+        )
         content = await generate_object_content(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
@@ -374,3 +381,23 @@ async def run_llm_object(
             llm_setting=llm_setting,
             structuring_path=StructuringPath.OBJECT_LIST if is_multiple_output else StructuringPath.OBJECT_DIRECT,
         )
+
+
+async def _with_readable_documents(
+    *, llm_prompt: LLMPrompt, llm_setting: LLMSetting, job_metadata: JobMetadata, cogt_run_params: CogtRunParams
+) -> LLMPrompt:
+    """The prompt with each Office file a model that may serve it cannot read replaced by the file's PDF.
+
+    Every document keeps its place and its token; only what the model input carries changes, never the working memory.
+    """
+    with job_metadata.log_context():
+        if not llm_prompt.user_documents:
+            return llm_prompt
+        readable_documents = await readable_prompt_documents(
+            documents=llm_prompt.user_documents,
+            model_reference=llm_setting.model,
+            model_type=ModelType.LLM,
+            job_metadata=job_metadata,
+            cogt_run_params=cogt_run_params,
+        )
+        return llm_prompt.model_copy(update={"user_documents": readable_documents})

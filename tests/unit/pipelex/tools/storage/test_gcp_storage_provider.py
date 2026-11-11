@@ -418,3 +418,56 @@ class TestGcpStorageProvider:
 
         with pytest.raises(StorageGcpError, match="denied"):
             await gcp_provider_no_signed_urls.store_if_absent(data=b"blob bytes", key="scope/blobs/one")
+
+    async def test_store_and_store_if_absent_set_the_custom_metadata_before_the_upload(
+        self,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        """The blob's custom metadata is set before the upload, which sends it with the object."""
+        metadata = {"converter-version": "0.1.0", "export-options": "printed-pages"}
+        uploaded_metadata: list[Any] = []
+        blob = mock_gcp_storage["blob"]
+
+        def record_metadata(*args: Any, **kwargs: Any) -> None:  # ruff: ignore[unused-function-argument]
+            uploaded_metadata.append(blob.metadata)
+
+        blob.upload_from_string.side_effect = record_metadata
+
+        await gcp_provider_no_signed_urls.store(data=b"%PDF-", key="scope/report.docx.pdf", content_type="application/pdf", metadata=metadata)
+        created = await gcp_provider_no_signed_urls.store_if_absent(data=b"%PDF-", key="scope/other.xlsx.pdf", metadata=metadata)
+
+        assert created is True
+        assert uploaded_metadata == [metadata, metadata]
+        assert blob.upload_from_string.call_args_list[1].kwargs["if_generation_match"] == 0
+
+    async def test_load_metadata_reads_the_blob_s_custom_metadata_lowercase(
+        self,
+        mocker: MockerFixture,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        held = mocker.MagicMock()
+        held.metadata = {"Converter-Version": "0.1.0", "export-options": "printed-pages"}
+        mock_gcp_storage["bucket"].get_blob.return_value = held
+
+        metadata = await gcp_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/report.docx.pdf")
+
+        assert metadata == {"converter-version": "0.1.0", "export-options": "printed-pages"}
+        mock_gcp_storage["bucket"].get_blob.assert_called_once_with("scope/report.docx.pdf")
+        mock_gcp_storage["blob"].download_as_bytes.assert_not_called()
+
+    async def test_load_metadata_of_a_blob_with_none_is_empty_and_of_a_missing_one_not_found(
+        self,
+        mocker: MockerFixture,
+        gcp_provider_no_signed_urls: GcpStorageProvider,
+        mock_gcp_storage: dict[str, Any],
+    ) -> None:
+        held = mocker.MagicMock()
+        held.metadata = None
+        mock_gcp_storage["bucket"].get_blob.return_value = held
+        assert await gcp_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/plain.pdf") == {}
+
+        mock_gcp_storage["bucket"].get_blob.return_value = None
+        with pytest.raises(StorageFileNotFoundError, match=r"scope/missing\.pdf"):
+            await gcp_provider_no_signed_urls.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/missing.pdf")

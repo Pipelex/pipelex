@@ -1,4 +1,4 @@
-"""`resolve_model_specs`, the models a file-input consumer's reference can be served by, reads a bare name as the run does."""
+"""`resolve_model_specs`, the models a reference can be served by, reads a bare name as the run does."""
 
 import pytest
 from pytest_mock import MockerFixture
@@ -11,11 +11,11 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_index import ModelSpecIndex
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.cogt.models.model_reference_specs import resolve_model_specs
 from pipelex.cogt.usage.cost_category import CostCategory
-from pipelex.pipeline.file_input_consumers import resolve_model_specs
 from pipelex.system.runtime import ProblemReaction
 
-_GET_MODEL_DECK_TARGET = "pipelex.pipeline.file_input_consumers.get_model_deck"
+_GET_MODEL_DECK_TARGET = "pipelex.cogt.models.model_reference_specs.get_model_deck"
 
 
 def _model_spec(name: str, model_type: ModelType) -> InferenceModelSpec:

@@ -6452,9 +6452,17 @@ rationale = "Positional-Callable re.sub repl: match is the single operand re pas
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._get_existing_blob_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand, as _load_size_sync."
+
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_head_sync"]
 param = "key"
 rationale = "Keyed accessor by the storage key, called positionally through asyncio.to_thread."
+
+["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_metadata_sync"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand, as _load_size_sync."
 
 ["pipelex/tools/storage/gcp_storage_provider.py::GcpStorageProvider._load_size_sync"]
 param = "key"
@@ -6476,6 +6484,10 @@ rationale = "Stores the data; single operand (key keyword-only)."
 param = "key"
 rationale = "Keyed accessor by the key; single operand."
 
+["pipelex/tools/storage/s3_storage_provider.py::S3StorageProvider._head_object"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand."
+
 ["pipelex/tools/storage/s3_storage_provider.py::S3StorageProvider._make_public_url"]
 param = "key"
 rationale = "Factory from source: builds the result from the key; single operand."
@@ -6487,6 +6499,10 @@ rationale = "Keyed accessor by the key; single operand."
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_head"]
 param = "key"
 rationale = "Keyed accessor by the storage key; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_metadata"]
+param = "key"
+rationale = "Keyed accessor by the storage key; single operand, as _load_size."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract._load_size"]
 param = "key"
@@ -6511,6 +6527,10 @@ rationale = "Keyed accessor by the uri; single operand."
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_head"]
 param = "uri"
 rationale = "Keyed accessor by the uri; single operand."
+
+["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_metadata"]
+param = "uri"
+rationale = "Keyed accessor by the uri; single operand, as load_size."
 
 ["pipelex/tools/storage/storage_provider_abstract.py::StorageProviderAbstract.load_size"]
 param = "uri"

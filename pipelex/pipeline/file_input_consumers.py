@@ -31,6 +31,12 @@ resolving sub-pipes through the hub:
   page views also needs a PDF, whatever its model reads, since page views are drawn from one.
 
 The walk depends only on the library and the model deck, never on the input values.
+
+**Office files.** When the runtime has a document converter, an Office file is accepted where the step would read its
+PDF instead (`conversion_reason_for_step` in `pipelex.kernel.document_conversion_ops`, the rule the step applies too): by a consumer asking for page
+views whose model may read a PDF, and by one whose models may not all read the file's format and some of which read
+PDFs. The check returns those conversions, which setup only logs: the step decides again when it runs, and converts
+then. Without a converter, a refusal a converter would have avoided says so.
 """
 
 from collections.abc import Sequence
@@ -40,13 +46,15 @@ from typing import Final, NamedTuple
 from pydantic import BaseModel, ConfigDict
 
 from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError
-from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_RENDERER
+from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE, PAGE_VIEWS_RENDERER
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.exceptions import ModelReferenceParseError
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.cogt.models.model_reference_specs import resolve_model_specs
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.interpreter_hub import get_concept_library, get_native_concept, get_optional_pipe
+from pipelex.kernel.document_conversion_ops import ConversionReason, conversion_reason_for_step
 from pipelex.kernel.extract_ops import resolve_extract_setting
 from pipelex.kernel.judgment_ops import judgment_setting_of_choice
 from pipelex.kernel.llm_ops import resolve_llm_setting_for_object, resolve_llm_setting_for_text
@@ -81,6 +89,9 @@ _WEB_PAGE_INPUT: Final[str] = "web_page"
 
 # The advice of a refusal, by what the file or the step must change.
 _FORMAT_ADVICE: Final[str] = "Give a file in a format its model reads, or use a model that reads this format."
+_FORMAT_OR_CONVERTER_ADVICE: Final[str] = (
+    "Give a file in a format its model reads, use a model that reads this format, or configure a document converter."
+)
 _PAGE_VIEWS_MODEL_ADVICE: Final[str] = "Use a model that reads PDFs, or remove page_views from the step."
 _PAGE_VIEWS_FILE_AND_MODEL_ADVICE: Final[str] = "Give a PDF to a model that reads PDFs, or remove page_views from the step."
 
@@ -127,6 +138,13 @@ class FileInputConsumer(BaseModel):
 
     readable_formats: frozenset[str] | None
     """The format keys the model reads; `None` when the model could not be resolved, which makes the consumer opaque."""
+
+    formats_read_by_every_model: frozenset[str] | None = None
+    """The format keys every model that may serve reads, a waterfall's members all; `None` when unresolved.
+
+    A step reads an Office file as its PDF when one of its models may not read the file's format, so the union above
+    says whether the file can be read at all and this says whether it is converted first.
+    """
 
     reads_web_pages: bool
     """Whether the model fetches a web page itself from an http(s) URL, which is then not format-checked."""
@@ -209,6 +227,15 @@ def collect_file_input_consumers(entry_pipe: PipeAbstract) -> dict[str, list[Fil
     return consumers_by_slot
 
 
+class ForeseenConversion(NamedTuple):
+    """An Office file run setup expects a step to read as its PDF, which setup logs and the step decides again."""
+
+    input_path: str
+    pipe_code: str
+    format_key: str
+    reason: ConversionReason
+
+
 class _ConsumerRefusal(NamedTuple):
     """Why a consumer cannot take a file, as the run's refusal states it."""
 
@@ -218,25 +245,33 @@ class _ConsumerRefusal(NamedTuple):
     model_param: str | None
 
 
-def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs: list[IdentifiedFileInput]) -> None:
+def check_file_inputs_against_consumers(
+    *, entry_pipe: PipeAbstract, file_inputs: list[IdentifiedFileInput], can_convert_documents: bool
+) -> list[ForeseenConversion]:
     """Refuse a run whose file inputs are certain to reach a consumer that cannot take them.
 
     Each file input is compared with the certain consumers that cover it: a consumer reached through a condition or a
     liftable step may never run, so it is left to the operator's own check. A consumer that asks for page views needs a
     PDF whatever its model reads; beyond that, a file of a known format is compared with what the model reads, a model
     that could not be resolved being opaque, and a web-page model given an http(s) URL fetching the page itself. Every
-    violation is collected and reported together.
+    violation is collected and reported together. When the runtime converts documents, an Office file a certain consumer
+    will read as its PDF is accepted, and returned.
 
     Args:
         entry_pipe: The pipe the run starts from. Its library must be loaded.
         file_inputs: The run's file inputs with the formats run setup established
             (`collect_file_inputs`).
+        can_convert_documents: Whether the runtime has a document converter, which turns an Office file into a PDF.
+
+    Returns:
+        The conversions certain consumers will run, in the order of the inputs, for setup to log.
 
     Raises:
         PipelineInputFormatUnsupportedError: If any file input is certain to reach a consumer that cannot take it.
     """
+    foreseen_conversions: list[ForeseenConversion] = []
     if not file_inputs:
-        return
+        return foreseen_conversions
     consumers_by_slot = collect_file_input_consumers(entry_pipe)
     refusals: list[_ConsumerRefusal] = []
     # The code's parameters name one violation, the first, which the message lists among the others: its file is named
@@ -247,7 +282,23 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
         for consumer in consumers_by_slot.get(slot_name, []):
             if consumer.is_conditional or not consumer.covers(file_input_path=file_input.path):
                 continue
-            refusal = _page_views_refusal(file_input=file_input, consumer=consumer) or _format_refusal(file_input=file_input, consumer=consumer)
+            conversion_reason = _conversion_reason(file_input=file_input, consumer=consumer)
+            if conversion_reason is not None and can_convert_documents:
+                foreseen_conversions.append(
+                    ForeseenConversion(
+                        input_path=file_input.display_path,
+                        pipe_code=consumer.pipe_code,
+                        # A conversion reason is found only for a file of a known format.
+                        format_key=file_input.format_key or UNKNOWN_FILE_TYPE,
+                        reason=conversion_reason,
+                    )
+                )
+                continue
+            # Without a converter, a refusal a converter would have avoided says so.
+            converter_would_help = conversion_reason is not None
+            refusal = _page_views_refusal(file_input=file_input, consumer=consumer, converter_would_help=converter_would_help) or _format_refusal(
+                file_input=file_input, consumer=consumer, converter_would_help=converter_would_help
+            )
             if refusal is None:
                 continue
             refusals.append(refusal)
@@ -259,9 +310,24 @@ def check_file_inputs_against_consumers(*, entry_pipe: PipeAbstract, file_inputs
         raise PipelineInputFormatUnsupportedError(msg, input_name=str(violating_input.path[0]), field=violating_input.display_path).with_params(
             format=first_refusal.format_param, model=first_refusal.model_param
         )
+    return foreseen_conversions
 
 
-def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> _ConsumerRefusal | None:
+def _conversion_reason(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> ConversionReason | None:
+    """Why the consumer would read this file as its PDF given a document converter, `None` when it would not.
+
+    The step's own rule, `conversion_reason_for_step`, applied to what the walk knows of the consumer's models, so a file
+    setup accepts is one the step converts, and a file whose page views setup refuses is never converted at the step.
+    """
+    return conversion_reason_for_step(
+        format_key=file_input.format_key,
+        formats_read_by_some_model=consumer.readable_formats,
+        formats_read_by_every_model=consumer.formats_read_by_every_model,
+        asks_for_page_views=consumer.asks_for_page_views,
+    )
+
+
+def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer, converter_would_help: bool) -> _ConsumerRefusal | None:
     """Why a consumer asking for page views cannot draw them from this file, `None` when it can or may.
 
     A file of a known format other than PDF cannot. A PDF can and a file of unknown format, a URL that declares no type
@@ -278,7 +344,7 @@ def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputC
                 f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
                 f"pipe '{consumer.pipe_code}' asks for page views, which are drawn from a PDF."
             ),
-            advice=_PAGE_VIEWS_FILE_AND_MODEL_ADVICE if reads_no_pdf else PAGE_VIEWS_FILE_ADVICE,
+            advice=_page_views_file_advice(reads_no_pdf=reads_no_pdf, converter_would_help=converter_would_help),
             format_param=format_key,
             model_param=consumer.model if reads_no_pdf else PAGE_VIEWS_RENDERER,
         )
@@ -295,7 +361,15 @@ def _page_views_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputC
     )
 
 
-def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer) -> _ConsumerRefusal | None:
+def _page_views_file_advice(*, reads_no_pdf: bool, converter_would_help: bool) -> str:
+    if reads_no_pdf:
+        return _PAGE_VIEWS_FILE_AND_MODEL_ADVICE
+    if converter_would_help:
+        return PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE
+    return PAGE_VIEWS_FILE_ADVICE
+
+
+def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsumer, converter_would_help: bool) -> _ConsumerRefusal | None:
     """Why this consumer's model cannot read this file, `None` when it can or when that cannot be known."""
     format_key = file_input.format_key
     if format_key is None or consumer.readable_formats is None:
@@ -310,7 +384,7 @@ def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsu
             f"pipe '{consumer.pipe_code}' {consumer.verb_phrase} model '{consumer.model}', "
             f"which reads {describe_format_keys(format_keys=consumer.listed_formats)}."
         ),
-        advice=_FORMAT_ADVICE,
+        advice=_FORMAT_OR_CONVERTER_ADVICE if converter_would_help else _FORMAT_ADVICE,
         format_param=format_key,
         model_param=consumer.model,
     )
@@ -322,50 +396,6 @@ def _is_http_url(*, uri_kind: UriKind) -> bool:
             return True
         case UriKind.LOCAL_PATH | UriKind.PIPELEX_STORAGE | UriKind.BASE64_DATA_URL:
             return False
-
-
-def resolve_model_specs(*, model_reference: str, model_type: ModelType) -> list[InferenceModelSpec]:
-    """The model specs a model reference can be served by: one for a handle or an alias, every available member for a waterfall.
-
-    A preset is not resolved here: the caller resolves a step's choice to a setting first. A member
-    the deck does not serve (its backend is disabled) is skipped, since no run could use it either.
-    An unresolvable reference gives no spec.
-    """
-    return _resolve_model_specs(model_reference=model_reference, model_type=model_type, visited=frozenset())
-
-
-def _resolve_model_specs(*, model_reference: str, model_type: ModelType, visited: frozenset[str]) -> list[InferenceModelSpec]:
-    if model_reference in visited:
-        return []
-    visited |= {model_reference}
-    try:
-        reference = ModelReference.parse(model_reference)
-    except ModelReferenceParseError:
-        return []
-    model_deck = get_model_deck()
-    aliases, waterfalls = model_deck.get_aliases_and_waterfalls_for_type(model_type)
-    alias_target: str | None = None
-    waterfall_members: list[str] | None = None
-    match reference.kind:
-        case ModelReferenceKind.PRESET:
-            return []
-        case ModelReferenceKind.ALIAS:
-            alias_target = aliases.get(reference.name)
-        case ModelReferenceKind.WATERFALL:
-            waterfall_members = waterfalls.get(reference.name)
-        case ModelReferenceKind.HANDLE:
-            # A handle served as another type only does not stop the lookup: this type's alias or
-            # waterfall of the same name is tried next, as the deck's own lookup does.
-            if model_spec := model_deck.inference_models.get(model_type=model_type, handle=reference.name):
-                return [model_spec]
-            alias_target = aliases.get(reference.name)
-            waterfall_members = None if alias_target else waterfalls.get(reference.name)
-    if alias_target:
-        return _resolve_model_specs(model_reference=alias_target, model_type=model_type, visited=visited)
-    model_specs: list[InferenceModelSpec] = []
-    for member in waterfall_members or []:
-        model_specs.extend(_resolve_model_specs(model_reference=member, model_type=model_type, visited=visited))
-    return model_specs
 
 
 def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting: frozenset[str], consumers: list[FileInputConsumer]) -> None:
@@ -557,9 +587,13 @@ def _record_extract_consumer(*, pipe_extract: PipeExtract, frame: _Frame, is_con
         return
     resolved_model = _resolve_extract_model(pipe_extract=pipe_extract)
     readable_formats: frozenset[str] | None = None
+    formats_read_by_every_model: frozenset[str] | None = None
     reads_web_pages = False
     if resolved_model is not None:
         readable_formats = frozenset[str]().union(*(model_spec.readable_formats_for_extract for model_spec in resolved_model.specs))
+        formats_read_by_every_model = _formats_read_by_every_model(
+            formats_by_model=[model_spec.readable_formats_for_extract for model_spec in resolved_model.specs]
+        )
         reads_web_pages = any(model_spec.is_web_page_supported_for_extract for model_spec in resolved_model.specs)
     consumers.append(
         FileInputConsumer(
@@ -570,6 +604,7 @@ def _record_extract_consumer(*, pipe_extract: PipeExtract, frame: _Frame, is_con
             kind=FileConsumerKind.EXTRACT,
             model=resolved_model.model if resolved_model else None,
             readable_formats=readable_formats,
+            formats_read_by_every_model=formats_read_by_every_model,
             reads_web_pages=reads_web_pages,
             is_conditional=is_conditional,
             asks_for_page_views=pipe_extract.should_include_page_views,
@@ -627,8 +662,12 @@ def _record_document_consumers(
     tracked consumes that input's files, read by the formats the model reads.
     """
     readable_formats: frozenset[str] | None = None
+    formats_read_by_every_model: frozenset[str] | None = None
     if resolved_model is not None:
         readable_formats = frozenset[str]().union(*(model_spec.supported_document_types for model_spec in resolved_model.specs))
+        formats_read_by_every_model = _formats_read_by_every_model(
+            formats_by_model=[model_spec.supported_document_types for model_spec in resolved_model.specs]
+        )
     # A model that reads no documents at all is the method author's choice of model, which the load or
     # the worker reports as a capability error: there is no caller's format to refuse.
     if not readable_formats:
@@ -646,11 +685,19 @@ def _record_document_consumers(
                 kind=kind,
                 model=resolved_model.model if resolved_model else None,
                 readable_formats=readable_formats,
+                formats_read_by_every_model=formats_read_by_every_model,
                 reads_web_pages=False,
                 is_conditional=is_conditional,
                 asks_for_page_views=False,
             )
         )
+
+
+def _formats_read_by_every_model(*, formats_by_model: list[set[str]]) -> frozenset[str]:
+    """The formats every model reads, what a step reads without converting whichever model serves it."""
+    if not formats_by_model:
+        return frozenset()
+    return frozenset[str](formats_by_model[0]).intersection(*formats_by_model[1:])
 
 
 def _resolve_judgment_model(*, pipe_judge: PipeJudge) -> _ResolvedModel | None:

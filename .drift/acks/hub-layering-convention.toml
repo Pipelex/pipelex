@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:8c80e6112b26f2f0dec72bbf6639cfc7dca269641dc6f097f7770a85a125a3fc"
+digest = "sha256:dd156f74342ea9d21fe0ae7fd5749f9b624b9a9f92177335bb31ac8edf2592bf"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-10-19T10:49:47Z"
-rationale = "clean-pass: absorbing Runner-speaks-problem keeps this branch's interpreter_hub.py, get_selectable_own_pipe_refs and get_required_pipe's referring_pipe_code, beside its runtime_hub.py's get_error_console; docs/contribute/hub-layering.md lists both and says what referring_pipe_code is for. No import crosses the boundary."
+reviewed_at = "2026-11-10T21:20:52Z"
+rationale = "real-catch: runtime_hub.py gains get_optional_document_converter, the document converter [runtime.document_conversion] names; docs/contribute/hub-layering.md now lists it in the runtime_hub table. It imports only pipelex.tools.document_conversion, a kernel-layer package, so no import crosses the boundary."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:8572e31eafdfa9eb5ecde01326ef51a971f86b2e"
-"pipelex/runtime_hub.py" = "blob:48f34feea22c29a56910f4a2fbb317a1d0a1e492"
+"pipelex/runtime_hub.py" = "blob:f372d155eb8e3be6a0268c457f0ce658326bbdee"

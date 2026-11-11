@@ -67,6 +67,13 @@ DocGenEngineMissingError | pipelex.docgen.engine_unavailable
 DocGenHandleNotFoundError | pipelex.config.invalid
 DocGenModelCapabilityError | model.capability_unsupported
 DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, security.method_url_refused
+DocumentConversionError | abstract
+DocumentConverterAnswerError | runtime.unexpected
+DocumentConverterMisconfiguredError | runtime.misconfigured
+DocumentConverterUnavailableError | runtime.unavailable
+DocumentFormatNotConvertibleError | runtime.unexpected
+DocumentTooLargeToConvertError | input.too_large
+DocumentUnreadableByConverterError | input.file_unreadable
 DomainCodeError | method.schema_violation
 DomainFactoryError | runtime.unexpected
 DomainLibraryError | runtime.unexpected
@@ -173,6 +180,7 @@ JudgmentModelMissingError | model.unspecified
 JudgmentModelNotFoundError | model.unavailable
 JudgmentOutputFieldsError | runtime.unexpected
 JudgmentRefusedError | model.content_refused
+KeptPdfConflictError | runtime.unexpected
 KitError | runtime.unexpected
 KitIndexLoadingError | runtime.unexpected
 LLMCapabilityError | one of model.capability_unsupported, model.context_exceeded
@@ -354,6 +362,7 @@ StorageFileNotFoundError | one of pipelex.storage.not_found, runtime.unexpected
 StorageGcpCredentialsError | pipelex.config.file_missing
 StorageGcpError | one of pipelex.storage.unavailable, pipelex.config.credential_refused
 StorageInvalidKeyError | runtime.unexpected
+StorageInvalidMetadataError | runtime.unexpected
 StorageInvalidUriError | one of security.input_path_refused, security.method_url_refused, runtime.unexpected
 StorageLocalError | runtime.misconfigured
 StorageNotConfiguredError | pipelex.storage.not_configured

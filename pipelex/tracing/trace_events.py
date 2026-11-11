@@ -20,6 +20,7 @@ from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, cap_error_stack
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.system.execution_chain import ExecutionAttempt, execution_chain_key
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
@@ -40,6 +41,7 @@ class TraceEventKind(StrEnum):
     CONDITION_RESOLVED = "condition_resolved"
     EXECUTION_DATA = "execution_data"
     USAGE_REPORT = "usage_report"
+    FILE_CONVERTED = "file_converted"
 
 
 class TraceEvent(BaseModel):
@@ -334,6 +336,33 @@ class UsageReportEvent(TraceEvent):
     tokens_usage: AnyTokensUsage
 
 
+class FileConvertedEvent(TraceEvent):
+    """Emitted when a step reads an Office file as its PDF, once per document, before the step's model is called.
+
+    The PDF was either kept beside the file, made for a preview or an earlier run, or made by a conversion this step
+    ran. It is written as soon as the step has its PDF, so a step that then fails still records the conversion it paid
+    for. The page count is the PDF's, which is what a step reading it is billed on.
+    """
+
+    event_kind: Literal[TraceEventKind.FILE_CONVERTED] = TraceEventKind.FILE_CONVERTED
+    node_id: str
+    """The node of the step that read the document."""
+    input_name: str | None
+    """The document's input path or prompt variable, such as `report` or `annexes[2]`; None for a document no input
+    names, such as inline bytes."""
+    format_key: str
+    """The original's format, such as `docx`."""
+    origin: PdfOrigin
+    """`kept` when the PDF was found beside the file, `made` when this step converted it."""
+    converter_name: str | None
+    """The backend that made the PDF, `gotenberg` or `soffice`; None for a kept PDF, whose metadata does not name it."""
+    converter_version: str | None
+    """The converter version the PDF is stamped with; None for a kept PDF a storage provider keeping no metadata holds."""
+    page_count: int = Field(ge=0)
+    conversion_seconds: float | None
+    """How long the conversion took; None when the PDF was kept."""
+
+
 # ---------------------------------------------------------------------------
 # Discriminated union for deserialization
 # ---------------------------------------------------------------------------
@@ -352,7 +381,8 @@ AnyTraceEvent = Annotated[
     | BatchFannedOutEvent
     | ConditionResolvedEvent
     | ExecutionDataEvent
-    | UsageReportEvent,
+    | UsageReportEvent
+    | FileConvertedEvent,
     Field(discriminator="event_kind"),
 ]
 

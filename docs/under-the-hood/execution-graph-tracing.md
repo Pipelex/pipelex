@@ -341,6 +341,24 @@ The mode a trace states is the one the run's pipes run in, which is not always t
 | `batch_fanned_out` | A `PipeBatch` knows how many items it runs, before any item starts | The batch's node, `item_count`, and the pipe each item runs: `branch_pipe_code`, its bare code, `branch_pipe_ref`, its domain-qualified reference, and `branch_pipe_type` |
 | `execution_data` | A pipe records details of its execution | The node, and the entries merged into its `execution_data` |
 | `usage_report` | An inference job reports what it used | The node it is attributed to and its usage |
+| `file_converted` | A step has the PDF it reads in place of an Office file, once per document, before its model is called | The step's node and what the PDF is: see [Office Files Read as PDFs](#office-files-read-as-pdfs) |
+
+#### Office Files Read as PDFs
+
+A step that reads an Office file as its PDF, because its models may not all read the file or because it draws page views (see [Office File Conversion](../features/office-file-conversion.md)), writes one `file_converted` event (`FileConvertedEvent`) per document, on its own node, as soon as it has the PDF and before its model is called. A step that fails after a conversion it paid for therefore still records it. Its fields, beside those every event carries:
+
+| Field | What it holds |
+|---|---|
+| `node_id` | The node of the step that read the document |
+| `input_name` | The document's input path or prompt variable, such as `report` or `annexes[2]`; `null` for a document no input names, such as one given inline in a prompt |
+| `format_key` | The original's format, such as `docx` |
+| `origin` | `kept` when the PDF was found already kept for the file, made for a preview or an earlier step or run, and `made` when this step converted it |
+| `converter_name` | The backend that made the PDF, `gotenberg` or `soffice`; `null` for a kept PDF, whose metadata does not name it |
+| `converter_version` | The `converter-version` the PDF is stamped with; `null` for a kept PDF held by a storage provider that keeps no metadata |
+| `page_count` | The PDF's number of pages, which is what a model reading it bills on |
+| `conversion_seconds` | How long the conversion took; `null` for a kept PDF |
+
+The event is recorded only on a node the tracer started, as execution data is, and only into an event log: the graph builders read it and draw nothing for it, so it appears in neither the `GraphSpec` nor its renderings. A dry run converts nothing and writes none.
 
 #### Decisions at Decision Time
 

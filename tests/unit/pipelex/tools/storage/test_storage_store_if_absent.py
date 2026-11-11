@@ -70,6 +70,20 @@ class TestStorageStoreIfAbsent:
 
         assert provider.checksums == {KEY: sha256}
 
+    async def test_a_provider_keeping_no_metadata_drops_it_and_answers_none(self) -> None:
+        """A plugin overriding none of the metadata hooks still stores, and `load_metadata` answers None for what it holds."""
+        provider = _PlainProvider()
+        metadata = {"converter-version": "0.1.0"}
+
+        assert await provider.store_if_absent(data=PAYLOAD, key=KEY, metadata=metadata) is True
+        other_uri = await provider.store(data=OTHER_PAYLOAD, key="scope/blobs/two", metadata=metadata)
+
+        assert await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}{KEY}") is None
+        assert await provider.load_metadata(uri=other_uri) is None
+        assert provider.objects == {KEY: PAYLOAD, "scope/blobs/two": OTHER_PAYLOAD}
+        with pytest.raises(StorageFileNotFoundError):
+            await provider.load_metadata(uri=f"{PIPELEX_STORAGE_SCHEME}scope/blobs/missing")
+
     async def test_bytes_not_matching_their_checksum_are_refused_before_any_write(self, tmp_path: Path) -> None:
         for provider in _providers(tmp_path=tmp_path):
             with pytest.raises(StorageChecksumMismatchError, match="do not hash to the checksum"):
