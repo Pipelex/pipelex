@@ -909,7 +909,7 @@ ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
 
 # The document converter's integration tests, which need soffice on the PATH (or PIPELEX_TEST_SOFFICE_BINARY) or a
-# Gotenberg container at PIPELEX_TEST_GOTENBERG_URL, such as `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
+# Gotenberg container at PIPELEX_TEST_GOTENBERG_URL, such as `docker run --rm -p 3000:3000 gotenberg/gotenberg:9`.
 # Excluded from every other run, as the tests needing the Pipelex API are; a backend not present is skipped.
 test-document-conversion: env
 	$(call PRINT_TITLE,"Document conversion integration testing")

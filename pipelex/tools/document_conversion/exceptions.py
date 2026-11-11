@@ -127,11 +127,7 @@ class DocumentConverterUnavailableError(ToolError):
 
 
 class DocumentConverterAnswerError(ToolError):
-    """The converter said it converted the file but answered something that cannot be kept: a fault of the converter.
-
-    Either the answer is not a PDF, or it is one whose answer names no version, which Gotenberg names on every answer
-    in its `Gotenberg-Version` header, so that a PDF kept unstamped would say nothing of what made it.
-    """
+    """The converter said it converted the file but answered something that is not a PDF: a fault of the converter."""
 
     error_code = CoreCode.RUNTIME_UNEXPECTED
 
@@ -155,7 +151,9 @@ class KeptPdfConflictError(ToolError):
 class DocumentConverterMisconfiguredError(ToolError):
     """The configured conversion backend cannot be used: a Gotenberg URL missing, or a `soffice` binary not found.
 
-    Raised at boot, so the operator learns it when the runtime starts rather than at the first Office file.
+    Raised at boot, so the operator learns it when the runtime starts rather than at the first Office file. Also raised
+    by the first conversion through a Gotenberg that answers a PDF without naming its version in `Gotenberg-Version`,
+    which only a Gotenberg older than 8.39.0, or a proxy stripping the header, does: nothing is sent at boot to tell.
     """
 
     error_code = CoreCode.RUNTIME_MISCONFIGURED

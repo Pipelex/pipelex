@@ -19,7 +19,7 @@ def document_converter(request: pytest.FixtureRequest) -> DocumentConverterProto
     """Each backend this machine has, the test skipped for one it lacks.
 
     `soffice` is the executable `PIPELEX_TEST_SOFFICE_BINARY` names, else `soffice` on the PATH; Gotenberg is the container
-    at `PIPELEX_TEST_GOTENBERG_URL`, such as one started with `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
+    at `PIPELEX_TEST_GOTENBERG_URL`, such as one started with `docker run --rm -p 3000:3000 gotenberg/gotenberg:9`.
     """
     match request.param:
         case "soffice":

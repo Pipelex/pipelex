@@ -9,6 +9,7 @@ from pipelex.errors.problem import ProblemView
 from pipelex.tools.document_conversion.exceptions import (
     ConversionLimitKind,
     DocumentConverterAnswerError,
+    DocumentConverterMisconfiguredError,
     DocumentConverterUnavailableError,
     DocumentFormatNotConvertibleError,
     DocumentTooLargeToConvertError,
@@ -124,16 +125,22 @@ class TestGotenbergConverter:
         assert converted.converter_version == "9.3.1"
 
     @pytest.mark.parametrize("version", [None, "", "   "], ids=["no-header", "empty", "blank"])
-    async def test_a_pdf_whose_answer_names_no_version_is_a_fault_of_the_converter_and_final(self, version: str | None) -> None:
+    async def test_a_pdf_whose_answer_names_no_version_is_a_misconfigured_converter_and_final(self, version: str | None) -> None:
+        """Gotenberg before 8.39.0, or a proxy stripping the header, answers so: a fault of the deployment, for its operator."""
         gotenberg = _ScriptedGotenberg(answers=[_pdf(version=version)])
         converter = _make_converter(gotenberg=gotenberg)
 
-        with pytest.raises(DocumentConverterAnswerError) as exc_info:
+        with pytest.raises(DocumentConverterMisconfiguredError) as exc_info:
             await converter.convert_to_pdf(data=SOURCE_BYTES, format_key="docx")
 
-        assert exc_info.value.resolve_error_code() == CoreCode.RUNTIME_UNEXPECTED
-        assert CONVERTER_VERSION_HEADER in exc_info.value.message
         assert len(gotenberg.convert_requests) == 1
+        error = exc_info.value
+        assert CONVERTER_VERSION_HEADER in error.message
+        assert "Gotenberg 8.39.0 or later" in error.message
+        problem = error.to_problem(view=ProblemView.OPERATOR)
+        assert problem.code == CoreCode.RUNTIME_MISCONFIGURED
+        assert problem.diagnostics is not None
+        assert problem.diagnostics.params == {"component": "runtime.document_conversion"}
 
     @pytest.mark.parametrize("status", [400, 422, 500, 504])
     async def test_a_first_unreadable_answer_is_tried_once_more(self, status: int) -> None:

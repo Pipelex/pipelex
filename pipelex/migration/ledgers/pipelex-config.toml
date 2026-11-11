@@ -542,10 +542,10 @@ is now stamped with the version Gotenberg names in the `Gotenberg-Version` heade
 carried it, so the key is gone, and a file that still sets it loses it.
 """
 guidance = """
-Nothing to decide. A version set here was stamped on every PDF whatever converter made it, and a version \
-asked once outlived a converter redeployed beneath a running process; read off each answer, the stamp is \
-the version of the process that converted the file, the same value the platform's preview worker stamps \
-on the PDF it keeps at the same key.
+Nothing to decide in the file. A version set here was stamped on every PDF whatever converter made it, \
+and a version asked once outlived a converter redeployed beneath a running process; read off each answer, \
+the stamp is the version of the process that converted the file. Gotenberg names it on a conversion's \
+answer from 8.39.0 on, so a deployment on an older Gotenberg upgrades it.
 """
 
 [[migration.ops]]

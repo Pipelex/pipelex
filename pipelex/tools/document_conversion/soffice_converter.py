@@ -76,7 +76,7 @@ class SofficeConverter(DocumentConverterProtocol):
         self._binary_path = binary_path
         self._timeout_seconds = timeout_seconds
         self._max_source_bytes = max_source_bytes
-        self._version_cache = ConverterVersionCache(known_version=None)
+        self._version_cache = ConverterVersionCache()
 
     @property
     @override

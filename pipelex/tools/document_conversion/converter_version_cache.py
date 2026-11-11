@@ -16,13 +16,9 @@ from collections.abc import Awaitable, Callable
 class ConverterVersionCache:
     """The version of one converter, fetched by the first caller while the others wait, then kept."""
 
-    def __init__(self, *, known_version: str | None) -> None:
-        """Start with the version already known, such as the one a configuration sets, or None to fetch it.
-
-        Args:
-            known_version: The version, or None when the first caller fetches it.
-        """
-        self._version = known_version
+    def __init__(self) -> None:
+        """Start with no version: the first caller fetches it."""
+        self._version: str | None = None
         self._lock_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
 
     async def get_or_fetch(self, *, fetch: Callable[[], Awaitable[str]]) -> str:

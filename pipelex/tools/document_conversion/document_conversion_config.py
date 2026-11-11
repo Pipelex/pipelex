@@ -18,7 +18,7 @@ class GotenbergConversionConfig(ConfigModel):
     """`[runtime.document_conversion.gotenberg]`: a Gotenberg container reached over HTTP.
 
     There is no version to set: a PDF is stamped with the version Gotenberg names in the `Gotenberg-Version` header of
-    the answer that carried it, as the platform's preview worker stamps the PDF it keeps at the same key.
+    the answer that carried it, which Gotenberg 8.39.0 or later sends.
     """
 
     # The container's base URL, such as `http://localhost:3000`. Empty is unset, which a boot naming this backend refuses.

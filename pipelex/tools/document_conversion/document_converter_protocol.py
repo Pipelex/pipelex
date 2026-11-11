@@ -73,7 +73,8 @@ class DocumentConverterProtocol(Protocol):
             DocumentUnreadableByConverterError: The converter could not read the file.
             DocumentTooLargeToConvertError: The file is past the converter's size, or its conversion ran out of time.
             DocumentConverterUnavailableError: The converter is busy or unreachable.
-            DocumentConverterAnswerError: The converter answered something that is not a PDF, or a PDF it named no
-                version for.
+            DocumentConverterAnswerError: The converter answered something that is not a PDF.
+            DocumentConverterMisconfiguredError: The converter cannot be used as deployed, such as a Gotenberg that
+                does not name its version.
         """
         ...

@@ -7,8 +7,9 @@ What Gotenberg's answers mean was measured for the platform's converter (pipelex
 
 - **A `200`** is the PDF, checked to start like one, and stamped with the version Gotenberg names in the
   `Gotenberg-Version` header of that same answer. Read off the answer that carried the PDF, it is the version of the
-  process that converted the file, whatever was deployed since, and the very value the platform's preview worker stamps
-  on the PDF it keeps at the same key. A PDF whose answer names no version is a fault of the converter, never taken.
+  process that converted the file, whatever was deployed since. Gotenberg names it on a conversion's answer from
+  8.39.0 on: a PDF whose answer names none comes from an older Gotenberg, or through a proxy that strips the header,
+  a fault of the deployment, `runtime.misconfigured`, and is never taken.
 - **A first `400`, `422`, `500` or `504`** is tried once more: a LibreOffice engine dying mid-conversion answers
   exactly as a damaged file does, and the same file then converts. A second one is the file's own,
   `input.file_unreadable`.
@@ -42,6 +43,7 @@ from pipelex.tools.document_conversion.document_converter_protocol import (
 from pipelex.tools.document_conversion.exceptions import (
     ConversionLimitKind,
     DocumentConverterAnswerError,
+    DocumentConverterMisconfiguredError,
     DocumentConverterUnavailableError,
     DocumentFormatNotConvertibleError,
     DocumentTooLargeToConvertError,
@@ -51,8 +53,10 @@ from pipelex.tools.document_conversion.exceptions import (
 GOTENBERG_CONVERTER_NAME = "gotenberg"
 
 _CONVERT_PATH = "/forms/libreoffice/convert"
-# The header Gotenberg names its own version in, on every answer, such as `9.2.0`: the `converter-version` of its PDFs.
+# The header Gotenberg names its own version in, such as `9.2.0`: the `converter-version` of its PDFs. Gotenberg sends it
+# on a conversion's answer from this version on; older ones send none, and 8.0.0 has no `GET /version` either.
 CONVERTER_VERSION_HEADER = "Gotenberg-Version"
+MIN_GOTENBERG_VERSION_NAMING_ITSELF = "8.39.0"
 
 # Short, so a converter between tasks costs an attempt seconds and not minutes: the file is posted only once connected.
 _CONNECT_TIMEOUT_SECONDS = 10.0
@@ -173,8 +177,8 @@ class GotenbergConverter(DocumentConverterProtocol):
 
         Raises:
             DocumentTooLargeToConvertError: The file is too large, or its conversion outran its budget.
-            DocumentConverterAnswerError: The converter answered `200` with something that is not a PDF, or with a PDF
-                whose answer names no version.
+            DocumentConverterAnswerError: The converter answered `200` with something that is not a PDF.
+            DocumentConverterMisconfiguredError: The converter answered a PDF without naming its version.
         """
         files = {"files": (f"document.{format_key}", data, "application/octet-stream")}
         started = monotonic()
@@ -210,7 +214,9 @@ class GotenbergConverter(DocumentConverterProtocol):
 
         Raises:
             DocumentTooLargeToConvertError: The file is too large, or its conversion ran out of time.
-            DocumentConverterAnswerError: A `200` that is not a PDF, or whose answer names no version.
+            DocumentConverterAnswerError: A `200` that is not a PDF.
+            DocumentConverterMisconfiguredError: A `200` whose answer names no version: a Gotenberg older than 8.39.0,
+                or a proxy stripping the header.
         """
         status = response.status_code
         log.debug(f"Gotenberg answered status {status} after {elapsed:.1f} seconds with {len(response.content)} bytes")
@@ -221,8 +227,12 @@ class GotenbergConverter(DocumentConverterProtocol):
                     raise DocumentConverterAnswerError(msg)
                 converter_version = response.headers.get(CONVERTER_VERSION_HEADER, "").strip()
                 if not converter_version:
-                    msg = f"The converter answered a PDF without naming its version in the {CONVERTER_VERSION_HEADER} header."
-                    raise DocumentConverterAnswerError(msg)
+                    msg = (
+                        f"The converter answered a PDF without naming its version in the {CONVERTER_VERSION_HEADER} header, "
+                        f"which Gotenberg {MIN_GOTENBERG_VERSION_NAMING_ITSELF} or later sends: upgrade the converter, "
+                        "or stop the proxy in front of it from stripping the header."
+                    )
+                    raise DocumentConverterMisconfiguredError(msg)
                 return ConvertedPdf(pdf_bytes=response.content, converter_name=GOTENBERG_CONVERTER_NAME, converter_version=converter_version)
             case HTTPStatus.TOO_MANY_REQUESTS:
                 msg = "The converter's queue is full (429)."
