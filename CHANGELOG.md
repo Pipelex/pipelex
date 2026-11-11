@@ -1,6 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.98.0] - 2026-11-11
+
+### Highlights
+
+**Office documents now reach models that read only PDFs.** With a document converter configured, Gotenberg or LibreOffice, a step reads the PDF of a Word, Excel, PowerPoint or OpenDocument file wherever a model that may serve it reads PDFs but not the Office format, keeps that PDF beside the source for reuse and records each conversion in the trace.
 
 ### Added
 
