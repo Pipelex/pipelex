@@ -42,7 +42,6 @@ max_source_bytes = 50_000_000
 
 [runtime.document_conversion.gotenberg]
 url = ""
-version = ""
 timeout_seconds = 360
 budget_seconds = 120
 

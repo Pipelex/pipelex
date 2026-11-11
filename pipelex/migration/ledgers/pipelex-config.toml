@@ -12,7 +12,7 @@ id = "pipelex-config"
 title = "The main Pipelex configuration"
 base_file = "pipelex.toml"
 tier_glob = "pipelex_*.toml"
-current_schema_version = 8
+current_schema_version = 9
 min_supported_schema_version = 0
 
 # This entry is inserted *below* the reshape rather than appended above it, and the order is what
@@ -527,3 +527,28 @@ Nothing to decide: the map was empty unless a maintainer filled it, and nothing 
 [[migration.ops]]
 kind = "delete_table"
 table_path = ["inference", "gateway_test"]
+
+[[migration]]
+id = "pipelex-config@9"
+to_schema_version = 9
+introduced_in = "0.99.0"
+breaking = true
+safety = "safe"
+title = "Drop the Gotenberg backend's version setting: a PDF is stamped with the version Gotenberg names"
+description = """
+`version` under `[runtime.document_conversion.gotenberg]` set the `converter-version` stamped on the PDFs \
+the Gotenberg backend makes, an empty value asking the container's `GET /version` once per process. A PDF \
+is now stamped with the version Gotenberg names in the `Gotenberg-Version` header of the very answer that \
+carried it, so the key is gone, and a file that still sets it loses it.
+"""
+guidance = """
+Nothing to decide in the file. A version set here was stamped on every PDF whatever converter made it, \
+and a version asked once outlived a converter redeployed beneath a running process; read off each answer, \
+the stamp is the version of the process that converted the file. Gotenberg names it on a conversion's \
+answer from 8.39.0 on, so a deployment on an older Gotenberg upgrades it.
+"""
+
+[[migration.ops]]
+kind = "delete_key"
+table_path = ["runtime", "document_conversion", "gotenberg"]
+key = "version"

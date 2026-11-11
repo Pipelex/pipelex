@@ -33,7 +33,6 @@ class TestDocumentConversionBackends:
 
         assert converted.pdf_bytes.startswith(PDF_MAGIC)
         assert converted.converter_name == document_converter.converter_name
-        assert converted.converter_version == await document_converter.get_converter_version()
         assert converted.converter_version
         page_count, first_page_text = _read_pdf(pdf_bytes=converted.pdf_bytes)
         assert page_count == office_file.page_count

@@ -541,7 +541,7 @@ What varies goes in `fields`, named by the [naming convention](#naming-conventio
 | `image_size` | string | An image size as a generation request spells it, width by height: `2560x1440` |
 | `format_key` | string | A file's format, as the extension the runtime knows it by, lowercase: `docx`, `xlsx` |
 | `origin` | string | Where the PDF a step reads in place of an Office file came from: `kept`, found at its key, or `made`, converted by the step |
-| `converter_version` | string or `null` | The `converter-version` a PDF is stamped with: `gotenberg-8.40.0`; `null` for a kept PDF held by a storage provider that keeps no metadata |
+| `converter_version` | string or `null` | The `converter-version` a PDF is stamped with, such as `9.2.0` for Gotenberg; `null` for a kept PDF held by a storage provider that keeps no metadata |
 | `page_count` | integer | The number of pages of a document, what a step reading it is billed on |
 | `reason` | string | Why something happens, as a word of the line's own vocabulary: for a step run setup expects to read an Office file as its PDF, `page_views` or `model_format` |
 | `nb_steps` | integer | The number of inference steps an image generation job requests, spelled as its parameters spell it |

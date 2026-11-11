@@ -76,7 +76,7 @@ class SofficeConverter(DocumentConverterProtocol):
         self._binary_path = binary_path
         self._timeout_seconds = timeout_seconds
         self._max_source_bytes = max_source_bytes
-        self._version_cache = ConverterVersionCache(known_version=None)
+        self._version_cache = ConverterVersionCache()
 
     @property
     @override
@@ -88,8 +88,16 @@ class SofficeConverter(DocumentConverterProtocol):
         """The `soffice` executable this backend runs."""
         return self._binary_path
 
-    @override
     async def get_converter_version(self) -> str:
+        """The version `soffice --version` prints, asked once and kept, which every PDF this backend makes is stamped with.
+
+        Unlike Gotenberg, whose every answer names the version of the process that made it, `soffice` is a binary on
+        this machine with nothing to say about its version but this: one process per conversion would double the cost
+        of each, and the binary a process found at boot is the one it keeps running.
+
+        Raises:
+            DocumentConverterUnavailableError: `soffice` could not be started, or printed no version.
+        """
         return await self._version_cache.get_or_fetch(fetch=self._fetch_version)
 
     async def _fetch_version(self) -> str:

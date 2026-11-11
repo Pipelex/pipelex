@@ -1,9 +1,11 @@
 """A converter's version, asked once however many conversions start at the same time.
 
-A backend lives for the process and is first used by whichever steps convert at once, each needing the version to
-stamp its PDF: without a lock, every one of them would ask the converter, a request to Gotenberg or a `soffice` process
-each. The lock is one per event loop, since a backend outlives the loop it was first used on, as an activity may run
-each step on another, and an `asyncio.Lock` waited on is bound to its loop.
+The `soffice` backend's: a backend lives for the process and is first used by whichever steps convert at once, each
+needing the version to stamp its PDF, and without a lock every one of them would start a `soffice --version` process.
+Gotenberg needs none, since each of its answers names the version of the process that made the PDF.
+
+The lock is one per event loop, since a backend outlives the loop it was first used on, as an activity may run each
+step on another, and an `asyncio.Lock` waited on is bound to its loop.
 """
 
 import asyncio
@@ -14,13 +16,9 @@ from collections.abc import Awaitable, Callable
 class ConverterVersionCache:
     """The version of one converter, fetched by the first caller while the others wait, then kept."""
 
-    def __init__(self, *, known_version: str | None) -> None:
-        """Start with the version already known, such as the one a configuration sets, or None to fetch it.
-
-        Args:
-            known_version: The version, or None when the first caller fetches it.
-        """
-        self._version = known_version
+    def __init__(self) -> None:
+        """Start with no version: the first caller fetches it."""
+        self._version: str | None = None
         self._lock_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Lock] = weakref.WeakKeyDictionary()
 
     async def get_or_fetch(self, *, fetch: Callable[[], Awaitable[str]]) -> str:

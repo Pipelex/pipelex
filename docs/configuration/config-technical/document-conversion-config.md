@@ -17,7 +17,6 @@ max_source_bytes = 50_000_000
 
 [runtime.document_conversion.gotenberg]
 url = ""
-version = ""
 timeout_seconds = 360
 budget_seconds = 120
 
@@ -42,9 +41,10 @@ Read only when `backend = "gotenberg"`.
 | Key | Default | Meaning |
 |---|---|---|
 | `url` | `""` | The container's base URL, such as `"http://localhost:3000"`. It must be an absolute `http` or `https` URL naming a host; empty or anything else stops Pipelex at startup with `runtime.misconfigured`. Nothing is contacted at startup, so a container that is down then is the converter being unavailable later, not a misconfiguration. |
-| `version` | `""` | The version stamped on the PDFs this backend makes, as their `converter-version` metadata. Empty asks the container's `GET /version` once per process. A deployment that tracks its converter image's own version sets it here. |
 | `timeout_seconds` | `360` | How long the client waits for the container's answer to one conversion. It must be greater than 0 and greater than `budget_seconds`. A hostile file was measured holding a connection for about six minutes before Gotenberg closed it, which is why the default allows for more. |
 | `budget_seconds` | `120` | Gotenberg's own budget for one conversion, queue included: set it to the container's `--api-timeout`. A connection that ends without an answer after this many seconds is the file outrunning its budget, `input.too_large`, never retried; one that ends before it is the converter going away, retried and then `runtime.unavailable`. It must be greater than 0. |
+
+There is no version to set. A PDF this backend makes is stamped, as its `converter-version` metadata, with the version Gotenberg names in the `Gotenberg-Version` header of the answer that carried it, which Gotenberg sends from 8.39.0 on: the backend needs **Gotenberg 8.39.0 or later**, and a conversion whose answer names no version fails with `runtime.misconfigured` (see [Office File Conversion](../../features/office-file-conversion.md#the-backends)).
 
 A `timeout_seconds` that does not exceed `budget_seconds` is refused when the configuration loads, with `pipelex.config.invalid`: the client would stop waiting before the converter's budget ran out, and would read every slow file as a converter gone away.
 

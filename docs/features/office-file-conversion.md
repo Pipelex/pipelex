@@ -21,7 +21,6 @@ max_source_bytes = 50_000_000
 
 [runtime.document_conversion.gotenberg]
 url = "http://localhost:3000"
-version = ""
 timeout_seconds = 360
 budget_seconds = 120
 
@@ -38,10 +37,13 @@ A backend that is named but cannot be used stops Pipelex at startup with `runtim
 
 Each backend drives LibreOffice and makes the same export: the document's printed pages, as it would print on paper.
 
-- **Gotenberg** posts the file to a [Gotenberg](https://gotenberg.dev) container over HTTP (`POST <url>/forms/libreoffice/convert`), always named `document.<extension>` so that nothing of a person's file name reaches the converter's logs. This is the backend for a server: a server that reads other people's files runs Gotenberg in a container of its own, which keeps a hostile file away from the process running Pipelex, its files and its credentials. For a quick local container, run `docker run --rm -p 3000:3000 gotenberg/gotenberg:8`.
+- **Gotenberg** posts the file to a [Gotenberg](https://gotenberg.dev) container over HTTP (`POST <url>/forms/libreoffice/convert`), always named `document.<extension>` so that nothing of a person's file name reaches the converter's logs. It needs Gotenberg 8.39.0 or later. This is the backend for a server: a server that reads other people's files runs Gotenberg in a container of its own, which keeps a hostile file away from the process running Pipelex, its files and its credentials. For a quick local container, run `docker run --rm -p 3000:3000 gotenberg/gotenberg:9`.
 - **soffice** runs LibreOffice's `soffice --headless --convert-to pdf` on this machine, once per conversion, in a temporary directory with a fresh LibreOffice profile, and kills its whole process group at the timeout. It is meant for a developer's machine and for tests. It is **not an isolation boundary**: `soffice` reads the file with the rights of the process that runs Pipelex, so never use it on a server that converts files you did not write.
 
-The version each backend reports is stamped on the PDFs it makes. Gotenberg's is the configured `version` when one is set, and otherwise what the container's `GET /version` answers; `soffice`'s is the line of `soffice --version`'s standard output that starts with `LibreOffice`, so a warning LibreOffice prints first, such as one about `javaldx`, is never taken for it. Each is read once and kept for the life of the process.
+Each PDF is stamped with the version of the converter that made it, as its `converter-version` metadata:
+
+- **Gotenberg's** is the version the container names in the `Gotenberg-Version` header of the very answer that carried the PDF, such as `9.2.0`. Read off each conversion's answer, it is the version of the process that converted the file, so a container redeployed while Pipelex runs stamps the PDFs it makes from then on with its new version. Gotenberg names its version on a conversion's answer from 8.39.0 on, so the Gotenberg backend needs **Gotenberg 8.39.0 or later**. A `200` whose answer names no version, which an older Gotenberg or a proxy stripping the header gives, fails the step with `runtime.misconfigured`, a fault of the deployment for its operator to fix, and its PDF is never kept.
+- **soffice's** is the line of `soffice --version`'s standard output that starts with `LibreOffice`, so a warning LibreOffice prints first, such as one about `javaldx`, is never taken for it. It is read once and kept for the life of the process.
 
 ### How Gotenberg's answers are read
 
@@ -49,7 +51,7 @@ A LibreOffice engine dying in the middle of a conversion answers exactly as a da
 
 | Gotenberg answers | What the backend does |
 |---|---|
-| `200` with a PDF | Uses it. A `200` that is not a PDF is a fault of the converter, `runtime.unexpected`. |
+| `200` with a PDF | Uses it, stamped with its `Gotenberg-Version` header. A `200` that is not a PDF is a fault of the converter, `runtime.unexpected`; one whose answer names no version comes from a Gotenberg older than 8.39.0 or through a proxy stripping the header, `runtime.misconfigured`. Neither is retried. |
 | `400`, `422`, `500` or `504` | Posts the file once more at once; a second such answer means the file is unreadable, `input.file_unreadable`. |
 | `413` | The file is too large for the converter, `input.too_large`, final. |
 | `503` | The conversion ran out of its budget, `input.too_large`, final. |
@@ -95,7 +97,7 @@ Everything else reached the page. LibreOffice also substitutes other fonts for t
 
 A PDF is made once and kept, so that the next step, or the next run, reading the same file reuses it.
 
-- **A source in storage** (`pipelex-storage://…`) has its PDF beside it, at `<source key>.pdf` with the source's extension lowercased: the PDF of `org/assets/report.DOCX` is `org/assets/report.docx.pdf`. Pipelex's hosted platform writes the PDFs of its previews at the same key with the same metadata, so a file converted for its preview is not converted again for a run, nor the other way round.
+- **A source in storage** (`pipelex-storage://…`) has its PDF beside it, at `<source key>.pdf` with the source's extension lowercased: the PDF of `org/assets/report.DOCX` is `org/assets/report.docx.pdf`. Pipelex's hosted platform writes the PDFs of its previews at the same key with the same metadata entries, so a file converted for its preview is not converted again for a run, nor the other way round.
 - **A source outside storage**, an `http(s)` URL, a local path or a `data:` URL, has no key to stand beside. Its PDF goes under the run's storage scope, named by the SHA-256 of the source's bytes and its format: `<storage scope>/<sha256>.<format>.pdf`. Every step of the run that reads the same file then converts it once, and a purge of the run erases the PDF.
 
 Every PDF is written create-only, with the content type `application/pdf` and the metadata entries `converter-version`, the version of the converter that made it, and `export-options: printed-pages`. When two steps convert the same file at once, the first write wins and both read the stored PDF: the step whose write lost reads the PDF it found there as a kept one, and its trace record gives that PDF's `converter-version` and page count, not those of the conversion it threw away. Should the winner have stored an object that is not a printed-pages PDF, the step fails with `runtime.unexpected`.
@@ -142,7 +144,7 @@ make test-document-conversion   # or: make tdc
 They run once per backend and skip a backend this machine lacks. The `soffice` backend uses the executable that `PIPELEX_TEST_SOFFICE_BINARY` names, or `soffice` on the `PATH`; the Gotenberg backend uses the container at `PIPELEX_TEST_GOTENBERG_URL`:
 
 ```bash
-docker run --rm -p 3000:3000 gotenberg/gotenberg:8
+docker run --rm -p 3000:3000 gotenberg/gotenberg:9
 PIPELEX_TEST_GOTENBERG_URL=http://localhost:3000 make tdc
 ```
 
