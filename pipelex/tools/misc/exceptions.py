@@ -133,6 +133,38 @@ class RemoteFileFetchError(ToolError):
         return {"host": self.host, "reason": self.reason, "input": self.input_name}
 
 
+class RemoteFileTooLargeError(RemoteFileFetchError):
+    """A remote file is past the most bytes a fetch reads, so its body was not read, or not read to its end.
+
+    The fetch refuses a response whose declared ``Content-Length`` already passes the cap before reading any of its
+    body, and stops reading one that passes the cap as it streams, counting the bytes once decoded, so a compressed
+    body is refused for what it expands to. ``limit`` is the cap and ``size`` the declared length or the bytes read
+    when the read stopped, both in bytes.
+
+    A file an input or a pipe referenced is ``input.too_large`` (the default), which takes the input, the limit and the
+    size; a file a provider's answer pointed at is ``provider.response_invalid``, which the provider's catch site
+    chooses and which declares none of them. Being a :class:`RemoteFileFetchError`, it is caught wherever a failed
+    download is, and a fallback that keeps a remote URL rather than its bytes keeps it here too.
+    """
+
+    error_code = ErrorCodeSet(default=CoreCode.INPUT_TOO_LARGE, others=(CoreCode.PROVIDER_RESPONSE_INVALID,))
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Use a smaller file, or raise [runtime.network] max_fetch_bytes if you run the runtime yourself.",
+    )
+
+    def __init__(self, message: str, *, limit: int, size: int):
+        super().__init__(message)
+        # The most bytes the fetch reads.
+        self.limit = limit
+        # The length the response declared, or the bytes read when the read stopped, past `limit`.
+        self.size = size
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {**super().problem_params(), "limit": self.limit, "size": self.size}
+
+
 class SemVerError(ToolError):
     """Raised when a version or a version constraint a method package declares does not parse."""
 

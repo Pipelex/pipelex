@@ -1,10 +1,12 @@
 import base64
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract, StoredData
@@ -23,8 +25,8 @@ def _serve_from(*, mocker: MockerFixture, response: httpx.Response) -> None:
     """Route the loader's fetch through a transport answering `response`, so the real header handling runs."""
     transport = httpx.MockTransport(lambda _request: response)
 
-    async def _fetch_through_transport(url: str, **_kwargs: object) -> tuple[bytes, str | None]:
-        return await fetch_file_and_content_type_from_url_httpx(url, transport=transport)
+    async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+        return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
 
     mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
 
@@ -108,3 +110,20 @@ class TestLoadBytesAndMimeTypeFromAnyUri:
         _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES, headers={"Content-Type": "text/css"}))
 
         assert await load_bytes_from_any_uri(STYLESHEET_URL) == CSS_BYTES
+
+    @pytest.mark.parametrize(
+        "loader",
+        [
+            pytest.param(load_bytes_and_mime_type_from_any_uri, id="with-mime-type"),
+            pytest.param(load_bytes_from_any_uri, id="bytes-only"),
+        ],
+    )
+    async def test_a_caller_s_cap_reaches_the_url_fetch(self, mocker: MockerFixture, loader: Callable[..., Awaitable[object]]) -> None:
+        """A caller with a tighter limit of its own passes it, and the fetch refuses a body past it."""
+        _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES, headers={"Content-Type": "text/css"}))
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await loader(STYLESHEET_URL, max_bytes=len(CSS_BYTES) - 1)
+
+        assert exc_info.value.limit == len(CSS_BYTES) - 1
+        assert exc_info.value.size == len(CSS_BYTES)

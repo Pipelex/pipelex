@@ -1,5 +1,5 @@
 ---
-description: "Configure how Pipelex fetches the documents and images a method points at — the SSRF guard that refuses private destinations, and when a self-hosted deployment turns it off."
+description: "Configure how Pipelex fetches the documents and images a method points at — the SSRF guard that refuses private destinations, the cap on how many bytes a download reads, and when a self-hosted deployment changes them."
 ---
 
 # Network Configuration
@@ -8,14 +8,15 @@ Configuration section: `[runtime.network]`
 
 ## Overview
 
-A method's values can carry `http://` and `https://` URLs: an image input, a PDF to extract, a document a model reads, a file an image-generation provider hands back. When a model or an extractor needs the bytes rather than the link, Pipelex downloads them itself, following redirects. Since a method, a model's structured output or a function can produce any URL, the download is guarded: Pipelex refuses to connect to any destination that is not a public internet address.
+A method's values can carry `http://` and `https://` URLs: an image input, a PDF to extract, a document a model reads, a file an image-generation provider hands back. When a model or an extractor needs the bytes rather than the link, Pipelex downloads them itself, following redirects. Since a method, a model's structured output or a function can produce any URL, the download is guarded: Pipelex refuses to connect to any destination that is not a public internet address, and it refuses to read more than a set number of bytes from any of them.
 
 ```toml
 [runtime.network]
 is_fetch_ssrf_guard_enabled = true
+max_fetch_bytes = 100_000_000
 ```
 
-The value above is the default.
+The values above are the defaults.
 
 ## What the guard refuses
 
@@ -41,6 +42,28 @@ is_fetch_ssrf_guard_enabled = false
 ```
 
 Do not turn it off on a server that runs methods from people you do not trust with your network.
+
+## How much a download reads
+
+`max_fetch_bytes` is the most bytes Pipelex reads from any URL it downloads, 100 MB by default. It must be at least 1, and there is no setting that turns the cap off. Whoever chooses the URL also chooses how large the file behind it is, so without a cap a single URL serving several gigabytes, or a small compressed body that expands to that size, could exhaust the memory of the process running the method, and every run that process was serving would fail with it.
+
+The download is read as a stream and checked twice:
+
+1. **The declared size.** When the server's `Content-Length` already passes the cap, the download is refused before any of the body is read. A missing `Content-Length`, or one that is not a number, skips this check.
+2. **The bytes actually read.** As the body arrives, Pipelex counts the bytes it has received and stops reading as soon as they pass the cap. The bytes are counted after decompression, so a `gzip` body that is small on the wire but large once decoded is refused for its decoded size.
+
+A refusal raises `RemoteFileTooLargeError` and fails the pipe that needed the bytes, with the code `input.too_large`, whose `limit` is the cap and whose `size` is the declared length or the number of bytes read when the read stopped. The error is not retried, since the same URL would serve the same file. Its message names those two numbers and never the URL. A file an image-generation provider pointed at is the provider's answer rather than the caller's input, so a refusal there is coded `provider.response_invalid`, and where Pipelex would otherwise keep a generated image's remote URL after a failed download, it keeps the URL here too rather than storing a very large object.
+
+A step with a tighter limit of its own applies that limit to the download instead. The conversion of an Office file to PDF downloads a source at a URL under its `max_source_bytes`, described in [Document conversion](document-conversion-config.md), and reports a source past it as a conversion that is too large.
+
+Raise the cap on a self-hosted deployment whose methods read larger files from sources you trust:
+
+```toml
+[runtime.network]
+max_fetch_bytes = 500_000_000
+```
+
+Every download holds its whole body in memory, and most are then encoded once more to be sent to a model, so leave the process room for several downloads of that size at once.
 
 ## What the switch does not cover
 

@@ -7,7 +7,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.config import get_config
-from pipelex.tools.misc.exceptions import RemoteFileFetchError
+from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileTooLargeError
 from pipelex.tools.network.exceptions import SsrfBlockedError
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
@@ -243,6 +243,28 @@ class TestGeneratedContentFactoryFetchedRemoteImage:
         storage_provider.store.assert_not_awaited()
         assert image_content.url == "https://example.com/gone"
         assert image_content.public_url == "https://example.com/gone"
+
+    @pytest.mark.usefixtures("_remote_fetch_enabled")
+    async def test_a_generated_image_past_the_fetch_cap_keeps_its_remote_url(self, mocker: MockerFixture):
+        """A provider's file past the cap is the provider's answer, and keeping its link beats storing a huge object."""
+        storage_provider = mocker.MagicMock(spec=StorageProviderAbstract)
+        storage_provider.store = mocker.AsyncMock(return_value="pipelex-storage://stored-uri")
+        storage_provider.public_url = mocker.AsyncMock(return_value=None)
+        too_large = RemoteFileTooLargeError("Could not fetch a remote file: its body passed the cap", limit=100, size=200)
+        mocker.patch(
+            "pipelex.cogt.content_generation.generated_content_factory.fetch_file_and_content_type_from_url_httpx",
+            new=mocker.AsyncMock(side_effect=too_large),
+        )
+        factory = GeneratedContentFactory(storage_provider=storage_provider)
+
+        image_content = await factory.make_image_content(
+            storage_scope="test/scope",
+            raw_details=GeneratedImageRawDetails(size=None, actual_url="https://example.com/huge.png"),
+        )
+
+        storage_provider.store.assert_not_awaited()
+        assert image_content.url == "https://example.com/huge.png"
+        assert too_large.resolve_error_code() == CoreCode.PROVIDER_RESPONSE_INVALID
 
     @pytest.mark.usefixtures("_remote_fetch_enabled")
     async def test_a_refused_provider_url_fails_as_the_provider_s(self, mocker: MockerFixture):

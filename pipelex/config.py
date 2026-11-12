@@ -73,6 +73,26 @@ def is_fetch_ssrf_guard_enabled() -> bool:
     return optional_config.runtime.network.is_fetch_ssrf_guard_enabled
 
 
+FETCH_MAX_BYTES_FALLBACK = 100_000_000
+"""The cap a fetch reads under when no config is loaded: the default ``pipelex/pipelex.toml`` ships, which a test pins.
+
+It is a safety floor, not a config default: an uncapped fetch of a URL a value carried is the fault the cap closes, so a
+process that fetches before, or without, loading the config must still be capped.
+"""
+
+
+def fetch_max_bytes() -> int:
+    """The most bytes fetching a URL's body reads in this process (non-raising).
+
+    The config's ``runtime.network.max_fetch_bytes``, falling back to :data:`FETCH_MAX_BYTES_FALLBACK` when no config is
+    set: a process that fetches before, or without, loading the config fails closed.
+    """
+    optional_config = get_optional_config()
+    if not isinstance(optional_config, PipelexConfig):
+        return FETCH_MAX_BYTES_FALLBACK
+    return optional_config.runtime.network.max_fetch_bytes
+
+
 def is_pipe_func_sandbox_hosted() -> bool:
     """Whether PipeFunc runs out-of-process in this process (non-raising; defaults to local).
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **A URL download is read under a byte cap, `[runtime.network] max_fetch_bytes`**: every download of a URL a value carries is now streamed and refused past `max_fetch_bytes`, 100 MB by default, where the whole body was read into memory however large, so a URL serving gigabytes or a compressed bomb could exhaust the process. A declared `Content-Length` past the cap is refused before the body is read, and a body is cut off once its decoded bytes pass it, raising the new `RemoteFileTooLargeError`, a `RemoteFileFetchError` coded `input.too_large` with `limit` and `size` (`provider.response_invalid` for a provider's file, whose generated image keeps its remote URL); an Office file to convert at a URL is downloaded under `max_source_bytes` instead and refused as `DocumentTooLargeToConvertError` before it is read in full.
+
 ## [v0.99.0] - 2026-11-11
 
 ### Changed

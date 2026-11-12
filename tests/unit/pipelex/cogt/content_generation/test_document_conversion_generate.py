@@ -9,6 +9,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
@@ -26,14 +27,18 @@ from pipelex.tools.document_conversion.document_converter_protocol import (
     ConvertedPdf,
 )
 from pipelex.tools.document_conversion.exceptions import (
+    ConversionLimitKind,
     DocumentConverterMisconfiguredError,
     DocumentTooLargeToConvertError,
     DocumentUnreadableByConverterError,
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
+from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
+from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.tools.uri import uri_bytes
 
 _MODULE = "pipelex.cogt.content_generation.document_conversion_generate"
 PDF_BYTES = Path("tests/data/documents/Job-Offer.pdf").read_bytes()
@@ -276,6 +281,28 @@ class TestDocumentConversionGenerate:
         load.assert_not_called()
         assert converter.calls == []
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("code") == CoreCode.INPUT_TOO_LARGE
+        assert wire.get("params") == {"input": "report", "limit": 1000, "size": len(DOCX_BYTES)}, wire
+
+    async def test_a_url_past_the_size_limit_is_refused_before_its_body_is_read(self, mocker: MockerFixture):
+        """A source at a URL is bounded by `max_source_bytes` as it is fetched, not after it is held in memory."""
+        converter = _StubConverter()
+        _wire(mocker=mocker, converter=converter, max_source_bytes=1000)
+        transport = httpx.MockTransport(lambda _request: httpx.Response(200, content=DOCX_BYTES))
+
+        async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+            return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
+
+        mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
+
+        with pytest.raises(DocumentTooLargeToConvertError) as exc_info:
+            await readable_pdf_of_document(conversion_assignment=_assignment(source_uri="https://files.example.com/report.docx"))
+
+        error = exc_info.value
+        assert converter.calls == []
+        assert isinstance(error.__cause__, RemoteFileTooLargeError)
+        assert (error.limit_kind, error.limit, error.size) == (ConversionLimitKind.BYTES, 1000, len(DOCX_BYTES))
+        wire = error.to_problem(view=ProblemView.CALLER).to_wire()
         assert wire.get("code") == CoreCode.INPUT_TOO_LARGE
         assert wire.get("params") == {"input": "report", "limit": 1000, "size": len(DOCX_BYTES)}, wire
 

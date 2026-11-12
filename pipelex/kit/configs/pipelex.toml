@@ -88,6 +88,10 @@ signed_urls_lifespan_seconds = 3600 # Set to "disabled" for public URLs
 # on an intranet host or your only way out is an HTTP proxy: with the guard on, fetches connect
 # directly and ignore HTTP_PROXY / HTTPS_PROXY. Webhook delivery is guarded whatever this says.
 is_fetch_ssrf_guard_enabled = true
+# The most bytes a fetch of a document or image URL reads, counted after decompression: a response
+# declaring a larger Content-Length is refused before its body is read, and one that keeps coming is
+# cut off at this size. Raise it if your methods read larger files from URLs you trust.
+max_fetch_bytes = 100_000_000
 
 ####################################################################################################
 # Secrets Config

@@ -30,6 +30,7 @@ signed_urls_lifespan_seconds = 3600
 
 [runtime.network]
 is_fetch_ssrf_guard_enabled = true
+max_fetch_bytes = 100_000_000
 
 [runtime.secrets]
 method = "env" # env (built-in); an external plugin may add e.g. vault

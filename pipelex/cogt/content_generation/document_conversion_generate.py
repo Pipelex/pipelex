@@ -15,7 +15,9 @@ goes back, so its bytes never cross a host runtime's boundary.
    scope instead, as a source outside storage does. The run's own key holding such an object fails the step as a
    fault of the storage, `runtime.unexpected`, since only the runtime writes there.
 2. **Otherwise a conversion.** A source in storage is sized first, and one past `max_source_bytes` fails as too large
-   without being read; any other source is read, and the converter refuses it past the same size before sending it.
+   without being read; a source at a URL is fetched under the same limit, which refuses a declared length past it before
+   reading the body and stops a body that passes it as it streams; a local path or a data URL is read, and the converter
+   refuses it past the same size before sending it.
    The PDF's pages are counted with pypdfium2, and the PDF is written create-only with `content_type="application/pdf"`
    and both metadata keys. A concurrent writer may win the race: the step then reads the PDF it stored, and the trace
    describes that PDF, kept, with its writer's version and page count.
@@ -52,6 +54,7 @@ from pipelex.tools.document_conversion.exceptions import (
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf, pdf_key_of, scoped_pdf_key
+from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
@@ -158,9 +161,13 @@ async def readable_pdf_of_document(*, conversion_assignment: DocumentConversionA
                         max_source_bytes=max_source_bytes,
                         input_name=input_name,
                     )
-        case ResolvedHttpUrl() | ResolvedLocalPath() | ResolvedBase64DataUrl():
-            with fetching_for_input(input_name=input_name):
-                source_bytes = await load_bytes_from_any_uri(source_uri, storage_provider=storage_provider)
+        case ResolvedHttpUrl():
+            source_bytes = await _load_url_source(
+                source_uri=source_uri, format_key=format_key, max_source_bytes=max_source_bytes, input_name=input_name
+            )
+        case ResolvedLocalPath() | ResolvedBase64DataUrl():
+            # Neither is a body a caller can size at will: the converter refuses one past `max_source_bytes` itself.
+            source_bytes = await load_bytes_from_any_uri(source_uri)
 
     pdf_key = scoped_pdf_key(storage_scope=storage_scope, source_sha256=hashlib.sha256(source_bytes).hexdigest(), format_key=format_key)
     kept_state = await _look_up_kept_pdf(storage_provider=storage_provider, pdf_key=pdf_key)
@@ -205,6 +212,29 @@ async def _load_storage_source(
             too_large.with_input(input_name=input_name)
         raise too_large
     return await storage_provider.load(storage_uri)
+
+
+async def _load_url_source(*, source_uri: str, format_key: str, max_source_bytes: int, input_name: str | None) -> bytes:
+    """The bytes of a source at a URL, fetched under `max_source_bytes`, so that one past it is refused before it is all read.
+
+    The fetch refuses a declared length past the limit before reading the body, and stops a body that passes it as it
+    streams; the refusal reads as the conversion's own, as a source in storage past the limit does.
+
+    Raises:
+        DocumentTooLargeToConvertError: The source declares, or reaches as it is read, more than `max_source_bytes`.
+        RemoteFileFetchError: The source could not be fetched.
+    """
+    try:
+        with fetching_for_input(input_name=input_name):
+            return await load_bytes_from_any_uri(source_uri, max_bytes=max_source_bytes)
+    except RemoteFileTooLargeError as exc:
+        msg = f"The file reaches {exc.size} bytes, past the {max_source_bytes} bytes a conversion to PDF takes: it was not read in full."
+        too_large = DocumentTooLargeToConvertError(
+            msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=max_source_bytes, size=exc.size
+        )
+        if input_name is not None:
+            too_large.with_input(input_name=input_name)
+        raise too_large from exc
 
 
 async def _look_up_kept_pdf(*, storage_provider: StorageProviderAbstract, pdf_key: str) -> _KeptPdfState:
