@@ -170,7 +170,8 @@ async def readable_pdf_of_document(*, conversion_assignment: DocumentConversionA
                 source_uri=source_uri, format_key=format_key, max_source_bytes=max_source_bytes, input_name=input_name
             )
         case ResolvedLocalPath() | ResolvedBase64DataUrl():
-            # Neither is a body a caller can size at will: the converter refuses one past `max_source_bytes` itself.
+            # Neither is fetched: a local path is read under the run's read scope, and a data URL arrives inside the request,
+            # which the server bounds. The converter refuses either past `max_source_bytes` itself.
             source_bytes = await load_bytes_from_any_uri(source_uri)
 
     pdf_key = scoped_pdf_key(storage_scope=storage_scope, source_sha256=hashlib.sha256(source_bytes).hexdigest(), format_key=format_key)

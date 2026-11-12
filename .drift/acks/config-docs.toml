@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:52f54f1241152c2a48797ff62b51d2d2b8e27d332ee010718f709ea5026da1be"
-reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-12T00:42:12Z"
-rationale = "clean-pass: the trigger change is the NetworkConfig docstring, now saying the smaller of a caller limit and max_fetch_bytes applies and that only an uncompressed declared length is prechecked; network-config.md, document-conversion-config.md and the other config docs were updated in this change to say the same, the field and its shipped default are unchanged, and cmig and cl pass with no golden moving"
+digest = "sha256:178e7e9bd1919347b2596dfb749b843d4a624c41f8ae6ad6c7b90a65151e9713"
+reviewed_by = "Claude Opus 5.5"
+reviewed_at = "2026-11-12T04:19:54Z"
+rationale = "real-catch: this branch adds runtime.network.max_fetch_bytes with its shipped default of 100 MB in pipelex.toml and the NetworkConfig field, whose docstring says a fetch reads under the smaller of the caller's limit and max_fetch_bytes, holds a compressed body's bytes to the cap plus a small margin, and refuses a declared length past its bound before the body is read; network-config.md, document-conversion-config.md and the other config docs were updated in this change to say the same, and the pipelex-config goldens defaults@9.toml and fingerprint@9.json were re-recorded additively, with cmig and cl passing"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -24,6 +24,6 @@ rationale = "clean-pass: the trigger change is the NetworkConfig docstring, now 
 "pipelex/tools/document_conversion/document_conversion_config.py" = "blob:e60253aa7073529674eb3ec3b9561b7b87d565cc"
 "pipelex/tools/log/log_config.py" = "blob:0a893b9e62737b7954a924eaed577ba5c8ef9eaf"
 "pipelex/tools/log/log_levels.py" = "blob:12b94e4d4793a70156ac547ee20c9d483910ecae"
-"pipelex/tools/network/network_config.py" = "blob:42fd7fb4660d15ef2dbaa0d782dfe20ff307fc1e"
+"pipelex/tools/network/network_config.py" = "blob:641e9c999a0f7845f7c07705572033dc698adf12"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

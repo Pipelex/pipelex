@@ -4,7 +4,7 @@
 
 ### Security
 
-- **A URL download is read under a byte cap, `[runtime.network] max_fetch_bytes`**: every download of a URL a value carries is now streamed and refused once it passes `max_fetch_bytes`, 100 MB by default, raising the new `RemoteFileTooLargeError` coded `input.too_large`, where the whole body was read into memory however large. Only `gzip` and `deflate` content codings are read, decompression being bounded so a compression bomb never expands, and any other coding, stacked codings, or a truncated compressed body or one with trailing data is refused as `input.file_unreadable`. An Office file to convert at a URL is downloaded under the smaller of `[runtime.document_conversion] max_source_bytes` and `max_fetch_bytes`.
+- **A URL download is read under a byte cap, `[runtime.network] max_fetch_bytes` (Breaking)**: every download of a URL a value carries is now streamed and refused once it passes `max_fetch_bytes`, 100 MB by default, raising the new `RemoteFileTooLargeError` coded `input.too_large`, where the whole body was read into memory however large. Only `gzip` and `deflate` content codings are read, decompression being bounded so a compression bomb never expands, and any other coding, stacked codings, or a truncated compressed body or one with trailing data is refused as `input.file_unreadable`. An Office file to convert at a URL is downloaded under the smaller of `[runtime.document_conversion] max_source_bytes` and `max_fetch_bytes`.
 
 ## [v0.99.0] - 2026-11-11
 
