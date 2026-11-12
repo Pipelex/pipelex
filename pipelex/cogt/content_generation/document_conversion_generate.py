@@ -15,9 +15,9 @@ goes back, so its bytes never cross a host runtime's boundary.
    scope instead, as a source outside storage does. The run's own key holding such an object fails the step as a
    fault of the storage, `runtime.unexpected`, since only the runtime writes there.
 2. **Otherwise a conversion.** A source in storage is sized first, and one past `max_source_bytes` fails as too large
-   without being read; a source at a URL is fetched under the same limit, which refuses a declared length past it before
-   reading the body and stops a body that passes it as it streams; a local path or a data URL is read, and the converter
-   refuses it past the same size before sending it.
+   without being read; a source at a URL is fetched under the same limit, or the fetch's own cap when it is smaller,
+   which refuses a declared length past it before reading the body and stops a body that passes it as it streams; a
+   local path or a data URL is read, and the converter refuses it past the same size before sending it.
    The PDF's pages are counted with pypdfium2, and the PDF is written create-only with `content_type="application/pdf"`
    and both metadata keys. A concurrent writer may win the race: the step then reads the PDF it stored, and the trace
    describes that PDF, kept, with its writer's version and page count.
@@ -217,21 +217,20 @@ async def _load_storage_source(
 async def _load_url_source(*, source_uri: str, format_key: str, max_source_bytes: int, input_name: str | None) -> bytes:
     """The bytes of a source at a URL, fetched under `max_source_bytes`, so that one past it is refused before it is all read.
 
-    The fetch refuses a declared length past the limit before reading the body, and stops a body that passes it as it
-    streams; the refusal reads as the conversion's own, as a source in storage past the limit does.
+    The fetch applies the smaller of `max_source_bytes` and its own cap, refusing a declared length past it before reading
+    the body and stopping a body that passes it as it streams; the refusal reads as the conversion's own, as a source in
+    storage past the limit does, with the limit that applied.
 
     Raises:
-        DocumentTooLargeToConvertError: The source declares, or reaches as it is read, more than `max_source_bytes`.
+        DocumentTooLargeToConvertError: The source declares, or reaches as it is read, more than the limit that applied.
         RemoteFileFetchError: The source could not be fetched.
     """
     try:
         with fetching_for_input(input_name=input_name):
             return await load_bytes_from_any_uri(source_uri, max_bytes=max_source_bytes)
     except RemoteFileTooLargeError as exc:
-        msg = f"The file reaches {exc.size} bytes, past the {max_source_bytes} bytes a conversion to PDF takes: it was not read in full."
-        too_large = DocumentTooLargeToConvertError(
-            msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=max_source_bytes, size=exc.size
-        )
+        msg = f"The file reaches {exc.size} bytes, past the {exc.limit} bytes a fetch for a conversion to PDF reads: it was not read in full."
+        too_large = DocumentTooLargeToConvertError(msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=exc.limit, size=exc.size)
         if input_name is not None:
             too_large.with_input(input_name=input_name)
         raise too_large from exc

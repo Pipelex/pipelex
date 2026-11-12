@@ -32,7 +32,7 @@ The values above are the defaults.
 | Key | Default | Meaning |
 |---|---|---|
 | `backend` | `"none"` | Which converter makes the PDF: `"none"` converts nothing, `"gotenberg"` posts the file to a Gotenberg container, and `"soffice"` runs LibreOffice on this machine. With `"none"`, every check and every step behaves as if conversion did not exist. |
-| `max_source_bytes` | `50_000_000` | The largest file, in bytes, handed to the converter. A larger one fails the step with `input.too_large`: a file in storage is sized and refused without being read, a file at an `http(s)` URL is downloaded under this limit, refused before its body is read when the server declares a larger size and as soon as the bytes read pass it otherwise, and a local file or a data URL is refused before it is sent. It must be at least 1. |
+| `max_source_bytes` | `50_000_000` | The largest file, in bytes, handed to the converter. A larger one fails the step with `input.too_large`: a file in storage is sized and refused without being read, a file at an `http(s)` URL is downloaded under this limit, or under `[runtime.network] max_fetch_bytes` when that is smaller, refused before its body is read when the server declares a larger uncompressed size and as soon as the bytes read pass it otherwise, and a local file or a data URL is refused before it is sent. It must be at least 1. |
 
 ## `[runtime.document_conversion.gotenberg]`
 

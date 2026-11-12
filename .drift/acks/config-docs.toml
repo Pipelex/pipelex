@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:0ee569396f5bc07360d81d0e4cc97a52e09655ffa4458fa3bfd6eb525bab928b"
+digest = "sha256:52f54f1241152c2a48797ff62b51d2d2b8e27d332ee010718f709ea5026da1be"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-12T00:11:20Z"
-rationale = "real-catch: the new runtime.network max_fetch_bytes key and its NetworkConfig field are documented in docs/configuration/config-technical/network-config.md (defaults block, the two checks, the error and its code, when to raise it) and the max_source_bytes row of document-conversion-config.md now covers a source at a URL; the migration goldens for pipelex-config schema 9 were re-recorded with make umig as an additive change needing no ledger entry, and cmig and cl pass"
+reviewed_at = "2026-11-12T00:42:12Z"
+rationale = "clean-pass: the trigger change is the NetworkConfig docstring, now saying the smaller of a caller limit and max_fetch_bytes applies and that only an uncompressed declared length is prechecked; network-config.md, document-conversion-config.md and the other config docs were updated in this change to say the same, the field and its shipped default are unchanged, and cmig and cl pass with no golden moving"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -24,6 +24,6 @@ rationale = "real-catch: the new runtime.network max_fetch_bytes key and its Net
 "pipelex/tools/document_conversion/document_conversion_config.py" = "blob:e60253aa7073529674eb3ec3b9561b7b87d565cc"
 "pipelex/tools/log/log_config.py" = "blob:0a893b9e62737b7954a924eaed577ba5c8ef9eaf"
 "pipelex/tools/log/log_levels.py" = "blob:12b94e4d4793a70156ac547ee20c9d483910ecae"
-"pipelex/tools/network/network_config.py" = "blob:a4a71fd542c4c46d3cc7b28704d7639ebabd1ca5"
+"pipelex/tools/network/network_config.py" = "blob:42fd7fb4660d15ef2dbaa0d782dfe20ff307fc1e"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
 "pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"

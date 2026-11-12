@@ -1,6 +1,7 @@
 import gzip
 import json
 import logging
+import os
 from collections.abc import AsyncIterator
 
 import httpx
@@ -13,6 +14,7 @@ from pipelex.config import get_config
 from pipelex.errors.problem import ProblemView
 from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx, fetch_file_from_url_httpx, fetching_for_input
+from tests.unit.pipelex.tools.misc.served_response import served_response
 
 SIGNED_URL = "https://files.example.com/reports/confidential-patient-diagnosis.pdf?token=secret-token-4471"
 CHUNK_SIZE = 1000
@@ -41,7 +43,7 @@ def _transport_streaming(stream: httpx.AsyncByteStream, headers: dict[str, str] 
 
 
 def _transport_answering(content: bytes, headers: dict[str, str] | None = None) -> httpx.MockTransport:
-    return httpx.MockTransport(lambda _request: httpx.Response(200, content=content, headers=headers))
+    return httpx.MockTransport(lambda _request: served_response(content=content, headers=headers))
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -135,15 +137,87 @@ class TestFileFetchSizeCap:
 
         assert (exc_info.value.limit, exc_info.value.size) == (1500, 2000)
 
-    async def test_a_caller_s_cap_overrides_the_configured_one(self, mocker: MockerFixture) -> None:
+    async def test_a_caller_s_cap_never_loosens_the_configured_one(self, mocker: MockerFixture) -> None:
         mocker.patch.object(get_config().runtime.network, "max_fetch_bytes", 1500)
 
-        raw_bytes = await fetch_file_from_url_httpx(url=SIGNED_URL, max_bytes=2000, transport=_transport_streaming(_CountingStream(chunk_count=2)))
-        assert len(raw_bytes) == 2000
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await fetch_file_from_url_httpx(url=SIGNED_URL, max_bytes=2000, transport=_transport_streaming(_CountingStream(chunk_count=2)))
+
+        assert (exc_info.value.limit, exc_info.value.size) == (1500, 2000)
+
+    async def test_a_tighter_caller_s_cap_wins(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(get_config().runtime.network, "max_fetch_bytes", 1500)
 
         with pytest.raises(RemoteFileTooLargeError) as exc_info:
             await fetch_file_from_url_httpx(url=SIGNED_URL, max_bytes=500, transport=_transport_streaming(_CountingStream(chunk_count=2)))
+
         assert exc_info.value.limit == 500
+
+    async def test_a_redirect_is_followed_without_reading_its_body(self) -> None:
+        """Each hop's body would be read whole and uncapped if httpx followed the redirects itself."""
+        hop_body = _CountingStream(chunk_count=50)
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/start":
+                return httpx.Response(302, headers={"Location": "https://files.example.com/final"}, stream=hop_body)
+            return served_response(content=b"the file")
+
+        raw_bytes = await fetch_file_from_url_httpx(url="https://files.example.com/start", max_bytes=1000, transport=httpx.MockTransport(_handler))
+
+        assert raw_bytes == b"the file"
+        assert hop_body.chunks_served == 0
+
+    async def test_a_redirect_loop_is_refused_past_the_client_s_redirect_limit(self) -> None:
+        hops: list[str] = []
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            hops.append(request.url.path)
+            return httpx.Response(302, headers={"Location": f"https://files.example.com/hop{len(hops)}"})
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(url="https://files.example.com/start", transport=httpx.MockTransport(_handler))
+
+        assert exc_info.value.reason == "the request failed (TooManyRedirects)"
+        assert len(hops) == httpx.AsyncClient().max_redirects + 1
+
+    async def test_only_the_content_codings_the_runtime_decodes_are_asked_for(self) -> None:
+        seen: dict[str, str | None] = {}
+
+        def _handler(request: httpx.Request) -> httpx.Response:
+            seen["accept-encoding"] = request.headers.get("accept-encoding")
+            return served_response(content=b"ok")
+
+        await fetch_file_from_url_httpx(url=SIGNED_URL, transport=httpx.MockTransport(_handler))
+
+        assert seen["accept-encoding"] == "gzip, deflate"
+
+    @pytest.mark.builds_problems_without_required_params(reason="the URL fetch knows not the input the URL came from")
+    async def test_stacked_content_codings_are_refused_before_the_body_is_read(self) -> None:
+        stream = _CountingStream(chunk_count=3)
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(url=SIGNED_URL, transport=_transport_streaming(stream, headers={"Content-Encoding": "gzip, gzip"}))
+
+        assert not isinstance(exc_info.value, RemoteFileTooLargeError)
+        assert stream.chunks_served == 0
+        caller = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert caller.code == CoreCode.INPUT_FILE_UNREADABLE
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"reason": "the server answered in a content encoding the runtime does not read"}
+
+    async def test_a_compressed_body_s_declared_length_is_not_held_against_the_decoded_cap(self) -> None:
+        """An incompressible gzip body is a little longer on the wire than decoded: only the decoded bytes count."""
+        decoded = os.urandom(100_000)
+        encoded = gzip.compress(decoded)
+        assert len(encoded) > len(decoded)
+
+        raw_bytes = await fetch_file_from_url_httpx(
+            url=SIGNED_URL,
+            max_bytes=len(decoded),
+            transport=_transport_answering(encoded, headers={"Content-Encoding": "gzip"}),
+        )
+
+        assert raw_bytes == decoded
 
     async def test_a_failure_while_the_body_streams_maps_as_before(self) -> None:
         stream = _CountingStream(chunk_count=1, failure=httpx.ReadTimeout("slow"))

@@ -47,14 +47,16 @@ Do not turn it off on a server that runs methods from people you do not trust wi
 
 `max_fetch_bytes` is the most bytes Pipelex reads from any URL it downloads, 100 MB by default. It must be at least 1, and there is no setting that turns the cap off. Whoever chooses the URL also chooses how large the file behind it is, so without a cap a single URL serving several gigabytes, or a small compressed body that expands to that size, could exhaust the memory of the process running the method, and every run that process was serving would fail with it.
 
-The download is read as a stream and checked twice:
+The download is read as a stream. Pipelex follows redirects itself and closes each redirect's response without reading its body, so only the body of the final response is ever read, and that body is checked twice:
 
-1. **The declared size.** When the server's `Content-Length` already passes the cap, the download is refused before any of the body is read. A missing `Content-Length`, or one that is not a number, skips this check.
-2. **The bytes actually read.** As the body arrives, Pipelex counts the bytes it has received and stops reading as soon as they pass the cap. The bytes are counted after decompression, so a `gzip` body that is small on the wire but large once decoded is refused for its decoded size.
+1. **The declared size.** When the response is not compressed and its `Content-Length` already passes the cap, the download is refused before any of the body is read. A missing `Content-Length`, or one that is not a number, skips this check. A compressed response skips it too, because its `Content-Length` is the compressed size and says nothing certain about the size it decodes to.
+2. **The bytes actually read.** As the body arrives, Pipelex counts the bytes it has received and stops reading as soon as they pass the cap. A compressed body is counted after decompression, and the decompression itself is bounded: each step is asked for no more than the bytes the cap still allows, so a `gzip` body that is small on the wire but enormous once decoded is refused one byte past the cap, without ever being expanded in memory.
+
+Pipelex asks for `gzip` and `deflate` only, and reads a body in one of those codings or in none. A response in any other content coding, such as `br` or `zstd`, or with several codings stacked on one another, is refused before its body is read with `input.file_unreadable`, whose reason says the server answered in a content encoding the runtime does not read. A compressed body that does not decode is refused the same way.
 
 A refusal raises `RemoteFileTooLargeError` and fails the pipe that needed the bytes, with the code `input.too_large`, whose `limit` is the cap and whose `size` is the declared length or the number of bytes read when the read stopped. The error is not retried, since the same URL would serve the same file. Its message names those two numbers and never the URL. A file an image-generation provider pointed at is the provider's answer rather than the caller's input, so a refusal there is coded `provider.response_invalid`, and where Pipelex would otherwise keep a generated image's remote URL after a failed download, it keeps the URL here too rather than storing a very large object.
 
-A step with a tighter limit of its own applies that limit to the download instead. The conversion of an Office file to PDF downloads a source at a URL under its `max_source_bytes`, described in [Document conversion](document-conversion-config.md), and reports a source past it as a conversion that is too large.
+A step with a limit of its own downloads under the smaller of that limit and `max_fetch_bytes`: a step's limit can tighten the cap, never loosen it. The conversion of an Office file to PDF downloads a source at a URL under the smaller of its `max_source_bytes`, described in [Document conversion](document-conversion-config.md), and `max_fetch_bytes`, and reports a source past it as a conversion that is too large, naming the limit that applied.
 
 Raise the cap on a self-hosted deployment whose methods read larger files from sources you trust:
 

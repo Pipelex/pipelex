@@ -14,10 +14,11 @@ class NetworkConfig(ConfigModel):
     a self-hosted deployment that reads documents from an intranet host, or whose only way out is an
     HTTP proxy, turns it off. Webhook delivery is guarded regardless of this switch.
 
-    ``max_fetch_bytes`` is the most bytes such a fetch reads, counted after the body is decoded: a
-    response declaring a larger ``Content-Length`` is refused before its body is read, and one that
-    keeps coming is cut off once it passes the cap. A caller with a tighter limit of its own, such as
-    the document conversion's ``max_source_bytes``, passes it instead.
+    ``max_fetch_bytes`` is the most bytes such a fetch reads, counted after the body is decoded: an
+    uncompressed response declaring a larger ``Content-Length`` is refused before its body is read,
+    and one that keeps coming is cut off once it passes the cap. A caller with a limit of its own,
+    such as the document conversion's ``max_source_bytes``, passes it, and the smaller of the two
+    applies: a caller can tighten the cap, never loosen it.
     """
 
     is_fetch_ssrf_guard_enabled: bool

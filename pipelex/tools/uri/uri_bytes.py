@@ -53,8 +53,8 @@ async def load_bytes_and_mime_type_from_any_uri(
         uri: A URI string (http(s)://, a local path, a data: URL, or pipelex-storage://)
         storage_provider: The storage provider that resolves pipelex-storage:// URIs.
             Required when the URI is a pipelex-storage:// URI.
-        max_bytes: The most bytes an http(s) URL's body may hold, for a caller with a tighter limit of its own, or
-            ``None`` for ``runtime.network.max_fetch_bytes``. The other kinds of URI are not fetched, and not capped here.
+        max_bytes: A limit of the caller's own on an http(s) URL's body, in bytes, which applies when it is smaller than
+            ``runtime.network.max_fetch_bytes``, or ``None`` for that cap alone. The other kinds of URI are not fetched, and not capped here.
 
     Raises:
         StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.

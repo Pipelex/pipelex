@@ -9,12 +9,13 @@ from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import ProblemView
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx, fetch_file_from_url_httpx
+from tests.unit.pipelex.tools.misc.served_response import served_response
 
 URL = "https://example.com/file.pdf"
 
 
 def _transport_answering(status_code: int, content: bytes = b"", headers: dict[str, str] | None = None) -> httpx.MockTransport:
-    return httpx.MockTransport(lambda _request: httpx.Response(status_code, content=content, headers=headers))
+    return httpx.MockTransport(lambda _request: served_response(status_code=status_code, content=content, headers=headers))
 
 
 def _transport_raising(exc: httpx.RequestError) -> httpx.MockTransport:
@@ -228,7 +229,7 @@ class TestFetchTimeout:
     def _transport_recording(seen: dict[str, object]) -> httpx.MockTransport:
         def _handler(request: httpx.Request) -> httpx.Response:
             seen["timeout"] = request.extensions.get("timeout")
-            return httpx.Response(200, content=b"ok")
+            return served_response(content=b"ok")
 
         return httpx.MockTransport(_handler)
 
