@@ -1,3 +1,4 @@
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
@@ -133,14 +134,22 @@ class RemoteFileFetchError(ToolError):
         return {"host": self.host, "reason": self.reason, "input": self.input_name}
 
 
+class RemoteFileSizeBound(StrEnum):
+    """Which of a fetch's two bounds a body passed: what it decodes to, or the compressed bytes the server sent."""
+
+    DECODED = "decoded"
+    COMPRESSED = "compressed"
+
+
 class RemoteFileTooLargeError(RemoteFileFetchError):
     """A remote file is past the most bytes a fetch reads, so its body was not read, or not read to its end.
 
-    The fetch refuses an uncompressed response whose declared ``Content-Length`` already passes the cap before reading
-    any of its body, and stops reading one that passes the cap as it streams, counting the bytes once decoded in
-    bounded steps, so a compressed body is refused one byte past the cap, for what it expands to. ``limit`` is the cap
-    and ``size`` the declared length or the decoded bytes read when the read stopped, both in bytes; for compressed input
-    that passes the cap by more than the decoder's margin without decoding past it, ``size`` is the raw bytes received.
+    The fetch refuses a response whose declared ``Content-Length`` already passes its bound before reading any of its
+    body, and stops reading one that passes it as it streams, counting the bytes once decoded in bounded steps, so a
+    compressed body is refused one byte past the cap, for what it expands to. ``bound`` says which bound fired, and
+    ``limit`` and ``size`` are in its unit: for :attr:`RemoteFileSizeBound.DECODED`, the cap and the declared or decoded
+    length; for :attr:`RemoteFileSizeBound.COMPRESSED`, the most compressed bytes the fetch accepts for that cap and the
+    compressed length declared or received, which is how input that decodes to little or nothing is stopped.
 
     A file an input or a pipe referenced is ``input.too_large`` (the default), which takes the input, the limit and the
     size; a file a provider's answer pointed at is ``provider.response_invalid``, which the provider's catch site
@@ -154,12 +163,14 @@ class RemoteFileTooLargeError(RemoteFileFetchError):
         detail="Use a smaller file, or raise [runtime.network] max_fetch_bytes if you run the runtime yourself.",
     )
 
-    def __init__(self, message: str, *, limit: int, size: int):
+    def __init__(self, message: str, *, limit: int, size: int, bound: RemoteFileSizeBound):
         super().__init__(message)
-        # The most bytes the fetch reads.
+        # The most bytes the fetch reads, in the unit of `bound`.
         self.limit = limit
         # The length the response declared, or the bytes read when the read stopped, past `limit`.
         self.size = size
+        # Which bound fired: the decoded bytes, or the compressed bytes received.
+        self.bound = bound
 
     @override
     def problem_params(self) -> dict[str, Any]:

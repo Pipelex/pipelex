@@ -7,7 +7,7 @@ from mthds.protocol.problem.registry import CoreCode
 
 from pipelex.config import fetch_max_bytes, is_fetch_ssrf_guard_enabled
 from pipelex.tools.misc.bounded_body_decoder import ACCEPTED_CONTENT_CODINGS, BoundedBodyDecoder, content_coding_of
-from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileTooLargeError
+from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.http_utils import get_user_agent
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
 
@@ -85,13 +85,14 @@ async def fetch_file_and_content_type_from_url_httpx(
 
     The body is read as a stream under a byte cap, so that a URL serving more than the runtime
     will hold cannot exhaust its memory. Redirects are followed without reading their bodies.
-    An uncompressed response whose ``Content-Length`` already passes the cap is refused before
-    any of its body is read, and the read stops as soon as the bytes received pass it. A body
-    is counted once decoded, by a decoder that never returns more than the cap allows, so a
-    compressed body is refused for what it expands to, one byte past the cap, and its raw bytes
-    are bounded too (:class:`BoundedBodyDecoder`). Only ``gzip`` and ``deflate`` are asked for and
-    read; any other content coding, or more than one, is refused, and so is a compressed body
-    that is truncated or carries trailing data.
+    A response whose ``Content-Length`` already passes its bound is refused before any of its
+    body is read: the cap for an uncompressed body, the compressed bound for a compressed one.
+    A body is counted once decoded, by a decoder that never returns more than the cap allows,
+    so a compressed body is refused for what it expands to, one byte past the cap, and its raw
+    bytes are bounded too (:class:`BoundedBodyDecoder`). Only ``gzip`` and ``deflate`` are asked
+    for and read; any other content coding, or more than one, is refused, and so is a
+    compressed body that is truncated or carries trailing data other than NUL padding after a
+    gzip member.
 
     Args:
         url: The http(s) URL to fetch.
@@ -107,7 +108,8 @@ async def fetch_file_and_content_type_from_url_httpx(
         The response body, and the declared media type or ``None``.
 
     Raises:
-        RemoteFileTooLargeError: The body, as declared or as read, is past the cap. It is a
+        RemoteFileTooLargeError: The body, as declared or as read, is past the cap, or its
+            compressed bytes past the compressed bound, which its ``bound`` names. It is a
             ``RemoteFileFetchError``, so every catch site of a failed download catches it.
         RemoteFileFetchError: The server answered with an error status, refused the
             connection, did not answer in time, redirected too many times, or answered in a
@@ -141,16 +143,10 @@ async def fetch_file_and_content_type_from_url_httpx(
             # Closing the response leaves the rest of a body cut off here unread.
             try:
                 response.raise_for_status()
-                coding = content_coding_of(headers=response.headers)
-                # The declared length is the encoded one, which says nothing sure of the decoded size of a coded body.
-                declared_length = None if coding.is_compressed else _declared_length_of(response=response)
-                if declared_length is not None and declared_length > limit:
-                    msg = (
-                        f"Could not fetch a remote file: it declares {declared_length} bytes, past the {limit} bytes a fetch reads, "
-                        "so it was not read"
-                    )
-                    raise RemoteFileTooLargeError(msg, limit=limit, size=declared_length)
-                decoder = BoundedBodyDecoder(coding=coding, limit=limit)
+                decoder = BoundedBodyDecoder(coding=content_coding_of(headers=response.headers), limit=limit)
+                declared_length = _declared_length_of(response=response)
+                if declared_length is not None:
+                    decoder.refuse_declared_length_past_bound(declared_length=declared_length)
                 async for raw_chunk in response.aiter_raw():
                     decoder.feed(chunk=raw_chunk)
                 raw_bytes = decoder.finish()

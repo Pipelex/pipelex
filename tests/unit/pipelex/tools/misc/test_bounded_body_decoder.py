@@ -6,8 +6,8 @@ import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.tools.misc.bounded_body_decoder import BoundedBodyDecoder, ContentCoding, content_coding_of
-from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileTooLargeError
+from pipelex.tools.misc.bounded_body_decoder import BoundedBodyDecoder, ContentCoding, content_coding_of, raw_bound_of
+from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileSizeBound, RemoteFileTooLargeError
 
 # The most bytes the transport hands over in one raw read.
 RAW_READ_SIZE = 64 * 1024
@@ -28,6 +28,14 @@ FIRST_THEN_SECOND = gzip.compress(b"first-") + gzip.compress(b"second")
 PATTERN = bytes(range(256)) * 400
 GZIP_OF_PATTERN = gzip.compress(PATTERN)
 ZLIB_OF_PATTERN = zlib.compress(PATTERN)
+# A raw deflate stream whose first two bytes also read as a valid zlib header: a stored block holding b"Z", then an
+# empty last block.
+RAW_DEFLATE_WITH_A_ZLIB_LOOKING_HEAD = bytes([0x78, 0x01, 0x00, 0xFE, 0xFF]) + b"Z" + bytes([0x01, 0x00, 0x00, 0xFF, 0xFF])
+NUL_PADDING = b"\x00" * 512
+
+
+def _split_points(*, body: bytes) -> list[int]:
+    return [*range(21), len(body) // 2, len(body) - 1]
 
 
 def _feed_until_refused(*, decoder: BoundedBodyDecoder, head: bytes, chunk: bytes) -> tuple[int, RemoteFileFetchError]:
@@ -158,9 +166,11 @@ class TestBoundedBodyDecoder:
 
         assert isinstance(refusal, RemoteFileTooLargeError)
         assert raw_reads == 2
-        assert refusal.limit == 1000
-        # The raw bytes received when the read stopped, which passed the cap by more than the slack.
+        # Limit and size are both compressed bytes: the raw bound, and the raw bytes received when the read stopped.
+        assert refusal.bound == RemoteFileSizeBound.COMPRESSED
+        assert refusal.limit == raw_bound_of(limit=1000)
         assert refusal.size == len(head) + raw_reads * len(chunk)
+        assert "compressed" in refusal.message
 
     @pytest.mark.parametrize(
         ("coding", "stream", "after"),
@@ -236,3 +246,50 @@ class TestBoundedBodyDecoder:
         decoder.feed(chunk=b"")
 
         assert decoder.finish() == b""
+
+    @pytest.mark.parametrize(
+        ("body", "expected"),
+        [
+            pytest.param(_zlib_compress(data=PATTERN[:5000], wbits=-zlib.MAX_WBITS), PATTERN[:5000], id="raw-deflate"),
+            pytest.param(_zlib_compress(data=PATTERN[:5000], wbits=zlib.MAX_WBITS), PATTERN[:5000], id="zlib-wrapped-deflate"),
+            pytest.param(RAW_DEFLATE_WITH_A_ZLIB_LOOKING_HEAD, b"Z", id="raw-deflate-with-a-zlib-looking-head"),
+        ],
+    )
+    def test_a_deflate_body_decodes_the_same_wherever_its_reads_split(self, body: bytes, expected: bytes) -> None:
+        """Which kind of deflate a body is cannot depend on where the network cut its first read."""
+        for split_point in _split_points(body=body):
+            decoder = BoundedBodyDecoder(coding=ContentCoding.DEFLATE, limit=1_000_000)
+            decoder.feed(chunk=body[:split_point])
+            decoder.feed(chunk=body[split_point:])
+
+            assert decoder.finish() == expected, f"split at {split_point}"
+
+    @pytest.mark.parametrize(
+        "chunks",
+        [
+            pytest.param([gzip.compress(b"hello") + NUL_PADDING], id="same-read"),
+            pytest.param([gzip.compress(b"hello"), NUL_PADDING], id="separate-read"),
+            pytest.param([gzip.compress(b"hello"), NUL_PADDING[:100], NUL_PADDING[100:]], id="several-reads"),
+        ],
+    )
+    def test_nul_padding_after_a_gzip_member_is_ignored(self, chunks: list[bytes]) -> None:
+        """Some writers pad a gzip body with NULs, which gzip.decompress skips and httpx never refused."""
+        decoder = BoundedBodyDecoder(coding=ContentCoding.GZIP, limit=1000)
+        for chunk in chunks:
+            decoder.feed(chunk=chunk)
+
+        assert decoder.finish() == b"hello"
+
+    @pytest.mark.parametrize(
+        "chunks",
+        [
+            pytest.param([gzip.compress(b"first-") + NUL_PADDING + gzip.compress(b"second")], id="same-read"),
+            pytest.param([gzip.compress(b"first-"), NUL_PADDING, gzip.compress(b"second")], id="separate-reads"),
+        ],
+    )
+    def test_nul_padding_between_gzip_members_is_ignored(self, chunks: list[bytes]) -> None:
+        decoder = BoundedBodyDecoder(coding=ContentCoding.GZIP, limit=1000)
+        for chunk in chunks:
+            decoder.feed(chunk=chunk)
+
+        assert decoder.finish() == b"first-second"

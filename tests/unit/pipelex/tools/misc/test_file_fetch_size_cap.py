@@ -12,7 +12,8 @@ from typing_extensions import override
 
 from pipelex.config import get_config
 from pipelex.errors.problem import ProblemView
-from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileTooLargeError
+from pipelex.tools.misc.bounded_body_decoder import raw_bound_of
+from pipelex.tools.misc.exceptions import RemoteFileFetchError, RemoteFileSizeBound, RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx, fetch_file_from_url_httpx, fetching_for_input
 from tests.unit.pipelex.tools.misc.served_response import served_response
 
@@ -279,7 +280,7 @@ class TestFileFetchSizeCap:
 
     async def test_junk_after_a_gzip_body_is_refused_without_reading_on(self) -> None:
         """Bytes after a gzip member are read as the next member, so junk there is refused, not consumed uncounted."""
-        stream = _CountingStream(chunk_count=50, chunk=b"\x00" * CHUNK_SIZE)
+        stream = _CountingStream(chunk_count=50, chunk=b"J" * CHUNK_SIZE)
         stream_with_member = _PrefixedStream(prefix=gzip.compress(b"hello"), rest=stream)
 
         with pytest.raises(RemoteFileFetchError) as exc_info:
@@ -290,6 +291,20 @@ class TestFileFetchSizeCap:
         assert not isinstance(exc_info.value, RemoteFileTooLargeError)
         assert exc_info.value.reason == "the server answered a compressed body that does not decode"
         assert stream.chunks_served == 1
+
+    @pytest.mark.builds_problems_without_required_params(reason="the URL fetch knows not the input the URL came from")
+    async def test_endless_nul_padding_after_a_gzip_body_is_refused_at_the_compressed_bound(self) -> None:
+        """NUL padding is skipped, never decoded, so it is the compressed bound that stops it."""
+        stream = _CountingStream(chunk_count=None, chunk=b"\x00" * CHUNK_SIZE)
+        stream_with_member = _PrefixedStream(prefix=gzip.compress(b"hello"), rest=stream)
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await fetch_file_from_url_httpx(
+                url=SIGNED_URL, max_bytes=1000, transport=_transport_streaming(stream_with_member, headers={"Content-Encoding": "gzip"})
+            )
+
+        assert exc_info.value.bound == RemoteFileSizeBound.COMPRESSED
+        assert stream.chunks_served <= raw_bound_of(limit=1000) // CHUNK_SIZE + 1
 
     async def test_a_truncated_gzip_body_is_refused(self) -> None:
         """A connection closed mid-body ends a response without a declared length, so the cut stream is what is checked."""
@@ -308,3 +323,42 @@ class TestFileFetchSizeCap:
         raw_bytes = await fetch_file_from_url_httpx(url=SIGNED_URL, transport=_transport_answering(b"", headers={"Content-Encoding": "gzip"}))
 
         assert raw_bytes == b""
+
+    @pytest.mark.builds_problems_without_required_params(reason="the URL fetch knows not the input the URL came from")
+    async def test_a_compressed_body_past_the_raw_bound_is_refused_in_compressed_bytes(self) -> None:
+        """Limit and size are both compressed bytes when it is the compressed input that passed its bound."""
+        endless_header = _PrefixedStream(prefix=b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\x03", rest=_CountingStream(chunk_count=None))
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await fetch_file_from_url_httpx(
+                url=SIGNED_URL, max_bytes=1000, transport=_transport_streaming(endless_header, headers={"Content-Encoding": "gzip"})
+            )
+
+        error = exc_info.value
+        assert error.bound == RemoteFileSizeBound.COMPRESSED
+        assert error.limit == raw_bound_of(limit=1000)
+        assert error.size > error.limit
+        caller = error.to_problem(view=ProblemView.CALLER)
+        assert caller.params is not None
+        assert caller.params.as_wire() == {"limit": raw_bound_of(limit=1000), "size": error.size}
+
+    @pytest.mark.builds_problems_without_required_params(reason="the URL fetch knows not the input the URL came from")
+    async def test_a_compressed_body_declaring_more_than_the_raw_bound_is_refused_unread(self) -> None:
+        stream = _CountingStream(chunk_count=5)
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await fetch_file_from_url_httpx(
+                url=SIGNED_URL,
+                max_bytes=1000,
+                transport=_transport_streaming(stream, headers={"Content-Encoding": "gzip", "Content-Length": "5000000000"}),
+            )
+
+        error = exc_info.value
+        assert stream.chunks_served == 0
+        assert (error.bound, error.limit, error.size) == (RemoteFileSizeBound.COMPRESSED, raw_bound_of(limit=1000), 5_000_000_000)
+
+    async def test_a_decoded_refusal_names_the_decoded_bound(self) -> None:
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await fetch_file_from_url_httpx(url=SIGNED_URL, max_bytes=1500, transport=_transport_streaming(_CountingStream(chunk_count=2)))
+
+        assert exc_info.value.bound == RemoteFileSizeBound.DECODED

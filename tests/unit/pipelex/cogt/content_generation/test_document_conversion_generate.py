@@ -35,6 +35,7 @@ from pipelex.tools.document_conversion.exceptions import (
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
+from pipelex.tools.misc.bounded_body_decoder import raw_bound_of
 from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
@@ -287,14 +288,14 @@ class TestDocumentConversionGenerate:
         assert wire.get("params") == {"input": "report", "limit": 1000, "size": len(DOCX_BYTES)}, wire
 
     @pytest.mark.parametrize(
-        ("max_source_bytes", "max_fetch_bytes", "expected_limit"),
+        ("max_source_bytes", "max_fetch_bytes", "expected_limit", "expected_setting"),
         [
-            pytest.param(1000, 100_000_000, 1000, id="the-conversion-limit-is-tighter"),
-            pytest.param(50_000_000, 3000, 3000, id="the-fetch-cap-is-tighter"),
+            pytest.param(1000, 100_000_000, 1000, "[runtime.document_conversion] max_source_bytes", id="the-conversion-limit-is-tighter"),
+            pytest.param(50_000_000, 3000, 3000, "[runtime.network] max_fetch_bytes", id="the-fetch-cap-is-tighter"),
         ],
     )
     async def test_a_url_past_the_size_limit_is_refused_before_its_body_is_read(
-        self, mocker: MockerFixture, max_source_bytes: int, max_fetch_bytes: int, expected_limit: int
+        self, mocker: MockerFixture, max_source_bytes: int, max_fetch_bytes: int, expected_limit: int, expected_setting: str
     ):
         """A source at a URL is bounded as it is fetched, by the smaller of `max_source_bytes` and the fetch's own cap."""
         converter = _StubConverter()
@@ -318,6 +319,32 @@ class TestDocumentConversionGenerate:
         wire = error.to_problem(view=ProblemView.CALLER).to_wire()
         assert wire.get("code") == CoreCode.INPUT_TOO_LARGE
         assert wire.get("params") == {"input": "report", "limit": expected_limit, "size": len(DOCX_BYTES)}, wire
+        # The advice a local CLI prints names the setting whose limit applied.
+        advice = error.advised_action()
+        assert advice is not None
+        assert expected_setting in advice.detail
+        assert expected_setting.rsplit(maxsplit=1)[-1] in error.message
+
+    async def test_a_compressed_url_past_the_raw_bound_is_refused_in_compressed_bytes(self, mocker: MockerFixture):
+        converter = _StubConverter()
+        _wire(mocker=mocker, converter=converter, max_source_bytes=1000)
+        endless_header = b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\x03" + b"A" * 200_000
+        transport = httpx.MockTransport(lambda _request: served_response(content=endless_header, headers={"Content-Encoding": "gzip"}))
+
+        async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+            return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
+
+        mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
+
+        with pytest.raises(DocumentTooLargeToConvertError) as exc_info:
+            await readable_pdf_of_document(conversion_assignment=_assignment(source_uri="https://files.example.com/report.docx"))
+
+        error = exc_info.value
+        assert converter.calls == []
+        assert error.limit == raw_bound_of(limit=1000)
+        assert "compressed" in error.message
+        wire = error.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("params") == {"input": "report", "limit": raw_bound_of(limit=1000), "size": len(endless_header)}, wire
 
     async def test_a_conversion_failure_keeps_its_code_and_names_the_input(self, mocker: MockerFixture):
         converter = _StubConverter(error=DocumentUnreadableByConverterError("The converter could not read the file.", format_key="docx"))

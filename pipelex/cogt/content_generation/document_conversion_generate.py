@@ -35,7 +35,8 @@ from typing import NamedTuple
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import DocumentConversionAssignment
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
-from pipelex.config import get_config
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
+from pipelex.config import fetch_max_bytes, get_config
 from pipelex.runtime_hub import get_optional_document_converter, get_storage_provider
 from pipelex.tools.document_conversion.document_converter_protocol import (
     EXPORT_OPTIONS_PRINTED_PAGES,
@@ -54,7 +55,7 @@ from pipelex.tools.document_conversion.exceptions import (
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin, ReadablePdf, pdf_key_of, scoped_pdf_key
-from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
+from pipelex.tools.misc.exceptions import RemoteFileSizeBound, RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
@@ -64,6 +65,9 @@ from pipelex.tools.uri.uri_bytes import load_bytes_from_any_uri
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 _PDF_CONTENT_TYPE = "application/pdf"
+# The settings that cap a source fetched from a URL, named in the advice of a refusal.
+_MAX_SOURCE_BYTES_SETTING = "[runtime.document_conversion] max_source_bytes"
+_MAX_FETCH_BYTES_SETTING = "[runtime.network] max_fetch_bytes"
 
 
 class _KeptLookup(StrEnum):
@@ -219,7 +223,8 @@ async def _load_url_source(*, source_uri: str, format_key: str, max_source_bytes
 
     The fetch applies the smaller of `max_source_bytes` and its own cap, refusing a declared length past it before reading
     the body and stopping a body that passes it as it streams; the refusal reads as the conversion's own, as a source in
-    storage past the limit does, with the limit that applied.
+    storage past the limit does, with the limit that applied, in the unit of the bound that fired, and its advice names
+    the setting that set that limit.
 
     Raises:
         DocumentTooLargeToConvertError: The source declares, or reaches as it is read, more than the limit that applied.
@@ -229,8 +234,27 @@ async def _load_url_source(*, source_uri: str, format_key: str, max_source_bytes
         with fetching_for_input(input_name=input_name):
             return await load_bytes_from_any_uri(source_uri, max_bytes=max_source_bytes)
     except RemoteFileTooLargeError as exc:
-        msg = f"The file reaches {exc.size} bytes, past the {exc.limit} bytes a fetch for a conversion to PDF reads: it was not read in full."
+        # The fetch applied the smaller of the two caps, the conversion's own when they are equal.
+        is_conversion_cap = max_source_bytes <= fetch_max_bytes()
+        setting = _MAX_SOURCE_BYTES_SETTING if is_conversion_cap else _MAX_FETCH_BYTES_SETTING
+        match exc.bound:
+            case RemoteFileSizeBound.DECODED:
+                msg = (
+                    f"The file reaches {exc.size} bytes, past the {exc.limit} bytes a fetch for a conversion to PDF reads under {setting}: "
+                    "it was not read in full."
+                )
+            case RemoteFileSizeBound.COMPRESSED:
+                msg = (
+                    f"The file's compressed body reaches {exc.size} bytes, past the {exc.limit} compressed bytes a fetch for a conversion "
+                    f"to PDF accepts under {setting}: it was not read in full."
+                )
         too_large = DocumentTooLargeToConvertError(msg, format_key=format_key, limit_kind=ConversionLimitKind.BYTES, limit=exc.limit, size=exc.size)
+        if is_conversion_cap:
+            # Left unset, the advice would be the fetch's, which names the other setting.
+            too_large.user_action = UserAction(
+                kind=UserActionKind.CHANGE_INPUT,
+                detail=f"Use a smaller file, or raise {_MAX_SOURCE_BYTES_SETTING} if you run the runtime yourself.",
+            )
         if input_name is not None:
             too_large.with_input(input_name=input_name)
         raise too_large from exc
