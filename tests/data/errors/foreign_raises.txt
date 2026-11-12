@@ -197,6 +197,7 @@ pipelex/tools/log/log_dispatch.py | LogDispatch.configure | RuntimeError | invar
 pipelex/tools/log/log_sink.py | stream_for_target | ValueError | invariant
 pipelex/tools/log/otlp_log_sink.py | OtlpLogSink.make_handler | RuntimeError | invariant
 pipelex/tools/misc/async_utils.py | gather_bounded | ValueError | invariant
+pipelex/tools/misc/file_fetch_utils.py | _send_following_redirects | TooManyRedirects | carrier
 pipelex/tools/misc/file_utils.py | mirror_dir | FileNotFoundError | tooling
 pipelex/tools/misc/file_utils.py | mirror_dir | NotADirectoryError | tooling
 pipelex/tools/misc/file_utils.py | reject_bare_str_or_path | TypeError | invariant

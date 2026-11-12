@@ -1375,6 +1375,15 @@
       "default": true,
       "open_node": false
     },
+    "runtime.network.max_fetch_bytes": {
+      "value_type": "int",
+      "required": true,
+      "default": 100000000,
+      "open_node": false,
+      "constraints": {
+        "ge": 1
+      }
+    },
     "runtime.observer": {
       "value_type": "table",
       "required": true,

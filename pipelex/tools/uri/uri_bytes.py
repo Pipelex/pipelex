@@ -40,6 +40,7 @@ async def load_bytes_and_mime_type_from_any_uri(
     uri: str,
     *,
     storage_provider: StorageProviderAbstract | None = None,
+    max_bytes: int | None = None,
 ) -> UriBytes:
     """Load the bytes a URI points at, whichever kind of URI it is, with the media type its source gives them.
 
@@ -52,9 +53,12 @@ async def load_bytes_and_mime_type_from_any_uri(
         uri: A URI string (http(s)://, a local path, a data: URL, or pipelex-storage://)
         storage_provider: The storage provider that resolves pipelex-storage:// URIs.
             Required when the URI is a pipelex-storage:// URI.
+        max_bytes: A limit of the caller's own on an http(s) URL's body, in bytes, which applies when it is smaller than
+            ``runtime.network.max_fetch_bytes``, or ``None`` for that cap alone. The other kinds of URI are not fetched, and not capped here.
 
     Raises:
         StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.
+        RemoteFileTooLargeError: The URL's body, as declared or as read, is past the cap.
         RemoteFileFetchError: The server answered with an error status, refused the connection, or did not answer in time.
         SsrfBlockedError: The destination, or a redirect hop's, is a private, loopback, link-local or metadata address.
     """
@@ -66,7 +70,7 @@ async def load_bytes_and_mime_type_from_any_uri(
             raw_bytes = base64.b64decode(resolved_uri.base64_data)
             declared_mime_type = resolved_uri.mime_type
         case ResolvedHttpUrl():
-            raw_bytes, declared_mime_type = await fetch_file_and_content_type_from_url_httpx(resolved_uri.url)
+            raw_bytes, declared_mime_type = await fetch_file_and_content_type_from_url_httpx(resolved_uri.url, max_bytes=max_bytes)
         case ResolvedLocalPath():
             raw_bytes = await load_binary_async(path=Path(resolved_uri.path))
             declared_mime_type = None
@@ -83,13 +87,17 @@ async def load_bytes_from_any_uri(
     uri: str,
     *,
     storage_provider: StorageProviderAbstract | None = None,
+    max_bytes: int | None = None,
 ) -> bytes:
     """Load the bytes a URI points at, whichever kind of URI it is, for a caller that has no use for their media type.
 
+    ``max_bytes`` caps an http(s) URL's body as :func:`load_bytes_and_mime_type_from_any_uri` says.
+
     Raises:
         StorageNotConfiguredError: If the URI is a pipelex-storage:// URI and no storage provider is given.
+        RemoteFileTooLargeError: The URL's body, as declared or as read, is past the cap.
         RemoteFileFetchError: The server answered with an error status, refused the connection, or did not answer in time.
         SsrfBlockedError: The destination, or a redirect hop's, is a private, loopback, link-local or metadata address.
     """
-    loaded = await load_bytes_and_mime_type_from_any_uri(uri, storage_provider=storage_provider)
+    loaded = await load_bytes_and_mime_type_from_any_uri(uri, storage_provider=storage_provider, max_bytes=max_bytes)
     return loaded.data

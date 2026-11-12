@@ -338,6 +338,7 @@ PromptImageFormatError | input.file_type_unsupported
 QualifiedRefError | method.schema_violation
 ReadinessCheckError | runtime.misconfigured
 RemoteFileFetchError | one of input.file_unreadable, input.url_unreachable, provider.response_invalid
+RemoteFileTooLargeError | one of input.too_large, provider.response_invalid
 ReservedServiceErrorCodeError | pipelex.plugin.broken
 RetiredPluginEntryPointGroupError | pipelex.plugin.broken
 RoutingProfileBlueprintValueError | pipelex.config.invalid

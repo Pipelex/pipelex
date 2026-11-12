@@ -132,6 +132,8 @@ Tabular references use the same relative-path resolution, but v1 reads local tab
 
 Callers that don't load from a file — the Python API and the hosted client — should pass absolute URLs or storage URIs, since there is no inputs-file directory to resolve against.
 
+A file given as an `http(s)` URL is downloaded by the step that reads it, and the download reads at most `[runtime.network] max_fetch_bytes`, 100 MB by default ([Network configuration](../../configuration/config-technical/network-config.md#how-much-a-download-reads)), or the step's own limit when it is smaller, such as the `max_source_bytes` of an Office file converted to PDF. A larger file fails the step with `input.too_large`, whose `params` name the input, the `limit` and the `size` the file declared or reached, in bytes; an uncompressed body whose declared size passes the limit is refused before anything is read, and any other body is cut off once it passes the limit, a compressed one counted at its decoded size, while its compressed bytes are held to the limit plus 64 KiB, a bound whose `limit` and `size` are in compressed bytes. To use a larger file, upload it and pass its storage reference, or, on a deployment you run, raise the limit.
+
 ## The explicit format (escape hatch)
 
 The explicit envelope `{"concept": "...", "content": ...}` gives you direct control over which concept a value is interpreted as. It is now **compatibility-checked**: the concept you name must be compatible with the input's declared concept, otherwise the run fails with a clear error.

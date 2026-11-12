@@ -1,15 +1,18 @@
 import base64
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import httpx
 import pytest
 from pytest_mock import MockerFixture
 
+from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.storage.exceptions import StorageNotConfiguredError
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract, StoredData
 from pipelex.tools.uri import uri_bytes
 from pipelex.tools.uri.uri_bytes import UriBytes, load_bytes_and_mime_type_from_any_uri, load_bytes_from_any_uri
+from tests.unit.pipelex.tools.misc.served_response import served_response
 
 CSS_BYTES = b"body { color: navy; }"
 STYLESHEET_URL = "https://fonts.example.com/css2?family=Inter"
@@ -23,8 +26,8 @@ def _serve_from(*, mocker: MockerFixture, response: httpx.Response) -> None:
     """Route the loader's fetch through a transport answering `response`, so the real header handling runs."""
     transport = httpx.MockTransport(lambda _request: response)
 
-    async def _fetch_through_transport(url: str, **_kwargs: object) -> tuple[bytes, str | None]:
-        return await fetch_file_and_content_type_from_url_httpx(url, transport=transport)
+    async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+        return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
 
     mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
 
@@ -35,14 +38,14 @@ class TestLoadBytesAndMimeTypeFromAnyUri:
 
     async def test_an_https_url_returns_the_type_the_response_declares(self, mocker: MockerFixture) -> None:
         """A URL with no extension still says what it serves: the response's `Content-Type`, bare and lowercased."""
-        _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES, headers={"Content-Type": "Text/CSS; charset=utf-8"}))
+        _serve_from(mocker=mocker, response=served_response(content=CSS_BYTES, headers={"Content-Type": "Text/CSS; charset=utf-8"}))
 
         loaded = await load_bytes_and_mime_type_from_any_uri(STYLESHEET_URL)
 
         assert loaded == UriBytes(data=CSS_BYTES, mime_type="text/css")
 
     async def test_an_https_url_whose_response_declares_no_type_returns_none(self, mocker: MockerFixture) -> None:
-        _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES))
+        _serve_from(mocker=mocker, response=served_response(content=CSS_BYTES))
 
         loaded = await load_bytes_and_mime_type_from_any_uri(STYLESHEET_URL)
 
@@ -50,7 +53,7 @@ class TestLoadBytesAndMimeTypeFromAnyUri:
 
     async def test_a_declared_octet_stream_is_returned_as_declared(self, mocker: MockerFixture) -> None:
         """A generic type says nothing, but deciding so is the engine's call: the loader reports it unchanged."""
-        _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES, headers={"Content-Type": "application/octet-stream"}))
+        _serve_from(mocker=mocker, response=served_response(content=CSS_BYTES, headers={"Content-Type": "application/octet-stream"}))
 
         loaded = await load_bytes_and_mime_type_from_any_uri(STYLESHEET_URL)
 
@@ -105,6 +108,23 @@ class TestLoadBytesAndMimeTypeFromAnyUri:
         assert loaded == UriBytes(data=CSS_BYTES, mime_type=None)
 
     async def test_the_bytes_only_loader_returns_the_same_bytes(self, mocker: MockerFixture) -> None:
-        _serve_from(mocker=mocker, response=httpx.Response(200, content=CSS_BYTES, headers={"Content-Type": "text/css"}))
+        _serve_from(mocker=mocker, response=served_response(content=CSS_BYTES, headers={"Content-Type": "text/css"}))
 
         assert await load_bytes_from_any_uri(STYLESHEET_URL) == CSS_BYTES
+
+    @pytest.mark.parametrize(
+        "loader",
+        [
+            pytest.param(load_bytes_and_mime_type_from_any_uri, id="with-mime-type"),
+            pytest.param(load_bytes_from_any_uri, id="bytes-only"),
+        ],
+    )
+    async def test_a_caller_s_cap_reaches_the_url_fetch(self, mocker: MockerFixture, loader: Callable[..., Awaitable[object]]) -> None:
+        """A caller with a tighter limit of its own passes it, and the fetch refuses a body past it."""
+        _serve_from(mocker=mocker, response=served_response(content=CSS_BYTES, headers={"Content-Type": "text/css"}))
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await loader(STYLESHEET_URL, max_bytes=len(CSS_BYTES) - 1)
+
+        assert exc_info.value.limit == len(CSS_BYTES) - 1
+        assert exc_info.value.size == len(CSS_BYTES)
