@@ -1,3 +1,4 @@
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
@@ -131,6 +132,49 @@ class RemoteFileFetchError(ToolError):
     @override
     def problem_params(self) -> dict[str, Any]:
         return {"host": self.host, "reason": self.reason, "input": self.input_name}
+
+
+class RemoteFileSizeBound(StrEnum):
+    """Which of a fetch's two bounds a body passed: what it decodes to, or the compressed bytes the server sent."""
+
+    DECODED = "decoded"
+    COMPRESSED = "compressed"
+
+
+class RemoteFileTooLargeError(RemoteFileFetchError):
+    """A remote file is past the most bytes a fetch reads, so its body was not read, or not read to its end.
+
+    The fetch refuses a response whose declared ``Content-Length`` already passes its bound before reading any of its
+    body, and stops reading one that passes it as it streams, counting the bytes once decoded in bounded steps, so a
+    compressed body is refused one byte past the cap, for what it expands to. ``bound`` says which bound fired, and
+    ``limit`` and ``size`` are in its unit: for :attr:`RemoteFileSizeBound.DECODED`, the cap and the declared or decoded
+    length; for :attr:`RemoteFileSizeBound.COMPRESSED`, the most compressed bytes the fetch accepts for that cap and the
+    compressed length declared or received, which is how input that decodes to little or nothing is stopped.
+
+    A file an input or a pipe referenced is ``input.too_large`` (the default), which takes the input, the limit and the
+    size; a file a provider's answer pointed at is ``provider.response_invalid``, which the provider's catch site
+    chooses and which declares none of them. Being a :class:`RemoteFileFetchError`, it is caught wherever a failed
+    download is, and a fallback that keeps a remote URL rather than its bytes keeps it here too.
+    """
+
+    error_code = ErrorCodeSet(default=CoreCode.INPUT_TOO_LARGE, others=(CoreCode.PROVIDER_RESPONSE_INVALID,))
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Use a smaller file, or raise [runtime.network] max_fetch_bytes if you run the runtime yourself.",
+    )
+
+    def __init__(self, message: str, *, limit: int, size: int, bound: RemoteFileSizeBound):
+        super().__init__(message)
+        # The most bytes the fetch reads, in the unit of `bound`.
+        self.limit = limit
+        # The length the response declared, or the bytes read when the read stopped, past `limit`.
+        self.size = size
+        # Which bound fired: the decoded bytes, or the compressed bytes received.
+        self.bound = bound
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {**super().problem_params(), "limit": self.limit, "size": self.size}
 
 
 class SemVerError(ToolError):

@@ -9,6 +9,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
@@ -16,6 +17,7 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.assignment_models import DocumentConversionAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.content_generation.document_conversion_generate import readable_pdf_of_document
+from pipelex.config import get_config
 from pipelex.errors.problem import ProblemView
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -26,14 +28,20 @@ from pipelex.tools.document_conversion.document_converter_protocol import (
     ConvertedPdf,
 )
 from pipelex.tools.document_conversion.exceptions import (
+    ConversionLimitKind,
     DocumentConverterMisconfiguredError,
     DocumentTooLargeToConvertError,
     DocumentUnreadableByConverterError,
     KeptPdfConflictError,
 )
 from pipelex.tools.document_conversion.readable_pdf import PdfOrigin
+from pipelex.tools.misc.bounded_body_decoder import raw_bound_of
+from pipelex.tools.misc.exceptions import RemoteFileTooLargeError
+from pipelex.tools.misc.file_fetch_utils import fetch_file_and_content_type_from_url_httpx
 from pipelex.tools.pdf.exceptions import PdfDocumentUnreadableError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.tools.uri import uri_bytes
+from tests.unit.pipelex.tools.misc.served_response import served_response
 
 _MODULE = "pipelex.cogt.content_generation.document_conversion_generate"
 PDF_BYTES = Path("tests/data/documents/Job-Offer.pdf").read_bytes()
@@ -278,6 +286,65 @@ class TestDocumentConversionGenerate:
         wire = exc_info.value.to_problem(view=ProblemView.CALLER).to_wire()
         assert wire.get("code") == CoreCode.INPUT_TOO_LARGE
         assert wire.get("params") == {"input": "report", "limit": 1000, "size": len(DOCX_BYTES)}, wire
+
+    @pytest.mark.parametrize(
+        ("max_source_bytes", "max_fetch_bytes", "expected_limit", "expected_setting"),
+        [
+            pytest.param(1000, 100_000_000, 1000, "[runtime.document_conversion] max_source_bytes", id="the-conversion-limit-is-tighter"),
+            pytest.param(50_000_000, 3000, 3000, "[runtime.network] max_fetch_bytes", id="the-fetch-cap-is-tighter"),
+        ],
+    )
+    async def test_a_url_past_the_size_limit_is_refused_before_its_body_is_read(
+        self, mocker: MockerFixture, max_source_bytes: int, max_fetch_bytes: int, expected_limit: int, expected_setting: str
+    ):
+        """A source at a URL is bounded as it is fetched, by the smaller of `max_source_bytes` and the fetch's own cap."""
+        converter = _StubConverter()
+        _wire(mocker=mocker, converter=converter, max_source_bytes=max_source_bytes)
+        mocker.patch.object(get_config().runtime.network, "max_fetch_bytes", max_fetch_bytes)
+        transport = httpx.MockTransport(lambda _request: served_response(content=DOCX_BYTES))
+
+        async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+            return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
+
+        mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
+
+        with pytest.raises(DocumentTooLargeToConvertError) as exc_info:
+            await readable_pdf_of_document(conversion_assignment=_assignment(source_uri="https://files.example.com/report.docx"))
+
+        error = exc_info.value
+        assert converter.calls == []
+        assert isinstance(error.__cause__, RemoteFileTooLargeError)
+        assert (error.limit_kind, error.limit, error.size) == (ConversionLimitKind.BYTES, expected_limit, len(DOCX_BYTES))
+        assert f"past the {expected_limit} bytes" in error.message
+        wire = error.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("code") == CoreCode.INPUT_TOO_LARGE
+        assert wire.get("params") == {"input": "report", "limit": expected_limit, "size": len(DOCX_BYTES)}, wire
+        # The advice a local CLI prints names the setting whose limit applied.
+        advice = error.advised_action()
+        assert advice is not None
+        assert expected_setting in advice.detail
+        assert expected_setting.rsplit(maxsplit=1)[-1] in error.message
+
+    async def test_a_compressed_url_past_the_raw_bound_is_refused_in_compressed_bytes(self, mocker: MockerFixture):
+        converter = _StubConverter()
+        _wire(mocker=mocker, converter=converter, max_source_bytes=1000)
+        endless_header = b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\x03" + b"A" * 200_000
+        transport = httpx.MockTransport(lambda _request: served_response(content=endless_header, headers={"Content-Encoding": "gzip"}))
+
+        async def _fetch_through_transport(url: str, *, max_bytes: int | None = None) -> tuple[bytes, str | None]:
+            return await fetch_file_and_content_type_from_url_httpx(url, max_bytes=max_bytes, transport=transport)
+
+        mocker.patch.object(uri_bytes, "fetch_file_and_content_type_from_url_httpx", _fetch_through_transport)
+
+        with pytest.raises(DocumentTooLargeToConvertError) as exc_info:
+            await readable_pdf_of_document(conversion_assignment=_assignment(source_uri="https://files.example.com/report.docx"))
+
+        error = exc_info.value
+        assert converter.calls == []
+        assert error.limit == raw_bound_of(limit=1000)
+        assert "compressed" in error.message
+        wire = error.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("params") == {"input": "report", "limit": raw_bound_of(limit=1000), "size": len(endless_header)}, wire
 
     async def test_a_conversion_failure_keeps_its_code_and_names_the_input(self, mocker: MockerFixture):
         converter = _StubConverter(error=DocumentUnreadableByConverterError("The converter could not read the file.", format_key="docx"))

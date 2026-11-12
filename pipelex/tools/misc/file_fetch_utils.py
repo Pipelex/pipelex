@@ -2,10 +2,11 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 import httpx
-from httpx import USE_CLIENT_DEFAULT, Response, Timeout
+from httpx import USE_CLIENT_DEFAULT, Timeout
 from mthds.protocol.problem.registry import CoreCode
 
-from pipelex.config import is_fetch_ssrf_guard_enabled
+from pipelex.config import fetch_max_bytes, is_fetch_ssrf_guard_enabled
+from pipelex.tools.misc.bounded_body_decoder import ACCEPTED_CONTENT_CODINGS, BoundedBodyDecoder, content_coding_of
 from pipelex.tools.misc.exceptions import RemoteFileFetchError
 from pipelex.tools.misc.http_utils import get_user_agent
 from pipelex.tools.network.ssrf_guard import SsrfGuardedTransport
@@ -23,9 +24,48 @@ def _host_of(*, url: str) -> str | None:
         return None
 
 
+def _declared_length_of(*, response: httpx.Response) -> int | None:
+    """The body length the response declares, or ``None`` when it declares none or one that does not parse."""
+    content_length = response.headers.get("content-length")
+    if content_length is None:
+        return None
+    try:
+        return int(content_length)
+    except ValueError:
+        return None
+
+
+async def _send_following_redirects(*, client: httpx.AsyncClient, request: httpx.Request) -> httpx.Response:
+    """Send ``request`` and follow its redirects by hand, closing each hop's response without reading its body.
+
+    httpx following the redirects itself reads every hop's body whole, uncapped, so a redirect answered with a huge or
+    compressed body would get past the cap. Each hop is still sent through the client's transport, so the SSRF guard
+    vets it, and the next request is the one httpx builds, with its method rewrite and its cross-origin header stripping.
+
+    Returns:
+        The final response, streamed and unread, which the caller closes.
+
+    Raises:
+        httpx.TooManyRedirects: The chain is longer than the client's ``max_redirects``.
+    """
+    redirect_count = 0
+    while True:
+        response = await client.send(request, stream=True, follow_redirects=False)
+        next_request = response.next_request
+        if next_request is None:
+            return response
+        await response.aclose()
+        redirect_count += 1
+        if redirect_count > client.max_redirects:
+            msg = "Exceeded maximum allowed redirects."
+            raise httpx.TooManyRedirects(msg, request=next_request)
+        request = next_request
+
+
 async def fetch_file_and_content_type_from_url_httpx(
     url: str,
     *,
+    max_bytes: int | None = None,
     request_timeout: int | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> tuple[bytes, str | None]:
@@ -43,8 +83,22 @@ async def fetch_file_and_content_type_from_url_httpx(
     The guard dials directly, so ``HTTP_PROXY`` / ``HTTPS_PROXY`` are honoured only with the
     switch off.
 
+    The body is read as a stream under a byte cap, so that a URL serving more than the runtime
+    will hold cannot exhaust its memory. Redirects are followed without reading their bodies.
+    A response whose ``Content-Length`` already passes its bound is refused before any of its
+    body is read: the cap for an uncompressed body, the compressed bound for a compressed one.
+    A body is counted once decoded, by a decoder that never returns more than the cap allows,
+    so a compressed body is refused for what it expands to, one byte past the cap, and its raw
+    bytes are bounded too (:class:`BoundedBodyDecoder`). Only ``gzip`` and ``deflate`` are asked
+    for and read; any other content coding, or more than one, is refused, and so is a
+    compressed body that is truncated or carries trailing data other than NUL padding after a
+    gzip member.
+
     Args:
         url: The http(s) URL to fetch.
+        max_bytes: A tighter limit of the caller's own, in bytes. The cap is the smaller of it and
+            ``runtime.network.max_fetch_bytes``, which alone applies when it is ``None``: a caller
+            can tighten the cap, never loosen it, and there is no uncapped fetch.
         request_timeout: Seconds allowed for each phase of the request, or ``None`` for
             httpx's default.
         transport: A test seam, for a ``MockTransport``. Production code never passes it:
@@ -54,8 +108,13 @@ async def fetch_file_and_content_type_from_url_httpx(
         The response body, and the declared media type or ``None``.
 
     Raises:
+        RemoteFileTooLargeError: The body, as declared or as read, is past the cap, or its
+            compressed bytes past the compressed bound, which its ``bound`` names. It is a
+            ``RemoteFileFetchError``, so every catch site of a failed download catches it.
         RemoteFileFetchError: The server answered with an error status, refused the
-            connection, or did not answer in time, or the URL does not parse.
+            connection, did not answer in time, redirected too many times, or answered in a
+            content coding the runtime does not read or a compressed body that does not decode,
+            or the URL does not parse.
         SsrfBlockedError: The destination, or a redirect hop's, is not a globally routable
             address. It is a security error and deliberately not a ``RemoteFileFetchError``,
             so no caller's fallback for a failed download absorbs it.
@@ -73,14 +132,27 @@ async def fetch_file_and_content_type_from_url_httpx(
     # the code that invites a retry, `input.url_unreachable`, takes it as its declared `host` parameter, and a code a
     # catch site chooses instead, which does not declare it, is given nothing it would refuse.
     host = _host_of(url=url)
+    limit = fetch_max_bytes() if max_bytes is None else min(max_bytes, fetch_max_bytes())
+    raw_bytes: bytes
+    declared_content_type: str | None
     try:
-        async with httpx.AsyncClient(headers={"User-Agent": user_agent}, transport=transport) as client:
-            response: Response = await client.get(
-                url,
-                timeout=timeout,
-                follow_redirects=True,
-            )
-            response.raise_for_status()
+        async with httpx.AsyncClient(headers={"User-Agent": user_agent, "Accept-Encoding": ACCEPTED_CONTENT_CODINGS}, transport=transport) as client:
+            # Built here, where the timeout is chosen: every redirect request httpx builds from it keeps its timeout.
+            request = client.build_request("GET", url, timeout=timeout)
+            response = await _send_following_redirects(client=client, request=request)
+            # Closing the response leaves the rest of a body cut off here unread.
+            try:
+                response.raise_for_status()
+                decoder = BoundedBodyDecoder(coding=content_coding_of(headers=response.headers), limit=limit)
+                declared_length = _declared_length_of(response=response)
+                if declared_length is not None:
+                    decoder.refuse_declared_length_past_bound(declared_length=declared_length)
+                async for raw_chunk in response.aiter_raw():
+                    decoder.feed(chunk=raw_chunk)
+                raw_bytes = decoder.finish()
+                declared_content_type = response.headers.get("content-type")
+            finally:
+                await response.aclose()
     except httpx.HTTPStatusError as exc:
         status_code = exc.response.status_code
         reason = f"the server answered HTTP {status_code}"
@@ -106,25 +178,28 @@ async def fetch_file_and_content_type_from_url_httpx(
         msg = f"Could not fetch a remote file: {reason}"
         raise RemoteFileFetchError(msg, reason=reason) from exc
 
-    declared_content_type: str | None = response.headers.get("content-type")
     if declared_content_type is None:
-        return response.content, None
+        return raw_bytes, None
     media_type = declared_content_type.split(";")[0].strip().lower()
-    return response.content, media_type or None
+    return raw_bytes, media_type or None
 
 
 async def fetch_file_from_url_httpx(
     url: str,
     *,
+    max_bytes: int | None = None,
     request_timeout: int | None = None,
     transport: httpx.AsyncBaseTransport | None = None,
 ) -> bytes:
     """Fetch the bytes at ``url``, or raise :class:`RemoteFileFetchError` saying why not.
 
-    Guarded against private destinations like
-    :func:`fetch_file_and_content_type_from_url_httpx`, whose ``transport`` test seam it forwards.
+    Guarded against private destinations and read under a byte cap, which ``max_bytes`` may
+    tighten but never loosen, like
+    :func:`fetch_file_and_content_type_from_url_httpx`, whose ``max_bytes`` and ``transport``
+    test seam it forwards.
 
     Raises:
+        RemoteFileTooLargeError: The body, as declared or as read, is past the cap.
         RemoteFileFetchError: The server answered with an error status, refused the
             connection, or did not answer in time.
         SsrfBlockedError: The destination, or a redirect hop's, is not a globally routable
@@ -132,6 +207,7 @@ async def fetch_file_from_url_httpx(
     """
     raw_bytes, _ = await fetch_file_and_content_type_from_url_httpx(
         url,
+        max_bytes=max_bytes,
         request_timeout=request_timeout,
         transport=transport,
     )
