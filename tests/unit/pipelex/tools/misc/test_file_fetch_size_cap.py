@@ -38,6 +38,20 @@ class _CountingStream(httpx.AsyncByteStream):
             raise self.failure
 
 
+class _PrefixedStream(httpx.AsyncByteStream):
+    """A body served as ``prefix``, then as what ``rest`` serves."""
+
+    def __init__(self, *, prefix: bytes, rest: httpx.AsyncByteStream):
+        self.prefix = prefix
+        self.rest = rest
+
+    @override
+    async def __aiter__(self) -> AsyncIterator[bytes]:
+        yield self.prefix
+        async for chunk in self.rest:
+            yield chunk
+
+
 def _transport_streaming(stream: httpx.AsyncByteStream, headers: dict[str, str] | None = None) -> httpx.MockTransport:
     return httpx.MockTransport(lambda _request: httpx.Response(200, headers=headers, stream=stream))
 
@@ -262,3 +276,35 @@ class TestFileFetchSizeCap:
         assert operator.code == CoreCode.PROVIDER_RESPONSE_INVALID
         assert (operator.params.as_wire() if operator.params is not None else {}) == {}
         assert [record.getMessage() for record in caplog.records if "does not declare" in record.getMessage()] == []
+
+    async def test_junk_after_a_gzip_body_is_refused_without_reading_on(self) -> None:
+        """Bytes after a gzip member are read as the next member, so junk there is refused, not consumed uncounted."""
+        stream = _CountingStream(chunk_count=50, chunk=b"\x00" * CHUNK_SIZE)
+        stream_with_member = _PrefixedStream(prefix=gzip.compress(b"hello"), rest=stream)
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(
+                url=SIGNED_URL, max_bytes=1000, transport=_transport_streaming(stream_with_member, headers={"Content-Encoding": "gzip"})
+            )
+
+        assert not isinstance(exc_info.value, RemoteFileTooLargeError)
+        assert exc_info.value.reason == "the server answered a compressed body that does not decode"
+        assert stream.chunks_served == 1
+
+    async def test_a_truncated_gzip_body_is_refused(self) -> None:
+        """A connection closed mid-body ends a response without a declared length, so the cut stream is what is checked."""
+        compressed = gzip.compress(bytes(range(256)) * 400)
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            await fetch_file_from_url_httpx(
+                url=SIGNED_URL,
+                transport=_transport_streaming(httpx.ByteStream(compressed[: len(compressed) // 2]), headers={"Content-Encoding": "gzip"}),
+            )
+
+        assert not isinstance(exc_info.value, RemoteFileTooLargeError)
+        assert exc_info.value.reason == "the server answered a compressed body that does not decode"
+
+    async def test_an_empty_body_labelled_gzip_is_empty(self) -> None:
+        raw_bytes = await fetch_file_from_url_httpx(url=SIGNED_URL, transport=_transport_answering(b"", headers={"Content-Encoding": "gzip"}))
+
+        assert raw_bytes == b""

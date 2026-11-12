@@ -88,8 +88,10 @@ async def fetch_file_and_content_type_from_url_httpx(
     An uncompressed response whose ``Content-Length`` already passes the cap is refused before
     any of its body is read, and the read stops as soon as the bytes received pass it. A body
     is counted once decoded, by a decoder that never returns more than the cap allows, so a
-    compressed body is refused for what it expands to, one byte past the cap. Only ``gzip`` and
-    ``deflate`` are asked for and read; any other content coding, or more than one, is refused.
+    compressed body is refused for what it expands to, one byte past the cap, and its raw bytes
+    are bounded too (:class:`BoundedBodyDecoder`). Only ``gzip`` and ``deflate`` are asked for and
+    read; any other content coding, or more than one, is refused, and so is a compressed body
+    that is truncated or carries trailing data.
 
     Args:
         url: The http(s) URL to fetch.

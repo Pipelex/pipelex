@@ -139,7 +139,8 @@ class RemoteFileTooLargeError(RemoteFileFetchError):
     The fetch refuses an uncompressed response whose declared ``Content-Length`` already passes the cap before reading
     any of its body, and stops reading one that passes the cap as it streams, counting the bytes once decoded in
     bounded steps, so a compressed body is refused one byte past the cap, for what it expands to. ``limit`` is the cap
-    and ``size`` the declared length or the bytes read when the read stopped, both in bytes.
+    and ``size`` the declared length or the decoded bytes read when the read stopped, both in bytes; for compressed input
+    that passes the cap by more than the decoder's margin without decoding past it, ``size`` is the raw bytes received.
 
     A file an input or a pipe referenced is ``input.too_large`` (the default), which takes the input, the limit and the
     size; a file a provider's answer pointed at is ``provider.response_invalid``, which the provider's catch site

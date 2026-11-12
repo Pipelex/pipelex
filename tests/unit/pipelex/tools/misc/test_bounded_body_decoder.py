@@ -1,3 +1,4 @@
+import gzip
 import os
 import zlib
 
@@ -16,6 +17,31 @@ def _decode_in_raw_reads(*, decoder: BoundedBodyDecoder, body: bytes) -> bytes:
     for start in range(0, len(body), RAW_READ_SIZE):
         decoder.feed(chunk=body[start : start + RAW_READ_SIZE])
     return decoder.finish()
+
+
+# A regression that stops refusing must fail the test rather than hang it: no test feeds more raw reads than this.
+MAX_RAW_READS = 50
+# A deflate stored block that holds nothing and is not the last: five bytes that decode to nothing, forever.
+EMPTY_STORED_BLOCK = b"\x00\x00\x00\xff\xff"
+UNDECODABLE_REASON = "the server answered a compressed body that does not decode"
+FIRST_THEN_SECOND = gzip.compress(b"first-") + gzip.compress(b"second")
+PATTERN = bytes(range(256)) * 400
+GZIP_OF_PATTERN = gzip.compress(PATTERN)
+ZLIB_OF_PATTERN = zlib.compress(PATTERN)
+
+
+def _feed_until_refused(*, decoder: BoundedBodyDecoder, head: bytes, chunk: bytes) -> tuple[int, RemoteFileFetchError]:
+    """Feed ``head``, then ``chunk`` again and again, until the decoder refuses: how many reads of ``chunk`` it took, and the refusal."""
+    raw_reads = 0
+    try:
+        decoder.feed(chunk=head)
+        for _ in range(MAX_RAW_READS):
+            raw_reads += 1
+            decoder.feed(chunk=chunk)
+        decoder.finish()
+    except RemoteFileFetchError as exc:
+        return raw_reads, exc
+    pytest.fail(f"The decoder took {MAX_RAW_READS} raw reads without refusing")
 
 
 def _zlib_compress(*, data: bytes, wbits: int) -> bytes:
@@ -117,3 +143,96 @@ class TestBoundedBodyDecoder:
         assert not isinstance(exc_info.value, RemoteFileTooLargeError)
         assert exc_info.value.resolve_error_code() == CoreCode.INPUT_FILE_UNREADABLE
         assert exc_info.value.reason == "the server answered a compressed body that does not decode"
+
+    @pytest.mark.parametrize(
+        ("coding", "head", "chunk"),
+        [
+            pytest.param(ContentCoding.DEFLATE, b"", EMPTY_STORED_BLOCK * (RAW_READ_SIZE // 5), id="raw-deflate-empty-blocks"),
+            pytest.param(ContentCoding.DEFLATE, b"\x78\x9c", EMPTY_STORED_BLOCK * (RAW_READ_SIZE // 5), id="zlib-wrapped-empty-blocks"),
+            pytest.param(ContentCoding.GZIP, b"\x1f\x8b\x08\x08\x00\x00\x00\x00\x00\x03", b"A" * RAW_READ_SIZE, id="gzip-endless-file-name"),
+        ],
+    )
+    def test_input_that_decodes_to_nothing_is_refused_once_it_passes_the_slack(self, coding: ContentCoding, head: bytes, chunk: bytes) -> None:
+        """Raw bytes count too, so a body that keeps coming without decoding to anything cannot hold the read open."""
+        raw_reads, refusal = _feed_until_refused(decoder=BoundedBodyDecoder(coding=coding, limit=1000), head=head, chunk=chunk)
+
+        assert isinstance(refusal, RemoteFileTooLargeError)
+        assert raw_reads == 2
+        assert refusal.limit == 1000
+        # The raw bytes received when the read stopped, which passed the cap by more than the slack.
+        assert refusal.size == len(head) + raw_reads * len(chunk)
+
+    @pytest.mark.parametrize(
+        ("coding", "stream", "after"),
+        [
+            pytest.param(ContentCoding.GZIP, gzip.compress(b"hello"), b"\xff" * RAW_READ_SIZE, id="junk-after-gzip"),
+            pytest.param(
+                ContentCoding.DEFLATE,
+                _zlib_compress(data=b"hello", wbits=zlib.MAX_WBITS),
+                _zlib_compress(data=b"again", wbits=zlib.MAX_WBITS),
+                id="a-second-stream-after-zlib-wrapped-deflate",
+            ),
+            pytest.param(
+                ContentCoding.DEFLATE,
+                _zlib_compress(data=b"hello", wbits=-zlib.MAX_WBITS),
+                _zlib_compress(data=b"again", wbits=-zlib.MAX_WBITS),
+                id="a-second-stream-after-raw-deflate",
+            ),
+        ],
+    )
+    def test_what_follows_a_complete_stream_is_refused_at_once(self, coding: ContentCoding, stream: bytes, after: bytes) -> None:
+        """A gzip body's next member must be gzip; a deflate body has no next member, so anything after its end is refused."""
+        raw_reads, refusal = _feed_until_refused(decoder=BoundedBodyDecoder(coding=coding, limit=1000), head=stream, chunk=after)
+
+        assert not isinstance(refusal, RemoteFileTooLargeError)
+        assert refusal.reason == UNDECODABLE_REASON
+        assert raw_reads == 1
+
+    @pytest.mark.parametrize(
+        "chunks",
+        [
+            pytest.param([FIRST_THEN_SECOND], id="one-read"),
+            pytest.param([gzip.compress(b"first-"), gzip.compress(b"second")], id="one-read-per-member"),
+            pytest.param([FIRST_THEN_SECOND[:25], FIRST_THEN_SECOND[25:40], FIRST_THEN_SECOND[40:]], id="reads-cutting-the-members"),
+        ],
+    )
+    def test_every_member_of_a_multi_member_gzip_body_is_read(self, chunks: list[bytes]) -> None:
+        decoder = BoundedBodyDecoder(coding=ContentCoding.GZIP, limit=1000)
+        for chunk in chunks:
+            decoder.feed(chunk=chunk)
+
+        assert decoder.finish() == b"first-second"
+
+    def test_the_cap_spans_every_member_of_a_gzip_body(self) -> None:
+        decoder = BoundedBodyDecoder(coding=ContentCoding.GZIP, limit=1000)
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            decoder.feed(chunk=gzip.compress(b"x" * 600) + gzip.compress(b"y" * 600))
+
+        assert (exc_info.value.limit, exc_info.value.size) == (1000, 1001)
+
+    @pytest.mark.parametrize(
+        ("coding", "truncated"),
+        [
+            pytest.param(ContentCoding.GZIP, GZIP_OF_PATTERN[:-8], id="gzip-without-its-trailer"),
+            pytest.param(ContentCoding.GZIP, GZIP_OF_PATTERN[: len(GZIP_OF_PATTERN) // 2], id="half-a-gzip-stream"),
+            pytest.param(ContentCoding.GZIP, GZIP_OF_PATTERN[:10], id="a-gzip-header-alone"),
+            pytest.param(ContentCoding.DEFLATE, ZLIB_OF_PATTERN[: len(ZLIB_OF_PATTERN) // 2], id="half-a-zlib-stream"),
+        ],
+    )
+    def test_a_truncated_compressed_body_is_refused(self, coding: ContentCoding, truncated: bytes) -> None:
+        decoder = BoundedBodyDecoder(coding=coding, limit=10_000_000)
+
+        with pytest.raises(RemoteFileFetchError) as exc_info:
+            _decode_in_raw_reads(decoder=decoder, body=truncated)
+
+        assert not isinstance(exc_info.value, RemoteFileTooLargeError)
+        assert exc_info.value.reason == UNDECODABLE_REASON
+
+    @pytest.mark.parametrize("coding", [ContentCoding.GZIP, ContentCoding.DEFLATE])
+    def test_an_empty_compressed_body_decodes_to_nothing(self, coding: ContentCoding) -> None:
+        """A server may label an empty body as compressed: it decodes to nothing, as httpx reads it."""
+        decoder = BoundedBodyDecoder(coding=coding, limit=1000)
+        decoder.feed(chunk=b"")
+
+        assert decoder.finish() == b""
