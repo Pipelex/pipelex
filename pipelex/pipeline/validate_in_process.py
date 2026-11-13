@@ -44,6 +44,7 @@ from pipelex.pipeline.usage_stats_reporting import MethodValidationReport
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validation_report import PipelexValidationReport, build_validation_report
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity
+from pipelex.system.job_metadata import validate_request_id
 from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
@@ -84,6 +85,7 @@ async def validate_bundles_in_process(
     method_dir: Path | None = None,
     methods_dirs: Sequence[Path] | None = None,
     tree_listing: MethodTreeListing | None = None,
+    request_id: str | None = None,
 ) -> PipelexValidationReport:
     """Parse, validate, and dry-run MTHDS bundles in-process; assemble the canonical report.
 
@@ -127,14 +129,26 @@ async def validate_bundles_in_process(
             arm take every tree from it, so each is listed once (`pipelex.libraries.method_tree_listing`). None takes
             the listing a host put in scope (`scoped_tree_listing`), such as the API server around its validator once
             it has checked the method's requirements, else lists the trees for this validation.
+        request_id: The inbound request id the host is serving, bound on the log context for the whole pass, so every
+            line the sweep and its graph arm write carries it. It must be one to 128 ASCII letters, digits, `_` or `-`
+            (`validate_request_id`), the rule a run's request id follows. ``None`` inherits the id already bound, if any.
 
     Returns:
         PipelexValidationReport with the structural artifacts of a valid bundle.
 
     Raises:
+        RunParameterError: When `request_id` breaks the request id rule: the host's bug, refused before any work.
         PipelexError: When the bundle is invalid (parse, static validation, or dry-run failure).
     """
-    with scoped_caller_identity(caller_identity=caller_identity), MethodValidationReport() as validation_report:
+    # Refused before any work, as a run refuses it before its setup: an id that breaks the rule is the host's bug, never
+    # the caller's invalid method, so it is not a verdict and nothing is validated, timed or reported for it.
+    if request_id is not None:
+        validate_request_id(value=request_id)
+    with (
+        log.context(request_id=request_id),
+        scoped_caller_identity(caller_identity=caller_identity),
+        MethodValidationReport() as validation_report,
+    ):
         return await _validate_bundles_in_scope(
             mthds_contents=mthds_contents,
             mthds_sources=mthds_sources,

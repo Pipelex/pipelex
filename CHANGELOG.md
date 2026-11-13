@@ -9,6 +9,7 @@
 ### Changed
 
 - **A custom telemetry manager states `join_host_trace` (Breaking)**: `TelemetryManagerAbstract` gains the abstract property `join_host_trace`, so a manager injected through `Pipelex.make(telemetry_manager=...)` implements it, returning `False` to keep Pipelex's spans out of the host's trace; `TelemetryManager.__init__` takes a required keyword-only `join_host_trace`, so code constructing one to inject passes it; and `OtelContext`, which the job metadata carries, gains the required `is_sampled` and the optional `trace_state`, `host_span_id` and `is_host_span_pipelex`.
+- **A bundle validator receives the request id, plugin API version 10 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `request_id`, the inbound request id the host is serving, `None` when it serves none, refused with `RunParameterError` before any work unless it is one to 128 ASCII letters, digits, `_` or `-`, as a run's request id is. The in-process validator binds it on the log context for the whole sweep, `validate_bundles_in_process` takes it too, and the API server's `POST /v1/validate` hands its validator the request's `X-Request-ID`, so a validator dispatching the dry run to a worker can carry the id to the worker's log lines; `PLUGIN_API_VERSION` moves to 10, so a plugin declaring `targets_api = 9` is refused at discovery with `PluginApiVersionMismatchError`.
 
 ## [v0.100.1] - 2026-11-13
 
