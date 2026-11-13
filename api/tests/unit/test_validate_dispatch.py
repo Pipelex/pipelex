@@ -60,6 +60,7 @@ class _StubBundleValidator:
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
         read_scope: str | None,
+        request_id: str | None,
     ) -> BundleValidationFailure:
         self.calls.append(
             {
@@ -73,6 +74,7 @@ class _StubBundleValidator:
                 "method_dir": method_dir,
                 "methods_dirs": methods_dirs,
                 "read_scope": read_scope,
+                "request_id": request_id,
             }
         )
         if self._error is not None:
@@ -194,6 +196,7 @@ class TestValidateDispatch:
                 allow_signatures=False,
                 requested_orchestration_mode=None,
                 graph_pipe_code=None,
+                request_id=None,
             )
         assert exc_info.value.mode == "direct"
         assert exc_info.value.resolve_error_code() == PipelexErrorCode.PLUGIN_NOT_FOUND

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **A bundle validator receives the request id, plugin API version 10 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `request_id`, the inbound request id the host is serving, `None` when it serves none, refused with `RunParameterError` before any work unless it is one to 128 ASCII letters, digits, `_` or `-`, as a run's request id is. The in-process validator binds it on the log context for the whole sweep, `validate_bundles_in_process` takes it too, and the API server's `POST /v1/validate` hands its validator the request's `X-Request-ID`, so a validator dispatching the dry run to a worker can carry the id to the worker's log lines; `PLUGIN_API_VERSION` moves to 10, so a plugin declaring `targets_api = 9` is refused at discovery with `PluginApiVersionMismatchError`.
+
 ## [v0.100.1] - 2026-11-13
 
 ### Fixed

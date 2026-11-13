@@ -46,6 +46,7 @@ class _FakeBundleValidator:
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
         read_scope: str | None,
+        request_id: str | None,
     ) -> PipelexValidationReport | BundleValidationFailure:
         raise NotImplementedError
 

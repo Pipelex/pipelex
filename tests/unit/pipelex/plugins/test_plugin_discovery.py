@@ -178,7 +178,14 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v8_plugin])
         assert "written_against_v8" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 9
+
+    def test_a_plugin_written_before_validators_received_the_request_id_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v9 called a bundle validator without `request_id`; a v9 validator would refuse the keyword on its first validation."""
+        v9_plugin = _InferencePlugin(name="written_against_v9", sdk="v9_sdk", targets_api=9)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v9_plugin])
+        assert "written_against_v9" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 10
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

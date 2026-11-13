@@ -5,8 +5,8 @@ covered by test_validation_report.py / the integration test_protocol_validate.py
 sweep is returned verbatim as the valid arm; a ``ValidateBundleError`` is converted to a
 ``BundleValidationFailure`` (the invalid arm: its problem in the operator's view, and its validation
 items) rather than propagated. Also pins argument
-passthrough, including the ``library_dirs`` host context, the explicit ``graph_pipe_code`` target
-and the ``log_context`` label, and that the read scope stops here: the in-process arm reads every
+passthrough, including the ``library_dirs`` host context, the explicit ``graph_pipe_code`` target,
+the ``log_context`` label and the request id, and that the read scope stops here: the in-process arm reads every
 file in its own process, through no blob store, so the sweep is never handed one.
 """
 
@@ -50,6 +50,7 @@ class TestDirectBundleValidator:
             method_dir=None,
             methods_dirs=None,
             read_scope="org_acme",
+            request_id="01HNJZ4XR7K3Q9D8MWAQ7FY2E5",
         )
 
         assert verdict is report
@@ -64,6 +65,7 @@ class TestDirectBundleValidator:
             submitted_files=submitted_files,
             method_dir=None,
             methods_dirs=None,
+            request_id="01HNJZ4XR7K3Q9D8MWAQ7FY2E5",
         )
 
     @pytest.mark.builds_problems_without_required_params(
@@ -88,6 +90,7 @@ class TestDirectBundleValidator:
             method_dir=None,
             methods_dirs=None,
             read_scope=None,
+            request_id=None,
         )
 
         assert isinstance(verdict, BundleValidationFailure)
@@ -116,4 +119,5 @@ class TestDirectBundleValidator:
                 method_dir=None,
                 methods_dirs=None,
                 read_scope=None,
+                request_id=None,
             )
