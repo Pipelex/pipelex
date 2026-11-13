@@ -67,6 +67,7 @@ class _RecordingBundleValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,
+        request_id: str | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         self.read_scopes.append(read_scope)
         self.held_keys.append(set(self._blob_storage.root))

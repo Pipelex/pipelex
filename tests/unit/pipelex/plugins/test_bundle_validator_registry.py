@@ -46,6 +46,7 @@ class _FakeBundleValidator:
         method_dir: Path | None,
         methods_dirs: Sequence[Path] | None,
         read_scope: str | None,
+        request_id: str | None,
     ) -> PipelexValidationReport | BundleValidationFailure:
         raise NotImplementedError
 
@@ -99,10 +100,11 @@ class TestBundleValidatorRegistry:
         assert not registry.has(mode="temporal")
         assert registry.modes == []
 
-    def test_the_protocol_requires_the_read_scope_by_keyword(self) -> None:
-        """A host must name the read scope, ``None`` included, so a dispatched validator never reads under a scope it guessed."""
-        read_scope = inspect.signature(BundleValidatorProtocol.validate_bundles).parameters["read_scope"]
+    @pytest.mark.parametrize("parameter_name", ["read_scope", "request_id"])
+    def test_the_protocol_requires_the_host_context_by_keyword(self, parameter_name: str) -> None:
+        """A host must name the read scope and the request id, ``None`` included, so a dispatched validator never guesses or drops one."""
+        parameter = inspect.signature(BundleValidatorProtocol.validate_bundles).parameters[parameter_name]
 
-        assert read_scope.kind is inspect.Parameter.KEYWORD_ONLY
-        assert read_scope.default is inspect.Parameter.empty
-        assert read_scope.annotation == str | None
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY
+        assert parameter.default is inspect.Parameter.empty
+        assert parameter.annotation == str | None
