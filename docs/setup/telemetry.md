@@ -65,7 +65,7 @@ What it costs:
 
 ## Error trackers
 
-Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails with a fault the operator must fix, whether the pipe failed or the storage or a webhook failed to receive its results, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault and every failure that ends a request after its response had started. A caller's mistake, a bad input or a method naming a model the deployment does not serve, is answered to the caller and not reported, nor is a `501`, something this deployment does not offer, which the caller meets each time it asks again; a dry run reports nothing. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails with a fault the operator must fix, whether the pipe failed or the storage or a webhook failed to receive its results, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault and every failure of its own code that ends a request after its response had started, though not its failure to send an answer to a client that hung up. A caller's mistake, a bad input or a method naming a model the deployment does not serve, is answered to the caller and not reported, nor is a `501`, something this deployment does not offer, which the caller meets each time it asks again; a dry run reports nothing. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
 
 ```toml
 [runtime.error_tracking]
