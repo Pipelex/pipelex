@@ -18,7 +18,7 @@ description: "The run's graph left usage unattributed: what the Pipelex error co
 
 ## What it means
 
-The run itself went on, but its record is incomplete. Every inference call names the graph node it was made for, and some of those nodes never appeared in the run's trace, because their start events were lost. The graph assembled from the trace therefore shows fewer steps, and a smaller cost under each step, than the run spent; the usage of those nodes is counted in the run's total, in its `unattributed` bucket. The runtime reports this once per assembled run to the error trackers of whoever runs it, carrying no content of the run.
+The run itself went on, but its record is incomplete. Every inference call names the graph node it was made for, and some of those nodes never appeared in the run's trace, because their start events were lost. The graph assembled from the trace therefore shows fewer steps, and a smaller cost under each step, than the run spent; the usage of those nodes is counted in the run's total, in its `unattributed` bucket. The runtime reports this to the error trackers of whoever runs it, carrying no content of the run, for a run that reports its failures there: never a dry run, nor a run a validation makes.
 
 ## What to do
 

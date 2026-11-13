@@ -13,9 +13,9 @@ supersedes the earlier one and everything it dispatched
 one its latest attempt ran, and never a failed node beside a succeeded one.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 from pipelex import log
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, apply_condition_output_merges
@@ -58,7 +58,6 @@ from pipelex.tracing.trace_events import (
     TraceEvent,
     UsageReportEvent,
 )
-from pipelex.tracing.unattributed_usage_report import report_unattributed_usage
 from pipelex.tracing.usage_attribution import NodeUsages, attribute_usage, make_self_contained_spec
 
 if TYPE_CHECKING:
@@ -138,6 +137,22 @@ class _AssemblerNodeData:
         )
 
 
+class AssembledGraph(NamedTuple):
+    """A graph assembled from a run's trace events, with what the assembly found missing from it.
+
+    Attributes:
+        graph_spec: The assembled graph.
+        mode: Its provenance mode, the run mode its events state: a dry run's graph is ``DRY``.
+        usages_by_never_started_node: The usage each node the trace never started reported, by node id; empty when the
+            graph is complete. The usage of a superseded attempt and fallback usage (``UNATTRIBUTED_NODE_ID``) are not
+            here, since neither names a node that went missing.
+    """
+
+    graph_spec: GraphSpec
+    mode: GraphSpecMode
+    usages_by_never_started_node: Mapping[str, NodeUsages]
+
+
 class GraphSpecAssembler:
     """Reconstructs a GraphSpec from trace events.
 
@@ -162,9 +177,10 @@ class GraphSpecAssembler:
     spent all the same, so a superseded usage report still counts in the run's total, as
     unattributed usage: the node it named belongs to an attempt the graph does not show.
 
-    Usage named by a node the trace never started means a start event was lost and the graph is incomplete: besides the
-    warning logged for each such node, the assembly reports it once to the operator's error trackers
-    (``report_unattributed_usage``), the graph's id being its run's id.
+    Usage named by a node the trace never started means a start event was lost and the graph is incomplete. Besides the
+    warning logged for each such node, ``assemble_with_never_started_usage`` returns those nodes and their usage beside
+    the graph, and the assembly reports nothing itself: whether the run's incomplete graph reaches the operator's error
+    trackers is the run's own policy, which only its caller knows (``pipelex.pipe_run.tracing_assembly``).
     """
 
     @staticmethod
@@ -176,7 +192,8 @@ class GraphSpecAssembler:
     ) -> GraphSpec:
         """Assemble a GraphSpec from a flat list of trace events.
 
-        The GraphSpec's provenance mode is the run mode every event states.
+        The GraphSpec's provenance mode is the run mode every event states. Free of side effects other than its log
+        lines: ``assemble_with_never_started_usage`` returns the same graph with what the assembly found missing from it.
 
         Args:
             events: Flat list of trace events, pre-sorted by (chain, sequence), the events of
@@ -190,6 +207,32 @@ class GraphSpecAssembler:
         Raises:
             TraceEventModeError: When the events mix modes, or there are none, and so state no single run mode.
         """
+        return GraphSpecAssembler.assemble_with_never_started_usage(events=events, graph_id=graph_id, pipeline_ref=pipeline_ref).graph_spec
+
+    @staticmethod
+    def assemble_with_never_started_usage(
+        *,
+        events: Sequence[TraceEvent],
+        graph_id: str,
+        pipeline_ref: PipelineRef | None = None,
+    ) -> AssembledGraph:
+        """Assemble a GraphSpec from a flat list of trace events, with the usage of the nodes the trace never started.
+
+        The GraphSpec's provenance mode is the run mode every event states. Nothing is reported from here: a caller that
+        knows the run's reporting policy reports the never-started nodes when it should.
+
+        Args:
+            events: Flat list of trace events, pre-sorted by (chain, sequence), the events of
+                superseded attempts included.
+            graph_id: The graph identifier for the assembled GraphSpec.
+            pipeline_ref: Optional pipeline reference metadata.
+
+        Returns:
+            The complete GraphSpec, its mode, and the usage each node the trace never started reported, by node id.
+
+        Raises:
+            TraceEventModeError: When the events mix modes, or there are none, and so state no single run mode.
+        """
         mode = _graphspec_mode_of_events(events=events, graph_id=graph_id)
         assembler = _AssemblerState(
             graph_id=graph_id,
@@ -199,9 +242,11 @@ class GraphSpecAssembler:
         )
         assembler.pass_one(events)
         assembler.pass_two()
-        graph_spec = assembler.build_graph_spec()
-        report_unattributed_usage(pipeline_run_id=graph_id, usages_by_never_started_node=assembler.usages_by_never_started_node)
-        return graph_spec
+        return AssembledGraph(
+            graph_spec=assembler.build_graph_spec(),
+            mode=mode,
+            usages_by_never_started_node=assembler.usages_by_never_started_node,
+        )
 
 
 def _graphspec_mode_of_events(*, events: Sequence[TraceEvent], graph_id: str) -> GraphSpecMode:
