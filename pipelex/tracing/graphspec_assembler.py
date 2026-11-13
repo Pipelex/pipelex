@@ -58,6 +58,7 @@ from pipelex.tracing.trace_events import (
     TraceEvent,
     UsageReportEvent,
 )
+from pipelex.tracing.unattributed_usage_report import report_unattributed_usage
 from pipelex.tracing.usage_attribution import NodeUsages, attribute_usage, make_self_contained_spec
 
 if TYPE_CHECKING:
@@ -160,6 +161,10 @@ class GraphSpecAssembler:
     what its earlier attempt, and every workflow that attempt dispatched, did. Its usage was
     spent all the same, so a superseded usage report still counts in the run's total, as
     unattributed usage: the node it named belongs to an attempt the graph does not show.
+
+    Usage named by a node the trace never started means a start event was lost and the graph is incomplete: besides the
+    warning logged for each such node, the assembly reports it once to the operator's error trackers
+    (``report_unattributed_usage``), the graph's id being its run's id.
     """
 
     @staticmethod
@@ -194,7 +199,9 @@ class GraphSpecAssembler:
         )
         assembler.pass_one(events)
         assembler.pass_two()
-        return assembler.build_graph_spec()
+        graph_spec = assembler.build_graph_spec()
+        report_unattributed_usage(pipeline_run_id=graph_id, usages_by_never_started_node=assembler.usages_by_never_started_node)
+        return graph_spec
 
 
 def _graphspec_mode_of_events(*, events: Sequence[TraceEvent], graph_id: str) -> GraphSpecMode:
@@ -251,6 +258,8 @@ class _AssemblerState:
         # the arithmetic is the cost engine's, applied once in usage_attribution.
         self._usage_by_reported_node: dict[str, NodeUsages] = {}
         self._graph_usage: GraphUsageSpec | None = None
+        # The usage of the nodes the trace never started, by node id: the graph is incomplete when it holds any.
+        self.usages_by_never_started_node: dict[str, NodeUsages] = {}
 
     def pass_one(self, events: Sequence[TraceEvent]) -> None:
         """Pass 1: Build nodes, producer map, and collect metadata."""
@@ -705,6 +714,7 @@ class _AssemblerState:
             if own_usages is None:
                 if reported_node_id != UNATTRIBUTED_NODE_ID:
                     log.warning("The usage of a node the trace never started was left unattributed", fields={"node_id": reported_node_id})
+                    self.usages_by_never_started_node[reported_node_id] = usages
                 unattributed_usages.extend(usages)
                 continue
             own_usages.extend(usages)

@@ -336,6 +336,26 @@ codes:
     meaning: "The caller chose the run's id, which Pipelex allows as an extension of the protocol, whose run id is always the runner's, and a run already holds that id."
     what_to_do: "Start the run with a new id, or with none so that the runner assigns it. To see the run that holds the id, read it by that id."
 
+  - code: pipelex.run.graph_incomplete
+    title: "The run's graph left usage unattributed"
+    domain: runtime
+    retry: "no"
+    raised_as: problem
+    status: 500
+    detail: "The run's graph is incomplete: {node_count} of its nodes reported inference usage but never started in its trace, so {inference_calls} inference calls were left unattributed."
+    steps:
+      actor: {kind: report, detail: "Look in the run's trace events for the start events of the {node_count} nodes that never started, then report the run to the maintainers of the Pipelex runtime."}
+      other: {kind: report, detail: "Report this to whoever runs the runtime."}
+    params:
+      node_ids: {type: list, items: {type: identifier}, description: "The ids of the nodes that reported usage but never started in the trace, sorted, at most twenty of them."}
+      node_count: {type: integer, description: "How many nodes reported usage but never started in the trace."}
+      inference_calls: {type: integer, description: "The inference calls those nodes made, which the graph left unattributed."}
+      cost_micro_usd: {type: integer, optional: true, description: "The cost of those calls in millionths of a US dollar, rounded, absent when none of them was priced."}
+    meaning: "The run itself went on, but its record is incomplete. Every inference call names the graph node it was made for, and some of those nodes never appeared in the run's trace, because their start events were lost. The graph assembled from the trace therefore shows fewer steps, and a smaller cost under each step, than the run spent; the usage of those nodes is counted in the run's total, in its `unattributed` bucket. The runtime reports this once per assembled run to the error trackers of whoever runs it, carrying no content of the run."
+    what_to_do: "If you run the runtime, look in the run's trace events, with its `pipeline_run_id`, for the start events of the nodes `params.node_ids` names, and report the run to the maintainers of the Pipelex runtime. The run's outputs and its total cost are not affected."
+    see:
+      - {title: "Per-node Usage Attribution", href: "under-the-hood/per-node-usage-attribution.md"}
+
   # --- pipelex.request. -------------------------------------------------------------------
 
   - code: pipelex.request.dependency_key_mismatch

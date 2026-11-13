@@ -122,6 +122,10 @@ The rollup is computed once, in the assembler, for the same reason `AggregatedCo
 
 On a healthy run `unattributed` is zero. A non-zero one is a real signal worth looking at. Its usual cause on the hosted runtime used to be a start event lost to the DynamoDB events table's item limit, an event carrying inputs or a prompt over 400 KB, whose node then never existed while its inference still counted. The DynamoDB event log now writes such an event with its bulky values left out (see [Event-Log Transport and the Scoped Override](execution-graph-tracing.md#event-log-transport-and-the-scoped-override)), so that cause is no longer expected.
 
+**An incomplete graph is reported to the operator's error trackers.** When usage names a node whose start event never made it into the stream, the assembler logs a warning for each such node and, once per assembled run, reports the run through the [error tracker seam](error-tracker-plugins.md) as a handled problem under the code [`pipelex.run.graph_incomplete`](../errors/pipelex/run/graph_incomplete.md) (`pipelex/tracing/unattributed_usage_report.py`). The report names the run (the graph's id is its run's id) and the request bound on the log context, the ids of the nodes that never started (at most twenty, with their count), the inference calls they made and their cost in millionths of a US dollar. It carries no content of the run: no input, output, prompt, pipe or model. Its domain is `runtime` and its status `500`, because the runtime's own record failed to hold what it ran, which is a fault for whoever runs the runtime to look into rather than the caller's, so the trackers admit it. With no tracker installed nothing is built and the warning is the only effect, and a report that cannot be built is logged at debug level and dropped, never costing the run its graph. The report carries no exception, and the built-in `posthog` tracker sends only reports that carry one, so it reaches a tracker that takes problem reports, such as an out-of-tree Sentry tracker, and not PostHog.
+
+Two other sources of unattributed usage are not reported, because neither leaves the graph incomplete: the usage of a superseded attempt, which the graph leaves out on purpose, and the `UNATTRIBUTED_NODE_ID` fallback, which never named a node.
+
 ### Cross-checking against the cost report
 
 The two are computed from the same events but encode "unrated" differently: `CostRegistry.aggregate_costs` treats an unrated usage as zero-cost, while `NodeUsageSpec.cost` is `None`. Comparing them naively manufactures a disagreement. The correct check is:
@@ -142,6 +146,7 @@ So usage is deliberately assembler-only. That gap is *asserted* rather than norm
 | `pipelex/graph/graphspec.py` | `NodeUsageSpec`, `GraphUsageSpec` and the four invariants |
 | `pipelex/tracing/usage_attribution.py` | `UsageAccumulator`, `roll_up`, `attribute_usage` |
 | `pipelex/tracing/graphspec_assembler.py` | Folds `UsageReportEvent`, attributes in pass 2 |
+| `pipelex/tracing/unattributed_usage_report.py` | Reports a graph whose nodes never started to the error trackers |
 | `pipelex/tracing/usage_aggregator.py` | The other projection — the flat `tokens_usages` list |
 | `pipelex/cogt/usage/usage_cost.py` | `compute_tokens_usage_cost` — the one cost engine |
 
