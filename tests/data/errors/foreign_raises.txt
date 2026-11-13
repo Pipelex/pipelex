@@ -207,3 +207,7 @@ pipelex/tools/network/standard_webhooks.py | decode_webhook_secret | ValueError 
 pipelex/tools/network/standard_webhooks.py | decode_webhook_secret | ValueError | caught
 pipelex/tools/network/standard_webhooks.py | sign_webhook | ValueError | invariant
 pipelex/tools/typing/pydantic_utils.py | clean_model_to_dict | TypeError | invariant
+pipelex/tracing/dynamodb_event_log.py | dynamodb_item_size | TypeError | invariant
+pipelex/tracing/trace_events.py | _execution_data_omission.leave_out | TypeError | invariant
+pipelex/tracing/trace_events.py | _input_spec_omission.leave_out | TypeError | invariant
+pipelex/tracing/trace_events.py | _output_spec_omission.leave_out | TypeError | invariant
