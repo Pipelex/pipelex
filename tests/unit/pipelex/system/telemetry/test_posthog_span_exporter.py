@@ -11,12 +11,15 @@ nobody keeps in step and a value no group-level count can use.
 
 from typing import Any
 
+import pytest
+from opentelemetry import trace
 from opentelemetry.sdk.trace import Span as SdkSpan
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import NonRecordingSpan, SpanContext, TraceFlags
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
-from pipelex.system.telemetry.otel_constants import PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
+from pipelex.system.telemetry.otel_constants import OTelConstants, PipelexSpanAttr, PostHogAttr, PostHogEvent, SpanCategory
 from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
@@ -194,3 +197,37 @@ class TestPostHogSpanExporter:
         exporter.export([_make_span(span_category=SpanCategory.PIPE)])
 
         assert "deployment-hash" not in repr(client.capture.call_args.kwargs["properties"])
+
+    @pytest.mark.parametrize(
+        ("parent_span_id", "is_run_root", "expected_parent_id"),
+        [
+            # A run's root span under the host's span, in a run that joined the host's trace: a parent this stream never receives.
+            (0x00000000000000CD, True, None),
+            # A run's own root span, under the virtual root parent.
+            (OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID, True, None),
+            # A nested pipe or an LLM call, under a Pipelex span this stream receives.
+            (0x00000000000000AB, False, "00000000000000ab"),
+        ],
+    )
+    def test_a_runs_root_span_names_no_parent(
+        self, mocker: MockerFixture, parent_span_id: int, is_run_root: bool, expected_parent_id: str | None
+    ) -> None:
+        client = mocker.MagicMock(spec=Posthog)
+        exporter = _make_exporter(client=client, fallback_distinct_id=None, run_identity_policy=RunIdentityPolicy.DIRECT)
+        parent_context = trace.set_span_in_context(
+            NonRecordingSpan(
+                SpanContext(
+                    trace_id=0x0123456789ABCDEF0123456789ABCDEF, span_id=parent_span_id, is_remote=True, trace_flags=TraceFlags(TraceFlags.SAMPLED)
+                )
+            )
+        )
+        attributes: dict[str, Any] = {PipelexSpanAttr.SPAN_CATEGORY: SpanCategory.PIPE.value, PipelexSpanAttr.PIPELINE_RUN_ID: "run-1"}
+        if is_run_root:
+            attributes[PipelexSpanAttr.RUN_ROOT] = True
+        span = TracerProvider().get_tracer("test").start_span(name="PipeSequence: root", context=parent_context, attributes=attributes)
+        span.end()
+        assert isinstance(span, SdkSpan)
+
+        exporter.export([span])
+
+        assert client.capture.call_args.kwargs["properties"].get(PostHogAttr.PARENT_ID) == expected_parent_id

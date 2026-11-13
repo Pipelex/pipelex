@@ -469,7 +469,9 @@ class TestInferenceCallSummary:
     async def test_the_model_keys_mean_what_the_llm_span_makes_them_mean(
         self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter
     ) -> None:
-        otel_context = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID)
+        otel_context = OtelContext(
+            trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID, is_sampled=True
+        )
 
         with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
             await _StandInLLMWorker(usage=LLM_USAGE).gen_text(llm_job=_llm_job(otel_context=otel_context))
@@ -711,7 +713,9 @@ class TestInferenceCallSummary:
     async def test_the_llm_event_carries_the_calls_span_and_a_refused_call_names_none(
         self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter, json_lines: io.StringIO
     ) -> None:
-        otel_context = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID)
+        otel_context = OtelContext(
+            trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID, is_sampled=True
+        )
 
         with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
             await _StandInLLMWorker(usage=LLM_USAGE).gen_text(llm_job=_llm_job(otel_context=otel_context))
@@ -765,7 +769,9 @@ class TestInferenceCallSummary:
     @pytest.mark.asyncio
     async def test_the_model_names_are_read_when_the_call_ends(self, caplog: pytest.LogCaptureFixture, span_exporter: InMemorySpanExporter) -> None:
         """A worker routing the call in `_before_job` is named as its span names it, and the model the provider served is the one named."""
-        otel_context = OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID)
+        otel_context = OtelContext(
+            trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID, is_sampled=True
+        )
 
         with caplog.at_level(logging.INFO, logger=SUMMARY_LOGGER):
             await _RoutingLLMWorker().gen_text(llm_job=_llm_job(otel_context=otel_context))
