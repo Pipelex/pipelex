@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`join_host_trace`, Pipelex's spans in your process's trace**: with the new top-level `join_host_trace = true` in `telemetry.toml`, the `PIPELEX_JOIN_HOST_TRACE` environment variable or `Pipelex.make(join_host_trace=True)`, the most explicit winning, a run's root pipe span starts under OpenTelemetry's current span, in its trace and following its sampling decision across a distributed worker too, and each pipe and LLM span is made current while it runs, so your own instrumentation nests under it and an error tracker reading the current span sees it. The boot refuses the switch with `pipelex.config.invalid` unless a destination of yours (your PostHog stream with tracing, an `[[otlp]]` exporter or Langfuse) receives Pipelex's spans, the default stays off, and a run's root span now carries `pipelex.run_root`, which keeps it parentless on your PostHog stream.
+
+### Changed
+
+- **A custom telemetry manager states `join_host_trace` (Breaking)**: `TelemetryManagerAbstract` gains the abstract property `join_host_trace`, so a manager injected through `Pipelex.make(telemetry_manager=...)` implements it, returning `False` to keep Pipelex's spans out of the host's trace; and `OtelContext`, which the job metadata carries, gains the required `is_sampled` and the optional `host_span_id`.
+
 ## [v0.100.1] - 2026-11-13
 
 ### Fixed

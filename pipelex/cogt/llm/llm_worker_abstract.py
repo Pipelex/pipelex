@@ -320,11 +320,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         # Use trace_id and span_id from otel_context (precomputed)
         # The span_id in otel_context is the parent pipe's span - use it as parent
         parent_span_id = otel_context.span_id
+        # The pipe's sampled flag, which follows the host's decision on a run that joined the host's trace.
         parent_span_context = SpanContext(
             trace_id=otel_context.trace_id,
             span_id=parent_span_id,
             is_remote=True,
-            trace_flags=TraceFlags(TraceFlags.SAMPLED),
+            trace_flags=TraceFlags(TraceFlags.SAMPLED if otel_context.is_sampled else TraceFlags.DEFAULT),
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
@@ -643,11 +644,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
             # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
             # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
-            # context is left alone, and it is what the line's standard trace fields name. The summary event
+            # context is left alone, and it is what the line's standard trace fields name, unless the operator
+            # turned `join_host_trace` on, which makes the span current so the provider SDK's spans nest under it. The summary event
             # is logged at the end of this block, as the span closes: the span has ended by then, on success in
             # the job's after-step and on failure in the `finally` below, but it is still the active Pipelex span,
             # so the event carries its ids.
-            with pipelex_span_active(span=span), call_summary.ends_here():
+            with pipelex_span_active(span=span, make_current=TelemetryManagerAbstract.is_join_host_trace_enabled()), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=False)
                     try:
@@ -694,11 +696,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
             # The span is the Pipelex span active here until it ends, whichever way it ends, so a log line
             # during the call, a provider SDK's included, names it under `pipelex.*`; OpenTelemetry's current
-            # context is left alone, and it is what the line's standard trace fields name. The summary event
+            # context is left alone, and it is what the line's standard trace fields name, unless the operator
+            # turned `join_host_trace` on, which makes the span current so the provider SDK's spans nest under it. The summary event
             # is logged at the end of this block, as the span closes: the span has ended by then, on success in
             # the job's after-step and on failure in the `finally` below, but it is still the active Pipelex span,
             # so the event carries its ids.
-            with pipelex_span_active(span=span), call_summary.ends_here():
+            with pipelex_span_active(span=span, make_current=TelemetryManagerAbstract.is_join_host_trace_enabled()), call_summary.ends_here():
                 try:
                     self.check_request(inference_model=self.inference_model, job_params=self._sent_job_params(llm_job=llm_job), is_structured=True)
                     object_result = await self._gen_object(llm_job=llm_job, schema=schema)

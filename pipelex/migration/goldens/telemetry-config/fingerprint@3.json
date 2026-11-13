@@ -109,6 +109,12 @@
       "required": false,
       "open_node": false
     },
+    "join_host_trace": {
+      "value_type": "bool",
+      "required": false,
+      "default": false,
+      "open_node": false
+    },
     "langfuse": {
       "value_type": "table",
       "required": false,

@@ -3,6 +3,7 @@
 import json
 
 import pytest
+from opentelemetry.trace import SpanContext, TraceFlags
 
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
@@ -10,6 +11,8 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.telemetry.otel_factory import OtelFactory
 
 
@@ -159,3 +162,34 @@ class TestOtelFactory:
 
         # Both should share the same hash suffix
         assert trace_name.endswith(trace_name_redacted)
+
+    # --- make_run_otel_context tests ---
+
+    def test_a_run_with_no_host_span_roots_its_own_sampled_trace(self) -> None:
+        otel_context = OtelFactory.make_run_otel_context(pipeline_run_id="run_123", pipe_code="my_pipe", host_span_context=None)
+
+        assert otel_context.trace_id == OtelFactory.make_trace_id(pipeline_run_id="run_123")
+        assert otel_context.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
+        assert otel_context.is_sampled is True
+        assert otel_context.host_span_id is None
+
+    @pytest.mark.parametrize("is_sampled", [True, False])
+    def test_a_run_joining_a_host_span_carries_its_trace_its_span_and_its_decision_across_a_process_boundary(self, is_sampled: bool) -> None:
+        host_span_context = SpanContext(
+            trace_id=0x0123456789ABCDEF0123456789ABCDEF,
+            span_id=0x00000000000000CD,
+            is_remote=False,
+            trace_flags=TraceFlags(TraceFlags.SAMPLED if is_sampled else TraceFlags.DEFAULT),
+        )
+
+        otel_context = OtelFactory.make_run_otel_context(pipeline_run_id="run_123", pipe_code="my_pipe", host_span_context=host_span_context)
+        # The job metadata crosses the Temporal boundary as JSON.
+        carried = OtelContext.model_validate_json(otel_context.model_dump_json())
+
+        assert carried == otel_context
+        assert carried.trace_id == host_span_context.trace_id
+        assert carried.host_span_id == host_span_context.span_id
+        assert carried.is_sampled is is_sampled
+        # The span id still marks the context as the run's root.
+        assert carried.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
+        assert (carried.trace_name, carried.trace_name_redacted) == OtelFactory.make_trace_names("run_123", pipe_code="my_pipe")

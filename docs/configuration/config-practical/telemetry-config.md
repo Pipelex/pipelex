@@ -41,6 +41,9 @@ Files are deep-merged, with later layers winning per leaf key. This means Langfu
 ## Full Example Configuration
 
 ```toml
+# Join the trace of the process that runs Pipelex (top-level, before any section)
+join_host_trace = false
+
 # PostHog Configuration (Event tracking + AI span tracing)
 [custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
@@ -86,6 +89,19 @@ name = "my-collector"                                # Identifier for logging
 endpoint = "https://otel.example.com/v1/traces"      # OTLP endpoint URL
 headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 ```
+
+---
+
+## Joining the host's trace
+
+The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and LLM spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`), itself overridden by `Pipelex.make(join_host_trace=...)` |
+
+!!! warning "A span destination is required"
+    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
 
 ---
 
@@ -191,6 +207,17 @@ headers = { "DD-API-KEY" = "${DD_API_KEY}" }
 name = "honeycomb"
 endpoint = "https://api.honeycomb.io/v1/traces"
 headers = { "x-honeycomb-team" = "${HONEYCOMB_API_KEY}" }
+```
+
+### Example: an endpoint and an auth header from the environment
+
+An exporter's `endpoint` and every header value resolve placeholders like any other string of this file, so a backend that keys its OTLP traces endpoint on a header, Sentry's `x-sentry-auth` for instance, needs nothing but configuration:
+
+```toml
+[[otlp]]
+name = "sentry"
+endpoint = "${env:SENTRY_OTLP_TRACES_ENDPOINT}"
+headers = { "x-sentry-auth" = "${env:SENTRY_OTLP_AUTH}" }
 ```
 
 !!! info "Full Data"

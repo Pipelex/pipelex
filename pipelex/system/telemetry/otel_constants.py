@@ -27,6 +27,8 @@ class OTelConstants:
     INSTRUMENTING_MODULE_NAME = "pipelex"
 
     DO_NOT_TRACK_ENV_VAR_KEY = "DO_NOT_TRACK"
+    # Overrides `join_host_trace` in telemetry.toml; `Pipelex.make(join_host_trace=...)` overrides both.
+    JOIN_HOST_TRACE_ENV_VAR_KEY = "PIPELEX_JOIN_HOST_TRACE"
     PIPE_CODE_REDACTED = "[REDACTED]"
     OUTPUT_CLASS_REDACTED = "Object"
     TRUNCATION_SUFFIX = "... [truncated]"
@@ -148,6 +150,9 @@ class PipelexSpanAttr(StrEnum):
     PIPELINE_RUN_ID = "pipelex.pipeline.run_id"
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
     OUTPUT_CLASS_NAME = "pipelex.output.class_name"
+    # True on a run's root pipe span, whose parent is outside the run: the virtual root parent, or the
+    # host's span when the run joined the host's trace, which none of Pipelex's own streams receives.
+    RUN_ROOT = "pipelex.run_root"
 
     # The run's identity, set at every span site from `RunMetadata` so the identity
     # rides the span object to every exporter instead of being correlated back to a

@@ -15,6 +15,7 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
+from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.telemetry.telemetry_config import LangfuseConfig, OtlpExporterConfig, TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy
 from pipelex.tools.log.log import log
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
     # Deferred imports: avoid pulling heavy SDKs at module-load time
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
+    from opentelemetry.trace import SpanContext
     from opentelemetry.trace import Tracer as OTelTracer
     from posthog import Posthog  # type: ignore[attr-defined]
 
@@ -163,6 +165,42 @@ class OtelFactory:
         trace_name = f"{pipe_code}_{hashed_id}"
         trace_name_redacted = hashed_id
         return trace_name, trace_name_redacted
+
+    @classmethod
+    def make_run_otel_context(cls, *, pipeline_run_id: str, pipe_code: str, host_span_context: "SpanContext | None") -> OtelContext:
+        """The OpenTelemetry context a run starts from: its own derived trace, or the host's when it joins one.
+
+        With no host span, the trace id is derived from ``pipeline_run_id``, the root pipe span starts under the
+        virtual root parent, and the run is sampled, as it always was. With the host's span, which a run reads
+        only when the operator turned ``join_host_trace`` on, the trace id is the host's, the root pipe span
+        starts under the host's span, and the run follows the host's sampling decision. The span id stays the
+        virtual root parent either way, which is what marks the context as the run's root.
+
+        Args:
+            pipeline_run_id: The run's id, from which its own trace id and trace names are derived.
+            pipe_code: The run's main pipe, which the full trace name carries.
+            host_span_context: The host's current span to join, or None to root the run's own trace.
+
+        Returns:
+            The run's root OpenTelemetry context, which the job metadata carries to every pipe.
+        """
+        trace_name, trace_name_redacted = cls.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
+        if host_span_context is None:
+            return OtelContext(
+                trace_id=cls.make_trace_id(pipeline_run_id=pipeline_run_id),
+                trace_name=trace_name,
+                trace_name_redacted=trace_name_redacted,
+                span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+                is_sampled=True,
+            )
+        return OtelContext(
+            trace_id=host_span_context.trace_id,
+            trace_name=trace_name,
+            trace_name_redacted=trace_name_redacted,
+            span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+            is_sampled=host_span_context.trace_flags.sampled,
+            host_span_id=host_span_context.span_id,
+        )
 
     @classmethod
     def _is_unresolved_placeholder(cls, value: str | None) -> bool:

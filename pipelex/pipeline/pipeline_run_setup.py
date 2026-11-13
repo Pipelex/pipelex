@@ -38,7 +38,6 @@ from pipelex.runtime_hub import (
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.exceptions import RunParameterError
-from pipelex.system.job_metadata import OtelContext
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.system.run_extras import validate_run_extras
 from pipelex.system.storage_scope import (
@@ -47,14 +46,15 @@ from pipelex.system.storage_scope import (
     validate_storage_scope,
     validate_storage_scope_within_read_scope,
 )
+from pipelex.system.telemetry.current_span import host_span_context_to_join
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tracing.event_log_factory import make_event_log
 
 if TYPE_CHECKING:
     from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+    from pipelex.system.job_metadata import OtelContext
     from pipelex.system.trace_context import TraceContext
     from pipelex.tracing.event_log_protocol import EventLogProtocol
 
@@ -434,17 +434,17 @@ async def pipeline_run_setup(
                 pipeline_run_id=pipeline_run_id,
             )
 
-        # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
-        # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
+        # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available). The run's trace is
+        # decided once, here: its own trace derived from the run id, or, when the operator turned join_host_trace
+        # on and the host has a current span, the host's trace under that span with the host's sampling decision.
+        # The job metadata carries it from here to every pipe, across a process boundary too.
         otel_context: OtelContext | None = None
         if pipe_run_mode.is_live and get_otel_tracer() is not None:
-            trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
-            trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
-            otel_context = OtelContext(
-                trace_id=trace_id,
-                trace_name=trace_name,
-                trace_name_redacted=trace_name_redacted,
-                span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+            host_span_context = host_span_context_to_join() if get_telemetry_manager().join_host_trace else None
+            otel_context = OtelFactory.make_run_otel_context(
+                pipeline_run_id=pipeline_run_id,
+                pipe_code=pipe_code,
+                host_span_context=host_span_context,
             )
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
@@ -481,7 +481,8 @@ async def pipeline_run_setup(
         # second one assembled here from the same parameters. Waiting also means a
         # failure inside that seam no longer announces a trace for a run that never
         # started, which is the event that cannot be unsent.
-        if otel_context is not None:
+        # A run the host sampled out keeps no span, so no trace is announced for it either.
+        if otel_context is not None and otel_context.is_sampled:
             get_telemetry_manager().handle_trace_start(
                 trace_name=otel_context.trace_name,
                 trace_name_redacted=otel_context.trace_name_redacted,

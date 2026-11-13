@@ -20,6 +20,13 @@ a line's ``pipelex.*`` fields, and nothing else does.
 Holding a span never ends it, records an exception on it or sets its status, which stay with the code
 that started it, and it never becomes the way a parent reaches a child: the job metadata still carries
 that, so a child running in another process gets the same parent it always did.
+
+An operator who declares the process's trace theirs, with ``join_host_trace``, gets the other behaviour:
+a run starts under the host's current span, read here by ``host_span_context_to_join``, and the runtime
+holds its spans with ``make_current``, so each is also OpenTelemetry's current span while the work it
+measures runs, and the host's own instrumentation and an error tracker reading the current span see it.
+The boot refuses that switch unless a destination of the operator's receives Pipelex's spans, so the
+host's spans made children of one arrive with a parent the operator has.
 """
 
 from __future__ import annotations
@@ -45,22 +52,45 @@ _ACTIVE_PIPELEX_SPAN: ContextVar[Span | None] = ContextVar("pipelex_active_span"
 
 
 @contextmanager
-def pipelex_span_active(*, span: Span | None) -> Generator[None]:
+def pipelex_span_active(*, span: Span | None, make_current: bool = False) -> Generator[None]:
     """Hold ``span`` as the Pipelex span active here while the block runs; no span, or one naming no trace, holds nothing.
 
     ``None`` is what the runtime holds with no tracer, in a dry run, or under a no-op tracer, the one
     ``OTEL_SDK_DISABLED`` hands out for one, which from ``opentelemetry-api`` 1.40 gives back the parent
     it was handed and before that an invalid span. A span naming no trace would hide the enclosing
-    Pipelex span from every line of the block. OpenTelemetry's own context is left as it is either way.
+    Pipelex span from every line of the block.
+
+    OpenTelemetry's own context is left as it is unless ``make_current`` is true, which the runtime passes
+    when the operator turned ``join_host_trace`` on: the span is then also OpenTelemetry's current span for
+    the block, and the previous one comes back on the way out, however the block ends. Being made current
+    never ends the span, records an exception on it or sets its status. The context is attached and
+    detached in the same task, and a thread started inside the block by ``asyncio.to_thread`` copies it.
     """
     if span is None or not span.get_span_context().is_valid:
         yield
         return
     token = _ACTIVE_PIPELEX_SPAN.set(span)
     try:
-        yield
+        if make_current:
+            with trace.use_span(span, end_on_exit=False, record_exception=False, set_status_on_exception=False):
+                yield
+        else:
+            yield
     finally:
         _ACTIVE_PIPELEX_SPAN.reset(token)
+
+
+def host_span_context_to_join() -> SpanContext | None:
+    """The host's current span a run joining the host's trace starts under, or ``None`` when no current span names a trace.
+
+    Read once, at pipeline start, where the run's trace is decided; the job metadata carries the result from
+    there, across a process boundary too. Inside a run whose spans are made current, this is the enclosing
+    Pipelex span, so a nested run joins it.
+    """
+    current_span_context = trace.get_current_span().get_span_context()
+    if current_span_context.is_valid:
+        return current_span_context
+    return None
 
 
 def current_span_context_for_logs() -> SpanContext | None:
