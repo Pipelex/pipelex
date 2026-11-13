@@ -59,6 +59,7 @@ class _RecordingBundleValidator:
         method_dir: Path | None,  # noqa: ARG002
         methods_dirs: Sequence[Path] | None,  # noqa: ARG002
         read_scope: str | None,  # noqa: ARG002
+        request_id: str | None,  # noqa: ARG002
     ) -> BundleValidationFailure:
         self.graph_pipe_codes.append(graph_pipe_code)
         return BundleValidationFailure(

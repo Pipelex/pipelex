@@ -51,6 +51,7 @@ class DirectBundleValidator:
         # The in-process arm reads every file of the method in this process, from the trees its libraries hold, and
         # reads no blob store, so the scope a dispatched arm hands its worker the trees through has no use here.
         read_scope: str | None,  # ruff: ignore[unused-method-argument]
+        request_id: str | None,
     ) -> PipelexValidationReport | BundleValidationFailure:
         try:
             return await validate_bundles_in_process(
@@ -64,6 +65,8 @@ class DirectBundleValidator:
                 submitted_files=submitted_files,
                 method_dir=method_dir,
                 methods_dirs=methods_dirs,
+                # Refused there before any work when it breaks the request id rule, then bound for the whole sweep.
+                request_id=request_id,
             )
         except ValidateBundleError as exc:
             # An invalid bundle is a produced verdict, not a fault: surface its problem and its items

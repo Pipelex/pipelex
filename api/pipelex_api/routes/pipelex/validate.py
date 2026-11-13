@@ -410,6 +410,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
             allow_signatures=request_data.allow_signatures,
             requested_orchestration_mode=request_data.orchestration_mode,
             graph_pipe_code=None,
+            request_id=request_id_of(request),
         )
         default_pipe_ref_known = False
         tree_default_pipe_ref: str | None = None
@@ -443,6 +444,7 @@ async def validate_mthds(request: Request, request_data: ValidateRequest) -> JSO
                 allow_signatures=request_data.allow_signatures,
                 requested_orchestration_mode=request_data.orchestration_mode,
                 graph_pipe_code=tree_default_pipe_ref,
+                request_id=request_id_of(request),
                 method_dir=written.method_dir,
             )
     if isinstance(verdict, BundleValidationFailure):
