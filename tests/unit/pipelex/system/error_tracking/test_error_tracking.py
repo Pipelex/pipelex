@@ -10,12 +10,14 @@ from pytest_mock import MockerFixture
 from typing_extensions import override
 
 from pipelex.errors.problem import ProblemView, make_problem
+from pipelex.system.error_tracking import error_tracking as error_tracking_module
 from pipelex.system.error_tracking.error_report import ErrorReport, ErrorReportKind
 from pipelex.system.error_tracking.error_tracker import ErrorTrackerAbstract
 from pipelex.system.error_tracking.error_tracking import (
     has_error_trackers,
     install_error_trackers,
     installed_error_trackers,
+    reaches_error_trackers,
     report_exception,
     report_problem,
     reset_error_trackers,
@@ -48,6 +50,15 @@ def keep_the_installed_trackers() -> Generator[None, None, None]:
     install_error_trackers(trackers=previous_trackers)
     sys.excepthook = previous_excepthook
     threading.excepthook = previous_threading_excepthook
+
+
+class _UnprintableError(Exception):
+    """An exception whose ``__str__`` raises, as a buggy class of a dependency's can."""
+
+    @override
+    def __str__(self) -> str:
+        msg = "this error cannot be printed"
+        raise RuntimeError(msg)
 
 
 def _raised(*, error: Exception) -> Exception:
@@ -200,3 +211,52 @@ class TestErrorTracking:
         install_error_trackers(trackers=[])
 
         assert sys.excepthook == previous_excepthook
+
+    def test_an_exception_whose_str_raises_never_fails_the_reporter(self) -> None:
+        with recording_error_tracker() as recorder:
+            report_exception(exception=_raised(error=_UnprintableError()))
+
+        assert [report.error_type for report in recorder.reports] == ["_UnprintableError"]
+
+    def test_a_report_that_cannot_be_built_is_dropped_and_never_raises(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(error_tracking_module, "make_error_report", side_effect=RuntimeError("the report could not be built"))
+        error = _raised(error=_UnprintableError())
+
+        with recording_error_tracker() as recorder:
+            report_exception(exception=error)
+            report_problem(problem=make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR))
+
+        assert recorder.reports == []
+        # Not marked: nothing was reported, so a later report of it may still go out.
+        assert not was_reported(exception=error)
+
+    def test_the_previous_hook_is_called_even_when_reporting_fails(self, mocker: MockerFixture) -> None:
+        previous_hook = mocker.MagicMock()
+        sys.excepthook = previous_hook
+        previous_threading_hook = mocker.MagicMock()
+        threading.excepthook = previous_threading_hook
+        install_error_trackers(trackers=[RecordingErrorTracker()])
+        mocker.patch.object(error_tracking_module, "_report_uncaught", side_effect=RuntimeError("reporting failed"))
+        error = _raised(error=ValueError("uncaught"))
+
+        with pytest.raises(RuntimeError, match="reporting failed"):
+            sys.excepthook(ValueError, error, error.__traceback__)
+        thread_args = mocker.MagicMock(exc_value=error)
+        with pytest.raises(RuntimeError, match="reporting failed"):
+            threading.excepthook(thread_args)
+
+        previous_hook.assert_called_once_with(ValueError, error, error.__traceback__)
+        previous_threading_hook.assert_called_once_with(thread_args)
+
+    @pytest.mark.parametrize(
+        ("code", "reaches"),
+        [
+            (CoreCode.RUNTIME_UNEXPECTED, True),
+            (CoreCode.RUNTIME_MISCONFIGURED, True),
+            (CoreCode.METHOD_INVALID, False),
+            (CoreCode.REQUEST_NOT_FOUND, False),
+            (CoreCode.AUTH_INVALID_CREDENTIAL, False),
+        ],
+    )
+    def test_only_an_operator_s_or_the_runtime_s_fault_reaches_the_trackers(self, code: CoreCode, reaches: bool) -> None:
+        assert reaches_error_trackers(problem=make_problem(code=code, view=ProblemView.OPERATOR)) is reaches

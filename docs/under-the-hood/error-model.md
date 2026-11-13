@@ -669,7 +669,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | `pipelex/errors/retired_error_pages.py` | The static redirects of the retired per-class error pages |
 | `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
 | `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
-| `pipelex/pipe_run/located_failure.py` | `find_root_fault()`, `located_root_fault()`, `failure_location_of()`, `make_unexpected_failure()` |
+| `pipelex/pipe_run/located_failure.py` | `find_root_fault()`, `located_root_fault()`, `failure_location_of()` |
+| `pipelex/errors/unexpected_failure.py` | `make_unexpected_failure()` |
 | `pipelex/pipe_operators/func/pipe_func_execution_transport.py` | `pipe_func_raised_report()` and `read_pipe_func_raised_report()`: the report a sandboxed `PipeFunc` call writes when its function raises, and its reading back |
 | `pipelex/graph/node_problem.py` | `make_node_problem()`: the caller-view problem a failed node of the execution graph records |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder — and `problem_item_of()` |

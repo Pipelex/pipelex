@@ -106,6 +106,35 @@ class TestErrorTrackerRegistry:
         assert exc_info.value.registered_methods == ["sentry"]
         assert "runtime.error_tracking.trackers" in str(exc_info.value)
 
+    def test_a_factory_that_raises_closes_the_trackers_built_before_it(self, mocker: MockerFixture) -> None:
+        built_first = RecordingErrorTracker()
+        built_second = RecordingErrorTracker()
+        close_second = mocker.patch.object(built_second, "close", side_effect=RuntimeError("the tracker could not flush"))
+        built_third = RecordingErrorTracker()
+        failing_factory = mocker.MagicMock(side_effect=RuntimeError("the SDK could not start"))
+        registry = ErrorTrackerRegistry(
+            _registrar_with(
+                factories={
+                    "first": mocker.MagicMock(return_value=built_first),
+                    "second": mocker.MagicMock(return_value=built_second),
+                    "broken": failing_factory,
+                    "third": mocker.MagicMock(return_value=built_third),
+                }
+            ).error_trackers
+        )
+
+        with pytest.raises(RuntimeError, match="the SDK could not start"):
+            registry.make_error_trackers(
+                config=ErrorTrackingConfig(trackers=["first", "second", "broken", "third"]),
+                secrets_provider=EnvSecretsProvider(),
+                telemetry_manager=TelemetryManagerNoOp(),
+            )
+
+        assert built_first.is_closed
+        # A tracker that cannot close does not stop the others closing, nor replace the boot's error.
+        close_second.assert_called_once_with()
+        assert not built_third.is_closed
+
     def test_a_tracker_named_twice_is_refused_by_the_configuration(self) -> None:
         with pytest.raises(ValueError, match="more than once: sentry"):
             ErrorTrackingConfig(trackers=["sentry", "posthog", "sentry"])

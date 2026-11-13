@@ -30,14 +30,14 @@ Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `i
 
 ## Error trackers
 
-Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a failed run, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails with a fault the operator must fix, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault. A caller's mistake, a bad input or a method naming a model the deployment does not serve, is answered to the caller and not reported, and a dry run reports nothing. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
 
 ```toml
 [runtime.error_tracking]
 trackers = ["posthog"]
 ```
 
-- **PostHog is one tracker among others.** The built-in `posthog` tracker sends each error's exception to your own PostHog stream as an `$exception`. It sends nothing unless that stream is on in `telemetry.toml`, and `DO_NOT_TRACK` turns it off with the rest.
+- **PostHog is one tracker among others.** The built-in `posthog` tracker sends each error's exception to your own PostHog stream as an `$exception`, with every exception message redacted: each error along the chain goes out as its class name and a privacy notice, whatever its class, and each frame as its module, function and line, without its source lines or its file's path. It sends nothing unless that stream is on in `telemetry.toml`, and `DO_NOT_TRACK` turns it off with the rest.
 - **Your own tracker plugs into the same seam.** A plugin registers a tracker under a token of its own, `sentry` for instance, and you add that token to the list. Pipelex ships no vendor SDK: a tracker's SDK comes with the plugin that contributes it.
 - **A tracker receives identifiers, not content.** Each error comes with its problem document in the operator's view, its error code, where it was raised, the failing pipe, the run and request ids, and the spans to join it on. A tracker never sends the locals of a frame, a request body, or a run's inputs or outputs.
 

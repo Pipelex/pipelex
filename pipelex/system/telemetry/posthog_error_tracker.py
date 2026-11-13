@@ -21,8 +21,10 @@ class PostHogErrorTracker(ErrorTrackerAbstract):
     """The built-in ``posthog`` error tracker: each reported exception goes to the operator's PostHog as an ``$exception``.
 
     Built by the telemetry manager (``TelemetryManager.make_error_tracker``) around the client it made for the
-    operator's own stream, whose ``capture_exception`` it wrapped to redact every ``PipelexError`` message the SDK
-    would send. A report with no exception sends nothing, since an ``$exception`` is built from one.
+    operator's own stream, whose ``capture_exception`` it wrapped so that every exception message the SDK would send,
+    along the whole cause chain and inside exception groups, whatever the error's class, is replaced by a privacy
+    notice, and whose ``before_send`` strips each frame's source lines and file path. A report with no exception sends
+    nothing, since an ``$exception`` is built from one.
 
     **An ``$exception`` is attributed like every other capture.** It is resolved through ``TelemetryIdentity`` rather
     than from a raw id, and per capture rather than once: the caller is read back from the error itself, the caller of

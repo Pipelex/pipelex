@@ -49,7 +49,7 @@ from pipelex.base_exceptions import ErrorDomain, PipelexError, iter_traceback_ch
 from pipelex.cogt.exceptions import find_inference_error_category_in_chain
 from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemView
 from pipelex.errors.security_event import emit_security_event
-from pipelex.pipe_run.located_failure import make_unexpected_failure
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.plugins.registrar import HttpErrorMapperFn
 from pipelex.system.error_tracking.error_tracking import report_exception, report_problem
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
@@ -296,13 +296,13 @@ def record_level_of(*, status: int, domain: ProblemDomain) -> RecordLevel:
             return RecordLevel.WARNING
 
 
-def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel | None) -> None:
+def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel) -> None:
     """Emit the structured error record for a failure answered with a problem, from the operator view.
 
-    Its level is `level` when the caller names one, else follows the HTTP status and the code's domain
-    (``record_level_of``): a 4xx is client-facing and logs at `warning` (caller mistakes, a provider's 429 passed through,
-    and the 409 conflict), a 5xx the server has to fix logs at `error` with the frames its deepest exception was raised
-    through. No record carries an
+    It logs at `level`, which ``problem_response`` decided once, from the caller's choice or else from the HTTP status
+    and the code's domain (``record_level_of``): a 4xx is client-facing and logs at `warning` (caller mistakes, a
+    provider's 429 passed through, and the 409 conflict), a 5xx the server has to fix logs at `error` with the frames its
+    deepest exception was raised through. No record carries an
     exception's text or its traceback (``_emit_api_error``). `error.code` is the
     problem's code, `error.type` the class of the exception that escaped, else
     the class the operator view names, and `error.chain` the classes of the
@@ -345,10 +345,9 @@ def _log_problem(problem: PipelexProblem, *, error: BaseException | None, reques
         fields["provider_status_code"] = diagnostics.provider.status
         fields["provider_request_id"] = diagnostics.provider.request_id
     fields.update(_operator_param_fields(diagnostics=diagnostics))
-    record_level = level or record_level_of(status=status, domain=problem.effective_domain)
     if error is not None:
-        fields.update(_chain_fields(error, with_frames=record_level.writes_frames))
-    _emit_api_error(fields=fields, level=record_level)
+        fields.update(_chain_fields(error, with_frames=level.writes_frames))
+    _emit_api_error(fields=fields, level=level)
 
 
 def problem_response(

@@ -6,7 +6,8 @@ from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView, make_location, make_problem
-from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report
+from pipelex.pipe_run.delivery_executor import run_problem_of
+from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report, operator_problem_of
 from pipelex.system.exceptions import ToolError
 
 _PLANTED_INPUT = "patient record 123-45-6789"
@@ -95,3 +96,21 @@ class TestErrorReport:
     def test_a_report_needs_an_exception_or_a_problem(self) -> None:
         with pytest.raises(ValueError, match="needs an exception or a problem"):
             make_error_report(kind=ErrorReportKind.HANDLED)
+
+    def test_a_foreign_exception_s_text_never_reaches_its_problem(self) -> None:
+        """A foreign exception stands as `runtime.unexpected` through the stand-in every surface gives it, named by its class."""
+        report = make_error_report(kind=ErrorReportKind.HANDLED, exception=KeyError(_PLANTED_INPUT))
+
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+        assert report.problem.diagnostics is not None
+        assert report.problem.diagnostics.message == "KeyError"
+        assert _PLANTED_INPUT not in report.problem.model_dump_json()
+
+    def test_a_failed_run_s_webhooks_and_its_report_share_one_builder(self) -> None:
+        """The problem a webhook receives and the one a report carries are built the same way, so they never disagree."""
+        error = KeyError(_PLANTED_INPUT)
+
+        webhook_problem = run_problem_of(error=error, pipeline_run_id="plr-3", request_id="req-3")
+        reported_problem = operator_problem_of(exception=error, pipeline_run_id="plr-3", request_id="req-3")
+
+        assert webhook_problem.model_dump() == reported_problem.model_dump()

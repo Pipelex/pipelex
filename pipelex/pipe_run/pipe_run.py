@@ -21,8 +21,8 @@ from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of, report_run_usage
-from pipelex.system.error_tracking.error_report import ErrorReportKind
-from pipelex.system.error_tracking.error_tracking import has_error_trackers, report_exception
+from pipelex.system.error_tracking.error_report import ErrorReportKind, operator_problem_of
+from pipelex.system.error_tracking.error_tracking import has_error_trackers, reaches_error_trackers, report_exception
 from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
@@ -77,9 +77,9 @@ class PipeRun(PipeRunProtocol):
             reports_usage_stats: Whether a run reports its anonymous usage statistics, its `run_completed` and
                 `model_used` events, when statistics are on. Off for the runs a validation makes, which its own
                 `method_validated` describes.
-            reports_errors: Whether a failed run is reported to the installed error trackers. Off for the runs a
-                validation makes, whose failures are the validation's findings about the method, answered to whoever
-                asked for it.
+            reports_errors: Whether a failed run is reported to the installed error trackers, when its failure is the
+                operator's to fix and the run is no dry run. Off for the runs a validation makes, whose failures are
+                the validation's findings about the method, answered to whoever asked for it.
         """
         self._pipe_router = pipe_router
         self._delivery_executor = DeliveryExecutor()
@@ -104,6 +104,38 @@ class PipeRun(PipeRunProtocol):
                 # webhook the SSRF guard refuses at fire time after the run completed, is logged here.
                 emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
                 raise
+
+    def _report_run_failure(self, *, error: Exception, pipe_job: PipeJob, webhook_problem: PipelexProblem | None) -> None:
+        """Report a failed run to the operator's error trackers, when its failure is the operator's to fix.
+
+        The report carries the operator's problem, the run's ids and its pipe. A validation's run, whose failures are
+        its findings about the method, and a dry run report nothing, nor does a caller's mistake, whose domain is the
+        caller's (``reaches_error_trackers``). With no tracker installed nothing is built. Reported once: a host that
+        lets the error reach the interpreter's hook, or raises its own from it, does not report it again.
+
+        Args:
+            error: The error the run fails with.
+            pipe_job: The run's job.
+            webhook_problem: The problem built for the run's webhooks, when it has any, which is reused.
+        """
+        if not self._reports_errors or not has_error_trackers() or pipe_job.pipe_run_params.run_mode.is_dry:
+            return
+        run_metadata = pipe_job.job_metadata.run_metadata
+        problem = webhook_problem or operator_problem_of(
+            exception=error,
+            pipeline_run_id=run_metadata.pipeline_run_id,
+            request_id=run_metadata.request_id,
+        )
+        if not reaches_error_trackers(problem=problem):
+            return
+        report_exception(
+            exception=error,
+            kind=ErrorReportKind.RUN_FAILURE,
+            problem=problem,
+            pipeline_run_id=run_metadata.pipeline_run_id,
+            request_id=run_metadata.request_id,
+            pipe_code=pipe_job.pipe.code,
+        )
 
     async def _run_bound(
         self,
@@ -159,19 +191,7 @@ class PipeRun(PipeRunProtocol):
             )
             # A security refusal also logs its security event, once, naming the run and never what it refused.
             emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
-            # The run's failure reaches the operator's error trackers, in the operator's view, with the run's ids and its
-            # pipe; with no tracker installed nothing is built. Reported once: a host that lets the error reach the
-            # interpreter's hook, or raises its own from it, does not report it again.
-            if self._reports_errors and has_error_trackers():
-                report_exception(
-                    exception=exc,
-                    kind=ErrorReportKind.RUN_FAILURE,
-                    problem=problem
-                    or run_problem_of(error=exc, pipeline_run_id=pipeline_run_id, request_id=pipe_job.job_metadata.run_metadata.request_id),
-                    pipeline_run_id=pipeline_run_id,
-                    request_id=pipe_job.job_metadata.run_metadata.request_id,
-                    pipe_code=pipe_job.pipe.code,
-                )
+            self._report_run_failure(error=exc, pipe_job=pipe_job, webhook_problem=problem)
         finally:
             # When the run ended, which a caller's webhook event states, taken before the run's tail does its own work.
             finished_at = datetime.now(UTC)

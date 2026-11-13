@@ -3,9 +3,9 @@ from typing import Protocol
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.observer.observer_protocol import ObserverProtocol, PayloadKey, PayloadType
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
-from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipe_run.pipe_job import PipeJob
 
 

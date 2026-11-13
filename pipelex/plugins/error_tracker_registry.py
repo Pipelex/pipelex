@@ -1,9 +1,11 @@
 from typing import Protocol
 
+from pipelex import log
 from pipelex.plugins.exceptions import UnknownErrorTrackerError
 from pipelex.system.error_tracking.error_tracker import ErrorTrackerAbstract
 from pipelex.system.error_tracking.error_tracking_config import ErrorTrackingConfig
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
 
@@ -67,12 +69,28 @@ class ErrorTrackerRegistry:
         """Build the trackers ``config`` names, in its order, leaving out each one whose factory found nothing to report to.
 
         Every token is looked up before any factory runs, so a token nobody registered stops the boot before a tracker
-        initialises its SDK.
+        initialises its SDK. A factory that raises stops the boot too, and the trackers built before it are closed
+        first, so none is left holding a client nobody will flush or shut down.
         """
         factories = [self.get_required(method=method) for method in config.trackers]
         trackers: list[ErrorTrackerAbstract] = []
-        for factory in factories:
-            tracker = factory(config, secrets_provider=secrets_provider, telemetry_manager=telemetry_manager)
-            if tracker is not None:
-                trackers.append(tracker)
+        try:
+            for factory in factories:
+                tracker = factory(config, secrets_provider=secrets_provider, telemetry_manager=telemetry_manager)
+                if tracker is not None:
+                    trackers.append(tracker)
+        except BaseException:
+            _close_built_trackers(trackers=trackers)
+            raise
         return trackers
+
+
+def _close_built_trackers(*, trackers: list[ErrorTrackerAbstract]) -> None:
+    """Close the trackers a failed boot built before its failure; a tracker that cannot be closed is logged at debug level."""
+    for tracker in trackers:
+        try:
+            tracker.close()
+        except Exception as close_error:  # ruff: ignore[blind-except]
+            # (2) a tracker is a plugin's code whose exception surface cannot be enumerated, and the boot's own error
+            # is the one that must surface.
+            log.debug("An error tracker could not be closed", fields={"error_tracker": type(tracker).__name__, **error_fields(exc=close_error)})

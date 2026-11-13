@@ -31,8 +31,9 @@ from pydantic.dataclasses import dataclass
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError, iter_cause_chain
-from pipelex.errors.failure_problem import ERROR_CHAIN_FIELD, failure_frames, foreign_failure_diagnostics
+from pipelex.errors.failure_problem import ERROR_CHAIN_FIELD, failure_frames
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.system.telemetry.current_span import (
     PIPELEX_SPAN_ID_KEY,
     PIPELEX_TRACE_ID_KEY,
@@ -162,29 +163,40 @@ class ErrorReport:
         return fields
 
 
-def operator_problem_of(*, exception: BaseException, pipeline_run_id: str | None, request_id: str | None) -> PipelexProblem:
-    """The problem of ``exception`` in the operator's view: a Pipelex error's own, else ``runtime.unexpected``.
+def build_operator_problem(*, exception: BaseException, pipeline_run_id: str | None, request_id: str | None) -> PipelexProblem:
+    """The problem of ``exception`` in the operator's view, raising whatever building it raises.
 
-    Building a report must never fail in place of the error it reports, and a Pipelex error's problem reads hooks a
-    plugin's error may override, so a problem that cannot be built falls back to ``runtime.unexpected``.
+    A Pipelex error's problem is its own. Any other exception stands as ``runtime.unexpected`` through the stand-in
+    every surface gives it (``make_unexpected_failure``), whose diagnostics name its class and never hold its text,
+    which can carry anything of the run's data. Most callers want ``operator_problem_of``, which never raises.
     """
-    if isinstance(exception, PipelexError):
-        try:
-            return exception.to_problem(view=ProblemView.OPERATOR, request_id=request_id, pipeline_run_id=pipeline_run_id)
-        except Exception as problem_error:  # ruff: ignore[blind-except]
-            # (2) `to_problem` runs hooks overridden across the whole error hierarchy, plugins' errors included, whose
-            # exception surface cannot be enumerated; the report falls back to the catch-all code rather than failing.
-            log.debug(
-                "A reported error's problem could not be built",
-                fields={"reported_error_type": type(exception).__name__, **error_fields(exc=problem_error)},
-            )
-    return make_problem(
-        code=CoreCode.RUNTIME_UNEXPECTED,
-        view=ProblemView.OPERATOR,
-        diagnostics=foreign_failure_diagnostics(error=exception),
-        pipeline_run_id=pipeline_run_id,
-        request_id=request_id,
-    )
+    failure = exception if isinstance(exception, PipelexError) else make_unexpected_failure(error=exception)
+    return failure.to_problem(view=ProblemView.OPERATOR, request_id=request_id, pipeline_run_id=pipeline_run_id)
+
+
+def unexpected_operator_problem(*, pipeline_run_id: str | None, request_id: str | None) -> PipelexProblem:
+    """The bare ``runtime.unexpected`` problem a failure stands as when its own problem could not be built."""
+    return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+
+
+def operator_problem_of(*, exception: BaseException, pipeline_run_id: str | None, request_id: str | None) -> PipelexProblem:
+    """The problem of ``exception`` in the operator's view: a Pipelex error's own, else ``runtime.unexpected``; never raises.
+
+    The one builder of a failure's operator problem that error reports and a failed run's webhooks share. Building a
+    report must never fail in place of the error it reports, and a Pipelex error's problem reads hooks a plugin's error
+    may override, so a problem that cannot be built is logged at debug level and falls back to a bare
+    ``runtime.unexpected``.
+    """
+    try:
+        return build_operator_problem(exception=exception, pipeline_run_id=pipeline_run_id, request_id=request_id)
+    except Exception as problem_error:  # ruff: ignore[blind-except]
+        # (2) `to_problem` runs hooks overridden across the whole error hierarchy, plugins' errors included, whose
+        # exception surface cannot be enumerated; the report falls back to the catch-all code rather than failing.
+        log.debug(
+            "A reported error's problem could not be built",
+            fields={"reported_error_type": type(exception).__name__, **error_fields(exc=problem_error)},
+        )
+    return unexpected_operator_problem(pipeline_run_id=pipeline_run_id, request_id=request_id)
 
 
 def raise_site_of(*, exception: BaseException) -> str | None:

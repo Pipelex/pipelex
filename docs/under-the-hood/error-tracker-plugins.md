@@ -40,13 +40,15 @@ Three paths report an error, each tagged with its **kind** (`ErrorReportKind`):
 
 | Kind | Who reports it | When |
 |------|----------------|------|
-| `run_failure` | The runtime that ran the run, at the run's boundary (`PipeRun`) | A run fails. A validation's dry run does not report. |
+| `run_failure` | The runtime that ran the run, at the run's boundary (`PipeRun`) | A run fails with a fault the operator must fix. A dry run, a validation's or `pipelex run --dry-run`, does not report. |
 | `uncaught` | The interpreter hooks, `sys.excepthook` and `threading.excepthook`, installed while a tracker is | An exception reaches the top of the main thread or of another thread. Interruptions such as `KeyboardInterrupt` are not reported. The hooks that were there before are still called. |
-| `handled` | A host, or the runtime, through `report_exception` or `report_problem` (`pipelex.system.error_tracking.error_tracking`) | Something caught the error and went on. The API server reports this way every response it answers as an operator's fault, an error-level record, and never a caller's mistake. |
+| `handled` | A host, or the runtime, through `report_exception` or `report_problem` (`pipelex.system.error_tracking.error_tracking`) | Something caught the error and went on. The API server reports this way every response it answers as an operator's fault, an error-level record. |
+
+**Only the operator's faults reach the trackers, never a caller's mistake.** A failure whose problem's domain is `runtime` or `operator` is the operator's to fix and is reported; one whose domain is `input`, `method` or `account`, a malformed input, a method naming a model this deployment does not know, a missing credential, is answered to the caller and is not. A failed run is reported by that one rule, `reaches_error_trackers(problem=...)` in `pipelex.system.error_tracking.error_tracking`, and the API server applies the same split through the level of its error record. Whether the caller's failures should reach the trackers too is an open decision; every report already carries its domain as the `error.domain` tag, so reporting them would change that one predicate and nothing else.
 
 **One error, one report.** An exception reported once is marked, and a later report of it, or of an error raised `from` it, is skipped. A run's failure reported at the run's boundary is therefore not reported again when the API server answers it, nor when a host lets it reach the interpreter's hook, nor when a host raises its own error from it.
 
-**Reporting never fails the reporter.** With no tracker installed, a report builds nothing. A tracker is a plugin's code, so each call is guarded: a failing tracker is logged at debug level and the other trackers still receive the error.
+**Reporting never fails the reporter.** With no tracker installed, a report builds nothing. A report that cannot be built, from an exception whose `__str__` raises for instance, is logged at debug level and dropped, and the interpreter hooks still hand the exception on to the hooks that were there before. A tracker is a plugin's code, so each call is guarded: a failing tracker is logged at debug level and the other trackers still receive the error.
 
 A host whose runs fail outside `PipeRun`, a distributed worker for instance, reports its run's failure itself, with `report_exception(exception=..., kind=ErrorReportKind.RUN_FAILURE, ...)`.
 
@@ -101,7 +103,7 @@ Every tracker receives the same frozen `ErrorReport` (`pipelex/system/error_trac
 | Member | What it is |
 |--------|------------|
 | `kind` | `run_failure`, `uncaught` or `handled` |
-| `problem` | The error's problem document in the **operator's view**, the view of whoever runs the runtime (see [Error Model](error-model.md)) |
+| `problem` | The error's problem document in the **operator's view**, the view of whoever runs the runtime (see [Error Model](error-model.md)): a Pipelex error's own, else `runtime.unexpected` naming the foreign exception's class and never quoting its text, the same problem a failed run's webhooks receive |
 | `exception` | The exception, or `None` for a problem reported without one |
 | `error_type`, `error_chain` | The exception's class, and the classes along its cause chain |
 | `frames` | The frames down to where the first exception was raised, each `module:line in function`, with no source line and no locals |
@@ -125,7 +127,7 @@ Three derived members give a tracker its grouping and its tags, spelled with the
 
 ## The built-in `posthog` tracker
 
-`pipelex/providers/error_trackers/error_tracker_plugin.py` registers the `posthog` token. Its factory asks the telemetry manager for the tracker of the operator's own PostHog stream (`TelemetryManager.make_error_tracker`), which is `None` whenever that stream is off: `[custom_posthog]` disabled in `telemetry.toml`, an integration mode the stream is not allowed in, or `DO_NOT_TRACK` set. `PostHogErrorTracker` sends the report's exception as an `$exception`, attributed to the caller the run belonged to as described in [Telemetry](../setup/telemetry.md#work-that-is-not-a-run-and-crashes), with every `PipelexError` message redacted; a report with no exception sends nothing, and an exception PostHog already captured is not sent again.
+`pipelex/providers/error_trackers/error_tracker_plugin.py` registers the `posthog` token. Its factory asks the telemetry manager for the tracker of the operator's own PostHog stream (`TelemetryManager.make_error_tracker`), which is `None` whenever that stream is off: `[custom_posthog]` disabled in `telemetry.toml`, an integration mode the stream is not allowed in, or `DO_NOT_TRACK` set. `PostHogErrorTracker` sends the report's exception as an `$exception`, attributed to the caller the run belonged to as described in [Telemetry](../setup/telemetry.md#work-that-is-not-a-run-and-crashes), with every exception message redacted: each error along the cause chain and inside exception groups, whatever its class, a `PipelexError`, a `ValueError` quoting what it refused or a pydantic `ValidationError` rendering its input, goes out as its class name and a privacy notice, without its attributes or its notes. Each frame goes out as its module, function and line, without the source lines around it or its file's path, which the client's `before_send` strips. A report with no exception sends nothing, and an exception PostHog already captured is not sent again.
 
 The plugin is not core-unconditional: a process may report its errors nowhere. One that disables it while `runtime.error_tracking.trackers` still names `posthog` stops at boot with `UnknownErrorTrackerError`.
 
@@ -199,3 +201,5 @@ assert recorder.reports[0].code == "model.unknown"
 | `runtime.error_tracking.trackers` names a tracker twice | a configuration validation error |
 | two plugins register the same token | `DuplicateErrorTrackerError` (names both plugins) |
 | a tracker raises while reporting or closing | logged at debug level; the reporter and the other trackers carry on |
+| a report cannot be built | logged at debug level; nothing is sent and the reporter carries on |
+| a tracker's factory raises at boot | the boot stops with that error, after closing the trackers already built |

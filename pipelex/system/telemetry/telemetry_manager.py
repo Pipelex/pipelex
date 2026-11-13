@@ -11,7 +11,6 @@ from typing_extensions import Unpack, override
 from pipelex import log
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity
 from pipelex.system.environment import is_env_var_truthy
-from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.exceptions import TelemetryApiKeyMissingError
@@ -27,6 +26,50 @@ if TYPE_CHECKING:
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
 
     from pipelex.system.job_metadata import RunMetadata
+
+
+# What PostHog writes into each frame of an `$exception` beside the module, function and line: the source lines around
+# the frame, which may hold a literal of the caller's data or a secret, and the path of the file on this machine.
+EXCEPTION_FRAME_SOURCE_KEYS = ("pre_context", "context_line", "post_context", "abs_path", "code_variables")
+
+
+def strip_exception_frame_sources(  # kw-only: ignore — PostHog before_send callback, invoked positionally
+    event: dict[str, Any],
+) -> dict[str, Any]:
+    """PostHog's `before_send` for the operator's client: an `$exception` leaves with its frames' sources stripped.
+
+    The SDK serializes each frame with the source lines around it and the absolute path of its file, and the
+    variables of its frames when asked to, none of which an error report may carry; what stays is the module, the
+    function and the line, which is what groups an issue. Any other event goes out untouched.
+    """
+    if event.get("event") != PostHogEvent.EXCEPTION:
+        return event
+    for frame in _exception_event_frames(event=event):
+        for key in EXCEPTION_FRAME_SOURCE_KEYS:
+            frame.pop(key, None)
+    return event
+
+
+def _exception_event_frames(*, event: dict[str, Any]) -> list[dict[str, Any]]:
+    """The frames of every exception of an `$exception` event, as the SDK serialized them; anything malformed is skipped."""
+    properties = _as_dict(value=event.get("properties"))
+    frames: list[dict[str, Any]] = []
+    for exception_entry in _as_list(value=properties.get(PostHogAttr.EXCEPTION_LIST)):
+        stacktrace = _as_dict(value=_as_dict(value=exception_entry).get("stacktrace"))
+        for frame in _as_list(value=stacktrace.get("frames")):
+            if isinstance(frame, dict):
+                frames.append(cast("dict[str, Any]", frame))
+    return frames
+
+
+def _as_dict(*, value: object) -> dict[str, Any]:
+    """``value`` when it is a dict, else an empty one: what a serialized event holds is read without trusting its shape."""
+    return cast("dict[str, Any]", value) if isinstance(value, dict) else {}
+
+
+def _as_list(*, value: object) -> list[Any]:
+    """``value`` when it is a list, else an empty one."""
+    return cast("list[Any]", value) if isinstance(value, list) else []
 
 
 class TelemetryManager(TelemetryManagerAbstract):
@@ -52,6 +95,7 @@ class TelemetryManager(TelemetryManagerAbstract):
                 disable_geoip=not telemetry_config.custom_posthog.geoip,
                 debug=telemetry_config.custom_posthog.debug,
                 on_error=self._handle_transmission_error,
+                before_send=strip_exception_frame_sources,
             )
 
         # Create OTel tracer for AI tracing if enabled
@@ -131,7 +175,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             exception: ExceptionArg | None = None,
             **kwargs: Unpack[OptionalCaptureArgs],
         ) -> Any:
-            """Capture exception with message sanitization for PipelexError subclasses.
+            """Capture an exception with every message along its chain replaced by the privacy notice.
 
             PostHog marks what it sent so a second capture of the same error is
             dropped, and what it sent may be a redacted copy rather than the
@@ -182,16 +226,13 @@ class TelemetryManager(TelemetryManagerAbstract):
         PostHog takes an error either bare or as the `(type, value, traceback)`
         triple an interpreter excepthook receives. And it does not send one
         exception: it walks `__cause__`, `__context__` and the members of an
-        exception group, and sends the message of every error it reaches. A
-        `PipelexError` message may repeat whatever the caller passed in — the
-        path it was reading, a slice of the document that would not parse — so
-        the message of every `PipelexError` in that graph is replaced by the
-        privacy notice, wherever it sits, and not only the one at the top.
-
-        The redaction goes by class. An error of another class keeps its own
-        message, so one that copied a `PipelexError`'s text into it —
-        `raise RuntimeError(f"failed: {error}") from error` — still sends that
-        text; only the linked `PipelexError` itself is replaced.
+        exception group, and sends the message of every error it reaches. Any
+        of those messages may repeat what the caller passed in: a `PipelexError`
+        quotes the path it was reading or a slice of the document that would not
+        parse, a `ValueError` a function raised quotes the value it refused, and
+        a pydantic `ValidationError` renders the input it rejected. So every
+        message in that graph is replaced by the privacy notice, whatever the
+        error's class, and what goes out is each error's class and its frames.
         """
         if isinstance(exception, BaseException):
             return cls._redacted_exception_graph(exception=exception)
@@ -199,33 +240,41 @@ class TelemetryManager(TelemetryManagerAbstract):
         if exception_value is None:
             return exception
         redacted_value = cls._redacted_exception_graph(exception=exception_value)
-        if redacted_value is exception_value:
-            return exception
         return (type(redacted_value), redacted_value, exception_traceback)
 
     @classmethod
     def _redacted_exception_graph(cls, *, exception: BaseException) -> BaseException:
-        """Return `exception` itself when nothing it reaches is a `PipelexError`, else a redacted copy of all of it.
+        """Return a copy of everything PostHog would walk from `exception`, every message replaced by the privacy notice.
 
-        The copy is never written back: the live exception is the one the
-        interpreter goes on to print and a host may still be holding, so only a
-        copy of the graph has its links pointed at the stand-ins.
+        The copy has the shape of the original, links and group members
+        included, so PostHog walks it as it would have walked the original. It
+        is never written back: the live exception is the one the interpreter
+        goes on to print and a host may still be holding.
+
+        Built with loops and not a recursion, as PostHog's own walk is: the SDK
+        sends a chain as long as the recursion limit, and the redaction in
+        front of it must not be what fails on it.
         """
-        if not cls._reaches_pipelex_error(exception=exception):
-            return exception
-        redacted = cls._redacted_link(exception=exception, copies={})
-        # The root is never cut: only a link back to an exception still being copied is.
-        assert redacted is not None
-        return redacted
+        graph = cls._exception_graph(exception=exception)
+        copies: dict[int, BaseException] = {}
+        for original in graph:
+            if not isinstance(original, BaseExceptionGroup):
+                copies[id(original)] = cls._redacted_stand_in(exception=original)
+        for group in cls._groups_members_first(graph=graph):
+            members = [copies[id(member)] for member in cls._group_members(exception=group) if id(member) in copies]
+            copies[id(group)] = cls._redacted_group_stand_in(group=group, members=members)
+        for original in graph:
+            copied = copies[id(original)]
+            copied.__traceback__ = original.__traceback__
+            copied.__cause__ = copies.get(id(original.__cause__)) if original.__cause__ is not None else None
+            copied.__context__ = copies.get(id(original.__context__)) if original.__context__ is not None else None
+            copied.__suppress_context__ = original.__suppress_context__
+        return copies[id(exception)]
 
     @classmethod
-    def _reaches_pipelex_error(cls, *, exception: BaseException) -> bool:
-        """Whether a `PipelexError` sits anywhere PostHog would walk from `exception`.
-
-        A loop and not a recursion, as PostHog's own walk is: the SDK sends a
-        chain as long as the recursion limit, and the check deciding whether it
-        needs redacting must not be what fails on it.
-        """
+    def _exception_graph(cls, *, exception: BaseException) -> list[BaseException]:
+        """Every exception PostHog would reach from `exception`, `exception` first, each once."""
+        graph: list[BaseException] = []
         pending: list[BaseException | None] = [exception]
         visited: set[int] = set()
         while pending:
@@ -233,10 +282,38 @@ class TelemetryManager(TelemetryManagerAbstract):
             if current is None or id(current) in visited:
                 continue
             visited.add(id(current))
-            if isinstance(current, PipelexError):
-                return True
+            graph.append(current)
             pending.extend((current.__cause__, current.__context__, *cls._group_members(exception=current)))
-        return False
+        return graph
+
+    @classmethod
+    def _groups_members_first(cls, *, graph: list[BaseException]) -> list[BaseException]:
+        """The exception groups of `graph`, each after the groups among its members, since a group is built from its members' copies."""
+        ordered: list[BaseException] = []
+        placed: set[int] = set()
+        for root in graph:
+            if not isinstance(root, BaseExceptionGroup):
+                continue
+            expanding: set[int] = set()
+            stack: list[tuple[BaseException, bool]] = [(root, False)]
+            while stack:
+                group, members_placed = stack.pop()
+                if id(group) in placed:
+                    continue
+                if members_placed:
+                    placed.add(id(group))
+                    ordered.append(group)
+                    continue
+                if id(group) in expanding:
+                    continue
+                expanding.add(id(group))
+                stack.append((group, True))
+                stack.extend(
+                    (member, False)
+                    for member in cls._group_members(exception=group)
+                    if cls._group_members(exception=member) and id(member) not in placed
+                )
+        return ordered
 
     @classmethod
     def _group_members(cls, *, exception: BaseException) -> tuple[BaseException, ...]:
@@ -246,73 +323,49 @@ class TelemetryManager(TelemetryManagerAbstract):
         return ()
 
     @classmethod
-    def _redacted_link(cls, *, exception: BaseException | None, copies: dict[int, BaseException | None]) -> BaseException | None:
-        """Copy one exception of the graph, with its own links redacted in turn.
-
-        `copies` maps an original to its copy so a shared or cyclic link is
-        copied once. An entry of `None` means that exception is still being
-        copied, and a link back to it is cut rather than followed forever.
-        """
-        if exception is None:
-            return None
-        exception_id = id(exception)
-        if exception_id in copies:
-            return copies[exception_id]
-        copies[exception_id] = None
-        copied: BaseException
-        if isinstance(exception, PipelexError):
-            copied = cls._redacted_stand_in(exception=exception)
-        elif isinstance(exception, BaseExceptionGroup):
-            group = cast("BaseExceptionGroup[BaseException]", exception)
-            members = [cls._redacted_link(exception=member, copies=copies) for member in cls._group_members(exception=group)]
-            kept_members = [member for member in members if member is not None]
-            copied = cast("BaseException", group.derive(kept_members)) if kept_members else Exception(type(group).__name__)
-            if hasattr(group, "__notes__"):
-                copied.__notes__ = list(group.__notes__)
-        else:
-            copied = cls._plain_copy(exception=exception)
-        copied.__traceback__ = exception.__traceback__
-        copies[exception_id] = copied
-        copied.__cause__ = cls._redacted_link(exception=exception.__cause__, copies=copies)
-        copied.__context__ = cls._redacted_link(exception=exception.__context__, copies=copies)
-        copied.__suppress_context__ = exception.__suppress_context__
-        return copied
-
-    @classmethod
-    def _redacted_stand_in(cls, *, exception: PipelexError) -> PipelexError:
+    def _redacted_stand_in(cls, *, exception: BaseException) -> BaseException:
         """Build a same-class stand-in for `exception` whose message is the privacy notice.
 
-        `__new__` without `__init__` is the point: the instance comes out with an
-        empty `__dict__`, so none of the subclass's own attributes — the
-        concepts it was comparing, the file it was reading — travel with it. What
-        goes out is the class name, the notice and the traceback.
-        """
-        exception_type = type(exception)
-        stand_in = exception_type.__new__(exception_type)
-        stand_in.args = (cls.PRIVACY_NOTICE,)
-        stand_in.__traceback__ = exception.__traceback__
-        return stand_in
-
-    @classmethod
-    def _plain_copy(cls, *, exception: BaseException) -> BaseException:
-        """Copy an error that is not a `PipelexError`, message and attributes included, without running its `__init__`.
-
-        Its own message is sent as it is, because the redaction goes by class:
-        a message that copied a `PipelexError`'s text travels with that text.
-        Its attributes stay because a subclass's `__str__` may read them. Only
-        the links are rewritten, by `_redacted_link`.
+        `__new__` without arguments and without `__init__` is the point: the
+        instance comes out with an empty `__dict__`, so none of the error's own
+        attributes, the concepts it was comparing, the file it was reading, the
+        input a model refused, travel with it. What goes out is the class name,
+        the notice and the traceback. A class that cannot be built that way, a
+        pydantic `ValidationError` for one, stands as a plain `Exception` naming
+        it, and never with its own text.
         """
         exception_type = type(exception)
         try:
-            copied = exception_type.__new__(exception_type, *exception.args)
-            copied.args = exception.args
-            copied.__dict__.update(
-                {name: value for name, value in exception.__dict__.items() if name not in PostHogErrorTracker.POSTHOG_CAPTURE_MARKS}
-            )
+            stand_in = exception_type.__new__(exception_type)
+            stand_in.args = (cls.PRIVACY_NOTICE,)
+            stand_in_attributes = getattr(stand_in, "__dict__", None)
+            if stand_in_attributes:
+                stand_in_attributes.clear()
         except Exception:  # ruff: ignore[blind-except]
-            # A class whose construction cannot be reproduced keeps its name and message, and nothing else.
-            return Exception(f"{exception_type.__name__}: {exception}")
-        return copied
+            # (2) any class's `__new__` runs here, whose exception surface cannot be enumerated; its name still travels.
+            return Exception(f"{exception_type.__name__}: {cls.PRIVACY_NOTICE}")
+        return stand_in
+
+    @classmethod
+    def _redacted_group_stand_in(cls, *, group: BaseException, members: list[BaseException]) -> BaseException:
+        """Build a same-class stand-in for an exception group, over its members' stand-ins, whose message is the privacy notice.
+
+        A group keeps its members because PostHog expands them, each its own
+        error with its own frames. Its notes are left behind, as every
+        attribute is.
+        """
+        group_type = type(group)
+        if not members:
+            return Exception(f"{group_type.__name__}: {cls.PRIVACY_NOTICE}")
+        try:
+            stand_in = group_type.__new__(group_type, cls.PRIVACY_NOTICE, members)
+            stand_in_attributes = getattr(stand_in, "__dict__", None)
+            if stand_in_attributes:
+                stand_in_attributes.clear()
+        except Exception:  # ruff: ignore[blind-except]
+            # (2) a group subclass's own `__new__` runs here, whose exception surface cannot be enumerated.
+            return BaseExceptionGroup(f"{group_type.__name__}: {cls.PRIVACY_NOTICE}", members)
+        return stand_in
 
     @override
     def setup(self, *, integration_mode: IntegrationMode):

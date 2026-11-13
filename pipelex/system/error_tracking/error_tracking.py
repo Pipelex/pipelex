@@ -3,7 +3,8 @@
 Boot installs the trackers ``runtime.error_tracking.trackers`` selects (``install_error_trackers``) and teardown removes
 them (``reset_error_trackers``), as it installs and resets the log sink. In between, three things report to them:
 
-- **A failed run**, which the runtime that ran it reports at the run's boundary (``PipeRun``), as ``run_failure``.
+- **A failed run**, which the runtime that ran it reports at the run's boundary (``PipeRun``), as ``run_failure``,
+  when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run.
 - **An uncaught exception**: while a tracker is installed, the interpreter's exception hooks, ``sys.excepthook`` and
   ``threading.excepthook``, report what reaches them as ``uncaught`` and then call the hooks that were there before.
 - **Anything else a host or the runtime catches and goes on from**, through ``report_exception`` or, for a problem
@@ -14,14 +15,18 @@ them (``reset_error_trackers``), as it installs and resets the log sink. In betw
 ``from`` it, is skipped: a run's failure reported at the run's boundary is not reported again when a host lets it reach
 the interpreter's hook, nor when the host raises its own error from it.
 
-**Reporting never fails the reporter.** With no tracker installed a report costs nothing and builds nothing. A tracker
-is a plugin's code, so each call is guarded and a failing tracker is logged at debug level, the others still called.
+**Reporting never fails the reporter.** With no tracker installed a report costs nothing and builds nothing. A report
+that cannot be built, an exception whose ``__str__`` raises for instance, is logged at debug level and dropped, and the
+interpreter's previous hooks are still called. A tracker is a plugin's code, so each call is guarded and a failing
+tracker is logged at debug level, the others still called.
 """
 
 import sys
 import threading
 from collections.abc import Sequence
 from types import TracebackType
+
+from mthds.protocol.problem.registry import ProblemDomain
 
 from pipelex import log
 from pipelex.base_exceptions import iter_cause_chain
@@ -59,16 +64,20 @@ class _UncaughtExceptionHooks:
         exc_value: BaseException,
         exc_traceback: TracebackType | None,
     ) -> None:
-        _report_uncaught(exception=exc_value)
-        self._previous_excepthook(exc_type, exc_value, exc_traceback)
+        try:
+            _report_uncaught(exception=exc_value)
+        finally:
+            self._previous_excepthook(exc_type, exc_value, exc_traceback)
 
     def _threading_excepthook(  # kw-only: ignore — installed as threading.excepthook; called positionally
         self,
         args: threading.ExceptHookArgs,
     ) -> None:
-        if args.exc_value is not None:
-            _report_uncaught(exception=args.exc_value)
-        self._previous_threading_excepthook(args)
+        try:
+            if args.exc_value is not None:
+                _report_uncaught(exception=args.exc_value)
+        finally:
+            self._previous_threading_excepthook(args)
 
 
 class _ErrorTrackingState:
@@ -124,6 +133,20 @@ def has_error_trackers() -> bool:
     return bool(_STATE.trackers)
 
 
+def reaches_error_trackers(*, problem: PipelexProblem) -> bool:
+    """Whether a failure with this problem is the operator's to fix, and so is reported to the error trackers.
+
+    A fault of the runtime or of the operator is; a caller's mistake, a domain of ``input``, ``method`` or ``account``,
+    is answered to the caller and is not. This is the one rule a failed run is reported by; every report carries its
+    domain as the ``error.domain`` tag, so reporting the caller's failures too would change this predicate alone.
+    """
+    match problem.effective_domain:
+        case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
+            return True
+        case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+            return False
+
+
 def was_reported(*, exception: BaseException) -> bool:
     """Whether ``exception``, or an error along its cause chain, was reported already."""
     return any(getattr(node, _REPORTED_STAMP, False) for node in iter_cause_chain(exception))
@@ -151,14 +174,20 @@ def report_exception(
     trackers = _STATE.trackers
     if not trackers or was_reported(exception=exception):
         return
-    report = make_error_report(
-        kind=kind,
-        exception=exception,
-        problem=problem,
-        pipeline_run_id=pipeline_run_id,
-        request_id=request_id,
-        pipe_code=pipe_code,
-    )
+    try:
+        report = make_error_report(
+            kind=kind,
+            exception=exception,
+            problem=problem,
+            pipeline_run_id=pipeline_run_id,
+            request_id=request_id,
+            pipe_code=pipe_code,
+        )
+    except Exception as build_error:  # ruff: ignore[blind-except]
+        # (2) building a report reads the exception itself, its class's `__str__` or `__repr__` included, whose
+        # exception surface cannot be enumerated; a report that cannot be built must never replace the error.
+        log.debug("An error report could not be built", fields={"reported_error_type": type(exception).__name__, **error_fields(exc=build_error)})
+        return
     _mark_reported(exception=exception)
     _dispatch(report=report, trackers=trackers)
 
@@ -181,7 +210,14 @@ def report_problem(
     trackers = _STATE.trackers
     if not trackers:
         return
-    _dispatch(report=make_error_report(kind=kind, problem=problem, pipe_code=pipe_code), trackers=trackers)
+    try:
+        report = make_error_report(kind=kind, problem=problem, pipe_code=pipe_code)
+    except Exception as build_error:  # ruff: ignore[blind-except]
+        # (2) building a report reads the problem and the bound log and span contexts; whatever it raises, reporting
+        # must never fail the reporter.
+        log.debug("An error report could not be built", fields={_REPORTED_ERROR_CODE_FIELD: problem.code, **error_fields(exc=build_error)})
+        return
+    _dispatch(report=report, trackers=trackers)
 
 
 def _report_uncaught(*, exception: BaseException) -> None:

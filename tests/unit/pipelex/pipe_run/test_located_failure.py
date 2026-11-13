@@ -17,8 +17,9 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError, PipeRunE
 from pipelex.core.pipes.inputs.exceptions import OptionalValueAbsentError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_location, make_problem_item
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.pipe_run.exceptions import PipeRouterError, find_failure_location
-from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault, make_unexpected_failure
+from pipelex.pipe_run.located_failure import compose_located_message, find_foreign_fault, find_root_fault
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.runtime_bridge.exceptions import PipelexBridgeDispatchError
 from pipelex.system.pipe_run_mode import PipeRunMode
