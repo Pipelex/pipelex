@@ -59,6 +59,18 @@ class EventLogSetupError(EventLogError):
     error_code = CoreCode.RUNTIME_MISCONFIGURED
 
 
+class TraceEventTooLargeError(EventLogError):
+    """Raised when a trace event does not fit a backend's record even with every bulky value left out.
+
+    A backend that limits the size of one record, such as DynamoDB's item limit, writes an oversized event with its
+    bulky values left out (`TraceEvent.reduced_to_fit`). What remains of an event once they are all left out is its
+    identifiers, codes and small numbers, which always fit, so this error means a field that can grow with the run's
+    data was not listed among the event's bulky values: a bug in the event model, never a property of the run.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
 class TraceEventModeError(PipelexError):
     """Raised when a set of trace events states no single run mode to build a graph in.
 

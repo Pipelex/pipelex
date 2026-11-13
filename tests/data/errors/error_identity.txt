@@ -387,6 +387,7 @@ TomlError | one of pipelex.config.syntax, request.malformed, method.syntax
 ToolError | abstract
 TraceContextRunModeError | runtime.unexpected
 TraceEventModeError | runtime.unexpected
+TraceEventTooLargeError | runtime.unexpected
 TracebackMessageError | abstract
 TreeModuleShadowingError | method.name_conflict
 TreePythonError | one of runtime.unexpected, request.unsupported, method.name_conflict
