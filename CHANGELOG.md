@@ -8,7 +8,7 @@
 
 ### Changed
 
-- **A custom telemetry manager states `join_host_trace` (Breaking)**: `TelemetryManagerAbstract` gains the abstract property `join_host_trace`, so a manager injected through `Pipelex.make(telemetry_manager=...)` implements it, returning `False` to keep Pipelex's spans out of the host's trace; and `OtelContext`, which the job metadata carries, gains the required `is_sampled` and the optional `trace_state`, `host_span_id` and `is_host_span_pipelex`.
+- **A custom telemetry manager states `join_host_trace` (Breaking)**: `TelemetryManagerAbstract` gains the abstract property `join_host_trace`, so a manager injected through `Pipelex.make(telemetry_manager=...)` implements it, returning `False` to keep Pipelex's spans out of the host's trace; `TelemetryManager.__init__` takes a required keyword-only `join_host_trace`, so code constructing one to inject passes it; and `OtelContext`, which the job metadata carries, gains the required `is_sampled` and the optional `trace_state`, `host_span_id` and `is_host_span_pipelex`.
 
 ## [v0.100.1] - 2026-11-13
 
