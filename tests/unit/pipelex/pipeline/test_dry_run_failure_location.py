@@ -11,8 +11,8 @@ from pipelex.core.exceptions import DryRunFailureErrorData
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.errors.error_codes import error_code_spec
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
-from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import (
     BundleValidator,
     DryRunOutput,

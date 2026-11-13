@@ -164,6 +164,17 @@ log_name = "pipelex"
 is_enabled = true
 extra_patterns = []
 
+####################################################################################################
+# Error tracking
+####################################################################################################
+
+# trackers names the error trackers every error pipelex reports reaches, each a token a plugin registered,
+# in order: a run's failure, an uncaught exception, an error a host caught and reported. "posthog" (built-in)
+# sends each exception to the PostHog stream telemetry.toml configures, and sends nothing while that stream
+# is off; an installed plugin adds its own token, such as "sentry". An empty list reports to no tracker.
+[runtime.error_tracking]
+trackers = ["posthog"]
+
 [runtime.aws]
 api_key_method = "env"
 bedrock_access_variant = "aws_access"

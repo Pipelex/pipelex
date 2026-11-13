@@ -17,7 +17,6 @@ from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.test_extras.usage_stats_isolation import turn_usage_stats_off_for_the_session, usage_stats_guarded
-from pipelex.tools.log.error_fields import error_fields
 
 if TYPE_CHECKING:
     from pipelex.system.telemetry.telemetry_manager import TelemetryManager
@@ -37,19 +36,14 @@ USAGE_STATS_TEST_HOME = turn_usage_stats_off_for_the_session()
 def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
     """Skip expensive OTel/PostHog shutdown during tests (~0.49s per call).
 
-    Preserves exception capture cleanup (restores sys.excepthook) and
-    singleton clearing. Skips PostHog client.shutdown() which flushes
-    queues and joins threads.
+    Preserves singleton clearing. Skips PostHog client.shutdown() which flushes
+    queues and joins threads. The error trackers, which restore sys.excepthook,
+    are reset by the boot's teardown before this runs.
 
     We still shutdown the TracerProvider to stop the BatchSpanProcessor
     background thread, otherwise it may try to export spans after the
     logging system has been torn down, causing RuntimeError.
     """
-    if self._exception_capture:  # pyright: ignore[reportPrivateUsage]
-        try:
-            self._exception_capture.close()  # pyright: ignore[reportPrivateUsage]
-        except Exception as exc:
-            log.debug("The exception capture could not be closed", fields=error_fields(exc=exc))
     if self._tracer_provider:  # pyright: ignore[reportPrivateUsage]
         try:
             self._tracer_provider.shutdown()  # pyright: ignore[reportPrivateUsage]

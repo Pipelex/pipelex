@@ -21,6 +21,11 @@ Holding a span never ends it, records an exception on it or sets its status, whi
 that started it, and it never becomes the way a parent reaches a child: the job metadata still carries
 that, so a child running in another process gets the same parent it always did.
 
+An exception leaving a held span's block is marked with that span, the innermost one winning, and
+:func:`raising_span_context` reads the mark back. A failure is reported after every span it crossed has
+closed, the run's failure at the run's boundary for instance, so the error tracker names the span that
+raised it from the mark rather than from the span held at the time of the report, which is none by then.
+
 An operator who declares the process's trace theirs, with ``join_host_trace``, gets the other behaviour:
 a run starts under the host's current span, read here by ``host_span_to_join``, and the runtime
 holds its spans with ``make_current``, so each is also OpenTelemetry's current span while the work it
@@ -76,8 +81,56 @@ def pipelex_span_active(*, span: Span | None, make_current: bool = False) -> Gen
                 yield
         else:
             yield
+    except BaseException as exc:
+        # Observe-and-reraise: an exception leaving the block is marked with the span it was raised in, so whoever
+        # reports it once every span has closed still names it. Marking never changes how the exception propagates.
+        _stamp_raising_span(exception=exc, span_context=span.get_span_context())
+        raise
     finally:
         _ACTIVE_PIPELEX_SPAN.reset(token)
+
+
+# The attribute an exception carries the Pipelex span it was raised in under, set as it leaves that span.
+_RAISING_SPAN_STAMP = "__pipelex_raising_span__"
+
+
+def _stamp_raising_span(*, exception: BaseException, span_context: SpanContext) -> None:
+    """Record on ``exception`` the Pipelex span it left, unless a span closer to where it was raised already did.
+
+    The innermost span is the one the failing work ran in, so an existing stamp is never replaced. Stamping is
+    best-effort and never raises: an exception whose class refuses the stamp to be read or written goes unstamped.
+    """
+    try:
+        if hasattr(exception, _RAISING_SPAN_STAMP):
+            return
+        setattr(exception, _RAISING_SPAN_STAMP, span_context)
+    except Exception:  # ruff: ignore[blind-except]
+        # (2) reading and setting an attribute run the exception class's own `__getattribute__` and `__setattr__`, whose
+        # exception surface cannot be enumerated (`__slots__` raise an AttributeError, a read-only class a TypeError, a
+        # class of its own anything), and this runs while the exception propagates, so whatever they raise must never
+        # replace it. Nothing is logged: the log sinks read this module, which therefore imports no logger.
+        return
+
+
+def _read_raising_span_stamp(*, exception: BaseException) -> object:
+    """The raising-span stamp ``exception`` carries, or ``None`` when it carries none or refuses to be read; never raises."""
+    try:
+        return getattr(exception, _RAISING_SPAN_STAMP, None)
+    except Exception:  # ruff: ignore[blind-except]
+        # (2) reading an attribute runs the exception class's own `__getattribute__`, whose exception surface cannot be
+        # enumerated; an exception that refuses to be read names no span.
+        return None
+
+
+def raising_span_context(*, exception: BaseException) -> SpanContext | None:
+    """The Pipelex span ``exception`` was raised in, as it left that span's block, or ``None`` when it left none.
+
+    Only ``exception`` itself is read; a reader walking a cause chain asks each of its errors in turn.
+    """
+    stamped = _read_raising_span_stamp(exception=exception)
+    if isinstance(stamped, trace.SpanContext):
+        return stamped
+    return None
 
 
 class HostSpanToJoin(NamedTuple):

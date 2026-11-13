@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     # Deferred import: avoid pulling heavy SDK at module-load time
     from opentelemetry.trace import Tracer as OTelTracer
 
+    from pipelex.system.error_tracking.error_tracker import ErrorTrackerAbstract
     from pipelex.system.job_metadata import RunMetadata
 
 
@@ -107,6 +108,15 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     @abstractmethod
     def teardown(self):
         pass
+
+    def make_error_tracker(self) -> "ErrorTrackerAbstract | None":
+        """The ``posthog`` error tracker reporting to this manager's stream, or ``None`` when it has no stream to report to.
+
+        Called once at boot by the built-in ``posthog`` tracker's factory, after this manager is built. Not abstract:
+        a manager with no PostHog stream, the no-op one and any injected one that does not override it, reports no
+        error to PostHog.
+        """
+        return None
 
     @abstractmethod
     def track_event(

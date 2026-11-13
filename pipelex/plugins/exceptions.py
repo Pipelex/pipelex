@@ -196,6 +196,22 @@ class DuplicateLogSinkError(PluginError):
         super().__init__(message)
 
 
+class DuplicateErrorTrackerError(PluginError):
+    """Two plugins registered an error tracker for the same method."""
+
+    error_code = PipelexErrorCode.PLUGIN_CONFLICT
+
+    def __init__(self, *, method: str, first_plugin: str, second_plugin: str):
+        self.method = method
+        self.first_plugin = first_plugin
+        self.second_plugin = second_plugin
+        message = (
+            f"Error tracker for method '{method}' is registered by both plugin '{first_plugin}' and plugin '{second_plugin}'. "
+            "Each method must have a single tracker."
+        )
+        super().__init__(message)
+
+
 class DuplicateInternalModelError(PluginError):
     """Two plugins declared a model of the same name and model type in the internal backend."""
 
@@ -515,6 +531,28 @@ class UnknownLogSinkError(PluginError):
         message = (
             f"No log sink is registered for '{method}'. Registered sinks: {available}. "
             "Check runtime.log.sink, or install/enable the plugin that provides that sink."
+        )
+        super().__init__(message)
+
+
+class UnknownErrorTrackerError(PluginError):
+    """A configured error tracker has no registered factory.
+
+    ``runtime.error_tracking.trackers`` names trackers from the registry the built-in ``ErrorTrackerPlugin`` (and any
+    external plugin contributing one) populates. When a token names no registered factory — a typo, or an external
+    plugin that is not installed or was disabled via ``runtime.plugins.disabled`` — boot fails loud here rather than
+    starting with its errors reported nowhere. The message lists the registered trackers so the fix is obvious.
+    """
+
+    error_code = PipelexErrorCode.PLUGIN_NOT_FOUND
+
+    def __init__(self, *, method: str, registered_methods: list[str]):
+        self.method = method
+        self.registered_methods = registered_methods
+        available = ", ".join(sorted(registered_methods)) or "(none)"
+        message = (
+            f"No error tracker is registered for '{method}'. Registered trackers: {available}. "
+            "Check runtime.error_tracking.trackers, or install/enable the plugin that provides that tracker."
         )
         super().__init__(message)
 

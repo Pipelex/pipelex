@@ -129,6 +129,17 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 
 See [Telemetry Setup](../../setup/telemetry.md) for how a run supplies its caller and its groups.
 
+#### Errors on your PostHog
+
+While this stream is on, the errors Pipelex reports, a failed run, an uncaught exception and an API response answered as an operator's fault, reach it as `$exception` events through the built-in `posthog` error tracker. That tracker is selected in `pipelex.toml`, not here:
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]   # remove "posthog" to keep errors off your PostHog
+```
+
+See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for the other trackers a plugin can add.
+
 ### `[custom_posthog.tracing]` Settings
 
 Controls AI span tracing to your PostHog instance.

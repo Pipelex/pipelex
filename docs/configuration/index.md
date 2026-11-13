@@ -68,7 +68,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)

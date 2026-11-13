@@ -105,12 +105,16 @@ class PostHogAttr(StrEnum):
     # Standard PostHog attribute for anonymous tracking
     PROCESS_PERSON_PROFILE = "$process_person_profile"
 
+    # The exceptions of an `$exception` event, each with its stack trace
+    EXCEPTION_LIST = "$exception_list"
+
 
 class PostHogEvent(StrEnum):
-    """PostHog AI analytics event names."""
+    """PostHog event names: the AI analytics ones and the `$exception` of error tracking."""
 
     SPAN = "$ai_span"
     GENERATION = "$ai_generation"
+    EXCEPTION = "$exception"
 
 
 class GenAIOutputType(StrEnum):
