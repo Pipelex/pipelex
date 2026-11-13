@@ -696,6 +696,7 @@ plugins:
         - tools/cli/agent-cli.md: "Agent CLI"
         - configuration/index.md: "Configuration Overview"
         - configuration/config-pipeline-validation/dry-run-config.md: "Dry Run Configuration"
+        - configuration/config-practical/error-tracking-config.md: "Error Tracking Configuration"
         - configuration/config-practical/logging-config.md: "Logging Configuration"
         - configuration/config-practical/methods-config.md: "Methods Configuration"
         - configuration/config-practical/pipe-run-config.md: "Pipe Run Configuration"
@@ -747,6 +748,7 @@ plugins:
         - under-the-hood/storage-provider-plugins.md: "Storage Provider Plugins"
         - under-the-hood/secrets-provider-plugins.md: "Secrets Provider Plugins"
         - under-the-hood/log-sink-plugins.md: "Log Sink Plugins"
+        - under-the-hood/error-tracker-plugins.md: "Error Tracker Plugins"
         - under-the-hood/document-engine-plugins.md: "Document Engine Plugins"
         - under-the-hood/error-model.md: "Error Model"
         - errors/index.md: "Error Codes"
@@ -955,6 +957,7 @@ nav:
       - Pipeline Validation Configuration:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
+        - Error Tracking: configuration/config-practical/error-tracking-config.md
         - Logging: configuration/config-practical/logging-config.md
         - Methods: configuration/config-practical/methods-config.md
         - Pipe Run: configuration/config-practical/pipe-run-config.md
@@ -1004,6 +1007,7 @@ nav:
       - Storage Provider Plugins: under-the-hood/storage-provider-plugins.md
       - Secrets Provider Plugins: under-the-hood/secrets-provider-plugins.md
       - Log Sink Plugins: under-the-hood/log-sink-plugins.md
+      - Error Tracker Plugins: under-the-hood/error-tracker-plugins.md
       - Document Engine Plugins: under-the-hood/document-engine-plugins.md
       - Error Model: under-the-hood/error-model.md
       - Runtime Bridge & Transport: under-the-hood/runtime-bridge-and-transport.md

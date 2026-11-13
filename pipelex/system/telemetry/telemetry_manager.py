@@ -14,10 +14,10 @@ from pipelex.system.environment import is_env_var_truthy
 from pipelex.system.exceptions import PipelexError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
-from pipelex.system.telemetry.exception_capture import ExceptionCapture
 from pipelex.system.telemetry.exceptions import TelemetryApiKeyMissingError
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
+from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
 from pipelex.system.telemetry.telemetry_identity import RunIdentityPolicy, StreamIdentityRule, TelemetryIdentity
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
@@ -39,7 +39,6 @@ class TelemetryManager(TelemetryManagerAbstract):
             telemetry_config: User's telemetry configuration.
         """
         self.telemetry_config = telemetry_config
-        self._exception_capture: ExceptionCapture | None = None
 
         # Create the PostHog client only if the user's event tracking is enabled
         self.custom_posthog_client: Posthog | None = None
@@ -83,27 +82,21 @@ class TelemetryManager(TelemetryManagerAbstract):
         posthog.privacy_mode = True
         posthog.default_client = self.custom_posthog_client
 
-        # Set up exception autocapture if the client is enabled
-        if self.custom_posthog_client:
-            self._exception_capture = self._make_exception_capture()
+    @override
+    def make_error_tracker(self) -> PostHogErrorTracker | None:
+        """The ``posthog`` error tracker over the operator's client, with the stream's identity rule, or ``None`` with no client.
 
-    def _make_exception_capture(self) -> ExceptionCapture:
-        """Build the exception autocapture, with the stream's identity rule.
-
-        An unhandled exception is attributed when it arrives, not here: the
-        capture reads back the caller of the pipe run the error escaped from, and
-        falls back to the stream's own id only for an error that belongs to no
-        caller. What is fixed here is the stream's rule, taken from the same
-        settings as every other capture on it — which is what carries
-        `anonymous` mode onto this path: a stream that identifies nobody must not
-        identify somebody when the process crashes.
-
-        Stated as its own method so the wiring can be exercised without the
-        constructor, which builds a live client and registers a singleton.
+        An exception is attributed when it is reported, not here: the tracker reads back the caller of the pipe run
+        the error escaped from, and falls back to the stream's own id only for an error that belongs to no caller.
+        What is fixed here is the stream's rule, taken from the same settings as every other capture on it, which is
+        what carries `anonymous` mode onto this path: a stream that identifies nobody must not identify somebody when
+        the process crashes.
         """
-        return ExceptionCapture(
-            custom_posthog_client=self.custom_posthog_client,
-            custom_identity_rule=StreamIdentityRule(
+        if self.custom_posthog_client is None:
+            return None
+        return PostHogErrorTracker(
+            posthog_client=self.custom_posthog_client,
+            identity_rule=StreamIdentityRule(
                 fallback_distinct_id=self.telemetry_config.custom_posthog.user_id,
                 run_identity_policy=RunIdentityPolicy.make_for_operator_stream(posthog_mode=self.telemetry_config.custom_posthog.mode),
             ),
@@ -156,14 +149,14 @@ class TelemetryManager(TelemetryManagerAbstract):
             """
             try:
                 resolved = self._resolved_exception_arg(exception=exception)
-                if resolved is None or ExceptionCapture.is_marked_as_captured(exception=resolved):
+                if resolved is None or PostHogErrorTracker.is_marked_as_captured(exception=resolved):
                     return None
                 sanitized = self._sanitized_exception_arg(exception=resolved)
             except Exception as sanitize_exc:  # ruff: ignore[blind-except]
                 log.debug("An exception capture the privacy redaction could not complete was dropped", fields=error_fields(exc=sanitize_exc))
                 return None
             result = original_capture_exception(sanitized, **kwargs)
-            ExceptionCapture.carry_capture_marks(source=sanitized, target=resolved)
+            PostHogErrorTracker.carry_capture_marks(source=sanitized, target=resolved)
             return result
 
         client.capture_exception = sanitized_capture_exception  # type: ignore[method-assign]
@@ -313,7 +306,9 @@ class TelemetryManager(TelemetryManagerAbstract):
         try:
             copied = exception_type.__new__(exception_type, *exception.args)
             copied.args = exception.args
-            copied.__dict__.update({name: value for name, value in exception.__dict__.items() if name not in ExceptionCapture.POSTHOG_CAPTURE_MARKS})
+            copied.__dict__.update(
+                {name: value for name, value in exception.__dict__.items() if name not in PostHogErrorTracker.POSTHOG_CAPTURE_MARKS}
+            )
         except Exception:  # ruff: ignore[blind-except]
             # A class whose construction cannot be reproduced keeps its name and message, and nothing else.
             return Exception(f"{exception_type.__name__}: {exception}")
@@ -325,15 +320,10 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
-        # First, restore original exception hooks to avoid capturing exceptions during shutdown
-        if self._exception_capture:
-            try:
-                self._exception_capture.close()
-            except Exception as exc:  # ruff: ignore[blind-except]
-                # Telemetry teardown must never break the app: a close failure is logged at debug and swallowed.
-                log.debug("The exception capture could not be closed", fields=error_fields(exc=exc))
+        # The error trackers, the posthog one over this manager's client included, were reset by the boot before this
+        # teardown, so no exception is captured during shutdown.
 
-        # Then, shutdown the TracerProvider to flush all pending spans
+        # First, shutdown the TracerProvider to flush all pending spans
         # This MUST happen before PostHog shutdown, otherwise spans won't be exported
         if self._tracer_provider:
             try:

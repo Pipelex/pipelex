@@ -16,7 +16,7 @@ from opentelemetry.sdk.trace import Span as SdkSpan
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import StatusCode
 
-from pipelex.system.telemetry.current_span import pipelex_span_active, pipelex_span_context_for_logs
+from pipelex.system.telemetry.current_span import pipelex_span_active, pipelex_span_context_for_logs, raising_span_context
 
 
 def _started_span(*, name: str) -> SdkSpan:
@@ -79,3 +79,23 @@ class TestPipelexSpanActive:
             assert pipelex_span_context_for_logs() is None
         with pipelex_span_active(span=enclosing), pipelex_span_active(span=trace.INVALID_SPAN):
             assert pipelex_span_context_for_logs() == enclosing.get_span_context()
+
+    def test_an_exception_leaving_the_block_is_marked_with_the_span_it_was_raised_in(self) -> None:
+        span = _started_span(name="work")
+
+        with pytest.raises(ValueError, match="boom") as exc_info:
+            _fail_under(span=span)
+
+        assert raising_span_context(exception=exc_info.value) == span.get_span_context()
+
+    def test_the_innermost_span_wins_over_the_ones_the_exception_crosses_on_its_way_out(self) -> None:
+        outer = _started_span(name="outer")
+        inner = _started_span(name="inner")
+
+        with pytest.raises(ValueError, match="boom") as exc_info, pipelex_span_active(span=outer):
+            _fail_under(span=inner)
+
+        assert raising_span_context(exception=exc_info.value) == inner.get_span_context()
+
+    def test_an_exception_raised_outside_every_span_carries_no_mark(self) -> None:
+        assert raising_span_context(exception=ValueError("boom")) is None

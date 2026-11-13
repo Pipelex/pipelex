@@ -24,9 +24,24 @@ Each integration mode allows these streams or not: by default the `cli`, `docker
 Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
-- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. An error tracker plugged into Pipelex's own seam receives both: the Pipelex span the error was raised in, and your current span when it was reported, as [Error trackers](#error-trackers) describes.
 - The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
 - If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
+
+## Error trackers
+
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a failed run, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]
+```
+
+- **PostHog is one tracker among others.** The built-in `posthog` tracker sends each error's exception to your own PostHog stream as an `$exception`. It sends nothing unless that stream is on in `telemetry.toml`, and `DO_NOT_TRACK` turns it off with the rest.
+- **Your own tracker plugs into the same seam.** A plugin registers a tracker under a token of its own, `sentry` for instance, and you add that token to the list. Pipelex ships no vendor SDK: a tracker's SDK comes with the plugin that contributes it.
+- **A tracker receives identifiers, not content.** Each error comes with its problem document in the operator's view, its error code, where it was raised, the failing pipe, the run and request ids, and the spans to join it on. A tracker never sends the locals of a frame, a request body, or a run's inputs or outputs.
+
+An empty list reports errors nowhere. [Error Tracker Plugins](../under-the-hood/error-tracker-plugins.md) describes what a tracker receives and how to write one.
 
 ## Quick Setup
 
@@ -99,10 +114,10 @@ The extras are also available to the inference workers, on the job metadata of e
 
 ### Work that is not a run, and crashes
 
-A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
+A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which the [error trackers](#error-trackers) install and which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
 
 - **Validation.** The validate entry points take a `caller_identity` — the `user_id` and `extras` you would state on a run, as a `CallerIdentity`. `PipelexMTHDSProtocol.validate` passes the caller the protocol was built for, `validate_bundles_in_process`, `validate_bundle` and `BundleValidator` accept one directly, and the `BundleValidatorProtocol` seam requires one (`None` meaning "nobody"). The `pipe_dry_run` event and every dry run the validation performs are then attributed to that caller. A CLI validation on your own machine names nobody and keeps reporting under your configured id.
-- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so an `$exception` captured once the error reaches the interpreter lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
+- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so the `$exception` captured when the run fails, or once the error reaches the interpreter, lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
 - **Anything else with no run in hand.** An event emitted without a run but while a caller is in scope reads that caller. A host can open such a scope around its own work with `scoped_caller_identity(caller_identity=...)` from `pipelex.system.caller_identity`.
 
 The same rules apply to all of these as to a run: a placeholder such as `local` names nobody, `mode = "anonymous"` identifies nobody, and the caller never becomes an event property.

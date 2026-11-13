@@ -17,29 +17,19 @@ marks an error as captured only when the send reported one.
 """
 
 import sys
-import threading
-from typing import Any, Generator
+from typing import Any
 
 import pytest
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
+from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report
 from pipelex.system.exceptions import ToolError
-from pipelex.system.telemetry.exception_capture import ExceptionCapture
+from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 
 _CONFIDENTIAL_MESSAGE = "could not read patient record 123-45-6789 at /home/acme/confidential.pdf"
-
-
-@pytest.fixture
-def restore_excepthooks() -> Generator[None, None, None]:
-    """Give the interpreter back the hooks a capture installs when it is built."""
-    original_excepthook = sys.excepthook
-    original_threading_excepthook = threading.excepthook
-    yield
-    sys.excepthook = original_excepthook
-    threading.excepthook = original_threading_excepthook
 
 
 def _make_stubbed_client(*, mocker: MockerFixture, api_key: str) -> tuple[Posthog, Any]:
@@ -49,7 +39,7 @@ def _make_stubbed_client(*, mocker: MockerFixture, api_key: str) -> tuple[Postho
     return client, capture
 
 
-def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
+def _make_capture(*, custom_client: Posthog) -> PostHogErrorTracker:
     """Assemble the capture the constructor would have built, over the two given clients.
 
     The manager is built without its constructor, as in the module beside this
@@ -65,12 +55,14 @@ def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
     manager.custom_posthog_client = custom_client
 
     manager._wrap_capture_exception(custom_client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
-    return manager._make_exception_capture()  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    tracker = manager.make_error_tracker()
+    assert tracker is not None
+    return tracker
 
 
-def _crash(*, capture: ExceptionCapture, error: BaseException) -> None:
-    """Hand the capture the triple an excepthook would, which is all it ever receives."""
-    capture._capture_exception((type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+def _crash(*, capture: PostHogErrorTracker, error: BaseException) -> None:
+    """Report the error to the tracker as an interpreter hook does, which hands PostHog the `(type, value, traceback)` triple."""
+    capture.report(report=make_error_report(kind=ErrorReportKind.UNCAUGHT, exception=error))
 
 
 def _sent_exception_values(*, capture_mock: Any) -> str:
@@ -78,8 +70,7 @@ def _sent_exception_values(*, capture_mock: Any) -> str:
     return repr(capture_mock.call_args.kwargs["properties"]["$exception_list"])
 
 
-@pytest.mark.usefixtures("restore_excepthooks")
-class TestExceptionCaptureSdkContract:
+class TestPostHogErrorTrackerSdkContract:
     def test_the_stream_records_one_crash(self, mocker: MockerFixture) -> None:
         """The crash reaches the operator's stream exactly once.
 

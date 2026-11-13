@@ -21,6 +21,8 @@ from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.pipe_run.tracing_assembly import RunTraceEvents, assemble_tracing_on_output, read_run_trace_events
 from pipelex.pipeline.build_pipe_io_artifacts import build_pipe_io_artifacts
 from pipelex.pipeline.usage_stats_reporting import RunUsageFacts, input_kinds_of, report_run_usage
+from pipelex.system.error_tracking.error_report import ErrorReportKind
+from pipelex.system.error_tracking.error_tracking import has_error_trackers, report_exception
 from pipelex.system.usage_stats.usage_stats_client import usage_stats_are_enabled
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsOutcome
 from pipelex.system.usage_stats.usage_stats_runs import RunInferenceTally, tallying_inference_calls
@@ -67,7 +69,7 @@ def _cancelled_run_problem(*, pipeline_run_id: str, request_id: str | None) -> P
 class PipeRun(PipeRunProtocol):
     """Direct-mode PipeRun: executes the pipe inline, then delivers results."""
 
-    def __init__(self, pipe_router: PipeRouterProtocol, *, reports_usage_stats: bool = True) -> None:
+    def __init__(self, pipe_router: PipeRouterProtocol, *, reports_usage_stats: bool = True, reports_errors: bool = True) -> None:
         """Execute pipes through `pipe_router`.
 
         Args:
@@ -75,10 +77,14 @@ class PipeRun(PipeRunProtocol):
             reports_usage_stats: Whether a run reports its anonymous usage statistics, its `run_completed` and
                 `model_used` events, when statistics are on. Off for the runs a validation makes, which its own
                 `method_validated` describes.
+            reports_errors: Whether a failed run is reported to the installed error trackers. Off for the runs a
+                validation makes, whose failures are the validation's findings about the method, answered to whoever
+                asked for it.
         """
         self._pipe_router = pipe_router
         self._delivery_executor = DeliveryExecutor()
         self._reports_usage_stats = reports_usage_stats
+        self._reports_errors = reports_errors
 
     @override
     async def run(
@@ -153,6 +159,19 @@ class PipeRun(PipeRunProtocol):
             )
             # A security refusal also logs its security event, once, naming the run and never what it refused.
             emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+            # The run's failure reaches the operator's error trackers, in the operator's view, with the run's ids and its
+            # pipe; with no tracker installed nothing is built. Reported once: a host that lets the error reach the
+            # interpreter's hook, or raises its own from it, does not report it again.
+            if self._reports_errors and has_error_trackers():
+                report_exception(
+                    exception=exc,
+                    kind=ErrorReportKind.RUN_FAILURE,
+                    problem=problem
+                    or run_problem_of(error=exc, pipeline_run_id=pipeline_run_id, request_id=pipe_job.job_metadata.run_metadata.request_id),
+                    pipeline_run_id=pipeline_run_id,
+                    request_id=pipe_job.job_metadata.run_metadata.request_id,
+                    pipe_code=pipe_job.pipe.code,
+                )
         finally:
             # When the run ended, which a caller's webhook event states, taken before the run's tail does its own work.
             finished_at = datetime.now(UTC)

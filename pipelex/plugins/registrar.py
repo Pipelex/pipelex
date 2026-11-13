@@ -11,9 +11,11 @@ from pipelex.cogt.inference.error_classification import RUNTIME_CLASSIFIED_ERROR
 from pipelex.cogt.model_backends.model_type import DEFAULT_MODEL_TYPE
 from pipelex.errors.error_codes import ErrorCode, parse_error_code
 from pipelex.plugins.bundle_validator_registry import BundleValidatorProtocol
+from pipelex.plugins.error_tracker_registry import ErrorTrackerFactoryFn
 from pipelex.plugins.exceptions import (
     DuplicateBundleValidatorError,
     DuplicateDocGenDefaultError,
+    DuplicateErrorTrackerError,
     DuplicateHttpErrorMapperError,
     DuplicateInferenceBackendError,
     DuplicateInternalModelError,
@@ -179,6 +181,7 @@ class PluginRegistrar:
         self.storage_providers: dict[str, StorageProviderFactoryFn] = {}
         self.secrets_providers: dict[str, SecretsProviderFactoryFn] = {}
         self.log_sinks: dict[str, LogSinkFactoryFn] = {}
+        self.error_trackers: dict[str, ErrorTrackerFactoryFn] = {}
         self.pipe_func_executors: dict[str, PipeFuncExecutorFactoryFn] = {}
         self.pipe_func_package_offers: dict[str, PipeFuncPackageOfferFactoryFn] = {}
         # Plain data, read once by ``make_model_declarations`` for the model manager to merge at boot.
@@ -202,6 +205,7 @@ class PluginRegistrar:
         self._storage_provider_sources: dict[str, str] = {}
         self._secrets_provider_sources: dict[str, str] = {}
         self._log_sink_sources: dict[str, str] = {}
+        self._error_tracker_sources: dict[str, str] = {}
         self._pipe_func_executor_sources: dict[str, str] = {}
         self._pipe_func_package_offer_sources: dict[str, str] = {}
         self._internal_model_sources: dict[tuple[str, str], str] = {}
@@ -356,6 +360,27 @@ class PluginRegistrar:
             value=factory,
             contribution=f"log sink {method}",
             on_duplicate=lambda first_plugin, second_plugin: DuplicateLogSinkError(
+                method=method, first_plugin=first_plugin, second_plugin=second_plugin
+            ),
+        )
+
+    def add_error_tracker(self, *, method: str, factory: ErrorTrackerFactoryFn) -> None:
+        """Contribute a factory for one error tracker, keyed by an open ``method`` token.
+
+        The built-in ``ErrorTrackerPlugin`` registers the ``posthog`` method; an external plugin registers its own
+        token (e.g. ``"sentry"``). Boot reads ``runtime.error_tracking.trackers``, a list of tokens, and calls the
+        looked-up factory of each, after the telemetry manager is built, to produce the trackers every reported error
+        reaches (``ErrorTrackerFactoryFn``). ``factory`` is invoked at that boot apply-point, never here, so a factory
+        may import its vendor SDK and initialise its client while ``register`` stays import-light. Fail-loud on a
+        duplicate method, naming both plugins.
+        """
+        self._add(
+            store=self.error_trackers,
+            sources=self._error_tracker_sources,
+            key=method,
+            value=factory,
+            contribution=f"error tracker {method}",
+            on_duplicate=lambda first_plugin, second_plugin: DuplicateErrorTrackerError(
                 method=method, first_plugin=first_plugin, second_plugin=second_plugin
             ),
         )

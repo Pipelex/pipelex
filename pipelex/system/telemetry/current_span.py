@@ -20,6 +20,11 @@ a line's ``pipelex.*`` fields, and nothing else does.
 Holding a span never ends it, records an exception on it or sets its status, which stay with the code
 that started it, and it never becomes the way a parent reaches a child: the job metadata still carries
 that, so a child running in another process gets the same parent it always did.
+
+An exception leaving a held span's block is marked with that span, the innermost one winning, and
+:func:`raising_span_context` reads the mark back. A failure is reported after every span it crossed has
+closed, the run's failure at the run's boundary for instance, so the error tracker names the span that
+raised it from the mark rather than from the span held at the time of the report, which is none by then.
 """
 
 from __future__ import annotations
@@ -59,8 +64,43 @@ def pipelex_span_active(*, span: Span | None) -> Generator[None]:
     token = _ACTIVE_PIPELEX_SPAN.set(span)
     try:
         yield
+    except BaseException as exc:
+        # Observe-and-reraise: an exception leaving the block is marked with the span it was raised in, so whoever
+        # reports it once every span has closed still names it. Marking never changes how the exception propagates.
+        _stamp_raising_span(exception=exc, span_context=span.get_span_context())
+        raise
     finally:
         _ACTIVE_PIPELEX_SPAN.reset(token)
+
+
+# The attribute an exception carries the Pipelex span it was raised in under, set as it leaves that span.
+_RAISING_SPAN_STAMP = "__pipelex_raising_span__"
+
+
+def _stamp_raising_span(*, exception: BaseException, span_context: SpanContext) -> None:
+    """Record on ``exception`` the Pipelex span it left, unless a span closer to where it was raised already did.
+
+    The innermost span is the one the failing work ran in, so an existing stamp is never replaced. An exception type that
+    refuses new attributes simply goes unstamped.
+    """
+    if hasattr(exception, _RAISING_SPAN_STAMP):
+        return
+    try:
+        setattr(exception, _RAISING_SPAN_STAMP, span_context)
+    except (AttributeError, TypeError):
+        # An exception type with `__slots__` or a read-only `__setattr__` cannot carry the stamp.
+        return
+
+
+def raising_span_context(*, exception: BaseException) -> SpanContext | None:
+    """The Pipelex span ``exception`` was raised in, as it left that span's block, or ``None`` when it left none.
+
+    Only ``exception`` itself is read; a reader walking a cause chain asks each of its errors in turn.
+    """
+    stamped = getattr(exception, _RAISING_SPAN_STAMP, None)
+    if isinstance(stamped, trace.SpanContext):
+        return stamped
+    return None
 
 
 def current_span_context_for_logs() -> SpanContext | None:

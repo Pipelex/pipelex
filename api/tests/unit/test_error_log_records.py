@@ -19,6 +19,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.testclient import TestClient
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.system.error_tracking.error_report import ErrorReportKind
+from pipelex.test_extras.recording_error_tracker import recording_error_tracker
 from pipelex.tools.log.json_log_sink import JsonLogFormatter
 from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
@@ -498,3 +500,32 @@ class TestErrorLogRecords:
         assert response.status_code == 422
         payload = _rendered_json(_api_error_record(caplog))
         assert payload["url.path"] == "/caller-mistake/rejected Authorization: Bearer [REDACTED]"
+
+    @pytest.mark.parametrize(
+        ("path", "expected_code", "expected_error_type"),
+        [
+            ("/pipelex-failure", "pipelex.config.invalid", "PipelexConfigError"),
+            ("/planted-failure", "runtime.unexpected", "LookupError"),
+        ],
+    )
+    def test_an_operator_fault_reaches_the_error_trackers_with_its_request_id(self, path: str, expected_code: str, expected_error_type: str):
+        # The `error`-level branch is the operator's to look at, so it reaches the installed trackers as well as the
+        # record, in the operator's view, with the request's id, and no tag or field carries the exception's text.
+        with recording_error_tracker() as recorder:
+            response = _build_client(raise_server_exceptions=False).get(path)
+        assert response.status_code == 500
+        assert len(recorder.reports) == 1
+        report = recorder.reports[0]
+        assert report.kind == ErrorReportKind.HANDLED
+        assert report.error_type == expected_error_type
+        assert report.request_id == response.headers[REQUEST_ID_HEADER]
+        assert report.problem.diagnostics is not None
+        assert str(report.code) == expected_code
+        assert _PLANTED_MARKER not in repr(report.tags) + repr(report.fields) + repr(report.fingerprint)
+
+    def test_a_caller_mistake_reaches_no_error_tracker(self):
+        # A `warning`-level answer is the caller's to fix: it is recorded, never reported as an operator fault.
+        with recording_error_tracker() as recorder:
+            response = _build_client().get("/caller-mistake/abc")
+        assert response.status_code == 422
+        assert recorder.reports == []

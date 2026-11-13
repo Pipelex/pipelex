@@ -51,6 +51,7 @@ from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemVi
 from pipelex.errors.security_event import emit_security_event
 from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.plugins.registrar import HttpErrorMapperFn
+from pipelex.system.error_tracking.error_tracking import report_exception, report_problem
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -183,6 +184,15 @@ class RecordLevel(StrEnum):
     DEBUG = "debug"
     WARNING = "warning"
     ERROR = "error"
+
+    @property
+    def reaches_error_trackers(self) -> bool:
+        """Whether the failure is reported to the error trackers too, which only an operator's fault is."""
+        match self:
+            case RecordLevel.ERROR:
+                return True
+            case RecordLevel.WARNING | RecordLevel.DEBUG:
+                return False
 
     @property
     def writes_frames(self) -> bool:
@@ -361,8 +371,24 @@ def problem_response(
     which adds `headers` to the ones its status calls for.
     """
     answered_status = status or problem_status(problem)
-    _log_problem(problem, error=error, request=request, status=answered_status, level=record_level)
+    level = record_level or record_level_of(status=answered_status, domain=problem.effective_domain)
+    _log_problem(problem, error=error, request=request, status=answered_status, level=level)
+    if level.reaches_error_trackers:
+        _report_to_error_trackers(problem, error=error)
     return problem_json_response(problem, view=problem_view_of(request), headers=headers, status=answered_status)
+
+
+def _report_to_error_trackers(problem: PipelexProblem, *, error: BaseException | None) -> None:
+    """Report a failure the operator must look at to the installed error trackers, in the operator's view, with its request id.
+
+    A run's failure the runtime already reported at the run's boundary is not reported again (``report_exception``
+    skips an error reported once, and one raised from it), and a fault the route received as a value is reported as its
+    problem alone. With no tracker installed this builds nothing.
+    """
+    if error is None:
+        report_problem(problem=problem)
+    else:
+        report_exception(exception=error, problem=problem)
 
 
 def operator_problem_of(error: PipelexError, *, request: Request) -> PipelexProblem:

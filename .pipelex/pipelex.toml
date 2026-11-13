@@ -167,6 +167,15 @@ extra_patterns = []
 pipelex = "INFO"
 
 ####################################################################################################
+# Error Tracking Config
+####################################################################################################
+
+[runtime.error_tracking]
+# The error trackers every error pipelex reports reaches: "posthog" sends each exception to the PostHog
+# stream telemetry.toml configures, an installed plugin adds its own token, and an empty list reports to none.
+trackers = ["posthog"]
+
+####################################################################################################
 # Reporting Config
 ####################################################################################################
 
