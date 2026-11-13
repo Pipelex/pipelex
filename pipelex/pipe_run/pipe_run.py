@@ -117,8 +117,9 @@ class PipeRun(PipeRunProtocol):
         its own from it, does not report it again.
 
         Args:
-            error: The error the run fails with: the pipe's own, or one its tail raised after the pipe executed, the
-                tracer that would not close or the delivery that failed.
+            error: The error that escapes the run, which its caller receives: the pipe's own, or one its tail raised
+                after the pipe executed, which replaced it, such as the tracer that would not close or the delivery
+                that failed.
             pipe_job: The run's job.
             webhook_problem: The problem built for the run's webhooks, when it has any, which is reused.
         """
@@ -153,161 +154,173 @@ class PipeRun(PipeRunProtocol):
         execution_error: Exception | None = None
         problem: PipelexProblem | None = None
         closed_graph: GraphSpec | None = None
-        # The run's statistics: its inputs are read before the run adds its own outputs to its working memory.
-        usage_tally = RunInferenceTally() if self._reports_usage_stats and usage_stats_are_enabled() else None
-        input_kinds = input_kinds_of(working_memory=pipe_job.working_memory) if usage_tally is not None else (False, False)
-        started_at = time.monotonic()
-
         try:
-            with tallying_inference_calls(tally=usage_tally):
-                pipe_output = await self._pipe_router.run(pipe_job)
-            # Stamp the job onto the run's OWN output, here and nowhere else.
-            # Only the top-level output crosses a transport boundary; a sub-pipe's
-            # output stays in-process, so stamping at every `PipeOutput(...)` site
-            # would be noise on ~17 constructors to serve one of them.
-            pipe_output.set_job_metadata(job_metadata=pipe_job.job_metadata)
-        except Exception as exc:  # ruff: ignore[blind-except]
-            # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
-            status = DeliveryStatus.FAILED
-            execution_error = exc
-            # The problem a FAILED webhook receives, the host's or a caller's, built only when a webhook is there to receive it.
-            if delivery_assignment is not None and delivery_assignment.needs_run_problem:
-                problem = run_problem_of(
-                    error=exc,
-                    pipeline_run_id=pipeline_run_id,
-                    request_id=pipe_job.job_metadata.run_metadata.request_id,
-                )
-            # The error rides as identifiers and no traceback: the exception is re-raised below, and its traceback
-            # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice. The
-            # line carries the failure's code and the exception's class, never its text: the text can hold the
-            # caller's own words, a function's message or a template's source, and a refused host, which no log line
-            # carries, while the problem the caller receives holds them where the code declares them. The code is read
-            # without building the problem, which a run with no webhook never builds.
-            # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
-            log.error(
-                "The execution of a pipe failed",
-                fields={
-                    "pipe_code": pipe_job.pipe.code,
-                    "pipe_ref": pipe_job.pipe.pipe_ref,
-                    ERROR_CODE_FIELD: _failure_code(error=exc),
-                    ERROR_TYPE_FIELD: type(exc).__name__,
-                },
-            )
-            # A security refusal also logs its security event, once, naming the run and never what it refused.
-            emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
-            self._report_run_failure(error=exc, pipe_job=pipe_job, webhook_problem=problem)
-        finally:
-            # When the run ended, which a caller's webhook event states, taken before the run's tail does its own work.
-            finished_at = datetime.now(UTC)
-            tracer_manager = GraphTracerManager.get_instance()
-            if tracer_manager is not None:
-                try:
-                    closed_graph = tracer_manager.close_tracer(pipeline_run_id)
-                except OSError as close_error:
-                    if execution_error is None:
-                        # The run's failure is now this one, raised after the pipe executed, so it is reported here.
-                        self._report_run_failure(error=close_error, pipe_job=pipe_job, webhook_problem=None)
-                        raise
-                    # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
-                    # its traceback would print the execution error's text, which can quote the run's inputs. Its own
-                    # text is not written either: an OSError's names the file of the run's trace.
-                    log.error(
-                        "The graph tracer could not be closed after the pipe execution failed",
-                        fields=_secondary_failure_fields(exc=close_error),
-                    )
+            # The run's statistics: its inputs are read before the run adds its own outputs to its working memory.
+            usage_tally = RunInferenceTally() if self._reports_usage_stats and usage_stats_are_enabled() else None
+            input_kinds = input_kinds_of(working_memory=pipe_job.working_memory) if usage_tally is not None else (False, False)
+            started_at = time.monotonic()
 
-            # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
-            # concerns are gated independently: graph events feed the GraphSpec (so a costs-only run does
-            # not set an empty GraphSpec, preserving the --no-graph contract), usage events feed the
-            # tokens_usages the submitter renders the cost report from.
-            # The run's statistics read the same events, its usage events, whether the run completed or not.
-            trace_context = pipe_job.job_metadata.trace_context
-            assembles_output = (
-                pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events)
-            )
-            counts_usage = usage_tally is not None and trace_context is not None and trace_context.emit_usage_events
-            trace_events: RunTraceEvents | None = None
-            if assembles_output or counts_usage:
-                trace_events = read_run_trace_events(pipeline_run_id=pipeline_run_id)
-            if pipe_output is not None and trace_context is not None and assembles_output:
-                assemble_tracing_on_output(
-                    pipe_output=pipe_output,
-                    pipeline_run_id=pipeline_run_id,
-                    assemble_graph=trace_context.emit_graph_events,
-                    assemble_usage=trace_context.emit_usage_events,
-                    domain_code=pipe_job.pipe.domain_code,
-                    main_pipe_code=pipe_job.pipe.code,
-                    trace_events=trace_events,
-                )
-                if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
-                    self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)
-
-            if usage_tally is not None:
-                outcome: UsageStatsOutcome
-                if execution_error is not None:
-                    outcome = UsageStatsOutcome.FAILED
-                elif pipe_output is None:
-                    # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
-                    outcome = UsageStatsOutcome.CANCELLED
-                else:
-                    outcome = UsageStatsOutcome.SUCCEEDED
-                self._report_usage_stats(
-                    pipe_job=pipe_job,
-                    outcome=outcome,
-                    execution_error=execution_error,
-                    duration_seconds=time.monotonic() - started_at,
-                    input_kinds=input_kinds,
-                    trace_events=trace_events if counts_usage else None,
-                    closed_graph=closed_graph,
-                    usage_tally=usage_tally,
-                )
-
-            # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
-            # It ended failed, so its webhooks are told so, as `run.cancelled`, and never that it completed, while the
-            # cancellation itself propagates once the delivery is done.
-            run_was_cancelled = execution_error is None and pipe_output is None
-            if run_was_cancelled:
+            try:
+                with tallying_inference_calls(tally=usage_tally):
+                    pipe_output = await self._pipe_router.run(pipe_job)
+                # Stamp the job onto the run's OWN output, here and nowhere else.
+                # Only the top-level output crosses a transport boundary; a sub-pipe's
+                # output stays in-process, so stamping at every `PipeOutput(...)` site
+                # would be noise on ~17 constructors to serve one of them.
+                pipe_output.set_job_metadata(job_metadata=pipe_job.job_metadata)
+            except Exception as exc:  # ruff: ignore[blind-except]
+                # Observe-and-reraise: records FAILED status so the finally delivery sees it, then re-raises the original error below.
                 status = DeliveryStatus.FAILED
+                execution_error = exc
+                # The problem a FAILED webhook receives, the host's or a caller's, built only when a webhook is there to receive it.
                 if delivery_assignment is not None and delivery_assignment.needs_run_problem:
-                    problem = _cancelled_run_problem(
+                    problem = run_problem_of(
+                        error=exc,
                         pipeline_run_id=pipeline_run_id,
                         request_id=pipe_job.job_metadata.run_metadata.request_id,
                     )
+                # The error rides as identifiers and no traceback: the exception is re-raised below, and its traceback
+                # belongs to whoever catches it, the CLI or the API's handler, which would otherwise print it twice. The
+                # line carries the failure's code and the exception's class, never its text: the text can hold the
+                # caller's own words, a function's message or a template's source, and a refused host, which no log line
+                # carries, while the problem the caller receives holds them where the code declares them. The code is read
+                # without building the problem, which a run with no webhook never builds.
+                # `pipe_code` is the bare code `Pipe run starts` carries for the same pipe, so one query finds both lines.
+                log.error(
+                    "The execution of a pipe failed",
+                    fields={
+                        "pipe_code": pipe_job.pipe.code,
+                        "pipe_ref": pipe_job.pipe.pipe_ref,
+                        ERROR_CODE_FIELD: _failure_code(error=exc),
+                        ERROR_TYPE_FIELD: type(exc).__name__,
+                    },
+                )
+                # A security refusal also logs its security event, once, naming the run and never what it refused.
+                emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
+            finally:
+                # When the run ended, which a caller's webhook event states, taken before the run's tail does its own work.
+                finished_at = datetime.now(UTC)
+                # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
+                # A cancellation stays one: no failure of the run's tail that the tail knows to expect replaces it.
+                run_was_cancelled = execution_error is None and pipe_output is None
+                tracer_manager = GraphTracerManager.get_instance()
+                if tracer_manager is not None:
+                    try:
+                        closed_graph = tracer_manager.close_tracer(pipeline_run_id)
+                    except OSError as close_error:
+                        if execution_error is None and not run_was_cancelled:
+                            # The run's failure is now this one, raised after the pipe executed, which the run's boundary reports.
+                            raise
+                        # The run keeps its own failure, or its cancellation. A secondary failure rides as fields with no
+                        # traceback: the execution error is chained onto it, so its traceback would print the execution
+                        # error's text, which can quote the run's inputs. Its own text is not written either: an OSError's
+                        # names the file of the run's trace.
+                        log.error(
+                            "The graph tracer could not be closed after the run failed or was cancelled",
+                            fields=_secondary_failure_fields(exc=close_error),
+                        )
 
-            if delivery_assignment is not None:
-                log.debug("Executing the delivery", fields={"delivery_status": status})
-                try:
-                    await self._delivery_executor.execute(
+                # Assemble graph and/or usage onto pipe_output from the single trace-event read. The two
+                # concerns are gated independently: graph events feed the GraphSpec (so a costs-only run does
+                # not set an empty GraphSpec, preserving the --no-graph contract), usage events feed the
+                # tokens_usages the submitter renders the cost report from.
+                # The run's statistics read the same events, its usage events, whether the run completed or not.
+                trace_context = pipe_job.job_metadata.trace_context
+                assembles_output = (
+                    pipe_output is not None and trace_context is not None and (trace_context.emit_graph_events or trace_context.emit_usage_events)
+                )
+                counts_usage = usage_tally is not None and trace_context is not None and trace_context.emit_usage_events
+                trace_events: RunTraceEvents | None = None
+                if assembles_output or counts_usage:
+                    trace_events = read_run_trace_events(pipeline_run_id=pipeline_run_id)
+                if pipe_output is not None and trace_context is not None and assembles_output:
+                    assemble_tracing_on_output(
                         pipe_output=pipe_output,
-                        storage_scope=pipe_job.job_metadata.run_metadata.storage_scope,
                         pipeline_run_id=pipeline_run_id,
-                        delivery_assignment=delivery_assignment,
-                        status=status,
-                        problem=problem,
-                        request_id=pipe_job.job_metadata.run_metadata.request_id,
-                        finished_at=finished_at,
-                        extras=pipe_job.job_metadata.run_metadata.extras,
+                        assemble_graph=trace_context.emit_graph_events,
+                        assemble_usage=trace_context.emit_usage_events,
+                        domain_code=pipe_job.pipe.domain_code,
+                        main_pipe_code=pipe_job.pipe.code,
+                        trace_events=trace_events,
                     )
-                except (DeliveryError, SsrfBlockedError) as delivery_error:
-                    # A caller's webhook never raises here: its failures are the delivery's own records. What can is
-                    # the storage, or one of the host's own webhooks, which the SSRF guard may refuse at fire time.
-                    if execution_error is None and not run_was_cancelled:
-                        # The run's failure is now the delivery's, the storage's or a host's webhook's after the pipe
-                        # executed, which the run's boundary reports as it reports the pipe's own.
-                        self._report_run_failure(error=delivery_error, pipe_job=pipe_job, webhook_problem=None)
-                        raise
-                    # The run keeps its own failure, or its cancellation. A refusal of the delivery's destination still logs its own security
-                    # event, naming the run, beside the one the run's failure logged if it was a refusal too.
-                    emit_security_event_for_run(error=delivery_error, run_metadata=pipe_job.job_metadata.run_metadata)
-                    # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
-                    # By its code and class, never its text, which names the caller's webhook URL or the store it wrote to.
-                    log.error(
-                        "The delivery also failed after the pipe execution failed",
-                        fields=_secondary_failure_fields(exc=delivery_error),
+                    if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
+                        self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)
+
+                if usage_tally is not None:
+                    outcome: UsageStatsOutcome
+                    if execution_error is not None:
+                        outcome = UsageStatsOutcome.FAILED
+                    elif pipe_output is None:
+                        # Neither a result nor an exception: the run was cancelled or interrupted, which no `except Exception` catches.
+                        outcome = UsageStatsOutcome.CANCELLED
+                    else:
+                        outcome = UsageStatsOutcome.SUCCEEDED
+                    self._report_usage_stats(
+                        pipe_job=pipe_job,
+                        outcome=outcome,
+                        execution_error=execution_error,
+                        duration_seconds=time.monotonic() - started_at,
+                        input_kinds=input_kinds,
+                        trace_events=trace_events if counts_usage else None,
+                        closed_graph=closed_graph,
+                        usage_tally=usage_tally,
                     )
 
-        if execution_error is not None:
-            raise execution_error
+                # A cancelled run ended failed, so its webhooks are told so, as `run.cancelled`, and never that it
+                # completed, while the cancellation itself propagates once the delivery is done.
+                if run_was_cancelled:
+                    status = DeliveryStatus.FAILED
+                    if delivery_assignment is not None and delivery_assignment.needs_run_problem:
+                        problem = _cancelled_run_problem(
+                            pipeline_run_id=pipeline_run_id,
+                            request_id=pipe_job.job_metadata.run_metadata.request_id,
+                        )
+
+                if delivery_assignment is not None:
+                    log.debug("Executing the delivery", fields={"delivery_status": status})
+                    try:
+                        await self._delivery_executor.execute(
+                            pipe_output=pipe_output,
+                            storage_scope=pipe_job.job_metadata.run_metadata.storage_scope,
+                            pipeline_run_id=pipeline_run_id,
+                            delivery_assignment=delivery_assignment,
+                            status=status,
+                            problem=problem,
+                            request_id=pipe_job.job_metadata.run_metadata.request_id,
+                            finished_at=finished_at,
+                            extras=pipe_job.job_metadata.run_metadata.extras,
+                        )
+                    except (DeliveryError, SsrfBlockedError) as delivery_error:
+                        # A caller's webhook never raises here: its failures are the delivery's own records. What can is
+                        # the storage, or one of the host's own webhooks, which the SSRF guard may refuse at fire time.
+                        if execution_error is None and not run_was_cancelled:
+                            # The run's failure is now the delivery's, the storage's or a host's webhook's after the pipe
+                            # executed, which the run's boundary reports as it reports the pipe's own.
+                            raise
+                        # The run keeps its own failure, or its cancellation. A refusal of the delivery's destination still logs its own security
+                        # event, naming the run, beside the one the run's failure logged if it was a refusal too.
+                        emit_security_event_for_run(error=delivery_error, run_metadata=pipe_job.job_metadata.run_metadata)
+                        # As fields with no traceback, for the same reason as the tracer's: the execution error is chained onto it.
+                        # By its code and class, never its text, which names the caller's webhook URL or the store it wrote to.
+                        log.error(
+                            "The delivery also failed after the pipe execution failed",
+                            fields=_secondary_failure_fields(exc=delivery_error),
+                        )
+
+            if execution_error is not None:
+                raise execution_error
+        except Exception as escaping_error:
+            # Observe-and-reraise at the run's boundary: the run fails with whatever escapes it, the pipe's own error or
+            # one its tail raised after it, a tracer that would not close, a trace that would not assemble, statistics or
+            # a delivery that failed, and that exception, the one the caller receives, is the one reported. It is
+            # reported here and nowhere else in the run, so a run sends one report: a tail failure that replaced the
+            # pipe's own is reported in its place, never beside it. A cancellation is no `Exception` and reports nothing.
+            self._report_run_failure(
+                error=escaping_error,
+                pipe_job=pipe_job,
+                webhook_problem=problem if escaping_error is execution_error else None,
+            )
+            raise
 
         assert pipe_output is not None
         return pipe_output

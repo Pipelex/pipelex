@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
@@ -12,10 +13,13 @@ from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, WebhookTarg
 from pipelex.pipe_run.exceptions import StorageDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.exceptions import PipelineInputUrlInvalidError
+from pipelex.system.data_inclusion_config import DataInclusionConfig
 from pipelex.system.error_tracking.error_report import ErrorReportKind
 from pipelex.system.error_tracking.error_tracking import report_exception
+from pipelex.system.execution_chain import make_direct_chain
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.system.trace_context import TraceContext
 from pipelex.test_extras.recording_error_tracker import recording_error_tracker
 
 
@@ -25,7 +29,7 @@ class _EngineNotOfferedError(PipelexError):
     error_code = PipelexErrorCode.DOCGEN_ENGINE_UNAVAILABLE
 
 
-def _failing_job(*, mocker: MockerFixture, error: Exception | None, run_mode: PipeRunMode = PipeRunMode.LIVE) -> tuple[Any, Any]:
+def _failing_job(*, mocker: MockerFixture, error: BaseException | None, run_mode: PipeRunMode = PipeRunMode.LIVE) -> tuple[Any, Any]:
     """A router failing with ``error`` (or succeeding with ``None``) and a job carrying the run's ids and its run mode."""
     router = mocker.AsyncMock()
     router.run = mocker.AsyncMock(return_value=mocker.MagicMock(), side_effect=error)
@@ -38,6 +42,34 @@ def _failing_job(*, mocker: MockerFixture, error: Exception | None, run_mode: Pi
         )
     )
     return router, job
+
+
+def _traced(*, job: Any) -> None:
+    """Give ``job`` a trace context asking for its graph, so the run's tail assembles the trace onto its output."""
+    job.job_metadata = job.job_metadata.model_copy(
+        update={
+            "trace_context": TraceContext(
+                graph_id="plr-tracked",
+                data_inclusion=DataInclusionConfig(pipe_and_concept_registry=False, stuff_json_content=False, error_stack_traces=False),
+                emit_graph_events=True,
+                emit_usage_events=False,
+                run_mode=PipeRunMode.LIVE,
+                chain=make_direct_chain(),
+            )
+        }
+    )
+
+
+def _failing_tracer_close(*, mocker: MockerFixture, error: Exception) -> None:
+    """A graph tracer whose closing raises ``error``."""
+    tracer_manager = mocker.patch("pipelex.pipe_run.pipe_run.GraphTracerManager").get_instance.return_value
+    tracer_manager.close_tracer.side_effect = error
+
+
+def _failing_delivery(*, mocker: MockerFixture, error: Exception) -> None:
+    """A delivery executor whose execution raises ``error``."""
+    executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor").return_value
+    executor.execute = mocker.AsyncMock(side_effect=error)
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -157,3 +189,107 @@ class TestPipeRunErrorTracking:
         assert report.exception is close_error
         assert report.kind == ErrorReportKind.RUN_FAILURE
         assert report.code == CoreCode.RUNTIME_UNEXPECTED
+
+    async def test_a_tracer_close_s_unexpected_failure_after_the_pipe_executed_is_reported(self, mocker: MockerFixture) -> None:
+        """Not only an `OSError`: whatever closing the trace raises after the pipe executed is the run's failure, and is reported."""
+        router, job = _failing_job(mocker=mocker, error=None)
+        mocker.patch("pipelex.pipe_run.pipe_run.assemble_tracing_on_output")
+        close_error = RuntimeError("the tracer's state is broken")
+        _failing_tracer_close(mocker=mocker, error=close_error)
+
+        with recording_error_tracker() as recorder, pytest.raises(RuntimeError, match="state is broken"):
+            await PipeRun(pipe_router=router).run(pipe_job=job)
+
+        (report,) = recorder.reports
+        assert report.exception is close_error
+        assert report.kind == ErrorReportKind.RUN_FAILURE
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+        assert (report.pipeline_run_id, report.request_id, report.pipe_code) == ("plr-tracked", "req-tracked", "two_steps")
+
+    async def test_a_trace_that_fails_to_assemble_is_reported(self, mocker: MockerFixture) -> None:
+        """Assembling the run's trace onto its output runs after the pipe executed; what it raises is the run's failure, reported."""
+        router, job = _failing_job(mocker=mocker, error=None)
+        _traced(job=job)
+        mocker.patch("pipelex.pipe_run.pipe_run.GraphTracerManager").get_instance.return_value = None
+        mocker.patch("pipelex.pipe_run.pipe_run.read_run_trace_events")
+        assembly_error = KeyError("a node the graph does not hold")
+        mocker.patch("pipelex.pipe_run.pipe_run.assemble_tracing_on_output", side_effect=assembly_error)
+
+        with recording_error_tracker() as recorder, pytest.raises(KeyError):
+            await PipeRun(pipe_router=router).run(pipe_job=job)
+
+        (report,) = recorder.reports
+        assert report.exception is assembly_error
+        assert report.kind == ErrorReportKind.RUN_FAILURE
+        assert report.code == CoreCode.RUNTIME_UNEXPECTED
+
+    async def test_usage_statistics_that_fail_unexpectedly_are_reported(self, mocker: MockerFixture) -> None:
+        """The run's statistics swallow the failures they expect; one they do not escapes the run as its failure, reported."""
+        router, job = _failing_job(mocker=mocker, error=None)
+        mocker.patch("pipelex.pipe_run.pipe_run.GraphTracerManager").get_instance.return_value = None
+        mocker.patch("pipelex.pipe_run.pipe_run.usage_stats_are_enabled", return_value=True)
+        mocker.patch("pipelex.pipe_run.pipe_run.input_kinds_of", return_value=(False, False))
+        mocker.patch("pipelex.pipe_run.pipe_run.get_own_pipes", return_value=[])
+        mocker.patch("pipelex.pipe_run.pipe_run.get_concept_library")
+        usage_error = TypeError("an unexpected statistic")
+        mocker.patch("pipelex.pipe_run.pipe_run.report_run_usage", side_effect=usage_error)
+
+        with recording_error_tracker() as recorder, pytest.raises(TypeError, match="unexpected statistic"):
+            await PipeRun(pipe_router=router).run(pipe_job=job)
+
+        (report,) = recorder.reports
+        assert report.exception is usage_error
+        assert report.kind == ErrorReportKind.RUN_FAILURE
+
+    async def test_a_delivery_s_unexpected_failure_is_reported(self, mocker: MockerFixture) -> None:
+        """Not only a `DeliveryError`: whatever the delivery raises after the pipe executed is the run's failure, and is reported."""
+        router, job = _failing_job(mocker=mocker, error=None)
+        mocker.patch("pipelex.pipe_run.pipe_run.assemble_tracing_on_output")
+        delivery_error = RuntimeError("the delivery's own bug")
+        _failing_delivery(mocker=mocker, error=delivery_error)
+
+        with recording_error_tracker() as recorder, pytest.raises(RuntimeError, match="delivery's own bug"):
+            await PipeRun(pipe_router=router).run(pipe_job=job, delivery_assignment=DeliveryAssignment())
+
+        (report,) = recorder.reports
+        assert report.exception is delivery_error
+        assert report.kind == ErrorReportKind.RUN_FAILURE
+
+    @pytest.mark.parametrize("fails_delivery", [False, True])
+    async def test_a_cancelled_run_whose_tail_fails_stays_cancelled_and_reports_nothing(self, mocker: MockerFixture, fails_delivery: bool) -> None:
+        """A cancelled run whose trace will not close, or whose delivery fails too, still propagates its cancellation, and no tracker hears of it."""
+        router, job = _failing_job(mocker=mocker, error=asyncio.CancelledError())
+        _failing_tracer_close(mocker=mocker, error=OSError("the trace file could not be closed"))
+        delivery_assignment: DeliveryAssignment | None = None
+        if fails_delivery:
+            _failing_delivery(mocker=mocker, error=StorageDeliveryError("the store is down").with_params(scheme="s3"))
+            delivery_assignment = DeliveryAssignment()
+
+        with recording_error_tracker() as recorder, pytest.raises(asyncio.CancelledError):
+            await PipeRun(pipe_router=router).run(pipe_job=job, delivery_assignment=delivery_assignment)
+
+        assert recorder.reports == []
+
+    @pytest.mark.parametrize("failing_stage", ["tracer_close", "delivery"])
+    async def test_a_failed_pipe_whose_tail_also_raises_reports_once_the_exception_the_caller_receives(
+        self, mocker: MockerFixture, failing_stage: str
+    ) -> None:
+        """The tail's exception replaces the pipe's own on its way to the caller; that one is reported, and the pipe's is not reported beside it."""
+        router_error = RuntimeError("router blew up")
+        router, job = _failing_job(mocker=mocker, error=router_error)
+        tail_error = RuntimeError("the tail's own bug")
+        delivery_assignment: DeliveryAssignment | None = None
+        if failing_stage == "tracer_close":
+            _failing_tracer_close(mocker=mocker, error=tail_error)
+        else:
+            mocker.patch("pipelex.pipe_run.pipe_run.GraphTracerManager").get_instance.return_value = None
+            _failing_delivery(mocker=mocker, error=tail_error)
+            delivery_assignment = DeliveryAssignment()
+
+        with recording_error_tracker() as recorder, pytest.raises(RuntimeError, match="tail's own bug") as raised:
+            await PipeRun(pipe_router=router).run(pipe_job=job, delivery_assignment=delivery_assignment)
+
+        assert raised.value is tail_error
+        (report,) = recorder.reports
+        assert report.exception is tail_error
+        assert report.kind == ErrorReportKind.RUN_FAILURE
