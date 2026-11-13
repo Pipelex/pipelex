@@ -308,7 +308,9 @@ class Pipelex(RuntimeBoot):
                 the current span, follows its sampling decision, and its pipe and LLM spans are made current while
                 they run. None leaves it to the PIPELEX_JOIN_HOST_TRACE environment variable, then to
                 `join_host_trace` in telemetry.toml. Refused at boot unless a telemetry.toml destination receives
-                Pipelex's spans.
+                Pipelex's spans. With a `telemetry_manager` injected, that manager's own `join_host_trace` decides,
+                neither the environment nor the file is read for it and its destinations are not checked, and a
+                value passed here that differs from the manager's is refused.
             observers: Custom observers for pipeline events
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.

@@ -40,12 +40,30 @@ class TelemetryFactory:
         own spans made children of a Pipelex span would otherwise reach the host's backend with a parent
         nobody has. With telemetry off as a whole, by its integration mode or ``DO_NOT_TRACK``, Pipelex
         starts no span, so there is nothing to orphan and the switch is inert.
+
+        An injected manager states the switch for itself, through its own ``join_host_trace``, which is what
+        the runtime reads: the environment and the file are not consulted for it, its destinations are its own
+        to check, and an in-code ``join_host_trace`` that disagrees with it is refused.
+
+        Raises:
+            TelemetryConfigValidationError: The switch is on with no span destination, ``PIPELEX_JOIN_HOST_TRACE``
+                is unreadable, or an in-code ``join_host_trace`` contradicts the injected manager's.
         """
         # Always load telemetry config first to determine allowed modes
         if not telemetry_config:
             telemetry_config = load_telemetry_config(secrets_provider=secrets_provider)
 
-        is_join_host_trace = cls.resolve_join_host_trace(telemetry_config=telemetry_config, join_host_trace=join_host_trace)
+        is_join_host_trace: bool
+        if injected_telemetry_manager is not None:
+            is_join_host_trace = injected_telemetry_manager.join_host_trace
+            if join_host_trace is not None and join_host_trace != is_join_host_trace:
+                msg = (
+                    f"join_host_trace={join_host_trace} was passed to the boot, but the injected telemetry manager states "
+                    f"join_host_trace={is_join_host_trace}, which is what the runtime reads: make them agree, or pass neither"
+                )
+                raise TelemetryConfigValidationError(msg, surface=TELEMETRY_SURFACE, file=None, setting=JOIN_HOST_TRACE_SETTING)
+        else:
+            is_join_host_trace = cls.resolve_join_host_trace(telemetry_config=telemetry_config, join_host_trace=join_host_trace)
 
         if not telemetry_config.is_custom_telemetry_allowed_for_mode(integration_mode):
             log.debug(f"Telemetry is disabled because the integration mode '{integration_mode}' does not allow it")
@@ -60,7 +78,8 @@ class TelemetryFactory:
                 log.debug("The join_host_trace switch is inert, since telemetry is off and Pipelex starts no span")
             return TelemetryManagerNoOp()
 
-        if is_join_host_trace:
+        # An injected manager's destinations are its own, so the file's are checked only for the manager made here.
+        if is_join_host_trace and injected_telemetry_manager is None:
             cls.check_join_host_trace_destination(telemetry_config=telemetry_config)
 
         # Deferred import: avoid pulling heavy SDK at module-load time
@@ -82,23 +101,24 @@ class TelemetryFactory:
     def resolve_join_host_trace(cls, *, telemetry_config: TelemetryConfig, join_host_trace: bool | None) -> bool:
         """Whether Pipelex's spans join the host's trace: the in-code value, else ``PIPELEX_JOIN_HOST_TRACE``, else the file.
 
+        An empty or whitespace-only variable counts as unset.
+
         Raises:
             TelemetryConfigValidationError: The environment variable holds something other than ``true``, ``false``,
                 ``1`` or ``0``.
         """
         if join_host_trace is not None:
             return join_host_trace
-        env_value = get_optional_env(OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY)
+        env_value = (get_optional_env(OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY) or "").strip()
         if env_value:
-            parsed = _JOIN_HOST_TRACE_ENV_VALUES.get(env_value.strip().lower())
+            parsed = _JOIN_HOST_TRACE_ENV_VALUES.get(env_value.lower())
             if parsed is None:
                 msg = (
                     f"The environment variable '{OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY}' must be 'true', 'false', '1' or '0' "
                     "to state whether Pipelex's spans join the host's trace"
                 )
-                raise TelemetryConfigValidationError(
-                    msg, surface=TELEMETRY_SURFACE, file=TELEMETRY_CONFIG_FILE_NAME, setting=OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY
-                )
+                # No file is at fault: the variable is the setting to correct.
+                raise TelemetryConfigValidationError(msg, surface=TELEMETRY_SURFACE, file=None, setting=OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY)
             return parsed
         return telemetry_config.join_host_trace
 

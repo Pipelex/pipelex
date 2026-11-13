@@ -98,7 +98,7 @@ The top-level `join_host_trace` key decides whether Pipelex's spans join the Ope
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`), itself overridden by `Pipelex.make(join_host_trace=...)` |
+| `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`; empty or blank counts as unset), itself overridden by `Pipelex.make(join_host_trace=...)`; a telemetry manager injected through `Pipelex.make(telemetry_manager=...)` states it for itself |
 
 !!! warning "A span destination is required"
     With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.

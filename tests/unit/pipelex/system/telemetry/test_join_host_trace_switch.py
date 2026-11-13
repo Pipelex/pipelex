@@ -16,7 +16,7 @@ from pipelex.system.telemetry.telemetry_config import (
     TelemetryConfig,
 )
 from pipelex.system.telemetry.telemetry_factory import JOIN_HOST_TRACE_SETTING, TelemetryFactory
-from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerNoOp
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract, TelemetryManagerNoOp
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 
 if TYPE_CHECKING:
@@ -63,6 +63,8 @@ class TestJoinHostTraceSwitch:
             (None, "false", True, False),
             (None, "0", True, False),
             (None, "", True, True),
+            (None, "   ", True, True),
+            (None, " false ", True, False),
             (True, "false", False, True),
             (False, "true", True, False),
         ],
@@ -84,6 +86,8 @@ class TestJoinHostTraceSwitch:
             TelemetryFactory.resolve_join_host_trace(telemetry_config=_config(), join_host_trace=None)
 
         assert exc_info.value.setting == OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY
+        # No file is at fault, so the refusal's advice points at none.
+        assert exc_info.value.file is None
 
     @pytest.mark.parametrize(
         ("telemetry_config", "expected"),
@@ -173,3 +177,38 @@ class TestJoinHostTraceSwitch:
         assert isinstance(telemetry_manager, TelemetryManagerNoOp)
         assert telemetry_manager.join_host_trace is False
         telemetry_manager_class.assert_not_called()
+
+    @pytest.mark.parametrize("in_code", [None, True])
+    def test_an_injected_manager_states_the_switch_and_is_not_checked_against_the_file(
+        self, mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch, in_code: bool | None
+    ) -> None:
+        """The file's switch is on with no span destination, and the environment is unreadable: neither is consulted for an injected manager."""
+        monkeypatch.setenv(OTelConstants.JOIN_HOST_TRACE_ENV_VAR_KEY, "yes")
+        injected = mocker.MagicMock(spec=TelemetryManagerAbstract)
+        injected.join_host_trace = True
+
+        telemetry_manager = TelemetryFactory.make_telemetry_manager(
+            secrets_provider=EnvSecretsProvider(),
+            integration_mode=IntegrationMode.FASTAPI,
+            telemetry_config=_config(join_host_trace=True, tracing_enabled=False),
+            injected_telemetry_manager=injected,
+            join_host_trace=in_code,
+        )
+
+        assert telemetry_manager is injected
+
+    def test_an_in_code_switch_contradicting_the_injected_manager_refuses_the_boot(self, mocker: MockerFixture) -> None:
+        injected = mocker.MagicMock(spec=TelemetryManagerAbstract)
+        injected.join_host_trace = False
+
+        with pytest.raises(TelemetryConfigValidationError, match="injected telemetry manager states join_host_trace=False") as exc_info:
+            TelemetryFactory.make_telemetry_manager(
+                secrets_provider=EnvSecretsProvider(),
+                integration_mode=IntegrationMode.FASTAPI,
+                telemetry_config=_config(),
+                injected_telemetry_manager=injected,
+                join_host_trace=True,
+            )
+
+        assert exc_info.value.setting == JOIN_HOST_TRACE_SETTING
+        assert exc_info.value.file is None
