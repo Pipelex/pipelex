@@ -38,7 +38,7 @@ import traceback
 from collections.abc import Awaitable, Callable
 from enum import StrEnum, unique
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
@@ -639,6 +639,12 @@ async def handle_http_exception(request: Request, exc: Exception) -> Response:
 # The message of the record `AnsweredErrorBarrier` writes for a failure no handler recorded, once a response had started.
 UNRECORDED_FAILURE_MESSAGE = "A request failed after its response had started"
 
+# What sending a response raises when the client hung up, on the server stack the API runs on: the socket's own
+# `OSError`, uvicorn's `ClientDisconnected` among them, and Starlette's `ClientDisconnect`, which a streaming response
+# raises from an `OSError`. Uvicorn's HTTP `send` drops a message to a client already gone without raising, and anyio's
+# `BrokenResourceError` is caught inside `BaseHTTPMiddleware`, so no anyio error reaches the barrier from sending.
+_CLIENT_HANG_UP_ERRORS: tuple[type[Exception], ...] = (OSError, ClientDisconnect)
+
 
 class AnsweredErrorBarrier:
     """Pure-ASGI layer around the app that keeps an exception it answered from reaching the server that runs it.
@@ -657,10 +663,12 @@ class AnsweredErrorBarrier:
     app, and none leaves it unrecorded.
 
     What reaches the error trackers follows where the failure arose. A failure of the app's code, the route's or a
-    handler's, the catch-all's failure to build the barrier's answer included, is recorded at `error` and reported. The
-    server's failure to send the barrier's own answer, an `OSError` or a `ClientDisconnect` when the client hung up, is
-    the delivery's, not a fault anyone running the server has to fix, and the catch-all already reported the failure the
-    answer was for: it is recorded at `warning` and not reported, whatever its class.
+    handler's, the catch-all's failure to build the barrier's answer included, is recorded at `error` and reported. A
+    failure to send the barrier's own answer because the client hung up, an `OSError` or a `ClientDisconnect`
+    (`_CLIENT_HANG_UP_ERRORS`), is the delivery's, not a fault anyone running the server has to fix, and the catch-all
+    already reported the failure the answer was for: it is recorded at `warning` and not reported. Any other exception
+    from sending the answer comes from the code between the barrier and the server, such as `RequestIdMiddleware`, so it
+    is recorded at `error` and reported like a failure of the app's code.
 
     `pipelex_api.main` puts it directly around the FastAPI app, inside `RequestIdMiddleware`, so the request's log
     context is still bound while it answers.
@@ -702,24 +710,35 @@ class AnsweredErrorBarrier:
                 return
             try:
                 await response(scope, receive, tracking_send)
+            except _CLIENT_HANG_UP_ERRORS as hang_up:
+                # The absolute root still: the server failed to send the barrier's answer to a client already gone, and
+                # nothing is left to answer it. The catch-all recorded and reported the failure that answer was for;
+                # this one is the delivery's, which nobody running the server has to fix, so it is recorded at
+                # `warning` and reported to no tracker.
+                _log_unrecorded_failure(hang_up, request=request, sent_status=sent_status, level=RecordLevel.WARNING)
             except Exception as send_failure:  # ruff: ignore[BLE001]
-                # The absolute root still: the server failed to send the barrier's answer, such as to a client already
-                # gone, and nothing is left to answer it. The catch-all recorded and reported the failure that answer
-                # was for; this one is the delivery's, which nobody running the server has to fix, so it is recorded
-                # at `warning` and reported to no tracker.
-                _log_unrecorded_failure(send_failure, request=request, sent_status=sent_status, level=RecordLevel.WARNING)
+                # The absolute root still: sending the barrier's answer failed for another reason than a hang-up, a
+                # fault of the code between the barrier and the server, and nothing is left to answer it.
+                _log_unrecorded_failure(send_failure, request=request, sent_status=sent_status, level=RecordLevel.ERROR)
+                _report_unrecorded_failure(send_failure, request=request)
 
 
-def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_status: int | None, level: RecordLevel) -> None:
+def _log_unrecorded_failure(
+    error: BaseException,
+    *,
+    request: Request,
+    sent_status: int | None,
+    level: Literal[RecordLevel.ERROR, RecordLevel.WARNING],
+) -> None:
     """Record a failure no handler recorded, which ended a request after its response had started.
 
     The response's status and part of it are already sent, so the failure is answered by no problem: the record names the
     request's path, the status sent, the class that escaped and the classes of its chain, and never an exception's text.
     `sent_status` is `None` only when the barrier's own answer failed before its status was sent, which leaves the
     server to answer for it, and the record then names no status. The caller picks `level` from where the failure arose:
-    `error` for a failure of the app's code, the route's or a handler's, which the caller also reports to the error
-    trackers (``_report_unrecorded_failure``), and `warning` for the server's failure to send the barrier's own answer,
-    which is not reported, so the error-level records and the reports stay the same set.
+    `error` for a fault of the server's code, the route's, a handler's or a middleware's, which the caller also reports
+    to the error trackers (``_report_unrecorded_failure``), and `warning` for a failure to send the barrier's own answer
+    to a client that hung up, which is not reported, so the error-level records and the reports stay the same set.
     """
     fields: dict[str, Any] = {
         "url.path": request.url.path,
@@ -733,8 +752,6 @@ def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_stat
             log.error(UNRECORDED_FAILURE_MESSAGE, fields=fields)
         case RecordLevel.WARNING:
             log.warning(UNRECORDED_FAILURE_MESSAGE, fields=fields)
-        case RecordLevel.DEBUG:
-            log.debug(UNRECORDED_FAILURE_MESSAGE, fields=fields)
 
 
 def _report_unrecorded_failure(error: BaseException, *, request: Request) -> None:
