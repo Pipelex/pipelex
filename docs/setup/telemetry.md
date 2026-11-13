@@ -21,12 +21,47 @@ Each integration mode allows these streams or not: by default the `cli`, `docker
 
 ### Pipelex's spans in your process
 
-Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
 - An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
 - The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
 - If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
+
+### Joining your process's trace
+
+When the trace of the process is yours, and you want Pipelex to behave as one more OpenTelemetry library in it, turn on `join_host_trace`. With the switch on:
+
+- **A run continues your current span.** When a run starts, Pipelex reads OpenTelemetry's current span; the run's root pipe span becomes its child, in your trace, instead of the root of a trace derived from the run's id. The trace id, the parent and your span's W3C trace state travel with the run's job metadata, so a step a distributed worker runs, in another process, stays in your trace too. With no current span, the run roots its own trace as before. A run started inside a running pipe, whose span is then the current one, becomes a subtree of the enclosing run rather than a new root in its trace.
+- **Your sampling decision is followed.** Pipelex's spans carry your span's sampled flag rather than always being sampled, so a request your sampler drops keeps none of Pipelex's spans, and none of the spans your instrumentation opens inside them.
+- **Pipe and LLM spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the LLM call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
+
+You turn it on in code, in the environment or in the file, and the most explicit wins: `Pipelex.make(join_host_trace=True)` in code, then the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`, in any case; an empty or blank variable counts as unset, and any other value stops the boot), then the top-level `join_host_trace` key of `telemetry.toml`, `false` by default.
+
+```toml
+join_host_trace = true  # top-level, before any [section]
+
+[custom_posthog]
+mode = "anonymous"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.tracing]
+enabled = true
+
+[[otlp]]
+name = "traces"
+endpoint = "${env:OTLP_TRACES_ENDPOINT}"
+headers = { "x-sentry-auth" = "${env:OTLP_AUTH_HEADER}" }
+```
+
+**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. The destinations are your PostHog stream with its AI span tracing on, an `[[otlp]]` exporter and Langfuse, all fed by the one tracer that exists when `[custom_posthog]` is `anonymous` or `identified` and `[custom_posthog.tracing]` is enabled; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
+
+What it costs:
+
+- **Several runs can share one trace id.** A run started inside one of your requests carries your request's trace id, and so does every other run started in it, on your PostHog stream too: key a run on its `pipeline_run_id`, which every span and event carries, never on the trace id.
+- **Langfuse's trace-level fields** are written by each run's root span, so when runs share one of your traces, they describe the run that wrote them last.
+- **A telemetry manager you inject states the switch for itself.** With `Pipelex.make(telemetry_manager=...)`, the manager's own `join_host_trace` decides, the environment and the file are not read for it, and its destinations are yours to check; passing `join_host_trace=` beside it with a different value stops the boot.
+- **Each process states the switch for itself.** A distributed worker continues your trace whatever its own setting, since the trace id and the sampled flag travel with the job, but it makes Pipelex's spans current only when its own switch is on.
 
 ## Quick Setup
 

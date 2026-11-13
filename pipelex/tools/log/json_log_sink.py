@@ -7,7 +7,8 @@ OpenTelemetry's current span names a trace, then ``pipelex.trace_id`` and ``pipe
 Pipelex span is held, then the fields, the context identifiers and the ``data`` attribute under their
 own names. The standard trace keys are the ones OpenTelemetry specifies for trace context in a JSON log
 that is not OTLP, hex-encoded, so a collector or an error tracker joins the line to the trace of the
-host's own spans without a parser; Pipelex only reads that span. The ``pipelex.*`` keys name the Pipelex
+host's own spans without a parser; Pipelex only reads that span, unless ``join_host_trace`` is on,
+when the Pipelex span it holds is also made current and is therefore the span these keys name. The ``pipelex.*`` keys name the Pipelex
 span held when the record is formatted, a pipe's or an LLM call's, whether or not it is also the current
 span. The stream handler formats inside the log call, in the calling task, and a boot line held until
 the sink arrives is replayed in the context it was logged in, so it keeps both its spans. The sink's own

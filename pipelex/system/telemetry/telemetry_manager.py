@@ -32,13 +32,16 @@ if TYPE_CHECKING:
 class TelemetryManager(TelemetryManagerAbstract):
     PRIVACY_NOTICE = "[Privacy: exception message redacted]"
 
-    def __init__(self, telemetry_config: TelemetryConfig):
+    def __init__(self, telemetry_config: TelemetryConfig, *, join_host_trace: bool):
         """Initialize the TelemetryManager with the user's own telemetry destinations.
 
         Args:
             telemetry_config: User's telemetry configuration.
+            join_host_trace: Whether Pipelex's spans join the host's trace, as `TelemetryFactory` resolved it
+                from code, the environment and the file. The factory has already refused it with no span destination.
         """
         self.telemetry_config = telemetry_config
+        self._join_host_trace = join_host_trace
         self._exception_capture: ExceptionCapture | None = None
 
         # Create the PostHog client only if the user's event tracking is enabled
@@ -497,6 +500,11 @@ class TelemetryManager(TelemetryManagerAbstract):
     @override
     def is_langfuse_enabled(self) -> bool:
         return self.telemetry_config.langfuse.enabled
+
+    @property
+    @override
+    def join_host_trace(self) -> bool:
+        return self._join_host_trace
 
     @override
     def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:

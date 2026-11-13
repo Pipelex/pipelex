@@ -2,8 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`join_host_trace`, Pipelex's spans in your process's trace**: with the new top-level `join_host_trace = true` in `telemetry.toml`, the `PIPELEX_JOIN_HOST_TRACE` environment variable or `Pipelex.make(join_host_trace=True)`, the most explicit winning, a run's root pipe span starts under OpenTelemetry's current span, in its trace, following its sampling decision and carrying its W3C trace state across a distributed worker too, and each pipe and LLM span is made current while it runs, so your own instrumentation nests under it and an error tracker reading the current span sees it. The boot refuses the switch with `pipelex.config.invalid` unless a destination of yours (your PostHog stream with tracing, an `[[otlp]]` exporter or Langfuse) receives Pipelex's spans, a manager injected through `telemetry_manager=` states it for itself, the default stays off, a span the sampler dropped no longer serializes its inputs, prompt or output, and a run's root span now carries `pipelex.run_root`, which keeps it parentless on your PostHog stream.
+
 ### Changed
 
+- **A custom telemetry manager states `join_host_trace` (Breaking)**: `TelemetryManagerAbstract` gains the abstract property `join_host_trace`, so a manager injected through `Pipelex.make(telemetry_manager=...)` implements it, returning `False` to keep Pipelex's spans out of the host's trace; `TelemetryManager.__init__` takes a required keyword-only `join_host_trace`, so code constructing one to inject passes it; and `OtelContext`, which the job metadata carries, gains the required `is_sampled` and the optional `trace_state`, `host_span_id` and `is_host_span_pipelex`.
 - **A bundle validator receives the request id, plugin API version 10 (Breaking)**: `BundleValidatorProtocol.validate_bundles` takes `request_id`, the inbound request id the host is serving, `None` when it serves none, refused with `RunParameterError` before any work unless it is one to 128 ASCII letters, digits, `_` or `-`, as a run's request id is. The in-process validator binds it on the log context for the whole sweep, `validate_bundles_in_process` takes it too, and the API server's `POST /v1/validate` hands its validator the request's `X-Request-ID`, so a validator dispatching the dry run to a worker can carry the id to the worker's log lines; `PLUGIN_API_VERSION` moves to 10, so a plugin declaring `targets_api = 9` is refused at discovery with `PluginApiVersionMismatchError`.
 
 ## [v0.100.1] - 2026-11-13

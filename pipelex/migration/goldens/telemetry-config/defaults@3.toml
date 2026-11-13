@@ -1,4 +1,5 @@
 otlp = []
+join_host_trace = false
 
 [custom_posthog]
 mode = "off"
