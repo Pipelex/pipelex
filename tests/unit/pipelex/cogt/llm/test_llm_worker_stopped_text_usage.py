@@ -87,6 +87,7 @@ def _make_llm_job() -> LLMJob:
             trace_name=STOP_TEST_PIPE_CODE,
             trace_name_redacted=STOP_TEST_PIPE_CODE,
             span_id=0x00000000000000AB,
+            is_sampled=True,
         ),
     )
     return LLMJob(

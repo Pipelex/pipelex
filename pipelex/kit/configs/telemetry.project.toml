@@ -20,6 +20,16 @@
 ####################################################################################################
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Joining your process's trace
+# When true, Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run
+# continues your current span, follows its sampling decision, and its pipe and LLM spans are made
+# current while they run. Boot refuses it unless a destination below receives Pipelex's spans.
+# PIPELEX_JOIN_HOST_TRACE and Pipelex.make(join_host_trace=...) override this key.
+# ──────────────────────────────────────────────────────────────────────────────
+
+# join_host_trace = false
+
+# ──────────────────────────────────────────────────────────────────────────────
 # PostHog Configuration (Event tracking + AI span tracing)
 # ──────────────────────────────────────────────────────────────────────────────
 
