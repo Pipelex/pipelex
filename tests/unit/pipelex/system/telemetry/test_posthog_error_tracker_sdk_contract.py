@@ -476,6 +476,6 @@ class TestPostHogErrorTrackerSdkContract:
         mocker.patch("posthog.privacy_mode", False)
         telemetry_config = TelemetryConfig(custom_posthog=PostHogConfig(mode=PostHogMode.IDENTIFIED, user_id="operator-user", api_key="phc_custom"))
 
-        TelemetryManager(telemetry_config)
+        TelemetryManager(telemetry_config, join_host_trace=False)
 
         assert posthog_class.call_args.kwargs["before_send"] is strip_exception_frame_sources

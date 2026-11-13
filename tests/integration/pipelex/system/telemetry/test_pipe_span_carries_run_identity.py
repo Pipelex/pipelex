@@ -43,6 +43,7 @@ _PARENT_OTEL_CONTEXT = OtelContext(
     trace_name="echo_topic_abc12345",
     trace_name_redacted="abc12345",
     span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+    is_sampled=True,
 )
 
 

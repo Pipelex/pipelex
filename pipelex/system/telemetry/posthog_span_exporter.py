@@ -247,9 +247,12 @@ class PostHogSpanExporter(SpanExporter):
             else:
                 properties[PostHogAttr.TRACE_NAME] = attributes.get(PipelexSpanAttr.TRACE_NAME)
 
-        # Add parent span ID for trace hierarchy
-        # Filter out virtual root parent (used to set trace_id for root spans)
-        if span.parent and span.parent.span_id != OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
+        # Add parent span ID for trace hierarchy. A run's root span has a parent this stream never receives,
+        # the virtual root parent that sets a run's own trace id, or a host's span the run joined, so it is
+        # left out and the run keeps the same shape here either way. A run started inside a running pipe keeps
+        # its parent, that pipe's span, which this stream receives: its first span carries no run-root mark.
+        is_run_root = attributes.get(PipelexSpanAttr.RUN_ROOT) is True
+        if span.parent and not is_run_root and span.parent.span_id != OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID:
             properties[PostHogAttr.PARENT_ID] = f"{span.parent.span_id:016x}"
 
         return properties

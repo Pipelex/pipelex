@@ -88,6 +88,19 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
             return False
         return instance.is_langfuse_enabled
 
+    @classmethod
+    def is_join_host_trace_enabled(cls) -> bool:
+        """Whether Pipelex's spans join the host's trace: a run continues the host's span, and pipe and LLM spans are made current.
+
+        Returns:
+            True if the switch is on for this process's telemetry manager, False otherwise (including when
+            no telemetry manager is configured).
+        """
+        instance = cls.get_instance()
+        if instance is None:
+            return False
+        return instance.join_host_trace
+
     @abstractmethod
     def setup(self, *, integration_mode: IntegrationMode):
         pass
@@ -167,6 +180,11 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
     def is_langfuse_enabled(self) -> bool:
         """Whether Langfuse OTLP exporter is enabled."""
 
+    @property
+    @abstractmethod
+    def join_host_trace(self) -> bool:
+        """Whether Pipelex's spans join the host process's OpenTelemetry trace (see ``TelemetryFactory.resolve_join_host_trace``)."""
+
     @abstractmethod
     def handle_trace_start(self, *, trace_name: str, trace_name_redacted: str, trace_id: int, run_metadata: "RunMetadata | None" = None) -> None:
         """Hook to do something when a trace starts.
@@ -241,6 +259,12 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
     @property
     @override
     def is_langfuse_enabled(self) -> bool:
+        return False
+
+    @property
+    @override
+    def join_host_trace(self) -> bool:
+        # No telemetry starts no span, so there is nothing to make current or to join.
         return False
 
     @override

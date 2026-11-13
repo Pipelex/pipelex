@@ -74,6 +74,7 @@ def _make_llm_job(*, extras: dict[str, str] | None = None) -> LLMJob:
             trace_name="some_pipe_abc12345",
             trace_name_redacted="abc12345",
             span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+            is_sampled=True,
         ),
     )
     return LLMJob(

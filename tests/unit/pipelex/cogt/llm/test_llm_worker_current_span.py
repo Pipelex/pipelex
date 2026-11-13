@@ -98,7 +98,9 @@ def _make_llm_job() -> LLMJob:
     job_metadata = JobMetadata(
         run_metadata=RunMetadata(user_id="pytest", pipeline_run_id="plr-llm", storage_scope="test/scope", read_scope=None),
         pipe_code="some_pipe",
-        otel_context=OtelContext(trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID),
+        otel_context=OtelContext(
+            trace_id=RUN_TRACE_ID, trace_name="some_pipe", trace_name_redacted="some_pipe", span_id=PIPE_SPAN_ID, is_sampled=True
+        ),
     )
     return LLMJob(
         job_metadata=job_metadata,
