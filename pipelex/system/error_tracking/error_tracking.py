@@ -6,7 +6,8 @@ them (``reset_error_trackers``), as it installs and resets the log sink. In betw
 - **A failed run**, which the runtime that ran it reports at the run's boundary (``PipeRun``), as ``run_failure``,
   when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run. What is reported
   is the exception that escapes the run, the pipe's own or one the run's tail raised after the pipe executed, such as
-  its trace, its statistics or its delivery failing, once per run; a cancelled run reports nothing.
+  its trace, its statistics or its delivery failing, once per run. A cancelled run reports nothing, whatever its
+  tail raises; a run whose pipe failed and which is cancelled during its tail reports the pipe's error.
 - **An uncaught exception**: while a tracker is installed, the interpreter's exception hooks, ``sys.excepthook`` and
   ``threading.excepthook``, report what reaches them as ``uncaught`` and then call the hooks that were there before.
 - **Anything else a host or the runtime catches and goes on from**, through ``report_exception`` or, for a problem
