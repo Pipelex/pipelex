@@ -354,6 +354,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
+        join_host_trace: bool | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -451,6 +452,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             integration_mode=integration_mode,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
+            join_host_trace=join_host_trace,
         )
         self.telemetry_manager.setup(integration_mode=integration_mode)
         self.runtime_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
@@ -938,6 +940,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
+        join_host_trace: bool | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         config_dir: Path | None = None,
         config_overrides: dict[str, Any] | None = None,
@@ -973,6 +976,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 reporting_delegate=reporting_delegate,
                 telemetry_config=telemetry_config,
                 telemetry_manager=telemetry_manager,
+                join_host_trace=join_host_trace,
                 observers=observers,
             )
             if needs_inference:
