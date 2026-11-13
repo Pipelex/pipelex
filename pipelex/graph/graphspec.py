@@ -30,6 +30,15 @@ class GraphSpecMode(StrEnum):
     LIVE = "live"
     STATIC = "static"
 
+    @property
+    def is_dry(self) -> bool:
+        """Whether the graph records a dry run."""
+        match self:
+            case GraphSpecMode.DRY:
+                return True
+            case GraphSpecMode.LIVE | GraphSpecMode.STATIC:
+                return False
+
 
 def make_graphspec_meta(*, mode: GraphSpecMode, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     """Build canonical GraphSpec metadata while preserving caller extras."""

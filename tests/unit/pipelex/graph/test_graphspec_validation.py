@@ -345,6 +345,13 @@ class TestGraphSpecValidation:
         assert graph.meta["format"] == "mthds"
         assert graph.meta["mode"] == mode
 
+    @pytest.mark.parametrize(
+        ("mode", "is_dry"),
+        [(GraphSpecMode.DRY, True), (GraphSpecMode.LIVE, False), (GraphSpecMode.STATIC, False)],
+    )
+    def test_only_a_dry_run_s_graph_is_dry(self, mode: GraphSpecMode, is_dry: bool) -> None:
+        assert mode.is_dry is is_dry
+
     def test_meta_mode_rejected_when_wrong(self) -> None:
         with pytest.raises(ValidationError):
             GraphSpec(

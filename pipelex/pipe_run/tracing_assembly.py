@@ -19,7 +19,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.graph.graphspec import GraphSpec, GraphSpecMode, PipelineRef
+from pipelex.graph.graphspec import GraphSpec, PipelineRef
 from pipelex.reporting.reporting_types import AnyTokensUsage
 from pipelex.runtime_hub import get_event_log_override
 from pipelex.system.exceptions import MissingDependencyError
@@ -258,7 +258,7 @@ def _assemble_tracing_events(
             log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
             # A dry run's graph is never reported, whoever asks: its events state its mode, so the rule holds for a
             # caller that does not know the run's mode, such as a durable-execution activity.
-            if reports_incomplete_graph and assembled_graph.mode != GraphSpecMode.DRY:
+            if reports_incomplete_graph and not assembled_graph.mode.is_dry:
                 report_unattributed_usage(
                     pipeline_run_id=pipeline_run_id,
                     usages_by_never_started_node=assembled_graph.usages_by_never_started_node,
