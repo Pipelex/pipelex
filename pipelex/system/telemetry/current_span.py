@@ -1,15 +1,15 @@
 """The two spans a log line names: OpenTelemetry's current span, and the Pipelex span active in this task.
 
-A line's standard trace fields name OpenTelemetry's current span in the process, which Pipelex only
-reads and never sets, so an operator's log backend files a line under the trace of the operator's own
-spans. The Pipelex span rides beside them, under the ``pipelex.trace_id`` and ``pipelex.span_id`` keys,
+A line's standard trace fields name OpenTelemetry's current span in the process, which by default
+Pipelex only reads and never sets, so an operator's log backend files a line under the trace of the
+operator's own spans. The Pipelex span rides beside them, under the ``pipelex.trace_id`` and ``pipelex.span_id`` keys,
 so a line inside a run still names the pipe or the LLM call it was logged in. The two are read
 independently: a line can carry both, either, or neither.
 
-The runtime starts its spans with an explicit parent carried in the job metadata, because a run's trace
-is derived from its business identifiers and has to survive a process boundary, where an in-process
-context does not travel. A span started that way is current nowhere, and the runtime never makes it
-OpenTelemetry's current span: Pipelex's tracer is its own and never the process's global one, so one of
+The runtime starts its spans with an explicit parent carried in the job metadata, because a run's trace,
+derived from its business identifiers or joined from the host's, has to survive a process boundary, where an in-process
+context does not travel. A span started that way is current nowhere, and by default the runtime never
+makes it OpenTelemetry's current span: Pipelex's tracer is its own and never the process's global one, so one of
 its spans made current there would re-parent the host application's own instrumentation under a trace
 only Pipelex's exporters receive, and have a sampler that follows its parent keep it. Instead, the
 runtime holds the span in a context variable of its own while the work it measures runs, in this task
@@ -22,7 +22,7 @@ that started it, and it never becomes the way a parent reaches a child: the job 
 that, so a child running in another process gets the same parent it always did.
 
 An operator who declares the process's trace theirs, with ``join_host_trace``, gets the other behaviour:
-a run starts under the host's current span, read here by ``host_span_context_to_join``, and the runtime
+a run starts under the host's current span, read here by ``host_span_to_join``, and the runtime
 holds its spans with ``make_current``, so each is also OpenTelemetry's current span while the work it
 measures runs, and the host's own instrumentation and an error tracker reading the current span see it.
 The boot refuses that switch unless a destination of the operator's receives Pipelex's spans, so the
@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from opentelemetry import trace
 
@@ -80,17 +80,32 @@ def pipelex_span_active(*, span: Span | None, make_current: bool = False) -> Gen
         _ACTIVE_PIPELEX_SPAN.reset(token)
 
 
-def host_span_context_to_join() -> SpanContext | None:
-    """The host's current span a run joining the host's trace starts under, or ``None`` when no current span names a trace.
+class HostSpanToJoin(NamedTuple):
+    """The current span a run joining the host's trace starts under, and whether it is a Pipelex span of this process."""
+
+    span_context: SpanContext
+    # True for a run started inside a running pipe whose span was made current: Pipelex's own streams receive that
+    # span, so the run is a subtree of the enclosing run's trace rather than a new root in it.
+    is_pipelex_span: bool
+
+
+def host_span_to_join() -> HostSpanToJoin | None:
+    """The current span a run joining the host's trace starts under, or ``None`` when no current span names a trace.
 
     Read once, at pipeline start, where the run's trace is decided; the job metadata carries the result from
-    there, across a process boundary too. Inside a run whose spans are made current, this is the enclosing
-    Pipelex span, so a nested run joins it.
+    there, across a process boundary too. Inside a run whose spans are made current, the current span is the
+    enclosing Pipelex span, the one held here, and the result says so.
     """
     current_span_context = trace.get_current_span().get_span_context()
-    if current_span_context.is_valid:
-        return current_span_context
-    return None
+    if not current_span_context.is_valid:
+        return None
+    pipelex_span_context = pipelex_span_context_for_logs()
+    is_pipelex_span = (
+        pipelex_span_context is not None
+        and pipelex_span_context.trace_id == current_span_context.trace_id
+        and pipelex_span_context.span_id == current_span_context.span_id
+    )
+    return HostSpanToJoin(span_context=current_span_context, is_pipelex_span=is_pipelex_span)
 
 
 def current_span_context_for_logs() -> SpanContext | None:

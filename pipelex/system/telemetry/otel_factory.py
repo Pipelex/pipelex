@@ -27,9 +27,11 @@ if TYPE_CHECKING:
     # Deferred imports: avoid pulling heavy SDKs at module-load time
     from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
-    from opentelemetry.trace import SpanContext
     from opentelemetry.trace import Tracer as OTelTracer
+    from opentelemetry.trace import TraceState
     from posthog import Posthog  # type: ignore[attr-defined]
+
+    from pipelex.system.telemetry.current_span import HostSpanToJoin
 
 
 class OtelFactory:
@@ -167,25 +169,27 @@ class OtelFactory:
         return trace_name, trace_name_redacted
 
     @classmethod
-    def make_run_otel_context(cls, *, pipeline_run_id: str, pipe_code: str, host_span_context: "SpanContext | None") -> OtelContext:
+    def make_run_otel_context(cls, *, pipeline_run_id: str, pipe_code: str, host_span: "HostSpanToJoin | None") -> OtelContext:
         """The OpenTelemetry context a run starts from: its own derived trace, or the host's when it joins one.
 
         With no host span, the trace id is derived from ``pipeline_run_id``, the root pipe span starts under the
         virtual root parent, and the run is sampled, as it always was. With the host's span, which a run reads
         only when the operator turned ``join_host_trace`` on, the trace id is the host's, the root pipe span
-        starts under the host's span, and the run follows the host's sampling decision. The span id stays the
-        virtual root parent either way, which is what marks the context as the run's root.
+        starts under the host's span, and the run follows the host's sampling decision and carries its W3C
+        trace state. The span id stays the virtual root parent either way, which is what marks the context as
+        the run's root. A host span that is the Pipelex span of a running pipe makes the run a subtree of that
+        pipe's run, which has already announced the trace and holds its root.
 
         Args:
             pipeline_run_id: The run's id, from which its own trace id and trace names are derived.
             pipe_code: The run's main pipe, which the full trace name carries.
-            host_span_context: The host's current span to join, or None to root the run's own trace.
+            host_span: The host's current span to join, or None to root the run's own trace.
 
         Returns:
             The run's root OpenTelemetry context, which the job metadata carries to every pipe.
         """
         trace_name, trace_name_redacted = cls.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
-        if host_span_context is None:
+        if host_span is None:
             return OtelContext(
                 trace_id=cls.make_trace_id(pipeline_run_id=pipeline_run_id),
                 trace_name=trace_name,
@@ -193,14 +197,34 @@ class OtelFactory:
                 span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
                 is_sampled=True,
             )
+        host_span_context = host_span.span_context
         return OtelContext(
             trace_id=host_span_context.trace_id,
             trace_name=trace_name,
             trace_name_redacted=trace_name_redacted,
             span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
             is_sampled=host_span_context.trace_flags.sampled,
+            trace_state=cls.make_trace_state_header(trace_state=host_span_context.trace_state),
             host_span_id=host_span_context.span_id,
+            is_host_span_pipelex=host_span.is_pipelex_span,
         )
+
+    @classmethod
+    def make_trace_state_header(cls, *, trace_state: "TraceState | None") -> str | None:
+        """The W3C ``tracestate`` header a span context's trace state reads as, or None when it is empty, which is how ``OtelContext`` carries it."""
+        if not trace_state:
+            return None
+        return trace_state.to_header() or None
+
+    @classmethod
+    def make_trace_state(cls, *, trace_state_header: str | None) -> "TraceState | None":
+        """The trace state an ``OtelContext`` carries as its W3C header, rebuilt for a synthetic parent, or None when it carries none."""
+        if not trace_state_header:
+            return None
+        # Deferred import: avoid pulling heavy SDK at module-load time
+        from opentelemetry.trace import TraceState  # ruff: ignore[import-outside-top-level]
+
+        return TraceState.from_header([trace_state_header])
 
     @classmethod
     def _is_unresolved_placeholder(cls, value: str | None) -> bool:

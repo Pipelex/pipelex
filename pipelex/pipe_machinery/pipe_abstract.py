@@ -1134,6 +1134,7 @@ class PipeAbstract(ABC, BaseModel):
                         trace_name_redacted=parent_otel_context.trace_name_redacted,
                         span_id=span_context.span_id,
                         is_sampled=span_context.trace_flags.sampled,
+                        trace_state=OtelFactory.make_trace_state_header(trace_state=span_context.trace_state),
                     )
 
             # Create child metadata with updated pipe_code and pipe_run_id
@@ -1264,18 +1265,22 @@ class PipeAbstract(ABC, BaseModel):
         # Always use full pipe code - redaction is handled by exporters
         span_name = f"{self.pipe_type}: {self.code}"
 
-        # For root spans: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
+        # For a run's first span: parent_otel_context.span_id is OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID (1)
         # This ensures OTel uses our trace_id (INVALID_SPAN_ID=0 makes context invalid).
-        # A run that joined its host's trace starts its root span under the host's span instead,
-        # in the host's trace. The span carries `pipelex.run_root`, so the PostHog exporter leaves
-        # out a parent none of Pipelex's streams receives, the virtual one or the host's.
+        # A run that joined its host's trace starts its first span under the host's span instead,
+        # in the host's trace.
         # For child spans: parent_otel_context.span_id is the actual parent's span_id
-        is_root_span = parent_otel_context.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
+        is_run_first_span = parent_otel_context.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
         parent_span_id: int
-        if is_root_span and parent_otel_context.host_span_id is not None:
+        if is_run_first_span and parent_otel_context.host_span_id is not None:
             parent_span_id = parent_otel_context.host_span_id
         else:
             parent_span_id = parent_otel_context.span_id
+        # The run's first span is the root of the trace in Pipelex's own streams unless the run joined the span of a
+        # pipe running in this process, which those streams receive: a nested run is a subtree of the enclosing one.
+        # A root span carries `pipelex.run_root`, so the PostHog exporter leaves out a parent its stream never
+        # receives, the virtual one or a host's, and only a root span writes Langfuse's trace-level attributes.
+        is_root_span = is_run_first_span and not parent_otel_context.is_host_span_pipelex
 
         # Build all span attributes upfront with FULL (non-redacted) values
         # PostHog exporters will apply redaction based on their TelemetryRedactionConfig
@@ -1314,18 +1319,8 @@ class PipeAbstract(ABC, BaseModel):
             if self.description:
                 span_attributes[LangfuseSpanAttr.OBSERVATION_DESCRIPTION] = self.description
 
-            # Capture full input content for Langfuse
-            needed_input_names = set(self.needed_inputs().declared_names)
-            inputs_json = OtelFactory.make_inputs_json(
-                working_memory=working_memory,
-                needed_input_names=needed_input_names,
-                max_length=None,  # No truncation for Langfuse
-            )
-            span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = inputs_json
-
-            # For root span, also set trace-level input and metadata
+            # For root span, also set trace-level metadata
             if is_root_span:
-                span_attributes[LangfuseSpanAttr.TRACE_INPUT] = inputs_json
                 # Set trace-level metadata (filterable in Langfuse UI)
                 span_attributes[LangfuseSpanAttr.TRACE_PIPE_CODE] = self.code
                 span_attributes[LangfuseSpanAttr.TRACE_PIPE_TYPE] = self.pipe_type
@@ -1341,6 +1336,7 @@ class PipeAbstract(ABC, BaseModel):
             span_id=parent_span_id,
             is_remote=True,
             trace_flags=TraceFlags(TraceFlags.SAMPLED if parent_otel_context.is_sampled else TraceFlags.DEFAULT),
+            trace_state=OtelFactory.make_trace_state(trace_state_header=parent_otel_context.trace_state),
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
 
@@ -1356,6 +1352,19 @@ class PipeAbstract(ABC, BaseModel):
         if span.get_span_context() == parent_span_context:
             return None, False
 
+        # Capture full input content for Langfuse, only on a span that records: one the sampler dropped, in a run the
+        # host sampled out, would discard it, and serializing the inputs is the costly part of starting a span.
+        if is_langfuse_enabled and span.is_recording():
+            needed_input_names = set(self.needed_inputs().declared_names)
+            inputs_json = OtelFactory.make_inputs_json(
+                working_memory=working_memory,
+                needed_input_names=needed_input_names,
+                max_length=None,  # No truncation for Langfuse
+            )
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_INPUT, inputs_json)
+            if is_root_span:
+                span.set_attribute(LangfuseSpanAttr.TRACE_INPUT, inputs_json)
+
         return span, is_root_span
 
     def _end_pipe_span_success(self, span: Span | None, *, pipe_output: PipeOutput, is_root_span: bool) -> None:
@@ -1369,8 +1378,8 @@ class PipeAbstract(ABC, BaseModel):
         if span is None:
             return
 
-        # Always capture full output content for Langfuse
-        if TelemetryManagerAbstract.get_langfuse_enabled():
+        # Always capture full output content for Langfuse, on a span that records it
+        if TelemetryManagerAbstract.get_langfuse_enabled() and span.is_recording():
             output_json = OtelFactory.make_output_json(
                 pipe_output=pipe_output,
                 max_length=None,  # No truncation for Langfuse

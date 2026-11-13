@@ -150,8 +150,9 @@ class PipelexSpanAttr(StrEnum):
     PIPELINE_RUN_ID = "pipelex.pipeline.run_id"
     OUTCOME = "pipelex.outcome"  # "success" or "failure"
     OUTPUT_CLASS_NAME = "pipelex.output.class_name"
-    # True on a run's root pipe span, whose parent is outside the run: the virtual root parent, or the
-    # host's span when the run joined the host's trace, which none of Pipelex's own streams receives.
+    # True on the root pipe span of a run's trace in Pipelex's own streams, whose parent those streams never
+    # receive: the virtual root parent, or a host's span the run joined. Absent from the first span of a run
+    # started inside a running pipe with join_host_trace on, whose parent is that pipe's span.
     RUN_ROOT = "pipelex.run_root"
 
     # The run's identity, set at every span site from `RunMetadata` so the identity

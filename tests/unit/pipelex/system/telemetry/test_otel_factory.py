@@ -3,7 +3,7 @@
 import json
 
 import pytest
-from opentelemetry.trace import SpanContext, TraceFlags
+from opentelemetry.trace import SpanContext, TraceFlags, TraceState
 
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
@@ -11,6 +11,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.system.telemetry.current_span import HostSpanToJoin
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -166,23 +167,40 @@ class TestOtelFactory:
     # --- make_run_otel_context tests ---
 
     def test_a_run_with_no_host_span_roots_its_own_sampled_trace(self) -> None:
-        otel_context = OtelFactory.make_run_otel_context(pipeline_run_id="run_123", pipe_code="my_pipe", host_span_context=None)
+        otel_context = OtelFactory.make_run_otel_context(pipeline_run_id="run_123", pipe_code="my_pipe", host_span=None)
 
         assert otel_context.trace_id == OtelFactory.make_trace_id(pipeline_run_id="run_123")
         assert otel_context.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
         assert otel_context.is_sampled is True
+        assert otel_context.trace_state is None
         assert otel_context.host_span_id is None
+        assert otel_context.is_host_span_pipelex is False
+        assert otel_context.is_trace_root_announced is True
 
-    @pytest.mark.parametrize("is_sampled", [True, False])
-    def test_a_run_joining_a_host_span_carries_its_trace_its_span_and_its_decision_across_a_process_boundary(self, is_sampled: bool) -> None:
+    @pytest.mark.parametrize(
+        ("is_sampled", "trace_state", "is_pipelex_span", "is_announced"),
+        [
+            (True, TraceState([("vendor", "value"), ("other", "1")]), False, True),
+            (False, TraceState(), False, False),
+            (True, TraceState(), True, False),
+        ],
+    )
+    def test_a_run_joining_a_host_span_carries_its_trace_its_span_and_its_decision_across_a_process_boundary(
+        self, is_sampled: bool, trace_state: TraceState, is_pipelex_span: bool, is_announced: bool
+    ) -> None:
         host_span_context = SpanContext(
             trace_id=0x0123456789ABCDEF0123456789ABCDEF,
             span_id=0x00000000000000CD,
             is_remote=False,
             trace_flags=TraceFlags(TraceFlags.SAMPLED if is_sampled else TraceFlags.DEFAULT),
+            trace_state=trace_state,
         )
 
-        otel_context = OtelFactory.make_run_otel_context(pipeline_run_id="run_123", pipe_code="my_pipe", host_span_context=host_span_context)
+        otel_context = OtelFactory.make_run_otel_context(
+            pipeline_run_id="run_123",
+            pipe_code="my_pipe",
+            host_span=HostSpanToJoin(span_context=host_span_context, is_pipelex_span=is_pipelex_span),
+        )
         # The job metadata crosses the Temporal boundary as JSON.
         carried = OtelContext.model_validate_json(otel_context.model_dump_json())
 
@@ -190,6 +208,17 @@ class TestOtelFactory:
         assert carried.trace_id == host_span_context.trace_id
         assert carried.host_span_id == host_span_context.span_id
         assert carried.is_sampled is is_sampled
+        assert carried.is_host_span_pipelex is is_pipelex_span
+        assert carried.is_trace_root_announced is is_announced
+        # The W3C trace state crosses as its header and is rebuilt as the same trace state for a synthetic parent.
+        rebuilt_trace_state = OtelFactory.make_trace_state(trace_state_header=carried.trace_state)
+        if trace_state:
+            assert carried.trace_state == trace_state.to_header()
+            assert rebuilt_trace_state is not None
+            assert list(rebuilt_trace_state.items()) == list(trace_state.items())
+        else:
+            assert carried.trace_state is None
+            assert rebuilt_trace_state is None
         # The span id still marks the context as the run's root.
         assert carried.span_id == OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID
         assert (carried.trace_name, carried.trace_name_redacted) == OtelFactory.make_trace_names("run_123", pipe_code="my_pipe")

@@ -46,7 +46,7 @@ from pipelex.system.storage_scope import (
     validate_storage_scope,
     validate_storage_scope_within_read_scope,
 )
-from pipelex.system.telemetry.current_span import host_span_context_to_join
+from pipelex.system.telemetry.current_span import host_span_to_join
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.tools.log.error_fields import error_fields
@@ -440,11 +440,11 @@ async def pipeline_run_setup(
         # The job metadata carries it from here to every pipe, across a process boundary too.
         otel_context: OtelContext | None = None
         if pipe_run_mode.is_live and get_otel_tracer() is not None:
-            host_span_context = host_span_context_to_join() if get_telemetry_manager().join_host_trace else None
+            host_span = host_span_to_join() if get_telemetry_manager().join_host_trace else None
             otel_context = OtelFactory.make_run_otel_context(
                 pipeline_run_id=pipeline_run_id,
                 pipe_code=pipe_code,
-                host_span_context=host_span_context,
+                host_span=host_span,
             )
 
         # Seam 2: build the pipe job (pure — no registration, telemetry, graph open, or library mutation).
@@ -481,8 +481,9 @@ async def pipeline_run_setup(
         # second one assembled here from the same parameters. Waiting also means a
         # failure inside that seam no longer announces a trace for a run that never
         # started, which is the event that cannot be unsent.
-        # A run the host sampled out keeps no span, so no trace is announced for it either.
-        if otel_context is not None and otel_context.is_sampled:
+        # A run the host sampled out keeps no span, so no trace is announced for it either, and a run started
+        # inside a running pipe of this process joins a trace its enclosing run has already announced.
+        if otel_context is not None and otel_context.is_trace_root_announced:
             get_telemetry_manager().handle_trace_start(
                 trace_name=otel_context.trace_name,
                 trace_name_redacted=otel_context.trace_name_redacted,

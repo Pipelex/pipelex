@@ -284,7 +284,35 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
         if job_params.seed:
             span_attributes[GenAISpanAttr.REQUEST_SEED] = job_params.seed
 
-        # Always capture full prompt content - exporters handle redaction as needed
+        # Use trace_id and span_id from otel_context (precomputed)
+        # The span_id in otel_context is the parent pipe's span - use it as parent
+        parent_span_id = otel_context.span_id
+        # The pipe's sampled flag, which follows the host's decision on a run that joined the host's trace.
+        parent_span_context = SpanContext(
+            trace_id=otel_context.trace_id,
+            span_id=parent_span_id,
+            is_remote=True,
+            trace_flags=TraceFlags(TraceFlags.SAMPLED if otel_context.is_sampled else TraceFlags.DEFAULT),
+            trace_state=OtelFactory.make_trace_state(trace_state_header=otel_context.trace_state),
+        )
+        parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
+
+        # Start span with our context and all attributes
+        span = tracer.start_span(
+            name=span_name,
+            kind=SpanKind.CLIENT,
+            context=parent_ctx,
+            attributes=span_attributes,
+        )
+        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
+        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
+        if span.get_span_context() == parent_span_context:
+            return None
+
+        # Always capture full prompt content - exporters handle redaction as needed - on a span that records it: one the
+        # sampler dropped, in a run the host sampled out, would discard it, and serializing the prompt is the costly part.
+        if not span.is_recording():
+            return span
         messages: list[dict[str, Any]] = []
         if llm_job.llm_prompt.system_text:
             system_text_dict = {
@@ -313,33 +341,9 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
             messages.append(user_dict)
 
         messages_json = OtelFactory.stringify_json(json_conent=messages)
-        span_attributes[GenAISpanAttr.PROMPT_CONTENT] = messages_json
+        span.set_attribute(GenAISpanAttr.PROMPT_CONTENT, messages_json)
         if is_langfuse_enabled:
-            span_attributes[LangfuseSpanAttr.OBSERVATION_INPUT] = messages_json
-
-        # Use trace_id and span_id from otel_context (precomputed)
-        # The span_id in otel_context is the parent pipe's span - use it as parent
-        parent_span_id = otel_context.span_id
-        # The pipe's sampled flag, which follows the host's decision on a run that joined the host's trace.
-        parent_span_context = SpanContext(
-            trace_id=otel_context.trace_id,
-            span_id=parent_span_id,
-            is_remote=True,
-            trace_flags=TraceFlags(TraceFlags.SAMPLED if otel_context.is_sampled else TraceFlags.DEFAULT),
-        )
-        parent_ctx = trace.set_span_in_context(NonRecordingSpan(parent_span_context))
-
-        # Start span with our context and all attributes
-        span = tracer.start_span(
-            name=span_name,
-            kind=SpanKind.CLIENT,
-            context=parent_ctx,
-            attributes=span_attributes,
-        )
-        # A tracer that records nothing, the no-op tracer `OTEL_SDK_DISABLED` hands out for one, gives back the
-        # parent it was handed rather than a span of its own; that is no span, exactly as with no tracer.
-        if span.get_span_context() == parent_span_context:
-            return None
+            span.set_attribute(LangfuseSpanAttr.OBSERVATION_INPUT, messages_json)
 
         return span
 
@@ -374,11 +378,12 @@ class LLMWorkerAbstract(InferenceWorkerAbstract, ABC):
 
         self._set_otel_span_usage(span=span, llm_job=llm_job)
 
-        # Always capture full completion content - exporters handle redaction as needed
-        completion_object_json = OtelFactory.stringify_json(json_conent=completion_object.model_dump(serialize_as_any=True))
-        span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_object_json)
-        if TelemetryManagerAbstract.get_langfuse_enabled():
-            span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, completion_object_json)
+        # Always capture full completion content - exporters handle redaction as needed - on a span that records it
+        if span.is_recording():
+            completion_object_json = OtelFactory.stringify_json(json_conent=completion_object.model_dump(serialize_as_any=True))
+            span.set_attribute(GenAISpanAttr.COMPLETION_CONTENT, completion_object_json)
+            if TelemetryManagerAbstract.get_langfuse_enabled():
+                span.set_attribute(LangfuseSpanAttr.OBSERVATION_OUTPUT, completion_object_json)
 
         span.set_status(Status(StatusCode.OK))
         span.end()

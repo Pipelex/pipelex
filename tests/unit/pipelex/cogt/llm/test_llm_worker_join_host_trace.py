@@ -29,6 +29,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.job_metadata import JobMetadata, OtelContext, RunMetadata
+from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 
 if TYPE_CHECKING:
@@ -181,3 +182,17 @@ class TestLLMWorkerJoinHostTrace:
         assert pipelex_spans.get_finished_spans() == ()
         # The host's own span opened under the unsampled LLM span is dropped by the host's parent-based sampler.
         assert host_spans.get_finished_spans() == ()
+
+    @pytest.mark.parametrize("is_sampled", [True, False])
+    async def test_a_span_that_records_nothing_serializes_no_content(
+        self, mocker: MockerFixture, pipelex_spans: InMemorySpanExporter, host_tracer: Tracer, is_sampled: bool
+    ) -> None:
+        """The prompt and the completion object are serialized only for a span that records them."""
+        stringify_json = mocker.patch.object(OtelFactory, "stringify_json", return_value="[]")
+        worker = _make_worker(host_tracer=host_tracer)
+
+        assert await worker.gen_object(llm_job=_make_llm_job(is_sampled=is_sampled), schema=_Answer) == _Answer(text="answer")
+
+        # The prompt when the span starts, and the completion object when it ends.
+        assert stringify_json.call_count == (2 if is_sampled else 0)
+        assert len(pipelex_spans.get_finished_spans()) == (1 if is_sampled else 0)
