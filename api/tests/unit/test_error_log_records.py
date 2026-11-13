@@ -26,6 +26,7 @@ from pipelex.tools.log.log_sink import LogSinkMethod
 from pipelex.tools.misc.pretty import PrettyPrintMode
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 from pytest_mock import MockerFixture
+from starlette.requests import ClientDisconnect
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from pipelex_api.exception_handlers import (
@@ -323,6 +324,7 @@ class TestErrorLogRecords:
         with caplog.at_level(logging.DEBUG):
             await AnsweredErrorBarrier(failing_app)(scope, receive, send)
         (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        assert record.levelno == logging.WARNING
         payload = _rendered_json(record)
         assert payload["url.path"] == "/gone"
         assert payload["http.response.status_code"] == 500
@@ -552,6 +554,92 @@ class TestErrorLogRecords:
         assert report.error_type == "LookupError"
         assert str(report.code) == "runtime.unexpected"
         assert _PLANTED_MARKER not in repr(report.tags) + repr(report.fields) + repr(report.fingerprint)
+
+    @pytest.mark.parametrize(
+        "send_failure",
+        [
+            pytest.param(ClientDisconnect(), id="client-disconnect"),
+            pytest.param(ConnectionResetError(_PLANTED_MARKER), id="os-error"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_a_failure_to_send_the_barriers_own_answer_reaches_no_error_tracker(
+        self, caplog: pytest.LogCaptureFixture, send_failure: Exception
+    ):
+        # The barrier answers a failure no handler answered, and the server fails to send that 500 because the client hung
+        # up: the original fault is reported once, by the catch-all, and the send's failure is recorded at `warning` and
+        # reported to no tracker.
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(_message: Message) -> None:
+            raise send_failure
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/gone", "raw_path": b"/gone", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG), recording_error_tracker() as recorder:
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert [report.error_type for report in recorder.reports] == ["LookupError"]
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        assert record.levelno == logging.WARNING
+        assert _rendered_json(record)["error.type"] == type(send_failure).__name__
+
+    @pytest.mark.parametrize(
+        "send_failure",
+        [
+            pytest.param(ValueError(_PLANTED_MARKER), id="value-error"),
+            pytest.param(RuntimeError(_PLANTED_MARKER), id="runtime-error"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_a_fault_sending_the_barriers_own_answer_that_is_no_hang_up_reaches_the_error_trackers(
+        self, caplog: pytest.LogCaptureFixture, send_failure: Exception
+    ):
+        # Sending the barrier's 500 fails with something a hung-up client never raises, a fault of the code between the
+        # barrier and the server: it is recorded at `error` and reported, beside the original fault the catch-all reported.
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(_message: Message) -> None:
+            raise send_failure
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/gone", "raw_path": b"/gone", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG), recording_error_tracker() as recorder:
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert [report.error_type for report in recorder.reports] == ["LookupError", type(send_failure).__name__]
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        assert record.levelno == logging.ERROR
+        assert _rendered_json(record)["error.type"] == type(send_failure).__name__
+
+    @pytest.mark.asyncio
+    async def test_a_failure_of_the_catch_all_building_the_barriers_answer_reaches_the_error_trackers(
+        self, caplog: pytest.LogCaptureFixture, mocker: MockerFixture
+    ):
+        # The catch-all itself fails while the barrier builds its answer: that is the server's own fault, not a failure to
+        # deliver, so it is reported, beside nothing else, since the original failure's report was never built.
+        mocker.patch("pipelex_api.exception_handlers.make_unexpected_failure", side_effect=KeyError(_PLANTED_MARKER))
+
+        async def failing_app(_scope: Scope, _receive: Receive, _send: Send) -> None:
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(_message: Message) -> None:
+            return None
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/", "raw_path": b"/", "query_string": b"", "headers": [], "app": None}
+        with caplog.at_level(logging.DEBUG), recording_error_tracker() as recorder:
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        assert [report.error_type for report in recorder.reports] == ["KeyError"]
+        (record,) = [record for record in caplog.records if record.getMessage() == UNRECORDED_FAILURE_MESSAGE]
+        assert record.levelno == logging.ERROR
+        assert _rendered_json(record)["error.type"] == "KeyError"
 
     def test_a_failure_the_catch_all_answered_mid_stream_is_reported_once(self):
         # The catch-all answers the stream's failure and reports it; the barrier, dropping it, reports nothing more.
