@@ -4,8 +4,11 @@ Boot installs the trackers ``runtime.error_tracking.trackers`` selects (``instal
 them (``reset_error_trackers``), as it installs and resets the log sink. In between, three things report to them:
 
 - **A failed run**, which the runtime that ran it reports at the run's boundary (``PipeRun``), as ``run_failure``,
-  when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run, and so is a
-  failure of the run's delivery, its storage or a host's webhook, after the pipe executed.
+  when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run. What is reported
+  is the exception that escapes the run, the pipe's own or one the run's tail raised after the pipe executed, such as
+  its trace or its delivery failing, once per run; its anonymous usage statistics are best effort and never fail it. A
+  cancelled run reports nothing, whatever its tail raises; a run whose pipe failed and which is cancelled during its
+  tail reports the pipe's error.
 - **An uncaught exception**: while a tracker is installed, the interpreter's exception hooks, ``sys.excepthook`` and
   ``threading.excepthook``, report what reaches them as ``uncaught`` and then call the hooks that were there before.
 - **Anything else a host or the runtime catches and goes on from**, through ``report_exception`` or, for a problem
