@@ -120,7 +120,7 @@ The rollup is computed once, in the assembler, for the same reason `AggregatedCo
 - **`total`** — every usage the run reported, attributed or not. This is the graph's comparand for the cost report's own total.
 - **`unattributed`** — the part that named no live node: the `UNATTRIBUTED_NODE_ID` (`"unknown"`) fallback stamped when an inference runs outside any pipe context, or a `node_id` whose `PipeStartEvent` never made it into the stream. Surfaced as its own bucket rather than dropped, so the graph's total can never silently disagree with the cost report's.
 
-On a healthy run `unattributed` is zero. A non-zero one is a real signal worth looking at.
+On a healthy run `unattributed` is zero. A non-zero one is a real signal worth looking at. Its usual cause on the hosted runtime used to be a start event lost to the DynamoDB events table's item limit, an event carrying inputs or a prompt over 400 KB, whose node then never existed while its inference still counted. The DynamoDB event log now writes such an event with its bulky values left out (see [Event-Log Transport and the Scoped Override](execution-graph-tracing.md#event-log-transport-and-the-scoped-override)), so that cause is no longer expected.
 
 ### Cross-checking against the cost report
 

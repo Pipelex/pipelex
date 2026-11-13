@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.100.1] - 2026-11-13
+
+### Fixed
+
+- **Run graph steps with oversized data**: on the DynamoDB event log, a step whose inputs, output, rendered prompt or condition value took its trace event past DynamoDB's 400 KB item limit was never written, so the run graph left the step out and its cost counted only as unattributed. Such an event is now written with its bulky values left out, largest first, until it fits: an io item's `data` becomes `null` with `extra["data_omitted_bytes"]` giving its size, an execution-data value is replaced by an entry in `execution_data["omitted_bytes"]`, and a condition's rendered value is cut with a suffix stating its size; every executed step is a node again.
+
 ## [v0.100.0] - 2026-11-12
 
 ### Security
