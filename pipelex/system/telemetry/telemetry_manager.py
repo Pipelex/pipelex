@@ -32,6 +32,13 @@ if TYPE_CHECKING:
 # the frame, which may hold a literal of the caller's data or a secret, and the path of the file on this machine.
 EXCEPTION_FRAME_SOURCE_KEYS = ("pre_context", "context_line", "post_context", "abs_path", "code_variables")
 
+# The key of a frame's file name, which PostHog writes relative to its top-level package only when it can: for a module of
+# a namespace package, such as `opentelemetry` or `google`, or of no module it knows, it writes the absolute path instead.
+EXCEPTION_FRAME_FILENAME_KEY = "filename"
+
+# The file name of a package's own module, whose module name is the package's rather than the file's.
+_PACKAGE_INIT_FILENAME = "__init__.py"
+
 
 def strip_exception_frame_sources(  # kw-only: ignore — PostHog before_send callback, invoked positionally
     event: dict[str, Any],
@@ -40,14 +47,42 @@ def strip_exception_frame_sources(  # kw-only: ignore — PostHog before_send ca
 
     The SDK serializes each frame with the source lines around it and the absolute path of its file, and the
     variables of its frames when asked to, none of which an error report may carry; what stays is the module, the
-    function and the line, which is what groups an issue. Any other event goes out untouched.
+    function and the line, which is what groups an issue. The frame's file name is rewritten from its module
+    (``frame_filename_of``), since the SDK writes the absolute path there too for some modules. Any other event goes out
+    untouched.
     """
     if event.get("event") != PostHogEvent.EXCEPTION:
         return event
     for frame in _exception_event_frames(event=event):
         for key in EXCEPTION_FRAME_SOURCE_KEYS:
             frame.pop(key, None)
+        if EXCEPTION_FRAME_FILENAME_KEY in frame:
+            frame[EXCEPTION_FRAME_FILENAME_KEY] = frame_filename_of(module=frame.get("module"), filename=frame[EXCEPTION_FRAME_FILENAME_KEY])
     return event
+
+
+def frame_filename_of(*, module: object, filename: object) -> str | None:
+    """A frame's file name with no directory of this machine in it: its base name, under the directories its module names.
+
+    The directories come from the module's dotted name alone, so ``pipelex.tools.misc`` raised in ``…/misc.py`` gives
+    ``pipelex/tools/misc.py``, as the SDK writes for a regular package, and a package's ``__init__.py`` keeps its own
+    package's name. With no module the base name stands alone; with no file name there is none.
+
+    Args:
+        module: The frame's module as the SDK serialized it, a dotted name or nothing.
+        filename: The frame's file name as the SDK serialized it, which may be an absolute path, on any platform.
+
+    Returns:
+        The rewritten file name, or ``None`` when the frame carried none.
+    """
+    if not isinstance(filename, str) or not filename:
+        return None
+    base_name = filename.replace("\\", "/").rsplit("/", 1)[-1]
+    if not isinstance(module, str) or not module:
+        return base_name
+    module_parts = module.split(".")
+    package_parts = module_parts if base_name == _PACKAGE_INIT_FILENAME else module_parts[:-1]
+    return "/".join([*package_parts, base_name])
 
 
 def _exception_event_frames(*, event: dict[str, Any]) -> list[dict[str, Any]]:

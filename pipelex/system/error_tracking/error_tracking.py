@@ -4,7 +4,8 @@ Boot installs the trackers ``runtime.error_tracking.trackers`` selects (``instal
 them (``reset_error_trackers``), as it installs and resets the log sink. In between, three things report to them:
 
 - **A failed run**, which the runtime that ran it reports at the run's boundary (``PipeRun``), as ``run_failure``,
-  when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run.
+  when the failure is the operator's to fix (``reaches_error_trackers``) and the run is no dry run, and so is a
+  failure of the run's delivery, its storage or a host's webhook, after the pipe executed.
 - **An uncaught exception**: while a tracker is installed, the interpreter's exception hooks, ``sys.excepthook`` and
   ``threading.excepthook``, report what reaches them as ``uncaught`` and then call the hooks that were there before.
 - **Anything else a host or the runtime catches and goes on from**, through ``report_exception`` or, for a problem
@@ -24,6 +25,7 @@ tracker is logged at debug level, the others still called.
 import sys
 import threading
 from collections.abc import Sequence
+from http import HTTPStatus
 from types import TracebackType
 
 from mthds.protocol.problem.registry import ProblemDomain
@@ -33,7 +35,7 @@ from pipelex.base_exceptions import iter_cause_chain
 from pipelex.errors.problem import PipelexProblem
 from pipelex.system.error_tracking.error_report import ErrorReport, ErrorReportKind, make_error_report
 from pipelex.system.error_tracking.error_tracker import ErrorTrackerAbstract
-from pipelex.tools.log.error_fields import error_fields
+from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD, error_fields
 
 # The attribute an exception carries once it was reported, so that it is reported once.
 _REPORTED_STAMP = "__pipelex_error_reported__"
@@ -133,23 +135,57 @@ def has_error_trackers() -> bool:
     return bool(_STATE.trackers)
 
 
-def reaches_error_trackers(*, problem: PipelexProblem) -> bool:
-    """Whether a failure with this problem is the operator's to fix, and so is reported to the error trackers.
+def reaches_error_trackers(*, status: int, domain: ProblemDomain) -> bool:
+    """Whether a failure is the operator's to fix, and so is reported to the error trackers, from its status and its domain.
 
-    A fault of the runtime or of the operator is; a caller's mistake, a domain of ``input``, ``method`` or ``account``,
-    is answered to the caller and is not. This is the one rule a failed run is reported by; every report carries its
-    domain as the ``error.domain`` tag, so reporting the caller's failures too would change this predicate alone.
+    The one rule every surface reports a failure by: a failed run (``PipeRun``), weighed by its problem's status
+    (``problem_status_of``), and an error the API server answers, weighed by the status it answers with, whose record
+    logs at ``error`` exactly when this holds. A failure reaches the trackers only when the server has something to fix:
+
+    - a 4xx is the caller's to act on, a mistake or a benign conflict, and is not reported;
+    - a ``501`` states that this deployment does not offer what was asked, custom code without a sandbox or a document
+      engine it was not given. The operator decides whether to offer it, but nothing is broken, and the caller meets
+      the refusal each time it asks again, so it is not reported, or any caller could flood the trackers by repeating it;
+    - any other 5xx is reported when its domain is the runtime's or the operator's, and not when it is the caller's,
+      ``input``, ``method`` or ``account``, a refusal the caller can avoid.
+
+    Every report carries its domain as the ``error.domain`` tag, so reporting the caller's failures too would change
+    this predicate alone.
+
+    Args:
+        status: The HTTP status the failure is, or would be, answered with.
+        domain: Who must act on it, its problem's domain.
     """
-    match problem.effective_domain:
-        case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
-            return True
-        case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+    match status:
+        case HTTPStatus.NOT_IMPLEMENTED:
+            return False
+        case server_status if server_status >= HTTPStatus.INTERNAL_SERVER_ERROR:
+            match domain:
+                case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
+                    return True
+                case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
+                    return False
+        case _:
             return False
 
 
 def was_reported(*, exception: BaseException) -> bool:
-    """Whether ``exception``, or an error along its cause chain, was reported already."""
-    return any(getattr(node, _REPORTED_STAMP, False) for node in iter_cause_chain(exception))
+    """Whether ``exception``, or an error along its cause chain, was reported already; never raises.
+
+    The walk reads attributes of each exception, its ``__cause__`` and the mark, which run its class's own
+    ``__getattribute__``. An exception that refuses to be read this way counts as not reported: it may then be reported
+    twice, but never fails the reporter in place of the error it reports.
+    """
+    try:
+        return any(getattr(node, _REPORTED_STAMP, False) for node in iter_cause_chain(exception))
+    except Exception as read_error:  # ruff: ignore[blind-except]
+        # (2) reading an exception's attributes runs its class's own `__getattribute__`, and testing the mark runs the
+        # mark's `__bool__`, whose exception surface cannot be enumerated; reporting must never replace the error.
+        log.debug(
+            "Whether an error was reported already could not be read",
+            fields={"reported_error_type": type(exception).__name__, ERROR_TYPE_FIELD: type(read_error).__name__},
+        )
+        return False
 
 
 def report_exception(
@@ -228,11 +264,17 @@ def _report_uncaught(*, exception: BaseException) -> None:
 
 
 def _mark_reported(*, exception: BaseException) -> None:
+    """Mark ``exception`` as reported, when its class lets it carry the mark; never raises."""
     try:
         setattr(exception, _REPORTED_STAMP, True)
-    except (AttributeError, TypeError):
-        # An exception type with `__slots__` or a read-only `__setattr__` cannot carry the mark, and may be reported twice.
-        return
+    except Exception as mark_error:  # ruff: ignore[blind-except]
+        # (2) setting an attribute runs the exception class's own `__setattr__`, whose exception surface cannot be
+        # enumerated: `__slots__` refuse it with an AttributeError, a read-only class with a TypeError, and a class of
+        # its own with anything. The exception then goes unmarked and may be reported twice, but the error stands.
+        log.debug(
+            "A reported error could not be marked as reported",
+            fields={"reported_error_type": type(exception).__name__, ERROR_TYPE_FIELD: type(mark_error).__name__},
+        )
 
 
 def _dispatch(*, report: ErrorReport, trackers: tuple[ErrorTrackerAbstract, ...]) -> None:

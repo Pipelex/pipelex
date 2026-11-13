@@ -22,7 +22,7 @@ the request body or any input or output of the run.
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from mthds.protocol.problem.registry import CoreCode
 from opentelemetry import trace
@@ -107,7 +107,7 @@ class ErrorReport:
         host_span_id: That span.
     """
 
-    kind: ErrorReportKind
+    kind: Annotated[ErrorReportKind, Field(strict=False)]
     problem: PipelexProblem
     exception: BaseException | None = Field(default=None, repr=False)
     error_type: str | None = None

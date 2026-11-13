@@ -9,7 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
-from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem
+from pipelex.errors.problem import PipelexProblem, ProblemView, make_problem, problem_status_of
 from pipelex.errors.security_event import emit_security_event_for_run
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_concept_library, get_own_pipes
@@ -109,12 +109,16 @@ class PipeRun(PipeRunProtocol):
         """Report a failed run to the operator's error trackers, when its failure is the operator's to fix.
 
         The report carries the operator's problem, the run's ids and its pipe. A validation's run, whose failures are
-        its findings about the method, and a dry run report nothing, nor does a caller's mistake, whose domain is the
-        caller's (``reaches_error_trackers``). With no tracker installed nothing is built. Reported once: a host that
-        lets the error reach the interpreter's hook, or raises its own from it, does not report it again.
+        its findings about the method, and a dry run report nothing, nor does a failure the server has nothing to fix
+        for, weighed by its problem's status and domain as the API server weighs the same failure
+        (``reaches_error_trackers``): a caller's mistake, or a ``501`` saying this deployment does not offer what the
+        run asked for, which the caller meets on every run that asks. With no tracker installed nothing is built.
+        Reported once, and marked so: a host that lets the error reach the interpreter's hook or answers it, or raises
+        its own from it, does not report it again.
 
         Args:
-            error: The error the run fails with.
+            error: The error the run fails with: the pipe's own, or one its tail raised after the pipe executed, the
+                tracer that would not close or the delivery that failed.
             pipe_job: The run's job.
             webhook_problem: The problem built for the run's webhooks, when it has any, which is reused.
         """
@@ -126,7 +130,7 @@ class PipeRun(PipeRunProtocol):
             pipeline_run_id=run_metadata.pipeline_run_id,
             request_id=run_metadata.request_id,
         )
-        if not reaches_error_trackers(problem=problem):
+        if not reaches_error_trackers(status=problem_status_of(problem=problem), domain=problem.effective_domain):
             return
         report_exception(
             exception=error,
@@ -201,6 +205,8 @@ class PipeRun(PipeRunProtocol):
                     closed_graph = tracer_manager.close_tracer(pipeline_run_id)
                 except OSError as close_error:
                     if execution_error is None:
+                        # The run's failure is now this one, raised after the pipe executed, so it is reported here.
+                        self._report_run_failure(error=close_error, pipe_job=pipe_job, webhook_problem=None)
                         raise
                     # A secondary failure rides as fields with no traceback: the execution error is chained onto it, so
                     # its traceback would print the execution error's text, which can quote the run's inputs. Its own
@@ -286,6 +292,9 @@ class PipeRun(PipeRunProtocol):
                     # A caller's webhook never raises here: its failures are the delivery's own records. What can is
                     # the storage, or one of the host's own webhooks, which the SSRF guard may refuse at fire time.
                     if execution_error is None and not run_was_cancelled:
+                        # The run's failure is now the delivery's, the storage's or a host's webhook's after the pipe
+                        # executed, which the run's boundary reports as it reports the pipe's own.
+                        self._report_run_failure(error=delivery_error, pipe_job=pipe_job, webhook_problem=None)
                         raise
                     # The run keeps its own failure, or its cancellation. A refusal of the delivery's destination still logs its own security
                     # event, naming the run, beside the one the run's failure logged if it was a refusal too.

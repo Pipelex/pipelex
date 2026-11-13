@@ -10,13 +10,41 @@ no trace, which is what a no-op tracer starts, hold nothing.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from opentelemetry import trace
 from opentelemetry.sdk.trace import Span as SdkSpan
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.trace import StatusCode
+from typing_extensions import override
 
 from pipelex.system.telemetry.current_span import pipelex_span_active, pipelex_span_context_for_logs, raising_span_context
+
+# The prefix of the attributes the runtime marks an exception with, the Pipelex span it left among them.
+_PIPELEX_MARK_PREFIX = "__pipelex_"
+
+
+class _UnreadableStampError(Exception):
+    """An exception whose class's ``__getattribute__`` raises when the runtime's marks are read."""
+
+    @override
+    def __getattribute__(self, name: str) -> Any:
+        if name.startswith(_PIPELEX_MARK_PREFIX):
+            msg = "this error's attributes cannot be read"
+            raise RuntimeError(msg)
+        return super().__getattribute__(name)
+
+
+class _UnstampableError(Exception):
+    """An exception whose class's ``__setattr__`` raises, other than an AttributeError or a TypeError, when the runtime marks it."""
+
+    @override
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith(_PIPELEX_MARK_PREFIX):
+            msg = "this error's attributes cannot be set"
+            raise RuntimeError(msg)
+        super().__setattr__(name, value)
 
 
 def _started_span(*, name: str) -> SdkSpan:
@@ -99,3 +127,14 @@ class TestPipelexSpanActive:
 
     def test_an_exception_raised_outside_every_span_carries_no_mark(self) -> None:
         assert raising_span_context(exception=ValueError("boom")) is None
+
+    @pytest.mark.parametrize("error_class", [_UnreadableStampError, _UnstampableError])
+    def test_an_exception_whose_class_refuses_the_stamp_leaves_the_block_as_itself(self, error_class: type[Exception]) -> None:
+        """Stamping runs the exception class's own code; whatever it raises, the exception that left the block is the one raised."""
+        span = _started_span(name="work")
+
+        msg = "boom"
+        with pytest.raises(error_class, match=msg) as exc_info, pipelex_span_active(span=span):
+            raise error_class(msg)
+
+        assert raising_span_context(exception=exc_info.value) is None

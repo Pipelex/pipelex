@@ -1,13 +1,15 @@
-from typing import Any
+from typing import Any, get_args, get_type_hints
 
 import pytest
 from mthds.protocol.problem.registry import CoreCode
+from pydantic.fields import FieldInfo
+from pydantic.types import Strict
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.problem import ProblemView, make_location, make_problem
 from pipelex.pipe_run.delivery_executor import run_problem_of
-from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report, operator_problem_of
+from pipelex.system.error_tracking.error_report import ErrorReport, ErrorReportKind, make_error_report, operator_problem_of
 from pipelex.system.exceptions import ToolError
 
 _PLANTED_INPUT = "patient record 123-45-6789"
@@ -114,3 +116,9 @@ class TestErrorReport:
         reported_problem = operator_problem_of(exception=error, pipeline_run_id="plr-3", request_id="req-3")
 
         assert webhook_problem.model_dump() == reported_problem.model_dump()
+
+    def test_the_kind_is_a_lax_enum_field(self) -> None:
+        """A StrEnum field is never strict, so a kind given by its value validates as the enum whatever the model's config."""
+        kind_hint = get_type_hints(ErrorReport, include_extras=True)["kind"]
+        kind_field_metadata = [item for info in get_args(kind_hint)[1:] if isinstance(info, FieldInfo) for item in info.metadata]
+        assert Strict(strict=False) in kind_field_metadata

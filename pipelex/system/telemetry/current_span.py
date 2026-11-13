@@ -80,16 +80,29 @@ _RAISING_SPAN_STAMP = "__pipelex_raising_span__"
 def _stamp_raising_span(*, exception: BaseException, span_context: SpanContext) -> None:
     """Record on ``exception`` the Pipelex span it left, unless a span closer to where it was raised already did.
 
-    The innermost span is the one the failing work ran in, so an existing stamp is never replaced. An exception type that
-    refuses new attributes simply goes unstamped.
+    The innermost span is the one the failing work ran in, so an existing stamp is never replaced. Stamping is
+    best-effort and never raises: an exception whose class refuses the stamp to be read or written goes unstamped.
     """
-    if hasattr(exception, _RAISING_SPAN_STAMP):
-        return
     try:
+        if hasattr(exception, _RAISING_SPAN_STAMP):
+            return
         setattr(exception, _RAISING_SPAN_STAMP, span_context)
-    except (AttributeError, TypeError):
-        # An exception type with `__slots__` or a read-only `__setattr__` cannot carry the stamp.
+    except Exception:  # ruff: ignore[blind-except]
+        # (2) reading and setting an attribute run the exception class's own `__getattribute__` and `__setattr__`, whose
+        # exception surface cannot be enumerated (`__slots__` raise an AttributeError, a read-only class a TypeError, a
+        # class of its own anything), and this runs while the exception propagates, so whatever they raise must never
+        # replace it. Nothing is logged: the log sinks read this module, which therefore imports no logger.
         return
+
+
+def _read_raising_span_stamp(*, exception: BaseException) -> object:
+    """The raising-span stamp ``exception`` carries, or ``None`` when it carries none or refuses to be read; never raises."""
+    try:
+        return getattr(exception, _RAISING_SPAN_STAMP, None)
+    except Exception:  # ruff: ignore[blind-except]
+        # (2) reading an attribute runs the exception class's own `__getattribute__`, whose exception surface cannot be
+        # enumerated; an exception that refuses to be read names no span.
+        return None
 
 
 def raising_span_context(*, exception: BaseException) -> SpanContext | None:
@@ -97,7 +110,7 @@ def raising_span_context(*, exception: BaseException) -> SpanContext | None:
 
     Only ``exception`` itself is read; a reader walking a cause chain asks each of its errors in turn.
     """
-    stamped = getattr(exception, _RAISING_SPAN_STAMP, None)
+    stamped = _read_raising_span_stamp(exception=exception)
     if isinstance(stamped, trace.SpanContext):
         return stamped
     return None

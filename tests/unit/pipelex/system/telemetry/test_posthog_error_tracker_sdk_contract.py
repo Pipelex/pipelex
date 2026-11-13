@@ -18,6 +18,7 @@ marks an error as captured only when the send reported one.
 
 import copy
 import sys
+import types
 from typing import Any
 
 import pytest
@@ -29,10 +30,19 @@ from pipelex.system.error_tracking.error_report import ErrorReportKind, make_err
 from pipelex.system.exceptions import ToolError
 from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
-from pipelex.system.telemetry.telemetry_manager import EXCEPTION_FRAME_SOURCE_KEYS, TelemetryManager, strip_exception_frame_sources
+from pipelex.system.telemetry.telemetry_manager import (
+    EXCEPTION_FRAME_SOURCE_KEYS,
+    TelemetryManager,
+    frame_filename_of,
+    strip_exception_frame_sources,
+)
 
 _CONFIDENTIAL_MESSAGE = "could not read patient record 123-45-6789 at /home/acme/confidential.pdf"
 _CUSTOMER_WORDS = "customer said SECRET-4242"
+
+# A package with no file of its own, as a namespace package is, and where one of its modules lives on this machine.
+_NAMESPACE_PACKAGE = "pipelex_test_namespace_package"
+_MACHINE_DIRECTORY = "/home/acme/site-packages"
 
 
 class _Order(BaseModel):
@@ -415,6 +425,45 @@ class TestPostHogErrorTrackerSdkContract:
             assert frame["module"] == __name__
             assert frame["lineno"]
         assert _CUSTOMER_WORDS not in repr(sent_event)
+
+    def test_a_frame_of_a_namespace_package_leaves_without_its_absolute_path(self, mocker: MockerFixture) -> None:
+        """PostHog writes the absolute path as the file name of a namespace package's frame; the client sends it rewritten from the module."""
+        client = Posthog(
+            project_api_key="phc_custom", host="http://localhost:1", sync_mode=True, disabled=False, before_send=strip_exception_frame_sources
+        )
+        batch_post = mocker.patch("posthog.client.batch_post")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        # A package module with no `__file__`, which is what makes PostHog fall back to the absolute path.
+        mocker.patch.dict(sys.modules, {_NAMESPACE_PACKAGE: types.ModuleType(_NAMESPACE_PACKAGE)})
+        module_code = compile("def fail():\n    raise ValueError('boom')\n", f"{_MACHINE_DIRECTORY}/{_NAMESPACE_PACKAGE}/fault.py", "exec")
+        function_code = next(const for const in module_code.co_consts if isinstance(const, types.CodeType))
+        failing_function = types.FunctionType(function_code, {"__name__": f"{_NAMESPACE_PACKAGE}.fault"})
+
+        try:
+            failing_function()
+        except ValueError as error:
+            client.capture_exception(error, distinct_id="operator-user")
+
+        (sent_event,) = batch_post.call_args.kwargs["batch"]
+        filenames = [frame["filename"] for exception in sent_event["properties"]["$exception_list"] for frame in exception["stacktrace"]["frames"]]
+        assert f"{_NAMESPACE_PACKAGE}/fault.py" in filenames
+        assert _MACHINE_DIRECTORY not in repr(sent_event)
+
+    @pytest.mark.parametrize(
+        ("module", "filename", "expected"),
+        [
+            ("opentelemetry.sdk.trace", "/opt/venv/lib/opentelemetry/sdk/trace.py", "opentelemetry/sdk/trace.py"),
+            ("google.auth", "/opt/venv/lib/google/auth/__init__.py", "google/auth/__init__.py"),
+            ("pipelex.tools.misc", "pipelex/tools/misc.py", "pipelex/tools/misc.py"),
+            ("__main__", "/home/acme/script.py", "script.py"),
+            (None, "/home/acme/unknown.py", "unknown.py"),
+            ("vendor.mod", "C:\\Users\\acme\\vendor\\mod.py", "vendor/mod.py"),
+            ("vendor.mod", None, None),
+        ],
+    )
+    def test_a_frame_s_file_name_keeps_no_directory_of_the_machine(self, module: str | None, filename: str | None, expected: str | None) -> None:
+        assert frame_filename_of(module=module, filename=filename) == expected
 
     def test_strip_exception_frame_sources_leaves_other_events_alone(self) -> None:
         event: dict[str, Any] = {"event": "$ai_span", "properties": {"context_line": "kept"}}

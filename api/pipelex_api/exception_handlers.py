@@ -51,7 +51,8 @@ from pipelex.errors.problem import PipelexProblem, ProblemDiagnostics, ProblemVi
 from pipelex.errors.security_event import emit_security_event
 from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.plugins.registrar import HttpErrorMapperFn
-from pipelex.system.error_tracking.error_tracking import report_exception, report_problem
+from pipelex.system.error_tracking.error_report import operator_problem_of as build_reported_problem
+from pipelex.system.error_tracking.error_tracking import has_error_trackers, reaches_error_trackers, report_exception, report_problem
 from pipelex.system.telemetry.otel_constants import OTelLogAttr
 from pipelex.tools.log.error_fields import ERROR_TYPE_FIELD
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -186,15 +187,6 @@ class RecordLevel(StrEnum):
     ERROR = "error"
 
     @property
-    def reaches_error_trackers(self) -> bool:
-        """Whether the failure is reported to the error trackers too, which only an operator's fault is."""
-        match self:
-            case RecordLevel.ERROR:
-                return True
-            case RecordLevel.WARNING | RecordLevel.DEBUG:
-                return False
-
-    @property
     def writes_frames(self) -> bool:
         """Whether the record names where the deepest exception of the chain was raised, which only an operator's fault needs."""
         match self:
@@ -272,28 +264,22 @@ def _operator_param_fields(*, diagnostics: ProblemDiagnostics | None) -> dict[st
 def record_level_of(*, status: int, domain: ProblemDomain) -> RecordLevel:
     """The level of an error response's record, from its status and from who must act on it, its code's domain.
 
-    A 4xx is the caller's to act on, a mistake or a benign conflict such as ``pipelex.run.already_exists`` answered with
-    409, so it logs at `warning`. A 5xx logs at `error` only when the server has something to fix:
+    It logs at `error` exactly when the server has something to fix, the one rule the error trackers receive a failure
+    by too (``reaches_error_trackers``), and at `warning` otherwise:
 
+    - a 4xx is the caller's to act on, a mistake or a benign conflict such as ``pipelex.run.already_exists`` answered
+      with 409;
     - a `501` states that this deployment does not offer what the request asks for, custom code without a sandbox,
       `/v1/start` on a blocking-only orchestrator, a model it serves no backend for. The operator decides whether to
-      offer it, but nothing is broken, and the caller meets the refusal each time it asks again, so it logs at `warning`,
-      or any caller could fill the error-rate alerts by repeating it;
+      offer it, but nothing is broken, and the caller meets the refusal each time it asks again, so it logs at
+      `warning`, or any caller could fill the error-rate alerts by repeating it;
     - any other 5xx logs at `warning` when its domain is the caller's (`input`, `method`, `account`), a refusal the
       caller can avoid, such as a webhook receiver of its own that refused a delivery, and at `error` when it is the
       runtime's or the operator's.
     """
-    match status:
-        case HTTPStatus.NOT_IMPLEMENTED:
-            return RecordLevel.WARNING
-        case server_status if server_status >= HTTPStatus.INTERNAL_SERVER_ERROR:
-            match domain:
-                case ProblemDomain.INPUT | ProblemDomain.METHOD | ProblemDomain.ACCOUNT:
-                    return RecordLevel.WARNING
-                case ProblemDomain.OPERATOR | ProblemDomain.RUNTIME:
-                    return RecordLevel.ERROR
-        case _:
-            return RecordLevel.WARNING
+    if reaches_error_trackers(status=status, domain=domain):
+        return RecordLevel.ERROR
+    return RecordLevel.WARNING
 
 
 def _log_problem(problem: PipelexProblem, *, error: BaseException | None, request: Request, status: int, level: RecordLevel) -> None:
@@ -370,9 +356,10 @@ def problem_response(
     which adds `headers` to the ones its status calls for.
     """
     answered_status = status or problem_status(problem)
-    level = record_level or record_level_of(status=answered_status, domain=problem.effective_domain)
+    domain = problem.effective_domain
+    level = record_level or record_level_of(status=answered_status, domain=domain)
     _log_problem(problem, error=error, request=request, status=answered_status, level=level)
-    if level.reaches_error_trackers:
+    if reaches_error_trackers(status=answered_status, domain=domain):
         _report_to_error_trackers(problem, error=error)
     return problem_json_response(problem, view=problem_view_of(request), headers=headers, status=answered_status)
 
@@ -708,12 +695,13 @@ class AnsweredErrorBarrier:
 
 
 def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_status: int | None) -> None:
-    """Record a failure no handler recorded, which ended a request after its response had started.
+    """Record a failure no handler recorded, which ended a request after its response had started, and report it.
 
     The response's status and part of it are already sent, so the failure is answered by no problem: the record names the
     request's path, the status sent, the class that escaped and the classes of its chain, and never an exception's text.
     `sent_status` is `None` only when the barrier's own answer failed before its status was sent, which leaves the
-    server to answer for it, and the record then names no status.
+    server to answer for it, and the record then names no status. It reaches the error trackers as every failure logged
+    at `error` does, when the server has something to fix (``_report_unrecorded_failure``).
     """
     fields: dict[str, Any] = {
         "url.path": request.url.path,
@@ -723,6 +711,22 @@ def _log_unrecorded_failure(error: BaseException, *, request: Request, sent_stat
     if sent_status is not None:
         fields[OTelLogAttr.HTTP_RESPONSE_STATUS_CODE] = sent_status
     log.error(UNRECORDED_FAILURE_MESSAGE, fields=fields)
+    _report_unrecorded_failure(error, request=request)
+
+
+def _report_unrecorded_failure(error: BaseException, *, request: Request) -> None:
+    """Report a failure no handler answered to the error trackers, by the rule an answered failure is reported by.
+
+    No problem was answered for it, so it is weighed by the problem it would have been answered with, its operator
+    problem (a `PipelexError`'s own, else `runtime.unexpected`) and that problem's status, not the status already
+    sent, which is the response's and not the failure's. A failure some handler or the run's boundary reported already
+    is not reported again (``report_exception``). Never raises, and with no tracker installed builds nothing.
+    """
+    if not has_error_trackers():
+        return
+    problem = build_reported_problem(exception=error, pipeline_run_id=_pipeline_run_id_of(request), request_id=request_id_of(request))
+    if reaches_error_trackers(status=problem_status(problem), domain=problem.effective_domain):
+        report_exception(exception=error, problem=problem)
 
 
 def register_exception_handlers(

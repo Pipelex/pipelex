@@ -11,23 +11,16 @@ share it while the handlers import the middleware's request-id reader, with no i
 import math
 
 from fastapi.responses import JSONResponse
-from pipelex.errors.error_codes import error_code_spec, parse_error_code
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, problem_status_of
 
 # Content type for every error response, an RFC 9457 problem document. Lives here, the module that renders them, so the
 # FastAPI app, the middleware and the error handlers all reference one constant.
 PROBLEM_JSON_MEDIA_TYPE = "application/problem+json"
 
-# The HTTP status of a problem whose code the registry gives none, which only a client's own failure has.
-_FALLBACK_PROBLEM_STATUS = 500
-
 
 def problem_status(problem: PipelexProblem) -> int:
-    """The HTTP status of the response a problem is the body of: its code's, from the error registry."""
-    code = parse_error_code(problem.code)
-    if code is None:
-        return _FALLBACK_PROBLEM_STATUS
-    return error_code_spec(code).status or _FALLBACK_PROBLEM_STATUS
+    """The HTTP status of the response a problem is the body of: its code's, from the error registry (``problem_status_of``)."""
+    return problem_status_of(problem=problem)
 
 
 def _retry_after_header(problem: PipelexProblem, *, status: int) -> dict[str, str]:

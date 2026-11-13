@@ -529,3 +529,33 @@ class TestErrorLogRecords:
             response = _build_client().get("/caller-mistake/abc")
         assert response.status_code == 422
         assert recorder.reports == []
+
+    @pytest.mark.asyncio
+    async def test_a_failure_after_the_response_started_reaches_the_error_trackers(self):
+        # A failure no handler answered, once a response had started, is logged at `error` and so reaches the trackers
+        # too, weighed by the problem it would have been answered with, `runtime.unexpected`, never by the status sent.
+        async def failing_app(_scope: Scope, _receive: Receive, send: Send) -> None:
+            await send({"type": "http.response.start", "status": 201, "headers": []})
+            raise LookupError(_PLANTED_MARKER)
+
+        async def receive() -> Message:
+            return {"type": "http.request", "body": b"", "more_body": False}
+
+        async def send(_message: Message) -> None:
+            return None
+
+        scope: Scope = {"type": "http", "method": "GET", "path": "/started", "raw_path": b"/started", "query_string": b"", "headers": [], "app": None}
+        with recording_error_tracker() as recorder:
+            await AnsweredErrorBarrier(failing_app)(scope, receive, send)
+        (report,) = recorder.reports
+        assert report.kind == ErrorReportKind.HANDLED
+        assert report.error_type == "LookupError"
+        assert str(report.code) == "runtime.unexpected"
+        assert _PLANTED_MARKER not in repr(report.tags) + repr(report.fields) + repr(report.fingerprint)
+
+    def test_a_failure_the_catch_all_answered_mid_stream_is_reported_once(self):
+        # The catch-all answers the stream's failure and reports it; the barrier, dropping it, reports nothing more.
+        with recording_error_tracker() as recorder:
+            response = _build_client(with_barrier=True).get("/stream-failure")
+        assert response.status_code == 200
+        assert [report.error_type for report in recorder.reports] == ["LookupError"]

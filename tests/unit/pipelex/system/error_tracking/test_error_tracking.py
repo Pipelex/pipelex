@@ -1,9 +1,10 @@
 import sys
 import threading
 from collections.abc import Generator
+from typing import Any
 
 import pytest
-from mthds.protocol.problem.registry import CoreCode
+from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from opentelemetry.sdk.trace import Span as SdkSpan
 from opentelemetry.sdk.trace import TracerProvider
 from pytest_mock import MockerFixture
@@ -59,6 +60,43 @@ class _UnprintableError(Exception):
     def __str__(self) -> str:
         msg = "this error cannot be printed"
         raise RuntimeError(msg)
+
+
+# The prefix of the attributes the runtime marks an exception with: reported once, and the Pipelex span it left.
+_PIPELEX_MARK_PREFIX = "__pipelex_"
+
+
+class _UnreadableMarkError(Exception):
+    """An exception whose class's ``__getattribute__`` raises when the runtime's marks are read."""
+
+    @override
+    def __getattribute__(self, name: str) -> Any:
+        if name.startswith(_PIPELEX_MARK_PREFIX):
+            msg = "this error's attributes cannot be read"
+            raise RuntimeError(msg)
+        return super().__getattribute__(name)
+
+
+class _UnwalkableError(Exception):
+    """An exception whose class's ``__getattribute__`` raises when its cause is read."""
+
+    @override
+    def __getattribute__(self, name: str) -> Any:
+        if name == "__cause__":
+            msg = "this error's cause cannot be read"
+            raise RuntimeError(msg)
+        return super().__getattribute__(name)
+
+
+class _UnmarkableError(Exception):
+    """An exception whose class's ``__setattr__`` raises, other than an AttributeError or a TypeError, when the runtime marks it."""
+
+    @override
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name.startswith(_PIPELEX_MARK_PREFIX):
+            msg = "this error's attributes cannot be set"
+            raise RuntimeError(msg)
+        super().__setattr__(name, value)
 
 
 def _raised(*, error: Exception) -> Exception:
@@ -249,14 +287,43 @@ class TestErrorTracking:
         previous_threading_hook.assert_called_once_with(thread_args)
 
     @pytest.mark.parametrize(
-        ("code", "reaches"),
+        ("status", "domain", "reaches"),
         [
-            (CoreCode.RUNTIME_UNEXPECTED, True),
-            (CoreCode.RUNTIME_MISCONFIGURED, True),
-            (CoreCode.METHOD_INVALID, False),
-            (CoreCode.REQUEST_NOT_FOUND, False),
-            (CoreCode.AUTH_INVALID_CREDENTIAL, False),
+            (500, ProblemDomain.RUNTIME, True),
+            (500, ProblemDomain.OPERATOR, True),
+            (503, ProblemDomain.RUNTIME, True),
+            # What this deployment does not offer, which a caller meets each time it asks: nothing is broken.
+            (501, ProblemDomain.OPERATOR, False),
+            (501, ProblemDomain.RUNTIME, False),
+            # A caller's mistake or a refusal the caller can avoid.
+            (422, ProblemDomain.INPUT, False),
+            (502, ProblemDomain.INPUT, False),
+            (500, ProblemDomain.METHOD, False),
+            (500, ProblemDomain.ACCOUNT, False),
+            # A 4xx is the caller's to act on, whatever its domain, such as a provider's rate limit passed through.
+            (429, ProblemDomain.RUNTIME, False),
+            (409, ProblemDomain.OPERATOR, False),
         ],
     )
-    def test_only_an_operator_s_or_the_runtime_s_fault_reaches_the_trackers(self, code: CoreCode, reaches: bool) -> None:
-        assert reaches_error_trackers(problem=make_problem(code=code, view=ProblemView.OPERATOR)) is reaches
+    def test_only_a_fault_the_server_must_fix_reaches_the_trackers(self, status: int, domain: ProblemDomain, reaches: bool) -> None:
+        assert reaches_error_trackers(status=status, domain=domain) is reaches
+
+    @pytest.mark.parametrize(
+        ("error_class", "report_count"),
+        [
+            (_UnreadableMarkError, 1),
+            (_UnmarkableError, 1),
+            # Its report cannot be built either, since the report walks the cause chain too, so it is dropped.
+            (_UnwalkableError, 0),
+        ],
+    )
+    def test_an_exception_whose_class_refuses_the_mark_never_fails_the_reporter(self, error_class: type[Exception], report_count: int) -> None:
+        """Reading or writing the reported mark runs the exception class's own code, whatever it raises the error stands."""
+        error = _raised(error=error_class("boom"))
+
+        with recording_error_tracker() as recorder:
+            report_exception(exception=error)
+
+        assert [report.error_type for report in recorder.reports] == [error_class.__name__] * report_count
+        # Unreadable or unmarked, it counts as not reported: it may be reported twice, never fail the reporter.
+        assert was_reported(exception=error) is False
