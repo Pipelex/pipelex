@@ -9,7 +9,7 @@ from pytest_mock import MockerFixture
 from pipelex.base_exceptions import PipelexError
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.pipe_run import pipe_run as pipe_run_module
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, WebhookTarget
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, WebhookTarget
 from pipelex.pipe_run.exceptions import StorageDeliveryError
 from pipelex.pipe_run.pipe_run import PipeRun
 from pipelex.pipeline.exceptions import PipelineInputUrlInvalidError
@@ -232,19 +232,21 @@ class TestPipeRunErrorTracking:
         assert report.kind == ErrorReportKind.RUN_FAILURE
         assert report.code == CoreCode.RUNTIME_UNEXPECTED
 
-    async def test_usage_statistics_that_fail_unexpectedly_are_reported(self, mocker: MockerFixture) -> None:
-        """The run's statistics swallow the failures they expect; one they do not escapes the run as its failure, reported."""
+    async def test_usage_statistics_that_fail_unexpectedly_never_fail_the_run(self, mocker: MockerFixture) -> None:
+        """An anonymous statistic is best effort: one that fails unexpectedly leaves a successful run successful, delivered and unreported."""
         router, job = _failing_job(mocker=mocker, error=None)
         mocker.patch("pipelex.pipe_run.pipe_run.GraphTracerManager").get_instance.return_value = None
-        usage_error = TypeError("an unexpected statistic")
-        _failing_usage_report(mocker=mocker, error=usage_error)
+        _failing_usage_report(mocker=mocker, error=TypeError("an unexpected statistic"))
+        executor = mocker.patch("pipelex.pipe_run.pipe_run.DeliveryExecutor").return_value
+        executor.execute = mocker.AsyncMock()
 
-        with recording_error_tracker() as recorder, pytest.raises(TypeError, match="unexpected statistic"):
-            await PipeRun(pipe_router=router).run(pipe_job=job)
+        with recording_error_tracker() as recorder:
+            pipe_output = await PipeRun(pipe_router=router).run(pipe_job=job, delivery_assignment=DeliveryAssignment())
 
-        (report,) = recorder.reports
-        assert report.exception is usage_error
-        assert report.kind == ErrorReportKind.RUN_FAILURE
+        assert pipe_output is router.run.return_value
+        executor.execute.assert_awaited_once()
+        assert executor.execute.call_args.kwargs["status"] == DeliveryStatus.COMPLETED
+        assert recorder.reports == []
 
     async def test_a_delivery_s_unexpected_failure_is_reported(self, mocker: MockerFixture) -> None:
         """Not only a `DeliveryError`: whatever the delivery raises after the pipe executed is the run's failure, and is reported."""

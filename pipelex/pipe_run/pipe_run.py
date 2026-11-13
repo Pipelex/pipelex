@@ -214,6 +214,9 @@ class PipeRun(PipeRunProtocol):
                         usage_tally=usage_tally,
                     )
                 except Exception as tail_error:
+                    # (2) The tail runs unbounded code, the graph tracer, the trace assembly and the delivery to the
+                    # host's storage and webhooks through their plugins, whose exception surface cannot be enumerated, and
+                    # a cancelled run's outcome must stay its cancellation whatever that code raises.
                     if not run_was_cancelled:
                         # The run's failure is now the tail's, which replaces the pipe's own on its way to the caller and is
                         # the one the run's boundary reports.
@@ -226,9 +229,10 @@ class PipeRun(PipeRunProtocol):
                         fields=_secondary_failure_fields(exc=tail_error),
                     )
                 except BaseException:
-                    # Observe-and-reraise: an interruption, such as a cancellation, arrived during the run's tail and
-                    # replaces the error the pipe failed with, which no `except Exception` sees any more. That error is the
-                    # run's fault, so it is reported now, before the interruption propagates; the run sends no other report.
+                    # (2) Observe-and-reraise around the same unbounded tail: an interruption, such as a cancellation,
+                    # arrived during the run's tail and replaces the error the pipe failed with, which no `except Exception`
+                    # sees any more. That error is the run's fault, so it is reported now, before the interruption
+                    # propagates; the run sends no other report.
                     if execution_error is not None:
                         self._report_run_failure(error=execution_error, pipe_job=pipe_job, webhook_problem=problem)
                     raise
@@ -236,11 +240,13 @@ class PipeRun(PipeRunProtocol):
             if execution_error is not None:
                 raise execution_error
         except Exception as escaping_error:
-            # Observe-and-reraise at the run's boundary: the run fails with whatever escapes it, the pipe's own error or
-            # one its tail raised after it, a tracer that would not close, a trace that would not assemble, statistics or
-            # a delivery that failed, and that exception, the one the caller receives, is the one reported. A run sends
-            # one report: a tail failure that replaced the pipe's own is reported in its place, never beside it. A
-            # cancellation is no `Exception` and reports nothing, and no failure of a cancelled run's tail replaces it.
+            # (2) The run executes unbounded code, the method's pipes, the providers and plugins they call and the run's
+            # tail, whose exception surface cannot be enumerated. Observe-and-reraise at the run's boundary: the run fails
+            # with whatever escapes it, the pipe's own error or one its tail raised after it, a tracer that would not
+            # close, a trace that would not assemble or a delivery that failed, and that exception, the one the caller
+            # receives, is the one reported. A run sends one report: a tail failure that replaced the pipe's own is
+            # reported in its place, never beside it. A cancellation is no `Exception` and reports nothing, and no
+            # failure of a cancelled run's tail replaces it.
             self._report_run_failure(
                 error=escaping_error,
                 pipe_job=pipe_job,
@@ -412,7 +418,8 @@ class PipeRun(PipeRunProtocol):
 
         Runs inside the run's library window, which the bundle's description reads. It runs in the `finally` ahead of
         the delivery, and an anonymous statistic must never replace a run's outcome or skip its delivery, so a failure
-        to build it is logged at debug level and the event is not sent.
+        to build it is logged and the event is not sent: a failure it expects at debug level, and any other, a fault of
+        the statistics' own, at warning level by its class and code, never its text, which can quote the run's data.
         """
         has_image_input, has_document_input = input_kinds
         try:
@@ -435,6 +442,11 @@ class PipeRun(PipeRunProtocol):
         except (PipelexError, ValueError, OSError) as report_error:
             # A library that cannot describe the bundle, an event that will not validate, a state that cannot be read.
             log.debug("The usage statistics of a run could not be built", fields=error_fields(exc=report_error))
+        except Exception as unexpected_error:  # ruff: ignore[blind-except]
+            # (2) Building the statistics walks the run library's pipes and concepts, plugins' included, and the run's
+            # trace events, whose exception surface cannot be enumerated; best effort like the I/O artifacts, since an
+            # anonymous statistic must never replace the run's outcome or skip its delivery.
+            log.warning("The usage statistics of a run failed unexpectedly", fields=_secondary_failure_fields(exc=unexpected_error))
 
     @classmethod
     def _build_pipe_io_artifacts_on_output(cls, *, pipe_output: PipeOutput, pipeline_run_id: str) -> None:
