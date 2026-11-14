@@ -30,6 +30,7 @@ from pipelex.tracing.event_log_factory import make_event_log
 from pipelex.tracing.exceptions import EventLogError, TraceEventModeError
 from pipelex.tracing.graphspec_assembler import GraphSpecAssembler
 from pipelex.tracing.trace_events import TraceEvent
+from pipelex.tracing.unattributed_usage_report import report_unattributed_usage
 from pipelex.tracing.usage_aggregator import UsageAggregator
 
 
@@ -141,6 +142,7 @@ def assemble_tracing(
     main_pipe_code: str | None = None,
     run_metadata: RunMetadata | None = None,
     trace_events: RunTraceEvents | None = None,
+    reports_incomplete_graph: bool = False,
 ) -> TracingAssembly:
     """Read the trace events for ``pipeline_run_id`` once and assemble the requested artifacts.
 
@@ -160,6 +162,14 @@ def assemble_tracing(
     ``TraceEventModeError`` recorded in ``graph_assembly_error``. Programming bugs (KeyError, AttributeError, etc.)
     propagate so they surface during development.
 
+    A graph whose nodes reported usage but never started in the trace is incomplete. It is reported to the operator's
+    error trackers (``pipelex.run.graph_incomplete``) only when the caller asks for it with ``reports_incomplete_graph``,
+    because whether a run reports is the run's own policy, which only its caller knows: ``PipeRun`` asks for it as it
+    reports a failure, never for the runs a validation makes. A dry run's graph is never reported, whoever asks, its
+    mode being stated by its events. Every call that asks reports again, so a caller that retries the assembly, such as
+    a durable-execution activity, sends one report per attempt that reached the end of the assembly; the trackers group
+    them under the code.
+
     Args:
         pipeline_run_id: The pipeline run ID to query events for.
         assemble_graph: Whether to assemble a GraphSpec from the events.
@@ -171,6 +181,9 @@ def assemble_tracing(
             run with no host-supplied scope.
         trace_events: The run's events, already read by the caller for another reader of the same events (the run's
             usage statistics), so the run's events are still read once; None to read them here.
+        reports_incomplete_graph: Whether an assembled graph left incomplete by nodes that never started is reported to
+            the error trackers. Off by default: a caller that knows the run's reporting policy turns it on, and code
+            that must stay free of side effects, such as a durable workflow's own code, leaves it off.
 
     Returns:
         A TracingAssembly carrying whichever artifacts were requested and succeeded.
@@ -189,6 +202,7 @@ def assemble_tracing(
             domain_code=domain_code,
             main_pipe_code=main_pipe_code,
             trace_events=trace_events,
+            reports_incomplete_graph=reports_incomplete_graph,
         )
 
 
@@ -201,6 +215,7 @@ def _assemble_tracing_events(
     domain_code: str | None,
     main_pipe_code: str | None,
     trace_events: RunTraceEvents | None,
+    reports_incomplete_graph: bool,
 ) -> TracingAssembly:
     """The body of ``assemble_tracing``, run inside the log context it binds: read the events once, assemble onto ``result``."""
     if not (assemble_graph or assemble_usage):
@@ -223,7 +238,7 @@ def _assemble_tracing_events(
 
     if assemble_graph:
         try:
-            result.graph_spec = GraphSpecAssembler.assemble(
+            assembled_graph = GraphSpecAssembler.assemble_with_never_started_usage(
                 events=events,
                 graph_id=pipeline_run_id,
                 pipeline_ref=PipelineRef(
@@ -231,7 +246,6 @@ def _assemble_tracing_events(
                     main_pipe=main_pipe_code,
                 ),
             )
-            log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
         except (ValidationError, TraceEventModeError) as assembly_error:
             log.warning("The graph could not be assembled from the trace events", fields=error_fields(exc=assembly_error))
             # The error travels on the run's output: a ValidationError is written by its reasons, never the traced values it
@@ -239,6 +253,16 @@ def _assemble_tracing_events(
             result.graph_assembly_error = (
                 f"Graph assembly failed for pipeline_run_id={pipeline_run_id}: {describe_exception_without_input(exc=assembly_error)}"
             )
+        else:
+            result.graph_spec = assembled_graph.graph_spec
+            log.debug("Assembled the graph from the trace events", fields={"event_count": len(events)})
+            # A dry run's graph is never reported, whoever asks: its events state its mode, so the rule holds for a
+            # caller that does not know the run's mode, such as a durable-execution activity.
+            if reports_incomplete_graph and not assembled_graph.mode.is_dry:
+                report_unattributed_usage(
+                    pipeline_run_id=pipeline_run_id,
+                    usages_by_never_started_node=assembled_graph.usages_by_never_started_node,
+                )
 
     return result
 
@@ -252,6 +276,7 @@ def assemble_tracing_on_output(
     domain_code: str | None = None,
     main_pipe_code: str | None = None,
     trace_events: RunTraceEvents | None = None,
+    reports_incomplete_graph: bool = False,
 ) -> None:
     """Assemble graph and/or usage from trace events and set them on pipe_output (DIRECT mode).
 
@@ -267,6 +292,8 @@ def assemble_tracing_on_output(
         domain_code: Domain code for the graph's pipeline ref.
         main_pipe_code: Main pipe code for the graph's pipeline ref.
         trace_events: The run's events when the caller already read them; None to read them here.
+        reports_incomplete_graph: Whether an incomplete graph is reported to the error trackers (see
+            :func:`assemble_tracing`).
     """
     result = assemble_tracing(
         pipeline_run_id=pipeline_run_id,
@@ -277,6 +304,7 @@ def assemble_tracing_on_output(
         # Inherited from the output this assembly decorates, so both key together.
         run_metadata=pipe_output.job_metadata.run_metadata if pipe_output.job_metadata else None,
         trace_events=trace_events,
+        reports_incomplete_graph=reports_incomplete_graph,
     )
     if result.graph_spec is not None:
         pipe_output.graph_spec = result.graph_spec

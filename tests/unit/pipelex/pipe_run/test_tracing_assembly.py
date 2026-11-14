@@ -1,6 +1,7 @@
 import json
 import logging
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -11,15 +12,22 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.graph.graphspec import GraphSpecMode
 from pipelex.pipe_run.tracing_assembly import TracingAssembly, assemble_tracing, assemble_tracing_on_output
 from pipelex.system.exceptions import MissingDependencyError
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
 from pipelex.tools.log.log_context import PIPELINE_RUN_ID_FIELD, REQUEST_ID_FIELD, get_log_context
 from pipelex.tracing.exceptions import EventLogReadError, EventLogSetupError
+from pipelex.tracing.graphspec_assembler import AssembledGraph
 from pipelex.tracing.trace_events import UsageReportEvent
 
 _MODULE = "pipelex.pipe_run.tracing_assembly"
+
+
+def _assembled(graph_spec: Any) -> AssembledGraph:
+    """What the assembler returns for a complete live graph, standing in for ``graph_spec``."""
+    return AssembledGraph(graph_spec=graph_spec, mode=GraphSpecMode.LIVE, usages_by_never_started_node={})
 
 
 def _make_usage_event(pipeline_run_id: str, node_id: str, run_mode: PipeRunMode = PipeRunMode.LIVE) -> UsageReportEvent:
@@ -80,7 +88,7 @@ class TestTracingAssembly:
         event_log = mocker.MagicMock()
         event_log.read_events = mocker.MagicMock(return_value=[])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
-        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble")
+        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage")
 
         result = assemble_tracing(pipeline_run_id="plr", assemble_graph=True, assemble_usage=True)
 
@@ -96,7 +104,7 @@ class TestTracingAssembly:
         event_log = mocker.MagicMock()
         event_log.read_events = mocker.MagicMock(return_value=[usage_event])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
-        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble")
+        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage")
 
         result = assemble_tracing(pipeline_run_id="plr-usage", assemble_graph=False, assemble_usage=True)
 
@@ -111,7 +119,7 @@ class TestTracingAssembly:
         event_log.read_events = mocker.MagicMock(return_value=[usage_event])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
         sentinel_graph = mocker.MagicMock()
-        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", return_value=sentinel_graph)
+        assemble = mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage", return_value=_assembled(sentinel_graph))
 
         result = assemble_tracing(
             pipeline_run_id="plr-graph",
@@ -162,7 +170,7 @@ class TestTracingAssembly:
         event_log.read_events = mocker.MagicMock(return_value=[usage_event])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
         sentinel_graph = mocker.MagicMock()
-        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", return_value=sentinel_graph)
+        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage", return_value=_assembled(sentinel_graph))
 
         result = assemble_tracing(pipeline_run_id="plr-both", assemble_graph=True, assemble_usage=True)
 
@@ -282,7 +290,7 @@ class TestTracingAssembly:
         event_log.read_events = mocker.MagicMock(return_value=[usage_event])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
         validation_error = ValidationError.from_exception_data(title="GraphSpec", line_errors=[])
-        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", side_effect=validation_error)
+        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage", side_effect=validation_error)
 
         result = assemble_tracing(pipeline_run_id="plr-mixed", assemble_graph=True, assemble_usage=True)
 
@@ -304,7 +312,7 @@ class TestTracingAssembly:
                 event_log.read_events = mocker.MagicMock(side_effect=caught.value)
             case _:
                 event_log.read_events = mocker.MagicMock(return_value=[_make_usage_event("plr-quote", "plr-quote:node_0")])
-                mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", side_effect=caught.value)
+                mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage", side_effect=caught.value)
 
         result = assemble_tracing(pipeline_run_id="plr-quote", assemble_graph=True, assemble_usage=False)
 
@@ -340,7 +348,7 @@ class TestTracingAssembly:
         event_log.read_events = mocker.MagicMock(return_value=[usage_event])
         mocker.patch(f"{_MODULE}.make_event_log", return_value=event_log)
         sentinel_graph = mocker.MagicMock()
-        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble", return_value=sentinel_graph)
+        mocker.patch(f"{_MODULE}.GraphSpecAssembler.assemble_with_never_started_usage", return_value=_assembled(sentinel_graph))
 
         pipe_output = PipeOutput(pipeline_run_id="plr-out")
         assemble_tracing_on_output(

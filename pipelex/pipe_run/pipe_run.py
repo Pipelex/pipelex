@@ -77,9 +77,10 @@ class PipeRun(PipeRunProtocol):
             reports_usage_stats: Whether a run reports its anonymous usage statistics, its `run_completed` and
                 `model_used` events, when statistics are on. Off for the runs a validation makes, which its own
                 `method_validated` describes.
-            reports_errors: Whether a failed run is reported to the installed error trackers, when its failure is the
-                operator's to fix and the run is no dry run. Off for the runs a validation makes, whose failures are
-                the validation's findings about the method, answered to whoever asked for it.
+            reports_errors: Whether the run reports to the installed error trackers, when it is no dry run: its
+                failure, when the failure is the operator's to fix, and a graph its trace left incomplete. Off for the
+                runs a validation makes, whose failures are the validation's findings about the method, answered to
+                whoever asked for it.
         """
         self._pipe_router = pipe_router
         self._delivery_executor = DeliveryExecutor()
@@ -105,6 +106,13 @@ class PipeRun(PipeRunProtocol):
                 emit_security_event_for_run(error=exc, run_metadata=pipe_job.job_metadata.run_metadata)
                 raise
 
+    def _reports_to_error_trackers(self, *, pipe_job: PipeJob) -> bool:
+        """Whether this run reports to the error trackers at all: a dry run and the runs a validation makes never do.
+
+        One policy for everything the run reports, its failure and its incomplete graph alike.
+        """
+        return self._reports_errors and not pipe_job.pipe_run_params.run_mode.is_dry
+
     def _report_run_failure(self, *, error: Exception, pipe_job: PipeJob, webhook_problem: PipelexProblem | None) -> None:
         """Report a failed run to the operator's error trackers, when its failure is the operator's to fix.
 
@@ -124,7 +132,7 @@ class PipeRun(PipeRunProtocol):
             pipe_job: The run's job.
             webhook_problem: The problem built for the run's webhooks, when it has any, which is reused.
         """
-        if not self._reports_errors or not has_error_trackers() or pipe_job.pipe_run_params.run_mode.is_dry:
+        if not self._reports_to_error_trackers(pipe_job=pipe_job) or not has_error_trackers():
             return
         run_metadata = pipe_job.job_metadata.run_metadata
         problem = webhook_problem or operator_problem_of(
@@ -331,6 +339,8 @@ class PipeRun(PipeRunProtocol):
                 domain_code=pipe_job.pipe.domain_code,
                 main_pipe_code=pipe_job.pipe.code,
                 trace_events=trace_events,
+                # A graph left incomplete by nodes that never started is reported under the run's own policy.
+                reports_incomplete_graph=self._reports_to_error_trackers(pipe_job=pipe_job),
             )
             if trace_context.describe_pipe_io and pipe_output.graph_spec is not None:
                 self._build_pipe_io_artifacts_on_output(pipe_output=pipe_output, pipeline_run_id=pipeline_run_id)

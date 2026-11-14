@@ -57,6 +57,7 @@ Pipelex's extensions to runs.
 | Code | Title | Domain | Retry | Status |
 |---|---|---|---|---|
 | [`pipelex.run.already_exists`](pipelex/run/already_exists.md) | A run with this id already exists | `input` | `no` | `409` |
+| [`pipelex.run.graph_incomplete`](pipelex/run/graph_incomplete.md) | The run's graph left usage unattributed | `runtime` | `no` | `500` |
 
 ## pipelex.request { #pipelex-request }
 

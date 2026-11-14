@@ -35,6 +35,7 @@ class PipelexErrorCode(StrEnum):
     CATALOG_SELECTOR_INVALID = "pipelex.catalog.selector_invalid"
     CATALOG_LINK_CONFLICT = "pipelex.catalog.link_conflict"
     RUN_ALREADY_EXISTS = "pipelex.run.already_exists"
+    RUN_GRAPH_INCOMPLETE = "pipelex.run.graph_incomplete"
     REQUEST_DEPENDENCY_KEY_MISMATCH = "pipelex.request.dependency_key_mismatch"
     STORAGE_URI_INVALID = "pipelex.storage.uri_invalid"
     STORAGE_NOT_FOUND = "pipelex.storage.not_found"
@@ -359,6 +360,28 @@ class RunAlreadyExistsParams(PipelexErrorParams):
     code: ClassVar[PipelexErrorCode] = PipelexErrorCode.RUN_ALREADY_EXISTS
 
     pipeline_run_id: str
+
+
+class RunGraphIncompleteParams(PipelexErrorParams):
+    """The parameters of `pipelex.run.graph_incomplete`.
+
+    The run's graph left usage unattributed.
+
+    Attributes:
+        node_ids: The ids of the nodes that reported usage but never started in the trace, sorted, at most
+            twenty of them.
+        node_count: How many nodes reported usage but never started in the trace.
+        inference_calls: The inference calls those nodes made, which the graph left unattributed.
+        cost_micro_usd: The cost of those calls in millionths of a US dollar, rounded, absent when none of
+            them was priced.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.RUN_GRAPH_INCOMPLETE
+
+    node_ids: list[str]
+    node_count: int
+    inference_calls: int
+    cost_micro_usd: int | None = None
 
 
 class RequestDependencyKeyMismatchParams(PipelexErrorParams):
@@ -1030,6 +1053,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.CATALOG_SELECTOR_INVALID: CatalogSelectorInvalidParams,
     PipelexErrorCode.CATALOG_LINK_CONFLICT: CatalogLinkConflictParams,
     PipelexErrorCode.RUN_ALREADY_EXISTS: RunAlreadyExistsParams,
+    PipelexErrorCode.RUN_GRAPH_INCOMPLETE: RunGraphIncompleteParams,
     PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: RequestDependencyKeyMismatchParams,
     PipelexErrorCode.STORAGE_URI_INVALID: StorageUriInvalidParams,
     PipelexErrorCode.STORAGE_NOT_FOUND: StorageNotFoundParams,
@@ -1313,6 +1337,23 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Start the run with another id, or with none so that the runner assigns one.",
         other_step="change_input",
         other_step_detail="Pass this to the caller, who chose the run id '{pipeline_run_id}', which is already taken.",
+    ),
+    PipelexErrorCode.RUN_GRAPH_INCOMPLETE: PipelexErrorEntry(
+        title="The run's graph left usage unattributed",
+        domain="runtime",
+        retry="no",
+        status=500,
+        detail=(
+            "The run's graph is incomplete: {node_count} of its nodes reported inference usage but never started in its trace, so "
+            "{inference_calls} inference calls were left unattributed."
+        ),
+        actor_step="report",
+        actor_step_detail=(
+            "Look in the run's trace events for the start events of the {node_count} nodes that never started, then report the run to the "
+            "maintainers of the Pipelex runtime."
+        ),
+        other_step="report",
+        other_step_detail="Report this to whoever runs the runtime.",
     ),
     PipelexErrorCode.REQUEST_DEPENDENCY_KEY_MISMATCH: PipelexErrorEntry(
         title="A dependency is keyed by another address than its manifest declares",
