@@ -178,7 +178,9 @@ class TestUnattributedUsageReport:
         assert recorder.reports == []
 
     def test_a_cost_too_large_to_scale_is_left_out_of_the_report(self, mocker: MockerFixture) -> None:
-        """A finite cost that overflows to infinity once scaled to micro-USD is dropped from the report, never raised."""
+        """A finite cost that overflows to infinity once scaled to micro-USD is dropped from the report, and the run's
+        tracing assembly still returns its graph, with an error tracker installed.
+        """
         assembled = GraphSpecAssembler.assemble_with_never_started_usage(
             events=IncompleteGraphRun.run_with_lost_starts(), graph_id=IncompleteGraphRun.PIPELINE_RUN_ID
         )
@@ -188,13 +190,19 @@ class TestUnattributedUsageReport:
         mocker.patch.object(unattributed_usage_report_module, "make_self_contained_spec", return_value=huge_usage_spec)
 
         with recording_error_tracker() as recorder:
-            report_unattributed_usage(
-                pipeline_run_id=IncompleteGraphRun.PIPELINE_RUN_ID, usages_by_never_started_node=assembled.usages_by_never_started_node
-            )
+            assembly = _assemble_and_report(events=IncompleteGraphRun.run_with_lost_starts())
 
+        assert assembly.graph_assembly_error is None
+        assert assembly.graph_spec is not None
+        assert assembly.graph_spec.usage is not None
+        assert assembly.graph_spec.usage.unattributed.inference_calls == 3
         (report,) = recorder.reports
         assert report.problem.params is not None
-        assert "cost_micro_usd" not in report.problem.params.as_wire()
+        assert report.problem.params.as_wire() == {
+            "node_ids": sorted([IncompleteGraphRun.GHOST_NODE_ID, IncompleteGraphRun.OTHER_GHOST_NODE_ID]),
+            "node_count": 2,
+            "inference_calls": 3,
+        }
 
     def test_the_code_is_an_operator_fault_the_error_trackers_admit(self) -> None:
         spec = error_code_spec(PipelexErrorCode.RUN_GRAPH_INCOMPLETE)
