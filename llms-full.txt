@@ -12829,7 +12829,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
@@ -12987,6 +12987,35 @@ The `text_gen_truncate_length` controls:
 
 - [Validation & Dry Run](../../features/validation-dry-run.md) - Overview of validation and dry run capabilities
 - [CLI validate](../../tools/cli/validate.md) - Using the CLI to validate methods
+
+
+## Error Tracking
+
+# Error Tracking Configuration
+
+Configuration section: `[runtime.error_tracking]`
+
+## Overview
+
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails, an exception that reaches the top of a thread uncaught, an error a host caught and reported, and, in the API server, every response answered as an operator's fault. This section names the trackers that receive them.
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]
+```
+
+The value above is the default.
+
+## `trackers`
+
+- A list of tokens, each naming a tracker a plugin registered. Every reported error reaches each tracker, in the list's order.
+- `"posthog"` is built in. It sends each error's exception to the PostHog stream you configure in `telemetry.toml`, as an `$exception`, and sends nothing while that stream is off or `DO_NOT_TRACK` is set (see [Telemetry Configuration](telemetry-config.md#errors-on-your-posthog)).
+- An installed plugin adds its own token, `"sentry"` for instance. Pipelex ships no tracker SDK of its own: the SDK comes with the plugin.
+- An empty list, `trackers = []`, reports errors to no tracker and leaves the interpreter's exception hooks alone.
+
+A token no installed plugin registered stops the boot with `UnknownErrorTrackerError`, which lists the registered tokens, and a token named twice is refused when the configuration is read.
+
+A tracker receives identifiers, never a run's content: the error's code, where it was raised, the failing pipe, the run and request ids and the spans to join it on, beside the problem document in the operator's view. [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) describes what a tracker receives and how to write one.
 
 
 ## Logging
@@ -13200,7 +13229,7 @@ keywords_to_hilight = []
 
 ## The `json` Sink
 
-No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, `trace_id`, `span_id` and `trace_flags` when OpenTelemetry's current span names a trace, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. The three standard trace keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP, lowercase hex at their full widths (32, 16 and 2 digits), and they name OpenTelemetry's current span, your own code's, which Pipelex reads and never changes, so a collector or an error tracker joins the line to your trace. The two `pipelex.*` keys, 32 and 16 hex digits, name the Pipelex span active at the log call, the pipe's own or the LLM call's during a run. The two sets are independent, so a line in a run under no span of yours carries only the `pipelex.*` keys (see [Logging](../../tools/logging.md#the-trace-context)). Every key the sink writes, the trace keys included, is reserved on every line, so a field named like one of them is carried under a `field_` prefix whether or not the line carries an exception or a span, and a non-finite float is written as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written as its `repr`, and every other field on the same line keeps its JSON type, so a number or a boolean beside it stays queryable as one. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
+No section of its own: the sink writes to `console_log_target`, one JSON object per line and no ANSI ever. Each line carries `time` (ISO 8601, UTC, milliseconds, `Z`), `severity` (the level name), `logger` (the module-named logger), `message`, `exception` when the record carries one, `trace_id`, `span_id` and `trace_flags` when OpenTelemetry's current span names a trace, `pipelex.trace_id` and `pipelex.span_id` when a Pipelex span is active, and then every field, the run-scoped identifiers and the `data` attribute flat beside them, under their own names. The three standard trace keys are the ones OpenTelemetry specifies for trace context in a JSON log that is not OTLP, lowercase hex at their full widths (32, 16 and 2 digits), and they name OpenTelemetry's current span, your own code's, which Pipelex reads and, unless you turn `join_host_trace` on, never changes, so a collector or an error tracker joins the line to your trace. The two `pipelex.*` keys, 32 and 16 hex digits, name the Pipelex span active at the log call, the pipe's own or the LLM call's during a run. The two sets are independent, so a line in a run under no span of yours carries only the `pipelex.*` keys (see [Logging](../../tools/logging.md#the-trace-context)). Every key the sink writes, the trace keys included, is reserved on every line, so a field named like one of them is carried under a `field_` prefix whether or not the line carries an exception or a span, and a non-finite float is written as the string `"NaN"`, `"Infinity"` or `"-Infinity"`. A value JSON refuses outright, a circular reference or a mapping with a non-string key, is written as its `repr`, and every other field on the same line keeps its JSON type, so a number or a boolean beside it stays queryable as one. The key names are the ones the CloudWatch agent, the Google Cloud Logging agent and any OTLP collector ingest without a parser.
 
 ```json
 {"time": "2026-09-16T10:12:03.417Z", "severity": "INFO", "logger": "pipelex.pipe_operators.pipe_llm", "message": "Running the pipe", "trace_id": "4bf92f3577b34da6a3ce929d0e0e4736", "span_id": "00f067aa0ba902b7", "trace_flags": "01", "pipelex.trace_id": "0af7651916cd43dd8448eb211c80319c", "pipelex.span_id": "b7ad6b7169203331", "request_id": "req-7f3a", "pipeline_run_id": "plr-01", "pipe_run_id": "pr-9c", "model": "gpt-5"}
@@ -13219,7 +13248,7 @@ headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 - `endpoint`: The collector's logs URL. Left unset, the exporter follows the OpenTelemetry environment conventions: `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`, then `OTEL_EXPORTER_OTLP_ENDPOINT` with the `/v1/logs` path, then the collector default on localhost
 - `headers`: Headers sent with every export, an authorization header typically. Empty, the default, leaves `OTEL_EXPORTER_OTLP_HEADERS` in charge. A value may name a secret rather than carry it, as the example's bearer token does, and the keys are taken as written: see [Secrets in Sink Settings](#secrets-in-sink-settings). This is the spelling `telemetry.toml` uses for the trace exporter's headers, so the two OTLP exporters of one process name the same credential the same way
 - The records are exported in batches on the OTLP HTTP protocol, with the same service identity as the spans the runtime already exports, so a collector files the two together
-- Each record carries the trace context of OpenTelemetry's current span, your own code's, so a collector files the record under your span; a record logged where no current span names a trace carries none. The Pipelex span active at the log call, the pipe's own or the LLM call's during a run, rides as the `pipelex.trace_id` and `pipelex.span_id` attributes, in hex. Pipelex never makes its own spans current in the process's OpenTelemetry context, so your own instrumentation is never re-parented under them
+- Each record carries the trace context of OpenTelemetry's current span, your own code's, so a collector files the record under your span; a record logged where no current span names a trace carries none. The Pipelex span active at the log call, the pipe's own or the LLM call's during a run, rides as the `pipelex.trace_id` and `pipelex.span_id` attributes, in hex. Pipelex never makes its own spans current in the process's OpenTelemetry context unless you turn [`join_host_trace`](../../setup/telemetry.md#joining-your-processs-trace) on, so your own instrumentation is never re-parented under them
 - The keys the sink writes itself — the source location `code.file.path`, `code.function.name` and `code.line.number`, `pipelex.trace_id` and `pipelex.span_id`, and the `exception.*` keys — are reserved on every record whether or not it carries an exception or a Pipelex span, exactly as the `json` sink reserves its own keys: a field named like one of them is carried under the same `field_` prefix, so nothing is overwritten and a field keeps one wire name whichever sink is selected
 - The sink never exports its own export path: a record the SDK or the transport emits while an export is in flight is rejected before the handler's lock is taken, so an unreachable collector costs a warning on the export thread and never a loop or a hang at exit. A flush at teardown is bounded by the exporter's own timeout, `OTEL_EXPORTER_OTLP_TIMEOUT`, and whatever the sink raises while it flushes or closes is said on stderr rather than left to interrupt the teardown
 
@@ -13641,6 +13670,9 @@ Files are deep-merged, with later layers winning per leaf key. This means Langfu
 ## Full Example Configuration
 
 ```toml
+# Join the trace of the process that runs Pipelex (top-level, before any section)
+join_host_trace = false
+
 # PostHog Configuration (Event tracking + AI span tracing)
 [custom_posthog]
 mode = "anonymous"                                   # "off" | "anonymous" | "identified"
@@ -13689,6 +13721,19 @@ headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 
 ---
 
+## Joining the host's trace
+
+The top-level `join_host_trace` key decides whether Pipelex's spans join the OpenTelemetry trace of the process that runs it: a run continues the current span, follows its sampling decision, and its pipe and LLM spans are made current while they run. [Telemetry Setup](../../setup/telemetry.md#joining-your-processs-trace) describes what it does and what it costs.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `join_host_trace` | boolean | `false` | Pipelex's spans join the host process's trace. Overridden by the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`; empty or blank counts as unset), itself overridden by `Pipelex.make(join_host_trace=...)`; a telemetry manager injected through `Pipelex.make(telemetry_manager=...)` states it for itself |
+
+!!! warning "A span destination is required"
+    With the switch on, the boot is refused with `pipelex.config.invalid` unless a destination of this file receives Pipelex's spans: `[custom_posthog]` in `anonymous` or `identified` mode with `[custom_posthog.tracing]` enabled, which also feeds every `[[otlp]]` exporter and `[langfuse]`. With `DO_NOT_TRACK` set, or in an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span and the switch is inert.
+
+---
+
 ## PostHog Configuration
 
 The `[custom_posthog]` section configures event tracking and optional AI span tracing to your own PostHog instance.
@@ -13712,6 +13757,17 @@ The `[custom_posthog]` section configures event tracking and optional AI span tr
 - **`"identified"`**: Events and spans produced during a run are attributed to that run's caller, with its `extras` attached as groups. Your `user_id` is what everything else reports under — an event outside any run, and a run that names no distinguishable caller, which is every run on your own machine. The extras ride either way: a run may carry them without naming a caller
 
 See [Telemetry Setup](../../setup/telemetry.md) for how a run supplies its caller and its groups.
+
+#### Errors on your PostHog
+
+While this stream is on, the errors Pipelex reports, a failed run, an uncaught exception and an API response answered as an operator's fault, reach it as `$exception` events through the built-in `posthog` error tracker. That tracker is selected in `pipelex.toml`, not here:
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]   # remove "posthog" to keep errors off your PostHog
+```
+
+See [Error Tracker Plugins](../../under-the-hood/error-tracker-plugins.md) for the other trackers a plugin can add.
 
 ### `[custom_posthog.tracing]` Settings
 
@@ -13791,6 +13847,17 @@ headers = { "DD-API-KEY" = "${DD_API_KEY}" }
 name = "honeycomb"
 endpoint = "https://api.honeycomb.io/v1/traces"
 headers = { "x-honeycomb-team" = "${HONEYCOMB_API_KEY}" }
+```
+
+### Example: an endpoint and an auth header from the environment
+
+An exporter's `endpoint` and every header value resolve placeholders like any other string of this file, so a backend that keys its OTLP traces endpoint on a header, Sentry's `x-sentry-auth` for instance, needs nothing but configuration:
+
+```toml
+[[otlp]]
+name = "sentry"
+endpoint = "${env:SENTRY_OTLP_TRACES_ENDPOINT}"
+headers = { "x-sentry-auth" = "${env:SENTRY_OTLP_AUTH}" }
 ```
 
 !!! info "Full Data"
@@ -15826,7 +15893,7 @@ The last two are the runner's and the orchestration plugin's to bind, beside the
 
 Beside the identifiers, a record names the spans it was logged in, and the structured sinks write them on their own, with nothing for a call site to pass. There are two, read independently of each other:
 
-- **The standard trace fields name OpenTelemetry's current span** in your process, which Pipelex reads and never changes, so your log backend files a line under the same trace as your own spans. The `json` sink writes them as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP; the `otlp` sink as the record's own trace context, so a collector files the record under the span; and the `gcp` sink as the entry's `trace`, `spanId` and `traceSampled`. A line logged where no current span names a trace carries none of them.
+- **The standard trace fields name OpenTelemetry's current span** in your process, which Pipelex reads and, unless you turned `join_host_trace` on, never changes, so your log backend files a line under the same trace as your own spans. The `json` sink writes them as `trace_id`, `span_id` and `trace_flags`, lowercase hex, the keys OpenTelemetry specifies for trace context in a JSON log that is not OTLP; the `otlp` sink as the record's own trace context, so a collector files the record under the span; and the `gcp` sink as the entry's `trace`, `spanId` and `traceSampled`. A line logged where no current span names a trace carries none of them.
 - **The Pipelex fields name the Pipelex span active at the log call**, the pipe's or the LLM call's, while Pipelex runs one: `pipelex.trace_id` and `pipelex.span_id`, lowercase hex, as keys in the `json` line and the `gcp` payload and as attributes on the `otlp` record. They are the fields that say which pipe or which LLM call a line belongs to. A line logged outside a Pipelex span carries neither.
 
 So a line carries both, either or neither:
@@ -15847,7 +15914,7 @@ The runtime holds each span it starts as the active Pipelex span from its start 
 
 The runtime starts these spans only when it traces a live run, which it does once telemetry has created its tracer, with AI span tracing enabled on your own PostHog, as [Telemetry](../setup/telemetry.md#pipelexs-spans-in-your-process) describes. Otherwise it holds no span, as it does when its tracer is a no-op one, under `OTEL_SDK_DISABLED` for instance, which starts no span of its own, and a line carries no `pipelex.*` fields. A boot line held until the sink arrives is replayed in the context it was logged in, so it keeps both its spans, and a thread started with `asyncio.to_thread` or `contextvars.copy_context` inherits both from the code that started it.
 
-Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs carries `pipelex.*` fields only while the process runs a span of its own, the LLM call's for instance.
+Holding a span is in-process plumbing, like binding the log context: it lives in a context variable of Pipelex's own. **By default Pipelex never makes its spans current in your process's OpenTelemetry context**, so your own instrumentation, an HTTP client's or a provider SDK's, is never re-parented under a Pipelex span, and an error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. With [`join_host_trace`](../setup/telemetry.md#joining-your-processs-trace) on, a run joins your trace and the held span is also made current, so the standard fields and the `pipelex.*` fields of a line inside a run name the same span. A span's children take their parent from the job metadata, so a step running in another process gets the parent it always did, and a line that process logs carries `pipelex.*` fields only while the process runs a span of its own, the LLM call's for instance.
 
 ## Structured content
 
@@ -16414,12 +16481,62 @@ Each integration mode allows these streams or not: by default the `cli`, `docker
 
 ### Pipelex's spans in your process
 
-Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **Pipelex never makes its spans current in your process's OpenTelemetry context**:
+Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
 
 - Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
-- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. An error tracker plugged into Pipelex's own seam receives both: the Pipelex span the error was raised in, and your current span when it was reported, as [Error trackers](#error-trackers) describes.
 - The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
 - If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
+
+### Joining your process's trace
+
+When the trace of the process is yours, and you want Pipelex to behave as one more OpenTelemetry library in it, turn on `join_host_trace`. With the switch on:
+
+- **A run continues your current span.** When a run starts, Pipelex reads OpenTelemetry's current span; the run's root pipe span becomes its child, in your trace, instead of the root of a trace derived from the run's id. The trace id, the parent and your span's W3C trace state travel with the run's job metadata, so a step a distributed worker runs, in another process, stays in your trace too. With no current span, the run roots its own trace as before. A run started inside a running pipe, whose span is then the current one, becomes a subtree of the enclosing run rather than a new root in its trace.
+- **Your sampling decision is followed.** Pipelex's spans carry your span's sampled flag rather than always being sampled, so a request your sampler drops keeps none of Pipelex's spans, and none of the spans your instrumentation opens inside them.
+- **Pipe and LLM spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the LLM call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
+
+You turn it on in code, in the environment or in the file, and the most explicit wins: `Pipelex.make(join_host_trace=True)` in code, then the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`, in any case; an empty or blank variable counts as unset, and any other value stops the boot), then the top-level `join_host_trace` key of `telemetry.toml`, `false` by default.
+
+```toml
+join_host_trace = true  # top-level, before any [section]
+
+[custom_posthog]
+mode = "anonymous"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.tracing]
+enabled = true
+
+[[otlp]]
+name = "traces"
+endpoint = "${env:OTLP_TRACES_ENDPOINT}"
+headers = { "x-sentry-auth" = "${env:OTLP_AUTH_HEADER}" }
+```
+
+**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. The destinations are your PostHog stream with its AI span tracing on, an `[[otlp]]` exporter and Langfuse, all fed by the one tracer that exists when `[custom_posthog]` is `anonymous` or `identified` and `[custom_posthog.tracing]` is enabled; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
+
+What it costs:
+
+- **Several runs can share one trace id.** A run started inside one of your requests carries your request's trace id, and so does every other run started in it, on your PostHog stream too: key a run on its `pipeline_run_id`, which every span and event carries, never on the trace id.
+- **Langfuse's trace-level fields** are written by each run's root span, so when runs share one of your traces, they describe the run that wrote them last.
+- **A telemetry manager you inject states the switch for itself.** With `Pipelex.make(telemetry_manager=...)`, the manager's own `join_host_trace` decides, the environment and the file are not read for it, and its destinations are yours to check; passing `join_host_trace=` beside it with a different value stops the boot.
+- **Each process states the switch for itself.** A distributed worker continues your trace whatever its own setting, since the trace id and the sampled flag travel with the job, but it makes Pipelex's spans current only when its own switch is on.
+
+## Error trackers
+
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails with a fault the operator must fix, whether the pipe failed or the storage or a webhook failed to receive its results, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault and every failure of its own code that ends a request after its response had started, though not its failure to send an answer to a client that hung up. A caller's mistake, a bad input or a method naming a model the deployment does not serve, is answered to the caller and not reported, nor is a `501`, something this deployment does not offer, which the caller meets each time it asks again; a dry run reports nothing. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]
+```
+
+- **PostHog is one tracker among others.** The built-in `posthog` tracker sends each error's exception to your own PostHog stream as an `$exception`, with every exception message redacted: each error along the chain goes out as its class name and a privacy notice, whatever its class, and each frame as its module, function and line, without its source lines or its file's path, its file name rewritten from its module. It sends nothing unless that stream is on in `telemetry.toml`, and `DO_NOT_TRACK` turns it off with the rest.
+- **Your own tracker plugs into the same seam.** A plugin registers a tracker under a token of its own, `sentry` for instance, and you add that token to the list. Pipelex ships no vendor SDK: a tracker's SDK comes with the plugin that contributes it.
+- **A tracker receives identifiers, not content.** Each error comes with its problem document in the operator's view, its error code, where it was raised, the failing pipe, the run and request ids, and the spans to join it on. A tracker never sends the locals of a frame, a request body, or a run's inputs or outputs.
+
+An empty list reports errors nowhere. [Error Tracker Plugins](../under-the-hood/error-tracker-plugins.md) describes what a tracker receives and how to write one.
 
 ## Quick Setup
 
@@ -16492,10 +16609,10 @@ The extras are also available to the inference workers, on the job metadata of e
 
 ### Work that is not a run, and crashes
 
-A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
+A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which the [error trackers](#error-trackers) install and which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
 
 - **Validation.** The validate entry points take a `caller_identity` — the `user_id` and `extras` you would state on a run, as a `CallerIdentity`. `PipelexMTHDSProtocol.validate` passes the caller the protocol was built for, `validate_bundles_in_process`, `validate_bundle` and `BundleValidator` accept one directly, and the `BundleValidatorProtocol` seam requires one (`None` meaning "nobody"). The `pipe_dry_run` event and every dry run the validation performs are then attributed to that caller. A CLI validation on your own machine names nobody and keeps reporting under your configured id.
-- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so an `$exception` captured once the error reaches the interpreter lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
+- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so the `$exception` captured when the run fails, or once the error reaches the interpreter, lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
 - **Anything else with no run in hand.** An event emitted without a run but while a caller is in scope reads that caller. A host can open such a scope around its own work with `scoped_caller_identity(caller_identity=...)` from `pipelex.system.caller_identity`.
 
 The same rules apply to all of these as to a run: a placeholder such as `local` names nobody, `mode = "anonymous"` identifies nobody, and the caller never becomes an event property.
@@ -19148,6 +19265,10 @@ The rollup is computed once, in the assembler, for the same reason `AggregatedCo
 
 On a healthy run `unattributed` is zero. A non-zero one is a real signal worth looking at. Its usual cause on the hosted runtime used to be a start event lost to the DynamoDB events table's item limit, an event carrying inputs or a prompt over 400 KB, whose node then never existed while its inference still counted. The DynamoDB event log now writes such an event with its bulky values left out (see [Event-Log Transport and the Scoped Override](execution-graph-tracing.md#event-log-transport-and-the-scoped-override)), so that cause is no longer expected.
 
+**An incomplete graph is reported to the operator's error trackers.** When usage names a node whose start event never made it into the stream, the assembler logs a warning for each such node and returns those nodes and their usage beside the graph (`GraphSpecAssembler.assemble_with_never_started_usage`); it reports nothing itself, so assembling a graph has no effect beyond its log lines. The run's tracing assembly (`assemble_tracing` in `pipelex/pipe_run/tracing_assembly.py`) reports the run through the [error tracker seam](error-tracker-plugins.md) as a handled problem under the code [`pipelex.run.graph_incomplete`](../errors/pipelex/run/graph_incomplete.md) (`pipelex/tracing/unattributed_usage_report.py`), but only when its caller asks for it with `reports_incomplete_graph`, because whether a run reports is the run's own policy. `PipeRun`, which runs a pipe in a single process, asks for it under the policy it applies to a run's failure: a dry run never reports, nor do the runs a validation makes (`reports_errors=False`). It is the only caller in the runtime that asks, so an in-process run reports and nothing else does by itself. A durable-execution host, which assembles a run's tracing in an activity of its own, reports only when that activity passes `reports_incomplete_graph=True` from the run's mode; that is the contract a host takes on, and a host that does not pass it reports nothing. The dry-run rule is held by the assembly itself: a dry run's graph is never reported even when a caller asks, since its events state its mode, so a host that passes the flag still holds that rule without knowing whether the run is a validation's, a validation's runs being dry runs. A caller that leaves `reports_incomplete_graph` off, the default, reports nothing, which code that must stay free of side effects, such as a durable workflow's own code, relies on. Every call that asks reports again: a host that passes the flag and retries its tracing activity sends one report per attempt that reaches the end of the assembly, which the trackers group under the code as further events of the same issue; nothing deduplicates them across attempts. The report names the run (the graph's id is its run's id) and the request bound on the log context, the ids of the nodes that never started (at most twenty, with their count), the inference calls they made and their cost in millionths of a US dollar, left out when it is unpriced or too large to scale. It carries no content of the run: no input, output, prompt, pipe or model. Its domain is `runtime` and its status `500`, because the runtime's own record failed to hold what it ran, which is a fault for whoever runs the runtime to look into rather than the caller's, so the trackers admit it. With no tracker installed nothing is built and the warning is the only effect, and a report that cannot be built, from the usage total and its cost conversion to the problem's validation, is logged at debug level and dropped, never costing the run its graph. The report carries no exception, and the built-in `posthog` tracker sends only reports that carry one, so it reaches a tracker that takes problem reports, such as an out-of-tree Sentry tracker, and not PostHog.
+
+Two other sources of unattributed usage are not reported, because neither leaves the graph incomplete: the usage of a superseded attempt, which the graph leaves out on purpose, and the `UNATTRIBUTED_NODE_ID` fallback, which never named a node.
+
 ### Cross-checking against the cost report
 
 The two are computed from the same events but encode "unrated" differently: `CostRegistry.aggregate_costs` treats an unrated usage as zero-cost, while `NodeUsageSpec.cost` is `None`. Comparing them naively manufactures a disagreement. The correct check is:
@@ -19167,7 +19288,9 @@ So usage is deliberately assembler-only. That gap is *asserted* rather than norm
 |------|---------|
 | `pipelex/graph/graphspec.py` | `NodeUsageSpec`, `GraphUsageSpec` and the four invariants |
 | `pipelex/tracing/usage_attribution.py` | `UsageAccumulator`, `roll_up`, `attribute_usage` |
-| `pipelex/tracing/graphspec_assembler.py` | Folds `UsageReportEvent`, attributes in pass 2 |
+| `pipelex/tracing/graphspec_assembler.py` | Folds `UsageReportEvent`, attributes in pass 2, returns the nodes that never started |
+| `pipelex/tracing/unattributed_usage_report.py` | Reports a graph whose nodes never started to the error trackers |
+| `pipelex/pipe_run/tracing_assembly.py` | Fires that report when its caller asks, never for a dry run's graph |
 | `pipelex/tracing/usage_aggregator.py` | The other projection — the flat `tokens_usages` list |
 | `pipelex/cogt/usage/usage_cost.py` | `compute_tokens_usage_cost` — the one cost engine |
 
@@ -22356,7 +22479,7 @@ class HelloInferencePlugin:
     name = "hello_inference"
     # The plugin API version this plugin was written against, as a literal: never import the
     # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
-    targets_api = 9
+    targets_api = 10
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
@@ -22767,6 +22890,7 @@ class BundleValidatorProtocol(Protocol):
         method_dir: "Path | None",
         methods_dirs: "Sequence[Path] | None",
         read_scope: str | None,
+        request_id: str | None,
     ) -> BundleValidationVerdict: ...
 ```
 
@@ -22786,6 +22910,8 @@ The seam is deliberately typed at the MTHDS-protocol level (`ValidationReport` f
 `submitted_files`, `method_dir` and `methods_dirs` say what the method is made of besides its contents. `submitted_files` are the files submitted with `mthds_contents` that their steps read, such as a `PipeDocGen` step's template file, keyed by the path the step names. `method_dir` names a method sent as a tree, or fetched by address, in place of `mthds_contents`, which is then `None`: the directory the host wrote the tree into and holds as written, with the dependency trees it ships in `methods_dirs`. Each is required, `None` meaning there is none, so a validator cannot drop the files a valid method needs and refuse it for a missing file.
 
 `read_scope` is the scope the host named for the validation: on a multi-tenant host, the organization it serves, the same trusted prefix a run of the request reads under. A worker-dispatched arm hands the method's trees to its worker through that scope's blob store, as an orchestrator copies a job's trees into the store its workers read before it dispatches ([the method file store slot](#the-method-file-store-slot)): it holds every tree it validates there, names each by its digest, and the worker reads them through its method file store under the scope, building every key from it and never from what the request names. `None` means the host named no scope, as a single-tenant deployment does, or a multi-tenant host serving a caller who belongs to no organization, and then no blob store is scoped to the caller: a worker-dispatched arm has none to hand the method through and must not make one up, such as one under the caller's id, where nothing lists or erases what a validation would leave. The in-process arm reads every file in its own process and ignores it. It is required for the same reason as `caller_identity`; a host runner passes the read scope it was built with, which `pipelex-api` builds from the request's own `read_scope` and never from the caller's id.
+
+`request_id` is the inbound request id the host is serving, so the log lines the validation writes carry the id the caller was answered under, wherever they are written. It follows the rule a run's request id follows: one to 128 ASCII letters, digits, `_` or `-` (`validate_request_id` in `pipelex/system/job_metadata.py`), and any other value is the host's bug, refused with a `RunParameterError` before any work, never turned into a verdict. The in-process arm hands it to `validate_bundles_in_process`, which binds it on the log context for the whole sweep, its graph arm included; a worker-dispatched arm must put it on the payload it dispatches and bind it in the worker around the sweep there, since the host's own binding does not cross a process boundary. It is required for the same reason as `caller_identity`, `None` meaning the host serves no request: a validator that dropped it would leave its worker's lines with no request id. `pipelex-api` passes the id its request-id middleware took from the inbound `X-Request-ID` header or minted, the one echoed on the response.
 
 A plugin contributes one per token, right next to its orchestrator:
 
@@ -23418,7 +23544,7 @@ class LogSink(ABC):
 
 ### What a sink reads off a record
 
-Every sink reads the same record, shaped by the [logging facade](../tools/logging.md): the message is `record.getMessage()`, and everything the call, the bound context or a record factory attached rides as attributes. `carried_attributes(record=...)` in `pipelex/tools/log/log_fields.py` hands a sink exactly that set, in the order the attributes were attached, by subtracting the attributes the stdlib gives every record and the ones this package stamps on a record itself. An exception a call carried with `include_exception=True` is the record's `exc_info`, the stdlib's own channel, which each sink renders its own way. The trace context is not on the record: it is read from the context when the sink's handler runs, which is inside the log call, or, for a boot line held until the sink arrives, from the context the holding handler copied when the line was logged and replays it under. A record names two spans, read independently at emit through `pipelex/system/telemetry/current_span.py`. Its standard trace fields name OpenTelemetry's current span, which a sink only reads: `current_span_context_for_logs()` returns its context when it names a trace, else `None`, and a sink handing a context to an OpenTelemetry API passes `get_current()` as it is. The runtime holds the pipe's span or the LLM call's in a context variable of its own while it runs, and never makes it OpenTelemetry's current span, so it rides beside them: `pipelex_span_context_for_logs()` returns the held Pipelex span's context, else `None`, and `pipelex_trace_fields_for_logs()` returns it already spelled, a dict of `pipelex.trace_id` and `pipelex.span_id` in lowercase hex at their full widths, or an empty dict outside a Pipelex span, under the key names `PIPELEX_TRACE_ID_KEY` and `PIPELEX_SPAN_ID_KEY`. The `json` sink writes the current span under the OpenTelemetry JSON keys and the Pipelex fields after them, the `otlp` sink files the record under `get_current()` and writes the Pipelex fields as attributes, and the `gcp` sink passes the current span as the entry's `trace`, `span_id` and `trace_sampled` and writes the Pipelex fields into the payload.
+Every sink reads the same record, shaped by the [logging facade](../tools/logging.md): the message is `record.getMessage()`, and everything the call, the bound context or a record factory attached rides as attributes. `carried_attributes(record=...)` in `pipelex/tools/log/log_fields.py` hands a sink exactly that set, in the order the attributes were attached, by subtracting the attributes the stdlib gives every record and the ones this package stamps on a record itself. An exception a call carried with `include_exception=True` is the record's `exc_info`, the stdlib's own channel, which each sink renders its own way. The trace context is not on the record: it is read from the context when the sink's handler runs, which is inside the log call, or, for a boot line held until the sink arrives, from the context the holding handler copied when the line was logged and replays it under. A record names two spans, read independently at emit through `pipelex/system/telemetry/current_span.py`. Its standard trace fields name OpenTelemetry's current span, which a sink only reads: `current_span_context_for_logs()` returns its context when it names a trace, else `None`, and a sink handing a context to an OpenTelemetry API passes `get_current()` as it is. The runtime holds the pipe's span or the LLM call's in a context variable of its own while it runs, and makes it OpenTelemetry's current span only when the operator turned `join_host_trace` on, so it rides beside them: `pipelex_span_context_for_logs()` returns the held Pipelex span's context, else `None`, and `pipelex_trace_fields_for_logs()` returns it already spelled, a dict of `pipelex.trace_id` and `pipelex.span_id` in lowercase hex at their full widths, or an empty dict outside a Pipelex span, under the key names `PIPELEX_TRACE_ID_KEY` and `PIPELEX_SPAN_ID_KEY`. The `json` sink writes the current span under the OpenTelemetry JSON keys and the Pipelex fields after them, the `otlp` sink files the record under `get_current()` and writes the Pipelex fields as attributes, and the `gcp` sink passes the current span as the entry's `trace`, `span_id` and `trace_sampled` and writes the Pipelex fields into the payload.
 
 Three rules follow for a sink author, and the shipped sinks honour all of them:
 
@@ -23520,6 +23646,216 @@ Use `pipelex plugins list` to see every discovered plugin, what each contributed
 - [Storage Provider Plugins](storage-provider-plugins.md) and [Secrets Provider Plugins](secrets-provider-plugins.md): the sibling config-selected-singleton seams
 - [Inference Backend Plugins](inference-backend-plugins.md): the shared discovery and denylist machinery
 - [Error Model](error-model.md): how these errors render and dereference
+
+
+## Error Tracker Plugins
+
+# Error Tracker Plugins
+
+A log line says that something failed; an **error tracker** groups the failures into issues, counts them and alerts on them. Pipelex hands every error it reports to the error trackers installed at boot, beside its log sink. Which trackers those are comes from data: one config field, `runtime.error_tracking.trackers`, names them, and an **error tracker plugin** is what teaches Pipelex how to build each one.
+
+Core names no tracker by import or by string, and **Pipelex ships no vendor SDK**. The built-in tracker, `posthog`, which sends an exception to the operator's own PostHog as an `$exception`, is a plugin too, the `ErrorTrackerPlugin`, riding the same seam an out-of-tree package rides. A Sentry tracker, for instance, lives in the package that contributes it and imports `sentry_sdk` when its factory runs.
+
+This seam has the shape of the [log sink](log-sink-plugins.md) seam, a keyed registry with a config-selected result, with one difference: a process installs one log sink but any number of error trackers, so the config names a list of tokens.
+
+---
+
+## The seam in one view
+
+```
+RuntimeBoot.setup
+  └─ build_registrar(config, builtin_plugins=…, …)   # pure, import-light
+       └─ plugin.register(registrar)                  # ErrorTrackerPlugin is one
+            └─ registrar.add_error_tracker(method=…, factory=…)
+  └─ secrets_provider = …
+  └─ telemetry_manager = …                            # the operator's telemetry streams
+  └─ ErrorTrackerRegistry(registrar.error_trackers)
+  └─ trackers = registry.make_error_trackers(config=runtime.error_tracking,
+                                             secrets_provider=…, telemetry_manager=…)
+  └─ install_error_trackers(trackers=trackers)        # and the interpreter's exception hooks, when there is one
+teardown
+  └─ reset_error_trackers()                           # closes each tracker, puts the hooks back, before telemetry teardown
+```
+
+Every token is looked up before any factory runs, so a token nobody registered stops the boot before a tracker initialises its SDK. A factory that finds nothing to report to in this process, a DSN left unset for instance, returns `None` and the boot goes on without that tracker.
+
+---
+
+## What reaches the trackers
+
+Three paths report an error, each tagged with its **kind** (`ErrorReportKind`):
+
+| Kind | Who reports it | When |
+|------|----------------|------|
+| `run_failure` | The runtime that ran the run, at the run's boundary (`PipeRun`) | A run fails with a fault the operator must fix. What is reported is the exception that escapes the run, which its caller receives: the pipe's own, or one the run's tail raised after the pipe executed, such as its trace failing to close or assemble, or the storage or a host's webhook failing to receive its results. Its anonymous usage statistics are best effort: a failure of theirs is logged and never fails the run. A run sends one report: when the pipe failed and its tail raised too, the tail's exception replaces the pipe's and is the one reported. A cancelled run reports nothing: whatever its tail raises is logged and never replaces the cancellation. A run whose pipe failed and which is then cancelled during its tail, during its delivery for instance, reports the pipe's error before the cancellation propagates. A dry run, a validation's or `pipelex run --dry-run`, does not report. |
+| `uncaught` | The interpreter hooks, `sys.excepthook` and `threading.excepthook`, installed while a tracker is | An exception reaches the top of the main thread or of another thread. Interruptions such as `KeyboardInterrupt` are not reported. The hooks that were there before are still called. |
+| `handled` | A host, or the runtime, through `report_exception` or `report_problem` (`pipelex.system.error_tracking.error_tracking`) | Something caught the error and went on. The API server reports this way every response it answers as an operator's fault, an error-level record, and a failure of its own code that ends a request after its response had started, which no response can answer any more. A failure to send the answer it built for a failure because the client hung up, an `OSError` or a `ClientDisconnect`, is not reported: it says the client left, not that anything needs fixing, and the failure that answer was for was reported already. Any other exception raised while sending that answer is reported. The runtime reports this way, with `report_problem`, a run whose assembled graph left the usage of nodes that never started unattributed, under `pipelex.run.graph_incomplete`, under the same policy as a run's failure: a dry run and the runs a validation makes do not report it. The run's tracing assembly reports it only when its caller asks: an in-process run asks, while a durable-execution host reports only when its tracing activity passes `reports_incomplete_graph=True` from the run's mode, and such a host then sends one report per attempt that reaches the end of the assembly, the assembly itself holding the dry-run rule (see [Per-node Usage Attribution](per-node-usage-attribution.md#the-run-total-and-the-unattributed-bucket)). |
+
+**Only what the server has to fix reaches the trackers, never a caller's mistake.** One rule decides, from the HTTP status the failure is, or would be, answered with and from its problem's domain, who must act on it: `reaches_error_trackers(status=..., domain=...)` in `pipelex.system.error_tracking.error_tracking`.
+
+- **A 4xx is not reported.** It is the caller's to act on, a mistake or a benign conflict, whatever its domain.
+- **A `501` is not reported.** It says this deployment does not offer what was asked, custom code without a sandbox or a document engine it was not given. The operator decides whether to offer it, but nothing is broken, and the caller meets the refusal each time it asks again, so reporting it would let any caller flood the trackers.
+- **Any other 5xx is reported when its domain is `runtime` or `operator`**, and not when it is `input`, `method` or `account`, a refusal the caller can avoid, such as its own webhook receiver refusing a delivery.
+
+A failed run is weighed by its problem's status, `problem_status_of` in `pipelex.errors.problem`, which is the status the API server would answer it with, and the API server weighs a response by the status it answers. The API server logs at `error` exactly the failures this rule reports, so its error-level records and its reports never disagree. Whether the caller's failures should reach the trackers too is an open decision; every report already carries its domain as the `error.domain` tag, so reporting them would change that one predicate and nothing else.
+
+**One error, one report.** An exception reported once is marked, and a later report of it, or of an error raised `from` it, is skipped. A run's failure reported at the run's boundary is therefore not reported again when the API server answers it, nor when a host lets it reach the interpreter's hook, nor when a host raises its own error from it. An exception whose class refuses the mark, one whose `__setattr__` or `__getattribute__` raises, goes unmarked and may be reported twice, but never fails the reporter.
+
+**Reporting never fails the reporter.** With no tracker installed, a report builds nothing. Reading and writing the marks the runtime leaves on an exception, the reported mark and the Pipelex span it was raised in, run the exception class's own code, so they are guarded: whatever that code raises, the exception goes unmarked and the error it stands for is the one that propagates. A report that cannot be built, from an exception whose `__str__` raises for instance, is logged at debug level and dropped, and the interpreter hooks still hand the exception on to the hooks that were there before. A tracker is a plugin's code, so each call is guarded: a failing tracker is logged at debug level and the other trackers still receive the error.
+
+A host whose runs fail outside `PipeRun`, a distributed worker for instance, reports its run's failure itself, with `report_exception(exception=..., kind=ErrorReportKind.RUN_FAILURE, ...)`.
+
+---
+
+## The contract
+
+### `ErrorTrackerFactoryFn`
+
+A tracker is produced by a typed callable (`pipelex/plugins/error_tracker_registry.py`):
+
+```python
+class ErrorTrackerFactoryFn(Protocol):
+    def __call__(
+        self,
+        config: ErrorTrackingConfig,
+        /,
+        *,
+        secrets_provider: SecretsProviderAbstract,
+        telemetry_manager: TelemetryManagerAbstract,
+    ) -> ErrorTrackerAbstract | None: ...
+```
+
+It is called once at boot, after the telemetry manager is built, never at registration. The secrets provider is how a factory reads a credential; the telemetry manager is the one this boot built, which the built-in `posthog` tracker reports through and any other tracker ignores.
+
+A plugin contributes one factory per token it serves, in its `register`:
+
+```python
+registrar.add_error_tracker(method="sentry", factory=_make_sentry_error_tracker)
+```
+
+`register` stays side-effect-free, as for every capability: `pipelex plugins list` shows the contribution as `error tracker sentry`. Two plugins registering the same token fail discovery with `DuplicateErrorTrackerError`, naming both.
+
+### `ErrorTrackerAbstract`
+
+The factory returns an `ErrorTrackerAbstract` (`pipelex/system/error_tracking/error_tracker.py`):
+
+```python
+class ErrorTrackerAbstract(ABC):
+    @abstractmethod
+    def report(self, *, report: ErrorReport) -> None: ...  # once per reported error
+
+    def close(self) -> None: ...  # once, at teardown; flush what was queued
+```
+
+`report` runs on the thread that met the error, an interpreter hook's thread included, so it returns quickly: a tracker whose SDK sends over the network queues the event, as the PostHog and Sentry SDKs do.
+
+### `ErrorReport`
+
+Every tracker receives the same frozen `ErrorReport` (`pipelex/system/error_tracking/error_report.py`):
+
+| Member | What it is |
+|--------|------------|
+| `kind` | `run_failure`, `uncaught` or `handled` |
+| `problem` | The error's problem document in the **operator's view**, the view of whoever runs the runtime (see [Error Model](error-model.md)): a Pipelex error's own, else `runtime.unexpected` naming the foreign exception's class and never quoting its text, the same problem a failed run's webhooks receive |
+| `exception` | The exception, or `None` for a problem reported without one |
+| `error_type`, `error_chain` | The exception's class, and the classes along its cause chain |
+| `frames` | The frames down to where the first exception was raised, each `module:line in function`, with no source line and no locals |
+| `raise_site` | Where the first exception of the cause chain was raised, as `module:function`, with no line number so that a release moving the code keeps the issue |
+| `pipeline_run_id`, `request_id` | The run and the request, from the reporter, else the problem, else the bound log context |
+| `pipe_code` | The failing pipe: the pipe the problem locates, else the pipe the reporter named |
+| `trace_id`, `span_id` | The Pipelex span the error was raised in, which stays readable after that span closed |
+| `host_trace_id`, `host_span_id` | OpenTelemetry's current span when the error was reported, the host's own |
+
+Three derived members give a tracker its grouping and its tags, spelled with the keys a log line about an error already carries:
+
+- **`code`** is the problem's registry code.
+- **`fingerprint`** is `[code, raise_site]`, or `[code]` with no exception: one fault is one issue, whatever its message says and whichever organization's pipe met it.
+- **`tags`** holds `error.code`, `error.domain`, `error.report_kind`, `error.type`, `error.raise_site`, `pipe_code`, `pipeline_run_id`, `request_id`, `pipelex.trace_id` and `pipelex.span_id`, only those that are set; **`fields`** adds `error.chain`.
+
+### What a tracker must never send
+
+**A tracker never sends a run's content.** It reads the exception's class and stack, never the locals of its frames; it attaches no request body, no input and no output of a run, and none of the personal data its SDK would collect by default. The problem's sentences, its parameters and its `diagnostics.message` are written for an operator and may quote the caller's own submission, so a tracker that sends its events off the machine sends the identifiers above and leaves those members out unless its operator chose otherwise.
+
+---
+
+## The built-in `posthog` tracker
+
+`pipelex/providers/error_trackers/error_tracker_plugin.py` registers the `posthog` token. Its factory asks the telemetry manager for the tracker of the operator's own PostHog stream (`TelemetryManager.make_error_tracker`), which is `None` whenever that stream is off: `[custom_posthog]` disabled in `telemetry.toml`, an integration mode the stream is not allowed in, or `DO_NOT_TRACK` set. `PostHogErrorTracker` sends the report's exception as an `$exception`, attributed to the caller the run belonged to as described in [Telemetry](../setup/telemetry.md#work-that-is-not-a-run-and-crashes), with every exception message redacted: each error along the cause chain and inside exception groups, whatever its class, a `PipelexError`, a `ValueError` quoting what it refused or a pydantic `ValidationError` rendering its input, goes out as its class name and a privacy notice, without its attributes or its notes. Each frame goes out as its module, function and line, without the source lines around it or its file's path, which the client's `before_send` strips. The frame's file name is rewritten from its module, `pipelex/tools/misc.py` for the module `pipelex.tools.misc`, because PostHog writes the absolute path there for a module of a namespace package, such as `opentelemetry` or `google`, and for a module it does not know. A report with no exception sends nothing, and an exception PostHog already captured is not sent again.
+
+The plugin is not core-unconditional: a process may report its errors nowhere. One that disables it while `runtime.error_tracking.trackers` still names `posthog` stops at boot with `UnknownErrorTrackerError`.
+
+---
+
+## Selecting trackers by config
+
+```toml
+# .pipelex/pipelex.toml
+[runtime.error_tracking]
+trackers = ["posthog", "sentry"]   # every reported error reaches each, in this order
+```
+
+The tokens are open strings, validated at registry lookup: a token no installed plugin registered surfaces as `UnknownErrorTrackerError` at boot, which lists the registered ones. A token named twice is refused when the configuration is read. An empty list installs no tracker and no interpreter hook. The shipped default is `["posthog"]`, which reports nothing unless the operator turned their PostHog stream on.
+
+An external tracker has no settings section of its own in `ErrorTrackingConfig`; it reads its own configuration, a DSN for instance, from the environment or the secrets provider it is handed.
+
+---
+
+## Writing an out-of-tree tracker
+
+A tracker package declares an entry point in the kernel group and registers its token:
+
+```toml
+# pyproject.toml of the package
+[project.entry-points."pipelex.plugins.kernel"]
+my_tracker = "my_package.plugin:MyTrackerPlugin"
+```
+
+```python
+class MyTrackerPlugin:
+    name = "my_tracker"
+    targets_api = PLUGIN_API_VERSION
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.add_error_tracker(method="my_tracker", factory=_make_my_tracker)
+
+
+def _make_my_tracker(
+    config: ErrorTrackingConfig,
+    /,
+    *,
+    secrets_provider: SecretsProviderAbstract,
+    telemetry_manager: TelemetryManagerAbstract,
+) -> ErrorTrackerAbstract | None:
+    dsn = os.environ.get("MY_TRACKER_DSN")
+    if not dsn:
+        return None  # nothing to report to in this process
+    import my_tracker_sdk  # the SDK is imported here, never at registration
+
+    return MyTracker(client=my_tracker_sdk.Client(dsn=dsn, send_default_pii=False, include_locals=False))
+```
+
+`MyTracker.report` groups by `report.fingerprint`, sets `report.tags`, and joins its event to the trace through `report.trace_id` and `report.span_id`, or `report.host_trace_id` and `report.host_span_id` when the host exports its own spans to the tracker.
+
+To test a host that reports through the seam, `pipelex.test_extras.recording_error_tracker` installs a `RecordingErrorTracker` for a block and keeps every report it receives:
+
+```python
+with recording_error_tracker() as recorder:
+    ...
+assert recorder.reports[0].code == "model.unknown"
+```
+
+---
+
+## Fail-loud guarantees
+
+| Condition | Error |
+|-----------|-------|
+| `runtime.error_tracking.trackers` names no registered tracker | `UnknownErrorTrackerError` (lists the registered tokens), at boot, before any factory runs |
+| `runtime.error_tracking.trackers` names a tracker twice | a configuration validation error |
+| two plugins register the same token | `DuplicateErrorTrackerError` (names both plugins) |
+| a tracker raises while reporting or closing | logged at debug level; the reporter and the other trackers carry on |
+| a report cannot be built | logged at debug level; nothing is sent and the reporter carries on |
+| a tracker's factory raises at boot | the boot stops with that error, after closing the trackers already built |
 
 
 ## Document Engine Plugins
@@ -24386,7 +24722,8 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 | `pipelex/errors/retired_error_pages.py` | The static redirects of the retired per-class error pages |
 | `pipelex/errors/registry/pipelex-error-registry.yaml` | The Pipelex error registry, the single source of the `pipelex.` codes; its snapshot, its typed codes (`pipelex_codes.py`) and its pages are generated from it |
 | `pipelex/errors/registry/registry_document.py` | The typed model of an MTHDS error registry, and `load_pipelex_error_registry()` |
-| `pipelex/pipe_run/located_failure.py` | `find_root_fault()`, `located_root_fault()`, `failure_location_of()`, `make_unexpected_failure()` |
+| `pipelex/pipe_run/located_failure.py` | `find_root_fault()`, `located_root_fault()`, `failure_location_of()` |
+| `pipelex/errors/unexpected_failure.py` | `make_unexpected_failure()` |
 | `pipelex/pipe_operators/func/pipe_func_execution_transport.py` | `pipe_func_raised_report()` and `read_pipe_func_raised_report()`: the report a sandboxed `PipeFunc` call writes when its function raises, and its reading back |
 | `pipelex/graph/node_problem.py` | `make_node_problem()`: the caller-view problem a failed node of the execution graph records |
 | `pipelex/pipeline/validation_errors.py` | `build_validation_error_items()` — shared CLI/API structured bundle-validation builder — and `problem_item_of()` |
@@ -24458,7 +24795,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.100.1` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.101.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -24508,6 +24845,7 @@ Pipelex's extensions to runs.
 | Code | Title | Domain | Retry | Status |
 |---|---|---|---|---|
 | [`pipelex.run.already_exists`](pipelex/run/already_exists.md) | A run with this id already exists | `input` | `no` | `409` |
+| [`pipelex.run.graph_incomplete`](pipelex/run/graph_incomplete.md) | The run's graph left usage unattributed | `runtime` | `no` | `500` |
 
 ## pipelex.request { #pipelex-request }
 
@@ -30349,7 +30687,7 @@ These keys come from the sink itself and are on every line written by the proces
 
 The two pairs name different traces. Pipelex's spans belong to a trace of their own, which only Pipelex's exporters receive, so if you export them to a backend of your own, such as Langfuse, an OTLP collector or your PostHog, join a line to them on `pipelex.trace_id` and `pipelex.span_id`. To gather a run's lines whether or not anything traces, use `request_id` or `pipeline_run_id`. How each sink writes both pairs is in the Pipelex documentation's [trace context](../tools/logging.md#the-trace-context) section.
 
-`request_id` reaches a line in one of two ways, depending on which process writes it. In this server's own process, the request-id middleware binds it on the runtime's log context for the whole request, so every record emitted there while the request is in flight carries it: the server's own lines, like the example above, and the lines the Pipelex runtime emits from inside a run executed in-process (`orchestration_mode = "direct"`), without any call site passing it along. A run dispatched to a worker, under a distributed `orchestration_mode` such as `temporal`, happens in another process, which that binding does not reach, so the id travels with the run instead: both run routes, `POST /v1/execute` and `POST /v1/start`, put it on the run's metadata, and the worker binds it from there while it runs the run's workflow and activities, so the lines written inside them carry the same id. A line the worker writes outside those bindings does not, such as the one the orchestration SDK logs after an activity has failed. One path does not carry it at all yet: when `POST /v1/validate` dispatches its dry run to a worker, the lines that worker writes for it have no `request_id`. The value is the one echoed in the response's `X-Request-ID` header and in the problem document's `request_id` member, so a caller reporting a failure hands you the key to its log lines.
+`request_id` reaches a line in one of two ways, depending on which process writes it. In this server's own process, the request-id middleware binds it on the runtime's log context for the whole request, so every record emitted there while the request is in flight carries it: the server's own lines, like the example above, and the lines the Pipelex runtime emits from inside a run executed in-process (`orchestration_mode = "direct"`), without any call site passing it along. A run dispatched to a worker, under a distributed `orchestration_mode` such as `temporal`, happens in another process, which that binding does not reach, so the id travels with the run instead: both run routes, `POST /v1/execute` and `POST /v1/start`, put it on the run's metadata, and the worker binds it from there while it runs the run's workflow and activities, so the lines written inside them carry the same id. A line the worker writes outside those bindings does not, such as the one the orchestration SDK logs after an activity has failed. `POST /v1/validate`, which runs no run, hands the id to its bundle validator instead: the in-process validator binds it for the whole validation, and a validator that dispatches the dry run to a worker carries it there for the worker to bind, so the lines that worker writes for the validation carry the id too. The value is the one echoed in the response's `X-Request-ID` header and in the problem document's `request_id` member, so a caller reporting a failure hands you the key to its log lines.
 
 The remaining keys are what the error handlers attach to an error line. The ones OpenTelemetry's semantic conventions define keep their keys verbatim, and the rest are spelled as the runtime's own lines spell them, so a query written for the runtime's lines finds these too:
 
@@ -30449,4 +30787,4 @@ Its keys are the blob's hash under `blob_sha256`, the size the store holds it at
 
 ## Uvicorn's own lines
 
-Uvicorn logs through its own handlers, not through the sink above, so its startup banner and its access log are plain text rather than JSON: the banner on stderr, the access log on stdout. Uvicorn also logs, with its traceback, any exception that leaves the app it runs, and Starlette's own catch-all raises the exception it answered again for that purpose; the server stops every exception there (`AnsweredErrorBarrier` in `pipelex_api/exception_handlers.py`), so uvicorn never writes an exception's text. The error line above stays the one record of a failure the catch-all answered, even one that ended a response already streaming, since Starlette runs the catch-all then too. A failure no handler recorded, the catch-all's own failure while a response was streaming, or the server's failure to send the answer the barrier built, such as to a client already gone, is written at `ERROR` before it is dropped, as `A request failed after its response had started`, with `url.path`, the status already sent under `http.response.status_code`, absent when the catch-all failed before any status was sent, and `error.type` and `error.chain` naming its classes, never any exception's text. No response answers it: the status and part of the body had already left. Pass `--no-access-log` to turn the access log off, which is what the hosted deployment does; configure uvicorn's `--log-config` if you want its lines structured too.
+Uvicorn logs through its own handlers, not through the sink above, so its startup banner and its access log are plain text rather than JSON: the banner on stderr, the access log on stdout. Uvicorn also logs, with its traceback, any exception that leaves the app it runs, and Starlette's own catch-all raises the exception it answered again for that purpose; the server stops every exception there (`AnsweredErrorBarrier` in `pipelex_api/exception_handlers.py`), so uvicorn never writes an exception's text. The error line above stays the one record of a failure the catch-all answered, even one that ended a response already streaming, since Starlette runs the catch-all then too. A failure no handler recorded, the catch-all's own failure while a response was streaming or while the barrier built its answer, is written at `ERROR` before it is dropped, and reaches the error trackers; so is any other exception raised while sending the answer the barrier built, a fault of the code between the barrier and the server. Only a failure to send that answer because the client hung up, an `OSError` or Starlette's `ClientDisconnect`, is written at `WARNING` and reported to no tracker, since it is the delivery's and the catch-all already reported the failure that answer was for. Both are written as `A request failed after its response had started`, with `url.path`, the status already sent under `http.response.status_code`, absent when the catch-all failed before any status was sent, and `error.type` and `error.chain` naming its classes, never any exception's text. No response answers it: the status and part of the body had already left. Pass `--no-access-log` to turn the access log off, which is what the hosted deployment does; configure uvicorn's `--log-config` if you want its lines structured too.
