@@ -278,7 +278,7 @@ class TestPipeRun:
                 expected_fields = {"error.type": "WebhookDeliveryError", "error.code": str(WebhookDeliveryError(secret).resolve_error_code())}
             case _:
                 tracer_manager.close_tracer.side_effect = OSError(f"cannot close {secret}")
-                expected_line = "The graph tracer could not be closed after the pipe execution failed"
+                expected_line = "The graph tracer could not be closed after the run failed or was cancelled"
                 expected_fields = {"error.type": "OSError"}
         mock_job = mocker.MagicMock()
         mock_job.job_metadata = JobMetadata(

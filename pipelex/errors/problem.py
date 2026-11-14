@@ -1067,3 +1067,19 @@ def problem_metadata(*, problem: PipelexProblem) -> ProblemMetadata:
 def runtime_version() -> str:
     """The version of the installed Pipelex runtime, which an operator's diagnostics name."""
     return get_package_version()
+
+
+# The HTTP status of a problem whose code the registry gives none, which only a client's own failure has.
+FALLBACK_PROBLEM_STATUS = 500
+
+
+def problem_status_of(*, problem: PipelexProblem) -> int:
+    """The HTTP status of the response a problem is the body of, or would be if one were answered: its code's, from the registry.
+
+    The API server answers a problem with this status, and the runtime weighs a failure it answers no request for, a
+    run's on the CLI or a worker, by the same status, so the two judge one failure alike.
+    """
+    code = parse_error_code(problem.code)
+    if code is None:
+        return FALLBACK_PROBLEM_STATUS
+    return error_code_spec(code).status or FALLBACK_PROBLEM_STATUS

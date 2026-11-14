@@ -92,7 +92,18 @@ if TYPE_CHECKING:
 # bundle validator's ``validate_bundles`` returns a ``BundleValidationFailure`` as its invalid arm, the refusal's
 # problem in the operator's view with its validation items, where it returned a report. A plugin written against v8
 # would hand back a type that is gone; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 9
+#
+# The error tracker seam joined the menu without a bump of its own, as an addition: ``add_error_tracker`` contributes an
+# ``ErrorTrackerFactoryFn`` keyed by an open token that ``runtime.error_tracking.trackers`` selects, and its
+# ``ErrorTrackerAbstract`` receives an ``ErrorReport`` (``pipelex.system.error_tracking``). A plugin written before it
+# registers no tracker and is served as it was.
+#
+# v10 changed what a host hands a bundle validator: ``validate_bundles`` takes ``request_id``, the inbound request id the
+# host is serving, ``None`` when it serves none, so a validator dispatching the validation to another process carries it
+# to its worker, whose log lines then carry it, as a run's worker binds the request id its run's metadata carries
+# (``BundleValidatorProtocol``). A validator written against v9 would be called with a keyword it does not accept on its
+# first validation; the bump turns that into a discovery-time mismatch naming the plugin.
+PLUGIN_API_VERSION: int = 10
 
 
 @runtime_checkable

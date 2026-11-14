@@ -1090,6 +1090,19 @@
         "gt": 0
       }
     },
+    "runtime.error_tracking": {
+      "value_type": "table",
+      "required": true,
+      "open_node": false
+    },
+    "runtime.error_tracking.trackers": {
+      "value_type": "list[str]",
+      "required": true,
+      "default": [
+        "posthog"
+      ],
+      "open_node": false
+    },
     "runtime.log": {
       "value_type": "table",
       "required": true,

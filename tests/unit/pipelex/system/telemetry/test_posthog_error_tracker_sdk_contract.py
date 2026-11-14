@@ -16,30 +16,47 @@ starting its consumer threads, and the stub returns an event id because the SDK
 marks an error as captured only when the send reported one.
 """
 
+import copy
 import sys
-import threading
-from typing import Any, Generator
+import types
+from typing import Any
 
 import pytest
 from posthog import Posthog
+from pydantic import BaseModel, ValidationError
 from pytest_mock import MockerFixture
 
+from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report
 from pipelex.system.exceptions import ToolError
-from pipelex.system.telemetry.exception_capture import ExceptionCapture
+from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
+from pipelex.system.telemetry.telemetry_manager import (
+    EXCEPTION_FRAME_SOURCE_KEYS,
+    TelemetryManager,
+    frame_filename_of,
+    strip_exception_frame_sources,
+)
 
 _CONFIDENTIAL_MESSAGE = "could not read patient record 123-45-6789 at /home/acme/confidential.pdf"
+_CUSTOMER_WORDS = "customer said SECRET-4242"
+
+# A package with no file of its own, as a namespace package is, and where one of its modules lives on this machine.
+_NAMESPACE_PACKAGE = "pipelex_test_namespace_package"
+_MACHINE_DIRECTORY = "/home/acme/site-packages"
 
 
-@pytest.fixture
-def restore_excepthooks() -> Generator[None, None, None]:
-    """Give the interpreter back the hooks a capture installs when it is built."""
-    original_excepthook = sys.excepthook
-    original_threading_excepthook = threading.excepthook
-    yield
-    sys.excepthook = original_excepthook
-    threading.excepthook = original_threading_excepthook
+class _Order(BaseModel):
+    quantity: int
+
+
+def _validation_error() -> ValidationError:
+    """A pydantic `ValidationError` whose rendering quotes the input it refused."""
+    try:
+        _Order.model_validate({"quantity": _CUSTOMER_WORDS})
+    except ValidationError as validation_error:
+        return validation_error
+    msg = "the model accepted an input it must refuse"
+    raise AssertionError(msg)
 
 
 def _make_stubbed_client(*, mocker: MockerFixture, api_key: str) -> tuple[Posthog, Any]:
@@ -49,7 +66,7 @@ def _make_stubbed_client(*, mocker: MockerFixture, api_key: str) -> tuple[Postho
     return client, capture
 
 
-def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
+def _make_capture(*, custom_client: Posthog) -> PostHogErrorTracker:
     """Assemble the capture the constructor would have built, over the two given clients.
 
     The manager is built without its constructor, as in the module beside this
@@ -65,21 +82,27 @@ def _make_capture(*, custom_client: Posthog) -> ExceptionCapture:
     manager.custom_posthog_client = custom_client
 
     manager._wrap_capture_exception(custom_client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
-    return manager._make_exception_capture()  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    tracker = manager.make_error_tracker()
+    assert tracker is not None
+    return tracker
 
 
-def _crash(*, capture: ExceptionCapture, error: BaseException) -> None:
-    """Hand the capture the triple an excepthook would, which is all it ever receives."""
-    capture._capture_exception((type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+def _crash(*, capture: PostHogErrorTracker, error: BaseException) -> None:
+    """Report the error to the tracker as an interpreter hook does, which hands PostHog the `(type, value, traceback)` triple."""
+    capture.report(report=make_error_report(kind=ErrorReportKind.UNCAUGHT, exception=error))
 
 
 def _sent_exception_values(*, capture_mock: Any) -> str:
-    """Render the `$exception_list` of the one event this client was asked to send."""
-    return repr(capture_mock.call_args.kwargs["properties"]["$exception_list"])
+    """Render the `$exception_list` of the one event this client was asked to send, as the operator's `before_send` leaves it.
+
+    `capture` is stubbed, so the client's `before_send`, which runs past it, is applied here; the test that sends an
+    event through a real client's `before_send` is `test_an_exception_s_frames_leave_without_their_source_lines_or_path`.
+    """
+    event = {"event": "$exception", "properties": copy.deepcopy(capture_mock.call_args.kwargs["properties"])}
+    return repr(strip_exception_frame_sources(event)["properties"]["$exception_list"])
 
 
-@pytest.mark.usefixtures("restore_excepthooks")
-class TestExceptionCaptureSdkContract:
+class TestPostHogErrorTrackerSdkContract:
     def test_the_stream_records_one_crash(self, mocker: MockerFixture) -> None:
         """The crash reaches the operator's stream exactly once.
 
@@ -96,12 +119,7 @@ class TestExceptionCaptureSdkContract:
         assert custom_capture.call_count == 1
 
     def test_the_stream_records_a_crash_that_is_not_a_pipelex_error(self, mocker: MockerFixture) -> None:
-        """An error with no redacted stand-in is the object PostHog stamps, and it still travels once.
-
-        A `ValueError` is never redacted and so never copied: the client is
-        handed the live error, stamps it, and the stamp is what stops anything
-        downstream from sending the same object a second time.
-        """
+        """An error of any class is sent once: PostHog stamps the redacted copy, and the stamp is carried back to the live error."""
         custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         capture = _make_capture(custom_client=custom_client)
 
@@ -163,7 +181,8 @@ class TestExceptionCaptureSdkContract:
         sent = _sent_exception_values(capture_mock=capture_mock)
         assert _CONFIDENTIAL_MESSAGE not in sent
         assert TelemetryManager.PRIVACY_NOTICE in sent
-        assert "wrapper" in sent
+        assert "wrapper" not in sent
+        assert RuntimeError.__name__ in sent
 
     def test_a_pipelex_error_being_handled_when_another_is_raised_is_redacted(self, mocker: MockerFixture) -> None:
         """An error raised inside `except PipelexError` carries it as `__context__`, which PostHog sends too."""
@@ -269,11 +288,7 @@ class TestExceptionCaptureSdkContract:
         assert custom_capture.call_count == 1
 
     def test_a_chain_longer_than_the_recursion_limit_is_still_sent(self, mocker: MockerFixture) -> None:
-        """PostHog walks a chain with a loop, so the check deciding whether it needs redacting must not recurse either.
-
-        Nothing in this chain is a `PipelexError`, so nothing in it is copied,
-        and the SDK sends it as it would have without the wrapper.
-        """
+        """PostHog walks a chain with a loop, so the redacted copy of the chain is built with loops too, and goes out."""
         client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         manager = TelemetryManager.__new__(TelemetryManager)
         manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
@@ -286,27 +301,24 @@ class TestExceptionCaptureSdkContract:
         client.capture_exception(error)
 
         assert capture_mock.call_count == 1
+        assert "link 0" not in _sent_exception_values(capture_mock=capture_mock)
 
     def test_a_capture_the_redaction_cannot_complete_is_dropped_rather_than_raised_or_sent_raw(self, mocker: MockerFixture) -> None:
         """PostHog's `capture_exception` never raises into its caller, and the redaction in front of it must not either.
 
-        A chain too deep to copy is the realistic way the redaction fails, but
-        the depth at which it fails is the interpreter's to decide: up to
-        Python 3.13 the recursion limit bounds the copy, while Python 3.14 lets
-        this recursion run past it until the stack itself runs out. So the
-        failure is forced here rather than reached by depth. Sending the
-        original instead is the one fallback that is not open, so nothing goes
-        out.
+        The copy is built with loops, so no realistic chain makes it fail, and
+        the failure is forced here. Sending the original instead is the one
+        fallback that is not open, so nothing goes out.
         """
         client, capture_mock = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
         manager = TelemetryManager.__new__(TelemetryManager)
         manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
-        redacted_link = mocker.patch.object(TelemetryManager, "_redacted_link", side_effect=RecursionError("maximum recursion depth exceeded"))
+        exception_graph = mocker.patch.object(TelemetryManager, "_exception_graph", side_effect=MemoryError("no room for the copy"))
         error = ValueError("wrapper")
         error.__context__ = ToolError(_CONFIDENTIAL_MESSAGE)
 
         assert client.capture_exception(error) is None
-        assert redacted_link.call_count == 1
+        assert exception_graph.call_count == 1
         assert capture_mock.call_count == 0
 
     @pytest.mark.parametrize("malformed", ["not an exception", (ValueError, ValueError("two")), 42])
@@ -318,3 +330,152 @@ class TestExceptionCaptureSdkContract:
 
         assert client.capture_exception(malformed) is None
         assert capture_mock.call_count == 0
+
+    def test_a_foreign_cause_of_a_pipelex_error_is_redacted(self, mocker: MockerFixture) -> None:
+        """A `ValueError` a function raised quotes what it refused, and it travels as the cause of the Pipelex error."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        capture = _make_capture(custom_client=custom_client)
+
+        try:
+            try:
+                raise ValueError(_CUSTOMER_WORDS)
+            except ValueError as foreign_error:
+                raise ToolError(_CONFIDENTIAL_MESSAGE) from foreign_error
+        except ToolError as crash:
+            _crash(capture=capture, error=crash)
+
+        sent = _sent_exception_values(capture_mock=custom_capture)
+        assert _CUSTOMER_WORDS not in sent
+        assert _CONFIDENTIAL_MESSAGE not in sent
+        assert ValueError.__name__ in sent
+
+    def test_a_validation_error_cause_is_redacted_without_its_input(self, mocker: MockerFixture) -> None:
+        """A pydantic `ValidationError` cannot be built without its arguments, so it stands as a plain error naming its class."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        capture = _make_capture(custom_client=custom_client)
+        validation_error = _validation_error()
+        assert _CUSTOMER_WORDS in str(validation_error)
+
+        try:
+            try:
+                raise validation_error
+            except ValidationError as foreign_error:
+                raise ToolError(_CONFIDENTIAL_MESSAGE) from foreign_error
+        except ToolError as crash:
+            _crash(capture=capture, error=crash)
+
+        sent = _sent_exception_values(capture_mock=custom_capture)
+        assert _CUSTOMER_WORDS not in sent
+        assert "input_value" not in sent
+        assert ValidationError.__name__ in sent
+
+    def test_a_foreign_error_with_no_pipelex_error_in_its_graph_is_redacted(self, mocker: MockerFixture) -> None:
+        """An error that never touched Pipelex's own errors still quotes whatever it was handed."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        capture = _make_capture(custom_client=custom_client)
+        error = KeyError(_CUSTOMER_WORDS)
+        error.add_note(_CUSTOMER_WORDS)
+
+        _crash(capture=capture, error=error)
+
+        sent = _sent_exception_values(capture_mock=custom_capture)
+        assert _CUSTOMER_WORDS not in sent
+        assert TelemetryManager.PRIVACY_NOTICE in sent
+        assert KeyError.__name__ in sent
+        # The live error is left as it was.
+        assert error.args == (_CUSTOMER_WORDS,)
+
+    def test_an_exception_group_keeps_its_members_and_loses_every_message_and_note(self, mocker: MockerFixture) -> None:
+        """A group's message, its notes and each member's message all quote run content; the members themselves still travel."""
+        custom_client, custom_capture = _make_stubbed_client(mocker=mocker, api_key="phc_custom")
+        capture = _make_capture(custom_client=custom_client)
+        group = ExceptionGroup(_CUSTOMER_WORDS, [ValueError(_CUSTOMER_WORDS), ExceptionGroup("inner", [KeyError(_CUSTOMER_WORDS)])])
+        group.add_note(_CUSTOMER_WORDS)
+
+        _crash(capture=capture, error=group)
+
+        sent = _sent_exception_values(capture_mock=custom_capture)
+        assert _CUSTOMER_WORDS not in sent
+        assert "inner" not in sent
+        assert ValueError.__name__ in sent
+        assert KeyError.__name__ in sent
+        exception_list = custom_capture.call_args.kwargs["properties"]["$exception_list"]
+        assert len(exception_list) == 4
+
+    def test_an_exception_s_frames_leave_without_their_source_lines_or_path(self, mocker: MockerFixture) -> None:
+        """PostHog serializes the source lines around each frame and its file's path; the operator's client strips them before sending."""
+        client = Posthog(
+            project_api_key="phc_custom", host="http://localhost:1", sync_mode=True, disabled=False, before_send=strip_exception_frame_sources
+        )
+        batch_post = mocker.patch("posthog.client.batch_post")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        secret_literal = _CUSTOMER_WORDS
+
+        try:
+            raise ValueError(secret_literal)
+        except ValueError as error:
+            client.capture_exception(error, distinct_id="operator-user")
+
+        (sent_event,) = batch_post.call_args.kwargs["batch"]
+        frames = [frame for exception in sent_event["properties"]["$exception_list"] for frame in exception["stacktrace"]["frames"]]
+        assert frames
+        for frame in frames:
+            assert not set(EXCEPTION_FRAME_SOURCE_KEYS) & set(frame)
+            assert frame["module"] == __name__
+            assert frame["lineno"]
+        assert _CUSTOMER_WORDS not in repr(sent_event)
+
+    def test_a_frame_of_a_namespace_package_leaves_without_its_absolute_path(self, mocker: MockerFixture) -> None:
+        """PostHog writes the absolute path as the file name of a namespace package's frame; the client sends it rewritten from the module."""
+        client = Posthog(
+            project_api_key="phc_custom", host="http://localhost:1", sync_mode=True, disabled=False, before_send=strip_exception_frame_sources
+        )
+        batch_post = mocker.patch("posthog.client.batch_post")
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager._wrap_capture_exception(client)  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        # A package module with no `__file__`, which is what makes PostHog fall back to the absolute path.
+        mocker.patch.dict(sys.modules, {_NAMESPACE_PACKAGE: types.ModuleType(_NAMESPACE_PACKAGE)})
+        module_code = compile("def fail():\n    raise ValueError('boom')\n", f"{_MACHINE_DIRECTORY}/{_NAMESPACE_PACKAGE}/fault.py", "exec")
+        function_code = next(const for const in module_code.co_consts if isinstance(const, types.CodeType))
+        failing_function = types.FunctionType(function_code, {"__name__": f"{_NAMESPACE_PACKAGE}.fault"})
+
+        try:
+            failing_function()
+        except ValueError as error:
+            client.capture_exception(error, distinct_id="operator-user")
+
+        (sent_event,) = batch_post.call_args.kwargs["batch"]
+        filenames = [frame["filename"] for exception in sent_event["properties"]["$exception_list"] for frame in exception["stacktrace"]["frames"]]
+        assert f"{_NAMESPACE_PACKAGE}/fault.py" in filenames
+        assert _MACHINE_DIRECTORY not in repr(sent_event)
+
+    @pytest.mark.parametrize(
+        ("module", "filename", "expected"),
+        [
+            ("opentelemetry.sdk.trace", "/opt/venv/lib/opentelemetry/sdk/trace.py", "opentelemetry/sdk/trace.py"),
+            ("google.auth", "/opt/venv/lib/google/auth/__init__.py", "google/auth/__init__.py"),
+            ("pipelex.tools.misc", "pipelex/tools/misc.py", "pipelex/tools/misc.py"),
+            ("__main__", "/home/acme/script.py", "script.py"),
+            (None, "/home/acme/unknown.py", "unknown.py"),
+            ("vendor.mod", "C:\\Users\\acme\\vendor\\mod.py", "vendor/mod.py"),
+            ("vendor.mod", None, None),
+        ],
+    )
+    def test_a_frame_s_file_name_keeps_no_directory_of_the_machine(self, module: str | None, filename: str | None, expected: str | None) -> None:
+        assert frame_filename_of(module=module, filename=filename) == expected
+
+    def test_strip_exception_frame_sources_leaves_other_events_alone(self) -> None:
+        event: dict[str, Any] = {"event": "$ai_span", "properties": {"context_line": "kept"}}
+
+        assert strip_exception_frame_sources(event) == {"event": "$ai_span", "properties": {"context_line": "kept"}}
+
+    def test_the_operator_s_client_is_built_with_the_frame_stripping_before_send(self, mocker: MockerFixture) -> None:
+        posthog_class = mocker.patch("pipelex.system.telemetry.telemetry_manager.Posthog")
+        mocker.patch("posthog.default_client", None)
+        mocker.patch("posthog.privacy_mode", False)
+        telemetry_config = TelemetryConfig(custom_posthog=PostHogConfig(mode=PostHogMode.IDENTIFIED, user_id="operator-user", api_key="phc_custom"))
+
+        TelemetryManager(telemetry_config, join_host_trace=False)
+
+        assert posthog_class.call_args.kwargs["before_send"] is strip_exception_frame_sources

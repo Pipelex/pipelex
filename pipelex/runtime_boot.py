@@ -82,6 +82,7 @@ from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.plugins.bundle_validator_registry import BundleValidatorRegistry
 from pipelex.plugins.discovery import build_registrar
+from pipelex.plugins.error_tracker_registry import ErrorTrackerRegistry
 from pipelex.plugins.exceptions import UnknownBootOrchestratorError
 from pipelex.plugins.inference_backend_registry import InferenceBackendRegistry
 from pipelex.plugins.log_sink_registry import LogSinkRegistry
@@ -99,6 +100,7 @@ from pipelex.system.configuration.config_loader import CONFIG_REFUSED, config_ma
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.config_surface import INFERENCE_BACKEND_CONFIG_SURFACE_ID, PIPELEX_CONFIG_SURFACE_ID
 from pipelex.system.configuration.configs import PipelexConfig
+from pipelex.system.error_tracking.error_tracking import install_error_trackers, reset_error_trackers
 from pipelex.system.registries.class_registry_access import class_registry_scoping
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
@@ -352,6 +354,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
+        join_host_trace: bool | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         **kwargs: Any,
     ) -> None:
@@ -449,9 +452,24 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             integration_mode=integration_mode,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
+            join_host_trace=join_host_trace,
         )
         self.telemetry_manager.setup(integration_mode=integration_mode)
         self.runtime_hub.set_telemetry_manager(telemetry_manager=self.telemetry_manager)
+
+        # The error trackers, right after the telemetry manager the built-in ``posthog`` one reports through. Each
+        # token ``runtime.error_tracking.trackers`` names is looked up before any factory runs, so a token nobody
+        # registered stops the boot naming the registered ones; a factory that finds nothing to report to in this
+        # process returns no tracker. Installed for the process until teardown resets them, as the log sink is.
+        error_tracking_config = get_config().runtime.error_tracking
+        error_tracker_registry = ErrorTrackerRegistry(plugin_registrar.error_trackers)
+        install_error_trackers(
+            trackers=error_tracker_registry.make_error_trackers(
+                config=error_tracking_config,
+                secrets_provider=secrets_provider,
+                telemetry_manager=self.telemetry_manager,
+            )
+        )
 
         # --- Tools ----------------------------------------------------------------------------
 
@@ -749,6 +767,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         ``_release_after_failed_boot`` into one list.
         """
         try:
+            # The error trackers first, so nothing is reported through a client the telemetry teardown below shuts down.
+            reset_error_trackers()
             if self.telemetry_manager:
                 self.telemetry_manager.teardown()
 
@@ -878,6 +898,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             # and the class registry half-populated — and replace the boot error on the way out. Reasoning
             # from the concrete class's guarantees about a call made through an injectable abstract type
             # is the mistake to avoid here.
+            # The error trackers a partial boot installed, before the telemetry manager whose client one may hold. Never raises.
+            reset_error_trackers()
             if self.telemetry_manager is not None:
                 try:
                     self.telemetry_manager.teardown()
@@ -918,6 +940,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
+        join_host_trace: bool | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         config_dir: Path | None = None,
         config_overrides: dict[str, Any] | None = None,
@@ -953,6 +976,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 reporting_delegate=reporting_delegate,
                 telemetry_config=telemetry_config,
                 telemetry_manager=telemetry_manager,
+                join_host_trace=join_host_trace,
                 observers=observers,
             )
             if needs_inference:

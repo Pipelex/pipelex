@@ -28,7 +28,7 @@ from pipelex.cli.agent_cli.commands.agent_output import (
 from pipelex.cli.commands.run.exceptions import AmbiguousInputsFilesError
 from pipelex.cogt.exceptions import InferenceBackendCredentialsError, InferenceBackendCredentialsErrorType
 from pipelex.errors.problem import MigrationErrorBlock, ProblemView, make_location, make_problem, make_problem_item
-from pipelex.pipe_run.located_failure import make_unexpected_failure
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.system.usage_stats.usage_stats_contract import UsageStatsError, UsageStatsErrorDomain
 from pipelex.tools.misc.exceptions import RemoteFileFetchError

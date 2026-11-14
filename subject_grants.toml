@@ -4772,6 +4772,14 @@ rationale = "Factory from source: builds the result from the doc; single operand
 param = "registrar"
 rationale = "Plugin protocol register: the registrar is the sole sink the plugin populates."
 
+["pipelex/providers/error_trackers/error_tracker_plugin.py::ErrorTrackerPlugin.register"]
+param = "registrar"
+rationale = "Plugin protocol: registers into the registrar; single operand, consistent with sibling plugins."
+
+["pipelex/providers/error_trackers/error_tracker_plugin.py::_make_posthog_error_tracker"]
+param = "_config"
+rationale = "ErrorTrackerFactoryFn shape: the registry calls the factory with the error-tracking config positionally, as the sibling log sink factories take theirs."
+
 ["pipelex/providers/fal/fal_factory.py::FalFactory.make_generated_image"]
 param = "fal_result"
 rationale = "Factory from source: builds the result from the fal_result; single operand."
@@ -5339,14 +5347,6 @@ rationale = "Setter: installs the run mode; single self-labelling operand."
 ["pipelex/system/runtime.py::RuntimeManager.set_worker_mode"]
 param = "worker_mode"
 rationale = "Setter: installs the worker mode; single self-labelling operand."
-
-["pipelex/system/telemetry/exception_capture.py::ExceptionCapture._capture_exception"]
-param = "exc_info"
-rationale = "Verb-object: captures the exc info; single operand."
-
-["pipelex/system/telemetry/exception_capture.py::ExceptionCapture._thread_exception_handler"]
-param = "args"
-rationale = "Positional Callable protocol: threading.excepthook handler, invoked hook(args)."
 
 ["pipelex/system/telemetry/otel_constants.py::make_otel_gen_ai_output_type"]
 param = "output_type"

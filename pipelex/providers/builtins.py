@@ -5,6 +5,7 @@ from pipelex.providers.azure_rest.azure_rest_plugin import AzureRestPlugin
 from pipelex.providers.bedrock.bedrock_plugin import BedrockPlugin
 from pipelex.providers.blackboxai.blackboxai_plugin import BlackboxaiPlugin
 from pipelex.providers.docling.docling_plugin import DoclingPlugin
+from pipelex.providers.error_trackers.error_tracker_plugin import ErrorTrackerPlugin
 from pipelex.providers.fal.fal_plugin import FalPlugin
 from pipelex.providers.google.google_plugin import GooglePlugin
 from pipelex.providers.huggingface.huggingface_plugin import HuggingFacePlugin
@@ -36,6 +37,7 @@ from pipelex.providers.typesafe.typesafe_plugin import TypesafePlugin
 # make_worker closures).
 KERNEL_BUILTIN_PLUGINS: list[PipelexPlugin] = [
     LogSinkPlugin(),
+    ErrorTrackerPlugin(),
     StoragePlugin(),
     SecretsPlugin(),
     OpenAIPlugin(),

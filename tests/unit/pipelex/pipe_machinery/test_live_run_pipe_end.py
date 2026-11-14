@@ -49,6 +49,7 @@ RUN_OTEL_CONTEXT = OtelContext(
     trace_name="pipe_run_end_test",
     trace_name_redacted="pipe_run_end_test",
     span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+    is_sampled=True,
 )
 
 

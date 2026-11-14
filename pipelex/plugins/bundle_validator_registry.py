@@ -105,6 +105,15 @@ class BundleValidatorProtocol(Protocol):
     The in-process arm reads every file in its own process and ignores it. It is required for the
     same reason as ``caller_identity``: a validator that dropped it would read the method under no
     scope.
+
+    ``request_id`` is the inbound request id the host is serving, so the lines the validation writes
+    carry the id the caller was answered under. It must be one to 128 ASCII letters, digits, ``_`` or
+    ``-`` (``pipelex.system.job_metadata.validate_request_id``), the rule a run's ``request_id``
+    follows: any other value is the host's bug, refused with a ``RunParameterError`` before any work.
+    The in-process arm binds it on the log context for the whole sweep; a worker-dispatched arm puts it
+    on the payload it dispatches, and the worker binds it there. It is required for the same reason as
+    ``caller_identity``, ``None`` meaning the host serves no request: a validator that dropped it would
+    leave its worker's lines with no request id.
     """
 
     async def validate_bundles(
@@ -120,6 +129,7 @@ class BundleValidatorProtocol(Protocol):
         method_dir: "Path | None",
         methods_dirs: "Sequence[Path] | None",
         read_scope: str | None,
+        request_id: str | None,
     ) -> BundleValidationVerdict: ...
 
 

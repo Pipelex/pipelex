@@ -131,6 +131,12 @@ class TelemetryConfig(ConfigModel):
     custom_portkey: PortkeyConfig = Field(default_factory=PortkeyConfig, description="Custom Portkey SDK configuration")
     langfuse: LangfuseConfig = Field(default_factory=LangfuseConfig, description="Langfuse configuration")
     otlp: list[OtlpExporterConfig] = Field(default_factory=empty_list_factory_of(OtlpExporterConfig), description="Additional OTLP exporters")
+    join_host_trace: bool = Field(
+        default=False,
+        description="Pipelex's spans join the host process's OpenTelemetry trace: a run continues the host's current span, follows its "
+        "sampling decision, and its pipe and LLM spans are made current while they run. Refused at boot unless a span destination "
+        "of this file receives Pipelex's spans. `PIPELEX_JOIN_HOST_TRACE` and `Pipelex.make(join_host_trace=...)` override it.",
+    )
     telemetry_allowed_modes: dict[str, bool] = Field(
         default_factory=lambda: {
             "ci": False,
@@ -157,6 +163,20 @@ class TelemetryConfig(ConfigModel):
             True if custom telemetry is allowed for this mode, False otherwise.
         """
         return self.telemetry_allowed_modes.get(mode, False)
+
+    def operator_span_destinations(self) -> list[str]:
+        """The destinations of this file that receive Pipelex's spans, by name, or nothing.
+
+        They all hang off the one tracer, which exists only when the operator's PostHog stream is on and its AI span
+        tracing is enabled: the PostHog stream itself, each `[[otlp]]` exporter, and Langfuse when it is enabled.
+        """
+        if not self.custom_posthog.mode.is_enabled or not self.custom_posthog.tracing.enabled:
+            return []
+        destinations = ["custom_posthog"]
+        destinations.extend(f"otlp:{exporter_config.name}" for exporter_config in self.otlp)
+        if self.langfuse.enabled:
+            destinations.append("langfuse")
+        return destinations
 
     @property
     def redact_properties(self) -> list[str]:

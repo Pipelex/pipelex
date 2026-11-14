@@ -11,6 +11,7 @@ from pipelex.methods.methods_config import MethodsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.pipe_func_config import PipeFuncConfig
+from pipelex.system.error_tracking.error_tracking_config import ErrorTrackingConfig
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.document_conversion.document_conversion_config import DocumentConversionConfig
 from pipelex.tools.log.log_config import LogConfig
@@ -192,7 +193,7 @@ class RuntimeConfig(ConfigModel):
 
     The machinery present at execution time whatever is loaded, per
     ``docs/contribute/hub-layering.md``: storage, secrets, logging, cloud credentials,
-    reporting, tracing, observation, outbound network posture, document conversion, and the plugin system's own denylist.
+    error tracking, reporting, tracing, observation, outbound network posture, document conversion, and the plugin system's own denylist.
     """
 
     storage: StorageConfig
@@ -200,6 +201,7 @@ class RuntimeConfig(ConfigModel):
     secrets: SecretsProviderConfig
     document_conversion: DocumentConversionConfig
     log: LogConfig
+    error_tracking: ErrorTrackingConfig
     aws: AwsConfig
     reporting: ReportingConfig
     tracing: TracingConfig

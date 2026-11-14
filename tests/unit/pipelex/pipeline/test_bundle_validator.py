@@ -20,9 +20,9 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.core.pipes.exceptions import PipeRunError
 from pipelex.errors.security_event import SECURITY_EVENT_MESSAGE, emit_security_event
 from pipelex.errors.security_target import SecurityTargetClass
+from pipelex.errors.unexpected_failure import make_unexpected_failure
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_run.exceptions import DryRunError, PipeRouterError
-from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.pipeline.bundle_validator import BundleValidator, DryRunStatus
 from pipelex.system.caller_identity import CallerIdentity, get_current_caller_identity, scoped_caller_identity
 from pipelex.system.pipe_run_mode import PipeRunMode

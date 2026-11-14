@@ -7,11 +7,9 @@ from urllib.parse import urlsplit
 
 import httpx
 from kajson.exceptions import KajsonException
-from mthds.protocol.problem.registry import CoreCode
 from pydantic import ValidationError
 
 from pipelex import log
-from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptRefAmbiguousError
@@ -25,17 +23,17 @@ from pipelex.core.qualified_ref_exceptions import QualifiedRefError
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
-from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of, make_problem
+from pipelex.errors.problem import PipelexProblem, ProblemView, caller_view_of
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.interpreter_hub import get_concept_library, get_current_library_id_or_none
 from pipelex.libraries.exceptions import LibraryError
 from pipelex.pipe_run.caller_webhook_delivery import deliver_caller_webhooks
 from pipelex.pipe_run.delivery_assignment import DeliveryStatus
 from pipelex.pipe_run.exceptions import DeliveryError, PipeJobError, StorageDeliveryError, WebhookDeliveryError
-from pipelex.pipe_run.located_failure import make_unexpected_failure
 from pipelex.reporting.usage_records import dump_tokens_usage_records
 from pipelex.runtime_bridge.primitives.hydration import hydrate_content
 from pipelex.runtime_hub import get_class_registry, get_storage_provider
+from pipelex.system.error_tracking.error_report import build_operator_problem, unexpected_operator_problem
 from pipelex.tools.log.error_fields import error_fields
 from pipelex.tools.misc.json_utils import clean_json_dumps
 from pipelex.tools.network.exceptions import SsrfBlockedError
@@ -86,11 +84,12 @@ WEBHOOK_PROBLEM_FAULT_MESSAGE = "The problem of a failed run could not be built 
 def run_problem_of(*, error: Exception, pipeline_run_id: str, request_id: str | None) -> PipelexProblem:
     """The problem of a failed run that its webhooks receive, in the operator's view, which each webhook projects to its own.
 
-    A Pipelex error carries its own code, and a bare exception stands as a fault of ours, so a webhook still receives
-    an ``error`` object. Delivery never changes how a run fails: this runs while the run's own error, or the delivery's
-    that the run will fail with, is on its way, so building the problem must not raise in its place. A problem that
-    cannot be built is logged as an error, and the webhooks receive ``runtime.unexpected``, as a traced node does
-    (``make_node_problem``).
+    Built by the one builder error reports share (``build_operator_problem``): a Pipelex error carries its own code,
+    and a bare exception stands as a fault of ours, named by its class, so a webhook still receives an ``error``
+    object. Delivery never changes how a run fails: this runs while the run's own error, or the delivery's that the run
+    will fail with, is on its way, so building the problem must not raise in its place. A problem that cannot be built
+    is logged as an error, since a caller's webhook then receives less than it should, and the webhooks receive
+    ``runtime.unexpected``, as a traced node does (``make_node_problem``).
 
     Args:
         error: The error the run fails with.
@@ -100,9 +99,8 @@ def run_problem_of(*, error: Exception, pipeline_run_id: str, request_id: str | 
     Returns:
         The problem, in the operator's view.
     """
-    failure = error if isinstance(error, PipelexError) else make_unexpected_failure(error=error)
     try:
-        return failure.to_problem(view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+        return build_operator_problem(exception=error, pipeline_run_id=pipeline_run_id, request_id=request_id)
     except Exception as problem_fault:  # ruff: ignore[blind-except]
         # Unbounded code: `to_problem` reads hooks overridden across the whole error hierarchy, the errors plugins
         # define included, and walks the error's cause chain, so what it raises cannot be enumerated. The run's own
@@ -111,7 +109,7 @@ def run_problem_of(*, error: Exception, pipeline_run_id: str, request_id: str | 
             WEBHOOK_PROBLEM_FAULT_MESSAGE,
             fields={"failed_error_type": type(error).__name__, **error_fields(exc=problem_fault)},
         )
-    return make_problem(code=CoreCode.RUNTIME_UNEXPECTED, view=ProblemView.OPERATOR, pipeline_run_id=pipeline_run_id, request_id=request_id)
+    return unexpected_operator_problem(pipeline_run_id=pipeline_run_id, request_id=request_id)
 
 
 class RunEnding(NamedTuple):

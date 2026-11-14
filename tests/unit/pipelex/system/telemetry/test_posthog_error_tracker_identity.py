@@ -1,10 +1,10 @@
-"""Unit tests for the identity an unhandled exception is captured under.
+"""Unit tests for the identity a reported exception is captured under on the operator's PostHog stream.
 
-An `$exception` is the one capture no run can hand its metadata to: the two
-interpreter hooks receive `(type, value, traceback)` and nothing else. So the
-caller is read back from the error — the caller of the pipe run it escaped,
-stamped on it as it left the run's scope — or from the caller still in scope,
-and only an error that belongs to no caller goes out under the stream's
+An `$exception` is the one capture no run hands its metadata to: the tracker
+receives the error, reported from an interpreter hook or from a run's boundary,
+and the caller is read back from the error — the caller of the pipe run it
+escaped, stamped on it as it left the run's scope — or from the caller still in
+scope, and only an error that belongs to no caller goes out under the stream's
 fallback. These tests are about that resolution reaching this path, because for
 a while it did not: the operator's configured `user_id` went out on every crash,
 `anonymous` mode included, and later the constant went out even for a crash
@@ -13,34 +13,22 @@ inside a known caller's run.
 The manager is built WITHOUT its constructor, as in the tracker tests beside
 these, because `TelemetryManager.__init__` creates live PostHog clients, writes
 `posthog.default_client` and registers a process-wide singleton. The wiring is
-still what is under test: `_make_exception_capture` is the constructor's own
-call, exercised here against stub clients. It installs the interpreter hooks, so
-every test closes the capture again.
+still what is under test: `make_error_tracker` is what the built-in `posthog`
+factory calls at boot, exercised here against stub clients.
 """
 
-import sys
-import threading
-from typing import Any, Generator
+from dataclasses import replace
+from typing import Any
 
-import pytest
 from posthog import Posthog
 from pytest_mock import MockerFixture
 
 from pipelex.system.caller_identity import CallerIdentity, scoped_caller_identity, stamp_caller_identity
-from pipelex.system.telemetry.exception_capture import ExceptionCapture
+from pipelex.system.error_tracking.error_report import ErrorReportKind, make_error_report
 from pipelex.system.telemetry.otel_constants import PostHogAttr
+from pipelex.system.telemetry.posthog_error_tracker import PostHogErrorTracker
 from pipelex.system.telemetry.telemetry_config import PostHogConfig, PostHogMode, TelemetryConfig
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
-
-
-@pytest.fixture
-def restore_excepthooks() -> Generator[None, None, None]:
-    """Give the interpreter back the hooks a capture installs when it is built."""
-    original_excepthook = sys.excepthook
-    original_threading_excepthook = threading.excepthook
-    yield
-    sys.excepthook = original_excepthook
-    threading.excepthook = original_threading_excepthook
 
 
 def _make_capture(
@@ -48,8 +36,8 @@ def _make_capture(
     mocker: MockerFixture,
     mode: PostHogMode,
     configured_user_id: str | None,
-) -> tuple[ExceptionCapture, Any]:
-    """Resolve the capture the constructor would have built, over stub clients."""
+) -> tuple[PostHogErrorTracker, Any]:
+    """Resolve the tracker the boot would have built, over stub clients."""
     manager = TelemetryManager.__new__(TelemetryManager)
     manager.telemetry_config = TelemetryConfig(
         custom_posthog=PostHogConfig(mode=mode, user_id=configured_user_id, api_key="phc_test"),
@@ -57,19 +45,20 @@ def _make_capture(
     custom_client = mocker.MagicMock(spec=Posthog)
     manager.custom_posthog_client = custom_client
 
-    capture = manager._make_exception_capture()  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+    capture = manager.make_error_tracker()
+    assert capture is not None
     return capture, custom_client
 
 
-def _crash(*, capture: ExceptionCapture) -> None:
-    capture._capture_exception((ValueError, ValueError("boom"), None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+def _crash(*, capture: PostHogErrorTracker) -> None:
+    _crash_with(capture=capture, error=ValueError("boom"))
 
 
 _CALLER = CallerIdentity(user_id="caller-7", extras={"organization": "org_caller"})
 
 
-def _crash_with(*, capture: ExceptionCapture, error: BaseException) -> None:
-    capture._capture_exception((type(error), error, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+def _crash_with(*, capture: PostHogErrorTracker, error: BaseException) -> None:
+    capture.report(report=make_error_report(kind=ErrorReportKind.UNCAUGHT, exception=error))
 
 
 def _escaped_from_a_run() -> ValueError:
@@ -82,8 +71,7 @@ def _escaped_from_a_run() -> ValueError:
         return exc
 
 
-@pytest.mark.usefixtures("restore_excepthooks")
-class TestExceptionCaptureIdentity:
+class TestPostHogErrorTrackerIdentity:
     def test_an_anonymous_stream_captures_an_exception_under_nobody(self, mocker: MockerFixture) -> None:
         """A mode that identifies nobody must not identify somebody when the process crashes.
 
@@ -115,17 +103,36 @@ class TestExceptionCaptureIdentity:
 
         assert custom_client.capture_exception.call_args.kwargs["distinct_id"] == "configured-id"
 
-    def test_an_exception_carrying_no_value_is_not_captured(self, mocker: MockerFixture) -> None:
-        """`threading.excepthook` can hand over a null value, and a null exception is not an event."""
+    def test_a_report_without_an_exception_is_not_captured(self, mocker: MockerFixture) -> None:
+        """An `$exception` is built from an exception, so a problem reported alone sends nothing to PostHog."""
         capture, custom_client = _make_capture(
             mocker=mocker,
             mode=PostHogMode.IDENTIFIED,
             configured_user_id="configured-id",
         )
+        problem_only = make_error_report(kind=ErrorReportKind.HANDLED, exception=ValueError("boom"))
 
-        capture._capture_exception((ValueError, None, None))  # ruff: ignore[private-member-access] # pyright: ignore[reportPrivateUsage]
+        capture.report(report=replace(problem_only, exception=None))
 
         custom_client.capture_exception.assert_not_called()
+
+    def test_an_error_posthog_captured_already_is_not_captured_again(self, mocker: MockerFixture) -> None:
+        """A host that captured the error itself before it was reported keeps it to one `$exception`."""
+        capture, custom_client = _make_capture(mocker=mocker, mode=PostHogMode.IDENTIFIED, configured_user_id="configured-id")
+        error = ValueError("boom")
+        setattr(error, PostHogErrorTracker.POSTHOG_CAPTURE_MARKS[0], True)
+
+        _crash_with(capture=capture, error=error)
+
+        custom_client.capture_exception.assert_not_called()
+
+    def test_no_client_makes_no_tracker(self) -> None:
+        """A manager whose stream has no client reports no error to PostHog."""
+        manager = TelemetryManager.__new__(TelemetryManager)
+        manager.telemetry_config = TelemetryConfig(custom_posthog=PostHogConfig(mode=PostHogMode.ANONYMOUS, api_key="phc_test"))
+        manager.custom_posthog_client = None
+
+        assert manager.make_error_tracker() is None
 
     def test_a_failing_capture_never_reaches_the_app(self, mocker: MockerFixture) -> None:
         """Telemetry must not turn one crash into two."""

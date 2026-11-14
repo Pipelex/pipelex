@@ -87,6 +87,7 @@ DryRunMockBuildError | method.mock_unsatisfiable
 DryRunObjectFidelityError | method.mock_unsatisfiable
 DuplicateBundleValidatorError | pipelex.plugin.conflict
 DuplicateDocGenDefaultError | pipelex.plugin.conflict
+DuplicateErrorTrackerError | pipelex.plugin.conflict
 DuplicateHttpErrorMapperError | pipelex.plugin.conflict
 DuplicateInferenceBackendError | pipelex.plugin.conflict
 DuplicateInternalModelError | pipelex.plugin.conflict
@@ -397,6 +398,7 @@ TypesafeError | pipelex.config.credential_missing
 TypesafeJudgmentResponseError | provider.response_invalid
 TypesafeQuestionUnsupportedError | one of model.capability_unsupported, runtime.unexpected
 UnknownBootOrchestratorError | pipelex.plugin.not_found
+UnknownErrorTrackerError | pipelex.plugin.not_found
 UnknownInputNameError | input.unexpected
 UnknownLogSinkError | pipelex.plugin.not_found
 UnknownPipeFuncExecutionModeError | pipelex.plugin.not_found

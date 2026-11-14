@@ -23,11 +23,9 @@ wrapper reports it, so the facts and locations of the errors between the two rea
 """
 
 from mthds.protocol.problem.models import ProblemLocation
-from pydantic import ValidationError
 
 from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError, iter_cause_chain
 from pipelex.errors.problem import PipelexProblem, ProblemView, make_location
-from pipelex.tools.typing.pydantic_utils import format_validation_error_without_input
 
 # Joins the pipe codes of a failure's path from the entry pipe down to the pipe that failed.
 PIPE_PATH_SEPARATOR = " → "
@@ -120,26 +118,6 @@ def failure_location_of(*, pipe_code: str, pipe_stack: list[str]) -> ProblemLoca
     if not pipe_stack:
         return None
     return make_location(pipe=pipe_code, path=pipe_stack)
-
-
-def make_unexpected_failure(*, error: Exception) -> PipelexUnexpectedError:
-    """Stand a `PipelexUnexpectedError` in for an exception that is not a `PipelexError`.
-
-    Its message names the original class, and it is chained to the original so its traceback
-    survives. The message becomes the run's `diagnostics.message`, which an operator's webhook
-    receives, so it never holds the foreign exception's text, which can carry anything: a key of the
-    run's data (`KeyError('jane.doe@acme.com')`), a value a function was handed, a server path or a
-    secret. A pydantic `ValidationError` adds its reasons, which hold none of the values it refused,
-    and no location, since the model it came from is not known here.
-    """
-    if isinstance(error, ValidationError):
-        message = f"{type(error).__name__}: {format_validation_error_without_input(validation_error=error)}"
-    else:
-        message = type(error).__name__
-    unexpected_error = PipelexUnexpectedError(message)
-    unexpected_error.__cause__ = error
-    unexpected_error.__suppress_context__ = True
-    return unexpected_error
 
 
 def _find_root_fault_below(*, wrapper: PipelexError) -> PipelexError | None:

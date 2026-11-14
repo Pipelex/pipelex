@@ -610,6 +610,7 @@ class ApiRunner(PipelexMTHDSProtocol):
         allow_signatures: bool,
         requested_orchestration_mode: str | None,
         graph_pipe_code: str | None,
+        request_id: str | None,
         method_dir: Path | None = None,
     ) -> PipelexValidationReport | BundleValidationFailure:
         """Validate MTHDS bundles, returning the verdict as a value (the route maps it to a 200).
@@ -650,6 +651,11 @@ class ApiRunner(PipelexMTHDSProtocol):
         arm hands the method's trees to its worker through. The route builds a validating runner with the
         `read_scope` its request names, `None` when it names none, and never with the caller's id a run
         would fall back to: nothing lists or erases what a validation would leave under that prefix.
+
+        `request_id` is the id of the request being served, which the route reads with `request_id_of`, handed to the
+        validator as a run's request id is put on its metadata: the in-process validator binds it for the sweep, and a
+        validator dispatching to a worker carries it there, so the worker's lines for this validation carry it too. It
+        is required, `None` meaning the request has none, so a route cannot leave it out by accident.
 
         The method's trees are listed once for the request: the requirements check lists them, and the validation is
         called with that listing in scope (`scoped_tree_listing`), which the in-process validator loads the trees from,
@@ -695,6 +701,8 @@ class ApiRunner(PipelexMTHDSProtocol):
                 submitted_files=self.submitted_files,
                 # The scope the host named, under which a dispatched validator's worker reads the method's trees.
                 read_scope=self.read_scope,
+                # The request's id, which a dispatched validator carries to its worker for the lines written there.
+                request_id=request_id,
             )
         # The core seam types its valid arm at the protocol-level ValidationReport (a leaf type)
         # to stay import-acyclic in core; every registered validator in fact produces the canonical
