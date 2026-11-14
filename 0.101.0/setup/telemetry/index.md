@@ -1,0 +1,179 @@
+# Telemetry
+
+**The telemetry you configure in `telemetry.toml` never reports to Pipelex.** It is yours: it is off until you turn it on, and it goes to analytics and monitoring systems you operate.
+
+!!! note "Usage statistics are separate"
+    Pipelex does collect anonymous usage statistics, counts of commands, runs, pipe types, models and tokens, through a client of their own that `telemetry.toml` neither configures nor reaches. They never carry your methods, prompts, inputs, outputs, file names or pipe names, and you turn them off with `pipelex usage-stats disable` or `DO_NOT_TRACK=1`. See [Usage Statistics](usage-statistics.md).
+
+## Your Telemetry Streams
+
+`telemetry.toml` sends observability data to **your own** analytics and monitoring systems:
+
+- **PostHog**: Event tracking and AI span tracing with privacy controls
+- **Langfuse**: Full LLM observability (receives full span data)
+- **OTLP**: Send spans to any OpenTelemetry-compatible backend (receives full span data)
+
+Each integration mode allows these streams or not: by default the `cli`, `docker`, `fastapi`, `mcp` and `n8n` modes allow them, and `pytest`, `ci` and `python` do not, so a test suite sends nothing unless you allow its mode under `[telemetry_allowed_modes]` in `telemetry.toml`. [Telemetry Configuration](../configuration/config-practical/telemetry-config.md) describes each destination's settings.
+
+### Pipelex's spans in your process
+
+Pipelex traces a run when your PostHog stream is on (`mode` is `anonymous` or `identified`) and its AI span tracing is enabled (`[custom_posthog.tracing]`); the same tracer feeds your Langfuse and OTLP destinations. Pipelex's tracer stays its own and never becomes the global one, so your own spans never reach Pipelex's exporters, and **by default Pipelex never makes its spans current in your process's OpenTelemetry context**:
+
+- Your own instrumentation, an HTTP client's or a provider SDK's, keeps opening its spans under your own current span, in your own trace, while a Pipelex run goes. It is never re-parented under a pipe or an LLM call, nor kept by a sampler that follows its parent because a Pipelex span was sampled.
+- An error tracker that reads OpenTelemetry's current span sees yours, not Pipelex's. An error tracker plugged into Pipelex's own seam receives both: the Pipelex span the error was raised in, and your current span when it was reported, as [Error trackers](#error-trackers) describes.
+- The standard trace fields of a log line, `trace_id` and `span_id` in the `json` sink, the record's trace context in the `otlp` sink and the entry's `trace` in the `gcp` sink, name your current span, inside a Pipelex run as outside one, so your log backend files a line under your own trace. The Pipelex span a line was logged in, the pipe's or the LLM call's, which Pipelex keeps in a context variable of its own, rides beside them as `pipelex.trace_id` and `pipelex.span_id`, as [Logging](../tools/logging.md#the-trace-context) describes.
+- If you export Pipelex's spans to your own backend, through your PostHog or an OTLP destination, they arrive in a trace of their own, not yours, so a line inside a run joins them on `pipelex.trace_id` and `pipelex.span_id` rather than on the standard fields, which a backend's trace view follows by itself.
+
+### Joining your process's trace
+
+When the trace of the process is yours, and you want Pipelex to behave as one more OpenTelemetry library in it, turn on `join_host_trace`. With the switch on:
+
+- **A run continues your current span.** When a run starts, Pipelex reads OpenTelemetry's current span; the run's root pipe span becomes its child, in your trace, instead of the root of a trace derived from the run's id. The trace id, the parent and your span's W3C trace state travel with the run's job metadata, so a step a distributed worker runs, in another process, stays in your trace too. With no current span, the run roots its own trace as before. A run started inside a running pipe, whose span is then the current one, becomes a subtree of the enclosing run rather than a new root in its trace.
+- **Your sampling decision is followed.** Pipelex's spans carry your span's sampled flag rather than always being sampled, so a request your sampler drops keeps none of Pipelex's spans, and none of the spans your instrumentation opens inside them.
+- **Pipe and LLM spans are made current while they run.** Your own instrumentation, a provider SDK's HTTP spans for instance, nests under the pipe or the LLM call that made it, and an error tracker that reads OpenTelemetry's current span, Sentry for instance, links an error raised in a pipe to that pipe's span. The standard trace fields of a log line inside a run then name the Pipelex span, the same one as its `pipelex.*` fields. The previous current span comes back as soon as the pipe or the call ends, however it ends.
+
+You turn it on in code, in the environment or in the file, and the most explicit wins: `Pipelex.make(join_host_trace=True)` in code, then the `PIPELEX_JOIN_HOST_TRACE` environment variable (`true`, `false`, `1` or `0`, in any case; an empty or blank variable counts as unset, and any other value stops the boot), then the top-level `join_host_trace` key of `telemetry.toml`, `false` by default.
+
+```toml
+join_host_trace = true  # top-level, before any [section]
+
+[custom_posthog]
+mode = "anonymous"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.tracing]
+enabled = true
+
+[[otlp]]
+name = "traces"
+endpoint = "${env:OTLP_TRACES_ENDPOINT}"
+headers = { "x-sentry-auth" = "${env:OTLP_AUTH_HEADER}" }
+```
+
+**Pipelex refuses to boot with the switch on unless one of your destinations receives its spans.** Once Pipelex's spans are current, your own spans opened inside them are their children, and those children would reach your backend with a parent nobody has if Pipelex's spans went nowhere. The destinations are your PostHog stream with its AI span tracing on, an `[[otlp]]` exporter and Langfuse, all fed by the one tracer that exists when `[custom_posthog]` is `anonymous` or `identified` and `[custom_posthog.tracing]` is enabled; the refusal is a `pipelex.config.invalid` naming the `join_host_trace` setting. Pipelex checks that a destination exists, not that it is the backend your own spans go to: for whole trees in one place, export Pipelex's spans to that backend, through an `[[otlp]]` exporter whose endpoint and headers come from your environment as above. When telemetry is off as a whole, by `DO_NOT_TRACK` or by an integration mode `[telemetry_allowed_modes]` keeps off, Pipelex starts no span, so the switch is inert and nothing is refused.
+
+What it costs:
+
+- **Several runs can share one trace id.** A run started inside one of your requests carries your request's trace id, and so does every other run started in it, on your PostHog stream too: key a run on its `pipeline_run_id`, which every span and event carries, never on the trace id.
+- **Langfuse's trace-level fields** are written by each run's root span, so when runs share one of your traces, they describe the run that wrote them last.
+- **A telemetry manager you inject states the switch for itself.** With `Pipelex.make(telemetry_manager=...)`, the manager's own `join_host_trace` decides, the environment and the file are not read for it, and its destinations are yours to check; passing `join_host_trace=` beside it with a different value stops the boot.
+- **Each process states the switch for itself.** A distributed worker continues your trace whatever its own setting, since the trace id and the sampled flag travel with the job, but it makes Pipelex's spans current only when its own switch is on.
+
+## Error trackers
+
+Beside its log lines, Pipelex hands the errors it meets to **error trackers**: a run that fails with a fault the operator must fix, whether the pipe failed or the storage or a webhook failed to receive its results, an exception that reaches the top of a thread uncaught, and, in the API server, every response answered as an operator's fault and every failure of its own code that ends a request after its response had started, though not its failure to send an answer to a client that hung up. A caller's mistake, a bad input or a method naming a model the deployment does not serve, is answered to the caller and not reported, nor is a `501`, something this deployment does not offer, which the caller meets each time it asks again; a dry run reports nothing. Which trackers receive them is selected in `pipelex.toml`, the same way the log sink is:
+
+```toml
+[runtime.error_tracking]
+trackers = ["posthog"]
+```
+
+- **PostHog is one tracker among others.** The built-in `posthog` tracker sends each error's exception to your own PostHog stream as an `$exception`, with every exception message redacted: each error along the chain goes out as its class name and a privacy notice, whatever its class, and each frame as its module, function and line, without its source lines or its file's path, its file name rewritten from its module. It sends nothing unless that stream is on in `telemetry.toml`, and `DO_NOT_TRACK` turns it off with the rest.
+- **Your own tracker plugs into the same seam.** A plugin registers a tracker under a token of its own, `sentry` for instance, and you add that token to the list. Pipelex ships no vendor SDK: a tracker's SDK comes with the plugin that contributes it.
+- **A tracker receives identifiers, not content.** Each error comes with its problem document in the operator's view, its error code, where it was raised, the failing pipe, the run and request ids, and the spans to join it on. A tracker never sends the locals of a frame, a request body, or a run's inputs or outputs.
+
+An empty list reports errors nowhere. [Error Tracker Plugins](../under-the-hood/error-tracker-plugins.md) describes what a tracker receives and how to write one.
+
+## Quick Setup
+
+When you run `pipelex init`, a default `telemetry.toml` configuration file is created:
+
+```bash
+pipelex init telemetry
+```
+
+The behavior depends on the target:
+
+- **Global init** (default — writes to `~/.pipelex/telemetry.toml`): an active template is created with all options disabled. Edit it to enable your preferred telemetry destinations machine-wide.
+- **Project init** (`pipelex init telemetry --local` — writes to `{project_root}/.pipelex/telemetry.toml`): a fully **commented-out** template is created. The project file is layered on top of your global config, so leaving it commented means the project inherits your global telemetry settings as-is. Uncomment a key only when this project should diverge.
+
+!!! note "Global vs project config"
+    Pipelex looks for telemetry config in **both** `~/.pipelex/` (machine-wide) and `{project_root}/.pipelex/` (per-project). Both are deep-merged, with the project file winning on key collisions — your global Langfuse keys keep applying across every project unless a project explicitly overrides them. See [Telemetry Configuration → Global vs project config](../configuration/config-practical/telemetry-config.md#global-vs-project-config) for the full load order.
+
+### Example: Enable PostHog Tracing
+
+```toml
+[custom_posthog]
+mode = "anonymous"  # or "identified" with user_id
+endpoint = "${POSTHOG_ENDPOINT}"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.tracing]
+enabled = true
+
+[custom_posthog.tracing.capture]
+content = false        # Don't capture prompts/completions
+pipe_codes = true      # Include pipe codes in span names
+```
+
+### Example: Enable Langfuse
+
+```toml
+[langfuse]
+enabled = true
+public_key = "${LANGFUSE_PUBLIC_KEY}"
+secret_key = "${LANGFUSE_SECRET_KEY}"
+```
+
+## DO_NOT_TRACK Global Override
+
+The `DO_NOT_TRACK` environment variable provides a universal way to disable **all** telemetry:
+
+```bash
+export DO_NOT_TRACK=1
+```
+
+When set, it disables every telemetry destination, whatever `telemetry.toml` says, and the request logging and tracing of your own Portkey backend too, `[custom_portkey]`'s force flags included.
+
+## Attaching your own labels to a run
+
+A host that runs Pipelex for more than one customer usually wants a run's telemetry to belong to the entities *it* cares about — an organization, a workspace, a tenant. Pipelex carries those labels for you without ever learning what they mean.
+
+The run-level metadata every run carries (`RunMetadata`) has an `extras` field: an opaque mapping of string keys to string values that you supply when you start the run, beside `user_id` and `storage_scope`. Pipelex never reads a key by name; the telemetry layer forwards the whole mapping as the **groups** of each capture, each key being a group type and its value a group key. Keys are lowercase snake_case starting with a letter (at most 32 characters), values use only letters, digits, `_` and `-` (1 to 128 characters), and a run carries at most five entries; anything else is refused before the run starts.
+
+```python
+extras = {"organization": "org_acme"}
+```
+
+On **your own** PostHog stream, every span and every event the run produces is then captured under that run's `user_id`, with its extras attached through PostHog's own groups facet — so a generation made for one of your customers appears on that customer's timeline and inside their organization, instead of under one identity per deployment. The same values reach every OpenTelemetry exporter as the span attributes `pipelex.run.user_id` and `pipelex.run.extras`, and Langfuse receives the user id in the field it reserves for it.
+
+Anything that names no caller of its own keeps reporting under the `user_id` you configured in `telemetry.toml`, which is what that setting now means: the identity of everything that is not one caller's run. That covers an event outside any run — a CLI command listing your pipes — and a run whose caller is not a distinguishable person either: a run on your own machine is attributed to the literal `local`, the same string on every machine, so Pipelex declines it as an identity and uses your configured id instead. The same goes for `single-tenant`, which pipelex-api states for every run when it is deployed with no users. Per-run attribution is for a host that passes a real `user_id` per run.
+
+The extras do not depend on that. A run that leaves `user_id` at its default still carries its `extras` onto every capture, under your configured id — knowing which entities a run belongs to and naming its caller are two separate decisions, and you may take one without the other.
+
+The extras are also available to the inference workers, on the job metadata of every call. None of the backends Pipelex ships sends them anywhere: a provider you reach directly with your own key gets none of your labels. An inference backend plugin of your own may forward them to a service you operate, for instance so that it can attribute each call's spend, and if it does, the run's own ids should win over an extras key of the same name, since the extras are caller data and must not be able to restate whose run it is.
+
+### Work that is not a run, and crashes
+
+A run is not the only thing a host does on a caller's behalf. Validating a bundle dry-runs its pipes without being a run, and an unhandled exception reaches PostHog through the interpreter's exception hook, which the [error trackers](#error-trackers) install and which is handed nothing but the error. Both are still attributed to the caller when one is known, so your configured `user_id` stands only for work that truly belongs to nobody:
+
+- **Validation.** The validate entry points take a `caller_identity` — the `user_id` and `extras` you would state on a run, as a `CallerIdentity`. `PipelexMTHDSProtocol.validate` passes the caller the protocol was built for, `validate_bundles_in_process`, `validate_bundle` and `BundleValidator` accept one directly, and the `BundleValidatorProtocol` seam requires one (`None` meaning "nobody"). The `pipe_dry_run` event and every dry run the validation performs are then attributed to that caller. A CLI validation on your own machine names nobody and keeps reporting under your configured id.
+- **Crashes inside a run.** Every pipe runs with its run's caller in scope, and an exception that escapes the pipe carries that caller with it — through any error a host raises `from` it — so the `$exception` captured when the run fails, or once the error reaches the interpreter, lands on the person whose run failed, with their groups. An exception raised outside every run reports under your configured id.
+- **Anything else with no run in hand.** An event emitted without a run but while a caller is in scope reads that caller. A host can open such a scope around its own work with `scoped_caller_identity(caller_identity=...)` from `pipelex.system.caller_identity`.
+
+The same rules apply to all of these as to a run: a placeholder such as `local` names nobody, `mode = "anonymous"` identifies nobody, and the caller never becomes an event property.
+
+!!! note "Anonymous mode covers your users too"
+    With `mode = "anonymous"`, the runtime identifies nobody on your stream: no run's `user_id` is applied, no groups are sent, and the `user_id` you configured is not sent either — a mode that identifies nobody would not be one that still named you. Leaving a `user_id` in `telemetry.toml` while switching to `anonymous` therefore changes nothing. Per-run attribution needs `mode = "identified"`.
+
+The rules it follows:
+
+- **Nothing is privileged.** `organization` is a word a host chose, not one Pipelex knows. A deployment that sends `{"tenant": "t-1", "plan_tier": "enterprise"}` is served identically, because the runtime never reads a key by name — the same boundary that keeps `storage_scope` opaque.
+- **It is validated where it enters.** A group type is lowercase snake_case starting with a letter (up to 32 characters); a group key is 1 to 128 characters from `A-Za-z0-9_-`; a run carries at most five group types. A mapping outside those bounds is refused before the run registers itself or emits anything, and again when a bridge payload is decoded — not later, inside a telemetry capture. The group key is quoted into log lines and capture payloads, so whitespace and control characters are refused outright.
+- **It is optional.** Omitting it leaves the group facet empty, which misattributes nothing. Unlike `user_id` and `storage_scope`, which have no default because a missing one used to be invented, a missing group invents nothing.
+- **It travels with the run.** The mapping rides the job through every nested pipe, and the bridge payload that crosses a process boundary carries it, so a distributed worker is handed the same groups the entry point was given.
+
+These are labels for grouping, not content: they land in the reserved identity fields of whichever backend understands groups, never in an event property or a span name.
+
+## Privacy
+
+We take your privacy seriously:
+
+- Nothing in `telemetry.toml` reports to Pipelex: every stream is one you configure, sent to a system you operate; the anonymous [usage statistics](usage-statistics.md) are separate and have switches of their own
+- Your `telemetry.toml` gives you full control over what data is captured
+- PostHog tracing includes privacy controls to redact sensitive content
+- All telemetry can be completely disabled
+
+For detailed configuration options, see [Telemetry Configuration](../configuration/config-practical/telemetry-config.md).
+
+For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).
