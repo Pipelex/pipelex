@@ -33,7 +33,7 @@ On the Text path:
 | --- | --- | --- | --- |
 | `type` | string | The type of the pipe: `PipeStructure` | Yes |
 | `description` | string | A description of what this structuring step produces. | Yes |
-| `inputs` | dictionary | Exactly one input, with no multiplicity. Its concept must be `Text` or refine `Text`, or be `Document` or refine `Document` to read a spreadsheet. | Yes |
+| `inputs` | dictionary | Exactly one input, with no multiplicity. Its concept must be `Text` or refine `Text`, or be `Document` or refine `Document`, at any depth, to read a spreadsheet; a concept that merely holds a `Document` in one of its fields is neither. | Yes |
 | `output` | string | The target structured concept, with optional multiplicity (`Foo`, `Foo[]`, `Foo[3]`). Cannot be `Text` or `Text`-compatible. Reading a spreadsheet, it must be a variable list (`Foo[]`). | Yes |
 | `model` | string or table | The LLM choice used for the structuring call. Defaults to the `for_object` LLM choice (override → default). Refused when reading a spreadsheet, which calls no model. | No |
 | `table` | string | Reading a spreadsheet: the name of the Excel Table to read, compared ignoring case. Leave it out to read the workbook's only Table. Refused on the Text path, and refused at run time for a CSV file, which has no Tables. | No |
@@ -79,6 +79,8 @@ max_table_cells = 2_000_000
 ```
 
 A workbook whose parts would hold more than `max_workbook_uncompressed_bytes` once decompressed, as its archive declares them, is refused before it is decompressed, and a Table spanning more than `max_table_cells` cells, its rows, header included, times its columns, is refused before its cells are read. Both refusals are `input.too_large`, naming the input. Cells are only ever read within the part of the sheet that holds cells: a column of the Table's declared range past the sheet's last filled column is no column of the table, and a row past the sheet's last filled row is an empty data row, counted toward the row position without being read. A refused workbook is fixed by reading a smaller Table, or by raising the limits on a deployment that has the memory for it.
+
+The table decides how many records the step outputs, so a step of a controller that asks it for a single output (`multiple_output = false`) or a fixed count (`nb_output`) fails when it runs, as `method.output_multiplicity_mismatch`; a batch over the step, or `multiple_output = true`, is fine.
 
 A dry run reads nothing: it produces mock records, with their positions in the `row_field`.
 

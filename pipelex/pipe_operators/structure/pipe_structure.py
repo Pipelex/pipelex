@@ -1,6 +1,6 @@
 from typing import Any, Final, Literal, NoReturn, TypeAlias
 
-from mthds.protocol.problem.registry import MethodOutputMultiplicityMismatchExpected
+from mthds.protocol.problem.registry import CoreCode, MethodOutputMultiplicityMismatchExpected
 from typing_extensions import override
 
 from pipelex import log
@@ -19,6 +19,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity, multiplicity_kind
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -126,15 +127,21 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
     def reads_document(self) -> bool:
         """Whether this step reads a spreadsheet: its single input is not Text-compatible and is a `Document` or refines it.
 
+        Being a `Document` is decided by lineage, never by shape: the input's structure class must be `DocumentContent` or
+        a class refining it, as the class of a concept refining `Document` is at any depth. The library's loose
+        compatibility would also take a concept that merely holds a `Document` in one of its fields, which no spreadsheet
+        is read from.
+
         Needs the library, which resolves the input's concept.
         """
-        the_single_input = self.inputs.get_single_stuff_spec()
+        input_concept = self.inputs.get_single_stuff_spec().concept
         concept_library = get_concept_library()
         text_concept = get_native_concept(native_concept=NativeConceptCode.TEXT)
-        if concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=text_concept, strict=False):
+        if concept_library.is_compatible(tested_concept=input_concept, wanted_concept=text_concept, strict=False):
             return False
-        document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
-        return concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=document_concept, strict=False)
+        if not input_concept.declares_a_structure_class:
+            return False
+        return issubclass(concept_library.get_structure_class(concept=input_concept), DocumentContent)
 
     def _refuse_field(self, *, field_name: str, finding: str) -> NoReturn:
         """Refuse a field of this step that breaks a rule of the language, located at the field's key path."""
@@ -201,7 +208,13 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
                 cell converts to, or `row_field` names no integer or number field of it.
         """
         declared_multiplicity = multiplicity_kind(multiplicity=self.output.multiplicity)
-        if declared_multiplicity != MethodOutputMultiplicityMismatchExpected.LIST:
+        is_variable_list: bool
+        match declared_multiplicity:
+            case MethodOutputMultiplicityMismatchExpected.LIST:
+                is_variable_list = True
+            case MethodOutputMultiplicityMismatchExpected.SINGLE | MethodOutputMultiplicityMismatchExpected.FIXED:
+                is_variable_list = False
+        if not is_variable_list:
             msg = (
                 f"PipeStructure '{self.code}' reads a spreadsheet into a list whose length is the table's, "
                 f"so its output must be a variable list ('{self.output.concept.code}[]'), got '{declared_multiplicity}'."
@@ -261,6 +274,7 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             return await super()._dry_run_operator_pipe(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
             )
+        self._refuse_output_multiplicity_override(pipe_run_params=pipe_run_params)
         row_model = self.row_model()
         nb_records = get_config().inference.dry_run.nb_list_items
         mock_records: list[StuffContent] = []
@@ -283,6 +297,37 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
             pipeline_run_id=job_metadata.run_metadata.pipeline_run_id,
         )
 
+    def _refuse_output_multiplicity_override(self, *, pipe_run_params: PipeRunParams) -> None:
+        """Refuse a run asking this spreadsheet step for anything but its variable list, as a step's `nb_output` or `multiple_output` can.
+
+        The table decides how many records the step outputs, so neither a single output nor a fixed count can be honoured.
+
+        Raises:
+            PipeRunError: The resolved multiplicity is a single output or a fixed count.
+        """
+        multiplicity_resolution = output_multiplicity_to_apply(
+            base_multiplicity=self.output_multiplicity,
+            override_multiplicity=pipe_run_params.output_multiplicity,
+        )
+        if not multiplicity_resolution.is_multiple_outputs_enabled:
+            requested = MethodOutputMultiplicityMismatchExpected.SINGLE
+            requested_label = "a single output"
+        elif multiplicity_resolution.specific_output_count is not None:
+            requested = MethodOutputMultiplicityMismatchExpected.FIXED
+            requested_label = f"{multiplicity_resolution.specific_output_count} outputs"
+        else:
+            return
+        location = self._format_error_location(pipe_run_params=pipe_run_params)
+        msg = (
+            f"PipeStructure {location} reads a spreadsheet into a list whose length is the table's, and the run asks it for "
+            f"{requested_label}: remove the step's `nb_output` or `multiple_output`."
+        )
+        raise (
+            PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
+            .with_error_code(CoreCode.METHOD_OUTPUT_MULTIPLICITY_MISMATCH)
+            .with_params(declared=MethodOutputMultiplicityMismatchExpected.LIST, expected=requested)
+        )
+
     async def _read_spreadsheet(
         self,
         *,
@@ -296,9 +341,11 @@ class PipeStructure(PipeOperator[PipeStructureOutput]):
         No model is called, so the node records none and the step costs no inference.
 
         Raises:
+            PipeRunError: The run asks the step for a single output or a fixed count.
             CsvError: The file, its table or a row cannot be read into the output concept, naming the input.
             TableFileTypeUnsupportedError: The document is neither an Excel workbook nor a CSV file.
         """
+        self._refuse_output_multiplicity_override(pipe_run_params=pipe_run_params)
         document = working_memory.get_stuff_as_document(name=self.source_input_name)
         row_model = self.row_model()
         field_names = flat_field_names(row_model)

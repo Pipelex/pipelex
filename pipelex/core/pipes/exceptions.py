@@ -94,6 +94,7 @@ class PipeRunError(PipelexError):
             CoreCode.METHOD_WIRING_INVALID,
             CoreCode.METHOD_NAME_CONFLICT,
             CoreCode.METHOD_OPTIONAL_UNHANDLED,
+            CoreCode.METHOD_OUTPUT_MULTIPLICITY_MISMATCH,
         ),
     )
 

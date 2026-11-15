@@ -4,13 +4,16 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from mthds.protocol.problem.registry import CoreCode, MethodOutputMultiplicityMismatchExpected
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.exceptions import PipeValidationError
+from pipelex.core.pipes.exceptions import PipeRunError, PipeValidationError
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.errors.problem import ProblemView
 from pipelex.interpreter_hub import get_native_concept, get_pipe_router
 from pipelex.pipe_machinery.pipe_factory import PipeFactory
 from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
@@ -46,9 +49,16 @@ description = "A folder of lines"
 [concept.Folder.structure]
 lines = {{ type = "list", item_type = "text", description = "The lines" }}
 
+[concept.Filing]
+description = "A filing that holds a document among its fields, without being one"
+[concept.Filing.structure]
+attachment = {{ type = "concept", concept_ref = "native.Document", description = "The attached document" }}
+label      = {{ type = "text", description = "A label" }}
+
 [concept]
 Note = "A note with no structure"
 Workbook = {{ description = "A budget workbook", refines = "Document" }}
+SignedWorkbook = {{ description = "A signed budget workbook", refines = "budget_read.Workbook" }}
 Photo = {{ description = "A photo of a receipt", refines = "Image" }}
 """
 
@@ -74,7 +84,7 @@ def _structure_pipe(
         domain_code=DOMAIN,
         pipe_code="read_budget",
         blueprint=blueprint,
-        concept_codes_from_the_same_domain=["BudgetLine", "Folder", "Note", "Photo", "Workbook"],
+        concept_codes_from_the_same_domain=["BudgetLine", "Filing", "Folder", "Note", "Photo", "SignedWorkbook", "Workbook"],
     )
 
 
@@ -82,11 +92,18 @@ def _data_url(*, data: bytes, mime_type: str) -> str:
     return f"data:{mime_type};base64,{base64.b64encode(data).decode('ascii')}"
 
 
-async def _run(*, pipe: PipeStructure, document: DocumentContent, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode) -> list[StuffContent]:
+async def _run(
+    *,
+    pipe: PipeStructure,
+    document: DocumentContent,
+    job_metadata: JobMetadata,
+    pipe_run_mode: PipeRunMode,
+    output_multiplicity: VariableMultiplicity | None = None,
+) -> list[StuffContent]:
     document_stuff = StuffFactory.make_stuff(concept=get_native_concept(NativeConceptCode.DOCUMENT), content=document, name="budget")
     pipe_job = PipeJobFactory.make_pipe_job(
         pipe=pipe,
-        pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+        pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode, output_multiplicity=output_multiplicity),
         job_metadata=job_metadata,
         working_memory=WorkingMemoryFactory.make_from_single_stuff(document_stuff),
         output_name="lines",
@@ -108,6 +125,12 @@ class TestPipeStructureSpreadsheet:
         pipe.validate_output_with_library()
         assert pipe.reads_document()
 
+    def test_a_concept_refining_document_at_any_depth_reads_a_spreadsheet(self) -> None:
+        pipe = _structure_pipe(inputs={"budget": "SignedWorkbook"})
+
+        pipe.validate_inputs_with_library()
+        assert pipe.reads_document()
+
     @pytest.mark.parametrize(
         ("pipe_fields", "validation", "expected_field", "expected_error_type"),
         [
@@ -123,6 +146,10 @@ class TestPipeStructureSpreadsheet:
             pytest.param({"inputs": {"text": "Text"}, "table": "Budget"}, "inputs", "table", None, id="table-on-text-path"),
             pytest.param({"inputs": {"text": "Text"}}, "inputs", "row_field", None, id="row-field-on-text-path"),
             pytest.param({"inputs": {"picture": "Image"}}, "inputs", None, PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH, id="image-input"),
+            # A concept holding a Document in a field is no Document: only lineage makes the input a spreadsheet.
+            pytest.param(
+                {"inputs": {"filing": "Filing"}}, "inputs", None, PipeValidationErrorType.INPUT_STUFF_SPEC_MISMATCH, id="document-in-a-field"
+            ),
         ],
     )
     def test_spreadsheet_rules_are_refused(
@@ -199,3 +226,50 @@ class TestPipeStructureSpreadsheet:
 
         assert isinstance(exc_info.value.__cause__, TableFileTypeUnsupportedError)
         assert "Input 'budget' is a PDF document" in str(exc_info.value.__cause__)
+
+    @pytest.mark.parametrize(
+        ("output_multiplicity", "expected"),
+        [
+            pytest.param(False, MethodOutputMultiplicityMismatchExpected.SINGLE, id="single-output"),
+            pytest.param(3, MethodOutputMultiplicityMismatchExpected.FIXED, id="fixed-count"),
+        ],
+    )
+    @pytest.mark.parametrize("pipe_run_mode", [PipeRunMode.LIVE, PipeRunMode.DRY])
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_run_asking_for_another_multiplicity_is_refused(
+        self,
+        job_metadata: JobMetadata,
+        pipe_run_mode: PipeRunMode,
+        output_multiplicity: VariableMultiplicity,
+        expected: MethodOutputMultiplicityMismatchExpected,
+    ) -> None:
+        """The table decides how many records the step outputs, so a step's `nb_output` or `multiple_output = false` cannot be honoured."""
+        csv_bytes = b"item,amount\nPaper,2\n"
+        document = DocumentContent(url=_data_url(data=csv_bytes, mime_type="text/csv"), mime_type="text/csv", filename="budget.csv")
+
+        with pytest.raises(PipeRouterError) as exc_info:
+            await _run(
+                pipe=_structure_pipe(),
+                document=document,
+                job_metadata=job_metadata,
+                pipe_run_mode=pipe_run_mode,
+                output_multiplicity=output_multiplicity,
+            )
+
+        cause = exc_info.value.__cause__
+        assert isinstance(cause, PipeRunError)
+        assert "remove the step's `nb_output` or `multiple_output`" in str(cause)
+        wire = cause.to_problem(view=ProblemView.CALLER).to_wire()
+        assert wire.get("code") == CoreCode.METHOD_OUTPUT_MULTIPLICITY_MISMATCH
+        assert wire.get("params") == {"pipe": "read_budget", "declared": "list", "expected": expected}, wire
+
+    @pytest.mark.asyncio(loop_scope="class")
+    async def test_a_run_asking_for_a_list_reads_the_table(self, job_metadata: JobMetadata) -> None:
+        csv_bytes = b"item,amount\nPaper,2\n"
+        document = DocumentContent(url=_data_url(data=csv_bytes, mime_type="text/csv"), mime_type="text/csv", filename="budget.csv")
+
+        items = await _run(
+            pipe=_structure_pipe(), document=document, job_metadata=job_metadata, pipe_run_mode=PipeRunMode.LIVE, output_multiplicity=True
+        )
+
+        assert [item.model_dump()["item"] for item in items] == ["Paper"]
