@@ -57,7 +57,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 1. `pipelex_local.toml`
 2. `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) — selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; unit tests use `tests/pipelex_unit_test.toml`, the one override file read outside a `.pipelex/` directory)
+3. `pipelex_{run_mode}.toml` (example: `pipelex_normal.toml`; the tests use `tests/pipelex_unit_test.toml` instead, under every test run mode, the one override file read outside a `.pipelex/` directory)
 4. `pipelex_override.toml` (recommended to gitignore)
 5. `pipelex_temporary_override.toml` (recommended to gitignore)
 
@@ -96,7 +96,7 @@ The exact loading sequence is (later wins, per leaf key):
 Notes on the override sequence:
 
 - `pipelex_{environment}.toml` (example: `pipelex_dev.toml`) is selected by the `PIPELEX_ENV` environment variable (see [Selecting the environment](#selecting-the-environment))
-- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under unit testing the run-mode overlay is sourced exclusively from `./tests/pipelex_{run_mode}.toml`
+- `pipelex_{run_mode}.toml` — example run modes: normal, unit_test; under any test run mode (`unit_test`, `ci_test`, `codex_cloud_test`) no run-mode file is read from a `.pipelex/` directory, and `./tests/pipelex_unit_test.toml` is layered on top instead
 - Each subsequent configuration file in this sequence can override settings from the previous ones, and project-level files override the global `~/.pipelex/` layer
 - The two inference documents, `inference/backends.toml` and `inference/routing_profiles.toml`, are not part of this merge. Each has a single personal override file beside it, `backends_override.toml` and `routing_profiles_override.toml`, merged over the resolved base — global tier first, then project tier. See [Personal overrides](config-technical/inference-backend-config.md#personal-overrides)
 
