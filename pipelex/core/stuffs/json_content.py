@@ -2,11 +2,11 @@ import json
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from json2html import json2html
-from pydantic import Field, PrivateAttr, field_validator
+from pydantic import Field, field_validator
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import StoredValueUnreadableError
-from pipelex.core.stuffs.stored_value_content import StoredValueContent
+from pipelex.core.stuffs.stored_value_content import StoredValue, StoredValueContent
 from pipelex.tools.misc.filetype_utils import base_mime_type
 from pipelex.tools.misc.markdown_utils import convert_to_markdown
 from pipelex.tools.misc.pretty import require_rich_for_rendering
@@ -38,9 +38,6 @@ class JSONContent(StoredValueContent):
         default=None, description="The first few hundred characters of the stored JSON object's serialized form, always its true start"
     )
 
-    # The JSON object read from storage for a referenced content, never serialized.
-    _loaded_json_obj: dict[str, Any] | None = PrivateAttr(default=None)
-
     @field_validator("json_obj", mode="before")
     @classmethod
     def check_valid_json(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
@@ -56,18 +53,12 @@ class JSONContent(StoredValueContent):
         return value
 
     @override
-    def _has_loaded_value(self) -> bool:
-        return self._loaded_json_obj is not None
-
-    @override
-    def accept_loaded_text(self, *, text: str) -> None:
-        """Keep the stored JSON, decoded by its MIME type: a JSON type, or none declared, is parsed back into its object.
+    def _decode_loaded_text(self, *, text: str) -> StoredValue:
+        """The stored JSON, decoded by its MIME type: a JSON type, or none declared, is parsed back into its object.
 
         Raises:
             StoredValueUnreadableError: The stored value declares a type that is not JSON, or is not a JSON object.
         """
-        if self.url is None:
-            return
         if self.mime_type is not None and not is_json_mime_type(mime_type=self.mime_type):
             msg = f"A stored JSON value declares the MIME type '{self.mime_type}', which is not JSON."
             raise StoredValueUnreadableError(msg)
@@ -79,11 +70,7 @@ class JSONContent(StoredValueContent):
         if not isinstance(decoded, dict):
             msg = f"A stored JSON value is a JSON {type(decoded).__name__}, and a JSON content holds an object."
             raise StoredValueUnreadableError(msg)
-        self._loaded_json_obj = cast("dict[str, Any]", decoded)
-
-    @override
-    def require_value(self) -> dict[str, Any]:
-        return self.require_json_obj()
+        return cast("dict[str, Any]", decoded)
 
     def require_json_obj(self) -> dict[str, Any]:
         """The JSON object, held inline or loaded from storage.
@@ -91,11 +78,8 @@ class JSONContent(StoredValueContent):
         Raises:
             StoredValueNotLoadedError: The content holds a reference to its JSON that was never loaded.
         """
-        if self.json_obj is not None:
-            return self.json_obj
-        if self._loaded_json_obj is not None:
-            return self._loaded_json_obj
-        raise self._make_not_loaded_error()
+        # A JSON content's value is its `json_obj` field, or the object its stored text decodes into, so it is always a dict.
+        return cast("dict[str, Any]", self.require_value())
 
     @property
     @override

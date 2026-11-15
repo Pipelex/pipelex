@@ -1,7 +1,7 @@
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
 from kajson import kajson
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
@@ -28,34 +28,14 @@ class HtmlContent(StoredValueContent):
     mime_type: str | None = Field(default=None, description="The MIME type of the stored inner HTML: text/html")
     preview: str | None = Field(default=None, description="The first few hundred characters of the stored inner HTML, always its true start")
 
-    # The HTML read from storage for a referenced content, never serialized.
-    _loaded_inner_html: str | None = PrivateAttr(default=None)
-
-    @override
-    def _has_loaded_value(self) -> bool:
-        return self._loaded_inner_html is not None
-
-    @override
-    def accept_loaded_text(self, *, text: str) -> None:
-        if self.url is None:
-            return
-        self._loaded_inner_html = text
-
-    @override
-    def require_value(self) -> str:
-        return self.require_inner_html()
-
     def require_inner_html(self) -> str:
         """The inner HTML, held inline or loaded from storage.
 
         Raises:
             StoredValueNotLoadedError: The content holds a reference to its HTML that was never loaded.
         """
-        if self.inner_html is not None:
-            return self.inner_html
-        if self._loaded_inner_html is not None:
-            return self._loaded_inner_html
-        raise self._make_not_loaded_error()
+        # An HTML content's value is its `inner_html` field, or the markup loaded as it was stored, so it is always a `str`.
+        return cast("str", self.require_value())
 
     @property
     @override

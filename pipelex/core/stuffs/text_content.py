@@ -1,9 +1,9 @@
 import html
 import json
 import re
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, ClassVar, cast
 
-from pydantic import Field, PrivateAttr
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.core.stuffs.stored_value_content import StoredValueContent
@@ -28,34 +28,14 @@ class TextContent(StoredValueContent):
     mime_type: str | None = Field(default=None, description="The MIME type of the stored text: text/plain or text/markdown")
     preview: str | None = Field(default=None, description="The first few hundred characters of the stored text, always its true start")
 
-    # The text read from storage for a referenced content, never serialized.
-    _loaded_text: str | None = PrivateAttr(default=None)
-
-    @override
-    def _has_loaded_value(self) -> bool:
-        return self._loaded_text is not None
-
-    @override
-    def accept_loaded_text(self, *, text: str) -> None:
-        if self.url is None:
-            return
-        self._loaded_text = text
-
-    @override
-    def require_value(self) -> str:
-        return self.require_text()
-
     def require_text(self) -> str:
         """The text, held inline or loaded from storage.
 
         Raises:
             StoredValueNotLoadedError: The content holds a reference to its text that was never loaded.
         """
-        if self.text is not None:
-            return self.text
-        if self._loaded_text is not None:
-            return self._loaded_text
-        raise self._make_not_loaded_error()
+        # A text content's value is its `text` field, or the text loaded as it was stored, so it is always a `str`.
+        return cast("str", self.require_value())
 
     @property
     @override

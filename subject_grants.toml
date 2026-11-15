@@ -2412,10 +2412,6 @@ rationale = "Noun-named derivation: the pinned description for the native code; 
 param = "native_code"
 rationale = "Noun-named derivation: the pinned structure for the native code; single operand."
 
-["pipelex/core/concepts/native/pinned_blueprints.py::_stored_value_field_name"]
-param = "native_code"
-rationale = "A lookup keyed by its one native code, called like _pinned_structure and _pinned_description beside it."
-
 ["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_blueprint"]
 param = "native_code"
 rationale = "Factory from source: builds the blueprint for the native code; single operand."

@@ -15,7 +15,7 @@ from pydantic.fields import FieldInfo
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.core.stuffs.stored_value_content import REFERENCE_METADATA_FIELDS, StoredValueContent
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -145,7 +145,7 @@ class DryRunFactory:
         if cls._is_stored_value_class(object_class=object_class):
             # A text, HTML or JSON value is mocked inline: it holds its value or a URL, never both, and polyfactory
             # fills every optional field, so the reference's fields are pinned to None.
-            return {field_name: Use(cls._no_value) for field_name in ("url", *REFERENCE_METADATA_FIELDS)}
+            return {field_name: Use(cls._no_value) for field_name in STORED_VALUE_REFERENCE_FIELDS}
         return {}
 
     @classmethod
@@ -160,7 +160,7 @@ class DryRunFactory:
         """
         if issubclass(object_class, StoredValueContent):
             return True
-        return {"url", *REFERENCE_METADATA_FIELDS} <= set(object_class.model_fields)
+        return set(STORED_VALUE_REFERENCE_FIELDS) <= set(object_class.model_fields)
 
     @classmethod
     def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:
