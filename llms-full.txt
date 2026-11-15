@@ -7642,11 +7642,16 @@ Analyze the following topic in depth, considering multiple perspectives:
 
 # PipeStructure
 
-`PipeStructure` is the operator that turns text into structured data. It takes a single `Text`-compatible input, asks an LLM to extract the requested structure, and produces a typed object (or list of objects) matching your output concept.
+`PipeStructure` is the operator that turns a single input into structured data. The concept of that input decides how:
 
-Use `PipeStructure` whenever the source of the text is not the LLM call itself — for example when text comes from a PDF extraction, a web search result, a user message, or an upstream `PipeLLM` step that intentionally produced free-form prose.
+- **A `Text` input** (or a concept that refines `Text`): an LLM extracts the requested structure from the text and produces a typed object, or a list of objects, matching your output concept.
+- **A `Document` input** (or a concept that refines `Document`): the runtime reads one table of a spreadsheet, an Excel workbook (`.xlsx`) or a CSV file, into a list of records, one per data row, and calls no model. See [Reading a spreadsheet](#reading-a-spreadsheet).
+
+Use the Text path whenever the source of the text is not the LLM call itself — for example when text comes from a PDF extraction, a web search result, a user message, or an upstream `PipeLLM` step that intentionally produced free-form prose.
 
 ## How it works
+
+On the Text path:
 
 1. The operator reads the single declared input from the working memory and renders the built-in `structuring_prompt` template against it.
 2. It appends a JSON-schema description of the target concept (the same helper `PipeLLM` uses for object generation) so the model knows which fields to fill.
@@ -7665,16 +7670,18 @@ Use `PipeStructure` whenever the source of the text is not the LLM call itself �
 | --- | --- | --- | --- |
 | `type` | string | The type of the pipe: `PipeStructure` | Yes |
 | `description` | string | A description of what this structuring step produces. | Yes |
-| `inputs` | dictionary | Exactly one input. Its concept must be `Text` or refine `Text` (e.g. `Document` is not allowed; a domain concept that `refines = "Text"` is). | Yes |
-| `output` | string | The target structured concept, with optional multiplicity (`Foo`, `Foo[]`, `Foo[3]`). Cannot be `Text` or `Text`-compatible. | Yes |
-| `model` | string or table | The LLM choice used for the structuring call. Defaults to the `for_object` LLM choice (override → default). | No |
+| `inputs` | dictionary | Exactly one input, with no multiplicity. Its concept must be `Text` or refine `Text`, or be `Document` or refine `Document`, at any depth, to read a spreadsheet; a concept that merely holds a `Document` in one of its fields is neither. | Yes |
+| `output` | string | The target structured concept, with optional multiplicity (`Foo`, `Foo[]`, `Foo[3]`). Cannot be `Text` or `Text`-compatible. Reading a spreadsheet, it must be a variable list (`Foo[]`). | Yes |
+| `model` | string or table | The LLM choice used for the structuring call. Defaults to the `for_object` LLM choice (override → default). Refused when reading a spreadsheet, which calls no model. | No |
+| `table` | string | Reading a spreadsheet: the name of the Excel Table to read, compared ignoring case. Leave it out to read the workbook's only Table. Refused on the Text path, and refused at run time for a CSV file, which has no Tables. | No |
+| `row_field` | string | Reading a spreadsheet: an integer or number field of the output concept that receives each row's position among the table's data rows, counted from 1. No column may match it. Refused on the Text path. | No |
 
 ### LLM Setting Fields
 
 When `model` is given as a table, it accepts the same fields as `PipeLLM`'s inline LLM setting (`model`, `temperature`, `max_tokens`, `reasoning_effort`, `reasoning_budget`, `description`). See [PipeLLM › LLM Setting Fields](./PipeLLM.md#llm-setting-fields).
 
-!!! note "No images, no documents"
-    `PipeStructure` is intentionally narrow: it takes one `Text` input. To structure an image or a PDF page, run an upstream extraction step (e.g. `PipeExtract` or a vision `PipeLLM`) and feed its text output into `PipeStructure`.
+!!! note "No images, no PDFs"
+    `PipeStructure` is intentionally narrow: it takes one `Text` input, or one spreadsheet `Document`. To structure an image or a PDF page, run an upstream extraction step (e.g. `PipeExtract` or a vision `PipeLLM`) and feed its text output into `PipeStructure`.
 
 ### Output Multiplicity
 
@@ -7685,6 +7692,53 @@ Use bracket notation in the `output` field to control how many items the LLM sho
 - `output = "Review[3]"` — exactly three.
 
 See [Understanding Multiplicity](../understanding-multiplicity.md) for the full picture.
+
+## Reading a spreadsheet
+
+When the single input is a `Document`, `PipeStructure` reads one table of the file into the output list, one item per data row, with no model call and no inference cost. The file's format is judged from its bytes first, then from the media type and the file name it was given with: an Excel workbook (`.xlsx`) or a CSV file is read, and any other file is refused, naming the input. A CSV file has no signature its bytes could be told by, and uploads often declare it with a type that names no table format, such as `application/octet-stream`, `text/plain` or `application/vnd.ms-excel`, the type Windows gives a `.csv` file when Excel is installed: when the bytes say nothing and the declared type names neither format, a file named `….csv` or `….xlsx` is read by its name. A workbook whose archive lists its spreadsheet parts after other entries can look like a plain ZIP archive from its first bytes: when neither its declared type nor its name says more, its archive's directory is read, and a file declaring a spreadsheet main part, or holding `xl/workbook.xml`, is read as a workbook. Run setup already refuses a file of another format given as a method input, before any step runs. Reading a workbook needs the `tabular` extra (`pip install "pipelex[tabular]"`), which installs openpyxl.
+
+**Which table.** In a workbook, the rows are read from an Excel Table, the named table object created with Insert > Table: the one `table` names, or the workbook's only Table when `table` is left out. A workbook with no Table of that name, or, with no name given, several Tables or none, is refused, and the refusal lists the Tables found. The Table's header row names the columns, and its totals row is not read. A CSV file is one table, read as comma-separated UTF-8 with a header line, a leading byte order mark ignored.
+
+**Which columns.** Each column header is matched to a field of the output concept ignoring case, spaces, dots and underscores, so a `Unit price` column fills `unit_price`. A header spelling a field's name exactly binds that field first, before any such comparison: an output concept with both `unit_price` and `unitprice` reads each from the column named exactly after it, and only a header spelling neither, such as `Unit Price`, matches both. A column that matches no field is ignored. A header matching several fields, several headers matching the same field, and a header matching the `row_field` are refused, and so is a required field that no column matches. An optional field with no column takes its default value, or nothing.
+
+**Which rows.** Every row of an Excel Table is a data row, an empty one included, and the totals row is not. In a CSV file, a blank line is skipped and not counted, a line of empty cells (`,,`) is a data row, a shorter line is padded with empty cells, and a line wider than the header is refused. The `row_field`, when given, receives each row's position among the data rows, counted from 1, so a row the method later changes can be found again.
+
+**Which values.** The output concept's fields must each be `text`, `integer`, `number`, `boolean`, `date`, `datetime` or `choices`; a concept without a structure, or with a nested or list field, is refused. An empty cell gives the field its default value, or nothing. A workbook cell keeps its type: a text field reads a whole number as its digits, another number in its shortest decimal form, a date in ISO 8601 form and a boolean as `true` or `false`; an integer field reads a number without a fractional part; a number field any number, never a boolean; a boolean field a boolean; a date field a date, or a datetime at midnight; a datetime field a datetime or a date. A text cell, which every CSV cell is, gives an integer only from an integer literal, a number only from a decimal written with a dot and no grouping separator (`1,5`, `1 234.5` and `1_000` are refused), both written in ASCII digits and refused when too large to be held, such as `1e999`, a boolean from `true`/`false`, `yes`/`no`, `on`/`off`, `y`/`n`, `t`/`f` or `1`/`0` ignoring case, a date or a datetime only in ISO 8601 form, and a choice only when it matches exactly. A value that does not convert fails the step, naming the row's position and the field.
+
+**Formulas.** A formula cell is read as the value the workbook last calculated and stored. A workbook saved by a program that stores no such value, as some generators do, has none: the cell reads as empty, and the step logs a warning naming the field. A formula whose stored value is an empty text, such as `=IF(A2>0,"","x")`, also reads as empty, but was calculated, so no warning is logged for it.
+
+**Limits.** Whoever supplies the file chooses its size, and a workbook of a few compressed kilobytes can declare a Table of millions of cells, so two limits are checked before any cell is read, set under `[runtime.table_reading]`:
+
+```toml
+[runtime.table_reading]
+max_workbook_uncompressed_bytes = 100_000_000
+max_table_cells = 2_000_000
+```
+
+A workbook whose parts would hold more than `max_workbook_uncompressed_bytes` once decompressed, as its archive declares them, is refused before it is decompressed, and a Table spanning more than `max_table_cells` cells, its rows, header included, times its columns, is refused before its cells are read. Cells are only ever read within the part of the sheet that holds cells: a column of the Table's declared range past the sheet's last filled column is no column of the table, and a row past the sheet's last filled row is an empty data row, counted toward the row position without being read. Such a row is still a record the step outputs, so every row the Table declares counts toward `max_table_cells`, only its columns being clipped to the sheet, and a Table counts at least one column wide; a Table with no column within the sheet has no header cell and is refused. A CSV file is held to `max_table_cells` too, counted while it is parsed, the header's cells and each line's, a line narrower than the header counting as wide as it and a blank line not at all, and parsing stops as soon as the count passes the limit. Both refusals are `input.too_large`, naming the input. A refused file is fixed by reading a smaller table, or by raising the limits on a deployment that has the memory for it.
+
+The table decides how many records the step outputs, so a step of a controller that asks it for a single output (`multiple_output = false`) or a fixed count (`nb_output`) fails when it runs, as `method.output_multiplicity_mismatch`; a batch over the step, or `multiple_output = true`, is fine.
+
+A dry run reads nothing: it produces mock records, with their positions in the `row_field`.
+
+```toml
+[concept.BudgetLine]
+description = "One line of a budget workbook"
+
+[concept.BudgetLine.structure]
+line     = { type = "integer", description = "The line's position in the table" }
+item     = { type = "text", required = true, description = "What is bought" }
+amount   = { type = "number", description = "What it costs" }
+approved = { type = "boolean", description = "Whether it is approved" }
+
+[pipe.read_budget]
+type = "PipeStructure"
+description = "Read the budget lines from the workbook"
+inputs = { budget = "Document" }
+output = "BudgetLine[]"
+table = "Expenses"
+row_field = "line"
+```
 
 ## Examples
 
@@ -7765,6 +7819,7 @@ model = "@default-premium"
 - You already have text and you want it as a typed object.
 - You want a deterministic boundary between "writing prose" and "filling a schema" — for example to make the prose call cheaper, or to swap the structuring model independently.
 - You want the same structuring step reused across several upstream sources (extraction, search, generation).
+- You have a spreadsheet and want its rows as typed records, without paying for a model to read them.
 
 For the common case where the text is freshly produced by an LLM and you want a single declaration, see [`structuring_method = "preliminary_text"` on PipeLLM](./PipeLLM.md#structuring-method-preliminary-text), which expands at build time into a `PipeSequence` of `PipeLLM` (text) + `PipeStructure`.
 
@@ -7773,6 +7828,7 @@ For the common case where the text is freshly produced by an LLM and you want a 
 - [PipeLLM](./PipeLLM.md) — direct structured generation in a single call, plus the `preliminary_text` shorthand.
 - [PipeExtract](./PipeExtract.md) — produces text from PDFs and images, a natural upstream step.
 - [Understanding Multiplicity](../understanding-multiplicity.md) — single vs list outputs.
+- [CSV Input & Output](../csv-input-and-output.md) — a CSV file or a workbook given directly as a method's list input, and CSV output.
 
 
 ## PipeExtract
@@ -8798,8 +8854,10 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `format` | string | `pdf`, `xlsx`, `docx` or `pptx`. It sets the file's type and suffix. | Yes |
 | `model` | string | The document engine that prints the file, a `doc_gen` model, alias or preset, such as `reportlab-pdf` or, with the plugin, `pipelex-pdf`. It defaults to the model deck's engine for the format and source. | No |
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
-| `template_file` | string | A template file relative to the bundle's file, written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a URL, a backslash and a colon are refused. When the bundle is read from a folder, the file is the one its [method tree](../../method-trees.md#file-references) holds at that path, a `..` climbing to another folder of the tree included, and a file the tree keeps out, such as a gitignored one, is refused; a path that climbs above the tree's root is refused as a security matter, `security.method_path_refused`, which fails validation and the run rather than reporting a validation error, and logs a security event; a bundle file run alone with no `METHODS.toml` at or above it reads no other file. When the bundle is loaded from a string, the file is one of the files sent with it, each keyed by a path inside the bundle, so a path no such file could be keyed by, one holding a `..` segment or a NUL character, or naming no file, is refused when the bundle is parsed, as a validation error at the step that does not repeat the path. It excludes `template`. `pptx` requires one. | No |
-| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
+| `template_file` | string | A template file relative to the bundle's file, written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a URL, a backslash and a colon are refused. When the bundle is read from a folder, the file is the one its [method tree](../../method-trees.md#file-references) holds at that path, a `..` climbing to another folder of the tree included, and a file the tree keeps out, such as a gitignored one, is refused; a path that climbs above the tree's root is refused as a security matter, `security.method_path_refused`, which fails validation and the run rather than reporting a validation error, and logs a security event; a bundle file run alone with no `METHODS.toml` at or above it reads no other file. When the bundle is loaded from a string, the file is one of the files sent with it, each keyed by a path inside the bundle, so a path no such file could be keyed by, one holding a `..` segment or a NUL character, or naming no file, is refused when the bundle is parsed, as a validation error at the step that does not repeat the path. It excludes `template` and `template_input`. `pptx` requires one, or a `template_input`. | No |
+| `template_input` | string | The input whose file is the office template, for `xlsx`, `docx` or `pptx`: the run supplies the template rather than the method. The input must be declared, as `Document` or a concept that refines it, single and required. It excludes `template` and `template_file`. See [A template the run supplies](#a-template-the-run-supplies). | No |
+| `table_fill` | string | How the records of a list input fill a Table of an `xlsx` template: `replace`, the default, writes them over the Table's rows, and `append` adds them after the rows the Table already holds. `append` needs an office template, `template_file` or `template_input`, and an engine that declares it. | No |
+| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code, or, with a `template_input`, to the name of the input's file. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
 
 ### The file's name
 
@@ -8890,6 +8948,31 @@ The engine that prints HTML joins each relative URL to a base URL Pipelex hands 
 An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
 A bundle loaded from a directory, a dependency package's included, finds its template file beside its own file, and never among the files sent with a request. A bundle loaded from a string has no directory, so its template files come with it: the API's routes take the whole method as a tree in `files`, or, until the server retires these older fields, its bundles as strings in `mthds_contents` with their template files in the request's `resources`, each keyed by exactly the path its step names, and the Python entry points take them as `submitted_files` (see [Template files sent with a bundle](#template-files-sent-with-a-bundle)). A string-loaded step whose file was not supplied is refused at load, saying so, whatever source label the bundle carries: only a bundle file the runtime read itself has a directory beside it, so a label naming a path, or a `source` written in the bundle's text, never makes the runtime read its own disk. An inline `template` works on every load path.
+
+### A template the run supplies
+
+A step with `template_input` fills the file one of its inputs holds rather than a file of its method: the caller sends a workbook, a Word document or a deck as that input, and the step returns a copy of it with the other inputs filled in. Paired with `table_fill = "append"`, a step adds records to the Table of the caller's own workbook:
+
+```toml
+[concept.ExpenseWorkbook]
+description = "The caller's workbook with the new expenses recorded"
+refines     = "Document"
+
+[pipe.record_expenses]
+type           = "PipeDocGen"
+description    = "Append the extracted expenses to the caller's expense workbook"
+inputs         = { workbook = "Document", expense_rows = "ExpenseRow[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "append"
+```
+
+- **The output is a new file.** The engine fills a copy of the input's file and the step stores it as a new document, so the caller's file is never changed in place. Without a `filename`, the copy takes the input file's name, `expenses.xlsx` for a workbook sent under that name.
+- **The template input is the template, not data.** It is left out of the data the template is filled with, so only the step's other inputs fill it, `expense_rows` above.
+- **The file must be of the step's format.** Its format is judged from its bytes first, then from the media type it was sent with, then from its name, so a Word document sent as `expenses.xlsx` is refused, as is a macro-enabled workbook for an `xlsx` step. The refusal, `input.file_type_unsupported`, names the input.
+- **The template is checked when the run supplies it.** `pipelex validate` cannot see the file, so its verdict carries a `template_check_warning` saying the template is checked later. When a run starts, before any step does, run setup reads each template the caller supplies to a step certain to run, under the run's read scope, and hands it to the engine's template checker: an error refuses the run as the caller's, `pipelex.docgen.template_input_unfit`, naming the input and what the checker found, and a warning is logged with the run. The print checks the file again before the engine fills it, which also covers a template an earlier step produced, or one reached through a condition.
+- **The engine must declare `append`.** A step with `table_fill = "append"` is refused when the method loads if its engine does not declare that it appends to a Table, `model.capability_unsupported`.
 
 ### Template files sent with a bundle
 
@@ -12829,7 +12912,7 @@ In addition to the base `pipelex.toml`, Pipelex applies override files from **in
 
 The configuration is organized into these main sections. The first three mirror the layers of the runtime:
 
-1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), reporting, tracing, observation, and the plugin denylist
+1. `[runtime]` - process-scoped infrastructure: storage, secrets, logging, error trackers (see [Error Tracking](config-practical/error-tracking-config.md)), cloud credentials, outbound network posture, document conversion (Office files to PDF, off by default, see [Document Conversion](config-technical/document-conversion-config.md)), the limits a spreadsheet is read under (`[runtime.table_reading]`, see [PipeStructure › Reading a spreadsheet](../building-methods/pipes/pipe-operators/PipeStructure.md#reading-a-spreadsheet)), reporting, tracing, observation, and the plugin denylist
 2. `[inference]` - the model-calling seam: the model deck, LLM, image generation, extraction, the default templating style, and dry-run mocks
 3. `[interpreter]` - library-scoped method machinery: MTHDS parsing, the limits a method tree is listed under, pipe runs, pipe functions, pipeline execution, source scanning, and the builder
 4. `[run]` - where `pipelex run` and `pipelex-agent run` execute a method by default: on this machine or on the hosted Pipelex API, see [Run Configuration](config-practical/run-config.md)
@@ -22479,7 +22562,7 @@ class HelloInferencePlugin:
     name = "hello_inference"
     # The plugin API version this plugin was written against, as a literal: never import the
     # runtime's PLUGIN_API_VERSION here, or the check that catches a breaking runtime upgrade always passes.
-    targets_api = 10
+    targets_api = 11
 
     def register(self, registrar: PluginRegistrar) -> None:
         registrar.add_inference_backend(family=InferenceFamily.LLM, sdk="hello", make_worker=_make_hello_llm_worker)
@@ -23876,7 +23959,7 @@ A step asks for a **format** (`pdf`, `xlsx`, `docx`, `pptx`), and its template d
 | --- | --- | --- |
 | No template (a `pdf`, `xlsx` or `docx`; a `pptx` needs a template file) | `layout` | The layout tree of the inputs |
 | An HTML `template` or `.html` `template_file` (a `pdf` only) | `html` | The template rendered against the inputs |
-| An office `template_file` | `template_file` | The file's bytes and the inputs as plain data |
+| An office `template_file`, or a `template_input` naming the input whose file is the template | `template_file` | The file's bytes and the inputs as plain data |
 
 Each engine is a model of the `internal` backend, declared with the sources it prints from as its `inputs` and its format as its `outputs`. The built-in engine is declared in the kit's `internal.toml`, which `pipelex update` refreshes, so an existing install receives it:
 
@@ -23961,6 +24044,7 @@ When a method loads, each `PipeDocGen` step resolves its engine: the model it na
 - the engine it names is one of the plugin's, `pipelex-pdf`, `pipelex-xlsx`, `pipelex-docx` or `pipelex-pptx`, and the plugin is not installed (`DocGenEngineMissingError`, naming `pipelex-doc-gen`);
 - the engine it names is any other model the deck does not define (an unknown model, located on the step's `model` field);
 - the engine does not print its format from its source, by the `inputs` and `outputs` it declares (`DocGenModelCapabilityError`);
+- the step has `table_fill = "append"` and the engine does not declare `table_append` among its `inputs` (`DocGenModelCapabilityError`, whose public code `model.capability_unsupported` names the engine and the capability);
 - no installed plugin registers the engine's sdk (`DocGenEngineMissingError`, naming the engine and `pipelex-doc-gen`, or saying the built-in engine is disabled).
 
 The other model families find a missing worker only when they build it, at run time; a document engine is checked when the method loads as well. A runtime therefore needs no rule of its own about what it prints: a host that must not print documents disables the built-in plugin with `runtime.plugins.disabled = ["reportlab"]` and installs no other engine, and every `PipeDocGen` step is refused at load.
@@ -23975,13 +24059,32 @@ An engine's worker subclasses `DocGenWorkerAbstract` from `pipelex.cogt.doc_gen.
 def render(self, *, job: RenderJob, resources: RenderResources) -> RenderedDocument: ...
 ```
 
-- **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name. An HTML job whose template belongs to a method tree also carries `base_url`, described below. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
+- **`RenderJob`** is plain data, which Pipelex builds in the print stage from the step's composition and hands to the worker in the same process. It has a JSON round trip for an engine that prints in another process, in which the template's bytes are URL-safe base64 and a date or a time is its ISO text. It holds the format and source, the file's name with its suffix, the document's title, and exactly the payload its source names, `layout` (a `LayoutDocument` from `layout_tree.py`), `html`, or `template` with `data`, the inputs as plain data by input name, and `table_fill`, described below. `template_name` names the template for messages: the path a method's template file has in its tree, or `the input 'workbook'` for a template a run input supplies, whose file the engine never sees by name. An HTML job whose template belongs to a method tree also carries `base_url`, described below. It carries no Pipelex object, so an ordinary Pipelex release does not break an engine; a change to it, or to the worker, is a change of the plugin contract.
 - **`RenderResources.load(uri=…, position=…)`** is how an engine reads a file its document names, such as an image or a stylesheet. It resolves `pipelex-storage://` keys through the run's storage provider, decodes `data:` URLs, fetches `https://` through the SSRF guard, and refuses what the run's read scope does not allow, a local path included, with `UriReadRefusedError`. It reads a file of the document's method tree, named by a relative URL, as the next section describes. An engine reads nothing any other way. It returns a **`LoadedResource`**: the file's bytes as `data`, and as `mime_type` the media type the file's source gives it, described below.
 - **`RenderedDocument`** holds the bytes. Their MIME type and suffix are the format's.
 
 `render` is synchronous and runs on a thread of a print pool of its own, never on the event loop's default executor, which the engine's reads need, while `RenderResources.load` hands each read back to the event loop the print started from. The print stage that calls it ends the print with the event every inference call ends with, `Inference call ends`, carrying no tokens and no cost since an engine reports none (see [Summary events](../tools/logging.md#summary-events)), logged on the coroutine that awaits the thread, so a print cancelled from outside ends `cancelled` while the thread finishes its render; an engine overrides `render` alone and logs nothing for the print itself. An engine keeps no state from one print into the next. It signals a document it cannot print by raising `DocGenRenderError`, which passes through; anything else it raises, beyond a Pipelex error, is reported as a `DocGenRenderError` naming the engine and the file. The engine chooses the error's public code where it raises it, with `.with_error_code(...)`: `pipelex.docgen.content_unprintable` for the run's data it cannot lay out, an element taller than a page or an image that is not one, `pipelex.docgen.resource_refused` for a file the printed document may not name, `pipelex.docgen.template_invalid` for a template file it cannot read, and `runtime.unexpected`, the default, for its own failure. It declares those codes when it registers, as every plugin declares the codes its errors carry (see [Declaring the error codes a plugin raises](inference-backend-plugins.md#declaring-the-error-codes-a-plugin-raises)). A Pipelex error raised by `RenderResources.load`, such as `UriReadRefusedError` or `TemplateUrlRefusedError`, is let through as it came, so the caller reads why the file was refused.
 
 The contract is what an engine uses in `pipelex.cogt.doc_gen`: the worker; the render job, its resources, the `LoadedResource` they return and the rendered document (`render_job.py`); the formats and sources (`doc_gen_format.py`); `DocGenRenderError`, the one error of `exceptions.py` an engine raises, `MarkdownFormattingBudgetError`, the one the contract raises to an engine that formats Markdown outside a template render, and `TemplateUrlRefusedError`, the one `RenderResources.load` raises for a relative URL naming no file of the method tree; the layout tree (`layout_tree.py`); the template check request and the findings a checker returns (`template_check.py`), with the input shapes the request carries (`InputShape` and `InputShapeKind` in `input_shape.py`); and the modules of the next section. The rest of the package is Pipelex's own side of the print. An engine reaches Pipelex only through the contract and the registration seam every plugin uses, which also hands a worker its model spec, its backend, its SDK clients and its reporting delegate: anything else in Pipelex may move or change in an ordinary release, while a breaking change to the contract moves `PLUGIN_API_VERSION`. A piece an engine is missing is added to the contract, rather than imported from elsewhere in Pipelex.
+
+### Filling a template's Tables
+
+A job of the `template_file` source carries `table_fill`, a `TableFill` from `pipelex.cogt.doc_gen.table_fill`, which says what the engine does with the records of a list input bound to a Table of the template: `replace`, the default, writes them over the Table's rows, and `append` adds them after the rows the Table already holds, which is how a step records new rows in a workbook its caller supplies. A job of any other source always carries `replace`, and a job built with another fill is refused before it reaches an engine.
+
+Only an `xlsx` step may ask for `append`, and an engine that can do it says so by declaring the capability `table_append` among its model's `inputs`, beside the sources it prints from:
+
+```python
+spec = {
+    "model_type": "doc_gen",
+    "sdk": "openpyxl",
+    "model_id": "write-xlsx",
+    "inputs": ["layout", "template_file", "table_append"],
+    "outputs": ["xlsx"],
+    "costs": {},
+}
+```
+
+A step that asks for `append` from an engine that does not declare it is refused when its method loads, so an engine written before the field never receives a job it would fill as a replacement. The field arrived with plugin API 11: an engine reads it, and its plugin targets `targets_api = 11`, since a plugin targeting an earlier version is refused at boot.
 
 ### Relative URLs: the files of the template's method tree
 
@@ -24036,7 +24139,7 @@ An office template names the fields it is filled with in its own way, which Pipe
 def check_template(self, *, request: TemplateCheckRequest) -> list[TemplateFinding]: ...
 ```
 
-The request carries the template file's bytes and name, the shape of each input as an `InputShape` tree (which fields exist, which are lists, and what their items hold), and the dry run's mock inputs as plain data, so the checker can also fill the template in memory. The dry run, and so `pipelex validate`, calls it for every step with an office template file: a finding of severity `error` fails the step with `PipeDocGenTemplateCheckError`, listing the findings, and a `warning` leaves the step valid and joins the verdict's advisory `warnings` as a `template_check_warning` item, its `message` and `location` becoming the item's message and its `template_location`. A dry run that returns no verdict logs it instead: `pipelex run --dry-run`, and a validation run for something other than a verdict, such as `pipelex fix bundle`'s or `pipelex build inputs`'. Write a finding's `message` and `location` for the template's author: the item is returned to whoever validates the method, through the CLI or the API. The default finds nothing. An HTML template, inline or in a `.html` template file, never reaches an engine's checker: Pipelex checks it itself, against the inputs' concepts, when the method loads. The built-in engine takes no template.
+The request carries the template file's bytes and name, the shape of each input as an `InputShape` tree (which fields exist, which are lists, and what their items hold), and the dry run's mock inputs as plain data, so the checker can also fill the template in memory. The template input of a step whose run supplies its template is not among the shapes, since it is the template rather than data. The dry run, and so `pipelex validate`, calls it for every step with an office template file: a finding of severity `error` fails the step with `PipeDocGenTemplateCheckError`, listing the findings, and a `warning` leaves the step valid and joins the verdict's advisory `warnings` as a `template_check_warning` item, its `message` and `location` becoming the item's message and its `template_location`. A dry run that returns no verdict logs it instead: `pipelex run --dry-run`, and a validation run for something other than a verdict, such as `pipelex fix bundle`'s or `pipelex build inputs`'. A template a run input supplies is unknown to the dry run, which reports a `template_check_warning` saying so and calls no checker. It is checked when a run supplies it instead: run setup, before any step starts, reads each such template a step certain to run takes from the run's inputs, and calls the checker with no `data`, and the print calls it again, with the run's data, before the engine fills the file. There an `error` finding refuses the run as the caller's, with `PipeDocGenTemplateInputUnfitError` and the public code `pipelex.docgen.template_input_unfit`, whose `input` and `finding` parameters name the input and what the checker found, and a `warning` is logged with the run. A checker that raises anything but a Pipelex error has failed on the template, which is refused for it: `pipelex.docgen.template_input_unfit` for a template a run input supplies, and `pipelex.docgen.template_invalid` with the reason `check_failed` for the method's own template file. The print checks a template a run input supplies with the worker it then fills it with. Write a finding's `message` and `location` for the template's author: the item is returned to whoever validates the method, through the CLI or the API. The default finds nothing. An HTML template, inline or in a `.html` template file, never reaches an engine's checker: Pipelex checks it itself, against the inputs' concepts, when the method loads. The built-in engine takes no template.
 
 ---
 
@@ -24795,7 +24898,7 @@ InferenceErrorCategory.TRANSIENT.is_retryable  # True — only TRANSIENT
 
 An error code names a situation a runner or a client can meet, and its type URI is the URL of the code's page. A code of the MTHDS standard, such as `input.missing`, is a core code, documented with the standard on [mthds.ai](https://mthds.ai/latest/errors/) at `https://mthds.ai/errors/<code>`. A code that starts with `pipelex.` names a situation the standard leaves to its implementations, and has its page here, at `https://docs.pipelex.com/errors/<code>`. Each page says what its code means, who must act and what to do, and gives the code's steps, parameters and templates.
 
-These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.101.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
+These pages are generated from the Pipelex error registry, which follows the [MTHDS error registry format](https://mthds.ai/latest/spec/error-registry/) under the `pipelex` prefix the core registry registers to Pipelex. The registry is published with every Pipelex release, as the release asset `pipelex-error-registry.json` on [GitHub](https://github.com/Pipelex/pipelex/releases) and inside the `pipelex` package. This is version `0.102.0` of the registry. [The Error Registry](../contribute/error-registry.md) describes how it is maintained.
 
 Every Pipelex error carries a code, one of these or a core code: its problem document names it as `code`, and its `type` is the code's page. The [Error Model](../under-the-hood/error-model.md#error-codes-and-the-pipelex-error-registry) describes how an error class declares the code it raises.
 
@@ -24927,6 +25030,7 @@ The document engines that print a PipeDocGen step's documents.
 | [`pipelex.docgen.content_unprintable`](pipelex/docgen/content_unprintable.md) | The document's content cannot be printed | `input` | `no` | `422` |
 | [`pipelex.docgen.print_timeout`](pipelex/docgen/print_timeout.md) | Printing the document took too long | `runtime` | `yes` | `504` |
 | [`pipelex.docgen.template_warning`](pipelex/docgen/template_warning.md) | The document template may be faulty | `method` | `no` | none (warning) |
+| [`pipelex.docgen.template_input_unfit`](pipelex/docgen/template_input_unfit.md) | The template a run supplied does not fit the step | `input` | `no` | `422` |
 
 ## pipelex.sandbox { #pipelex-sandbox }
 
@@ -25268,6 +25372,10 @@ The sourced-answer path (`make_search_sourced_answer`) has no dynamic class at a
 
 A judgment's leaf, `judgment_gen_answers`, has one entry point where search has three, because nothing about it is dynamic. Its `JudgmentAssignment` carries the state as a JSON object, the image and document inputs as prompt files keyed by input name, which cross the boundary as an LLM prompt's files do, the questions as the family's own discriminated models and the resolved `JudgmentSetting`; its result is a map of answers that are plain models of the same package. No caller class travels down and no schema is shipped, so the in-process arm and the boundary arm would be the same function, and there is nothing to split.
 
+### Reading a spreadsheet needs no model and no class
+
+A `PipeStructure` step whose input is a `Document` reads one table of the file into records with no model, but the read is still a leaf, `read_table` on the content generator (`pipelex/cogt/content_generation/table_read_generate.py`), because it reads storage, which workflow code may not do. Its `TableReadAssignment` carries the document's URL, its declared media type and name, the row concept's field names, the row field and the Table's name; its result, `TableRecords`, is plain data: each row's position, its label and its cells keyed by field, each cell tagged with the kind of value it holds (`text`, `integer`, `number`, `boolean`, `date` or `datetime`, or null when empty), so a JSON payload converter carries every cell exactly: a text that looks like a number or a date, such as a zip code or an ID, stays a text. No class crosses the boundary in either direction: the step binds the records to its row concept, converting each value by the standard's rules, in the process that runs the step. A content generator that does not implement the leaf, as a host runtime's that predates it, inherits the protocol's default, which refuses as `runtime.misconfigured`; the leaf is part of plugin API 11.
+
 ---
 
 ## Large payload management
@@ -25322,7 +25430,7 @@ A reference is only as safe as whoever reads it. A value can carry any URL its m
 
 On a run whose read scope is set, a storage key is read only when it lies under the read scope, compared segment by segment, with no empty, `.` or `..` segment; a local path is never read; `https://` and `data:` URLs are untouched. The storage scope must lie under the read scope, since a run reads its own outputs back, and a mismatch is refused when the metadata is built. A run whose read scope is `None` (a laptop, a single-tenant server) reads exactly as before.
 
-The check runs in the leaves, because both orchestration modes call the same leaves and every read of a value's URL happens while one of them handles an assignment. Each assignment declares the URLs it will read through `referenced_uris()` — the prompt's images and documents given by URI, an image generation's input images, the image or document to extract, the document to render as page views, the Office file to convert to PDF — and the leaf authorizes them as its first statement, before the dry-run branch and before any worker is built. A dry run therefore refuses the same method a live run would, and the check performs no IO. The input seam applies the same rule to what it reads itself: a table given as a CSV input, and a file the normalization would upload or link. A refused read raises `UriReadRefusedError`, answered as a 422 with the code `security.input_url_refused`, or `security.method_url_refused` where the reader knows the method named the URL, which names where the URL sat and never quotes it. A unit test walks every assignment model's fields for URL-shaped ones, so a new assignment or a new field that carries a URL fails until its `referenced_uris()` declares it.
+The check runs in the leaves, because both orchestration modes call the same leaves and every read of a value's URL happens while one of them handles an assignment. Each assignment declares the URLs it will read through `referenced_uris()` — the prompt's images and documents given by URI, an image generation's input images, the image or document to extract, the document to render as page views, the Office file to convert to PDF, the spreadsheet to read a table from — and the leaf authorizes them as its first statement, before the dry-run branch and before any worker is built. A dry run therefore refuses the same method a live run would, and the check performs no IO. The input seam applies the same rule to what it reads itself: a table given as a CSV input, and a file the normalization would upload or link. A refused read raises `UriReadRefusedError`, answered as a 422 with the code `security.input_url_refused`, or `security.method_url_refused` where the reader knows the method named the URL, which names where the URL sat and never quotes it. A unit test walks every assignment model's fields for URL-shaped ones, so a new assignment or a new field that carries a URL fails until its `referenced_uris()` declares it.
 
 The read scope leaves `https://` URLs alone because they are not the process's to scope: they are fetched over the network, and the network fetch has its own guard. Every leaf that needs the bytes behind a URL — prompt images and documents for a provider that does not take URLs, the document an extractor reads, the PDF rendered as page views, a generated image a provider returned as a link — goes through one fetch helper, and that helper connects through `SsrfGuardedTransport` unless `[runtime.network] is_fetch_ssrf_guard_enabled` is off. The transport resolves the host when each connection opens, on the first request and on every redirect hop to a new origin, refuses a name that resolves to any private, loopback, link-local or metadata address, and dials the address it vetted. A refusal raises `SsrfBlockedError`, a security error that no leaf's download fallback absorbs, so the pipe fails; its code is `security.input_url_refused` unless the reader knows the method or a provider's answer named the URL (`security.method_url_refused`, `security.provider_url_refused`). The guard connects directly and ignores `HTTP(S)_PROXY`; a deployment whose egress goes through a proxy, or that reads documents from an intranet host, turns the switch off, as the [network configuration](../configuration/config-technical/network-config.md) explains. Checking in the fetch helper rather than in input normalization is deliberate: a construct, a structured output or a function result can produce a URL as easily as an input can. The same helper reads the body as a stream under a byte cap, `[runtime.network] max_fetch_bytes` or a leaf's own limit when it is smaller, such as the conversion's `max_source_bytes`. It follows redirects by hand, closing each hop's response unread, refuses a body whose declared `Content-Length` passes its bound before reading it, the cap for an uncompressed body and the compressed bound for a compressed one, and decodes a `gzip` or `deflate` body itself in bounded steps, stopping once the decoded bytes pass the cap, or once the compressed bytes pass it by more than a fixed margin, with `RemoteFileTooLargeError` (`input.too_large`), whose `bound` says which of the two fired; any other content coding is refused unread, and a compressed body that is truncated or carries trailing data other than NUL padding after a `gzip` member is refused as undecodable. A URL serving more than the worker can hold, or a compression bomb, therefore fails its pipe rather than the worker.
 
