@@ -274,7 +274,8 @@ def check_file_inputs_against_consumers(
     PDF whatever its model reads; beyond that, a file of a known format is compared with what the model reads, a model
     that could not be resolved being opaque, and a web-page model given an http(s) URL fetching the page itself. Every
     violation is collected and reported together. When the runtime converts documents, an Office file a certain consumer
-    will read as its PDF is accepted, and returned.
+    will read as its PDF is accepted, and returned. A `PipeDocGen` step filling an input's file as its template is left to
+    the check of the templates a run supplies, which judges the file from its bytes rather than its label.
 
     Args:
         entry_pipe: The pipe the run starts from. Its library must be loaded.
@@ -300,6 +301,11 @@ def check_file_inputs_against_consumers(
         slot_name = str(file_input.path[0])
         for consumer in consumers_by_slot.get(slot_name, []):
             if consumer.is_conditional or not consumer.covers(file_input_path=file_input.path):
+                continue
+            if consumer.kind.is_doc_gen_template:
+                # The format established here is the caller's label or a sniff of the file's head, either of which can
+                # call a workbook something else: a template's format is judged from its whole bytes by the check of the
+                # templates a run supplies (`pipelex.pipeline.doc_gen_template_inputs`), which runs next.
                 continue
             conversion_reason = _conversion_reason(file_input=file_input, consumer=consumer)
             if conversion_reason is not None and can_convert_documents:
@@ -652,7 +658,8 @@ def _record_doc_gen_template_consumer(*, pipe_doc_gen: PipeDocGen, frame: _Frame
         ModelNotFoundError,
         ModelReferenceParseError,
     ):
-        # The method's load resolved it, so only an engine gone since lands here: the step refuses it when it runs.
+        # The method's load resolved it, so only an engine gone since lands here: run setup's check of the step's template
+        # resolves the engine again, and refuses the run there, before any step starts.
         model = None
         readable_formats = None
     consumers.append(

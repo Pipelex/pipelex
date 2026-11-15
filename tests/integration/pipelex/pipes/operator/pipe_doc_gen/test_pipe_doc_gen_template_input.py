@@ -15,16 +15,21 @@ from pytest_mock import MockerFixture
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.content_generation import doc_gen_template_input
 from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
+from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenTemplateInputUnfitError
 from pipelex.pipeline.exceptions import ValidateBundleError
+from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
+from pipelex.runtime_hub import get_storage_provider
+from pipelex.tools.uri.uri_bytes import UriBytes
 from pipelex.validation_error_types import TemplateCheckErrorType
 from tests.helpers.office_files import DOCX_MIME_TYPE, XLSX_MIME_TYPE, docx_bytes, xlsx_bytes
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, only_problem_item, refusal_messages
@@ -63,11 +68,13 @@ def _data_url(*, mime_type: str, raw_bytes: bytes) -> str:
 
 
 def _inputs(*, workbook_bytes: bytes, mime_type: str = XLSX_MIME_TYPE) -> dict[str, Any]:
+    url = _data_url(mime_type=mime_type, raw_bytes=workbook_bytes)
+    return _inputs_with_workbook(workbook_content={"url": url, "mime_type": mime_type, "filename": "expenses.xlsx"})
+
+
+def _inputs_with_workbook(*, workbook_content: dict[str, str]) -> dict[str, Any]:
     return {
-        "workbook": {
-            "concept": "native.Document",
-            "content": {"url": _data_url(mime_type=mime_type, raw_bytes=workbook_bytes), "mime_type": mime_type, "filename": "expenses.xlsx"},
-        },
+        "workbook": {"concept": "native.Document", "content": workbook_content},
         "expense_rows": {
             "concept": "doc_gen_append.ExpenseRow",
             "content": [{"description": "Tea", "amount": 7.0}, {"description": "Cake", "amount": 4.5}],
@@ -176,3 +183,33 @@ class TestPipeDocGenTemplateInput:
         assert all("checked against the step's inputs when a run supplies it" in warning.message for warning in template_warnings)
         assert all(warning.template_file == "the input 'workbook'" for warning in template_warnings)
         assert xlsx_stub_engines.check_requests == []
+
+    @pytest.mark.parametrize("where", ["https_declared_as_pdf", "stored_named_as_word"])
+    async def test_a_workbook_labelled_as_another_format_passes_setup_on_its_bytes(
+        self, xlsx_stub_engines: StubEngines, mocker: MockerFixture, where: str
+    ) -> None:
+        """Run setup's generic format check reads the label, so it leaves a template to the check that reads the bytes."""
+        workbook = xlsx_bytes()
+        workbook_content: dict[str, str]
+        match where:
+            case "https_declared_as_pdf":
+                mocker.patch.object(
+                    doc_gen_template_input, "load_bytes_and_mime_type_from_any_uri", return_value=UriBytes(data=workbook, mime_type="application/pdf")
+                )
+                workbook_content = {"url": "https://files.example.com/expenses", "mime_type": "application/pdf"}
+            case _:
+                url = await get_storage_provider().store(data=workbook, key="template-input-tests/expenses.docx")
+                workbook_content = {"url": url, "filename": "expenses.docx"}
+
+        pipe_job, _pipeline_run_id, _ = await pipeline_run_setup(
+            storage_scope="template-input-tests",
+            read_scope=None,
+            user_id="test-user",
+            execution_config=get_config().interpreter.pipeline_execution.with_execution_overrides(generate_graph=False),
+            mthds_contents=[_APPEND_MTHDS],
+            pipe_code="append_expenses",
+            inputs=_inputs_with_workbook(workbook_content=workbook_content),
+        )
+
+        assert pipe_job.pipe.code == "append_expenses"
+        assert [request.template for request in xlsx_stub_engines.check_requests] == [workbook]
