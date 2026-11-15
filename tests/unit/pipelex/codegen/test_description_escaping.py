@@ -4,7 +4,6 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.codegen.emitters.python_common import normalized_docstring_text
 from pipelex.codegen.emitters.python_pydantic import emit_python_pydantic
 from pipelex.codegen.emitters.python_structures import emit_python_structures
 from pipelex.codegen.emitters.target import EmittedFile
@@ -13,6 +12,7 @@ from pipelex.codegen.resolved_concepts import ResolvedLibrary, resolve_concepts_
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.libraries.library_crate import LibraryCrate
+from pipelex.tools.misc.python_literals import normalized_docstring_text
 from tests.unit.pipelex.codegen.conftest import load_generated_module
 from tests.unit.pipelex.codegen.test_data import DescriptionEscapingCases
 
@@ -25,13 +25,20 @@ class TestDescriptionEscaping:
             pytest.param(emit_python_structures, "generated_structures", id="python-structures"),
         ],
     )
+    @pytest.mark.parametrize(
+        "description",
+        [
+            pytest.param(DescriptionEscapingCases.MALICIOUS_DESCRIPTION, id="verbatim-docstring"),
+            pytest.param(DescriptionEscapingCases.ESCAPED_DOCSTRING_DESCRIPTION, id="escaped-docstring"),
+        ],
+    )
     def test_python_descriptions_cannot_escape_docstrings(
         self,
         emitter: Callable[[ResolvedLibrary], list[EmittedFile]],
         module_name: str,
+        description: str,
         tmp_path: Path,
     ):
-        description = DescriptionEscapingCases.MALICIOUS_DESCRIPTION
         library = resolve_concepts_from_crate(self._make_crate(description=description))
 
         content = emitter(library)[0].content

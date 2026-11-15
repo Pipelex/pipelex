@@ -724,21 +724,9 @@ rationale = "Single-operand transformation: derives the name mapping over the wh
 param = "name"
 rationale = "Single-operand conversion of the name."
 
-["pipelex/codegen/emitters/python_common.py::_docstring_delimiter"]
-param = "text"
-rationale = "Single-operand derivation: picks the delimiter that fits the text."
-
 ["pipelex/codegen/emitters/python_common.py::_split_top_level"]
 param = "inner"
 rationale = "Verb-object: splits the bracket inner text; single operand."
-
-["pipelex/codegen/emitters/python_common.py::class_docstring"]
-param = "description"
-rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
-
-["pipelex/codegen/emitters/python_common.py::escape_py_string"]
-param = "value"
-rationale = "Single-operand conversion of the value."
 
 ["pipelex/codegen/emitters/python_common.py::explode_bracket"]
 param = "text"
@@ -751,10 +739,6 @@ rationale = "Noun-named derivation: the source line for the field; annotation st
 ["pipelex/codegen/emitters/python_common.py::format_default_value"]
 param = "value"
 rationale = "Single-operand formatting of the value."
-
-["pipelex/codegen/emitters/python_common.py::normalized_docstring_text"]
-param = "text"
-rationale = "Single-operand normalization of the text into its docstring-canonical form."
 
 ["pipelex/codegen/emitters/python_common.py::order_by_base"]
 param = "concepts"
@@ -6203,6 +6187,26 @@ rationale = "Renders the content; single operand."
 ["pipelex/tools/misc/pretty.py::pretty_print_url"]
 param = "url"
 rationale = "Renders the url; single operand."
+
+["pipelex/tools/misc/python_literals.py::_docstring_delimiter"]
+param = "text"
+rationale = "Single-operand derivation: picks the delimiter that fits the text."
+
+["pipelex/tools/misc/python_literals.py::_double_quoted_inner"]
+param = "value"
+rationale = "Single-operand conversion of the value."
+
+["pipelex/tools/misc/python_literals.py::class_docstring"]
+param = "description"
+rationale = "Noun-named derivation: builds the docstring from the description; extras stay keyword."
+
+["pipelex/tools/misc/python_literals.py::escape_py_string"]
+param = "value"
+rationale = "Single-operand conversion of the value."
+
+["pipelex/tools/misc/python_literals.py::normalized_docstring_text"]
+param = "text"
+rationale = "Single-operand normalization of the text into its docstring-canonical form."
 
 ["pipelex/tools/misc/semver.py::parse_constraint"]
 param = "constraint_str"
