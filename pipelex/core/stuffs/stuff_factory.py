@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptValueError
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStructureClassNotFoundError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -262,6 +262,17 @@ class StuffFactory:
             # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
             # Checked BEFORE url parsing so a native concept never raises a CSV-flavored error.
             return None
+        try:
+            is_file_concept = concept_provider.is_file_concept(concept=concept)
+        except ConceptStructureClassNotFoundError:
+            # A concept whose class does not resolve can be compared by structure no more than it can be built: it is
+            # taken for no file concept, and the table path below, or the record path, reports the missing class.
+            is_file_concept = False
+        if is_file_concept:
+            # A concept refining a native file concept (a workbook given to a `template_input`, a spreadsheet a
+            # `PipeStructure` reads) holds the file itself, whatever its suffix: never hijack it as a table of rows.
+            # Checked BEFORE url parsing too, so such a file never raises a CSV-flavored error.
+            return None
         # Parse the URL once, up front. A malformed url (e.g. a bad IPv6 bracket like ``https://[``)
         # makes ``urlsplit`` itself raise ``ValueError`` — convert that to a redacted CsvError rather
         # than let it escape into a traceback that would surface the raw (possibly token-bearing) url.
@@ -297,10 +308,6 @@ class StuffFactory:
                 .with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
                 .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
             ) from exc
-        if concept_provider.is_file_concept(concept=concept):
-            # A concept refining a native file concept (a workbook given to a `template_input`, a spreadsheet a
-            # `PipeStructure` reads) holds the file itself, whatever its suffix: never hijack it as a table of rows.
-            return None
 
         resolved = resolve_uri(url)
         # Accept only genuine local paths. `file://` resolves to a scheme-free local path; an http(s)/

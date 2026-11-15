@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 
 STORAGE_XLSX_URL = "pipelex-storage://org_test/uploads/0f1e2d3c4b5a69788796a5b4c3d2e1f00f1e2d3c4b5a69788796a5b4c3d2e1f0.xlsx"
 HTTPS_CSV_URL = "https://example.com/exports/expenses.csv"
+MALFORMED_XLSX_URL = "https://[example.com/exports/expenses.xlsx"
 
 PEOPLE_CSV_CONTENT = "name\nAda Lovelace\nGrace Hopper\n"
 
@@ -110,6 +111,25 @@ class TestFileConceptTableRefs:
         workbook = working_memory.get_stuff("workbook")
         assert isinstance(workbook.content, DocumentContent), topic
         assert workbook.content.url == url, topic
+
+    @pytest.mark.parametrize(
+        ("topic", "concept_ref"),
+        [
+            ("a refined Document", "shaper_test.Exhibit"),
+            ("a twice-refined Document", "shaper_test.ShaperExpenseWorkbook"),
+            ("a refined Image", "shaper_test.Photo"),
+        ],
+    )
+    def test_a_url_that_does_not_parse_under_a_file_concept_is_no_table_error(self, topic: str, concept_ref: str):
+        """A url `urlsplit` refuses is the file concept's own to judge, never refused as an unreadable table."""
+        concept_library = get_concept_library()
+        concept = concept_library.get_required_concept(concept_ref=concept_ref)
+
+        list_content = StuffFactory.try_make_csv_list_content(
+            concept, concept_provider=concept_library, content={"url": MALFORMED_XLSX_URL}, name="workbook", read_scope=None
+        )
+
+        assert list_content is None, topic
 
     def test_a_local_csv_under_a_refined_document_is_not_read_as_rows(self, people_csv: Path, mocker: MockerFixture):
         table_reader = mocker.patch("pipelex.core.stuffs.stuff_factory.list_content_from_table_file")
