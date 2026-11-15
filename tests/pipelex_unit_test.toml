@@ -1,7 +1,7 @@
 
 [runtime.storage]
 method = "local"
-# Every non-empty text is past the threshold, so the reference path runs in every test.
+# Every non-empty text is past the threshold, so the code that stores large texts, once it reads this setting, stores them in every test.
 inline_text_max_bytes = 0
 
 [inference.model_deck]

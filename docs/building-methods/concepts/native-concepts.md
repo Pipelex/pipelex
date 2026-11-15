@@ -416,13 +416,13 @@ Read the markup in Python with `require_inner_html()`.
 
 ### Stored values
 
-A `Text`, `Markdown`, `Html` or `JSON` value larger than a threshold lives in the run's storage and travels as a reference, exactly as an image or a document does, so a long page, a fetched web page or a large JSON document is not copied into every step, trace event and result that carries it. The value field is then absent, and the content carries `url`, `size`, `mime_type` and `preview` instead:
+A `Text`, `Markdown`, `Html` or `JSON` value may live in storage and travel as a reference, exactly as an image or a document does, so that a long page, a fetched web page or a large JSON document need not be copied into every step, trace event and result that carries it. The value field is then absent, and the content carries `url`, `size`, `mime_type` and `preview` instead:
 
 ```json
 {"url": "pipelex-storage://…/generated/…/text.txt", "size": 48213, "mime_type": "text/plain", "preview": "Page 1. The parties agree…"}
 ```
 
-The two forms carry the same value, and a method behaves the same whichever form its values arrive in: Pipelex reads a stored value where a step uses it, under the same read rules as an image, so a run never reads a stored value another run owns. The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default (see [Cloud Storage](../../features/cloud-storage.md#large-texts)).
+A value holds exactly one of the two forms. In this release Pipelex accepts and keeps the stored form, and can load a stored value under the same read rules as an image, so a run never reads a stored value another run owns; it does not yet store a value past the size threshold by itself, nor load a stored value where a step reads it, so a stored value given to a step that renders it is refused rather than read. Both arrive in later releases. The threshold is `inline_text_max_bytes` under `[runtime.storage]`, 4096 bytes by default, and nothing reads it yet (see [Cloud Storage](../../features/cloud-storage.md#large-texts)).
 
 In Python, `require_text()`, `require_inner_html()` and `require_json_obj()` return the value in either form, once a stored one has been loaded. Code that can read storage loads it with `load_stored_value` (`pipelex.core.stuffs.stored_value_loader`); reading or rendering a stored value that was never loaded raises `StoredValueNotLoadedError` rather than printing nothing.
 
