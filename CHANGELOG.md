@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.103.1] - 2026-11-15
+
+### Fixed
+
+- **A file input refining `Document` or `Image` is no longer read as a table**: an input whose concept refines `Document` or `Image`, at any depth, given as `{"url": ...}` with a URL ending in `.xlsx` or `.csv`, as every client's input preparation sends a file, is now read as the file itself, where it was taken for a table of rows and a remote one refused as `request.unsupported` with the reason `remote_table_url`; so the workbook of a `PipeDocGen` `template_input` or of a spreadsheet-reading `PipeStructure` can be declared with its own concept refining `Document`. `ConceptProviderAbstract.is_file_concept` and `NativeConceptCode.is_file` state which concepts hold a file.
+
 ## [v0.103.0] - 2026-11-15
 
 ### Added
