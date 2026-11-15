@@ -311,7 +311,7 @@ def stale_configuration_warning(*, plans: Sequence[MigrationPlan], walked_dirs: 
     **`pipelex migrate` is named only for a file it would reach**, which is what `walked_dirs` is
     for. Boot tolerance replays exactly the files the loader merged, and a loader pointed at a
     directory of its own — `Pipelex.make(config_dir=…)`, or this repository's own
-    `tests/pipelex_{run_mode}.toml` — merges files the command's fixed walk will never touch. A
+    `tests/pipelex_unit_test.toml` — merges files the command's fixed walk will never touch. A
     warning that said "run `pipelex migrate`" there would name, on every boot, a command that then
     reports nothing to do. The same rule as the migration report's: a remedy is named only where
     it would write. Pass the walk (`config_manager.existing_config_dirs`); an embedder's directory

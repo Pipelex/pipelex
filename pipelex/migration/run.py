@@ -11,7 +11,7 @@ and the validation error that reports a plan — must aim at exactly the same se
 user would be told one thing by their boot and another by their tool.
 
 > **The walk is the global `~/.pipelex/` and the project `.pipelex/`, and nothing else.** A
-> `config_dir=` load and `./tests/pipelex_{run_mode}.toml` are outside it. Both are deliberate:
+> `config_dir=` load and `./tests/pipelex_unit_test.toml` are outside it. Both are deliberate:
 > the first is a caller pointing the loader at a directory of its own choosing, and the second is
 > this repository's own test fixture. Neither is a user's configuration, and migrating a
 > directory nobody asked about is how a tool earns a reputation for touching things.
