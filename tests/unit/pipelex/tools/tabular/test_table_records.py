@@ -71,6 +71,18 @@ def _step_items(*, header: list[str], rows: list[list[TableCellValue]]) -> list[
 
 
 class TestTableRecords:
+    def test_step_binds_a_header_spelling_a_field_exactly_before_comparing_loosely(self) -> None:
+        table_records = build_table_records(
+            raw_table=_raw_table(header=["unitprice", "unit_price"], rows=[[2.5, 3.5]]),
+            table_format=TableFormat.XLSX,
+            field_names=["unit_price", "unitprice"],
+            row_field=None,
+            binding=TableBinding.STEP,
+            subject=SUBJECT,
+        )
+
+        assert table_records.records[0].plain_values() == {"unitprice": 2.5, "unit_price": 3.5}
+
     def test_step_ignores_unmatched_columns_and_matches_headers_loosely(self) -> None:
         table_records = _step_records(header=["Item", "Comment", "AMOUNT", "Due date"], rows=[["Paper", "ignored", 12.5, None]])
 

@@ -69,7 +69,7 @@ Vint Cerf,Computer Scientist,United States,1943,
 
 ### Header and column rules
 
-- The header row is **required**, and each header must match a field name, compared ignoring case, spaces, dots and underscores, so a `Birth year` column fills `birth_year`. A header matching several fields, and several headers matching the same field, are errors.
+- The header row is **required**, and each header must match a field name, compared ignoring case, spaces, dots and underscores, so a `Birth year` column fills `birth_year`. A header spelling a field's name exactly binds that field first, so a concept with both `unit_price` and `unitprice` reads each from its exactly named column. A header matching several fields otherwise, and several headers matching the same field, are errors.
 
 - An **extra** column (one with no matching field) is an error.
 

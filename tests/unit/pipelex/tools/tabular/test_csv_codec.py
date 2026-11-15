@@ -143,6 +143,11 @@ class Inner(StructuredContent):
     x: int
 
 
+class TwoPricesRow(StructuredContent):
+    unit_price: float
+    unitprice: float
+
+
 class WithList(StructuredContent):
     tags: list[str]
 
@@ -463,6 +468,20 @@ class TestCsvCodec:
     # ----------------------------------------------------------------------------------
     # Strict columns
     # ----------------------------------------------------------------------------------
+
+    def test_headers_spelling_fields_exactly_bind_them_when_their_keys_collide(self, tmp_path: Path) -> None:
+        """Fields sharing a normalised key are each read from the column named exactly after them, as before loose matching."""
+        path = write_csv_file(tmp_path, "unitprice,unit_price\n2.5,3.5\n")
+
+        items = list_content_from_csv(path, row_model=TwoPricesRow).items
+
+        assert [(item.unit_price, item.unitprice) for item in items] == [(3.5, 2.5)]
+
+    def test_a_loose_header_matching_fields_whose_keys_collide_raises(self, tmp_path: Path) -> None:
+        path = write_csv_file(tmp_path, "Unit Price,unitprice\n2.5,3.5\n")
+
+        with pytest.raises(CsvColumnError, match="matches several fields"):
+            list_content_from_csv(path, row_model=TwoPricesRow)
 
     def test_extra_column_raises(self, tmp_path: Path) -> None:
         path = write_csv_file(tmp_path, "value,surprise\n42,boom\n")

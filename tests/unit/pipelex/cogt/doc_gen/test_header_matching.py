@@ -26,3 +26,9 @@ class TestHeaderMatching:
         matched = column_fields(headers={3: "Unit price"}, field_names=["unit_price", "unitprice"])
 
         assert matched == {3: ["unit_price", "unitprice"]}
+
+    def test_a_header_spelling_a_field_exactly_binds_it_before_any_comparison(self) -> None:
+        matched = column_fields(headers={0: "unit_price", 1: "unitprice", 2: "Unit Price"}, field_names=["unit_price", "unitprice"])
+
+        # Each exact header binds its own field; a header spelling neither exactly is still ambiguous.
+        assert matched == {0: ["unit_price"], 1: ["unitprice"], 2: ["unit_price", "unitprice"]}

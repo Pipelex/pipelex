@@ -221,9 +221,9 @@ def build_table_records(
 ) -> TableRecords:
     """Match a table's header to the fields and key each row's values by the field its column matched.
 
-    Headers are compared with `column_fields`. Refused: a header matching several fields, several headers matching one
-    field, a header matching the field `row_field` names, and, under a binding that refuses them, a column matching no
-    field. An empty cell, an empty text included, is None.
+    Headers are compared with `column_fields`, a header spelling a field exactly binding it first. Refused: a header
+    matching several fields, several headers matching one field, a header matching the field `row_field` names, and,
+    under a binding that refuses them, a column matching no field. An empty cell, an empty text included, is None.
 
     Raises:
         CsvColumnError: The header does not match the fields as above.

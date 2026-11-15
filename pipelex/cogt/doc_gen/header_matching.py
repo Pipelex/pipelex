@@ -1,8 +1,10 @@
 """How a table's column headers and a template's names find the fields of a record, the one rule every reader and writer applies.
 
 Names are compared ignoring case, spaces, dots and underscores (`field_key`), so `InvoiceCustomerName` and a dotted name
-find the same field, and a `Unit price` header binds `unit_price`. A header that matches several fields is ambiguous,
-which the caller refuses, naming the header by its position.
+find the same field, and a `Unit price` header binds `unit_price`. A header spelling a field's name exactly binds that
+field first, before any comparison: a record with both `unit_price` and `unitprice` takes each from the column named
+exactly after it. A header that spells no field exactly and matches several is ambiguous, which the caller refuses,
+naming the header by its position.
 
 The rule is public because both sides of a spreadsheet use it: `PipeStructure` reads a Table's columns into records with
 it (`pipelex.tools.tabular`), and a document engine's fill writes records into a Table's columns with it, so the reader
@@ -24,7 +26,8 @@ def field_key(name: str) -> str:
 def column_fields(*, headers: Mapping[int, str], field_names: Iterable[str]) -> dict[int, list[str]]:
     """The fields each column's header matches, by column index: one binds the column, several are ambiguous.
 
-    A column whose header matches no field has no entry.
+    A header equal to a field's name binds that field alone, whatever other fields share its key; any other header
+    matches the fields sharing its key. A column whose header matches no field has no entry.
 
     Args:
         headers: Each column's header, by the column's index, as the caller numbers its columns.
@@ -33,11 +36,16 @@ def column_fields(*, headers: Mapping[int, str], field_names: Iterable[str]) -> 
     Returns:
         The fields each matching header matches, sorted, by column index.
     """
+    exact_field_names: set[str] = set()
     fields_by_key: dict[str, list[str]] = {}
     for field_name in field_names:
+        exact_field_names.add(field_name)
         fields_by_key.setdefault(field_key(field_name), []).append(field_name)
     matched: dict[int, list[str]] = {}
     for column_index, header in headers.items():
+        if header in exact_field_names:
+            matched[column_index] = [header]
+            continue
         candidates = fields_by_key.get(field_key(header))
         if candidates:
             matched[column_index] = sorted(candidates)
