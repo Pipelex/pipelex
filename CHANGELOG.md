@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.102.0] - 2026-11-15
 
 ### Added
 
@@ -14,10 +14,9 @@
 
 ### Changed
 
-- **A content generator reads tables, plugin API version 11 (Breaking)**: `ContentGeneratorProtocol` gains the leaf `read_table`, which reads one table of a spreadsheet `Document` into `TableRecords`, plain data a host runtime dispatches as it dispatches every other leaf, each record's cells tagged with the kind of value they hold so that any JSON payload converter carries them exactly; a content generator that does not implement it inherits a default that refuses as `runtime.misconfigured`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
-- **CSV input headers match fields loosely**: a CSV file given as a list input now matches each header to a field ignoring case, spaces, dots and underscores, where the header had to spell the field exactly, so a `Birth year` column fills `birth_year`; a header spelling a field's name exactly binds that field before any loose comparison, so a concept with both `unit_price` and `unitprice` still reads each from its exactly named column, as it did; a header otherwise matching several fields, or several headers matching one field, is refused, and a column matching no field is still refused on that path. The exact-first tie-break applies to a `PipeStructure` step reading a spreadsheet too, and to `pipelex.cogt.doc_gen.header_matching.column_fields`, which a document engine's fill shares.
+- **Plugin API version 11, content generators read tables and document engines receive `table_fill` (Breaking)**: `ContentGeneratorProtocol` gains the leaf `read_table`, which reads one table of a spreadsheet `Document` into `TableRecords`, plain data a host runtime dispatches as it dispatches every other leaf, each record's cells tagged with the kind of value they hold so that any JSON payload converter carries them exactly; a content generator that does not implement it inherits a default that refuses as `runtime.misconfigured`. `RenderJob` carries `table_fill`, a `TableFill` from `pipelex.cogt.doc_gen.table_fill`, `replace` unless the step asks for `append`, an engine that appends declares `table_append` among its model's `inputs`, and `resolve_doc_gen_setting` takes a required `table_fill`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
+- **CSV input headers match fields loosely**: a CSV file given as a list input now matches each header to a field ignoring case, spaces, dots and underscores, where the header had to spell the field exactly, so a `Birth year` column fills `birth_year`; a header spelling a field's name exactly binds that field before any loose comparison, so a concept with both `unit_price` and `unitprice` still reads each from its exactly named column, as it did; a header otherwise matching several fields, or several headers matching one field, is refused, and a column matching no field is still refused on that path. The exact-first tie-break applies to `pipelex.cogt.doc_gen.header_matching.column_fields` too, which a document engine's fill shares.
 - **`PipeStructure.source_input_name` (Breaking)**: the attribute naming the step's single input, `text_input_name`, is renamed `source_input_name`, since the input may now be a `Document`.
-- **Document engines receive `table_fill`, plugin API version 11 (Breaking)**: `RenderJob` carries `table_fill`, a `TableFill` from `pipelex.cogt.doc_gen.table_fill`, `replace` unless the step asks for `append`, an engine that appends declares `table_append` among its model's `inputs`, and `resolve_doc_gen_setting` takes a required `table_fill`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
 
 ## [v0.101.0] - 2026-11-14
 
