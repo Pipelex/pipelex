@@ -104,3 +104,32 @@ def with_table_ref(*, xlsx_bytes: bytes, ref: str) -> bytes:
         return re.sub(rb'ref="[A-Z]+[0-9]+:[A-Z]+[0-9]+"', f'ref="{ref}"'.encode(), content)
 
     return with_part_rewritten(xlsx_bytes=xlsx_bytes, part_name="xl/tables/table1.xml", rewrite=_rewrite)
+
+
+def formula_with_cached_text(*, xlsx_bytes: bytes, cached_text: str) -> bytes:
+    """Give every formula of the first sheet a cached text value, typed `str` as Excel stores a formula's text result."""
+
+    def _rewrite(content: bytes) -> bytes:
+        text = content.decode("utf-8")
+        text = re.sub(r"<c ([^>]*)><f>([^<]*)</f>(?:<v\s*/>|<v></v>)?", rf'<c \1 t="str"><f>\2</f><v>{cached_text}</v>', text)
+        return text.encode("utf-8")
+
+    return with_part_rewritten(xlsx_bytes=xlsx_bytes, part_name="xl/worksheets/sheet1.xml", rewrite=_rewrite)
+
+
+def with_entries_reordered(*, xlsx_bytes: bytes, leading_names: list[str]) -> bytes:
+    """The bytes of a workbook re-zipped with `leading_names` first, then its other entries, `xl/` ones last.
+
+    A leading name the workbook lacks is written as an empty entry, so a sniffer reading only the first few entries
+    finds no part that names the workbook.
+    """
+    source = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
+    existing_names = source.namelist()
+    other_names = [name for name in existing_names if name not in leading_names]
+    ordered_names = leading_names + sorted(other_names, key=lambda name: name.startswith("xl/"))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as target:
+        for name in ordered_names:
+            content = source.read(name) if name in existing_names else b""
+            target.writestr(name, content)
+    return buffer.getvalue()

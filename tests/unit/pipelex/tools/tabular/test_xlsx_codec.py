@@ -13,6 +13,7 @@ from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table
 from tests.helpers.xlsx_workbooks import (
     add_table,
     empty_workbook,
+    formula_with_cached_text,
     formula_with_cached_value,
     single_table_workbook,
     with_part_rewritten,
@@ -101,6 +102,18 @@ class TestXlsxCodec:
         assert raw_table.rows[0].cells == [2, None]
         assert raw_table.uncached_formula_columns == frozenset({1})
 
+    def test_a_formula_whose_cached_value_is_an_empty_text_is_not_reported_uncached(self) -> None:
+        """A formula calculated to an empty text reads empty, and was calculated, so no column is reported."""
+        raw_bytes = formula_with_cached_text(
+            xlsx_bytes=single_table_workbook(header=["quantity", "flag"], rows=[[2, '=IF(A2>0,"","x")']]),
+            cached_text="",
+        )
+
+        raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=None, limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+
+        assert raw_table.rows[0].cells == [2, None]
+        assert raw_table.uncached_formula_columns == frozenset()
+
     def test_bytes_that_are_not_a_workbook_are_refused(self) -> None:
         with pytest.raises(CsvReadError, match="Could not open the workbook given for input 'budget' as an Excel workbook"):
             read_xlsx_raw_table(raw_bytes=b"item,amount\nPaper,2\n", table_name=None, limits=TABLE_READING_FALLBACK, subject=SUBJECT)
@@ -130,6 +143,20 @@ class TestXlsxCodec:
         assert len(raw_table.rows) == 99_999
         assert raw_table.rows[0].cells == ["Paper", 2]
         assert raw_table.rows[-1].cells == [None, None]
+
+    def test_a_table_declared_past_the_sheet_columns_counts_its_rows_and_is_refused(self) -> None:
+        """A Table declared over a column holding no cell counts every declared row, one cell wide, and has no header."""
+        raw_bytes = with_table_ref(xlsx_bytes=single_table_workbook(header=["item"], rows=[]), ref="ZZ1:ZZ1048576")
+        limits = TableReadingConfig(max_workbook_uncompressed_bytes=10_000_000, max_table_cells=1000)
+
+        started_at = time.monotonic()
+        with pytest.raises(TableTooLargeError, match=r"spans 1048576 cells, more than the 1000 a table is read with"):
+            read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=None, limits=limits, subject=SUBJECT)
+        # Under the cap, a Table with no column within the sheet is refused, since no header cell names a column.
+        with pytest.raises(CsvReadError, match=r"Table 'Rows' of the workbook given for input 'budget' has no column within the sheet's cells"):
+            read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=None, limits=TABLE_READING_FALLBACK, subject=SUBJECT)
+
+        assert time.monotonic() - started_at < 2
 
     def test_rows_past_the_sheet_are_empty_data_rows_and_columns_past_it_are_dropped(self) -> None:
         raw_bytes = with_table_ref(xlsx_bytes=single_table_workbook(header=["item", "amount"], rows=[["Paper", 2]]), ref="A1:J4")

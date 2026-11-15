@@ -51,8 +51,9 @@ binary = "soffice"
 timeout_seconds = 120
 
 # How large a spreadsheet a PipeStructure step or a table run input reads into records. An Excel workbook is refused
-# when its parts, decompressed, would hold more than max_workbook_uncompressed_bytes, and the Table read when it spans
-# more than max_table_cells cells, rows times columns, over the part of its range the sheet fills.
+# when its parts, decompressed, would hold more than max_workbook_uncompressed_bytes, and the table read, a workbook's
+# Table or a CSV file, when it spans more than max_table_cells cells, rows times columns: every row a Table declares
+# counts, and only its columns are clipped to the sheet's filled extent; a CSV file is counted while it is parsed.
 [runtime.table_reading]
 max_workbook_uncompressed_bytes = 100_000_000
 max_table_cells = 2_000_000

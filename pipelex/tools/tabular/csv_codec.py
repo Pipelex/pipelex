@@ -25,6 +25,7 @@ from typing import Any, Literal, Union, get_args, get_origin
 
 from mthds.protocol.problem.registry import CoreCode
 
+from pipelex.config import table_reading_limits
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.tools.tabular.exceptions import (
@@ -32,7 +33,9 @@ from pipelex.tools.tabular.exceptions import (
     CsvError,
     CsvFlatnessError,
     CsvReadError,
+    TableTooLargeError,
 )
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import (
     RawTable,
     RawTableRow,
@@ -41,6 +44,7 @@ from pipelex.tools.tabular.table_records import (
     TableFormat,
     build_table_records,
     list_content_from_table_records,
+    sentence_subject,
 )
 
 # v1 dialect defaults. Configurable via codec params, never auto-guessed (design §9).
@@ -175,7 +179,7 @@ def _read_csv_bytes(*, path: Path, subject: str) -> bytes:
         raise CsvReadError(msg) from exc
 
 
-def _parse_csv_rows(*, raw_bytes: bytes, delimiter: str, encoding: str, subject: str) -> list[tuple[int, list[str]]]:
+def _parse_csv_rows(*, raw_bytes: bytes, delimiter: str, encoding: str, subject: str, max_table_cells: int | None) -> list[tuple[int, list[str]]]:
     """Decode and parse a CSV file's bytes into its records, each with its 1-based physical line number.
 
     Each record carries ``reader.line_num`` (the count of physical lines consumed so far) rather than an enumeration, so
@@ -183,6 +187,12 @@ def _parse_csv_rows(*, raw_bytes: bytes, delimiter: str, encoding: str, subject:
     reader runs in ``strict=True`` mode so malformed quoting raises ``csv.Error`` at the boundary rather than silently
     merging the following lines into one cell. Wraps every raw ``UnicodeDecodeError``/``LookupError``/``csv.Error`` as
     ``CsvReadError``: a decoding error's own text quotes the byte it refused, so it is written by its reason alone.
+
+    A blank physical line after the first record is not kept, since no caller reads it (``_split_table`` skips it), so
+    a file of newlines holds nothing in memory. With ``max_table_cells``, the cells are counted as each record is
+    parsed, the header's and each data record's, a record narrower than the header counting as wide as the header,
+    which its padding makes it: the parse stops with ``TableTooLargeError`` as soon as the count passes the limit,
+    before the rest of the file is parsed or any record is built.
     """
     _assert_single_char_delimiter(delimiter)
     try:
@@ -194,9 +204,22 @@ def _parse_csv_rows(*, raw_bytes: bytes, delimiter: str, encoding: str, subject:
         msg = f"Unknown encoding {encoding!r} for {subject}"
         raise CsvReadError(msg) from exc
     numbered_rows: list[tuple[int, list[str]]] = []
+    header_width = 0
+    nb_cells = 0
     try:
         reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True)
         for row in reader:
+            if not numbered_rows:
+                header_width = len(row)
+            elif not row:
+                continue
+            nb_cells += max(len(row), header_width)
+            if max_table_cells is not None and nb_cells > max_table_cells:
+                msg = (
+                    f"{sentence_subject(subject=subject)} holds more than the {max_table_cells} cells a table is read with "
+                    "([runtime.table_reading] max_table_cells): read a smaller table."
+                )
+                raise TableTooLargeError(msg)
             numbered_rows.append((reader.line_num, row))
     except csv.Error as exc:
         # The csv module's own wording, which names the dialect's characters and never a cell.
@@ -240,18 +263,20 @@ def _split_table(
     return header, data_rows
 
 
-def _read_table(path: Path, *, delimiter: str, encoding: str, subject: str) -> tuple[list[str], list[tuple[int, list[str]]]]:
+def _read_table(
+    path: Path, *, delimiter: str, encoding: str, subject: str, max_table_cells: int | None
+) -> tuple[list[str], list[tuple[int, list[str]]]]:
     """Read a CSV file into a strictly validated header row + the (1-based-line-numbered) data rows.
 
     No message names the file's path, which the caller gave, nor quotes its content. ``subject`` names the file as the
-    input it was given as, when that is known.
+    input it was given as, when that is known. ``max_table_cells`` bounds the cells parsed, None for no bound.
     """
     raw_bytes = _read_csv_bytes(path=path, subject=subject)
-    numbered_rows = _parse_csv_rows(raw_bytes=raw_bytes, delimiter=delimiter, encoding=encoding, subject=subject)
+    numbered_rows = _parse_csv_rows(raw_bytes=raw_bytes, delimiter=delimiter, encoding=encoding, subject=subject, max_table_cells=max_table_cells)
     return _split_table(numbered_rows=numbered_rows, subject=subject, is_strict_header=True)
 
 
-def read_csv_raw_table(*, raw_bytes: bytes, binding: TableBinding, subject: str) -> RawTable:
+def read_csv_raw_table(*, raw_bytes: bytes, binding: TableBinding, limits: TableReadingConfig, subject: str) -> RawTable:
     """Read a CSV file's bytes into a `RawTable`: comma-separated UTF-8, a leading byte order mark ignored.
 
     A row is named by its physical line, as an editor shows it. Under a binding that refuses a column matching no
@@ -261,8 +286,15 @@ def read_csv_raw_table(*, raw_bytes: bytes, binding: TableBinding, subject: str)
         CsvReadError: The bytes do not decode or do not parse, or the file is empty.
         CsvColumnError: The header is empty or, strictly validated, holds a blank or repeated cell, or a row is wider
             than the header.
+        TableTooLargeError: The file holds more cells, the header's included, than ``limits.max_table_cells``.
     """
-    numbered_rows = _parse_csv_rows(raw_bytes=raw_bytes, delimiter=DEFAULT_DELIMITER, encoding=DEFAULT_READ_ENCODING, subject=subject)
+    numbered_rows = _parse_csv_rows(
+        raw_bytes=raw_bytes,
+        delimiter=DEFAULT_DELIMITER,
+        encoding=DEFAULT_READ_ENCODING,
+        subject=subject,
+        max_table_cells=limits.max_table_cells,
+    )
     header, data_rows = _split_table(numbered_rows=numbered_rows, subject=subject, is_strict_header=binding.refuses_unmatched_columns)
     raw_rows = [RawTableRow(label=f"row {line_number}", cells=list[TableCellValue](row)) for line_number, row in data_rows]
     return RawTable(header=header, rows=raw_rows)
@@ -280,7 +312,7 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     missing/unreadable file, an unknown/wrong encoding, or malformed quoting; raises
     ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=csv_subject(input_name=None))
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=csv_subject(input_name=None), max_table_cells=None)
     return [_row_to_dict(row, header=header) for _, row in data_rows]
 
 
@@ -364,6 +396,7 @@ def list_content_from_csv(
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_READ_ENCODING,
     input_name: str | None = None,
+    limits: TableReadingConfig | None = None,
 ) -> ListContent[StuffContentType]:
     """Read a CSV file given as a run input into a ``ListContent`` of ``row_model`` instances (one row → one item).
 
@@ -378,11 +411,15 @@ def list_content_from_csv(
     The file is the caller's input: no message names its path, quotes a cell, or names a column the concept does not
     declare, which is the file's own text: a message names the file by ``input_name``, the input it was given as, when
     the caller knows it.
+
+    The file is held to ``limits``, this process's ``[runtime.table_reading]`` when None: a file holding more cells than
+    ``max_table_cells`` raises ``TableTooLargeError`` while it is parsed.
     """
     assert_supported_table_suffix(path)
     field_names = flat_field_names(row_model)
     subject = csv_subject(input_name=input_name)
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=subject)
+    max_table_cells = (limits or table_reading_limits()).max_table_cells
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=subject, max_table_cells=max_table_cells)
     raw_table = RawTable(
         header=header,
         rows=[RawTableRow(label=f"row {line_number}", cells=list[TableCellValue](row)) for line_number, row in data_rows],

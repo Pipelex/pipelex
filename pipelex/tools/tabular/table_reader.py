@@ -31,7 +31,11 @@ from pipelex.tools.tabular.table_records import (
     build_table_records,
     list_content_from_table_records,
 )
-from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table, xlsx_subject
+from pipelex.tools.tabular.xlsx_codec import is_xlsx_archive, read_xlsx_raw_table, xlsx_subject
+
+# The type a sniffer gives a zip archive whose contents it does not recognise, and the format key it has.
+_BARE_ZIP_MIME_TYPE = "application/zip"
+_BARE_ZIP_FORMAT_KEY = "zip"
 
 
 def table_format_key_of(*, raw_bytes: bytes, mime_type: str | None, file_name: str | None) -> str | None:
@@ -41,12 +45,23 @@ def table_format_key_of(*, raw_bytes: bytes, mime_type: str | None, file_name: s
     table format: `application/octet-stream`, `text/plain`, or `application/vnd.ms-excel`, the type Windows gives a
     `.csv` file when Excel is installed. So when the bytes identify nothing and the declared type names no format a
     table is read from, the file's name decides, when it names one.
+
+    A workbook whose identifying entry is not among its archive's first few sniffs as a bare zip, which neither a type
+    naming no format nor a missing name settles: its archive is opened then, and a workbook is known by its parts
+    (`is_xlsx_archive`).
     """
     identified_mime_type = identify_mime_type(head=raw_bytes, declared_mime_type=mime_type, file_name=file_name)
     if identified_mime_type is None and file_name:
         identified_mime_type = mime_type_of_file_name(file_name=file_name)
     format_key = format_key_from_mime_type(mime_type=identified_mime_type)
-    if table_format_of(format_key=format_key) is not None or not file_name or guess_file_type_from_bytes(raw_bytes=raw_bytes) is not None:
+    if table_format_of(format_key=format_key) is not None:
+        return format_key
+    sniffed_file_type = guess_file_type_from_bytes(raw_bytes=raw_bytes)
+    # A bare zip whose type and name tell nothing more, or tell only that it is a zip, is judged by its parts.
+    is_unsettled = format_key is None or format_key == _BARE_ZIP_FORMAT_KEY
+    if sniffed_file_type is not None and sniffed_file_type.mime == _BARE_ZIP_MIME_TYPE and is_unsettled and is_xlsx_archive(raw_bytes=raw_bytes):
+        return TableFormat.XLSX
+    if not file_name or sniffed_file_type is not None:
         return format_key
     named_table_format = table_format_named_by(file_name=file_name)
     return named_table_format if named_table_format is not None else format_key
@@ -103,7 +118,7 @@ def read_table_records(
         TableSelectionError: A Table is named for a CSV file, or the workbook's Table cannot be chosen.
         CsvError: The file cannot be read, or its header does not match the fields.
         MissingDependencyError: The file is a workbook and openpyxl is not installed.
-        TableTooLargeError: The workbook, or its Table, is larger than `limits` allow.
+        TableTooLargeError: The workbook, its Table, or the CSV file is larger than `limits` allow.
     """
     subject = table_subject(table_format=table_format, input_name=input_name)
     raw_table: RawTable
@@ -112,7 +127,7 @@ def read_table_records(
             if table_name is not None:
                 msg = f"The step reads the Table '{table_name}', and {subject} has no Tables: give an Excel workbook (.xlsx) holding that Table."
                 raise TableSelectionError(msg)
-            raw_table = read_csv_raw_table(raw_bytes=raw_bytes, binding=binding, subject=subject)
+            raw_table = read_csv_raw_table(raw_bytes=raw_bytes, binding=binding, limits=limits, subject=subject)
         case TableFormat.XLSX:
             raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=table_name, limits=limits, subject=subject)
     return build_table_records(

@@ -26,6 +26,7 @@ No message names the file's path or quotes a cell, which are the caller's: a col
 field it matches, which the method declares.
 """
 
+import math
 import re
 import types
 from datetime import date, datetime, time
@@ -280,6 +281,14 @@ def build_table_records(
     )
 
 
+def sentence_subject(*, subject: str) -> str:
+    """A table file's subject opening a sentence: its first letter capitalized, the rest, the input's name included, as is.
+
+    `str.capitalize` would lowercase the rest, renaming an input `Budget` to `budget` in the message.
+    """
+    return subject[:1].upper() + subject[1:]
+
+
 def list_content_from_table_records(
     *,
     table_records: TableRecords,
@@ -397,8 +406,13 @@ def cell_kind_of(*, annotation: Any) -> CellKind | None:
     return None
 
 
-_INTEGER_LITERAL = re.compile(r"[+-]?\d+")
-_DECIMAL_LITERAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
+# The standard's literal forms are written in ASCII digits: `re.ASCII` keeps `\d` from matching another script's digits,
+# which `int` and `float` would otherwise read.
+_INTEGER_LITERAL = re.compile(r"[+-]?\d+", re.ASCII)
+_DECIMAL_LITERAL = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?", re.ASCII)
+# A typed cell holding an infinity or a NaN, and a decimal text whose exponent passes what a float holds.
+_NOT_FINITE_REFUSAL: Final[str] = "the cell holds a number that is not finite"
+_TOO_LARGE_REFUSAL: Final[str] = "the number is too large to be held"
 _TRUE_WORDS: Final[frozenset[str]] = frozenset({"true", "yes", "on", "y", "t", "1"})
 _FALSE_WORDS: Final[frozenset[str]] = frozenset({"false", "no", "off", "n", "f", "0"})
 
@@ -411,7 +425,8 @@ def convert_cell(*, value: TableCellValue, kind: CellKind) -> CellConversion:
     ignoring case, a date or a datetime from ISO 8601 only, and a text as it is. Surrounding spaces are ignored but by a
     text. A typed workbook cell: a text takes it as its text (`_as_text`); an integer a number with no fractional part;
     a number any number; a boolean a boolean; a date a date or a datetime at midnight; a datetime a datetime or a date.
-    A boolean is never a number, nor a number a boolean.
+    A boolean is never a number, nor a number a boolean, and a number that is not finite, such as an exponent too large
+    for a float, is refused.
     """
     if kind.is_text:
         return CellConversion(value=_as_text(value=value))
@@ -421,12 +436,16 @@ def convert_cell(*, value: TableCellValue, kind: CellKind) -> CellConversion:
         case CellKind.INTEGER:
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 return CellConversion(value=None, refusal="the cell does not hold a number, where an integer is expected")
+            if isinstance(value, float) and not math.isfinite(value):
+                return CellConversion(value=None, refusal=_NOT_FINITE_REFUSAL)
             if isinstance(value, float) and not value.is_integer():
                 return CellConversion(value=None, refusal="the cell holds a number with a fractional part, where an integer is expected")
             return CellConversion(value=int(value))
         case CellKind.NUMBER:
             if isinstance(value, bool) or not isinstance(value, (int, float)):
                 return CellConversion(value=None, refusal="the cell does not hold a number")
+            if isinstance(value, float) and not math.isfinite(value):
+                return CellConversion(value=None, refusal=_NOT_FINITE_REFUSAL)
             return CellConversion(value=value)
         case CellKind.BOOLEAN:
             if not isinstance(value, bool):
@@ -456,11 +475,18 @@ def _convert_text(*, text: str, kind: CellKind) -> CellConversion:
         case CellKind.INTEGER:
             if _INTEGER_LITERAL.fullmatch(text) is None:
                 return CellConversion(value=None, refusal="the text is not an integer literal")
-            return CellConversion(value=int(text))
+            try:
+                return CellConversion(value=int(text))
+            # Python refuses to read an integer of more digits than `sys.get_int_max_str_digits()` allows.
+            except ValueError:
+                return CellConversion(value=None, refusal="the integer has too many digits")
         case CellKind.NUMBER:
             if _DECIMAL_LITERAL.fullmatch(text) is None:
                 return CellConversion(value=None, refusal="the text is not a decimal number written with a dot and no grouping separator")
-            return CellConversion(value=float(text))
+            number = float(text)
+            if not math.isfinite(number):
+                return CellConversion(value=None, refusal=_TOO_LARGE_REFUSAL)
+            return CellConversion(value=number)
         case CellKind.BOOLEAN:
             lowered = text.lower()
             if lowered in _TRUE_WORDS:

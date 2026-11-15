@@ -25,6 +25,7 @@ from pipelex.tools.tabular.table_records import (
     cell_kind_of,
     convert_cell,
     list_content_from_table_records,
+    sentence_subject,
 )
 
 SUBJECT = "the workbook given for input 'budget'"
@@ -247,6 +248,14 @@ class TestTableRecords:
             pytest.param("04/03/2026", CellKind.DATE, id="text-non-iso-date"),
             pytest.param("March 4, 2026", CellKind.DATETIME, id="text-non-iso-datetime"),
             pytest.param("2026-03-04T09:00", CellKind.DATE, id="text-datetime-with-time-to-date"),
+            pytest.param("1e999", CellKind.NUMBER, id="text-number-past-a-float"),
+            pytest.param("-1e999", CellKind.NUMBER, id="text-negative-number-past-a-float"),
+            pytest.param(float("inf"), CellKind.NUMBER, id="infinite-number"),
+            pytest.param(float("nan"), CellKind.NUMBER, id="nan-number"),
+            pytest.param(float("inf"), CellKind.INTEGER, id="infinite-number-to-integer"),
+            pytest.param("\u0661\u0662", CellKind.INTEGER, id="text-arabic-indic-digits-integer"),
+            pytest.param("\u0661.\u0665", CellKind.NUMBER, id="text-arabic-indic-digits-number"),
+            pytest.param("\uff11\uff12", CellKind.INTEGER, id="text-fullwidth-digits-integer"),
         ],
     )
     def test_convert_cell_refuses(self, value: TableCellValue, kind: CellKind) -> None:
@@ -254,6 +263,30 @@ class TestTableRecords:
 
         assert conversion.refusal is not None
         assert str(value) not in conversion.refusal
+
+    @pytest.mark.parametrize(
+        ("subject", "expected"),
+        [
+            pytest.param("the CSV file given for input 'Budget'", "The CSV file given for input 'Budget'", id="keeps-the-rest-as-is"),
+            pytest.param("", "", id="empty"),
+        ],
+    )
+    def test_sentence_subject_capitalizes_only_the_first_letter(self, subject: str, expected: str) -> None:
+        assert sentence_subject(subject=subject) == expected
+
+    @pytest.mark.parametrize(
+        ("value", "kind", "expected_refusal"),
+        [
+            pytest.param("9" * 4301, CellKind.INTEGER, "the integer has too many digits", id="integer-past-the-digit-limit"),
+            pytest.param("1e999", CellKind.NUMBER, "the number is too large to be held", id="decimal-past-a-float"),
+            pytest.param(float("inf"), CellKind.NUMBER, "the cell holds a number that is not finite", id="typed-infinity"),
+        ],
+    )
+    def test_convert_cell_refuses_out_of_range_numbers_without_raising(self, value: TableCellValue, kind: CellKind, expected_refusal: str) -> None:
+        conversion = convert_cell(value=value, kind=kind)
+
+        assert conversion.value is None
+        assert conversion.refusal == expected_refusal
 
     @pytest.mark.parametrize(
         ("annotation", "kind"),

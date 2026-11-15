@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:14b96cd0fef795f1f047b5e1dec6f5e614932f42a29d3f273abc345a9f1ba373"
+digest = "sha256:e99d75b900cc167667078dc1ddebdb5a45ffc24aad316a2523a0b4f6498bec14"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-15T12:09:10Z"
-rationale = "real-catch: the branch adds [runtime.table_reading] (max_workbook_uncompressed_bytes, max_table_cells) with its shipped defaults in pipelex.toml and the TableReadingConfig field on RuntimeConfig, no validator narrowing a domain beyond ge=1; the configuration overview now names the section and links the PipeStructure page that documents it, and the pipelex-config goldens defaults@9.toml and fingerprint@9.json were re-recorded additively, no ledger entry being owed for a new table with defaults"
+reviewed_at = "2026-11-15T13:12:06Z"
+rationale = "clean-pass: the pipelex.toml change only rewords the [runtime.table_reading] comment (every declared row counts toward max_table_cells, only columns clipped, a CSV counted while parsed); no key, default or validator moved, the configuration overview still links the PipeStructure page whose Limits paragraph now says the same, and the defaults@9 golden was re-recorded with make umig"
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -10,7 +10,7 @@ rationale = "real-catch: the branch adds [runtime.table_reading] (max_workbook_u
 "pipelex/graph/graph_config.py" = "blob:dc0939a6d2730c0a10b88aa1a6e0b2dd583462a6"
 "pipelex/language/mthds_config.py" = "blob:353009ad8c59dc5266bdd9dfa42b1ad18b67dca7"
 "pipelex/methods/methods_config.py" = "blob:76ca9a0e64f8c10ef6a355aafd0d79d36b09f06a"
-"pipelex/pipelex.toml" = "blob:ee9fa0f503269ae05878444d83728704e1b00472"
+"pipelex/pipelex.toml" = "blob:79f58f3d02fb90fc8c8a968c44ddf4300fed7d05"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
 "pipelex/system/configuration/config_loader.py" = "blob:8703fc3e5a82d7c6a3d148ea195c25044c2f0fe0"
