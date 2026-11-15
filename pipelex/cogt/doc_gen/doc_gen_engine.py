@@ -7,6 +7,10 @@ and its worker is registered by a plugin. A step may name one in its
 runs when the method loads, so a step no engine here can print is refused before a run spends anything, and when
 the step runs, where the resolved handle rides into the print stage as its routing key.
 
+A step that fills a template file's Tables other than by replacing their rows, such as one appending to them, asks
+for a capability its engine declares among its `inputs` too (`TableFill.engine_capability`): an engine that does not
+declare it would ignore the fill and replace the rows, so such a step is refused when it resolves.
+
 A missing engine is refused naming its remedy. Core knows the name of the built-in engine, `reportlab-pdf`, and the
 names of the engines the Pipelex document generation plugin declares when it loads, so a step that asks for one
 this installation does not declare is told to run `pipelex update` or to install the plugin, rather than that its
@@ -18,6 +22,7 @@ from functools import partial
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice, DocGenSetting
 from pipelex.cogt.doc_gen.exceptions import KNOWN_DOC_GEN_MODEL_NAMES, DocGenEngineGap, DocGenEngineMissingError, DocGenModelCapabilityError
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import resolve_deck_choice
@@ -29,6 +34,15 @@ from pipelex.runtime_hub import get_inference_backend_registry, get_model_deck
 def prints_document(*, inference_model: InferenceModelSpec, doc_gen_format: DocGenFormat, source: DocGenSource) -> bool:
     """Whether a `doc_gen` model prints this format from this source, by the `inputs` and `outputs` it declares."""
     return str(source) in inference_model.inputs and str(doc_gen_format) in inference_model.outputs
+
+
+def fills_tables(*, inference_model: InferenceModelSpec, table_fill: TableFill) -> bool:
+    """Whether a `doc_gen` model fills a template file's Tables this way, by the capability it declares among its `inputs`.
+
+    Every engine that fills a template file replaces a Table's rows; any other fill is one its model declares.
+    """
+    engine_capability = table_fill.engine_capability
+    return engine_capability is None or engine_capability in inference_model.inputs
 
 
 def require_doc_gen_engine_installed(
@@ -132,8 +146,11 @@ def resolve_doc_gen_setting(
     doc_gen_format: DocGenFormat,
     source: DocGenSource,
     pipe_code: str | None,
+    table_fill: TableFill,
 ) -> DocGenSetting:
     """The engine that prints a step, pinned to the model handle it resolves to, checked to print the step here.
+
+    `table_fill` is how the step fills its template file's Tables, `replace` for a step with no template file.
 
     Raises:
         DocGenEngineMissingError: the deck names no default for the step and the step names no engine, the engine is
@@ -143,7 +160,8 @@ def resolve_doc_gen_setting(
         ModelDeckChoiceUnresolvedError: the step names no engine and the deck's default for the step names a reference
             the deck does not define.
         ModelNotFoundError: the reference resolves to no model served here.
-        DocGenModelCapabilityError: the engine does not print the step's format from its source.
+        DocGenModelCapabilityError: the engine does not print the step's format from its source, or does not declare the
+            step's fill of its Tables.
     """
     model_deck = get_model_deck()
     doc_gen_setting: DocGenSetting
@@ -167,6 +185,10 @@ def resolve_doc_gen_setting(
     )
     if not prints_document(inference_model=inference_model, doc_gen_format=doc_gen_format, source=source):
         raise DocGenModelCapabilityError(doc_gen_format=doc_gen_format, source=source, model=inference_model.name, pipe_code=pipe_code)
+    if not fills_tables(inference_model=inference_model, table_fill=table_fill):
+        raise DocGenModelCapabilityError(
+            doc_gen_format=doc_gen_format, source=source, model=inference_model.name, pipe_code=pipe_code, table_fill=table_fill
+        )
     require_doc_gen_engine_installed(inference_model=inference_model, doc_gen_format=doc_gen_format, source=source, pipe_code=pipe_code)
     # Pinned as a reference that parses back to the resolved handle, whatever its spelling, since every lookup reads it again.
     resolved_handle = write_model_handle(name=inference_model.name)

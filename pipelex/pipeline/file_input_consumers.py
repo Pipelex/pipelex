@@ -28,7 +28,10 @@ resolving sub-pipes through the hub:
   path, and reads its resolved model's document types. A `PipeJudge` consumes the documents its prompt
   references by variable path, as a PipeLLM does, and reads its resolved judgment model's document
   types. A waterfall reads a format when any of its members reads it. A `PipeExtract` that asks for
-  page views also needs a PDF, whatever its model reads, since page views are drawn from one.
+  page views also needs a PDF, whatever its model reads, since page views are drawn from one. A `PipeDocGen` with a
+  `template_input` consumes that input's file as its template, and reads only its own format: an `xlsx` step reads an
+  Excel workbook, whatever its engine prints otherwise. Run setup also hands such a file to the engine's template
+  checker (`pipelex.pipeline.doc_gen_template_inputs`).
 
 The walk depends only on the library and the model deck, never on the input values.
 
@@ -45,7 +48,8 @@ from typing import Final, NamedTuple
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError
+from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError, DocGenModelCapabilityError
+from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError, ModelNotFoundError
 from pipelex.cogt.extract.extract_input import PAGE_VIEWS_FILE_ADVICE, PAGE_VIEWS_FILE_OR_CONVERTER_ADVICE, PAGE_VIEWS_RENDERER
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -66,6 +70,7 @@ from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
+from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
@@ -106,6 +111,7 @@ class FileConsumerKind(StrEnum):
     EXTRACT = "extract"
     LLM_DOCUMENT = "llm_document"
     JUDGMENT_DOCUMENT = "judgment_document"
+    DOC_GEN_TEMPLATE = "doc_gen_template"
 
     @property
     def model_type(self) -> ModelType:
@@ -116,6 +122,17 @@ class FileConsumerKind(StrEnum):
                 return ModelType.LLM
             case FileConsumerKind.JUDGMENT_DOCUMENT:
                 return ModelType.JUDGMENT
+            case FileConsumerKind.DOC_GEN_TEMPLATE:
+                return ModelType.DOC_GEN
+
+    @property
+    def is_doc_gen_template(self) -> bool:
+        """Whether the consumer fills the file as its template, which run setup also hands to the engine's checker."""
+        match self:
+            case FileConsumerKind.DOC_GEN_TEMPLATE:
+                return True
+            case FileConsumerKind.EXTRACT | FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT:
+                return False
 
 
 class FileInputConsumer(BaseModel):
@@ -188,6 +205,8 @@ class FileInputConsumer(BaseModel):
                 return "extracts it with"
             case FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT:
                 return "gives it to"
+            case FileConsumerKind.DOC_GEN_TEMPLATE:
+                return "fills it as its template with"
 
     def covers(self, *, file_input_path: tuple[str | int, ...]) -> bool:
         """Whether a file at this path in the inputs is among what the consumer consumes.
@@ -430,6 +449,8 @@ def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting:
         _record_llm_document_consumers(pipe_llm=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
     elif isinstance(pipe, PipeJudge):
         _record_judgment_document_consumers(pipe_judge=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
+    elif isinstance(pipe, PipeDocGen):
+        _record_doc_gen_template_consumer(pipe_doc_gen=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
 
 
 def _visit_sequence(
@@ -608,6 +629,45 @@ def _record_extract_consumer(*, pipe_extract: PipeExtract, frame: _Frame, is_con
             reads_web_pages=reads_web_pages,
             is_conditional=is_conditional,
             asks_for_page_views=pipe_extract.should_include_page_views,
+        )
+    )
+
+
+def _record_doc_gen_template_consumer(*, pipe_doc_gen: PipeDocGen, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
+    """Record the step as the consumer of its template input's file, which it reads in its own format alone."""
+    if pipe_doc_gen.template_input is None:
+        return
+    consumed_path = _tracked_path(frame=frame, variable_path=pipe_doc_gen.template_input)
+    if consumed_path is None:
+        return
+    model: str | None
+    readable_formats: frozenset[str] | None
+    try:
+        model = pipe_doc_gen.resolve_engine().model
+        readable_formats = frozenset({pipe_doc_gen.doc_gen_format.suffix})
+    except (
+        DocGenEngineMissingError,
+        DocGenModelCapabilityError,
+        ModelChoiceNotFoundError,
+        ModelNotFoundError,
+        ModelReferenceParseError,
+    ):
+        # The method's load resolved it, so only an engine gone since lands here: the step refuses it when it runs.
+        model = None
+        readable_formats = None
+    consumers.append(
+        FileInputConsumer(
+            slot_name=consumed_path[0],
+            consumed_path=consumed_path,
+            pipe_ref=pipe_doc_gen.pipe_ref,
+            pipe_code=pipe_doc_gen.code,
+            kind=FileConsumerKind.DOC_GEN_TEMPLATE,
+            model=model,
+            readable_formats=readable_formats,
+            formats_read_by_every_model=readable_formats,
+            reads_web_pages=False,
+            is_conditional=is_conditional,
+            asks_for_page_views=False,
         )
     )
 

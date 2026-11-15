@@ -909,6 +909,24 @@ codes:
     see:
       - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
 
+  - code: pipelex.docgen.template_input_unfit
+    title: "The template a run supplied does not fit the step"
+    domain: input
+    retry: "no"
+    raised_as: problem
+    status: 422
+    detail: "The file of the input '{input}' cannot be used as the document's template: {finding}"
+    steps:
+      actor: {kind: change_input, detail: "Give the input '{input}' a file that fits the step's template, then run the method again."}
+      other: {kind: change_input, detail: "Pass this to the caller, whose file for the input '{input}' does not fit the step's template."}
+    params:
+      input: {type: identifier, description: "The input whose file is the template."}
+      finding: {type: caller_text, description: "What the engine's check found in the file the caller supplied."}
+    meaning: "A PipeDocGen step takes its template from a run input, and the engine's check of the file found that it does not fit the step's inputs, such as a Table the step fills that the workbook lacks."
+    what_to_do: "Read `params.finding`, then fix the file, or give the input another one, and run the method again."
+    see:
+      - {title: "Document Engine Plugins", href: "under-the-hood/document-engine-plugins.md"}
+
   # --- pipelex.sandbox. -------------------------------------------------------------------
 
   - code: pipelex.sandbox.unavailable

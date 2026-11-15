@@ -54,6 +54,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.blueprint_selection import select_primary_blueprint
+from pipelex.pipeline.doc_gen_template_inputs import check_doc_gen_template_inputs
 from pipelex.pipeline.file_input_consumers import check_file_inputs_against_consumers
 from pipelex.pipeline.input_normalizer import collect_file_inputs, prepare_file_inputs
 from pipelex.pipeline.validate_bundle_translation import (
@@ -548,6 +549,9 @@ async def prepare_pipe_job(
                     "reason": foreseen_conversion.reason,
                 },
             )
+        # The templates the run supplies to its PipeDocGen steps are known now, before any step starts: each is checked
+        # against its engine's template checker, and one that does not fit refuses the run as the caller's.
+        await check_doc_gen_template_inputs(entry_pipe=pipe, working_memory=working_memory, read_scope=read_scope)
 
     # Build the library crate from all accumulated blueprints for Temporal dispatch.
     library_crate = get_library_manager().get_crate(library_id=library_id)

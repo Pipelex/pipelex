@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.cogt.doc_gen.exceptions import BUILT_IN_DOC_GEN_MODEL
+from pipelex.cogt.doc_gen.table_fill import TABLE_APPEND_CAPABILITY
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
@@ -27,9 +28,24 @@ def stub_engines() -> Iterator[StubEngines]:
     The stub registers as the real plugin does: a worker per sdk, which replaces the runtime's document engines, and
     the plugin's models and deck defaults, which a model manager set up with its declarations merges.
     """
+    yield from _installed(engines=StubEngines())
+
+
+@pytest.fixture
+def xlsx_stub_engines() -> Iterator[StubEngines]:
+    """The stub plugin with its Excel engine, which declares that it appends to a Table."""
+    yield from _installed(engines=StubEngines(xlsx_inputs=["layout", "template_file", TABLE_APPEND_CAPABILITY]))
+
+
+@pytest.fixture
+def replace_only_xlsx_stub_engines() -> Iterator[StubEngines]:
+    """The stub plugin with an Excel engine that predates appending: it declares no `table_append`."""
+    yield from _installed(engines=StubEngines(xlsx_inputs=["layout", "template_file"]))
+
+
+def _installed(*, engines: StubEngines) -> Iterator[StubEngines]:
     booted_registry = get_inference_backend_registry()
     booted_models_manager = get_models_manager()
-    engines = StubEngines()
     registrar = engines.make_registrar()
     get_runtime_hub().set_inference_backend_registry(
         booted_registry.with_family(family=InferenceFamily.DOC_GEN, backends=make_doc_gen_backends(registrar=registrar))

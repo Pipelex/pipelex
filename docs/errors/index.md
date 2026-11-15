@@ -139,6 +139,7 @@ The document engines that print a PipeDocGen step's documents.
 | [`pipelex.docgen.content_unprintable`](pipelex/docgen/content_unprintable.md) | The document's content cannot be printed | `input` | `no` | `422` |
 | [`pipelex.docgen.print_timeout`](pipelex/docgen/print_timeout.md) | Printing the document took too long | `runtime` | `yes` | `504` |
 | [`pipelex.docgen.template_warning`](pipelex/docgen/template_warning.md) | The document template may be faulty | `method` | `no` | none (warning) |
+| [`pipelex.docgen.template_input_unfit`](pipelex/docgen/template_input_unfit.md) | The template a run supplied does not fit the step | `input` | `no` | `422` |
 
 ## pipelex.sandbox { #pipelex-sandbox }
 

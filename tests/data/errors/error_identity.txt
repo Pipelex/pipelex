@@ -67,6 +67,7 @@ DocGenEngineMissingError | pipelex.docgen.engine_unavailable
 DocGenHandleNotFoundError | pipelex.config.invalid
 DocGenModelCapabilityError | model.capability_unsupported
 DocGenRenderError | one of runtime.unexpected, pipelex.docgen.content_unprintable, pipelex.docgen.print_timeout, pipelex.docgen.resource_refused, pipelex.docgen.template_invalid, security.method_url_refused
+DocGenTemplateInputFormatError | input.file_type_unsupported
 DocumentConversionError | abstract
 DocumentConverterAnswerError | runtime.unexpected
 DocumentConverterMisconfiguredError | runtime.misconfigured
@@ -274,6 +275,7 @@ PipeDocGenFactoryError | one of method.template_invalid, method.output_concept_m
 PipeDocGenRunError | inherits cause, else pipe.template_render_failed; or chosen: runtime.unexpected, method.template_invalid
 PipeDocGenTemplateCheckError | pipelex.docgen.template_invalid
 PipeDocGenTemplateFileUncheckedError | runtime.unsupported
+PipeDocGenTemplateInputUnfitError | pipelex.docgen.template_input_unfit
 PipeDocGenUndefinedValueError | pipe.template_render_failed
 PipeExecutionError | one of runtime.unexpected, request.pipe_unspecified, input.invalid
 PipeExtractFactoryError | method.schema_violation

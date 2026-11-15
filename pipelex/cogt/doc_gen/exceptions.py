@@ -2,12 +2,16 @@ from enum import StrEnum
 from typing import Any
 
 from mthds.method_tree.vocabulary import TreeRefusalCode
+from mthds.protocol.problem.models import ProblemLocation
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource, doc_gen_choice_key
+from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.inference.error_classification import UserAction, UserActionKind
 from pipelex.errors.error_code_declaration import ErrorCodeSet
+from pipelex.errors.problem import make_location
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 
 # The package whose engines print what open Pipelex does not: a PDF from a template, Excel, Word and PowerPoint.
@@ -122,28 +126,51 @@ class DocGenEngineMissingError(PipelexError):
 
 
 class DocGenModelCapabilityError(PipelexError):
-    """The document engine a `PipeDocGen` step names does not print the step's format from its source.
+    """The document engine a `PipeDocGen` step names does not print the step's format from its source, or does not fill its Tables the step's way.
 
     A `doc_gen` model lists the sources it prints from as its `inputs` and its format as its `outputs`, and a step
-    that names one outside them is refused when the method loads.
+    that names one outside them is refused when the method loads. A fill of a template file's Tables other than
+    `replace` is a capability the model lists among its `inputs` too (`TableFill.engine_capability`), and a step asking
+    for one its engine does not declare is refused the same way, naming the fill: an engine that predates it would
+    replace the Table's rows instead.
     """
 
     error_code = CoreCode.MODEL_CAPABILITY_UNSUPPORTED
 
-    def __init__(self, *, doc_gen_format: DocGenFormat, source: DocGenSource, model: str, pipe_code: str | None = None):
+    def __init__(
+        self,
+        *,
+        doc_gen_format: DocGenFormat,
+        source: DocGenSource,
+        model: str,
+        pipe_code: str | None = None,
+        table_fill: TableFill | None = None,
+    ):
         self.doc_gen_format = doc_gen_format
         self.source = source
         self.model = model
         self.pipe_code = pipe_code
-        message = (
-            f"{_step_label(pipe_code=pipe_code)} asks the engine '{model}' for {doc_gen_format.with_article} {source.desc}, which it does not print. "
-            "Name an engine that does in the step's 'model', or leave 'model' out for the model deck's default."
-        )
+        self.table_fill = table_fill
+        message: str
+        if table_fill is None:
+            message = (
+                f"{_step_label(pipe_code=pipe_code)} asks the engine '{model}' for {doc_gen_format.with_article} {source.desc}, "
+                "which it does not print. Name an engine that does in the step's 'model', or leave 'model' out for the model deck's default."
+            )
+        else:
+            message = (
+                f"{_step_label(pipe_code=pipe_code)} asks the engine '{model}' to {table_fill.desc} (table_fill = \"{table_fill}\"), "
+                f"which it does not do. Name an engine that declares '{table_fill.engine_capability}' in the step's 'model', "
+                "or fill the template's Tables another way."
+            )
         super().__init__(message)
 
     @override
     def problem_params(self) -> dict[str, Any]:
-        return {"model": self.model, "capability": f"printing {self.doc_gen_format.with_article} {self.source.desc}"}
+        capability = f"printing {self.doc_gen_format.with_article} {self.source.desc}"
+        if self.table_fill is not None:
+            capability = self.table_fill.engine_capability or capability
+        return {"model": self.model, "capability": capability}
 
 
 class DocGenRenderError(PipelexError):
@@ -217,3 +244,44 @@ class TemplateUrlRefusedError(PipelexError):
     def __init__(self, message: str, *, refusal_code: TreeRefusalCode | None):
         super().__init__(message)
         self.refusal_code = refusal_code
+
+
+class DocGenTemplateInputFormatError(PipelexError):
+    """The file a run input supplies as a `PipeDocGen` step's template is not a file of the step's format.
+
+    A step with `template_input` fills the input's file, so a Word document given to a step that fills an Excel workbook
+    cannot be its template. The format is judged from the bytes first, an Office file being a zip whose content-types
+    entry names its main part, then from the media type the document carries, then from its file name's suffix. Raised at
+    run setup, by the check of a template a run input supplies, and by the print stage, which reads the file again. The
+    input is the caller's, so it is ``input.file_type_unsupported``, its model the step's engine; the message names the
+    input by its name and the formats in words, never the file's name or its URL.
+    """
+
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Give the template input a file in the format the step fills.",
+    )
+
+    def __init__(self, message: str, *, input_name: str, file_format: str, model: str):
+        """The refusal of a template input, named by the step's input, with the format judged and the engine that fills it.
+
+        Args:
+            message: What is wrong, naming the input and the formats.
+            input_name: The step's input whose file is the template.
+            file_format: The format the file was judged to be, `unknown` when nothing told.
+            model: The engine that fills the step's template.
+        """
+        super().__init__(message)
+        self.input_name = input_name
+        self.file_format = file_format
+        self.model = model
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "format": self.file_format, "model": self.model}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name)
