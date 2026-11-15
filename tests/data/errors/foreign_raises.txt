@@ -36,6 +36,7 @@ pipelex/cogt/llm/llm_worker_abstract.py | LLMWorkerAbstract._start_otel_span_llm
 pipelex/cogt/models/model_manager.py | ModelManager.get_inference_model | RuntimeError | invariant
 pipelex/cogt/models/model_manager.py | ModelManager.get_model_deck | RuntimeError | invariant
 pipelex/cogt/models/model_manager.py | ModelManager.routing_profile | RuntimeError | invariant
+pipelex/cogt/templating/prompt_file_registrations.py | PromptFileRegistrations.with_documents | ValueError | invariant
 pipelex/config.py | get_config | TypeError | invariant
 pipelex/core/concepts/concept_representation_generator.py | ConceptRepresentationGenerator._generate_basemodel_representation | ValueError | invariant
 pipelex/core/concepts/concept_representation_generator.py | ConceptRepresentationGenerator.generate_class_representation | ValueError | invariant

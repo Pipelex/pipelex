@@ -1,10 +1,10 @@
 contract = "hub-layering-convention"
-digest = "sha256:dd156f74342ea9d21fe0ae7fd5749f9b624b9a9f92177335bb31ac8edf2592bf"
+digest = "sha256:0750028c6eb1617aae9a7d7e237e8f5ba6d99c5edd4d303360e6585956b9816b"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-10T21:20:52Z"
-rationale = "real-catch: runtime_hub.py gains get_optional_document_converter, the document converter [runtime.document_conversion] names; docs/contribute/hub-layering.md now lists it in the runtime_hub table. It imports only pipelex.tools.document_conversion, a kernel-layer package, so no import crosses the boundary."
+reviewed_at = "2026-11-15T22:00:12Z"
+rationale = "clean-pass: runtime_hub.py changes only the scoped_content_generator docstring, which now says a dry run's inline leaves read storage to load a stored text a prompt or condition reads; no hub accessor, import or layer moved, so docs/contribute/hub-layering.md stays accurate."
 
 [trigger_files]
 "pipelex/cli/dev_cli/commands/hub_layering_guard.py" = "blob:fda2237457fe0b6830ff2ae8f720698735bec4c3"
 "pipelex/interpreter_hub.py" = "blob:8572e31eafdfa9eb5ecde01326ef51a971f86b2e"
-"pipelex/runtime_hub.py" = "blob:f372d155eb8e3be6a0268c457f0ce658326bbdee"
+"pipelex/runtime_hub.py" = "blob:960daf57f1568977a6e3b89baaa8fba0002c5c20"

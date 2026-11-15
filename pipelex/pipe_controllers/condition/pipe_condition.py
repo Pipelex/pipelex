@@ -4,6 +4,7 @@ from mthds.protocol.problem.registry import CoreCode, MethodOptionalUnhandledSit
 from pydantic import BaseModel, ConfigDict
 from typing_extensions import override
 
+from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.absence import AbsenceKind, AbsenceRecord
@@ -16,6 +17,7 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.graph.condition_output_merge import ConditionOutputMerge, ConditionOutputTyping
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.interpreter_hub import get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.kernel.stored_value_ops import load_stored_values_through_leaf
 from pipelex.pipe_controllers.absence_taint import (
     ConditionTaintAnalysis,
     ForceConsumptionInfo,
@@ -411,7 +413,9 @@ class PipeCondition(PipeController):
     async def _validate_before_run(
         self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
-        evaluated_expression = await self._render_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
+        evaluated_expression = await self._render_expression(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+        )
         if not evaluated_expression or evaluated_expression == "None":
             # The expression is the caller's own method, rendered over their run's data: when it renders
             # nothing, no outcome can be chosen, and the method is theirs to fix. The message names only the pipe.
@@ -430,8 +434,32 @@ class PipeCondition(PipeController):
     ):
         pass
 
-    async def _render_expression(self, *, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> str:
-        """Render the conditional expression over the run's data.
+    async def _load_stored_values_read_by_expression(
+        self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams
+    ) -> None:
+        """Load, through a leaf, the stored values among the stuffs the expression reads, so it renders over their text.
+
+        The expression renders here, in the controller, which on a host runtime is workflow code that reads no storage.
+        A stuff the expression names that holds a stored text never loaded is loaded through the content generator's
+        `load_stored_texts` leaf; an expression reading only inline values dispatches nothing.
+        """
+        try:
+            read_paths = detect_jinja2_required_variables(
+                template_category=TemplateCategory.EXPRESSION,
+                template_source=rewrite_template_sigils(self.expression),
+            )
+        except Jinja2DetectVariablesError:
+            # The render that follows refuses the expression with the method's own error, which names the field.
+            return
+        read_contents: dict[str, Any] = {}
+        for read_name in sorted({get_root_from_dotted_path(read_path) for read_path in read_paths}):
+            read_stuff = working_memory.get_optional_stuff(name=read_name)
+            if read_stuff is not None:
+                read_contents[read_name] = read_stuff.content
+        await load_stored_values_through_leaf(roots=read_contents, job_metadata=job_metadata, cogt_run_params=pipe_run_params.cogt_run_params)
+
+    async def _render_expression(self, *, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams) -> str:
+        """Render the conditional expression over the run's data, the stored values it reads loaded first.
 
         Raises:
             PipeRunError: `method.template_invalid` when the expression cannot render as written, such as a filter or
@@ -440,6 +468,7 @@ class PipeCondition(PipeController):
                 refused, never the expression's text, and the refusal is located on that field, as a refusal of the
                 template sandbox is.
         """
+        await self._load_stored_values_read_by_expression(job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params)
         try:
             with locating_template_refusal(template_field=self.expression_field):
                 return await render_template(
@@ -461,19 +490,23 @@ class PipeCondition(PipeController):
     async def _evaluate_expression(
         self,
         *,
+        job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
     ) -> str:
         """Evaluate the conditional expression and select the appropriate pipe.
 
         Args:
+            job_metadata: The step's metadata, under which a stored value the expression reads is loaded
             working_memory: The working memory context for evaluation
             pipe_run_params: The run's parameters, whose mode a refusal of the expression reports
 
         Returns:
             The evaluated expression
         """
-        evaluated_expression = await self._render_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
+        evaluated_expression = await self._render_expression(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+        )
 
         if self.add_alias_from_expression_to:
             working_memory.add_alias(
@@ -493,7 +526,9 @@ class PipeCondition(PipeController):
         output_name: str | None = None,
         library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
-        evaluated_expression = await self._evaluate_expression(working_memory=working_memory, pipe_run_params=pipe_run_params)
+        evaluated_expression = await self._evaluate_expression(
+            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params
+        )
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 

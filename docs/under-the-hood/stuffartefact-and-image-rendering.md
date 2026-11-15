@@ -148,7 +148,9 @@ A `Text`, `Markdown`, `Html` or `JSON` content may hold a reference to its value
 - `iter_keys()`, `iter_items()` and `iter_values()` list the fields of the inline form (`text`, or `inner_html` and `css_class`, or `json_obj`), whichever form the content holds.
 - A structure holding such a content renders it through `rendered_value_form()`, the dict its inline form dumps, which `serialize_model` uses in place of the model's fields (`ValueFormRenderable` in `pipelex/tools/typing/pydantic_utils.py`).
 
-Loading is the caller's job, done before rendering in code that may perform IO: `load_stored_value(content, read_scope=…, position=…, storage_provider=…)` in `pipelex/core/stuffs/stored_value_loader.py` reads the value through `load_text_from_any_uri` (`pipelex/tools/uri/uri_text.py`), which checks the run's read scope exactly as an image read does, and keeps it in a private attribute of the content. That attribute is never serialized, so a loaded content still dumps as its reference. Workflow code never loads, since it performs no IO.
+Loading is the caller's job, done before rendering in code that may perform IO: `load_stored_value(content, read_scope=…, position=…, storage_provider=…)` in `pipelex/core/stuffs/stored_value_loader.py` reads the value through `load_text_from_any_uri` (`pipelex/tools/uri/uri_text.py`), which checks the run's read scope exactly as an image read does, and keeps it in a private attribute of the content. That attribute is never serialized, so a loaded content still dumps as its reference. `load_stored_values` loads several at once, and `find_unloaded_stored_values(roots=…)` in `pipelex/core/stuffs/stored_value_walker.py` lists, without any IO, the stored values not yet loaded wherever they sit under the values it is given: a stuff's content, a list's items, a structure's fields, a dict's values. Each comes with its path, such as `pages.items[1].text_and_images.text`, so a refused read names where the value sat and never its URL.
+
+Workflow code never loads, since it performs no IO, so the two readers that run there hand the load to a leaf. A `PipeLLM` or `PipeStructure` prompt crosses to its content-generation leaf unrendered, and the leaf loads the stored values its context holds and renders it there (see [Prompts render in the leaf](./distributed-content-generation.md#prompts-render-in-the-leaf)). A `PipeCondition` expression is rendered in the controller, so the controller first finds the stored values among the inputs its expression reads and loads them through the content generator's `load_stored_texts` leaf, which reads each URL under the run's read scope and returns its text; an expression that reads only inline values dispatches nothing.
 
 ---
 
@@ -349,7 +351,8 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | `pipelex/core/stuffs/list_content.py` | List iteration for images |
 | `pipelex/core/stuffs/text_and_images_content.py` | Text + images rendering |
 | `pipelex/core/stuffs/stored_value_content.py` | The inline and stored forms of `Text`, `Html` and `JSON`, and their synchronous readers |
-| `pipelex/core/stuffs/stored_value_loader.py` | `load_stored_value`, the read of a stored value under the run's read scope |
+| `pipelex/core/stuffs/stored_value_loader.py` | `load_stored_value` and `load_stored_values`, the read of stored values under the run's read scope |
+| `pipelex/core/stuffs/stored_value_walker.py` | `find_unloaded_stored_values`, the stored values not yet loaded under a set of roots, with their paths |
 
 ---
 

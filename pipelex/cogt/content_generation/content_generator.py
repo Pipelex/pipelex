@@ -38,13 +38,16 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, Extrac
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.judgment.judgment_models import JudgmentOutcome
+from pipelex.cogt.llm.llm_generation import LLMObjectGeneration, LLMObjectListGeneration, LLMTextGeneration
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
+from pipelex.kernel.llm_prompt_content import render_llm_prompt
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.tools.document_conversion.readable_pdf import ReadablePdf
@@ -52,6 +55,8 @@ from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.tabular.table_records import TableRecords
 from pipelex.tools.templating.templating_style import TemplatingStyle
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.tools.uri.uri_read_scope import UriReference
+from pipelex.tools.uri.uri_text import load_text_from_any_uri
 
 
 class ContentGenerator(ContentGeneratorProtocol):
@@ -63,10 +68,18 @@ class ContentGenerator(ContentGeneratorProtocol):
         """Inline generator wired to the hub storage provider.
 
         The single home for the in-process scopes' generator (``bundle_validator``,
-        ``dry_run_pipeline``): under DRY its leaves mock without dispatching and without
-        touching storage.
+        ``dry_run_pipeline``): under DRY its leaves mock without dispatching, and the only storage
+        they touch is a read of a stored text the prompt or a condition reads, so the run sees real values.
         """
         return cls(generated_content_factory=GeneratedContentFactory(storage_provider=get_storage_provider()))
+
+    async def _render_prompt(self, *, job_metadata: JobMetadata, unrendered_prompt: UnrenderedLLMPrompt) -> LLMPrompt:
+        """Load the prompt's stored values under the run's read scope and render it: the leaf's first step."""
+        return await render_llm_prompt(
+            unrendered_prompt=unrendered_prompt,
+            read_scope=job_metadata.run_metadata.read_scope,
+            storage_provider=self._generated_content_factory.storage_provider,
+        )
 
     @override
     @update_job_metadata
@@ -76,15 +89,17 @@ class ContentGenerator(ContentGeneratorProtocol):
         job_metadata: JobMetadata,
         cogt_run_params: CogtRunParams,
         llm_setting_main: LLMSetting,
-        llm_prompt_for_text: LLMPrompt,
-    ) -> str:
+        unrendered_prompt: UnrenderedLLMPrompt,
+    ) -> LLMTextGeneration:
+        rendered_prompt = await self._render_prompt(job_metadata=job_metadata, unrendered_prompt=unrendered_prompt)
         llm_assignment = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             llm_setting=llm_setting_main,
-            llm_prompt=llm_prompt_for_text,
+            llm_prompt=rendered_prompt,
         )
-        return await llm_gen_text(llm_assignment=llm_assignment)
+        generated_text = await llm_gen_text(llm_assignment=llm_assignment)
+        return LLMTextGeneration(text=generated_text, rendered_prompt=rendered_prompt)
 
     @override
     @update_job_metadata
@@ -95,20 +110,22 @@ class ContentGenerator(ContentGeneratorProtocol):
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object: LLMSetting,
-        llm_prompt_for_object: LLMPrompt,
-    ) -> BaseModelTypeVar:
+        unrendered_prompt: UnrenderedLLMPrompt,
+    ) -> LLMObjectGeneration[BaseModelTypeVar]:
+        rendered_prompt = await self._render_prompt(job_metadata=job_metadata, unrendered_prompt=unrendered_prompt)
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             llm_setting=llm_setting_for_object,
-            llm_prompt=llm_prompt_for_object,
+            llm_prompt=rendered_prompt,
         )
         object_assignment = ObjectAssignment.make_for_class(
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
         raw_obj = await llm_gen_object(object_assignment=object_assignment, object_class=object_class)
-        return revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        generated_object = revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry)
+        return LLMObjectGeneration(generated_object=generated_object, rendered_prompt=rendered_prompt)
 
     @override
     @update_job_metadata
@@ -119,14 +136,15 @@ class ContentGenerator(ContentGeneratorProtocol):
         cogt_run_params: CogtRunParams,
         object_class: type[BaseModelTypeVar],
         llm_setting_for_object_list: LLMSetting,
-        llm_prompt_for_object_list: LLMPrompt,
+        unrendered_prompt: UnrenderedLLMPrompt,
         nb_items: int | None = None,
-    ) -> list[BaseModelTypeVar]:
+    ) -> LLMObjectListGeneration[BaseModelTypeVar]:
+        rendered_prompt = await self._render_prompt(job_metadata=job_metadata, unrendered_prompt=unrendered_prompt)
         llm_assignment_for_object = LLMAssignment.make_from_prompt(
             job_metadata=job_metadata,
             cogt_run_params=cogt_run_params,
             llm_setting=llm_setting_for_object_list,
-            llm_prompt=llm_prompt_for_object_list,
+            llm_prompt=rendered_prompt,
         )
         object_assignment = ObjectAssignment.make_for_class(
             object_class=object_class,
@@ -134,7 +152,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             nb_items=nb_items,
         )
         raw_list = await llm_gen_object_list(object_assignment=object_assignment, object_class=object_class)
-        return [revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list]
+        generated_objects = [
+            revalidate_leaf_object(raw_obj, object_class=object_class, is_mock_built=cogt_run_params.run_mode.is_dry) for raw_obj in raw_list
+        ]
+        return LLMObjectListGeneration(generated_objects=generated_objects, rendered_prompt=rendered_prompt)
 
     @override
     @update_job_metadata
@@ -211,6 +232,27 @@ class ContentGenerator(ContentGeneratorProtocol):
             category=template_category or TemplateCategory.BASIC,
         )
         return await templating_gen_text(templating_assignment=templating_assignment)
+
+    @override
+    @update_job_metadata
+    async def load_stored_texts(
+        self,
+        *,
+        job_metadata: JobMetadata,
+        cogt_run_params: CogtRunParams,
+        uri_references: list[UriReference],
+    ) -> list[str]:
+        # Read in every run mode: a dry run reads the values its caller sent by URL as a live run does, and stores none.
+        read_scope = job_metadata.run_metadata.read_scope
+        storage_provider = self._generated_content_factory.storage_provider
+        loaded_texts: list[str] = []
+        for uri_reference in uri_references:
+            loaded_texts.append(
+                await load_text_from_any_uri(
+                    uri_reference.uri, read_scope=read_scope, position=uri_reference.position, storage_provider=storage_provider
+                )
+            )
+        return loaded_texts
 
     @override
     @update_job_metadata

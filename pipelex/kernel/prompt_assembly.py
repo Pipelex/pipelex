@@ -24,6 +24,13 @@ reaches a file through a structure (`page.page_view`). A direct or list image is
 template parameter; a dotted image cannot be, since it lives inside an immutable artefact, so the
 registry's `finalize` hook turns it into its token as Jinja2 prints it. A document is always
 substituted as a parameter, a dotted path included.
+
+**An LLM prompt registers in its operator and renders in its leaf.** Registering reads only URLs out of
+working memory, while rendering reads the texts, which may live in storage; on a host runtime the
+operator is workflow code, which reads no storage. So an LLM operator registers, snapshots the
+registry (`to_registrations`), and hands the snapshot to its leaf, which rebuilds the same registry
+(`make_from_registrations`) and renders: the numbering is decided once, in the operator, and the
+nested images a `with_images` filter registers while rendering still come after every direct one.
 """
 
 from collections.abc import Sequence
@@ -36,6 +43,7 @@ from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.templating.prompt_file_registrations import PromptFileRegistrations
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -161,6 +169,36 @@ class PromptFiles:
                     prompt_files._register_direct_list_documents(document_reference=document_reference, context_provider=context_provider)
                     prompt_files._list_document_paths.append(document_reference.variable_path)
         return prompt_files
+
+    @classmethod
+    def make_from_registrations(cls, *, registrations: PromptFileRegistrations) -> Self:
+        """Rebuild the registry an operator snapshot with `to_registrations`, as it stood before any template rendered.
+
+        The images are registered again in their registry order, so each takes back the index it had, and the
+        documents keep the order their tokens number them.
+        """
+        prompt_files = cls()
+        for image_content in registrations.images:
+            prompt_files._image_registry.register_image(image_content)
+        prompt_files._image_registry_indices = dict(registrations.image_registry_indices)
+        prompt_files._list_image_paths = list(registrations.list_image_paths)
+        prompt_files._documents = dict(registrations.documents)
+        prompt_files._list_document_paths = list(registrations.list_document_paths)
+        return prompt_files
+
+    def to_registrations(self) -> PromptFileRegistrations:
+        """Snapshot the registry before any template renders, for the leaf that renders them to rebuild it.
+
+        Taken after a render, the snapshot would carry the nested images a `with_images` filter registered, and the
+        leaf's render would register them again: snapshot first, render after.
+        """
+        return PromptFileRegistrations(
+            images=self._image_registry.images,
+            image_registry_indices=dict(self._image_registry_indices),
+            list_image_paths=list(self._list_image_paths),
+            documents=dict(self._documents),
+            list_document_paths=list(self._list_document_paths),
+        )
 
     def template_params(self, *, extra_params: dict[str, Any] | None) -> dict[str, Any]:
         """The caller's parameters, plus the token each direct, list and dotted-document reference renders as.

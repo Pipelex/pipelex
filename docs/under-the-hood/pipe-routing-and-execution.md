@@ -165,7 +165,7 @@ Controllers are pipes that orchestrate the execution of other pipes. They resolv
 |------------|----------|
 | **PipeSequence** | Executes `sequential_sub_pipes` one after another. Each step receives working memory with outputs from previous steps. |
 | **PipeBatch** | Iterates over a `ListContent` input. For each item, loads `branch_pipe` and executes it with a deep copy of working memory. Items run concurrently via asyncio. |
-| **PipeCondition** | Evaluates a Jinja2 `expression` against working memory, maps the result via `outcome_map` to a pipe code, and executes that pipe. |
+| **PipeCondition** | Evaluates a Jinja2 `expression` against working memory, after loading through the content generator's `load_stored_texts` leaf any stored text the expression reads, maps the result via `outcome_map` to a pipe code, and executes that pipe. |
 | **PipeParallel** | Loads multiple child pipes and executes them concurrently, each with its own working memory copy. |
 
 All controllers follow the same pattern:

@@ -11,6 +11,14 @@ The numbering of the images and documents a prompt references is the shared user
 load-bearing: system-prompt references are registered before user-prompt ones, and the system text
 renders before the user text, so the `[Image N]` tokens a template interpolates match the positions
 of the images handed to the model.
+
+**An LLM step renders its prompt in its content-generation leaf.** The operator calls
+:func:`prepare_llm_prompt`, which registers the files and gathers the stuffs the templates read into an
+:class:`~pipelex.cogt.llm.unrendered_llm_prompt.UnrenderedLLMPrompt`, performing no IO, and the leaf
+calls :func:`render_llm_prompt`, which loads every stored value those stuffs hold and renders. On a host
+runtime the operator is workflow code and the leaf an activity, so a text kept in storage is read only
+by the activity. :func:`assemble_llm_prompt` does both halves in one process, over a context whose
+stored values are already loaded.
 """
 
 from typing import Any, Self
@@ -18,12 +26,18 @@ from typing import Any, Self
 from pydantic import BaseModel
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stored_value_loader import load_stored_values
+from pipelex.core.stuffs.stored_value_walker import find_unloaded_stored_values
 from pipelex.kernel.prompt_assembly import PromptFiles
 from pipelex.kernel.prompt_references import DocumentReference, ImageReference
 from pipelex.tools.jinja2.jinja2_rendering import locating_template_refusal
 from pipelex.tools.jinja2.template_category import TemplateCategory
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tools.templating.templating_style import TemplatingStyle
 
 
@@ -55,6 +69,75 @@ class LlmPromptContent(BaseModel):
         )
 
 
+def prepare_llm_prompt(
+    *,
+    prompt_content: LlmPromptContent,
+    memory: WorkingMemory,
+    output_structure_prompt: str | None = None,
+    extra_params: dict[str, Any] | None = None,
+    templating_style: TemplatingStyle,
+) -> UnrenderedLLMPrompt:
+    """The operator's half: register the prompt's files and gather what its templates read, rendering nothing.
+
+    It performs no IO, so workflow code may call it. The numbering is the shared user-prompt assembly's: the system
+    prompt's references are registered before the user prompt's. The memory handed on holds only the stuffs the
+    templates and the references name, so a step reads no more of a long run's memory than it uses, and its stored
+    values stay references until the leaf loads them.
+
+    Raises:
+        PromptContentError: when a reference names something the memory does not hold, or holds as the wrong type.
+    """
+    prompt_files = _register_prompt_files(prompt_content=prompt_content, context_provider=memory)
+    return UnrenderedLLMPrompt(
+        system_template=prompt_content.system_template,
+        user_template=prompt_content.user_template,
+        templating_style=templating_style,
+        context=_memory_read_by_prompt(prompt_content=prompt_content, memory=memory),
+        extra_params=dict(extra_params) if extra_params else {},
+        output_structure_prompt=output_structure_prompt,
+        files=prompt_files.to_registrations(),
+    )
+
+
+async def render_llm_prompt(
+    *,
+    unrendered_prompt: UnrenderedLLMPrompt,
+    read_scope: str | None,
+    storage_provider: StorageProviderAbstract | None,
+) -> LLMPrompt:
+    """The leaf's half: load every stored value the prompt's memory holds, then render both templates.
+
+    Every stored value is loaded before anything renders, wherever it sits (a stuff's content, a list item, a field of
+    a structure), so a template and its filters read the real text. Each read is checked against the run's read scope.
+
+    Args:
+        unrendered_prompt: The prompt the operator prepared with :func:`prepare_llm_prompt`.
+        read_scope: The run's read scope, ``None`` for an unscoped run.
+        storage_provider: The storage provider that resolves a storage URI, required when the memory holds one.
+
+    Raises:
+        UriReadRefusedError: A stored value's URL is outside the run's read scope.
+        StorageNotConfiguredError: A stored value is a storage URI and no storage provider is given.
+        Jinja2TemplateInvalidError: A template cannot render as written, located on its prompt field.
+    """
+    memory = unrendered_prompt.context
+    stuff_contents = {stuff_name: stuff.content for stuff_name, stuff in memory.root.items()}
+    await load_stored_values(
+        stored_values=find_unloaded_stored_values(roots=stuff_contents),
+        read_scope=read_scope,
+        storage_provider=storage_provider,
+    )
+    return await _render_llm_prompt(
+        prompt_files=PromptFiles.make_from_registrations(registrations=unrendered_prompt.files),
+        system_template=unrendered_prompt.system_template,
+        user_template=unrendered_prompt.user_template,
+        context_provider=memory,
+        output_structure_prompt=unrendered_prompt.output_structure_prompt,
+        extra_params=unrendered_prompt.extra_params,
+        templating_style=unrendered_prompt.templating_style,
+    )
+
+
 async def assemble_llm_prompt(
     *,
     prompt_content: LlmPromptContent,
@@ -63,34 +146,86 @@ async def assemble_llm_prompt(
     extra_params: dict[str, Any] | None = None,
     templating_style: TemplatingStyle,
 ) -> LLMPrompt:
-    """Render both templates against the context and collect the images and documents they reference.
+    """Both halves in one process: render both templates against the context and collect the files they reference.
 
-    The numbering is the shared user-prompt assembly's (`pipelex.kernel.prompt_assembly`): the system
-    prompt's references are registered before the user prompt's, and the system text renders first, so
-    its files take the lower numbers in both texts.
+    The context's stored values must already be loaded, since a context provider cannot be walked for them: a step
+    renders through :func:`prepare_llm_prompt` and :func:`render_llm_prompt` instead. The numbering is the shared
+    user-prompt assembly's (`pipelex.kernel.prompt_assembly`): the system prompt's references are registered before
+    the user prompt's, and the system text renders first, so its files take the lower numbers in both texts.
     """
-    prompt_files = PromptFiles.make_from_references(
+    return await _render_llm_prompt(
+        prompt_files=_register_prompt_files(prompt_content=prompt_content, context_provider=context_provider),
+        system_template=prompt_content.system_template,
+        user_template=prompt_content.user_template,
+        context_provider=context_provider,
+        output_structure_prompt=output_structure_prompt,
+        extra_params=extra_params,
+        templating_style=templating_style,
+    )
+
+
+def _register_prompt_files(*, prompt_content: LlmPromptContent, context_provider: ContextProviderAbstract) -> PromptFiles:
+    return PromptFiles.make_from_references(
         context_provider=context_provider,
         image_references=[*(prompt_content.system_image_references or []), *(prompt_content.user_image_references or [])],
         document_references=[*(prompt_content.system_document_references or []), *(prompt_content.user_document_references or [])],
     )
+
+
+def _memory_read_by_prompt(*, prompt_content: LlmPromptContent, memory: WorkingMemory) -> WorkingMemory:
+    """The part of the memory the prompt reads: the stuffs its templates and references name, aliases resolved.
+
+    A name read through an alias keeps the alias and brings its target, so the context the leaf generates binds the
+    name to the same stuff the operator's memory does.
+    """
+    read_names: set[str] = set()
+    for template in (prompt_content.system_template, prompt_content.user_template):
+        if template is not None:
+            read_names.update(get_root_from_dotted_path(variable_path) for variable_path in template.required_variables())
+    for references in (
+        prompt_content.system_image_references,
+        prompt_content.user_image_references,
+        prompt_content.system_document_references,
+        prompt_content.user_document_references,
+    ):
+        read_names.update(get_root_from_dotted_path(reference.variable_path) for reference in references or [])
+
+    read_root = {name: stuff for name, stuff in memory.root.items() if name in read_names}
+    read_aliases: dict[str, str] = {}
+    for alias, target in memory.aliases.items():
+        if alias in read_names and target in memory.root:
+            read_aliases[alias] = target
+            read_root[target] = memory.root[target]
+    return WorkingMemory(root=read_root, aliases=read_aliases)
+
+
+async def _render_llm_prompt(
+    *,
+    prompt_files: PromptFiles,
+    system_template: TemplateBlueprint | None,
+    user_template: TemplateBlueprint | None,
+    context_provider: ContextProviderAbstract,
+    output_structure_prompt: str | None,
+    extra_params: dict[str, Any] | None,
+    templating_style: TemplatingStyle,
+) -> LLMPrompt:
     template_params = prompt_files.template_params(extra_params=extra_params)
 
     system_text: str | None = None
-    if prompt_content.system_template:
+    if system_template:
         with locating_template_refusal(template_field="system_prompt"):
             system_text = await prompt_files.render(
-                template_blueprint=prompt_content.system_template,
+                template_blueprint=system_template,
                 context_provider=context_provider,
                 extra_params=template_params,
                 templating_style=templating_style,
             )
 
     user_text: str | None
-    if prompt_content.user_template:
+    if user_template:
         with locating_template_refusal(template_field="prompt"):
             user_text = await prompt_files.render(
-                template_blueprint=prompt_content.user_template,
+                template_blueprint=user_template,
                 context_provider=context_provider,
                 extra_params=template_params,
                 templating_style=templating_style,

@@ -13,6 +13,8 @@ from uuid import UUID
 import pytest
 from pydantic import ValidationError
 
+from pipelex.cogt.llm.llm_generation import LLMTextGeneration
+from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -205,9 +207,9 @@ class TestPipelexKernelRunState:
         """The two layers together, as a host uses them: the run bound by the host, the step by the kernel."""
         seen: list[LogContext | None] = []
 
-        async def make_llm_text(**kwargs: object) -> str:  # ruff: ignore[unused-function-argument, unused-async]
+        async def make_llm_text(**kwargs: object) -> LLMTextGeneration:  # ruff: ignore[unused-function-argument, unused-async]
             seen.append(get_log_context())
-            return "generated text"
+            return LLMTextGeneration(text="generated text", rendered_prompt=LLMPrompt(user_text="rendered by the leaf"))
 
         content_generator = mocker.MagicMock()
         content_generator.make_llm_text = make_llm_text

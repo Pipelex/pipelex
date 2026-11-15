@@ -7,10 +7,11 @@ from pipelex.cogt.exceptions import ModelNotFoundError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
-from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.llm.unrendered_llm_prompt import UnrenderedLLMPrompt
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.runtime_hub import get_model_deck
 from pipelex.system.job_metadata import JobMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
@@ -61,28 +62,34 @@ class TestContentGenerator:
     async def test_make_llm_text_only(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
 
-        text: str = await content_generator.make_llm_text(
+        text_generation = await content_generator.make_llm_text(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
-            llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text=USER_TEXT_FOR_BASE, templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_main=llm_setting_main,
         )
-        pretty_print(text, title="make_llm_text")
+        pretty_print(text_generation.text, title="make_llm_text")
 
-        assert isinstance(text, str)
+        assert text_generation.text
+        assert text_generation.rendered_prompt.user_text == USER_TEXT_FOR_BASE
 
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
-        person_direct: Employee = await content_generator.make_object(
+        object_generation = await content_generator.make_object(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             object_class=Employee,
-            llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text=USER_TEXT_FOR_SINGLE_PERSON, templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_for_object=llm_setting_for_object,
         )
+        person_direct = object_generation.generated_object
         pretty_print(person_direct, title="make_object")
 
         assert isinstance(person_direct, Employee)
@@ -92,13 +99,16 @@ class TestContentGenerator:
     async def test_make_object_list(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
-        person_list_direct: list[Employee] = await content_generator.make_object_list(
+        object_list_generation = await content_generator.make_object_list(
             job_metadata=job_metadata,
             cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
             object_class=Employee,
-            llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
+            unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                user_text=USER_TEXTS_FOR_PEOPLE_STR, templating_style=resolve_templating_style(authored=None)
+            ),
             llm_setting_for_object_list=llm_setting_for_object,
         )
+        person_list_direct = object_list_generation.generated_objects
         pretty_print(person_list_direct, title="make_object_list")
 
         assert isinstance(person_list_direct, list)
@@ -183,7 +193,9 @@ class TestContentGenerator:
             await content_generator.make_llm_text(
                 job_metadata=job_metadata,
                 cogt_run_params=CogtRunParams(run_mode=PipeRunMode.LIVE),
-                llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
+                unrendered_prompt=UnrenderedLLMPrompt.make_from_texts(
+                    user_text=USER_TEXT_FOR_BASE, templating_style=resolve_templating_style(authored=None)
+                ),
                 llm_setting_main=llm_setting_main,
             )
         error = excinfo.value

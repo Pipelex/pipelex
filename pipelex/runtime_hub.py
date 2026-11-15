@@ -655,7 +655,7 @@ def scoped_content_generator(content_generator: ContentGeneratorProtocol) -> Gen
     ``ContentGeneratorInWorkflow``, which dispatches activities. An in-process run (e.g. the
     dry-run/validation activity body) wraps itself in this scope with an inline generator so its
     leaves never dispatch — the DRY mock lives at the cogt leaf, so the inline generator's leaves
-    mock without dispatching and without storage IO. ContextVar-scoped like
+    mock without dispatching and read storage only to load a stored text a prompt or a condition reads. ContextVar-scoped like
     :func:`pipelex.interpreter_hub.scoped_pipe_router`, so concurrent runs don't cross-contaminate.
     """
     prev = _content_generator_override.get()
