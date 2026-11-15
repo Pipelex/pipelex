@@ -137,6 +137,10 @@ class StoredValueContent(StuffContent):
         """Whether the value can be read synchronously: held inline, or loaded from storage."""
         return not self.is_stored or self._loaded_value is not None
 
+    def is_value_field(self, *, field_name: str) -> bool:
+        """Whether a field is the one holding the value inline, which a reader reads through `require_value` (`ValueFieldReadable`)."""
+        return field_name == self.value_field_name
+
     def require_value(self) -> StoredValue:
         """The value, held inline or loaded from storage, for a reader that does not know the content's class.
 

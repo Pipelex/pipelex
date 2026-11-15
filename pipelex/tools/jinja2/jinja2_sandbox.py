@@ -79,6 +79,7 @@ from pipelex.tools.jinja2.jinja2_render_charging import (
 from pipelex.tools.jinja2.jinja2_render_costs import PLAIN_VALUE_METHOD_COSTS
 from pipelex.tools.jinja2.jinja2_render_rewrite import rewrite_for_render_budget
 from pipelex.tools.jinja2.template_surface import get_template_surface
+from pipelex.tools.typing.pydantic_utils import ValueFieldReadable
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -336,6 +337,9 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
         # `__getattr__`, and never reaches Jinja's fallback to `obj[attribute]`, which it does not check.
         if _is_private_name(name=attribute) and not isinstance(obj, Undefined) and not _declares_private_name(obj=obj, name=attribute):
             self.unsafe_undefined(obj, attribute)
+        # A value held in storage reads as its value, or refuses unloaded, wherever the template reaches it: its field holds None.
+        if isinstance(obj, ValueFieldReadable) and obj.is_value_field(field_name=attribute):
+            return obj.require_value()
         return super().getattr(obj, attribute)
 
     @override
@@ -352,6 +356,8 @@ class PipelexTemplateEnvironment(ImmutableSandboxedEnvironment):
             and not _declares_private_name(obj=obj, name=argument)
         ):
             self.unsafe_undefined(obj, argument)
+        if isinstance(argument, str) and isinstance(obj, ValueFieldReadable) and obj.is_value_field(field_name=argument):
+            return obj.require_value()
         key: object = argument
         if isinstance(key, tuple):
             # Reading with a tuple key hashes every element of it again, nested ones included.
