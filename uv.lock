@@ -3644,6 +3644,7 @@ dev = [
     { name = "types-aiofiles" },
     { name = "types-jsonschema" },
     { name = "types-networkx" },
+    { name = "types-openpyxl" },
     { name = "types-pyyaml" },
 ]
 docling = [
@@ -3695,6 +3696,9 @@ mistralai = [
 s3 = [
     { name = "aiobotocore" },
     { name = "boto3" },
+]
+tabular = [
+    { name = "openpyxl" },
 ]
 typesafe = [
     { name = "typesafe-sdk" },
@@ -3749,6 +3753,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=2.0.0" },
+    { name = "openpyxl", marker = "extra == 'tabular'", specifier = ">=3.1.5" },
     { name = "opentelemetry-api", specifier = ">=1.39.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.38.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.39.0" },
@@ -3791,12 +3796,13 @@ requires-dist = [
     { name = "types-aiofiles", marker = "extra == 'dev'", specifier = ">=24.1.0.20240626" },
     { name = "types-jsonschema", marker = "extra == 'dev'", specifier = ">=4.20.0" },
     { name = "types-networkx", marker = "extra == 'dev'", specifier = ">=3.3.0.20241020" },
+    { name = "types-openpyxl", marker = "extra == 'dev'", specifier = ">=3.1.5.20250306" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
     { name = "typesafe-sdk", marker = "extra == 'typesafe'", specifier = ">=0.7.0" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
     { name = "urllib3", specifier = ">=2.7.0" },
 ]
-provides-extras = ["anthropic", "bedrock", "cli", "docling", "fal", "gcp-logging", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "docs", "dev", "typesafe"]
+provides-extras = ["anthropic", "bedrock", "cli", "docling", "fal", "gcp-logging", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "dynamodb", "s3", "tabular", "docs", "dev", "typesafe"]
 
 [[package]]
 name = "pipelex-api"

@@ -635,10 +635,10 @@ class TestCsvCodec:
         # No raise for .csv.
         assert_supported_table_suffix(tmp_path / "data.csv")
 
-    def test_xlsx_suffix_points_at_tabular_extra(self, tmp_path: Path) -> None:
+    def test_xlsx_suffix_is_refused_for_writing(self, tmp_path: Path) -> None:
         with pytest.raises(CsvError) as exc_info:
             assert_supported_table_suffix(tmp_path / "data.xlsx")
-        assert "pipelex[tabular]" in str(exc_info.value)
+        assert "Writing Excel files (.xlsx) is not supported" in str(exc_info.value)
 
     def test_unsupported_suffix_raises(self, tmp_path: Path) -> None:
         with pytest.raises(CsvError):
