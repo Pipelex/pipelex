@@ -12,6 +12,12 @@
 - **`Text`, `Markdown`, `Html` and `JSON` hold their value or a URL to it, MTHDS standard 9.0.0 (Breaking)**: `text`, `inner_html` and `json_obj` are optional, and each class gains `url`, `size`, `mime_type` and `preview`, the stored form; a content holds exactly one of its value and `url`, and `size`, `mime_type` and `preview` only beside `url`, any other combination being refused as invalid. A content dumps only the fields of the form it holds, so an inline text still dumps as `{"text": "..."}`. The pinned native set follows the standard's set pinned at 9.0.0, so every crate fingerprint changes. Code reading `content.text`, `content.inner_html` or `content.json_obj` now gets `None` for a stored value and reads `require_text()`, `require_inner_html()` or `require_json_obj()` instead.
 - **`mthds` and `pipelex-sdk` versions, MTHDS standard 9.0.0 (Breaking)**: the pins move to `mthds==0.28.0`, the release following the MTHDS standard's `v9.0.0`, and `pipelex-sdk==0.68.0`, the release built on it, whose own breaking changes since `0.60.0`, such as `get_method` returning `MethodDetail | PublicMethodDetail`, an optional `MethodVersionSummary.published_by` and `labels` on `MethodCategory`, reach anyone importing `pipelex_sdk` beside pipelex. A crate pipelex normalizes is stamped `mthds_version` `9.0.0` and materializes the native set pinned at `9.0.0`, and a `METHODS.toml` declaring `^8.0.0`, `8.*` or an exact `8.x` now warns that the engine does not satisfy it while `>=9.0.0` does not; the core error codes did not change and `protocol_version` stays `2.0.1`. Everyone downstream inherits those exact versions.
 
+## [v0.103.1] - 2026-11-15
+
+### Fixed
+
+- **A file input refining `Document` or `Image` is no longer read as a table**: an input whose concept refines `Document` or `Image`, at any depth, given as `{"url": ...}` with a URL ending in `.xlsx` or `.csv`, as every client's input preparation sends a file, is now read as the file itself, where it was taken for a table of rows and a remote one refused as `request.unsupported` with the reason `remote_table_url`; so the workbook of a `PipeDocGen` `template_input` or of a spreadsheet-reading `PipeStructure` can be declared with its own concept refining `Document`. `ConceptProviderAbstract.is_file_concept` and `NativeConceptCode.is_file` state which concepts hold a file.
+
 ## [v0.103.0] - 2026-11-15
 
 ### Added

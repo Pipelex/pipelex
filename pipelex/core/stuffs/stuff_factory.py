@@ -11,7 +11,7 @@ from pydantic import BaseModel, ValidationError, field_validator
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.concept_provider_abstract import ConceptProviderAbstract
-from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptValueError
+from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError, ConceptStructureClassNotFoundError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import validate_concept_ref
 from pipelex.core.stuffs.exceptions import StuffFactoryError
@@ -231,8 +231,10 @@ class StuffFactory:
         ``{"url": <tabular path>}`` — under a non-native structured concept. Each data row then
         becomes one instance of the concept's structure class, so one CSV yields one
         ``ListContent`` (the concept names the *row* type). Returns ``None`` for an ordinary
-        record dict — no ``url`` key, sibling keys alongside ``url``, a non-tabular suffix, or a
-        native concept — so the caller falls through to normal dict handling. The single-key gate
+        record dict — no ``url`` key, sibling keys alongside ``url``, a non-tabular suffix, a
+        native concept, or a concept that is or refines a native file concept (``Image``,
+        ``Document``: a workbook given to a ``template_input`` or to a spreadsheet-reading
+        ``PipeStructure`` is the file itself) — so the caller falls through to normal dict handling. The single-key gate
         keeps a real record that merely *has* a ``url`` field (e.g. ``{"label": "Home", "url":
         "report.csv"}``) from being silently reduced to a table with its sibling keys dropped.
 
@@ -260,6 +262,17 @@ class StuffFactory:
             # Native file concepts (Image, PDF, ...) own their own url handling; never hijack them.
             # Checked BEFORE url parsing so a native concept never raises a CSV-flavored error.
             return None
+        try:
+            is_file_concept = concept_provider.is_file_concept(concept=concept)
+        except ConceptStructureClassNotFoundError:
+            # A concept whose class does not resolve can be compared by structure no more than it can be built: it is
+            # taken for no file concept, and the table path below, or the record path, reports the missing class.
+            is_file_concept = False
+        if is_file_concept:
+            # A concept refining a native file concept (a workbook given to a `template_input`, a spreadsheet a
+            # `PipeStructure` reads) holds the file itself, whatever its suffix: never hijack it as a table of rows.
+            # Checked BEFORE url parsing too, so such a file never raises a CSV-flavored error.
+            return None
         # Parse the URL once, up front. A malformed url (e.g. a bad IPv6 bracket like ``https://[``)
         # makes ``urlsplit`` itself raise ``ValueError`` — convert that to a redacted CsvError rather
         # than let it escape into a traceback that would surface the raw (possibly token-bearing) url.
@@ -283,6 +296,19 @@ class StuffFactory:
         if not is_tabular_path(Path(url_parts.path)):
             return None
 
+        try:
+            row_model = concept_provider.get_structure_class(concept=concept)
+        except ConceptValueError as exc:
+            # Keep the codec's typed-error boundary intact: an unregistered structure class is no fault of the caller's
+            # table but of the method's concept, which cannot be built, and never a raw ValueError escaping into the runner.
+            msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
+            raise (
+                CsvError(msg)
+                .with_input(input_name=name)
+                .with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
+                .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
+            ) from exc
+
         resolved = resolve_uri(url)
         # Accept only genuine local paths. `file://` resolves to a scheme-free local path; an http(s)/
         # base64/pipelex-storage url is a non-local ResolvedUri; an `s3://`/`gs://`-style scheme slips
@@ -304,18 +330,6 @@ class StuffFactory:
                 .with_params(field=_input_request_field(name=name), reason=REMOTE_TABLE_UNSUPPORTED_REASON)
             )
 
-        try:
-            row_model = concept_provider.get_structure_class(concept=concept)
-        except ConceptValueError as exc:
-            # Keep the codec's typed-error boundary intact: an unregistered structure class is no fault of the caller's
-            # table but of the method's concept, which cannot be built, and never a raw ValueError escaping into the runner.
-            msg = f"CSV input for stuff '{name}': concept '{concept.concept_ref}' has no registered structure class to read CSV rows into."
-            raise (
-                CsvError(msg)
-                .with_input(input_name=name)
-                .with_error_code(CoreCode.METHOD_CONCEPT_INVALID)
-                .with_params(concept=concept.concept_ref, finding="it has no structure class to read rows into")
-            ) from exc
         authorize_uri_read(
             uri=url,
             read_scope=read_scope,
