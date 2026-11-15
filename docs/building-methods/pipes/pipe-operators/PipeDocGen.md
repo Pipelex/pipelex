@@ -81,8 +81,10 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `format` | string | `pdf`, `xlsx`, `docx` or `pptx`. It sets the file's type and suffix. | Yes |
 | `model` | string | The document engine that prints the file, a `doc_gen` model, alias or preset, such as `reportlab-pdf` or, with the plugin, `pipelex-pdf`. It defaults to the model deck's engine for the format and source. | No |
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
-| `template_file` | string | A template file relative to the bundle's file, written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a URL, a backslash and a colon are refused. When the bundle is read from a folder, the file is the one its [method tree](../../method-trees.md#file-references) holds at that path, a `..` climbing to another folder of the tree included, and a file the tree keeps out, such as a gitignored one, is refused; a path that climbs above the tree's root is refused as a security matter, `security.method_path_refused`, which fails validation and the run rather than reporting a validation error, and logs a security event; a bundle file run alone with no `METHODS.toml` at or above it reads no other file. When the bundle is loaded from a string, the file is one of the files sent with it, each keyed by a path inside the bundle, so a path no such file could be keyed by, one holding a `..` segment or a NUL character, or naming no file, is refused when the bundle is parsed, as a validation error at the step that does not repeat the path. It excludes `template`. `pptx` requires one. | No |
-| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
+| `template_file` | string | A template file relative to the bundle's file, written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a URL, a backslash and a colon are refused. When the bundle is read from a folder, the file is the one its [method tree](../../method-trees.md#file-references) holds at that path, a `..` climbing to another folder of the tree included, and a file the tree keeps out, such as a gitignored one, is refused; a path that climbs above the tree's root is refused as a security matter, `security.method_path_refused`, which fails validation and the run rather than reporting a validation error, and logs a security event; a bundle file run alone with no `METHODS.toml` at or above it reads no other file. When the bundle is loaded from a string, the file is one of the files sent with it, each keyed by a path inside the bundle, so a path no such file could be keyed by, one holding a `..` segment or a NUL character, or naming no file, is refused when the bundle is parsed, as a validation error at the step that does not repeat the path. It excludes `template` and `template_input`. `pptx` requires one, or a `template_input`. | No |
+| `template_input` | string | The input whose file is the office template, for `xlsx`, `docx` or `pptx`: the run supplies the template rather than the method. The input must be declared, as `Document` or a concept that refines it, single and required. It excludes `template` and `template_file`. See [A template the run supplies](#a-template-the-run-supplies). | No |
+| `table_fill` | string | How the records of a list input fill a Table of an `xlsx` template: `replace`, the default, writes them over the Table's rows, and `append` adds them after the rows the Table already holds. `append` needs an office template, `template_file` or `template_input`, and an engine that declares it. | No |
+| `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code, or, with a `template_input`, to the name of the input's file. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
 
 ### The file's name
 
@@ -173,6 +175,31 @@ The engine that prints HTML joins each relative URL to a base URL Pipelex hands 
 An `.xlsx`, `.docx` or `.pptx` template file is filled by its engine from the inputs as plain data, so it sees fields, not the sigils and filters of HTML templates. In plain data a native value is its value, and a verdict is its verdict: a `YesNo` is its boolean, a `Choice` its option key and a `Rating` its level, so the file reads `team` rather than `team.choice`, and a verdict's probability or confidence does not reach it. A `pdf` template reads the verdict whole, `team.choice` and `team.confidence` included, as a `PipeCompose` template does. Its contract is documented with the plugin. When the plugin's engine checks templates, `pipelex validate` and the dry run compare the file with the inputs' concepts: a misspelled name is reported before any run.
 
 A bundle loaded from a directory, a dependency package's included, finds its template file beside its own file, and never among the files sent with a request. A bundle loaded from a string has no directory, so its template files come with it: the API's routes take the whole method as a tree in `files`, or, until the server retires these older fields, its bundles as strings in `mthds_contents` with their template files in the request's `resources`, each keyed by exactly the path its step names, and the Python entry points take them as `submitted_files` (see [Template files sent with a bundle](#template-files-sent-with-a-bundle)). A string-loaded step whose file was not supplied is refused at load, saying so, whatever source label the bundle carries: only a bundle file the runtime read itself has a directory beside it, so a label naming a path, or a `source` written in the bundle's text, never makes the runtime read its own disk. An inline `template` works on every load path.
+
+### A template the run supplies
+
+A step with `template_input` fills the file one of its inputs holds rather than a file of its method: the caller sends a workbook, a Word document or a deck as that input, and the step returns a copy of it with the other inputs filled in. Paired with `table_fill = "append"`, a step adds records to the Table of the caller's own workbook:
+
+```toml
+[concept.ExpenseWorkbook]
+description = "The caller's workbook with the new expenses recorded"
+refines     = "Document"
+
+[pipe.record_expenses]
+type           = "PipeDocGen"
+description    = "Append the extracted expenses to the caller's expense workbook"
+inputs         = { workbook = "Document", expense_rows = "ExpenseRow[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "append"
+```
+
+- **The output is a new file.** The engine fills a copy of the input's file and the step stores it as a new document, so the caller's file is never changed in place. Without a `filename`, the copy takes the input file's name, `expenses.xlsx` for a workbook sent under that name.
+- **The template input is the template, not data.** It is left out of the data the template is filled with, so only the step's other inputs fill it, `expense_rows` above.
+- **The file must be of the step's format.** Its format is judged from its bytes first, then from the media type it was sent with, then from its name, so a Word document sent as `expenses.xlsx` is refused, as is a macro-enabled workbook for an `xlsx` step. The refusal, `input.file_type_unsupported`, names the input.
+- **The template is checked when the run supplies it.** `pipelex validate` cannot see the file, so its verdict carries a `template_check_warning` saying the template is checked later. When a run starts, before any step does, run setup reads each template the caller supplies to a step certain to run, under the run's read scope, and hands it to the engine's template checker: an error refuses the run as the caller's, `pipelex.docgen.template_input_unfit`, naming the input and what the checker found, and a warning is logged with the run. The print checks the file again before the engine fills it, which also covers a template an earlier step produced, or one reached through a condition.
+- **The engine must declare `append`.** A step with `table_fill = "append"` is refused when the method loads if its engine does not declare that it appends to a Table, `model.capability_unsupported`.
 
 ### Template files sent with a bundle
 
