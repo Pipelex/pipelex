@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.103.0] - 2026-11-15
+
+### Added
+
+- **`PipeDocGen` `table_fill = "update"`, with `match_on`, `match_row` and `cells`**: an `xlsx` step with an office template writes each record of a list input into the one row of the Table it matches, by the key fields `match_on` names or by the row position the field `match_row` names, exactly one of the two, both refused under any other fill. Under `update` a null leaves its cell as it was, `cells = "fill_empty"`, the default, writes only empty cells and fails on a non-empty cell holding a different value, and `cells = "overwrite"` writes every cell a value matches, `cells` being refused under any other fill. When the method loads, at least one list of records the step's data holds must carry every `match_on` field as a single value, or the `match_row` field as an integer or number field, since otherwise no Table could be updated, while another list lacking them or holding them with another kind is left to the engine, a step with no list of records is refused, and a step whose engine does not declare the new `table_update` capability is refused with `model.capability_unsupported`. `RenderJob` and `TemplateCheckRequest` carry `match_on`, `match_row` and `cells` under `update`, `TemplateCheckRequest` carries the step's `table_fill` too, `CellPolicy` and `TABLE_UPDATE_CAPABILITY` join `pipelex.cogt.doc_gen.table_fill`, and the `RenderJob` docstring states the update's rules an engine honours: a Table filled from a list whose records lack a matching field fails the fill and is an error of the engine's template check, and a record whose key is null, or whose row position is null, not a whole number or out of the Table's rows, matches no row and fails the fill. Under `update` the dry run hands the template checker no mock data, which cannot match real rows, so `pipelex validate` checks the template's structure alone. Plugin API stays at 11: an engine that predates the update does not declare `table_update`, so it is never handed one.
+
 ## [v0.102.0] - 2026-11-15
 
 ### Added

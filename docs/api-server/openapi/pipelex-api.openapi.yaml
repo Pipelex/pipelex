@@ -12,7 +12,7 @@ info:
   license:
     name: Elastic License 2.0
     identifier: Elastic-2.0
-  version: 0.102.0
+  version: 0.103.0
 paths:
   /health:
     get:
@@ -2157,6 +2157,13 @@ components:
       - required
       title: BooleanItem
       description: '`boolean` — true or false.'
+    CellPolicy:
+      type: string
+      enum:
+      - fill_empty
+      - overwrite
+      title: CellPolicy
+      description: Which cells of a matched row an `update` may write. A null field writes nothing under either.
     CodegenRequest:
       properties:
         files:
@@ -5700,6 +5707,22 @@ components:
           anyOf:
           - $ref: '#/components/schemas/TableFill'
           - type: 'null'
+        match_on:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Match On
+        match_row:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Match Row
+        cells:
+          anyOf:
+          - $ref: '#/components/schemas/CellPolicy'
+          - type: 'null'
         filename:
           anyOf:
           - type: string
@@ -5735,18 +5758,26 @@ components:
         is checked when the run starts, and the output is a new file, the input''s file being left as it was. `table_fill`
 
         says how the template''s Tables are filled: `replace`, the default, writes a list''s records over a Table''s rows,
-        and
 
-        `append`, for `xlsx` only, writes them after its last row. The output must be a single `Document`, or a concept refining
-        it. `model` names the
+        `append`, for `xlsx` only, writes them after its last row, and `update`, for `xlsx` only, writes each record into
+        the
 
-        document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
+        one row it matches, by the key fields `match_on` names or by the row position the field `match_row` names, exactly
 
-        document generation plugin, `pipelex-pdf`; without it, the model deck''s default for the format and source prints
+        one of the two. Under `update` a null leaves its cell as it was, and `cells` says which cells may be written:
 
-        it. Which engines a runtime has depends on its plugins: open Pipelex prints a `pdf` without a template on
+        `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. The output
+        must
 
-        `reportlab-pdf`, and a runtime without the engine a step needs refuses the method when it loads.'
+        be a single `Document`, or a concept refining it. `model` names the document engine that prints it, a model of the
+
+        `doc_gen` family such as `reportlab-pdf` or, with the Pipelex document generation plugin, `pipelex-pdf`; without it,
+
+        the model deck''s default for the format and source prints it. Which engines a runtime has depends on its plugins:
+
+        open Pipelex prints a `pdf` without a template on `reportlab-pdf`, and a runtime without the engine a step needs
+
+        refuses the method when it loads.'
     PipeExtractBlueprint:
       properties:
         source:
@@ -8409,6 +8440,7 @@ components:
       enum:
       - replace
       - append
+      - update
       title: TableFill
       description: How a step fills the Tables of its template file.
     TagStyle:

@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.core.bundle_resources.bundle_resource import canonical_resource_path_or_none
 from pipelex.core.method_trees.file_references import BundleFileOrigin, BundleValidationContext
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
@@ -186,3 +186,49 @@ class TestPipeDocGenBlueprint:
     def test_refused_template_inputs_and_fills(self, overrides: dict[str, Any], expected_message: str) -> None:
         with pytest.raises(ValidationError, match=re.escape(expected_message)):
             _blueprint(inputs=_WORKBOOK_INPUTS, **overrides)
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected"),
+        [
+            ({"match_on": ["invoice_number"]}, (["invoice_number"], None, None)),
+            ({"match_on": ["sheet", "line"], "cells": "overwrite"}, (["sheet", "line"], None, CellPolicy.OVERWRITE)),
+            ({"match_row": "row"}, (None, "row", None)),
+            ({"match_row": "row", "cells": "fill_empty"}, (None, "row", CellPolicy.FILL_EMPTY)),
+        ],
+        ids=["by_key", "by_composite_key_overwriting", "by_row", "by_row_filling_empty_cells"],
+    )
+    def test_accepted_updates(self, overrides: dict[str, Any], expected: tuple[list[str] | None, str | None, CellPolicy | None]) -> None:
+        blueprint = _blueprint(inputs=_WORKBOOK_INPUTS, format="xlsx", template_input="workbook", table_fill="update", **overrides)
+        assert blueprint.table_fill == TableFill.UPDATE
+        assert (blueprint.match_on, blueprint.match_row, blueprint.cells) == expected
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_message"),
+        [
+            ({"table_fill": "update"}, "name the fields whose columns are the Table's key with 'match_on'"),
+            ({"table_fill": "update", "match_on": ["id"], "match_row": "row"}, "by 'match_on' or by 'match_row', not both"),
+            ({"table_fill": "update", "match_on": []}, "names the fields whose columns are the Table's key, and it names none"),
+            ({"table_fill": "update", "match_on": ["id", "id"]}, "names each key field once, and it repeats 'id'"),
+            ({"table_fill": "update", "match_row": "row", "cells": "erase"}, "cells"),
+            ({"table_fill": "append", "match_on": ["id"]}, "'match_on' says how 'table_fill = \"update\"'"),
+            ({"match_row": "row"}, "this step uses the default 'table_fill = \"replace\"': remove 'match_row'"),
+            ({"table_fill": "replace", "cells": "overwrite"}, "'cells' says how 'table_fill = \"update\"'"),
+            ({"format": "docx", "table_fill": "update", "match_on": ["id"]}, "is for the 'xlsx' format only"),
+        ],
+        ids=[
+            "no_way_to_match",
+            "both_ways_to_match",
+            "empty_key",
+            "repeated_key",
+            "unknown_cell_policy",
+            "key_on_append",
+            "row_on_the_default_fill",
+            "cells_on_replace",
+            "update_on_docx",
+        ],
+    )
+    def test_refused_updates(self, overrides: dict[str, Any], expected_message: str) -> None:
+        kwargs: dict[str, Any] = {"format": "xlsx", "template_input": "workbook"}
+        kwargs.update(overrides)
+        with pytest.raises(ValidationError, match=re.escape(expected_message)):
+            _blueprint(inputs=_WORKBOOK_INPUTS, **kwargs)

@@ -83,7 +83,10 @@ To print the same invoice on the plugin's `pipelex-pdf`, the step names it: `mod
 | `template` | string | An inline HTML and Jinja2 template, for `pdf` only. A `pdf` with a template is printed by the plugin. | No |
 | `template_file` | string | A template file relative to the bundle's file, written with forward slashes: `.html` for `pdf`, `.xlsx`, `.docx` or `.pptx`. An empty or absolute path, a URL, a backslash and a colon are refused. When the bundle is read from a folder, the file is the one its [method tree](../../method-trees.md#file-references) holds at that path, a `..` climbing to another folder of the tree included, and a file the tree keeps out, such as a gitignored one, is refused; a path that climbs above the tree's root is refused as a security matter, `security.method_path_refused`, which fails validation and the run rather than reporting a validation error, and logs a security event; a bundle file run alone with no `METHODS.toml` at or above it reads no other file. When the bundle is loaded from a string, the file is one of the files sent with it, each keyed by a path inside the bundle, so a path no such file could be keyed by, one holding a `..` segment or a NUL character, or naming no file, is refused when the bundle is parsed, as a validation error at the step that does not repeat the path. It excludes `template` and `template_input`. `pptx` requires one, or a `template_input`. | No |
 | `template_input` | string | The input whose file is the office template, for `xlsx`, `docx` or `pptx`: the run supplies the template rather than the method. The input must be declared, as `Document` or a concept that refines it, single and required. It excludes `template` and `template_file`. See [A template the run supplies](#a-template-the-run-supplies). | No |
-| `table_fill` | string | How the records of a list input fill a Table of an `xlsx` template: `replace`, the default, writes them over the Table's rows, and `append` adds them after the rows the Table already holds. `append` needs an office template, `template_file` or `template_input`, and an engine that declares it. | No |
+| `table_fill` | string | How the records of a list input fill a Table of an `xlsx` template: `replace`, the default, writes them over the Table's rows, `append` adds them after the rows the Table already holds, and `update` writes each record into the one row it matches. `append` and `update` need an office template, `template_file` or `template_input`, and an engine that declares them. See [Updating a Table's rows](#updating-a-tables-rows). | No |
+| `match_on` | array of strings | Under `table_fill = "update"`, the fields of the records whose columns are the Table's key, such as `["invoice_number"]`. Exactly one of `match_on` and `match_row` is required under `update`, and both are refused under any other fill. | No |
+| `match_row` | string | Under `table_fill = "update"`, the field of the records holding each record's row position among the Table's data rows, an integer or number field, such as the `row_field` a `PipeStructure` step filled when it read the Table. | No |
+| `cells` | string | Under `table_fill = "update"`, which cells of a matched row may be written: `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a non-null value matches. Refused under any other fill. | No |
 | `filename` | string | A Jinja expression over the inputs for the file's name, without its suffix, such as `invoice-{{ invoice.number }}`. It defaults to the pipe's code, or, with a `template_input`, to the name of the input's file. The rendered name is made into one every storage reader serves, the hosted API's included, spelled in ASCII with hyphens for the rest: see [The file's name](#the-files-name). | No |
 
 ### The file's name
@@ -200,6 +203,31 @@ table_fill     = "append"
 - **The file must be of the step's format.** Its format is judged from its bytes first, then from the media type it was sent with, then from its name, so a Word document sent as `expenses.xlsx` is refused, as is a macro-enabled workbook for an `xlsx` step. The refusal, `input.file_type_unsupported`, names the input.
 - **The template is checked when the run supplies it.** `pipelex validate` cannot see the file, so its verdict carries a `template_check_warning` saying the template is checked later. When a run starts, before any step does, run setup reads each template the caller supplies to a step certain to run, under the run's read scope, and hands it to the engine's template checker: an error refuses the run as the caller's, `pipelex.docgen.template_input_unfit`, naming the input and what the checker found, and a warning is logged with the run. The print checks the file again before the engine fills it, which also covers a template an earlier step produced, or one reached through a condition.
 - **The engine must declare `append`.** A step with `table_fill = "append"` is refused when the method loads if its engine does not declare that it appends to a Table, `model.capability_unsupported`.
+
+### Updating a Table's rows
+
+With `table_fill = "update"`, an `xlsx` step writes each record of a list input into the one row of the Table it matches, rather than adding rows or replacing them: a method that found the missing values of some rows returns the workbook with those cells filled in.
+
+```toml
+[pipe.complete_expenses]
+type           = "PipeDocGen"
+description    = "Write the categories found into the caller's expense workbook"
+inputs         = { workbook = "Document", completions = "ExpenseCompletion[]" }
+output         = "ExpenseWorkbook"
+format         = "xlsx"
+template_input = "workbook"
+table_fill     = "update"
+match_on       = ["invoice_number"]
+```
+
+- **A record finds its row by a key or by its position.** `match_on` names one or more fields whose columns are the Table's key, and the record is written into the row whose key cells equal its key fields. When the sheet has no natural key, `match_row` names the field holding the row's position among the Table's data rows, one for the first: a `PipeStructure` step reading the workbook fills it through its `row_field`, and the position must travel through the method unchanged, never produced by a model. A `PipeBatch` over the rows keeps it, since its output list lines up with its input list.
+- **A list of records must carry the matching fields.** When the method loads, at least one list of records among the step's inputs, or held by a structured input in a field, must have every `match_on` field as a single value, or the `match_row` field as an integer or number field, since otherwise no Table could be updated. Another list without them, or holding them with another kind, such as a list of notes or of attachments beside the line items, is accepted, but a Table filled from it fails the step, which the engine's template check reports. A step with no list of records at all is refused too.
+- **A null leaves its cell as it was.** In an update, a null means the method produced nothing for that cell, the opposite of the other fills, where a null empties what the template holds.
+- **`cells` decides what may be overwritten.** Under `fill_empty`, the default, only an empty cell is written, and a non-empty cell holding a different value is a conflict that fails the step. `cells = "overwrite"` writes every cell a non-null value matches, for corrections.
+- **All or nothing.** A key that appears twice in the Table, a record that matches no row, and two records matching the same row each fail the step before anything is written. A record whose key is null, or whose row position is null, not a whole number, or outside the Table's data rows, matches no row. A formula cell, and every cell of a calculated column, is never written.
+- **The engine must declare `update`.** A step with `table_fill = "update"` is refused when the method loads if its engine does not declare that it updates a Table's rows, `model.capability_unsupported`.
+
+The engine's side of the update, how it compares a key and what its template check refuses, is documented with the plugin's Excel templates.
 
 ### Template files sent with a bundle
 
