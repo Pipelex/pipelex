@@ -58,6 +58,25 @@ class ConceptProviderAbstract(ABC):
     def is_compatible(self, *, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
         """Whether `tested_concept` satisfies `wanted_concept` (refinement only when `strict`)."""
 
+    def is_file_concept(self, *, concept: Concept) -> bool:
+        """Whether `concept` is, or refines at any depth, a native whose value is a file (`Image`, `Document`).
+
+        The test is the strict compatibility the input shaper dispatches a declared input with
+        (`InputShaper.resolve_input_kind`), so a concept this answers True for is the one read as a
+        file there, and nowhere taken for a table of rows.
+
+        Raises:
+            ConceptStructureClassNotFoundError: the concept's structure class has to be compared and
+                does not resolve.
+        """
+        for native_code in NativeConceptCode.values_list():
+            if not native_code.is_file:
+                continue
+            file_concept = self.get_native_concept(native_concept=native_code)
+            if self.is_compatible(tested_concept=concept, wanted_concept=file_concept, strict=True):
+                return True
+        return False
+
     def resolve_wire_concept_ref(self, *, concept_ref: str) -> Concept:
         """Resolve the concept ref a transported stuff carries, the one rule both readers share.
 

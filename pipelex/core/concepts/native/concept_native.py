@@ -141,6 +141,36 @@ class NativeConceptCode(StrEnum):
                 return True
 
     @property
+    def is_file(self) -> bool:
+        """Whether a value of this native is a file, given by its url: `Image` and `Document`.
+
+        A concept that is or refines one of these takes `{"url": ...}` as the file itself, whatever the url's suffix,
+        so a `.csv` or `.xlsx` url there is never a table of rows (`ConceptProviderAbstract.is_file_concept`).
+        """
+        match self:
+            case NativeConceptCode.IMAGE | NativeConceptCode.DOCUMENT:
+                return True
+            case (
+                NativeConceptCode.DYNAMIC
+                | NativeConceptCode.TEXT
+                | NativeConceptCode.MARKDOWN
+                | NativeConceptCode.HTML
+                | NativeConceptCode.TEXT_AND_IMAGES
+                | NativeConceptCode.NUMBER
+                | NativeConceptCode.YES_NO
+                | NativeConceptCode.CHOICE
+                | NativeConceptCode.RATING
+                | NativeConceptCode.DATE
+                | NativeConceptCode.TIME
+                | NativeConceptCode.PAGE
+                | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
+                | NativeConceptCode.ANYTHING
+                | NativeConceptCode.COMPOSITE
+            ):
+                return False
+
+    @property
     def concept_ref(self) -> str:
         return f"{SpecialDomain.NATIVE}.{self.value}"
 
