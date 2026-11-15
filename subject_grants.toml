@@ -1336,6 +1336,10 @@ rationale = "Processes the templating assignment; single operand."
 param = "key"
 rationale = "Verb–object: parses the key of a doc gen default; single operand."
 
+["pipelex/cogt/doc_gen/header_matching.py::field_key"]
+param = "name"
+rationale = "Reads as a verb-object phrase over one obvious operand, the name being compared: field_key(header)."
+
 ["pipelex/cogt/doc_gen/input_shape.py::_content_leaf_kind"]
 param = "content_class"
 rationale = "Classifies one content class as a leaf kind."

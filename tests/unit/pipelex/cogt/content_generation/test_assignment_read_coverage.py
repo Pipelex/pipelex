@@ -28,6 +28,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     RenderPageViewsAssignment,
     SearchAssignment,
     SearchObjectAssignment,
+    TableReadAssignment,
     TemplatingAssignment,
 )
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
@@ -64,6 +65,7 @@ URL_FIELD_INVENTORY: dict[type[BaseModel], set[str]] = {
     ExtractAssignment: {"extract_input.image_uri", "extract_input.document_uri"},
     RenderPageViewsAssignment: {"document_uri"},
     DocumentConversionAssignment: {"source_uri"},
+    TableReadAssignment: {"source_uri"},
     # A section's blocks hold blocks again: the walk names the images inside one section and stops where a section would enclose itself.
     # A template file is a method file, named by its tree's digest and read through the method file store, never by a URI.
     RenderDocumentAssignment: {"composition.layout.blocks.url", "composition.layout.blocks.blocks.url", "composition.template_file.file.url"},
@@ -189,6 +191,15 @@ URL_BEARING_SAMPLES: dict[type[BaseModel], tuple[_DeclaresReads, set[str]]] = {
             format_key="docx",
         ),
         {"pipelex-storage://s/report.docx"},
+    ),
+    TableReadAssignment: (
+        TableReadAssignment(
+            job_metadata=_job_metadata(),
+            cogt_run_params=CogtRunParams(run_mode=PipeRunMode.DRY),
+            source_uri="pipelex-storage://s/expenses.xlsx",
+            field_names=["merchant", "amount"],
+        ),
+        {"pipelex-storage://s/expenses.xlsx"},
     ),
     RenderDocumentAssignment: (
         RenderDocumentAssignment(

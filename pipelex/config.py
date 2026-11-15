@@ -4,6 +4,7 @@ from pipelex.runtime_hub import get_optional_config, get_required_config
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.tools.log.log_fields import USER_ACTION_FIELD
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 
 METHODS_FETCH_ON_MISS_ENV_VAR = "PIPELEX_METHODS_FETCH_ON_MISS"
 
@@ -91,6 +92,25 @@ def fetch_max_bytes() -> int:
     if not isinstance(optional_config, PipelexConfig):
         return FETCH_MAX_BYTES_FALLBACK
     return optional_config.runtime.network.max_fetch_bytes
+
+
+TABLE_READING_FALLBACK = TableReadingConfig(max_workbook_uncompressed_bytes=100_000_000, max_table_cells=2_000_000)
+"""The limits a spreadsheet is read under when no config is loaded: the defaults ``pipelex/pipelex.toml`` ships, which a test pins.
+
+A safety floor, as :data:`FETCH_MAX_BYTES_FALLBACK` is: a process that reads a table before, or without, loading the
+config must still bound what a crafted workbook costs it.
+"""
+
+
+def table_reading_limits() -> TableReadingConfig:
+    """The limits reading a spreadsheet into records is held to in this process (non-raising).
+
+    The config's ``runtime.table_reading``, falling back to :data:`TABLE_READING_FALLBACK` when no config is set.
+    """
+    optional_config = get_optional_config()
+    if not isinstance(optional_config, PipelexConfig):
+        return TABLE_READING_FALLBACK
+    return optional_config.runtime.table_reading
 
 
 def is_pipe_func_sandbox_hosted() -> bool:

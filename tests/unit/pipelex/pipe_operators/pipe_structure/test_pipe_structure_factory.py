@@ -35,7 +35,7 @@ class TestPipeStructureFactory:
             blueprint=blueprint,
         )
 
-        assert pipe_structure.text_input_name == "draft_text"
+        assert pipe_structure.source_input_name == "draft_text"
         assert pipe_structure.output_multiplicity == expected_multiplicity
         assert pipe_structure.code == f"struct_{test_id}"
 

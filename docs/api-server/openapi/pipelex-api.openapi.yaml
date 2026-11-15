@@ -6870,6 +6870,16 @@ components:
           - $ref: '#/components/schemas/ModelReference'
           - type: 'null'
           title: Model
+        table:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Table
+        row_field:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Row Field
       additionalProperties: false
       type: object
       required:

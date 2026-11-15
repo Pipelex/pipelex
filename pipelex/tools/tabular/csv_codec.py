@@ -1,12 +1,14 @@
 """CSV codec — the I/O bridge between CSV files and ``ListContent[row-concept]``.
 
 CSV is an I/O codec, not a prompt-render format: it does NOT join the
-``rendered_plain/markdown/html/json`` ``TextFormat`` router. This single module owns
-row read/write (``read_rows``/``write_rows``), the shared flatness/field-order helper
-(``flat_field_names``, used by BOTH read and write), the concept binding
-(``list_content_from_csv``/``csv_from_list_content``), and a thin format seam
-(``assert_supported_table_suffix``) so an ``openpyxl``-backed ``.xlsx`` codec can be
-added later under ``pipelex[tabular]`` without touching callers.
+``rendered_plain/markdown/html/json`` ``TextFormat`` router. This module owns row read/write
+(``read_rows``/``write_rows``), the shared flatness/field-order helper (``flat_field_names``,
+used by BOTH read and write, and by the Excel reader), the CSV half of reading a table
+(``read_csv_raw_table``, which ``pipelex.tools.tabular.table_reader`` calls for a ``PipeStructure``
+step), the run-input binding (``list_content_from_csv``), the write binding
+(``csv_from_list_content``), and the write seam (``assert_supported_table_suffix``). Matching the
+header to the row concept's fields and binding the rows to it are format-neutral, in
+``pipelex.tools.tabular.table_records``, so a row concept that reads a ``.csv`` reads a ``.xlsx``.
 
 Dialect contract: the stdlib default ``QUOTE_MINIMAL`` quoting is the codec's wire
 format — a value is quoted only when it contains the delimiter, the quote char, or a
@@ -14,6 +16,7 @@ newline. The exact-line write assertions in the test suite rely on this.
 """
 
 import csv
+import io
 import types
 from datetime import date, datetime
 from enum import Enum
@@ -21,19 +24,28 @@ from pathlib import Path
 from typing import Any, Literal, Union, get_args, get_origin
 
 from mthds.protocol.problem.registry import CoreCode
-from pydantic import ValidationError
 
+from pipelex.config import table_reading_limits
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.tools.tabular.exceptions import (
-    CsvCoercionError,
     CsvColumnError,
     CsvError,
     CsvFlatnessError,
     CsvReadError,
+    TableTooLargeError,
 )
-from pipelex.tools.typing.annotation_utils import annotation_admits_none
-from pipelex.tools.typing.pydantic_utils import located_validation_errors, refusal_reason_without_input
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
+from pipelex.tools.tabular.table_records import (
+    RawTable,
+    RawTableRow,
+    TableBinding,
+    TableCellValue,
+    TableFormat,
+    build_table_records,
+    list_content_from_table_records,
+    sentence_subject,
+)
 
 # v1 dialect defaults. Configurable via codec params, never auto-guessed (design §9).
 # The user-facing config surface (toml default / --delimiter / --encoding flags) is a
@@ -131,7 +143,7 @@ def _assert_single_char_delimiter(delimiter: str) -> None:
         raise CsvError(msg).with_error_code(CoreCode.RUNTIME_UNEXPECTED)
 
 
-def _csv_subject(*, input_name: str | None) -> str:
+def csv_subject(*, input_name: str | None) -> str:
     """How a message names the file it refuses: by the input it was given as, never by its path, which is the caller's."""
     return f"the CSV file given for input '{input_name}'" if input_name is not None else "the CSV file"
 
@@ -158,54 +170,83 @@ def _validate_header(header: list[str], *, subject: str) -> None:
         seen.add(column)
 
 
-def _read_table(path: Path, *, delimiter: str, encoding: str, subject: str) -> tuple[list[str], list[tuple[int, list[str]]]]:
-    """Read a CSV file into a validated header row + the (1-based-line-numbered) data rows.
+def _read_csv_bytes(*, path: Path, subject: str) -> bytes:
+    """Read a CSV file's bytes, wrapping an ``OSError`` as ``CsvReadError`` written by its reason alone, never its path."""
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        msg = f"Could not read {subject}: {exc.strerror or type(exc).__name__}"
+        raise CsvReadError(msg) from exc
 
-    The shared reader behind ``read_rows`` and ``list_content_from_csv`` — keeps the
-    header explicit so column validation works even for a header-only file. Blank physical
-    lines (which ``csv`` yields as ``[]``) are skipped, matching ``csv.DictReader``; a data
-    row wider than the header is rejected (its surplus cells map to no column). Each kept row
-    carries its 1-based physical CSV line number (the header is line 1, so the first data row
-    is line 2, and skipped blank lines still advance the count) so error messages point at the
-    line the author sees in their editor. The reader runs in ``strict=True`` mode so malformed
-    quoting (e.g. an unterminated quoted field) raises ``csv.Error`` at the boundary rather than
-    silently merging the following lines into one cell. Wraps every raw
-    ``OSError``/``UnicodeDecodeError``/``LookupError``/``csv.Error`` as ``CsvReadError``.
 
-    No message names the file's path, which the caller gave, nor quotes its content: a decoding error's own text
-    quotes the byte it refused, and an ``OSError``'s the path, so each is written by its reason alone. ``subject``
-    names the file as the input it was given as, when that is known.
+def _parse_csv_rows(*, raw_bytes: bytes, delimiter: str, encoding: str, subject: str, max_table_cells: int | None) -> list[tuple[int, list[str]]]:
+    """Decode and parse a CSV file's bytes into its records, each with its 1-based physical line number.
+
+    Each record carries ``reader.line_num`` (the count of physical lines consumed so far) rather than an enumeration, so
+    a quoted cell spanning several physical lines does not skew the line numbers of the records that follow it. The
+    reader runs in ``strict=True`` mode so malformed quoting raises ``csv.Error`` at the boundary rather than silently
+    merging the following lines into one cell. Wraps every raw ``UnicodeDecodeError``/``LookupError``/``csv.Error`` as
+    ``CsvReadError``: a decoding error's own text quotes the byte it refused, so it is written by its reason alone.
+
+    A blank physical line after the first record is not kept, since no caller reads it (``_split_table`` skips it), so
+    a file of newlines holds nothing in memory. With ``max_table_cells``, the cells are counted as each record is
+    parsed, the header's and each data record's, a record narrower than the header counting as wide as the header,
+    which its padding makes it: the parse stops with ``TableTooLargeError`` as soon as the count passes the limit,
+    before the rest of the file is parsed or any record is built.
     """
     _assert_single_char_delimiter(delimiter)
-    # Capture each record's physical line number from ``reader.line_num`` (the count of physical lines
-    # consumed so far) rather than enumerating, so a quoted cell that spans multiple physical lines
-    # doesn't skew the line numbers of the records that follow it.
-    numbered_rows: list[tuple[int, list[str]]] = []
     try:
-        with path.open("r", encoding=encoding, newline="") as csv_file:
-            reader = csv.reader(csv_file, delimiter=delimiter, strict=True)
-            for row in reader:
-                numbered_rows.append((reader.line_num, row))
+        text = raw_bytes.decode(encoding)
     except UnicodeDecodeError as exc:
         msg = f"Could not decode {subject} as {encoding}: {exc.reason}"
         raise CsvReadError(msg) from exc
     except LookupError as exc:
         msg = f"Unknown encoding {encoding!r} for {subject}"
         raise CsvReadError(msg) from exc
+    numbered_rows: list[tuple[int, list[str]]] = []
+    header_width = 0
+    nb_cells = 0
+    try:
+        reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True)
+        for row in reader:
+            if not numbered_rows:
+                header_width = len(row)
+            elif not row:
+                continue
+            nb_cells += max(len(row), header_width)
+            if max_table_cells is not None and nb_cells > max_table_cells:
+                msg = (
+                    f"{sentence_subject(subject=subject)} holds more than the {max_table_cells} cells a table is read with "
+                    "([runtime.table_reading] max_table_cells): read a smaller table."
+                )
+                raise TableTooLargeError(msg)
+            numbered_rows.append((reader.line_num, row))
     except csv.Error as exc:
         # The csv module's own wording, which names the dialect's characters and never a cell.
         msg = f"Malformed CSV in {subject}: {exc}"
         raise CsvReadError(msg) from exc
-    except OSError as exc:
-        msg = f"Could not read {subject}: {exc.strerror or type(exc).__name__}"
-        raise CsvReadError(msg) from exc
+    return numbered_rows
 
+
+def _split_table(
+    *, numbered_rows: list[tuple[int, list[str]]], subject: str, is_strict_header: bool
+) -> tuple[list[str], list[tuple[int, list[str]]]]:
+    """Split a CSV file's records into a validated header row and the (1-based-line-numbered) data rows.
+
+    Blank physical lines (which ``csv`` yields as ``[]``) are skipped, matching ``csv.DictReader``; a data row wider
+    than the header is rejected (its surplus cells map to no column). The header must name columns; a strict header,
+    which every column must match a field, also refuses a blank or repeated header cell.
+    """
     if not numbered_rows:
         msg = f"Found nothing in {subject}; a header row is required."
         raise CsvReadError(msg)
 
     header = numbered_rows[0][1]
-    _validate_header(header, subject=subject)
+    if is_strict_header:
+        _validate_header(header, subject=subject)
+    elif not header:
+        msg = f"Found an empty header row in {subject}; a header naming the columns is required."
+        raise CsvColumnError(msg)
 
     data_rows: list[tuple[int, list[str]]] = []
     for line_number, row in numbered_rows[1:]:
@@ -222,6 +263,43 @@ def _read_table(path: Path, *, delimiter: str, encoding: str, subject: str) -> t
     return header, data_rows
 
 
+def _read_table(
+    path: Path, *, delimiter: str, encoding: str, subject: str, max_table_cells: int | None
+) -> tuple[list[str], list[tuple[int, list[str]]]]:
+    """Read a CSV file into a strictly validated header row + the (1-based-line-numbered) data rows.
+
+    No message names the file's path, which the caller gave, nor quotes its content. ``subject`` names the file as the
+    input it was given as, when that is known. ``max_table_cells`` bounds the cells parsed, None for no bound.
+    """
+    raw_bytes = _read_csv_bytes(path=path, subject=subject)
+    numbered_rows = _parse_csv_rows(raw_bytes=raw_bytes, delimiter=delimiter, encoding=encoding, subject=subject, max_table_cells=max_table_cells)
+    return _split_table(numbered_rows=numbered_rows, subject=subject, is_strict_header=True)
+
+
+def read_csv_raw_table(*, raw_bytes: bytes, binding: TableBinding, limits: TableReadingConfig, subject: str) -> RawTable:
+    """Read a CSV file's bytes into a `RawTable`: comma-separated UTF-8, a leading byte order mark ignored.
+
+    A row is named by its physical line, as an editor shows it. Under a binding that refuses a column matching no
+    field, the header is validated strictly, as a run input's always was: no blank and no repeated header cell.
+
+    Raises:
+        CsvReadError: The bytes do not decode or do not parse, or the file is empty.
+        CsvColumnError: The header is empty or, strictly validated, holds a blank or repeated cell, or a row is wider
+            than the header.
+        TableTooLargeError: The file holds more cells, the header's included, than ``limits.max_table_cells``.
+    """
+    numbered_rows = _parse_csv_rows(
+        raw_bytes=raw_bytes,
+        delimiter=DEFAULT_DELIMITER,
+        encoding=DEFAULT_READ_ENCODING,
+        subject=subject,
+        max_table_cells=limits.max_table_cells,
+    )
+    header, data_rows = _split_table(numbered_rows=numbered_rows, subject=subject, is_strict_header=binding.refuses_unmatched_columns)
+    raw_rows = [RawTableRow(label=f"row {line_number}", cells=list[TableCellValue](row)) for line_number, row in data_rows]
+    return RawTable(header=header, rows=raw_rows)
+
+
 def _row_to_dict(data_row: list[str], *, header: list[str]) -> dict[str, str]:
     """Map a raw data row onto the header, padding a short row with empty cells."""
     return {column: (data_row[index] if index < len(data_row) else "") for index, column in enumerate(header)}
@@ -234,7 +312,7 @@ def read_rows(path: Path, *, delimiter: str = DEFAULT_DELIMITER, encoding: str =
     missing/unreadable file, an unknown/wrong encoding, or malformed quoting; raises
     ``CsvColumnError`` for a duplicate/blank header cell or a data row wider than the header.
     """
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=_csv_subject(input_name=None))
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=csv_subject(input_name=None), max_table_cells=None)
     return [_row_to_dict(row, header=header) for _, row in data_rows]
 
 
@@ -276,38 +354,31 @@ def write_rows(
 # Format seam
 # ---------------------------------------------------------------------------------------
 
-# Suffixes the tabular codec claims: the .csv built-in plus the deferred .xlsx seam.
+# Suffixes the tabular codec claims: the .csv built-in and the .xlsx workbook the optional `tabular` extra reads.
 _TABULAR_SUFFIXES: frozenset[str] = frozenset({".csv", ".xlsx"})
 
 
 def is_tabular_path(path: Path) -> bool:
-    """Whether ``path``'s suffix is one the tabular codec claims.
+    """Whether ``path``'s suffix is one the tabular codec claims: ``.csv`` or ``.xlsx``.
 
-    ``True`` for ``.csv`` (the v1 built-in) and ``.xlsx`` (the deferred seam). The input
-    hook uses this to decide whether a ``{"url": ...}`` reference is a table to read rather
-    than an ordinary record dict. ``.xlsx`` is claimed here so it reaches the codec's clear
-    "needs pipelex[tabular]" seam error (via ``assert_supported_table_suffix``) instead of
-    being misread as a record.
+    The input hook uses this to decide whether a ``{"url": ...}`` reference is a table to read rather than an ordinary
+    record dict.
     """
     return path.suffix.lower() in _TABULAR_SUFFIXES
 
 
 def assert_supported_table_suffix(path: Path) -> None:
-    """Format seam: accept ``.csv`` (the only v1 built-in); reject everything else.
+    """Format seam of a table the CLI writes: accept ``.csv``; reject everything else.
 
-    A ``.xlsx`` path raises ``CsvError`` pointing at the optional ``pipelex[tabular]``
-    extra; any other suffix raises a generic unsupported-format ``CsvError``. This is
-    the seam an ``openpyxl``-backed codec slots into later without touching callers.
+    Only reading reaches Excel workbooks: a ``.xlsx`` path raises ``CsvError`` saying so, and any other suffix raises a
+    generic unsupported-format ``CsvError``.
     """
     suffix = path.suffix.lower()
     if suffix == ".csv":
         return
     # The file's name is the caller's own text, which no message carries: its suffix names the format.
     if suffix == ".xlsx":
-        msg = (
-            "Reading/writing Excel files (.xlsx) requires the optional 'pipelex[tabular]' extra, "
-            "which is not part of v1. Convert to .csv, or install 'pipelex[tabular]' once it ships."
-        )
+        msg = "Writing Excel files (.xlsx) is not supported: write a .csv file, which Excel opens."
         raise CsvError(msg)
     msg = f"Unsupported table file format: only .csv is supported (got suffix {path.suffix!r})."
     raise CsvError(msg)
@@ -325,91 +396,45 @@ def list_content_from_csv(
     delimiter: str = DEFAULT_DELIMITER,
     encoding: str = DEFAULT_READ_ENCODING,
     input_name: str | None = None,
+    limits: TableReadingConfig | None = None,
 ) -> ListContent[StuffContentType]:
-    """Read a CSV file into a ``ListContent`` of ``row_model`` instances (one row → one item).
+    """Read a CSV file given as a run input into a ``ListContent`` of ``row_model`` instances (one row → one item).
 
-    Columns must match ``row_model``'s field names (no implicit remap): an extra column
-    or a missing *required* column raises ``CsvColumnError``; a missing *optional* column
-    sets that field to ``None`` for all rows, or leaves a defaulted field that refuses ``None``
-    to its default. Empty cells map to ``None`` BEFORE pydantic validation (so they must target
-    optional fields), but are left out for a defaulted field that refuses ``None``, which then
-    takes its default; remaining strings are coerced via
-    pydantic's lax validation. A coercion failure raises ``CsvCoercionError`` naming the
-    1-based row and the field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
+    The run input's binding (``TableBinding.RUN_INPUT``): every column must match a field of ``row_model``, compared
+    as `pipelex.cogt.doc_gen.header_matching` compares a header and a field, so an extra column or a missing *required*
+    column raises ``CsvColumnError``; a missing *optional* column sets that field to ``None`` for all rows, or leaves a
+    defaulted field that refuses ``None`` to its default. Empty cells map to ``None`` BEFORE pydantic validation (so
+    they must target optional fields), but are left out for a defaulted field that refuses ``None``, which then takes
+    its default; remaining strings are coerced via pydantic's lax validation. A coercion failure raises
+    ``CsvCoercionError`` naming the 1-based row and the field. ``row_model`` must be CSV-flat (see ``flat_field_names``).
 
     The file is the caller's input: no message names its path, quotes a cell, or names a column the concept does not
     declare, which is the file's own text: a message names the file by ``input_name``, the input it was given as, when
     the caller knows it.
+
+    The file is held to ``limits``, this process's ``[runtime.table_reading]`` when None: a file holding more cells than
+    ``max_table_cells`` raises ``TableTooLargeError`` while it is parsed.
     """
     assert_supported_table_suffix(path)
     field_names = flat_field_names(row_model)
-    field_name_set = set(field_names)
-    required_fields = {name for name, field_info in row_model.model_fields.items() if field_info.is_required()}
-
-    subject = _csv_subject(input_name=input_name)
-    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=subject)
-    header_set = set(header)
-
-    extra_column_numbers = [column_number for column_number, column in enumerate(header, start=1) if column not in field_name_set]
-    if extra_column_numbers:
-        msg = (
-            f"Column(s) {', '.join(str(column_number) for column_number in extra_column_numbers)} of {subject} are not declared "
-            f"on concept {row_model.__name__!r}, whose columns are {', '.join(field_names)}. "
-            "Remove them or project to a matching flat concept."
-        )
-        raise CsvColumnError(msg)
-
-    missing_required = sorted(required_fields - header_set)
-    if missing_required:
-        msg = f"Required column(s) {missing_required} of concept {row_model.__name__!r} are missing from {subject}."
-        raise CsvColumnError(msg).with_params(field=missing_required[0])
-
-    # A CSV that omits a *nullable* column means "no value" for every row → None (CT2), regardless of
-    # the row model's own default. Carrying these as explicit None keeps the contract from silently
-    # depending on a non-None field default (e.g. ``nickname: str | None = "anon"`` → None, not "anon").
-    # A non-nullable defaulted field (e.g. ``count: int = 0``) is left absent so its own default
-    # applies — forcing None there would fail validation, not honor the column's absence.
-    omitted_nullable_fields = {
-        name for name in (field_name_set - header_set) if annotation_admits_none(annotation=row_model.model_fields[name].annotation)
-    }
-    # An empty cell is "no value" in the same way: a defaulted field that refuses None (a structure field with a
-    # `default_value` never holds nothing) is left out of the row so its default applies, as for an omitted column.
-    defaulted_non_nullable_fields = {
-        name
-        for name, field_info in row_model.model_fields.items()
-        if not field_info.is_required() and not annotation_admits_none(annotation=field_info.annotation)
-    }
-
-    items: list[StuffContentType] = []
-    for row_number, data_row in data_rows:
-        cell_map = _row_to_dict(data_row, header=header)
-        # Empty cell -> None BEFORE validation (so it targets an optional field, or fails required), or left out
-        # for a defaulted field that refuses None.
-        row_data: dict[str, str | None] = {
-            column: (value or None) for column, value in cell_map.items() if value or column not in defaulted_non_nullable_fields
-        }
-        for omitted_field in omitted_nullable_fields:
-            row_data[omitted_field] = None
-        try:
-            item = row_model.model_validate(row_data)
-        except ValidationError as exc:
-            # A row's key the model does not declare is the file's own text: the locations name what the row model's
-            # schema names, and a model-level failure, which has none, is named by its error type. The errors are read
-            # once, with their locations.
-            located_errors = located_validation_errors(validation_error=exc, validated_type=row_model)
-            error_fields = sorted({located_error.location or located_error.error["type"] for located_error in located_errors})
-            fields_label = ", ".join(error_fields) or "?"
-            # Each error's reason without the cell, NOT str(exc): str(exc) appends `input_value=<raw cell>`, and a
-            # validator's message can quote the cell too, which would put the cell content, a run's input, into the
-            # operator's diagnostics and every log line carrying the message. Row/field identifiers suffice.
-            reasons = (
-                "; ".join(sorted({refusal_reason_without_input(error=located_error.error) for located_error in located_errors})) or "invalid value"
-            )
-            msg = f"Could not coerce row {row_number} of {subject} for concept {row_model.__name__!r}: field(s) {fields_label} — {reasons}"
-            raise CsvCoercionError(msg).with_params(field=located_errors[0].location if located_errors else None) from exc
-        items.append(item)
-
-    return ListContent(items=items)
+    subject = csv_subject(input_name=input_name)
+    max_table_cells = (limits or table_reading_limits()).max_table_cells
+    header, data_rows = _read_table(path, delimiter=delimiter, encoding=encoding, subject=subject, max_table_cells=max_table_cells)
+    raw_table = RawTable(
+        header=header,
+        rows=[RawTableRow(label=f"row {line_number}", cells=list[TableCellValue](row)) for line_number, row in data_rows],
+    )
+    table_records = build_table_records(
+        raw_table=raw_table,
+        table_format=TableFormat.CSV,
+        field_names=field_names,
+        row_field=None,
+        binding=TableBinding.RUN_INPUT,
+        subject=subject,
+    )
+    return list_content_from_table_records(
+        table_records=table_records, row_model=row_model, row_field=None, binding=TableBinding.RUN_INPUT, subject=subject
+    )
 
 
 def csv_from_list_content(

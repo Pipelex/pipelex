@@ -300,7 +300,7 @@ PipeOperatorModelAvailabilityError | inherits cause, else model.unavailable
 PipeOperatorModelChoiceError | inherits cause, else model.unknown
 PipeParallelFactoryError | method.schema_violation
 PipeRouterError | inherits cause, else runtime.unexpected
-PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled
+PipeRunError | inherits cause, else runtime.unexpected; or chosen: model.output_schema_mismatch, pipe.condition_unmatched, pipe.condition_refused, pipe.input_unresolved, method.function_invalid, method.template_invalid, method.pipe_unresolved, method.schema_violation, method.wiring_invalid, method.name_conflict, method.optional_unhandled, method.output_multiplicity_mismatch
 PipeRunInputsError | one of pipe.input_unresolved, input.missing, input.reference_not_found, method.wiring_invalid
 PipeRunParamsError | method.schema_violation
 PipeSequenceValueError | method.wiring_invalid
@@ -382,6 +382,10 @@ StuffContentValidationError | method.wiring_invalid
 StuffError | abstract
 StuffFactoryError | one of input.invalid, input.wrong_concept, pipe.output_invalid, pipe.output_multiplicity
 StuffSpecFactoryError | method.schema_violation
+TableFileTypeUnsupportedError | input.file_type_unsupported
+TableReaderMisconfiguredError | runtime.misconfigured
+TableSelectionError | input.invalid
+TableTooLargeError | input.too_large
 TelemetryApiKeyMissingError | pipelex.config.variable_missing
 TelemetryConfigError | abstract
 TelemetryConfigValidationError | pipelex.config.invalid

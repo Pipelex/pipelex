@@ -28,10 +28,12 @@ resolving sub-pipes through the hub:
   path, and reads its resolved model's document types. A `PipeJudge` consumes the documents its prompt
   references by variable path, as a PipeLLM does, and reads its resolved judgment model's document
   types. A waterfall reads a format when any of its members reads it. A `PipeExtract` that asks for
-  page views also needs a PDF, whatever its model reads, since page views are drawn from one. A `PipeDocGen` with a
-  `template_input` consumes that input's file as its template, and reads only its own format: an `xlsx` step reads an
-  Excel workbook, whatever its engine prints otherwise. Run setup also hands such a file to the engine's template
-  checker (`pipelex.pipeline.doc_gen_template_inputs`).
+  page views also needs a PDF, whatever its model reads, since page views are drawn from one. A `PipeStructure` whose
+  input is a `Document` consumes it with no model and reads only an Excel workbook (`.xlsx`) or a CSV file, the rule
+  the step applies when it runs; the refusal names its reader, `table_reader`, where a model is named. A `PipeDocGen`
+  with a `template_input` consumes that input's file as its template, and reads only its own format: an `xlsx` step
+  reads an Excel workbook, whatever its engine prints otherwise. Run setup also hands such a file to the engine's
+  template checker (`pipelex.pipeline.doc_gen_template_inputs`).
 
 The walk depends only on the library and the model deck, never on the input values.
 
@@ -74,11 +76,14 @@ from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
 from pipelex.pipe_operators.judge.pipe_judge import PipeJudge
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
+from pipelex.pipe_operators.structure.pipe_structure import PipeStructure
 from pipelex.pipe_run.pipe_run_params import BatchParams
 from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
 from pipelex.pipeline.input_normalizer import IdentifiedFileInput
 from pipelex.runtime_hub import get_model_deck
 from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_file_format, describe_format_keys
+from pipelex.tools.tabular.table_reader import table_format_named_by
+from pipelex.tools.tabular.table_records import TABLE_READER, TableFormat
 from pipelex.tools.uri.resolved_uri import UriKind
 
 # The segment of a consumed path that stands for any item of a list: `("transcripts", "[]")`
@@ -89,6 +94,9 @@ LIST_ITEM_SEGMENT: Final[str] = "[]"
 # only stops a malformed deck that points a reference back at itself.
 _MAX_PRESET_HOPS: Final[int] = 8
 
+# The formats a PipeStructure reading a spreadsheet reads, by their format key.
+TABLE_FORMAT_KEYS: Final[frozenset[str]] = frozenset[str](TableFormat)
+
 # How a refusal names a web-page model's declaration among the formats it reads.
 _WEB_PAGE_INPUT: Final[str] = "web_page"
 
@@ -97,6 +105,7 @@ _FORMAT_ADVICE: Final[str] = "Give a file in a format its model reads, or use a 
 _FORMAT_OR_CONVERTER_ADVICE: Final[str] = (
     "Give a file in a format its model reads, use a model that reads this format, or configure a document converter."
 )
+_TABLE_ADVICE: Final[str] = "Give an Excel workbook (.xlsx) or a CSV file (.csv) to a step reading a spreadsheet."
 _PAGE_VIEWS_MODEL_ADVICE: Final[str] = "Use a model that reads PDFs, or remove page_views from the step."
 _PAGE_VIEWS_FILE_AND_MODEL_ADVICE: Final[str] = "Give a PDF to a model that reads PDFs, or remove page_views from the step."
 
@@ -111,10 +120,12 @@ class FileConsumerKind(StrEnum):
     EXTRACT = "extract"
     LLM_DOCUMENT = "llm_document"
     JUDGMENT_DOCUMENT = "judgment_document"
+    TABLE_READ = "table_read"
     DOC_GEN_TEMPLATE = "doc_gen_template"
 
     @property
-    def model_type(self) -> ModelType:
+    def model_type(self) -> ModelType | None:
+        """The type of the model that reads the file, None for a step that reads it with no model."""
         match self:
             case FileConsumerKind.EXTRACT:
                 return ModelType.TEXT_EXTRACTOR
@@ -122,6 +133,8 @@ class FileConsumerKind(StrEnum):
                 return ModelType.LLM
             case FileConsumerKind.JUDGMENT_DOCUMENT:
                 return ModelType.JUDGMENT
+            case FileConsumerKind.TABLE_READ:
+                return None
             case FileConsumerKind.DOC_GEN_TEMPLATE:
                 return ModelType.DOC_GEN
 
@@ -131,7 +144,7 @@ class FileConsumerKind(StrEnum):
         match self:
             case FileConsumerKind.DOC_GEN_TEMPLATE:
                 return True
-            case FileConsumerKind.EXTRACT | FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT:
+            case FileConsumerKind.EXTRACT | FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT | FileConsumerKind.TABLE_READ:
                 return False
 
 
@@ -178,7 +191,7 @@ class FileInputConsumer(BaseModel):
     carries the package's alias, or find a host step that shares its domain and code. Never serialized."""
 
     @property
-    def model_type(self) -> ModelType:
+    def model_type(self) -> ModelType | None:
         return self.kind.model_type
 
     @property
@@ -210,6 +223,8 @@ class FileInputConsumer(BaseModel):
                 return "extracts it with"
             case FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT:
                 return "gives it to"
+            case FileConsumerKind.TABLE_READ:
+                return "reads a table from it"
             case FileConsumerKind.DOC_GEN_TEMPLATE:
                 return "fills it as its template with"
 
@@ -408,9 +423,27 @@ def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsu
         return None
     if format_key in consumer.readable_formats:
         return None
+    file_format = describe_file_format(format_key=format_key, mime_type=file_input.mime_type)
+    match consumer.kind:
+        case FileConsumerKind.TABLE_READ:
+            # A CSV file is often declared with a type naming no table format, which the step then judges by the file's
+            # name, reading its bytes too (`table_format_key_of`): a name naming a table format leaves it to the step.
+            if file_input.file_name is not None and table_format_named_by(file_name=file_input.file_name) is not None:
+                return None
+            return _ConsumerRefusal(
+                sentence=(
+                    f"Input '{file_input.display_path}' is {file_format}: "
+                    f"pipe '{consumer.pipe_code}' {consumer.verb_phrase}, and reads {describe_format_keys(format_keys=consumer.listed_formats)} only."
+                ),
+                advice=_TABLE_ADVICE,
+                format_param=format_key,
+                model_param=consumer.model,
+            )
+        case FileConsumerKind.EXTRACT | FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT | FileConsumerKind.DOC_GEN_TEMPLATE:
+            pass
     return _ConsumerRefusal(
         sentence=(
-            f"Input '{file_input.display_path}' is {describe_file_format(format_key=format_key, mime_type=file_input.mime_type)}: "
+            f"Input '{file_input.display_path}' is {file_format}: "
             f"pipe '{consumer.pipe_code}' {consumer.verb_phrase} model '{consumer.model}', "
             f"which reads {describe_format_keys(format_keys=consumer.listed_formats)}."
         ),
@@ -460,6 +493,8 @@ def _visit(*, pipe: PipeAbstract, frame: _Frame, is_conditional: bool, visiting:
         _record_llm_document_consumers(pipe_llm=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
     elif isinstance(pipe, PipeJudge):
         _record_judgment_document_consumers(pipe_judge=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
+    elif isinstance(pipe, PipeStructure) and pipe.reads_document():
+        _record_table_read_consumer(pipe_structure=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
     elif isinstance(pipe, PipeDocGen):
         _record_doc_gen_template_consumer(pipe_doc_gen=pipe, frame=frame, is_conditional=is_conditional, consumers=consumers)
 
@@ -640,6 +675,29 @@ def _record_extract_consumer(*, pipe_extract: PipeExtract, frame: _Frame, is_con
             reads_web_pages=reads_web_pages,
             is_conditional=is_conditional,
             asks_for_page_views=pipe_extract.should_include_page_views,
+        )
+    )
+
+
+def _record_table_read_consumer(*, pipe_structure: PipeStructure, frame: _Frame, is_conditional: bool, consumers: list[FileInputConsumer]) -> None:
+    # A PipeStructure reading a spreadsheet reads its single Document input with no model, and reads only the table
+    # formats: the reader stands where a model is named, so a refusal reads as every other consumer's does.
+    consumed_path = _tracked_path(frame=frame, variable_path=pipe_structure.source_input_name)
+    if consumed_path is None:
+        return
+    consumers.append(
+        FileInputConsumer(
+            slot_name=consumed_path[0],
+            consumed_path=consumed_path,
+            pipe_ref=pipe_structure.pipe_ref,
+            pipe_code=pipe_structure.code,
+            kind=FileConsumerKind.TABLE_READ,
+            model=TABLE_READER,
+            readable_formats=TABLE_FORMAT_KEYS,
+            formats_read_by_every_model=TABLE_FORMAT_KEYS,
+            reads_web_pages=False,
+            is_conditional=is_conditional,
+            asks_for_page_views=False,
         )
     )
 

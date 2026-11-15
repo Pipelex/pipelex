@@ -7,6 +7,9 @@ from pipelex.errors.error_code_declaration import ErrorCodeDeclaration, ErrorCod
 from pipelex.errors.problem import ProblemLocation, make_location
 from pipelex.system.exceptions import ToolError
 
+# The configuration a table read refused by the content generator names: the plugins that provide the orchestrator.
+TABLE_READER_COMPONENT = "runtime.plugins"
+
 
 class CsvError(ToolError):
     """Base for CSV codec errors, also raised directly.
@@ -101,3 +104,62 @@ class CsvCoercionError(CsvError):
     """
 
     error_code = CoreCode.INPUT_INVALID
+
+
+class TableSelectionError(CsvError):
+    """Raised when the table a step reads cannot be chosen in the file it was given.
+
+    A workbook holding no Table of the name the step gives, or, when the step names none, a workbook holding several
+    Tables or none, and a CSV file given to a step that names a Table, which a CSV file has none of. The refusal names
+    the Tables the workbook holds, so the caller can fix the file or the author the step.
+    """
+
+    error_code = CoreCode.INPUT_INVALID
+
+
+class TableFileTypeUnsupportedError(CsvError):
+    """Raised when the file a step reads a table from is neither an Excel workbook (`.xlsx`) nor a CSV file.
+
+    The format is judged from the file's bytes first, then from its media type, then from its name. The input's fault,
+    ``input.file_type_unsupported``: the step reads tables, while the file changes from run to run.
+    """
+
+    error_code = CoreCode.INPUT_FILE_TYPE_UNSUPPORTED
+
+
+class TableReaderMisconfiguredError(ToolError):
+    """Raised by a content generator that cannot read a table from a document, which a `PipeStructure` step asked for.
+
+    A fault of the deployment, ``runtime.misconfigured``: the orchestrator's content generator predates the table read,
+    and the plugin providing it must be updated.
+    """
+
+    error_code = CoreCode.RUNTIME_MISCONFIGURED
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"component": TABLE_READER_COMPONENT}
+
+
+class TableTooLargeError(CsvError):
+    """Raised when a spreadsheet is larger than the runtime reads, before its cells are read.
+
+    ``input.too_large``, the input's fault: a workbook whose parts, decompressed, would pass
+    ``[runtime.table_reading] max_workbook_uncompressed_bytes``, refused with ``limit`` and ``size`` in bytes, or a
+    Table spanning more cells than ``max_table_cells``, a count of cells the code's sentence would read as a size, so
+    that refusal withholds both and its sentence says the input is too large for the step.
+    """
+
+    error_code = CoreCode.INPUT_TOO_LARGE
+
+    def __init__(self, message: str, *, limit_bytes: int | None = None, size_bytes: int | None = None):
+        super().__init__(message)
+        # The bound the workbook passed and its decompressed size, in bytes, or None for a refusal counted in cells.
+        self.limit_bytes = limit_bytes
+        self.size_bytes = size_bytes
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        if self.limit_bytes is None or self.size_bytes is None:
+            return {"input": self.input_name}
+        return {"input": self.input_name, "limit": self.limit_bytes, "size": self.size_bytes}

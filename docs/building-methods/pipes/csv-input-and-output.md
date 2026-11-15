@@ -1,12 +1,12 @@
 ---
-description: "Read CSV files into typed lists and write list outputs back to CSV. Covers the inputs.json convention, the --save-csv flag, the flat-concept rule, type coercion, and v1 limitations."
+description: "Read CSV files and Excel workbooks into typed lists and write list outputs back to CSV. Covers the inputs.json convention, the --save-csv flag, the flat-concept rule, type coercion, and v1 limitations."
 ---
 
 # CSV Input & Output
 
-Pipelex can read a CSV file directly into a typed list and write a list output back out as CSV. A CSV maps to a `ListContent` of a flat concept: each row becomes one instance of the concept, and each column maps to one of its fields. No new language construct is involved — you describe the row concept exactly as you would any structured concept.
+Pipelex can read a CSV file or an Excel workbook directly into a typed list and write a list output back out as CSV. A CSV maps to a `ListContent` of a flat concept: each row becomes one instance of the concept, and each column maps to one of its fields. No new language construct is involved — you describe the row concept exactly as you would any structured concept.
 
-This covers reading a `.csv` referenced from your `inputs.json`, writing a result with `--save-csv`, and the rules and limitations of the v1 codec.
+This covers reading a `.csv` or `.xlsx` referenced from your `inputs.json`, writing a result with `--save-csv`, and the rules and limitations of the v1 codec. To read a spreadsheet that arrives as a `Document` during a run, for example one a user uploads, use a [`PipeStructure` step](pipe-operators/PipeStructure.md#reading-a-spreadsheet), whose rules are the MTHDS standard's.
 
 ## The flat-concept rule
 
@@ -34,7 +34,7 @@ death_year = { type = "integer", required = false, description = "Year of death,
 
 ## Reading a CSV as input
 
-Reference the file from `inputs.json` with a `url` whose path ends in a tabular suffix (`.csv`, or `.xlsx` once the Excel backend is available), under a flat structured concept. Pipelex detects the tabular suffix and reads the file into a `ListContent` of that concept — one CSV file becomes one list, and the concept names the **row** type:
+Reference the file from `inputs.json` with a `url` whose path ends in a tabular suffix (`.csv` or `.xlsx`), under a flat structured concept. Pipelex detects the tabular suffix and reads the file into a `ListContent` of that concept — one CSV file becomes one list, and the concept names the **row** type:
 
 ```json
 {
@@ -69,7 +69,7 @@ Vint Cerf,Computer Scientist,United States,1943,
 
 ### Header and column rules
 
-- The header row is **required**, and headers must match the concept's field names exactly — there is no implicit renaming.
+- The header row is **required**, and each header must match a field name, compared ignoring case, spaces, dots and underscores, so a `Birth year` column fills `birth_year`. A header spelling a field's name exactly binds that field first, so a concept with both `unit_price` and `unitprice` reads each from its exactly named column. A header matching several fields otherwise, and several headers matching the same field, are errors.
 
 - An **extra** column (one with no matching field) is an error.
 
@@ -91,6 +91,16 @@ Cell strings are coerced through Pydantic's lax validation. The contract is pinn
 | `date` | ISO `2020-12-31` | `31/12/2020`, `12/31/2020` |
 
 A cell that cannot be coerced raises a clear error naming the 1-based row, the concept, and the field, so you can find the offending value.
+
+## Reading an Excel workbook as input
+
+A `.xlsx` path is read the same way, from an Excel Table of the workbook: the named table object created with Insert > Table. The workbook must hold exactly one Table, since an input names none; a workbook with several Tables or none is refused, naming the Tables found. The Table's header row names the columns under the same header and column rules as a CSV file, its totals row is not read, and every other row of the Table is an item of the list, an empty row included. Reading a workbook needs the `tabular` extra:
+
+```bash
+pip install "pipelex[tabular]"
+```
+
+A workbook cell keeps its type: a number, a date or a boolean is read as one, then coerced to its field as a CSV cell is, and a text field reads a typed cell as its text (a whole number as its digits, a date in ISO 8601 form, a boolean as `true` or `false`). A formula cell is read as the value the workbook last calculated and stored; a workbook saved by a program that stores none reads that cell as empty.
 
 ## Writing a result as CSV
 
@@ -170,7 +180,7 @@ The codec defaults to a comma delimiter and UTF-8 encoding. Reads use `utf-8-sig
 
 - **Not uploaded on a hosted run.** A run on the hosted Pipelex API uploads the local files named at document and image inputs only, so a `.csv` path at a structured-list input reaches the hosted runner as a path on your machine, which it cannot read. Give the rows as a JSON list of objects instead, or run with `--local`. `--save-csv` is refused on a hosted run too (see [Running on the Hosted API](../../tools/cli/run.md#running-on-the-hosted-api)).
 
-- **`.xlsx` is recognized but not yet implemented.** An `.xlsx` path is detected as tabular and routed to a clear "needs `pipelex[tabular]`" message; the Excel backend itself is not built in v1.
+- **`.xlsx` is read, not written.** `--save-csv` writes CSV only, which Excel opens.
 
 - **Empty string is indistinguishable from `None`.** An empty cell reads as `None`, and on write `None` is rendered as an empty cell, so a genuinely empty string `""` cannot be told apart from a missing value through a CSV round trip.
 
