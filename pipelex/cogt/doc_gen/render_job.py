@@ -25,7 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
 
 #: The start of every URL that names a file of a document's method tree: the job's `base_url`, and every URL an engine
 #: joins to it, such as a stylesheet's and the URLs it holds. Its host is in the `.invalid` domain, which RFC 2606
@@ -54,7 +54,34 @@ class RenderJob(BaseModel):
     document names no file.
 
     `table_fill` says how the template file's Tables are filled, and is `replace` for every other source. A fill other
-    than `replace` reaches only an engine whose model declares it (`TableFill.engine_capability`).
+    than `replace` reaches only an engine whose model declares it (`TableFill.engine_capability`). It applies to the
+    Tables a list of records fills; a single value fills its named cell as under every fill.
+
+    Under `update`, which an engine declares as `table_update`, the job also carries how a record finds its row,
+    `match_on` or `match_row`, exactly one of them, and `cells`, always set; under any other fill it carries none of the
+    three. An engine that declares `table_update` honours these rules, for every Table a list of records fills:
+
+    - **Each record is written into the one row it matches**, and no row is added, removed or moved. With `match_on`,
+      the Table's key is the columns whose headers match those fields, compared as every header is
+      (`pipelex.cogt.doc_gen.header_matching`), and a record matches the row whose key cells equal its key fields. With
+      `match_row`, that field of the record holds the row's position among the Table's data rows, one for the first, as
+      Pipelex's spreadsheet reader counts it (`pipelex.tools.tabular`). The fields a record is matched by are not written.
+    - **Every record of a filled Table's list carries the matching fields.** A Table filled from a list whose records
+      lack a `match_on` field, or the `match_row` field, fails the fill, and the engine's template checker reports it
+      as an error. The method's load holds only some list of the step's data to those fields, since only the engine
+      knows which list fills which Table.
+    - **Nothing is written unless every record matches exactly one row.** The engine matches every record before it
+      writes any cell, and fails the fill when a key appears twice in the Table, when a record matches no row, or when
+      two records match the same row. A record whose `match_on` value is null, or whose `match_row` value is null, not a
+      whole number, or outside 1 to the number of the Table's data rows, matches no row, and so fails the fill.
+    - **A null means "nothing produced"**: the cell is left as it was. This is the opposite of the other fills, where a
+      null empties what the template holds.
+    - **`cells` says which cells may be written.** Under `fill_empty`, only an empty cell is written, and a non-empty
+      cell holding a different value is a conflict that fails the fill; a cell already holding the value is left alone.
+      Under `overwrite`, every cell a non-null field matches is written.
+    - **A formula cell, and every cell of a calculated column, is never written**, under either policy.
+    - **A failure names the Table, the column and the row's key or position, and never a cell's value**, which is the
+      run's data.
 
     The template file's bytes are the method's file or a file the run supplied as one of its inputs, which the engine
     cannot tell apart and need not: `template_name` names it for messages either way, the file as the method names it,
@@ -77,7 +104,20 @@ class RenderJob(BaseModel):
     table_fill: TableFill = Field(
         default=TableFill.REPLACE,
         strict=False,
-        description="How the template file's Tables are filled: `replace` their rows, or `append` after them",
+        description="How the template file's Tables are filled: `replace` their rows, `append` after them, or `update` the rows records match",
+    )
+    match_on: list[str] | None = Field(
+        default=None,
+        description="Under `update`, the fields of the records whose columns are the Table's key; None under any other fill",
+    )
+    match_row: str | None = Field(
+        default=None,
+        description="Under `update`, the field of the records holding the row's position among the Table's data rows; None under any other fill",
+    )
+    cells: CellPolicy | None = Field(
+        default=None,
+        strict=False,
+        description="Under `update`, which cells of a matched row may be written: `fill_empty` or `overwrite`; None under any other fill",
     )
     data: dict[str, Any] = Field(
         default_factory=dict,
@@ -112,6 +152,10 @@ class RenderJob(BaseModel):
             raise ValueError(msg)
         if not self.table_fill.is_replace and not self.source.fills_template_file:
             msg = f"A render job {self.source.desc} fills no Table of a template file, so it cannot {self.table_fill.desc}."
+            raise ValueError(msg)
+        match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
+        if match_refusal is not None:
+            msg = f"A render job cannot match its records to rows this way: {match_refusal}."
             raise ValueError(msg)
         if self.base_url is not None:
             if not self.source.is_html:

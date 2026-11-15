@@ -120,6 +120,14 @@ if TYPE_CHECKING:
 # returned as plain data (``TableRecords`` in ``pipelex.tools.tabular.table_records``). A content generator written against
 # v10 would fall through to the protocol's default body and fail the step with a deployment fault; the bump turns that
 # into a discovery-time mismatch naming the plugin, so a host dispatches the leaf before it serves such a step.
+#
+# The ``update`` fill joined the document engine contract under v11 without a bump, as an addition: ``TableFill.UPDATE``,
+# the ``table_update`` capability, ``CellPolicy``, and the render job's and the template check request's ``match_on``,
+# ``match_row`` and ``cells``, all optional and absent under every other fill. An engine written before them never
+# receives an update: it does not declare ``table_update``, so a step asking it for one is refused when the method loads,
+# and every job and request it does receive is one it already reads, the new fields left unset. The capability gate v11
+# introduced already stands between an old engine and the new fill, so a bump would only make every plugin re-declare
+# ``targets_api`` for nothing.
 PLUGIN_API_VERSION: int = 11
 
 

@@ -6,7 +6,7 @@ from mthds.method_tree.vocabulary import ReferenceContext, TreeRefusalCode
 from mthds.protocol.problem.registry import CoreCode
 from typing_extensions import override
 
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.method_trees.building_bundle import get_building_tree_bundle
 from pipelex.core.method_trees.file_references import reference_refusal_reason, resolve_bundle_file_reference, resolve_crate_file_reference
@@ -114,6 +114,7 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
                     facts = _file_facts(pipe_code=pipe_code, file=template_file)
                     raise PipeDocGenFactoryError(msg, facts=facts).with_error_code(CoreCode.METHOD_RESOURCE_MISSING)
 
+        table_fill = blueprint.table_fill or TableFill.REPLACE
         pipe_doc_gen = PipeDocGen(
             domain_code=domain_code,
             code=pipe_code,
@@ -128,7 +129,11 @@ class PipeDocGenFactory(PipeFactoryProtocol[PipeDocGenBlueprint, PipeDocGen]):
             template_bundle_ref=template_bundle_ref,
             template_tree_is_one_file=template_tree_is_one_file,
             template_input=blueprint.template_input,
-            table_fill=blueprint.table_fill or TableFill.REPLACE,
+            table_fill=table_fill,
+            match_on=blueprint.match_on,
+            match_row=blueprint.match_row,
+            # Resolved here, so an engine never picks the default: an update writes only empty cells unless told otherwise.
+            cells=(blueprint.cells or CellPolicy.FILL_EMPTY) if table_fill.is_update else None,
             filename=blueprint.filename,
         )
         if template_file_text is not None:

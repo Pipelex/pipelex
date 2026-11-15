@@ -57,6 +57,7 @@ from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, Docu
 from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, TemplateUrlRefusedError
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase, is_relative_url, template_asset_refusal
 from pipelex.cogt.doc_gen.render_job import LoadedResource, RenderedDocument, RenderJob, RenderResources, is_method_file_url
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateCheckRequest, TemplateFinding, TemplateFindingSeverity
 from pipelex.cogt.inference.inference_call_summary import InferenceCallSummary, InferenceOperation
 from pipelex.core.method_trees.method_files import TreeListing, read_listed_file, read_method_file, read_tree_listing
@@ -288,7 +289,9 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment, s
     is handed to its engine's template checker, when the engine has one, and the interpreter's template file stage
     reports what it found: an error fails the step, and a warning joins the validation verdict's warnings, or the log.
     A template a run input supplies cannot be read, since the dry run's inputs are mocks, so the stage reports that it
-    is checked when a run supplies it, as an advisory warning.
+    is checked when a run supplies it, as an advisory warning. Under `table_fill = "update"` the checker receives no
+    data: mock records match no real row of the template, so a checker filling it in memory would fail every valid
+    update, and it judges the template's structure alone.
 
     Raises:
         MethodFileUnavailableError: the file cannot be read through the method file store for this run.
@@ -315,7 +318,11 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment, s
         template_file=template_file,
         template=read_template.template,
         doc_gen_format=composition.format,
-        data=composition.data,
+        data=None if composition.table_fill.is_update else composition.data,
+        table_fill=composition.table_fill,
+        match_on=composition.match_on,
+        match_row=composition.match_row,
+        cells=composition.cells,
     )
 
 
@@ -326,6 +333,10 @@ async def check_office_template(
     template: bytes,
     doc_gen_format: DocGenFormat,
     data: dict[str, Any] | None,
+    table_fill: TableFill,
+    match_on: list[str] | None,
+    match_row: str | None,
+    cells: CellPolicy | None,
 ) -> None:
     """Hand an office template's bytes to its engine's template checker, and have the template file stage report the findings.
 
@@ -339,6 +350,10 @@ async def check_office_template(
         template: The template's bytes.
         doc_gen_format: The step's format.
         data: The step's inputs as plain data, for a checker that fills the template in memory; None to compare structure alone.
+        table_fill: How the step fills the template's Tables.
+        match_on: Under `update`, the fields of the records whose columns are the Table's key.
+        match_row: Under `update`, the field of the records holding the row's position.
+        cells: Under `update`, which cells of a matched row may be written.
 
     Raises:
         PipeDocGenTemplateCheckError: the checker reported errors in the method's template file (raised by the stage).
@@ -351,6 +366,10 @@ async def check_office_template(
         template_name=template_file.name,
         inputs=template_file.input_shapes,
         data=data,
+        table_fill=table_fill,
+        match_on=match_on,
+        match_row=match_row,
+        cells=cells,
     )
     try:
         findings = await asyncio.to_thread(worker.check_template, request=request)
@@ -449,6 +468,10 @@ async def _print_document(*, render_assignment: RenderDocumentAssignment, storag
                 template=read_template.template,
                 doc_gen_format=composition.format,
                 data=composition.data,
+                table_fill=composition.table_fill,
+                match_on=composition.match_on,
+                match_row=composition.match_row,
+                cells=composition.cells,
             )
         render_job = _render_job_of(composition=composition, read_template=read_template)
         resources = RunRenderResources(

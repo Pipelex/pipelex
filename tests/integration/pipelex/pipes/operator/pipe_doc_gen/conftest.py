@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.cogt.doc_gen.exceptions import BUILT_IN_DOC_GEN_MODEL
-from pipelex.cogt.doc_gen.table_fill import TABLE_APPEND_CAPABILITY
+from pipelex.cogt.doc_gen.table_fill import TABLE_APPEND_CAPABILITY, TABLE_UPDATE_CAPABILITY
 from pipelex.interpreter_hub import get_interpreter_hub
 from pipelex.plugins.inference_backend_registry import InferenceFamily
 from pipelex.plugins.plugin_model_declarations import PluginModelDeclarations
@@ -35,6 +35,12 @@ def stub_engines() -> Iterator[StubEngines]:
 def xlsx_stub_engines() -> Iterator[StubEngines]:
     """The stub plugin with its Excel engine, which declares that it appends to a Table."""
     yield from _installed(engines=StubEngines(xlsx_inputs=["layout", "template_file", TABLE_APPEND_CAPABILITY]))
+
+
+@pytest.fixture
+def updating_xlsx_stub_engines() -> Iterator[StubEngines]:
+    """The stub plugin with its Excel engine, which declares that it updates a Table's rows as well as appending to it."""
+    yield from _installed(engines=StubEngines(xlsx_inputs=["layout", "template_file", TABLE_APPEND_CAPABILITY, TABLE_UPDATE_CAPABILITY]))
 
 
 @pytest.fixture

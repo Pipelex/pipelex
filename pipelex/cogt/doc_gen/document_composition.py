@@ -7,7 +7,7 @@ from pipelex.cogt.doc_gen.input_shape import InputShape
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.render_job import RenderJob
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.tools.uri.uri_read_scope import UriReference
 
@@ -134,6 +134,9 @@ class DocumentComposition(BaseModel):
         default=None, description="Where the HTML template sits in its method tree, which every relative URL of the document resolves against"
     )
     table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the template file's Tables are filled")
+    match_on: list[str] | None = Field(default=None, description="Under `update`, the fields of the records whose columns are the Table's key")
+    match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
+    cells: CellPolicy | None = Field(default=None, strict=False, description="Under `update`, which cells of a matched row may be written")
 
     @property
     def template_name(self) -> str | None:
@@ -170,6 +173,10 @@ class DocumentComposition(BaseModel):
             raise ValueError(msg)
         if not self.table_fill.is_replace and not self.source.fills_template_file:
             msg = f"A document composed {self.source.desc} fills no Table of a template file, so it cannot {self.table_fill.desc}."
+            raise ValueError(msg)
+        match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
+        if match_refusal is not None:
+            msg = f"A document composed this way cannot match its records to rows: {match_refusal}."
             raise ValueError(msg)
         self._validate_url_base()
         return self
@@ -225,6 +232,9 @@ class DocumentComposition(BaseModel):
             template=template,
             template_name=self.template_name,
             table_fill=self.table_fill,
+            match_on=self.match_on,
+            match_row=self.match_row,
+            cells=self.cells,
             data=self.data,
             base_url=self.url_base.base_url if self.url_base is not None else None,
         )

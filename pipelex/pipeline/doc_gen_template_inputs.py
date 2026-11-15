@@ -99,6 +99,10 @@ async def _check_template_input(
         template=template,
         doc_gen_format=pipe_doc_gen.doc_gen_format,
         data=None,
+        table_fill=pipe_doc_gen.table_fill,
+        match_on=pipe_doc_gen.match_on,
+        match_row=pipe_doc_gen.match_row,
+        cells=pipe_doc_gen.cells,
     )
 
 
