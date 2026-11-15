@@ -394,6 +394,36 @@ template = "A note about $transcript"
 
         assert consumers.get("transcript", []) == []
 
+    def test_a_pipe_structure_reading_a_spreadsheet_consumes_it_with_its_reader(self, load_empty_library: Callable[[], str]):
+        """A PipeStructure whose input is a Document reads it with no model; one whose input is Text consumes no file."""
+        pipes = """
+[concept.BudgetLine]
+description = "One line of a budget"
+[concept.BudgetLine.structure]
+item = { type = "text", required = true, description = "What is bought" }
+
+[pipe.main]
+type = "PipeSequence"
+description = "Read the budget"
+inputs = { budget = "Document" }
+output = "BudgetLine[]"
+steps = [{ pipe = "read_budget", result = "lines" }]
+
+[pipe.read_budget]
+type = "PipeStructure"
+description = "Read the budget's lines"
+inputs = { budget = "Document" }
+output = "BudgetLine[]"
+"""
+        consumers = _consumers(load_empty_library=load_empty_library, domain="fic_table", pipes=pipes)
+
+        (consumer,) = consumers["budget"]
+        assert consumer.pipe_code == "read_budget"
+        assert consumer.kind is FileConsumerKind.TABLE_READ
+        assert consumer.model == "table_reader"
+        assert consumer.readable_formats == frozenset({"xlsx", "csv"})
+        assert consumer.is_conditional is False
+
     def test_an_unresolved_pipe_is_opaque(self, load_empty_library: Callable[[], str], mocker: MockerFixture):
         """A cross-package reference whose package is not loaded resolves to nothing, and the walk never guesses past it."""
         pipes = """

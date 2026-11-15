@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipeStructure` reads a spreadsheet, `table` and `row_field`**: a `PipeStructure` whose single input is a `Document`, or a concept refining it, now reads one table of an Excel workbook (`.xlsx`) or a CSV file into its output list, one item per data row, calling no model. `table` names the Excel Table to read, compared ignoring case, the workbook's only Table being read when it is left out, and `row_field` names an integer or number field that receives each row's position among the data rows. Columns are matched to fields ignoring case, spaces, dots and underscores, a column matching no field is ignored, and each cell converts by the MTHDS standard's rules for reading a spreadsheet, a value that does not convert failing the step with the row's position and the field. The output must be a variable list of a flat structured concept, and `model` is refused on that path, as `table` and `row_field` are on the Text path; run setup refuses a file of another format given to such a step as `input.file_type_unsupported`, naming the reader `table_reader` where a model is named.
+- **Excel workbooks as list inputs, the `tabular` extra**: a local `.xlsx` path given for a structured list input is now read from the workbook's only Excel Table, as a `.csv` path is, where it was refused. Reading a workbook needs openpyxl, which `pip install "pipelex[tabular]"` installs.
+
+### Changed
+
+- **A content generator reads tables, plugin API version 11 (Breaking)**: `ContentGeneratorProtocol` gains the leaf `read_table`, which reads one table of a spreadsheet `Document` into `TableRecords`, plain data a host runtime dispatches as it dispatches every other leaf; a content generator that does not implement it inherits a default that refuses as `runtime.misconfigured`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
+- **CSV input headers match fields loosely**: a CSV file given as a list input now matches each header to a field ignoring case, spaces, dots and underscores, where the header had to spell the field exactly, so a `Birth year` column fills `birth_year`; a header matching several fields, or several headers matching one field, is refused, and a column matching no field is still refused on that path.
+- **`PipeStructure.source_input_name` (Breaking)**: the attribute naming the step's single input, `text_input_name`, is renamed `source_input_name`, since the input may now be a `Document`.
+
 ## [v0.101.0] - 2026-11-14
 
 ### Added
