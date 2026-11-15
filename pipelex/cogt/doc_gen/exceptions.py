@@ -184,7 +184,9 @@ class DocGenRenderError(PipelexError):
     out (an element taller than a page, an image that is not one), whose raise site gives the code's ``reason`` and
     ``element`` parameters; ``pipelex.docgen.print_timeout`` for a print stopped at its deadline;
     ``pipelex.docgen.resource_refused`` or ``security.method_url_refused`` for a file the printed document may not
-    name; ``pipelex.docgen.template_invalid`` for a method's template file the print cannot read; and
+    name; ``pipelex.docgen.template_invalid`` for a method's template file the print cannot read, or one whose
+    engine's template check fails; ``pipelex.docgen.template_input_unfit`` for a template a run input supplies whose
+    engine's template check fails; and
     ``runtime.unexpected``, the default, for an engine failure or a job an engine was never meant to get,
     since the step's engine was checked to print it before printing.
     """
@@ -196,6 +198,7 @@ class DocGenRenderError(PipelexError):
             PipelexErrorCode.DOCGEN_PRINT_TIMEOUT,
             PipelexErrorCode.DOCGEN_RESOURCE_REFUSED,
             PipelexErrorCode.DOCGEN_TEMPLATE_INVALID,
+            PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT,
             CoreCode.SECURITY_METHOD_URL_REFUSED,
         ),
     )

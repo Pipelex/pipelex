@@ -16,6 +16,7 @@ from pytest_mock import MockerFixture
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation import doc_gen_template_input
+from pipelex.cogt.doc_gen.exceptions import DocGenRenderError
 from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.config import get_config
@@ -30,12 +31,14 @@ from pipelex.pipeline import doc_gen_template_inputs, execution_seams
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
+from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.pipeline.validate_in_process import validate_bundles_in_process
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.uri.uri_bytes import UriBytes
 from pipelex.validation_error_types import TemplateCheckErrorType
 from tests.helpers.office_files import DOCX_MIME_TYPE, XLSX_MIME_TYPE, docx_bytes, xlsx_bytes
 from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, only_problem_item, refusal_messages
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.test_data import PipeDocGenTestData
 
 _APPEND_MTHDS = """
 domain = "doc_gen_append"
@@ -241,3 +244,46 @@ class TestPipeDocGenTemplateInput:
 
         assert setup_checker_spy.call_count == 1
         assert xlsx_stub_engines.engine.jobs == []
+
+    async def test_the_print_checks_the_workbook_with_the_worker_it_fills_it_with(self, xlsx_stub_engines: StubEngines) -> None:
+        """Run setup builds a worker for its check, and the print one worker for both its check and its fill."""
+        await PipelexMTHDSProtocol().execute(mthds_contents=[_APPEND_MTHDS], inputs=_inputs(workbook_bytes=xlsx_bytes()))
+
+        assert len(xlsx_stub_engines.check_requests) == 2
+        assert xlsx_stub_engines.nb_builds == 2
+
+    async def test_a_checker_that_fails_on_the_caller_s_workbook_refuses_it_as_the_caller_s(
+        self, xlsx_stub_engines: StubEngines, mocker: MockerFixture
+    ) -> None:
+        """An exception the engine's checker did not mean is still the template's refusal, never an unexpected failure."""
+        mocker.patch.object(xlsx_stub_engines, "check_template", side_effect=KeyError("Table1"))
+
+        with pytest.raises(DocGenRenderError) as exc_info:
+            await PipelexMTHDSProtocol().execute(mthds_contents=[_APPEND_MTHDS], inputs=_inputs(workbook_bytes=xlsx_bytes()))
+
+        problem = exc_info.value.to_problem(view=ProblemView.CALLER)
+        assert problem.code == PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT
+        assert problem.params is not None
+        assert problem.params.model_dump(exclude_none=True) == {"input": "workbook", "finding": "the engine's template check failed on the file"}
+        assert "Table1" in exc_info.value.message
+        assert xlsx_stub_engines.engine.jobs == []
+
+    async def test_a_checker_that_fails_on_the_method_s_template_file_refuses_it_as_the_method_s(
+        self, stub_engines: StubEngines, mocker: MockerFixture
+    ) -> None:
+        mocker.patch.object(stub_engines, "check_template", side_effect=KeyError("invoice.total"))
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(
+                mthds_contents=[PipeDocGenTestData.bundle(step_fields='format = "docx"\ntemplate_file = "templates/invoice.docx"')],
+                submitted_files={"templates/invoice.docx": b"PK docx template bytes"},
+            )
+
+        item = only_problem_item(exc_info.value)
+        assert item.code == PipelexErrorCode.DOCGEN_TEMPLATE_INVALID
+        assert item.params is not None
+        assert item.params.model_dump(exclude_none=True) == {
+            "template": "templates/invoice.docx",
+            "reason": "check_failed",
+            "finding": "the engine's template check failed on the file",
+        }

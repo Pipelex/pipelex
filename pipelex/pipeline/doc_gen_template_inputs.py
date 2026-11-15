@@ -16,6 +16,7 @@ from typing import Any, cast
 from pipelex.cogt.content_generation.doc_gen_generate import check_office_template
 from pipelex.cogt.content_generation.doc_gen_template_input import read_template_input
 from pipelex.cogt.doc_gen.doc_gen_engine import get_doc_gen_inference_model
+from pipelex.cogt.doc_gen.doc_gen_worker_factory import DocGenWorkerFactory
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, TemplateInputFile, template_input_name
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -25,7 +26,7 @@ from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.file_input_consumers import FileInputConsumer, collect_file_input_consumers
 from pipelex.pipeline.input_normalizer import FileInputPath, collect_file_inputs
-from pipelex.runtime_hub import get_storage_provider
+from pipelex.runtime_hub import get_report_delegate, get_storage_provider
 
 
 async def check_doc_gen_template_inputs(*, entry_pipe: PipeAbstract, working_memory: WorkingMemory, read_scope: str | None) -> None:
@@ -88,7 +89,7 @@ async def _check_template_input(
         storage_provider=get_storage_provider(),
     )
     await check_office_template(
-        inference_model=inference_model,
+        worker=DocGenWorkerFactory.make_doc_gen_worker(inference_model=inference_model, reporting_delegate=get_report_delegate()),
         template_file=ComposedTemplateFile(
             file=input_file,
             name=template_input_name(input_name=input_name),
