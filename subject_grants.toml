@@ -2428,14 +2428,6 @@ rationale = "Verb-object: resolves the structure blueprint's fields; local_domai
 param = "syntax_error"
 rationale = "Factory from source: builds from the syntax error; single operand."
 
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._escape_string_for_python"]
-param = "value"
-rationale = "Transforms the value; single operand."
-
-["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_class_docstring"]
-param = "docstring"
-rationale = "Transforms the docstring; single operand."
-
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._format_default_value"]
 param = "value"
 rationale = "Transforms the value; context stays keyword."
@@ -2447,6 +2439,10 @@ rationale = "Transforms the description; single operand."
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._generate_field_line"]
 param = "resolved_field"
 rationale = "Noun-named derivation: the source line for the resolved field; single operand."
+
+["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._is_string_statement"]
+param = "statement"
+rationale = "Predicate on the statement; single operand."
 
 ["pipelex/core/concepts/structure_generation/generator.py::StructureGenerator._python_type_for_concept"]
 param = "resolved_type"

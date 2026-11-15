@@ -1,17 +1,19 @@
-"""Unit tests for line-length wrapping in StructureGenerator.
+"""Unit tests for line-length handling in StructureGenerator.
 
-Generated structure files must stay under the project's ruff line-length limit
-(150 chars). The generator handles this in two places:
+Generated structure files keep their code lines under the project's ruff line-length
+limit (150 chars), with one deliberate exception:
 
-- **Class docstrings**: emitted as a multi-line triple-quoted block when the
-  single-line form would exceed the limit.
+- **Class docstrings** are never wrapped. A docstring is the class description that
+  pydantic hands to the JSON schema, so a line break the generator added would become
+  part of the text every consumer reads. A long description stays on one line.
 - **Field `description=` arguments**: emitted as a parenthesized
   implicit-string-concatenation block when the inline `description="..."` would
-  exceed the limit.
+  exceed the limit; the concatenation leaves the string's value untouched.
 
-For short descriptions, both fall back to the compact single-line form.
+For short descriptions, both use the compact single-line form.
 """
 
+import inspect
 import subprocess  # ruff: ignore[suspicious-subprocess-import]
 import sys
 from pathlib import Path
@@ -22,6 +24,9 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 
 _LINE_LIMIT = 150
+
+# A rendering that let a statement run would append to this list, which the statement reaches through `sys.modules`.
+STATEMENTS_RUN: list[str] = []
 
 
 def _max_line_length(code: str) -> int:
@@ -46,8 +51,8 @@ class TestStructureGeneratorWrapping:
         assert '"""A person."""' in code
         assert _max_line_length(code) <= _LINE_LIMIT
 
-    def test_long_class_docstring_wraps_to_multiline(self):
-        """A long class description is split across multiple lines, each under the limit."""
+    def test_long_class_docstring_stays_one_line(self):
+        """A long class description is emitted on one line, so the class reads it back without a break it never had."""
         long_description = (
             "Specific output structure for this example's question — how many references in the report come from the "
             "report's own research center. Demonstrates how to output a typed structure tailored to the question rather "
@@ -60,21 +65,30 @@ class TestStructureGeneratorWrapping:
                 required=True,
             ),
         }
-        code, _ = StructureGenerator().generate_from_structure_blueprint(
+        code, generated_class = StructureGenerator().generate_from_structure_blueprint(
             class_name="ReferenceCount",
             structure_blueprint=blueprint,
             description=long_description,
         )
 
-        # Multi-line docstring form: opening """, body lines, closing """ on its own line.
-        assert '    """\n' in code
-        assert '\n    """' in code
-        # Every emitted line stays under the limit.
-        assert _max_line_length(code) <= _LINE_LIMIT
-        # The full description content is preserved across the wrapped lines.
-        # Fragments must fit within a single wrapped line (textwrap inserts \n at word boundaries).
-        for fragment in ["Specific output structure", "research center", "free-form text"]:
-            assert fragment in code
+        assert f'    """{long_description}"""' in code
+        assert inspect.getdoc(generated_class) == long_description
+        assert generated_class.model_json_schema()["description"] == long_description  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue]
+
+    def test_long_class_docstring_with_triple_quotes_runs_no_statement(self):
+        """A long description containing triple quotes and no space to break at renders verbatim and runs no statement."""
+        statement = f'__import__("sys").modules["{__name__}"].STATEMENTS_RUN.append("ran")'
+        long_description = f'""";{statement};"""' + " padding" * 30
+        STATEMENTS_RUN.clear()
+
+        _, generated_class = StructureGenerator().generate_from_structure_blueprint(
+            class_name="Padded",
+            structure_blueprint={},
+            description=long_description,
+        )
+
+        assert STATEMENTS_RUN == []
+        assert inspect.getdoc(generated_class) == long_description
 
     def test_short_field_description_stays_single_line(self):
         """A short Field description uses the compact `description="..."` form."""
@@ -186,7 +200,7 @@ class TestStructureGeneratorWrapping:
 
     def test_long_descriptions_in_long_class_produce_clean_output(self):
         """End-to-end: a class with a long docstring AND multiple long field descriptions
-        still stays under the line limit on every emitted line.
+        keeps every code line under the limit, the one-line docstring aside.
         """
         long_class_doc = (
             "Structured understanding of the user's question: its type, whether it is answerable from documents at all, "
@@ -219,9 +233,13 @@ class TestStructureGeneratorWrapping:
                 required=False,
             ),
         }
-        code, _ = StructureGenerator().generate_from_structure_blueprint(
+        code, generated_class = StructureGenerator().generate_from_structure_blueprint(
             class_name="QuestionAnalysis",
             structure_blueprint=blueprint,
             description=long_class_doc,
         )
-        assert _max_line_length(code) <= _LINE_LIMIT
+        # The class docstring is the one line allowed past the limit, and it reads back as authored.
+        docstring_line = f'    """{long_class_doc}"""'
+        assert docstring_line in code.splitlines()
+        assert _max_line_length(code.replace(docstring_line, "")) <= _LINE_LIMIT
+        assert inspect.getdoc(generated_class) == long_class_doc
