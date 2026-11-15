@@ -144,12 +144,7 @@ class FileConsumerKind(StrEnum):
         match self:
             case FileConsumerKind.DOC_GEN_TEMPLATE:
                 return True
-            case (
-                FileConsumerKind.EXTRACT
-                | FileConsumerKind.LLM_DOCUMENT
-                | FileConsumerKind.JUDGMENT_DOCUMENT
-                | FileConsumerKind.TABLE_READ
-            ):
+            case FileConsumerKind.EXTRACT | FileConsumerKind.LLM_DOCUMENT | FileConsumerKind.JUDGMENT_DOCUMENT | FileConsumerKind.TABLE_READ:
                 return False
 
 
