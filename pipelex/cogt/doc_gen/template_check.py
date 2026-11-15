@@ -11,12 +11,13 @@ The built-in PDF engine takes no template, and Pipelex checks HTML templates its
 """
 
 from enum import StrEnum
-from typing import Any
+from typing import Any, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.input_shape import InputShape
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill, table_match_refusal
 
 
 class TemplateFindingSeverity(StrEnum):
@@ -42,7 +43,14 @@ class TemplateFinding(BaseModel):
 
 
 class TemplateCheckRequest(BaseModel):
-    """A template file and the inputs it is filled with, for a checker to compare."""
+    """A template file and the inputs it is filled with, for a checker to compare.
+
+    It carries the step's fill as the render job does (`RenderJob`): `table_fill`, and under `update` how a record finds
+    its row, `match_on` or `match_row`, and `cells`. A checker that knows the update refuses what the fill would, such
+    as a `match_on` field no column of a filled Table matches, or a field that matches a calculated column, and fills
+    the template in memory the way the job would; a checker that does not ignores them, and is never handed an update,
+    since a step asking its engine for a fill it does not declare is refused when the method loads.
+    """
 
     model_config = ConfigDict(extra="forbid", ser_json_bytes="base64", val_json_bytes="base64")
 
@@ -57,3 +65,15 @@ class TemplateCheckRequest(BaseModel):
             "what the fill would raise; None when only the structure is to be compared"
         ),
     )
+    table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the step fills the template's Tables")
+    match_on: list[str] | None = Field(default=None, description="Under `update`, the fields of the records whose columns are the Table's key")
+    match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
+    cells: CellPolicy | None = Field(default=None, strict=False, description="Under `update`, which cells of a matched row may be written")
+
+    @model_validator(mode="after")
+    def validate_table_match(self) -> Self:
+        match_refusal = table_match_refusal(table_fill=self.table_fill, match_on=self.match_on, match_row=self.match_row, cells=self.cells)
+        if match_refusal is not None:
+            msg = f"A template check request cannot match records to rows this way: {match_refusal}."
+            raise ValueError(msg)
+        return self

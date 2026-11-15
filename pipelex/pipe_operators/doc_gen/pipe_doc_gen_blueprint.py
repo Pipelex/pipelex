@@ -5,7 +5,7 @@ from typing_extensions import override
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenModelChoice
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.templating.exceptions import TemplateSigilSyntaxError
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.method_trees.file_references import BundleFileOrigin, bundle_file_origin, file_reference_refusal
@@ -55,12 +55,16 @@ class PipeDocGenBlueprint(PipeBlueprint):
     `template_input` names one of the step's inputs, a single `Document` or a concept refining it, whose file is the
     template, as an alternative to `template_file` for `xlsx`, `docx` and `pptx`: the run supplies the template, which
     is checked when the run starts, and the output is a new file, the input's file being left as it was. `table_fill`
-    says how the template's Tables are filled: `replace`, the default, writes a list's records over a Table's rows, and
-    `append`, for `xlsx` only, writes them after its last row. The output must be a single `Document`, or a concept refining it. `model` names the
-    document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
-    document generation plugin, `pipelex-pdf`; without it, the model deck's default for the format and source prints
-    it. Which engines a runtime has depends on its plugins: open Pipelex prints a `pdf` without a template on
-    `reportlab-pdf`, and a runtime without the engine a step needs refuses the method when it loads.
+    says how the template's Tables are filled: `replace`, the default, writes a list's records over a Table's rows,
+    `append`, for `xlsx` only, writes them after its last row, and `update`, for `xlsx` only, writes each record into the
+    one row it matches, by the key fields `match_on` names or by the row position the field `match_row` names, exactly
+    one of the two. Under `update` a null leaves its cell as it was, and `cells` says which cells may be written:
+    `fill_empty`, the default, writes only empty cells, and `overwrite` writes every cell a value matches. The output must
+    be a single `Document`, or a concept refining it. `model` names the document engine that prints it, a model of the
+    `doc_gen` family such as `reportlab-pdf` or, with the Pipelex document generation plugin, `pipelex-pdf`; without it,
+    the model deck's default for the format and source prints it. Which engines a runtime has depends on its plugins:
+    open Pipelex prints a `pdf` without a template on `reportlab-pdf`, and a runtime without the engine a step needs
+    refuses the method when it loads.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -72,6 +76,9 @@ class PipeDocGenBlueprint(PipeBlueprint):
     template_file: str | None = None
     template_input: str | None = None
     table_fill: TableFill | None = Field(default=None, strict=False)
+    match_on: list[str] | None = None
+    match_row: str | None = None
+    cells: CellPolicy | None = Field(default=None, strict=False)
     filename: str | None = None
 
     @model_validator(mode="after")
@@ -120,6 +127,7 @@ class PipeDocGenBlueprint(PipeBlueprint):
             )
             raise ValueError(msg)
         self._validate_table_fill()
+        self._validate_table_match()
         return self
 
     def _validate_template_input(self) -> None:
@@ -168,6 +176,41 @@ class PipeDocGenBlueprint(PipeBlueprint):
         if not table_fill.is_replace and not self.format.has_table_fills:
             msg = f"PipeDocGen's 'table_fill = \"{table_fill}\"' is for the 'xlsx' format only: a '{self.format}' template's tables are replaced."
             raise ValueError(msg)
+
+    def _validate_table_match(self) -> None:
+        """An update matches each record to its row by exactly one of `match_on` and `match_row`; no other fill matches rows.
+
+        Whether each field exists on the records is checked once the library resolves their concept
+        (`PipeDocGen.validate_inputs_with_library`).
+        """
+        if self.table_fill is None or not self.table_fill.is_update:
+            fill_label = f"'table_fill = \"{self.table_fill}\"'" if self.table_fill is not None else "the default 'table_fill = \"replace\"'"
+            for field_name, value in (("match_on", self.match_on), ("match_row", self.match_row), ("cells", self.cells)):
+                if value is not None:
+                    msg = (
+                        f"PipeDocGen's '{field_name}' says how 'table_fill = \"update\"' writes a record into the row it matches, "
+                        f"and this step uses {fill_label}: remove '{field_name}', or update the Table's rows."
+                    )
+                    raise ValueError(msg)
+            return
+        match_on = self.match_on
+        if match_on is None and self.match_row is None:
+            msg = (
+                "PipeDocGen's 'table_fill = \"update\"' writes each record into the row it matches: name the fields whose "
+                "columns are the Table's key with 'match_on', or the field holding each record's row position with 'match_row'."
+            )
+            raise ValueError(msg)
+        if match_on is not None and self.match_row is not None:
+            msg = "PipeDocGen's 'table_fill = \"update\"' matches a record to its row one way: by 'match_on' or by 'match_row', not both."
+            raise ValueError(msg)
+        if match_on is not None:
+            if not match_on:
+                msg = "PipeDocGen's 'match_on' names the fields whose columns are the Table's key, and it names none."
+                raise ValueError(msg)
+            repeated = sorted({field_name for field_name in match_on if match_on.count(field_name) > 1})
+            if repeated:
+                msg = f"PipeDocGen's 'match_on' names each key field once, and it repeats {', '.join(repr(name) for name in repeated)}."
+                raise ValueError(msg)
 
     @property
     @override

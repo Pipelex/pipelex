@@ -1,5 +1,5 @@
 from pathlib import PurePosixPath
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, NoReturn
 from urllib.parse import urlparse
 
 from mthds.protocol.problem.registry import CoreCode
@@ -21,7 +21,7 @@ from pipelex.cogt.doc_gen.input_shape import InputShape, shape_of_input
 from pipelex.cogt.doc_gen.layout_builder import build_layout_document, humanize
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.plain_data import plain_data
-from pipelex.cogt.doc_gen.table_fill import TableFill
+from pipelex.cogt.doc_gen.table_fill import CellPolicy, TableFill
 from pipelex.cogt.models.model_deck_check import check_doc_gen_choice_with_deck
 from pipelex.cogt.templating.template_preprocessor import rewrite_template_sigils
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -40,6 +40,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateFileUncheckedError
+from pipelex.pipe_operators.doc_gen.table_match_check import match_field_refusal, record_lists
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -85,7 +86,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     checks one the run's caller gives (`pipelex.pipeline.doc_gen_template_inputs`), and the print checks it again before
     it fills it, which covers one an earlier step produced. That input is the template, not data: it is left out of the
     data and of the input shapes the engine fills the template with. `table_fill` says how the template's Tables are
-    filled, and an engine that does not declare the fill is refused when the method loads.
+    filled, and an engine that does not declare the fill is refused when the method loads. Under `update`, `match_on` or
+    `match_row` says how a record finds its row and `cells` which of its cells may be written, resolved here so the
+    engine never picks a default; the load checks that every list of records the step's data holds carries those fields.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -109,6 +112,11 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     )
     template_input: str | None = Field(default=None, description="The input whose file is the office template, when a run supplies it")
     table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the template file's Tables are filled")
+    match_on: list[str] | None = Field(default=None, description="Under `update`, the fields of the records whose columns are the Table's key")
+    match_row: str | None = Field(default=None, description="Under `update`, the field of the records holding the row's position")
+    cells: CellPolicy | None = Field(
+        default=None, strict=False, description="Under `update`, which cells of a matched row may be written; None under any other fill"
+    )
     filename: str | None = None
 
     # The text of an HTML template file, read when the step was built in a method tree this process holds, for the checks
@@ -230,6 +238,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         # The template input's file is filled as the step's template, so its concept must be a document.
         if self.template_input is not None:
             self._validate_template_input_concept(template_input=self.template_input)
+        # An update matches each record to its row by fields every list of records it may fill a Table from must carry.
+        if self.table_fill.is_update:
+            self._validate_table_match_fields()
         # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
         # validation refuses rather than reach a verdict the template could contradict. A load that skips validation,
         # such as a worker's load of the crate a validated library made, never gets here.
@@ -276,6 +287,43 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
             .with_error_code(CoreCode.METHOD_INPUT_CONCEPT_MISMATCH)
             .with_params(input=template_input, declared=stuff_spec.concept.concept_ref, expected=[document_concept.concept_ref])
         )
+
+    def _validate_table_match_fields(self) -> None:
+        """Refuse an update whose `match_on` or `match_row` names a field some list of records of the step's data lacks.
+
+        Which list fills which Table is known only once the template is read, so every list of records the data holds is
+        held to the fields. A step whose data holds no list of records at all has nothing to update a Table's rows with,
+        unless some value's shape is undeclared, such as a JSON input, which may hold one this check cannot see.
+
+        Raises:
+            PipeValidationError: A field is missing from a list's records, or cannot match a row by its kind, or the
+                step's data holds no list of records.
+        """
+        found = record_lists(input_shapes=self.input_shapes())
+        if not found.lists and not found.undeclared_paths:
+            match_field = "match_on" if self.match_on is not None else "match_row"
+            self._refuse_table_match(
+                field_name=match_field,
+                finding=(
+                    "'table_fill = \"update\"' writes the records of a list into the rows of the Table it fills, and none of "
+                    "the step's inputs holds a list of records: declare one, such as 'ExpenseCompletion[]'"
+                ),
+            )
+        for record_list in found.lists:
+            refusal = match_field_refusal(record_list=record_list, match_on=self.match_on, match_row=self.match_row)
+            if refusal is not None:
+                field_name, finding = refusal
+                self._refuse_table_match(field_name=field_name, finding=finding)
+
+    def _refuse_table_match(self, *, field_name: str, finding: str) -> NoReturn:
+        """Refuse the step's `match_on` or `match_row`, located at the field's key path."""
+        msg = f"PipeDocGen '{self.code}': {finding}."
+        raise PipeValidationError(
+            message=msg,
+            domain_code=self.domain_code,
+            pipe_code=self.code,
+            field_name=field_name,
+        ).with_params(field_path=f"pipe.{self.code}.{field_name}", finding=finding)
 
     @override
     def validate_output_static(self):
@@ -418,6 +466,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                     template_file=template_file,
                     data={name: plain_data(content) for name, content in named_contents},
                     table_fill=self.table_fill,
+                    match_on=self.match_on,
+                    match_row=self.match_row,
+                    cells=self.cells,
                 )
 
     def _inline_template_url_base(self) -> RelativeUrlBase | None:
@@ -553,6 +604,9 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
                 "source": self.source,
                 "template_input": self.template_input,
                 "table_fill": self.table_fill,
+                "match_on": self.match_on,
+                "match_row": self.match_row,
+                "cells": self.cells,
                 "resolved_model": doc_gen_setting.model,
                 "filename": document.filename,
                 "url": document.url,
