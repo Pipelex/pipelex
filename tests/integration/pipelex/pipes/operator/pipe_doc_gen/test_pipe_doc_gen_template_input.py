@@ -19,11 +19,14 @@ from pipelex.cogt.content_generation import doc_gen_template_input
 from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.doc_gen.template_check import TemplateFinding, TemplateFindingSeverity
 from pipelex.config import get_config
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.errors.problem import ProblemView
 from pipelex.errors.registry.pipelex_codes import PipelexErrorCode
 from pipelex.interpreter_hub import clear_current_library, get_current_library_id_or_none, get_library_manager, set_current_library
+from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenTemplateInputUnfitError
+from pipelex.pipeline import doc_gen_template_inputs, execution_seams
 from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
@@ -213,3 +216,28 @@ class TestPipeDocGenTemplateInput:
 
         assert pipe_job.pipe.code == "append_expenses"
         assert [request.template for request in xlsx_stub_engines.check_requests] == [workbook]
+
+    async def test_setup_checks_the_step_the_walk_reached_whatever_its_library_key(
+        self, xlsx_stub_engines: StubEngines, mocker: MockerFixture
+    ) -> None:
+        """A step whose reference is not its library key, as a dependency package's is not, is still checked at setup.
+
+        The entry step is handed to the check under a code the library does not hold, so a lookup by its reference finds
+        nothing: the check must use the step the walk reached, and refuse the run before any step starts.
+        """
+        real_check = doc_gen_template_inputs.check_doc_gen_template_inputs
+
+        async def _check_with_an_unkeyed_step(*, entry_pipe: PipeAbstract, working_memory: WorkingMemory, read_scope: str | None) -> None:
+            await real_check(
+                entry_pipe=entry_pipe.model_copy(update={"code": "kept_under_another_key"}), working_memory=working_memory, read_scope=read_scope
+            )
+
+        mocker.patch.object(execution_seams, "check_doc_gen_template_inputs", side_effect=_check_with_an_unkeyed_step)
+        setup_checker_spy = mocker.spy(doc_gen_template_inputs, "check_office_template")
+        xlsx_stub_engines.findings = [TemplateFinding(severity=TemplateFindingSeverity.ERROR, message="The workbook holds no Table")]
+
+        with pytest.raises(PipeDocGenTemplateInputUnfitError):
+            await PipelexMTHDSProtocol().execute(mthds_contents=[_APPEND_MTHDS], inputs=_inputs(workbook_bytes=xlsx_bytes()))
+
+        assert setup_checker_spy.call_count == 1
+        assert xlsx_stub_engines.engine.jobs == []

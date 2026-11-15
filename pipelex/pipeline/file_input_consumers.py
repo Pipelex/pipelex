@@ -46,7 +46,7 @@ from collections.abc import Sequence
 from enum import StrEnum
 from typing import Final, NamedTuple
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.cogt.doc_gen.exceptions import DocGenEngineMissingError, DocGenModelCapabilityError
 from pipelex.cogt.exceptions import JudgmentModelMissingError, ModelChoiceNotFoundError, ModelNotFoundError
@@ -171,6 +171,11 @@ class FileInputConsumer(BaseModel):
 
     asks_for_page_views: bool
     """Whether the consumer also draws its file's pages as images, which only a PDF allows, whatever its model reads."""
+
+    doc_gen_step: PipeDocGen | None = Field(default=None, exclude=True, repr=False)
+    """The `PipeDocGen` step itself, for a consumer that fills the file as its template, so that run setup checks the step
+    the walk reached: a step looked up again by its `pipe_ref` could miss a dependency package's step, whose library key
+    carries the package's alias, or find a host step that shares its domain and code. Never serialized."""
 
     @property
     def model_type(self) -> ModelType:
@@ -675,6 +680,7 @@ def _record_doc_gen_template_consumer(*, pipe_doc_gen: PipeDocGen, frame: _Frame
             reads_web_pages=False,
             is_conditional=is_conditional,
             asks_for_page_views=False,
+            doc_gen_step=pipe_doc_gen,
         )
     )
 

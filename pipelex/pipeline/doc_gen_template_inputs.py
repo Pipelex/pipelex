@@ -21,7 +21,6 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.interpreter_hub import get_optional_pipe
 from pipelex.pipe_machinery.pipe_abstract import PipeAbstract
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen import PipeDocGen
 from pipelex.pipeline.file_input_consumers import FileInputConsumer, collect_file_input_consumers
@@ -52,8 +51,9 @@ async def check_doc_gen_template_inputs(*, entry_pipe: PipeAbstract, working_mem
         if consumer.kind.is_doc_gen_template and not consumer.is_conditional
     ]
     for consumer in template_consumers:
-        pipe_doc_gen = get_optional_pipe(pipe_code=consumer.pipe_ref)
-        if not isinstance(pipe_doc_gen, PipeDocGen):
+        # The step the walk reached, never one looked up again by its reference.
+        pipe_doc_gen = consumer.doc_gen_step
+        if pipe_doc_gen is None:
             continue
         for file_input in file_inputs:
             if not consumer.covers(file_input_path=file_input.path):
