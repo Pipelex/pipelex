@@ -51,6 +51,10 @@ class Exhibit(DocumentContent):
     """Refines native Document."""
 
 
+class ShaperExpenseWorkbook(Exhibit):
+    """Refines `Exhibit`, itself refining native Document: a file concept two refinements down."""
+
+
 class Payload(JSONContent):
     """Refines native JSON — the subclass generated for `refines = "JSON"`."""
 
@@ -91,7 +95,7 @@ class ShaperWeird(StructuredContent):
 
 # Non-StructuredContent refinements — registered explicitly (the refinement machinery would register
 # a subclass like these for a `refines = "<native>"` concept).
-REFINING_CLASSES = [Question, Priority, Verdict, Deadline, OpeningTime, Photo, Exhibit, Payload]
+REFINING_CLASSES = [Question, Priority, Verdict, Deadline, OpeningTime, Photo, Exhibit, ShaperExpenseWorkbook, Payload]
 
 # (concept_code, structure_class_name, refines) for every test concept.
 CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
@@ -102,6 +106,7 @@ CONCEPT_DEFS: list[tuple[str, str, str | None]] = [
     ("OpeningTime", "OpeningTime", "native.Time"),
     ("Photo", "Photo", "native.Image"),
     ("Exhibit", "Exhibit", "native.Document"),
+    ("ShaperExpenseWorkbook", "ShaperExpenseWorkbook", "shaper_test.Exhibit"),
     ("Payload", "Payload", "native.JSON"),
     ("ShaperInvoice", "ShaperInvoice", None),
     ("ShaperPerson", "ShaperPerson", None),
