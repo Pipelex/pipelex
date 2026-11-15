@@ -103,7 +103,14 @@ if TYPE_CHECKING:
 # to its worker, whose log lines then carry it, as a run's worker binds the request id its run's metadata carries
 # (``BundleValidatorProtocol``). A validator written against v9 would be called with a keyword it does not accept on its
 # first validation; the bump turns that into a discovery-time mismatch naming the plugin.
-PLUGIN_API_VERSION: int = 10
+#
+# v11 added a leaf to the content generator an orchestrator plugin provides: ``ContentGeneratorProtocol.read_table``, which
+# a ``PipeStructure`` step reading a spreadsheet ``Document`` calls to read one table of the file into records, returned as
+# plain data (``TableRecords`` in ``pipelex.tools.tabular.table_records``). A content generator written against v10 would
+# fall through to the protocol's default body and fail the step with a deployment fault; the bump turns that into a
+# discovery-time mismatch naming the plugin, so a host dispatches the leaf before it serves such a step. The leaf is part
+# of API 11, together with the other changes that release made under the same number.
+PLUGIN_API_VERSION: int = 11
 
 
 @runtime_checkable

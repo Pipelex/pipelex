@@ -188,6 +188,30 @@ class DocumentConversionAssignment(BaseModel):
         return [UriReference(uri=self.source_uri, position="the document to convert to PDF")]
 
 
+class TableReadAssignment(BaseModel):
+    """Serializable unit for reading one table of a spreadsheet `Document` into records, a `PipeStructure` step's read.
+
+    ``mime_type`` and ``file_name`` are what the document declares, which judge its format when its bytes do not;
+    ``input_name`` is the step's input, which a refusal names. ``field_names`` are the row concept's flat fields, which
+    the columns are matched to, ``row_field`` the one that receives each row's position, and ``table_name`` the Excel
+    Table to read, ``None`` for the workbook's only one.
+    """
+
+    job_metadata: JobMetadata
+    cogt_run_params: CogtRunParams
+    source_uri: str
+    mime_type: str | None = None
+    file_name: str | None = None
+    input_name: str | None = None
+    field_names: list[str]
+    row_field: str | None = None
+    table_name: str | None = None
+
+    def referenced_uris(self) -> list[UriReference]:
+        """The URL the leaf reads for this assignment: the spreadsheet it reads the table from."""
+        return [UriReference(uri=self.source_uri, position="the spreadsheet to read a table from")]
+
+
 class RenderDocumentAssignment(BaseModel):
     """Serializable unit for a single document print: the composed document and the engine that prints it.
 
