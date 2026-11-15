@@ -54,6 +54,9 @@ is_fetch_remote_content_enabled = true
 is_upload_local_content_enabled = true
 # Storage method: "local", "in_memory", "s3", or "gcp"
 method = "local"
+# The largest Text, Markdown, Html or JSON value kept inline, in bytes (UTF-8 for a text, serialized for JSON).
+# A larger value lives in the run's storage and travels as a reference, as an image does. 0 stores every value.
+inline_text_max_bytes = 4096
 
 [runtime.storage.local]
 # Local storage settings

@@ -1,8 +1,8 @@
 contract = "config-docs"
-digest = "sha256:e99d75b900cc167667078dc1ddebdb5a45ffc24aad316a2523a0b4f6498bec14"
+digest = "sha256:b3b103da23a8cc3f9a1b7192eddc51c7e4333cbe413fce8b2ead58d3783c6d14"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-15T13:12:06Z"
-rationale = "clean-pass: the pipelex.toml change only rewords the [runtime.table_reading] comment (every declared row counts toward max_table_cells, only columns clipped, a CSV counted while parsed); no key, default or validator moved, the configuration overview still links the PipeStructure page whose Limits paragraph now says the same, and the defaults@9 golden was re-recorded with make umig"
+reviewed_at = "2026-11-15T19:40:19Z"
+rationale = "real-catch: the new [runtime.storage] inline_text_max_bytes key (StorageConfig, pipelex.toml, the kit template and .pipelex) had no user-facing doc; it is documented under Cloud Storage > Large texts and named in the configuration overview's [runtime] line. Adding a key with a default is no shape change, so no ledger entry; the defaults@9 and fingerprint@9 goldens were re-recorded with make umig."
 
 [trigger_files]
 "pipelex/cogt/config_cogt.py" = "blob:293ef22ae123266e6a1886d4ffb07f455e5be9e3"
@@ -10,7 +10,7 @@ rationale = "clean-pass: the pipelex.toml change only rewords the [runtime.table
 "pipelex/graph/graph_config.py" = "blob:dc0939a6d2730c0a10b88aa1a6e0b2dd583462a6"
 "pipelex/language/mthds_config.py" = "blob:353009ad8c59dc5266bdd9dfa42b1ad18b67dca7"
 "pipelex/methods/methods_config.py" = "blob:76ca9a0e64f8c10ef6a355aafd0d79d36b09f06a"
-"pipelex/pipelex.toml" = "blob:79f58f3d02fb90fc8c8a968c44ddf4300fed7d05"
+"pipelex/pipelex.toml" = "blob:36fa3ce389eec0c800ac315501950307aeecdaf1"
 "pipelex/system/configuration/__init__.py" = "blob:8b137891791fe96927ad78e64b0aad7bded08bdc"
 "pipelex/system/configuration/config_check.py" = "blob:2d5de29aba3d2ce205d3d82b4623f37b53108332"
 "pipelex/system/configuration/config_loader.py" = "blob:8703fc3e5a82d7c6a3d148ea195c25044c2f0fe0"
@@ -26,4 +26,4 @@ rationale = "clean-pass: the pipelex.toml change only rewords the [runtime.table
 "pipelex/tools/log/log_levels.py" = "blob:12b94e4d4793a70156ac547ee20c9d483910ecae"
 "pipelex/tools/network/network_config.py" = "blob:641e9c999a0f7845f7c07705572033dc698adf12"
 "pipelex/tools/secrets/secrets_config.py" = "blob:cf30aaec1c76c9cabc0531a5b9fe681e153d7024"
-"pipelex/tools/storage/storage_config.py" = "blob:3ba0fee5282937e2639d2707ee8ab61aad7bf206"
+"pipelex/tools/storage/storage_config.py" = "blob:1e8ef6a864134d075fd9a4391812862816617d9b"

@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Stored values, `load_stored_value` and `require_text()`**: a `Text`, `Markdown`, `Html` or `JSON` content may now hold a reference to its value in storage, and `load_stored_value(content, read_scope=..., position=..., storage_provider=...)` from `pipelex.core.stuffs.stored_value_loader` reads it once, refusing a URL the run's read scope does not allow with the `UriReadRefusedError` an image read raises, and keeps it on the content without changing its fields, so a loaded content still dumps as its reference. `require_text()`, `require_inner_html()` and `require_json_obj()` return the value held inline or loaded, and every render of a stored value never loaded, a template reading `{{ note.text }}` included, raises `StoredValueNotLoadedError` rather than printing nothing. `load_text_from_any_uri` in `pipelex.tools.uri.uri_text` reads the UTF-8 text a URL points at under the read scope, raising `UriTextNotUtf8Error` for bytes that are not UTF-8.
+- **`[runtime.storage] inline_text_max_bytes`**: the largest `Text`, `Markdown`, `Html` or `JSON` value kept inline, in bytes, 4096 by default and measured on a text's UTF-8 encoding and on a JSON value's serialized form. Nothing reads it yet; the code that stores large values as they are produced arrives in a later release.
+
+### Changed
+
+- **`Text`, `Markdown`, `Html` and `JSON` hold their value or a URL to it, MTHDS standard 9.0.0 (Breaking)**: `text`, `inner_html` and `json_obj` are optional, and each class gains `url`, `size`, `mime_type` and `preview`, the stored form; a content holds exactly one of its value and `url`, and `size`, `mime_type` and `preview` only beside `url`, any other combination being refused as invalid. A content dumps only the fields of the form it holds, so an inline text still dumps as `{"text": "..."}`. The pinned native set follows the standard's set pinned at 9.0.0, so every crate fingerprint changes. Code reading `content.text`, `content.inner_html` or `content.json_obj` now gets `None` for a stored value and reads `require_text()`, `require_inner_html()` or `require_json_obj()` instead.
+- **`mthds` and `pipelex-sdk` versions, MTHDS standard 9.0.0 (Breaking)**: the pins move to `mthds==0.28.0`, the release following the MTHDS standard's `v9.0.0`, and `pipelex-sdk==0.68.0`, the release built on it, whose own breaking changes since `0.60.0`, such as `get_method` returning `MethodDetail | PublicMethodDetail`, an optional `MethodVersionSummary.published_by` and `labels` on `MethodCategory`, reach anyone importing `pipelex_sdk` beside pipelex. A crate pipelex normalizes is stamped `mthds_version` `9.0.0` and materializes the native set pinned at `9.0.0`, and a `METHODS.toml` declaring `^8.0.0`, `8.*` or an exact `8.x` now warns that the engine does not satisfy it while `>=9.0.0` does not; the core error codes did not change and `protocol_version` stays `2.0.1`. Everyone downstream inherits those exact versions.
+
 ## [v0.103.0] - 2026-11-15
 
 ### Added

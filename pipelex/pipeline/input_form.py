@@ -91,7 +91,7 @@ from pipelex.core.concepts.annotation_shapes import (
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
+from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_value_blueprint
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import fixed_item_count
 from pipelex.interpreter_hub import get_current_library, get_library_manager
@@ -407,7 +407,8 @@ class InputFormDeriver:
         seen: frozenset[str],
     ) -> InputFormField:
         """The node of a native concept, or of a concept whose chain bottoms at one (identity-decided, never shape-sniffed)."""
-        pinned = make_pinned_native_blueprint(native_code)
+        # A caller supplies a value itself, never the reference to a stored one, so the form reads the value's own fields.
+        pinned = make_pinned_native_value_blueprint(native_code)
         node_ref = concept_ref or native_code.concept_ref
         text = description or pinned.description
         match native_code:

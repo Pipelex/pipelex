@@ -2412,9 +2412,17 @@ rationale = "Noun-named derivation: the pinned description for the native code; 
 param = "native_code"
 rationale = "Noun-named derivation: the pinned structure for the native code; single operand."
 
+["pipelex/core/concepts/native/pinned_blueprints.py::_stored_value_field_name"]
+param = "native_code"
+rationale = "A lookup keyed by its one native code, called like _pinned_structure and _pinned_description beside it."
+
 ["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_blueprint"]
 param = "native_code"
 rationale = "Factory from source: builds the blueprint for the native code; single operand."
+
+["pipelex/core/concepts/native/pinned_blueprints.py::make_pinned_native_value_blueprint"]
+param = "native_code"
+rationale = "Reads as build-the-value-blueprint-of a native code, the same verb-object call as make_pinned_native_blueprint beside it."
 
 ["pipelex/core/concepts/resolved_fields.py::_resolve_concept"]
 param = "concept_ref"
@@ -2903,6 +2911,10 @@ rationale = "parse_iso_time(text) reads as the verb-object sentence it is: one s
 ["pipelex/core/stuffs/list_content.py::ListContent.get_items"]
 param = "item_type"
 rationale = "Type-directed accessor: the target item type; single operand."
+
+["pipelex/core/stuffs/stored_value_loader.py::load_stored_value"]
+param = "content"
+rationale = "Loads the stored value of the one content it is given."
 
 ["pipelex/core/stuffs/structured_content.py::StructuredContent._render_value_with_images"]
 param = "value"
@@ -6751,6 +6763,10 @@ rationale = "Verb-object: resolves the uri; base_dir is context."
 ["pipelex/tools/uri/uri_resolver.py::resolve_uri"]
 param = "uri"
 rationale = "Parses/reads the uri; single operand."
+
+["pipelex/tools/uri/uri_text.py::load_text_from_any_uri"]
+param = "uri"
+rationale = "Loads the text one URI names."
 
 ["pipelex/tracing/activity_event_log.py::ActivityEventLogCache.get_or_create"]
 param = "tracing_config"

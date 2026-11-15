@@ -38,3 +38,16 @@ Storage is configured in `pipelex.toml` under `[runtime.storage]`. Set `method` 
 For AWS configuration, see [AWS Configuration](../configuration/config-technical/aws-config.md).
 
 When an image-generation provider returns a URL rather than bytes and `is_fetch_remote_content_enabled` is on, Pipelex downloads the image into storage. That download, like every download of a URL a value carries, goes through the SSRF guard, which refuses private and metadata addresses; see [Network Configuration](../configuration/config-technical/network-config.md).
+
+## Large texts
+
+A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold is meant to live in storage and travel as a reference, as an image does, so that a long extracted page or a large JSON document is not copied into every step, trace event and result that carries it. The threshold is a byte count under `[runtime.storage]`:
+
+```toml
+[runtime.storage]
+inline_text_max_bytes = 4096
+```
+
+A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form is exercised everywhere. The value must not be negative.
+
+The setting is read by the code that stores values as they are produced, which arrives in a later release; until then it changes nothing. How a stored value looks, and how a run reads it, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).

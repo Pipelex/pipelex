@@ -439,7 +439,7 @@ class StructuredContentComposer:
         """
         if isinstance(stuff_content, TextContent):
             if self._expects_type(expected_type=expected_type, target_type=str):
-                return NativeScalarExtraction(matched=True, value=stuff_content.text)
+                return NativeScalarExtraction(matched=True, value=stuff_content.require_text())
         elif isinstance(stuff_content, NumberContent):
             if expected_type is not bool and (
                 self._expects_type(expected_type=expected_type, target_type=float) or self._expects_type(expected_type=expected_type, target_type=int)

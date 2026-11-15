@@ -48,7 +48,7 @@ class TestExtractGenerateDryBranch:
         assert len(page_contents) == get_config().inference.dry_run.nb_extract_pages
         for page_content in page_contents:
             assert page_content.text_and_images.text is not None
-            assert page_content.text_and_images.text.text.startswith("DRY RUN:")
+            assert page_content.text_and_images.text.require_text().startswith("DRY RUN:")
 
     @pytest.mark.asyncio
     async def test_dry_image_mocks_single_page(self, mocker: MockerFixture) -> None:

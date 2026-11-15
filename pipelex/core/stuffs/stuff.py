@@ -221,8 +221,8 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
 
     @property
     def as_str(self) -> str:
-        """Get content as string if applicable."""
-        return self.as_text.text
+        """Get content as string if applicable, a stored text having been loaded."""
+        return self.as_text.require_text()
 
     @property
     def as_image(self) -> ImageContent:

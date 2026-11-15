@@ -82,7 +82,7 @@ class TestOfficeFilesAtTheStep:
             pages = pipe_output.main_stuff_as_items(item_type=PageContent)
             assert len(pages) == office_file.page_count
             assert all(page.page_view is not None for page in pages)
-            first_page_text = pages[0].text_and_images.text.text if pages[0].text_and_images.text else ""
+            first_page_text = pages[0].text_and_images.text.require_text() if pages[0].text_and_images.text else ""
             for word in office_file.first_page_words:
                 assert word in first_page_text
             readable_pdfs.append(read_document_as_pdf.spy_return)

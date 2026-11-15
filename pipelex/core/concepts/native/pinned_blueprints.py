@@ -14,7 +14,7 @@ standard's page itself, read live from the sibling `mthds/` checkout (the `MTHDS
 conformance` CI workflow runs it against a fresh checkout on every pull request), so the day the
 standard moves a definition, this repo goes red instead of a downstream port.
 
-The set below is the one the standard pinned at MTHDS 5.0.0, named by
+The set below is the one the standard pinned at MTHDS 9.0.0, named by
 `PINNED_NATIVES_MTHDS_VERSION`. Version-keyed lookup can come when a second pinned set exists;
 until then an implementation of standard version `V` materializes the greatest pinned set not
 above `V`, and this is the only one there is.
@@ -32,7 +32,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 # is the latest release of the standard. `tests/unit/pipelex/core/concepts/test_pinned_natives_vs_standard.py`
 # holds this value to the page; `test_pinned_natives_version.py` beside it holds it to the standard
 # version this engine implements, which is the reading that needs no sibling checkout.
-PINNED_NATIVES_MTHDS_VERSION = "5.0.0"
+PINNED_NATIVES_MTHDS_VERSION = "9.0.0"
 
 
 def make_pinned_native_blueprint(native_code: NativeConceptCode) -> ConceptBlueprint:
@@ -42,6 +42,63 @@ def make_pinned_native_blueprint(native_code: NativeConceptCode) -> ConceptBluep
         description=_pinned_description(native_code),
         structure=_pinned_structure(native_code),
     )
+
+
+# The fields carrying a stored value in place of the inline one, on `Text`, `Markdown`, `Html` and `JSON`. They describe
+# where the value is, not a part of it: the standard's binding walk treats them as no field of the value, and a caller
+# supplying an input supplies the value itself, so the readers asking what a value holds read the value blueprint below.
+STORED_VALUE_REFERENCE_FIELDS: tuple[str, ...] = ("url", "size", "mime_type", "preview")
+
+
+def make_pinned_native_value_blueprint(native_code: NativeConceptCode) -> ConceptBlueprint:
+    """The pinned blueprint of a native concept without the fields carrying a stored value: the parts of the value itself.
+
+    For a native that may hold its value stored (`Text`, `Markdown`, `Html`, `JSON`), it drops `url`, `size`, `mime_type`
+    and `preview`, so `Text` holds its value in the single field `text`, and marks that value field required: the value
+    is always there, inline or once loaded from its URL, which is what a caller supplying it and a path reading it see.
+    Every other native is its pinned blueprint as is.
+    """
+    blueprint = make_pinned_native_blueprint(native_code)
+    value_field_name = _stored_value_field_name(native_code)
+    if value_field_name is None or not isinstance(blueprint.structure, dict):
+        return blueprint
+    value_structure: dict[str, ConceptStructureBlueprintType] = {}
+    for field_name, field_blueprint in blueprint.structure.items():
+        if field_name in STORED_VALUE_REFERENCE_FIELDS:
+            continue
+        if field_name == value_field_name and isinstance(field_blueprint, ConceptStructureBlueprint):
+            value_structure[field_name] = field_blueprint.model_copy(update={"required": True})
+        else:
+            value_structure[field_name] = field_blueprint
+    return ConceptBlueprint(source=None, description=blueprint.description, structure=value_structure)
+
+
+def _stored_value_field_name(native_code: NativeConceptCode) -> str | None:
+    """The field holding the value inline, for a native that may hold it stored instead; `None` for every other native."""
+    match native_code:
+        case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
+            return "text"
+        case NativeConceptCode.HTML:
+            return "inner_html"
+        case NativeConceptCode.JSON:
+            return "json_obj"
+        case (
+            NativeConceptCode.DYNAMIC
+            | NativeConceptCode.IMAGE
+            | NativeConceptCode.DOCUMENT
+            | NativeConceptCode.TEXT_AND_IMAGES
+            | NativeConceptCode.NUMBER
+            | NativeConceptCode.YES_NO
+            | NativeConceptCode.CHOICE
+            | NativeConceptCode.RATING
+            | NativeConceptCode.DATE
+            | NativeConceptCode.TIME
+            | NativeConceptCode.PAGE
+            | NativeConceptCode.SEARCH_RESULT
+            | NativeConceptCode.ANYTHING
+            | NativeConceptCode.COMPOSITE
+        ):
+            return None
 
 
 def _pinned_description(native_code: NativeConceptCode) -> str:
@@ -91,15 +148,20 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
             # crate sufficiency guarantee — never a guessed structure.
             return None
         case NativeConceptCode.TEXT:
+            # The text inline, or a URL to it in storage with its size, MIME type and preview: a compliant value
+            # carries exactly one of `text` and `url`, and the three others only with `url`. The structure language
+            # has no cross-field form, so the rule constrains values, not this blueprint.
             return {
-                "text": _text_field(description="The text", required=True),
+                "text": _text_field(description="The text"),
+                **_stored_value_fields(stored_desc="text", measured_desc="text", mime_types_desc="text/plain or text/markdown"),
             }
         case NativeConceptCode.MARKDOWN:
-            # Text's one field, holding the Markdown source. A blueprint states `structure` or `refines`,
+            # Text's fields, its value holding the Markdown source. A blueprint states `structure` or `refines`,
             # never both, so the refinement of `Text` lives on the runtime concept (`ConceptFactory`), not here.
             # Pipelex defines Markdown ahead of the standard, so this is not yet a copy of the standard's page.
             return {
-                "text": _text_field(description="The text, written in Markdown", required=True),
+                "text": _text_field(description="The text, written in Markdown"),
+                **_stored_value_fields(stored_desc="text", measured_desc="text", mime_types_desc="text/plain or text/markdown"),
             }
         case NativeConceptCode.IMAGE:
             return {
@@ -125,9 +187,11 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                 "snippet": _text_field(description="A text snippet or excerpt from the document"),
             }
         case NativeConceptCode.HTML:
+            # As Text: the HTML inline or a URL to it, exactly one; `css_class` stays inline in both forms.
             return {
-                "inner_html": _text_field(description="The inner HTML of the content", required=True),
+                "inner_html": _text_field(description="The inner HTML of the content"),
                 "css_class": _text_field(description="The CSS class of the content"),
+                **_stored_value_fields(stored_desc="inner HTML", measured_desc="inner HTML", mime_types_desc="text/html"),
             }
         case NativeConceptCode.TEXT_AND_IMAGES:
             return {
@@ -220,14 +284,15 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                 ),
             }
         case NativeConceptCode.JSON:
+            # As Text: the object inline or a URL to its serialized form, exactly one.
             return {
                 "json_obj": ConceptStructureBlueprint(
                     description="The JSON object",
                     type=ConceptStructureBlueprintFieldType.DICT,
                     key_type="text",
                     value_type="Any",
-                    required=True,
                 ),
+                **_stored_value_fields(stored_desc="JSON object", measured_desc="JSON object's serialized form", mime_types_desc="application/json"),
             }
         case NativeConceptCode.SEARCH_RESULT:
             return {
@@ -240,6 +305,24 @@ def _pinned_structure(native_code: NativeConceptCode) -> dict[str, ConceptStruct
                     required=True,
                 ),
             }
+
+
+def _stored_value_fields(*, stored_desc: str, measured_desc: str, mime_types_desc: str) -> dict[str, ConceptStructureBlueprintType]:
+    """The stored form's fields of `Text`, `Html` and `JSON`, in the order and the words the standard pins them.
+
+    Args:
+        stored_desc: What is stored, as the descriptions name it: "text", "inner HTML", "JSON object".
+        measured_desc: What `size` and `preview` are taken from, the same but for JSON, measured on its serialized form.
+        mime_types_desc: The MIME types the stored value declares, as the description lists them.
+    """
+    return {
+        "url": _text_field(description=f"The URL of the stored {stored_desc}: a storage URI, an HTTP(S) URL, or a base64 data URL"),
+        "size": ConceptStructureBlueprint(
+            description=f"The length of the stored {measured_desc}, in bytes as stored", type=ConceptStructureBlueprintFieldType.INTEGER
+        ),
+        "mime_type": _text_field(description=f"The MIME type of the stored {stored_desc}: {mime_types_desc}"),
+        "preview": _text_field(description=f"The first few hundred characters of the stored {measured_desc}, always its true start"),
+    }
 
 
 def _text_field(*, description: str, required: bool = False) -> ConceptStructureBlueprint:

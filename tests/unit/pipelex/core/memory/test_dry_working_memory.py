@@ -259,12 +259,12 @@ class TestDryWorkingMemory:
         # Test question input
         question_stuff = dry_memory.get_stuff("question")
         assert isinstance(question_stuff.content, TextContent)
-        assert len(question_stuff.content.text) > 0  # Should have mock text
+        assert len(question_stuff.content.require_text()) > 0  # Should have mock text
 
         # Test question analysis input
         question_analysis_stuff = dry_memory.get_stuff("question_analysis")
         assert isinstance(question_analysis_stuff.content, TextContent)
-        assert len(question_analysis_stuff.content.text) > 0  # Should have mock text
+        assert len(question_analysis_stuff.content.require_text()) > 0  # Should have mock text
 
         # Test thoughtful answer input (structured)
         thoughtful_answer_stuff = dry_memory.get_stuff("thoughtful_answer")

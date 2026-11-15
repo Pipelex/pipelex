@@ -1522,6 +1522,15 @@
       "default": "{hash}.{extension}",
       "open_node": false
     },
+    "runtime.storage.inline_text_max_bytes": {
+      "value_type": "int",
+      "required": true,
+      "default": 4096,
+      "open_node": false,
+      "constraints": {
+        "ge": 0
+      }
+    },
     "runtime.storage.is_fetch_remote_content_enabled": {
       "value_type": "bool",
       "required": true,

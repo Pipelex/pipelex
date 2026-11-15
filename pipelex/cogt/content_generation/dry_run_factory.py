@@ -15,6 +15,7 @@ from pydantic.fields import FieldInfo
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.stored_value_content import REFERENCE_METADATA_FIELDS, StoredValueContent
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -141,7 +142,25 @@ class DryRunFactory:
             return {"url": Use(cls.generate_mock_image_url)}
         if cls._is_file_class(object_class=object_class, file_class=DocumentContent):
             return {"url": Use(cls.generate_mock_document_url)}
+        if cls._is_stored_value_class(object_class=object_class):
+            # A text, HTML or JSON value is mocked inline: it holds its value or a URL, never both, and polyfactory
+            # fills every optional field, so the reference's fields are pinned to None.
+            return {field_name: Use(cls._no_value) for field_name in ("url", *REFERENCE_METADATA_FIELDS)}
         return {}
+
+    @classmethod
+    def _no_value(cls) -> None:
+        return None
+
+    @classmethod
+    def _is_stored_value_class(cls, *, object_class: type[BaseModel]) -> bool:
+        """Whether a class holds a value that may be stored, or is a copy of such a class rebuilt from a JSON schema.
+
+        A rebuilt copy keeps no validator and no base class, only the fields, so it is told by its reference fields.
+        """
+        if issubclass(object_class, StoredValueContent):
+            return True
+        return {"url", *REFERENCE_METADATA_FIELDS} <= set(object_class.model_fields)
 
     @classmethod
     def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:

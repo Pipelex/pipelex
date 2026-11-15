@@ -45,7 +45,7 @@ class TestListContentIteration:
 
         texts: list[str] = []
         for item in content:
-            texts.append(item.text)
+            texts.append(item.require_text())
 
         assert texts == ["A", "B"]
 

@@ -181,7 +181,7 @@ Each works only if the main_stuff is (or refines) the matching verdict native.
 **`main_stuff_as_markdown`** - Returns `MarkdownContent` object:
 
 ```python
-report = pipe_output.main_stuff_as_markdown.text  # the Markdown source
+report = pipe_output.main_stuff_as_markdown.require_text()  # the Markdown source
 ```
 
 This works only if the main_stuff is (or refines) a `MarkdownContent` concept.

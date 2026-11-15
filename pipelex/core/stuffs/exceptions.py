@@ -62,3 +62,21 @@ class StuffContentValidationError(StuffError):
         self.target_type = target_type
         self.validation_error = validation_error
         super().__init__(f"Failed to validate content from {original_type} to {target_type}: {validation_error}")
+
+
+class StoredValueNotLoadedError(StuffError):
+    """A text, HTML or JSON value held in storage was read before it was loaded.
+
+    A content past the inline threshold carries a URL to its value instead of the value. The code that reads it must
+    load it first, with ``load_stored_value``, which only code allowed to perform IO can do; a synchronous render that meets a
+    reference never loaded raises this rather than printing nothing. It is always the runtime's own fault: a reader
+    that forgot to load.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
+
+
+class StoredValueUnreadableError(StuffError):
+    """The stored value of a content could be read but is not a value of its kind, such as a JSON value that is not an object."""
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED

@@ -104,14 +104,14 @@ class TextAndImagesContent(StuffContent):
 
         # If only text is present, render as Markdown
         if self.text and not self.images:
-            return Markdown(self.text.text)
+            return Markdown(self.text.require_text())
 
         group = Group()
 
         # Add text section if present
         if self.text:
             group.renderables.append(Text("Text:", style="bold cyan"))
-            group.renderables.append(Markdown(self.text.text))
+            group.renderables.append(Markdown(self.text.require_text()))
             if self.images:
                 group.renderables.append(Text())  # Add spacing
 

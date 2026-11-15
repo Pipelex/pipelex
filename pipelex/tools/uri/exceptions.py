@@ -9,6 +9,7 @@ from pipelex.base_exceptions import SecurityError
 from pipelex.errors.error_code_declaration import ErrorCodeSet
 from pipelex.errors.problem import make_location
 from pipelex.errors.security_target import SecurityTargetClass
+from pipelex.system.exceptions import ToolError
 
 
 class UriReadRefusalReason(StrEnum):
@@ -79,3 +80,14 @@ class UriReadRefusedError(SecurityError):
     @override
     def problem_location(self) -> ProblemLocation | None:
         return make_location(input_name=self.input_name, field=self.field)
+
+
+class UriTextNotUtf8Error(ToolError):
+    """Raised when the bytes behind a URL read as a text are not UTF-8.
+
+    A stored text, HTML or JSON value is written as UTF-8 by the code that stores it, so bytes that do not decode are
+    either a stored object damaged since, or a URL a caller or a method pointed at a file that is not a text. The
+    message names where the URL sat, never the URL itself, which can be a signed link holding a credential.
+    """
+
+    error_code = CoreCode.RUNTIME_UNEXPECTED
