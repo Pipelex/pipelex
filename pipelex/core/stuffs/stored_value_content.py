@@ -88,6 +88,21 @@ class StoredValueContent(StuffContent):
         return self
 
     @override
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Assigning the value makes the content hold it inline, so it is never in both forms at once.
+
+        A PipeFunc that rewrites a loaded reference (`note.text = note.require_text().upper()`) gets an inline content:
+        the reference and its size, MIME type and preview described the value it replaces, so they are cleared, and so
+        is the value loaded from it. Construction does not pass through here; the model validator checks it instead.
+        """
+        if name == self.value_field_name and value is not None:
+            if self.url is not None:
+                for field_name in STORED_VALUE_REFERENCE_FIELDS:
+                    super().__setattr__(field_name, None)
+            self._loaded_value = None
+        super().__setattr__(name, value)
+
+    @override
     def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
         """Leave out the absent form's fields, so a content reads `TextContent(text='...')` as it did before it could be stored."""
         absent_form_fields = (self.value_field_name, *STORED_VALUE_REFERENCE_FIELDS)

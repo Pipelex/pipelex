@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+from typing import TYPE_CHECKING, Any, ClassVar, NoReturn, cast
 
 from json2html import json2html
 from pydantic import Field, field_validator
@@ -24,6 +24,24 @@ def is_json_mime_type(*, mime_type: str) -> bool:
     return bare_mime_type == JSON_MIME_TYPE or bare_mime_type.endswith("+json")
 
 
+def json_obj_invalidity(*, json_obj: object) -> str | None:
+    """Why a value is not a JSON object's content that JSON can hold, `None` when it is.
+
+    NaN and the infinities are refused, since JSON cannot hold them and serialization would turn them into null. The
+    encoder's complaint names a type, a circular reference or an out-of-range float, never the value.
+    """
+    try:
+        json.dumps(json_obj, allow_nan=False)
+    except (TypeError, ValueError) as exc:
+        return str(exc)
+    return None
+
+
+def _refuse_non_standard_constant(constant: str) -> NoReturn:  # kw-only: ignore — `json.loads` calls `parse_constant` positionally
+    msg = f"A stored JSON value is not valid JSON: it holds {constant}, which JSON cannot hold."
+    raise StoredValueUnreadableError(msg)
+
+
 # TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
 class JSONContent(StoredValueContent):
     value_field_name: ClassVar[str] = "json_obj"
@@ -42,14 +60,11 @@ class JSONContent(StoredValueContent):
     @classmethod
     def check_valid_json(cls, value: dict[str, Any] | None) -> dict[str, Any] | None:
         # A ValueError, never a TypeError: pydantic turns only the former into a ValidationError, so a
-        # dict holding a value that is not JSON is reported like any other invalid content. NaN and the
-        # infinities are refused too, since JSON cannot hold them and serialization would turn them into null.
-        # The encoder's complaint names a type, a circular reference or an out-of-range float, never the value.
-        try:
-            json.dumps(value, allow_nan=False)
-        except (TypeError, ValueError) as exc:
-            msg = f"json_obj is not valid JSON: {exc}"
-            raise InputFreeValueError(msg) from exc
+        # dict holding a value that is not JSON is reported like any other invalid content.
+        invalidity = json_obj_invalidity(json_obj=value)
+        if invalidity is not None:
+            msg = f"json_obj is not valid JSON: {invalidity}"
+            raise InputFreeValueError(msg)
         return value
 
     @override
@@ -63,14 +78,20 @@ class JSONContent(StoredValueContent):
             msg = f"A stored JSON value declares the MIME type '{self.mime_type}', which is not JSON."
             raise StoredValueUnreadableError(msg)
         try:
-            decoded: Any = json.loads(text)
+            # JSON has no NaN nor infinities, which Python's decoder accepts by default: refused, as an inline value is.
+            decoded: Any = json.loads(text, parse_constant=_refuse_non_standard_constant)
         except json.JSONDecodeError as exc:
             msg = f"A stored JSON value is not valid JSON: {exc.msg} at line {exc.lineno}, column {exc.colno}."
             raise StoredValueUnreadableError(msg) from exc
         if not isinstance(decoded, dict):
             msg = f"A stored JSON value is a JSON {type(decoded).__name__}, and a JSON content holds an object."
             raise StoredValueUnreadableError(msg)
-        return cast("dict[str, Any]", decoded)
+        json_obj = cast("dict[str, Any]", decoded)
+        invalidity = json_obj_invalidity(json_obj=json_obj)
+        if invalidity is not None:
+            msg = f"A stored JSON value is not valid JSON: {invalidity}"
+            raise StoredValueUnreadableError(msg)
+        return json_obj
 
     def require_json_obj(self) -> dict[str, Any]:
         """The JSON object, held inline or loaded from storage.
