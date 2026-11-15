@@ -48,6 +48,6 @@ A `Text`, `Markdown`, `Html` or `JSON` value past a size threshold is meant to l
 inline_text_max_bytes = 4096
 ```
 
-A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form is exercised everywhere. The value must not be negative.
+A text is measured on its UTF-8 encoding and a JSON value on its serialized form. A value of at most `inline_text_max_bytes` bytes stays inline; a larger one is stored. `0` stores every non-empty value, which the Pipelex test suite sets so that the stored form will be exercised everywhere once values are stored. The value must not be negative.
 
-The setting is read by the code that stores values as they are produced, which arrives in a later release; until then it changes nothing. How a stored value looks, and how a run reads it, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).
+The setting is read by the code that stores values as they are produced, which arrives in a later release; until then it changes nothing. How a stored value looks, and what a run does with one today, is described under [Stored values](../building-methods/concepts/native-concepts.md#stored-values).

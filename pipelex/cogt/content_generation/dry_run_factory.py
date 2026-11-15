@@ -14,8 +14,12 @@ from pydantic.fields import FieldInfo
 
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.core.stuffs.stored_value_content import REFERENCE_METADATA_FIELDS, StoredValueContent
+from pipelex.core.stuffs.json_content import JSONContent
+from pipelex.core.stuffs.markdown_content import MarkdownContent
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
+from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -48,6 +52,10 @@ class MockFormat(StrEnum):
     IGNORE = "ignore"
     DICT_SNAKE_KEY_PASCAL_VALUE = "dict_snake_key_pascal_value"
     DICT_SINGLE_EXTRACT_INPUT = "dict_single_extract_input"
+
+
+# The native content classes whose value may be stored, the ones a class rebuilt from a JSON schema is matched against by name.
+_STORED_VALUE_CONTENT_CLASSES: tuple[type[StoredValueContent], ...] = (TextContent, MarkdownContent, HtmlContent, JSONContent)
 
 
 class DryRunFactory:
@@ -145,7 +153,7 @@ class DryRunFactory:
         if cls._is_stored_value_class(object_class=object_class):
             # A text, HTML or JSON value is mocked inline: it holds its value or a URL, never both, and polyfactory
             # fills every optional field, so the reference's fields are pinned to None.
-            return {field_name: Use(cls._no_value) for field_name in ("url", *REFERENCE_METADATA_FIELDS)}
+            return {field_name: Use(cls._no_value) for field_name in STORED_VALUE_REFERENCE_FIELDS}
         return {}
 
     @classmethod
@@ -156,11 +164,18 @@ class DryRunFactory:
     def _is_stored_value_class(cls, *, object_class: type[BaseModel]) -> bool:
         """Whether a class holds a value that may be stored, or is a copy of such a class rebuilt from a JSON schema.
 
-        A rebuilt copy keeps no validator and no base class, only the fields, so it is told by its reference fields.
+        A rebuilt copy keeps no validator and no base class, so it is told as `_is_file_class` tells a file: by the name
+        of the native content class it copies, which the schema carries as the definition's title, and by that class's
+        value and reference fields. A user's structure that merely names its fields `url`, `size`, `mime_type` and
+        `preview` is none of them, and keeps the values polyfactory gives it.
         """
         if issubclass(object_class, StoredValueContent):
             return True
-        return {"url", *REFERENCE_METADATA_FIELDS} <= set(object_class.model_fields)
+        field_names = set(object_class.model_fields)
+        for stored_value_class in _STORED_VALUE_CONTENT_CLASSES:
+            if object_class.__name__ == stored_value_class.__name__:
+                return {stored_value_class.value_field_name, *STORED_VALUE_REFERENCE_FIELDS} <= field_names
+        return False
 
     @classmethod
     def _is_file_class(cls, *, object_class: type[BaseModel], file_class: type[BaseModel]) -> bool:

@@ -640,6 +640,20 @@ class ValueFormRenderable(Protocol):
     def rendered_value_form(self) -> dict[str, Any]: ...
 
 
+@runtime_checkable
+class ValueFieldReadable(Protocol):
+    """A model one of whose fields may hold nothing while its value lives elsewhere: a reader of that field reads `require_value`.
+
+    A `Text`, `Html` or `JSON` content held in storage keeps `None` in its value field (`text`, `inner_html`, `json_obj`)
+    and its value at `url`. A template or a binding reading that field by name reads `require_value` instead, which
+    answers the value loaded from storage, or refuses a reference never loaded rather than reading `None`.
+    """
+
+    def is_value_field(self, *, field_name: str) -> bool: ...
+
+    def require_value(self) -> object: ...
+
+
 def clean_model_to_dict(obj: BaseModel) -> dict[str, Any]:
     dict_dump = serialize_model(
         obj=obj,

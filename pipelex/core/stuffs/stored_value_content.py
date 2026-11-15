@@ -8,9 +8,9 @@ three facts about the value so it can describe itself without being read: its `s
 A referenced value is read with `load_stored_value` (`pipelex.core.stuffs.stored_value_loader`), which checks the run's
 read scope exactly as an image read does, and keeps what it read in a private attribute of the content. That attribute
 is never serialized, so a dump of a loaded content is still its reference, and there is never a second state on the
-wire. The synchronous accessors
-(`require_text`, `require_inner_html`, `require_json_obj`) and every `rendered_*` method read the value inline or
-loaded, and raise :class:`StoredValueNotLoadedError` on a reference never loaded rather than printing nothing.
+wire. `require_value` and the typed accessors built on it (`require_text`, `require_inner_html`, `require_json_obj`),
+and every `rendered_*` method, read the value inline or loaded, and raise :class:`StoredValueNotLoadedError` on a
+reference never loaded rather than printing nothing.
 
 Loading performs IO, so only code allowed to perform IO loads: input intake, a content-generation leaf, a PipeFunc, a
 direct run. Workflow code never does.
@@ -19,14 +19,14 @@ This module performs no IO and imports nothing that does, since every content cl
 the loader lives in its own module, imported only by code that loads.
 
 Each class declares its own fields, its value first, so its schema reads in the order the standard pins; this base
-declares the reference's fields for the type checkers only, and holds the rule and the loading they share.
+declares the reference's fields for the type checkers only, and holds the rule, the loaded value and the reading they
+share. A class whose stored text is not its value as it is overrides `_decode_loaded_text` (`JSONContent` parses it).
 """
 
-from abc import abstractmethod
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, Self, cast
 
-from pydantic import SerializerFunctionWrapHandler, model_serializer, model_validator
+from pydantic import PrivateAttr, SerializerFunctionWrapHandler, model_serializer, model_validator
 from typing_extensions import override
 
 from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
@@ -36,6 +36,12 @@ from pipelex.tools.uri.uri_resolver import describe_uri
 
 # The fields of the referenced form, which accompany `url` and are absent from the inline form.
 REFERENCE_METADATA_FIELDS: tuple[str, ...] = ("size", "mime_type", "preview")
+# Every field of the referenced form, `url` first: where the value is and what describes it, never a part of the value.
+# The pinned natives, the input templates and the dry-run mocks all read this one list.
+STORED_VALUE_REFERENCE_FIELDS: tuple[str, ...] = ("url", *REFERENCE_METADATA_FIELDS)
+
+# The value read from storage: a text, or the object a JSON content parses its text into.
+StoredValue = str | dict[str, Any]
 
 
 class StoredValueContent(StuffContent):
@@ -54,6 +60,9 @@ class StoredValueContent(StuffContent):
     value_form_field_names: ClassVar[tuple[str, ...]]
     # The value's kind in a description or a message: "text", "markdown", "html", "JSON".
     value_kind_desc: ClassVar[str]
+
+    # The value read from storage for a referenced content, never serialized.
+    _loaded_value: StoredValue | None = PrivateAttr(default=None)
 
     @model_validator(mode="after")
     def _validate_value_or_reference(self) -> Self:
@@ -79,9 +88,24 @@ class StoredValueContent(StuffContent):
         return self
 
     @override
+    def __setattr__(self, name: str, value: Any) -> None:
+        """Assigning the value makes the content hold it inline, so it is never in both forms at once.
+
+        A PipeFunc that rewrites a loaded reference (`note.text = note.require_text().upper()`) gets an inline content:
+        the reference and its size, MIME type and preview described the value it replaces, so they are cleared, and so
+        is the value loaded from it. Construction does not pass through here; the model validator checks it instead.
+        """
+        if name == self.value_field_name and value is not None:
+            if self.url is not None:
+                for field_name in STORED_VALUE_REFERENCE_FIELDS:
+                    super().__setattr__(field_name, None)
+            self._loaded_value = None
+        super().__setattr__(name, value)
+
+    @override
     def __repr_args__(self) -> Sequence[tuple[str | None, Any]]:
         """Leave out the absent form's fields, so a content reads `TextContent(text='...')` as it did before it could be stored."""
-        absent_form_fields = (self.value_field_name, "url", *REFERENCE_METADATA_FIELDS)
+        absent_form_fields = (self.value_field_name, *STORED_VALUE_REFERENCE_FIELDS)
         return [
             (field_name, field_value)
             for field_name, field_value in super().__repr_args__()
@@ -98,7 +122,7 @@ class StoredValueContent(StuffContent):
         if not isinstance(serialized, dict):
             return serialized
         serialized_dict = cast("dict[str, Any]", serialized)
-        for field_name in (self.value_field_name, "url", *REFERENCE_METADATA_FIELDS):
+        for field_name in (self.value_field_name, *STORED_VALUE_REFERENCE_FIELDS):
             if field_name in serialized_dict and serialized_dict[field_name] is None:
                 del serialized_dict[field_name]
         return serialized_dict
@@ -111,19 +135,24 @@ class StoredValueContent(StuffContent):
     @property
     def is_loaded(self) -> bool:
         """Whether the value can be read synchronously: held inline, or loaded from storage."""
-        return not self.is_stored or self._has_loaded_value()
+        return not self.is_stored or self._loaded_value is not None
 
-    @abstractmethod
-    def _has_loaded_value(self) -> bool:
-        """Whether a value loaded from storage is kept on the instance."""
+    def is_value_field(self, *, field_name: str) -> bool:
+        """Whether a field is the one holding the value inline, which a reader reads through `require_value` (`ValueFieldReadable`)."""
+        return field_name == self.value_field_name
 
-    @abstractmethod
-    def require_value(self) -> str | dict[str, Any]:
+    def require_value(self) -> StoredValue:
         """The value, held inline or loaded from storage, for a reader that does not know the content's class.
 
         Raises:
             StoredValueNotLoadedError: The content holds a reference to its value that was never loaded.
         """
+        inline_value: StoredValue | None = getattr(self, self.value_field_name)
+        if inline_value is not None:
+            return inline_value
+        if self._loaded_value is not None:
+            return self._loaded_value
+        raise self._make_not_loaded_error()
 
     def rendered_value_form(self) -> dict[str, Any]:
         """The content as its inline form dumps it, a stored value read in place of its reference.
@@ -139,7 +168,6 @@ class StoredValueContent(StuffContent):
             for field_name in self.value_form_field_names
         }
 
-    @abstractmethod
     def accept_loaded_text(self, *, text: str) -> None:
         """Keep the value read from storage, given as the text it was stored as, so the content can be read synchronously.
 
@@ -149,6 +177,17 @@ class StoredValueContent(StuffContent):
         Raises:
             StoredValueUnreadableError: The text is not a value of the content's kind.
         """
+        if self.url is None:
+            return
+        self._loaded_value = self._decode_loaded_text(text=text)
+
+    def _decode_loaded_text(self, *, text: str) -> StoredValue:
+        """The value a stored text holds: the text itself, for a text or HTML content.
+
+        Raises:
+            StoredValueUnreadableError: The text is not a value of the content's kind.
+        """
+        return text
 
     def _make_not_loaded_error(self) -> StoredValueNotLoadedError:
         url_desc = describe_uri(self.url) if self.url is not None else "nowhere"

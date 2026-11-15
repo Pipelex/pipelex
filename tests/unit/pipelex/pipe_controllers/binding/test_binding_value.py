@@ -5,6 +5,8 @@ import pytest
 
 from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.exceptions import StoredValueNotLoadedError
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -16,6 +18,7 @@ from pipelex.core.stuffs.yes_no_content import YesNoContent
 from pipelex.pipe_controllers.binding.binding_derivation import BindingDerivation, BindingRoot, derive_binding
 from pipelex.pipe_controllers.binding.binding_value import FoundNothing, bind_content
 from pipelex.pipe_controllers.binding.exceptions import BindingStepRunError
+from tests.unit.pipelex.core.stuffs.stored_value.test_data import STORED_HTML, StoredValueTestData
 from tests.unit.pipelex.pipe_controllers.binding.test_data import (
     INVOICE,
     INVOICE_ISSUED_AT,
@@ -290,3 +293,19 @@ class TestBindContent:
         assert "Binding 'invoices'" in message
         assert "a list" in message
         assert "'invoices' holds a single value" in message
+
+    def test_a_path_ending_on_the_markup_of_a_stored_html_never_loaded_refuses(self) -> None:
+        """A stored value is not nothing: the walk reads the markup through the content, which refuses an unloaded reference."""
+        page = HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE)
+
+        with pytest.raises(StoredValueNotLoadedError):
+            bind_content(root_content=page, derivation=_derive("page.inner_html", root=make_root("native.Html")))
+
+    def test_a_path_ending_on_the_markup_of_a_loaded_stored_html_binds_that_markup(self) -> None:
+        page = HtmlContent.model_validate(StoredValueTestData.HTML_REFERENCE)
+        page.accept_loaded_text(text=STORED_HTML)
+
+        bound = bind_content(root_content=page, derivation=_derive("page.inner_html", root=make_root("native.Html")))
+
+        assert isinstance(bound, TextContent)
+        assert bound.require_text() == STORED_HTML

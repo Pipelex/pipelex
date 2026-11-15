@@ -14,7 +14,7 @@ from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
-from pipelex.core.stuffs.stored_value_content import REFERENCE_METADATA_FIELDS, StoredValueContent
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 
 
@@ -129,12 +129,11 @@ class ConceptRepresentationGenerator:
         # A content that may hold its value stored is represented inline: its value, never the reference fields, since a
         # value carries exactly one of the two forms and an example is written by hand.
         stored_value_field_name: str | None = None
-        reference_field_names = {"url", *REFERENCE_METADATA_FIELDS}
         if issubclass(content_class, StoredValueContent):
             stored_value_field_name = content_class.value_field_name
 
         for field_name, field_info in content_class.model_fields.items():
-            if stored_value_field_name is not None and field_name in reference_field_names:
+            if stored_value_field_name is not None and field_name in STORED_VALUE_REFERENCE_FIELDS:
                 continue
             # Skip optional fields if include_optional is False, but never the value of a stored-value content
             if not include_optional and not field_info.is_required() and field_name != stored_value_field_name:

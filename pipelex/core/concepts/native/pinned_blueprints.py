@@ -23,6 +23,7 @@ above `V`, and this is the only one there is.
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprintType
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.stuffs.stored_value_content import STORED_VALUE_REFERENCE_FIELDS, StoredValueContent
 
 # The standard version in which the pinned set below last changed — the standard asks each
 # implementation to declare that number once, in one place, naming its source: the page's own
@@ -44,24 +45,21 @@ def make_pinned_native_blueprint(native_code: NativeConceptCode) -> ConceptBluep
     )
 
 
-# The fields carrying a stored value in place of the inline one, on `Text`, `Markdown`, `Html` and `JSON`. They describe
-# where the value is, not a part of it: the standard's binding walk treats them as no field of the value, and a caller
-# supplying an input supplies the value itself, so the readers asking what a value holds read the value blueprint below.
-STORED_VALUE_REFERENCE_FIELDS: tuple[str, ...] = ("url", "size", "mime_type", "preview")
-
-
 def make_pinned_native_value_blueprint(native_code: NativeConceptCode) -> ConceptBlueprint:
     """The pinned blueprint of a native concept without the fields carrying a stored value: the parts of the value itself.
 
-    For a native that may hold its value stored (`Text`, `Markdown`, `Html`, `JSON`), it drops `url`, `size`, `mime_type`
-    and `preview`, so `Text` holds its value in the single field `text`, and marks that value field required: the value
-    is always there, inline or once loaded from its URL, which is what a caller supplying it and a path reading it see.
-    Every other native is its pinned blueprint as is.
+    For a native that may hold its value stored (`Text`, `Markdown`, `Html`, `JSON`, whose content classes are the
+    `StoredValueContent` ones), it drops `url`, `size`, `mime_type` and `preview` (`STORED_VALUE_REFERENCE_FIELDS`), which
+    say where the value is rather than what it holds: the standard's binding walk treats them as no field of the value,
+    and a caller supplying an input supplies the value itself. So `Text` holds its value in the single field `text`,
+    which this marks required: the value is always there, inline or once loaded from its URL. The value field is the
+    content class's own `value_field_name`. Every other native is its pinned blueprint as is.
     """
     blueprint = make_pinned_native_blueprint(native_code)
-    value_field_name = _stored_value_field_name(native_code)
-    if value_field_name is None or not isinstance(blueprint.structure, dict):
+    structure_class = native_code.structure_class
+    if structure_class is None or not issubclass(structure_class, StoredValueContent) or not isinstance(blueprint.structure, dict):
         return blueprint
+    value_field_name = structure_class.value_field_name
     value_structure: dict[str, ConceptStructureBlueprintType] = {}
     for field_name, field_blueprint in blueprint.structure.items():
         if field_name in STORED_VALUE_REFERENCE_FIELDS:
@@ -71,34 +69,6 @@ def make_pinned_native_value_blueprint(native_code: NativeConceptCode) -> Concep
         else:
             value_structure[field_name] = field_blueprint
     return ConceptBlueprint(source=None, description=blueprint.description, structure=value_structure)
-
-
-def _stored_value_field_name(native_code: NativeConceptCode) -> str | None:
-    """The field holding the value inline, for a native that may hold it stored instead; `None` for every other native."""
-    match native_code:
-        case NativeConceptCode.TEXT | NativeConceptCode.MARKDOWN:
-            return "text"
-        case NativeConceptCode.HTML:
-            return "inner_html"
-        case NativeConceptCode.JSON:
-            return "json_obj"
-        case (
-            NativeConceptCode.DYNAMIC
-            | NativeConceptCode.IMAGE
-            | NativeConceptCode.DOCUMENT
-            | NativeConceptCode.TEXT_AND_IMAGES
-            | NativeConceptCode.NUMBER
-            | NativeConceptCode.YES_NO
-            | NativeConceptCode.CHOICE
-            | NativeConceptCode.RATING
-            | NativeConceptCode.DATE
-            | NativeConceptCode.TIME
-            | NativeConceptCode.PAGE
-            | NativeConceptCode.SEARCH_RESULT
-            | NativeConceptCode.ANYTHING
-            | NativeConceptCode.COMPOSITE
-        ):
-            return None
 
 
 def _pinned_description(native_code: NativeConceptCode) -> str:

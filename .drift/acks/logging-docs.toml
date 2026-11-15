@@ -1,10 +1,10 @@
 contract = "logging-docs"
-digest = "sha256:d73d7bc4f3c36b86d079cbfa548af05a45610b4a28fc6842cb82bb0340fcc171"
+digest = "sha256:a3be95f507ac00e2b5cd024a8fbade313896e371ee3788a494654f0ee29a8c29"
 reviewed_by = "Louis Choquel"
-reviewed_at = "2026-11-15T19:40:28Z"
-rationale = "clean-pass: pydantic_utils.py only gains ValueFormRenderable, which serialize_model uses so a structure renders a stored text as its value; neither logging.md nor log-sink-plugins.md says anything about serialize_model or structure rendering, and the handled-exception fields they restate are untouched."
+reviewed_at = "2026-11-15T21:25:31Z"
+rationale = "clean-pass: pydantic_utils.py only gains the ValueFieldReadable protocol, which the Jinja sandbox and the binding walk read for a stored value's field; neither logging.md nor log-sink-plugins.md covers template reads or binding, and the console field rules and handled-exception fields they restate are untouched."
 
 [trigger_files]
 "pipelex/tools/log/console_fields.py" = "blob:10c4516405dfdfe889590ef0d8e1914f56600a2f"
 "pipelex/tools/log/error_fields.py" = "blob:76a1e4c88aa57427a11e7550c1144644494d56f3"
-"pipelex/tools/typing/pydantic_utils.py" = "blob:a1512e335f05a5212736d8f0d748a8bb2cb6570b"
+"pipelex/tools/typing/pydantic_utils.py" = "blob:62c987ee7e5c05ca37882e3565a1c2c37767eddb"

@@ -76,6 +76,29 @@ class TestStoredValueLoading:
         with pytest.raises(StoredValueUnreadableError):
             await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
 
+    @pytest.mark.parametrize(
+        "stored_json",
+        [
+            '{"ratio": NaN}',
+            '{"ratio": Infinity}',
+            '{"ratio": -Infinity}',
+            '{"nested": {"values": [1, NaN]}}',
+            # A literal too large for a float decodes to an infinity, which the same check as an inline value's refuses.
+            '{"ratio": 1e999}',
+        ],
+    )
+    async def test_a_stored_json_holding_a_non_standard_constant_is_refused_as_inline_json_is(self, stored_json: str):
+        """JSON has no NaN nor infinities: an inline `json_obj` holding one is refused, and so is a stored one."""
+        storage = InMemoryStorageProvider()
+        storage.root[JSON_KEY] = stored_json.encode("utf-8")
+        content = JSONContent.model_validate(StoredValueTestData.JSON_REFERENCE)
+
+        with pytest.raises(StoredValueUnreadableError) as exc_info:
+            await load_stored_value(content, read_scope=READ_SCOPE, position="a value", storage_provider=storage)
+
+        assert "not valid JSON" in str(exc_info.value)
+        assert not content.is_loaded
+
     async def test_a_stored_text_that_is_not_utf8_is_refused(self):
         storage = InMemoryStorageProvider()
         storage.root[TEXT_KEY] = b"\xff\xfe\xfa not utf-8"
