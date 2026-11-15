@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`PipeDocGen` `template_input`, a template the run supplies**: an `xlsx`, `docx` or `pptx` step names the input whose file is its office template, so a caller sends the workbook, document or deck to fill and receives a filled copy stored as a new file named after theirs, their file left unchanged. The input is declared as a single required `Document` and is left out of the data the template is filled with; its file is judged from its bytes and refused as `input.file_type_unsupported` when it is not of the step's format; and run setup hands it to the engine's template checker before any step starts, an error refusing the run with the new code `pipelex.docgen.template_input_unfit` (domain `input`, status `422`), while `pipelex validate` reports a `template_check_warning` saying the template is checked when a run supplies it.
+- **`PipeDocGen` `table_fill = "append"`**: an `xlsx` step with an office template adds the records of a list input after the rows its Table already holds rather than writing over them, the default `replace`; a step asking for `append` from an engine that does not declare the `table_append` capability is refused when the method loads with `model.capability_unsupported`.
+
+### Changed
+
+- **Document engines receive `table_fill`, plugin API version 11 (Breaking)**: `RenderJob` carries `table_fill`, a `TableFill` from `pipelex.cogt.doc_gen.table_fill`, `replace` unless the step asks for `append`, an engine that appends declares `table_append` among its model's `inputs`, and `resolve_doc_gen_setting` takes a required `table_fill`. `PLUGIN_API_VERSION` moves to 11, so a plugin declaring `targets_api = 10` is refused at discovery with `PluginApiVersionMismatchError`.
+
 ## [v0.101.0] - 2026-11-14
 
 ### Added

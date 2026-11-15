@@ -1,9 +1,11 @@
+import re
 from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.core.bundle_resources.bundle_resource import canonical_resource_path_or_none
 from pipelex.core.method_trees.file_references import BundleFileOrigin, BundleValidationContext
 from pipelex.pipe_operators.doc_gen.pipe_doc_gen_blueprint import PipeDocGenBlueprint
@@ -18,6 +20,7 @@ def _blueprint(*, file_origin: BundleFileOrigin | None = None, **overrides: Any)
 
 _NO_FILE: set[str] = set()
 _NO_OVERRIDE: dict[str, Any] = {}
+_WORKBOOK_INPUTS: dict[str, str] = {"workbook": "Document", "rows": "Row[]", "maybe": "Document?", "workbooks": "Document[]"}
 
 
 class TestPipeDocGenBlueprint:
@@ -131,3 +134,55 @@ class TestPipeDocGenBlueprint:
     def test_the_file_of_its_tree_it_names(self, overrides: dict[str, Any], expected_files: set[str]) -> None:
         """A step names its template file, as written; the print stage reads it, an HTML one checked at load too."""
         assert _blueprint(**overrides).named_file_references == expected_files
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_template_input", "expected_table_fill"),
+        [
+            ({"format": "xlsx", "template_input": "workbook", "table_fill": "append"}, "workbook", TableFill.APPEND),
+            ({"format": "xlsx", "template_input": "workbook"}, "workbook", None),
+            ({"format": "docx", "template_input": "workbook", "table_fill": "replace"}, "workbook", TableFill.REPLACE),
+            ({"format": "pptx", "template_input": "workbook"}, "workbook", None),
+            ({"format": "xlsx", "template_file": "expenses.xlsx", "table_fill": "append"}, None, TableFill.APPEND),
+        ],
+        ids=["xlsx_append", "xlsx_default_fill", "docx_replace", "pptx_needs_no_template_file", "template_file_append"],
+    )
+    def test_accepted_template_inputs_and_fills(
+        self, overrides: dict[str, Any], expected_template_input: str | None, expected_table_fill: TableFill | None
+    ) -> None:
+        blueprint = _blueprint(inputs=_WORKBOOK_INPUTS, **overrides)
+        assert blueprint.template_input == expected_template_input
+        assert blueprint.table_fill == expected_table_fill
+        assert blueprint.named_file_references == ({blueprint.template_file} if blueprint.template_file else _NO_FILE)
+
+    @pytest.mark.parametrize(
+        ("overrides", "expected_message"),
+        [
+            ({"format": "xlsx", "template_input": "workbook", "template_file": "expenses.xlsx"}, "cannot be used with 'template' or 'template_file'"),
+            ({"format": "pdf", "template_input": "workbook", "template": "<p>x</p>"}, "cannot be used with 'template' or 'template_file'"),
+            ({"format": "pdf", "template_input": "workbook"}, "'template_input' is for an office format"),
+            ({"format": "xlsx", "template_input": "ledger"}, "names 'ledger', which is not one of the step's inputs"),
+            ({"format": "xlsx", "template_input": "workbooks"}, "a list ('Document[]')"),
+            ({"format": "xlsx", "template_input": "maybe"}, "an optional input ('Document?')"),
+            ({"format": "docx", "template_input": "workbook", "table_fill": "append"}, "is for the 'xlsx' format only"),
+            ({"format": "pptx", "template_input": "workbook", "table_fill": "append"}, "is for the 'xlsx' format only"),
+            ({"format": "xlsx", "table_fill": "append"}, "fills the Tables of a template file, and this step has none"),
+            ({"format": "pdf", "table_fill": "replace"}, "fills the Tables of a template file, and this step has none"),
+            ({"format": "xlsx", "template_input": "workbook", "table_fill": "upsert"}, "table_fill"),
+        ],
+        ids=[
+            "with_template_file",
+            "with_inline_template",
+            "pdf",
+            "undeclared_input",
+            "list_input",
+            "optional_input",
+            "append_on_docx",
+            "append_on_pptx",
+            "fill_without_template",
+            "fill_on_the_pdf_auto_layout",
+            "unknown_fill",
+        ],
+    )
+    def test_refused_template_inputs_and_fills(self, overrides: dict[str, Any], expected_message: str) -> None:
+        with pytest.raises(ValidationError, match=re.escape(expected_message)):
+            _blueprint(inputs=_WORKBOOK_INPUTS, **overrides)

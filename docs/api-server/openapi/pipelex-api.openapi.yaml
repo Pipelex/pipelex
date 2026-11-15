@@ -5691,6 +5691,15 @@ components:
           - type: string
           - type: 'null'
           title: Template File
+        template_input:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Template Input
+        table_fill:
+          anyOf:
+          - $ref: '#/components/schemas/TableFill'
+          - type: 'null'
         filename:
           anyOf:
           - type: string
@@ -5717,7 +5726,19 @@ components:
 
         `.docx` for `docx` and a `.pptx` for `pptx`, which `pptx` requires. `filename` is a Jinja expression over the
 
-        inputs; the suffix is added. The output must be a single `Document`, or a concept refining it. `model` names the
+        inputs; the suffix is added, and without it the file is named after the step, or after the template input''s file.
+
+        `template_input` names one of the step''s inputs, a single `Document` or a concept refining it, whose file is the
+
+        template, as an alternative to `template_file` for `xlsx`, `docx` and `pptx`: the run supplies the template, which
+
+        is checked when the run starts, and the output is a new file, the input''s file being left as it was. `table_fill`
+
+        says how the template''s Tables are filled: `replace`, the default, writes a list''s records over a Table''s rows,
+        and
+
+        `append`, for `xlsx` only, writes them after its last row. The output must be a single `Document`, or a concept refining
+        it. `model` names the
 
         document engine that prints it, a model of the `doc_gen` family such as `reportlab-pdf` or, with the Pipelex
 
@@ -8373,6 +8394,13 @@ components:
       required:
       - pipe
       title: SubPipeBlueprint
+    TableFill:
+      type: string
+      enum:
+      - replace
+      - append
+      title: TableFill
+      description: How a step fills the Tables of its template file.
     TagStyle:
       type: string
       enum:

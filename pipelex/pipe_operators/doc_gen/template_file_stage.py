@@ -8,8 +8,10 @@ needs the method itself (`pipelex.cogt.doc_gen.template_file_stage`):
   concepts of the run's library crate, in the run's own library when this process holds it, such as in a local run, and
   otherwise, such as in an activity on a worker, in a library loaded from those concepts alone, which this process keeps
   for the prints that follow (`RenderLibraryCache`);
-- the findings of the engine's check of an office template file, at a dry print, fail the step when one is an error,
-  and join the validation verdict's warnings otherwise, or the log when no validation collects them.
+- the findings of the engine's check of an office template file, at a dry print, or at a live one for a template a
+  run input supplies, fail the step when one is an error, and join the validation verdict's warnings otherwise, or the
+  log when no validation collects them. An error in a template a run input supplies is the caller's
+  (`PipeDocGenTemplateInputUnfitError`), and one in the method's own template file the method's.
 """
 
 import threading
@@ -33,7 +35,7 @@ from pipelex.kernel.compose_ops import build_compose_context
 from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
-from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateCheckError
+from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateCheckError, PipeDocGenTemplateInputUnfitError
 from pipelex.pipe_run.dry_run_warning_collector import report_dry_run_warning
 from pipelex.runtime_bridge.primitives.hydration import hydrate_working_memory
 from pipelex.tools.jinja2.template_category import TemplateCategory
@@ -179,34 +181,42 @@ class DocGenTemplateFileStage(TemplateFileStageProtocol):
         domain_code, pipe_code = _step_codes(template_file=template_file)
         for finding in findings:
             if not finding.severity.is_error:
-                _report_template_warning(domain_code=domain_code, pipe_code=pipe_code, template_file=template_file.name, finding=finding)
+                _report_template_warning(domain_code=domain_code, pipe_code=pipe_code, template_file=template_file, finding=finding)
         errors = [finding for finding in findings if finding.severity.is_error]
-        if errors:
-            listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
-            msg = f"PipeDocGen '{pipe_code}': the template file '{template_file.name}' does not fit the step's inputs:\n{listed}"
-            findings_text = "; ".join(finding.message for finding in errors)
-            raise PipeDocGenTemplateCheckError(msg).with_params(template=template_file.name, reason="does_not_fit", finding=findings_text)
+        if not errors:
+            return
+        listed = "\n".join(f"- {finding.message}" + (f" ({finding.location})" if finding.location else "") for finding in errors)
+        findings_text = "; ".join(finding.message for finding in errors)
+        input_file = template_file.input_file
+        if input_file is not None:
+            # The file is the caller's, so the refusal is the caller's to act on, naming the input and never its file.
+            msg = f"PipeDocGen '{pipe_code}': {template_file.desc} does not fit the step's inputs:\n{listed}"
+            raise PipeDocGenTemplateInputUnfitError(msg, input_name=input_file.input_name, finding=findings_text)
+        msg = f"PipeDocGen '{pipe_code}': the template file '{template_file.name}' does not fit the step's inputs:\n{listed}"
+        raise PipeDocGenTemplateCheckError(msg).with_params(template=template_file.name, reason="does_not_fit", finding=findings_text)
 
 
-def _report_template_warning(*, domain_code: str | None, pipe_code: str, template_file: str, finding: TemplateFinding) -> None:
+def _report_template_warning(*, domain_code: str | None, pipe_code: str, template_file: ComposedTemplateFile, finding: TemplateFinding) -> None:
     """Report a warning of the template check as an advisory item, located at its step, its file and the place in it.
 
-    An engine that answers an empty location names no place, so the item's `template_location` is left unset.
+    An engine that answers an empty location names no place, so the item's `template_location` is left unset. A template
+    a run input supplies is named by the input, `the input 'workbook'`, as its job names it.
     """
     location = finding.location or None
     location_suffix = f" ({location})" if location is not None else ""
+    template_label = template_file.desc if template_file.input_file is not None else f"template file '{template_file.name}'"
     warning = ValidationErrorItem(
         category=ValidationErrorCategory.DRY_RUN,
         error_type=TemplateCheckErrorType.TEMPLATE_CHECK_WARNING,
         pipe_code=pipe_code,
         domain_code=domain_code,
-        template_file=template_file,
+        template_file=template_file.name,
         template_location=location,
-        message=f"PipeDocGen '{pipe_code}', template file '{template_file}': {finding.message}{location_suffix}",
+        message=f"PipeDocGen '{pipe_code}', {template_label}: {finding.message}{location_suffix}",
     )
     if report_dry_run_warning(warning=warning):
         return
-    finding_fields: dict[str, str] = {"pipe_code": pipe_code, "template_file": template_file, "finding_message": finding.message}
+    finding_fields: dict[str, str] = {"pipe_code": pipe_code, "template_file": template_file.name, "finding_message": finding.message}
     if location is not None:
         finding_fields["finding_location"] = location
     log.warning("The template check of a PipeDocGen found a warning in its template file", fields=finding_fields)

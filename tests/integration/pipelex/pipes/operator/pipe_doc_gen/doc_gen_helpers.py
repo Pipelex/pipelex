@@ -62,6 +62,14 @@ PIPELEX_DOCX_SPEC: dict[str, Any] = {
     "costs": {},
 }
 
+# The plugin's Excel engine, which the stubs declare only when a test asks for it, with the inputs the test gives it:
+# `table_append` among them declares that it appends to a Table.
+PIPELEX_XLSX_SDK = "openpyxl"
+
+
+def pipelex_xlsx_spec(*, inputs: list[str]) -> dict[str, Any]:
+    return {"model_type": "doc_gen", "sdk": PIPELEX_XLSX_SDK, "model_id": "fill-xlsx", "inputs": inputs, "outputs": ["xlsx"], "costs": {}}
+
 
 class StubEngine:
     """An engine that prints the job it was handed as its bytes, and remembers it."""
@@ -91,9 +99,10 @@ class StubDocGenWorker(DocGenWorkerAbstract):
 
 
 class StubEngines:
-    """The stub engines of one test, registered for the sdks of `reportlab-pdf`, `pipelex-pdf` and `pipelex-docx`."""
+    """The stub engines of one test, for the sdks of `reportlab-pdf`, `pipelex-pdf` and `pipelex-docx`, and of `pipelex-xlsx` when asked."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, xlsx_inputs: list[str] | None = None) -> None:
+        self.xlsx_inputs = xlsx_inputs
         self.engine = StubEngine()
         self.nb_builds = 0
         self.findings: list[TemplateFinding] = []
@@ -125,6 +134,10 @@ class StubEngines:
         registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.PDF, source=DocGenSource.HTML, model="pipelex-pdf")
         registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.DOCX, source=DocGenSource.LAYOUT, model="pipelex-docx")
         registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.DOCX, source=DocGenSource.TEMPLATE_FILE, model="pipelex-docx")
+        if self.xlsx_inputs is not None:
+            registrar.add_inference_backend(family=InferenceFamily.DOC_GEN, sdk=PIPELEX_XLSX_SDK, make_worker=self.make_worker)
+            registrar.add_internal_model(name="pipelex-xlsx", spec=pipelex_xlsx_spec(inputs=self.xlsx_inputs))
+            registrar.add_doc_gen_default(doc_gen_format=DocGenFormat.XLSX, source=DocGenSource.TEMPLATE_FILE, model="pipelex-xlsx")
 
     def make_registrar(self) -> PluginRegistrar:
         """A registrar holding only the stub plugin's contributions, built the way discovery builds one."""

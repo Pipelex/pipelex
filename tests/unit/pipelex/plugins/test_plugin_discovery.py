@@ -185,7 +185,14 @@ class TestPluginDiscovery:
         with pytest.raises(PluginApiVersionMismatchError) as exc_info:
             _build_registrar_with(mocker=mocker, plugins=[v9_plugin])
         assert "written_against_v9" in str(exc_info.value)
-        assert PLUGIN_API_VERSION == 10
+
+    def test_a_plugin_written_before_render_jobs_carried_a_table_fill_is_refused(self, mocker: MockerFixture) -> None:
+        """Plugin API v10 render jobs had no `table_fill`; a v10 engine would replace a Table's rows when asked to append."""
+        v10_plugin = _InferencePlugin(name="written_against_v10", sdk="v10_sdk", targets_api=10)
+        with pytest.raises(PluginApiVersionMismatchError) as exc_info:
+            _build_registrar_with(mocker=mocker, plugins=[v10_plugin])
+        assert "written_against_v10" in str(exc_info.value)
+        assert PLUGIN_API_VERSION == 11
 
     def test_duplicate_inference_backend_names_both(self, mocker: MockerFixture) -> None:
         with pytest.raises(DuplicateInferenceBackendError) as exc_info:

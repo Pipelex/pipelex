@@ -31,9 +31,11 @@ class TemplateFileStageProtocol(Protocol):
         ...
 
     def report_template_findings(self, *, template_file: ComposedTemplateFile, findings: list[TemplateFinding]) -> None:
-        """Report what the engine's template checker found in an office template file, at a dry print.
+        """Report what the engine's template checker found in an office template file.
 
-        An error finding fails the step; a warning joins the validation verdict's warnings, or the log when no
-        validation collects them.
+        Called at a dry print for the method's template file, and for a template a run input supplies at run setup and
+        at the step's live print. An error finding fails the step, as the method's fault for its own template file and
+        as the caller's for a file a run input supplies; a warning joins the validation verdict's warnings, or the log
+        when no validation collects them.
         """
         ...
