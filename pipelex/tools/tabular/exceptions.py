@@ -139,3 +139,27 @@ class TableReaderMisconfiguredError(ToolError):
     @override
     def problem_params(self) -> dict[str, Any]:
         return {"component": TABLE_READER_COMPONENT}
+
+
+class TableTooLargeError(CsvError):
+    """Raised when a spreadsheet is larger than the runtime reads, before its cells are read.
+
+    ``input.too_large``, the input's fault: a workbook whose parts, decompressed, would pass
+    ``[runtime.table_reading] max_workbook_uncompressed_bytes``, refused with ``limit`` and ``size`` in bytes, or a
+    Table spanning more cells than ``max_table_cells``, a count of cells the code's sentence would read as a size, so
+    that refusal withholds both and its sentence says the input is too large for the step.
+    """
+
+    error_code = CoreCode.INPUT_TOO_LARGE
+
+    def __init__(self, message: str, *, limit_bytes: int | None = None, size_bytes: int | None = None):
+        super().__init__(message)
+        # The bound the workbook passed and its decompressed size, in bytes, or None for a refusal counted in cells.
+        self.limit_bytes = limit_bytes
+        self.size_bytes = size_bytes
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        if self.limit_bytes is None or self.size_bytes is None:
+            return {"input": self.input_name}
+        return {"input": self.input_name, "limit": self.limit_bytes, "size": self.size_bytes}

@@ -10,9 +10,11 @@ workbook (`.xlsx`) or a CSV file is refused as ``input.file_type_unsupported``, 
 dispatches this in a dry run, which reads nothing, so there is no dry branch.
 """
 
+import asyncio
+
 from pipelex.cogt.content_generation.assignment_models import TableReadAssignment
 from pipelex.cogt.content_generation.read_authorization import authorize_assignment_reads
-from pipelex.config import fetch_max_bytes
+from pipelex.config import fetch_max_bytes, table_reading_limits
 from pipelex.runtime_hub import get_storage_provider
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, describe_file_format
 from pipelex.tools.tabular.exceptions import CsvError, TableFileTypeUnsupportedError
@@ -57,13 +59,17 @@ async def read_table_of_document(*, table_read_assignment: TableReadAssignment) 
             .with_params(format=format_key or UNKNOWN_FILE_TYPE, model=TABLE_READER)
         )
     try:
-        return read_table_records(
+        # Parsing a workbook is CPU-bound and can take seconds, so it runs on a worker thread rather than blocking the
+        # event loop; `to_thread` copies the context, which keeps the run's logging context on that thread.
+        return await asyncio.to_thread(
+            read_table_records,
             raw_bytes=raw_bytes,
             table_format=table_format,
             field_names=table_read_assignment.field_names,
             row_field=table_read_assignment.row_field,
             table_name=table_read_assignment.table_name,
             binding=TableBinding.STEP,
+            limits=table_reading_limits(),
             input_name=input_name,
         )
     except CsvError as exc:

@@ -17,6 +17,11 @@ reported so the step can warn (`RawTable.uncached_formula_columns`).
 
 **The rows.** Every data row of the Table is a row of the table, an empty one included, named in messages by its sheet
 row, as Excel shows it.
+
+**The limits.** The file chooses its own size, so two bounds (`TableReadingConfig`) are checked before any cell is read:
+the bytes the workbook's parts hold once decompressed, summed from its archive's directory before anything is
+decompressed, and the cells the Table spans. Cells are read only within the sheet's own extent, whatever range the Table
+declares.
 """
 
 import io
@@ -25,7 +30,8 @@ from datetime import date, datetime, time, timedelta
 from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.system.exceptions import MissingDependencyError
-from pipelex.tools.tabular.exceptions import CsvReadError, TableSelectionError
+from pipelex.tools.tabular.exceptions import CsvReadError, TableSelectionError, TableTooLargeError
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import RawTable, RawTableRow, TableCellValue
 
 try:
@@ -56,12 +62,13 @@ def xlsx_subject(*, input_name: str | None) -> str:
     return f"the workbook given for input '{input_name}'" if input_name is not None else "the workbook"
 
 
-def read_xlsx_raw_table(*, raw_bytes: bytes, table_name: str | None, subject: str) -> RawTable:
+def read_xlsx_raw_table(*, raw_bytes: bytes, table_name: str | None, limits: TableReadingConfig, subject: str) -> RawTable:
     """Read one Table of a workbook's bytes into a `RawTable`.
 
     Args:
         raw_bytes: The workbook's bytes.
         table_name: The Table to read, compared ignoring case; None to read the workbook's only Table.
+        limits: How large a workbook, and a Table, may be read.
         subject: How messages name the workbook.
 
     Returns:
@@ -71,7 +78,9 @@ def read_xlsx_raw_table(*, raw_bytes: bytes, table_name: str | None, subject: st
         MissingDependencyError: openpyxl is not installed.
         CsvReadError: The bytes are not a workbook openpyxl can open, or the Table has no header row.
         TableSelectionError: The Table cannot be chosen, as the module says.
+        TableTooLargeError: The workbook's parts, decompressed, or the Table's cells, pass the limits.
     """
+    _refuse_oversized_archive(raw_bytes=raw_bytes, max_uncompressed_bytes=limits.max_workbook_uncompressed_bytes, subject=subject)
     value_workbook = _load_workbook(raw_bytes=raw_bytes, data_only=True, subject=subject)
     worksheet, table = _choose_table(workbook=value_workbook, table_name=table_name, subject=subject)
     table_label = f"Table '{table.displayName}'"
@@ -87,24 +96,66 @@ def read_xlsx_raw_table(*, raw_bytes: bytes, table_name: str | None, subject: st
     totals_row_count = table.totalsRowCount or 0
     first_data_row = min_row + 1
     last_data_row = max_row - totals_row_count
-    columns = range(min_col, max_col + 1)
+
+    # The declared range is the file's word, and a crafted one can span the whole sheet: cells are only ever read within
+    # the sheet's own extent. A column past it holds no cell, its header included, so it is no column of the table; a row
+    # past it is a data row of the Table whose cells are all empty, which counts toward the row position as the standard
+    # rules, and is made without reading the sheet.
+    sheet_last_row = worksheet.max_row
+    last_column = min(max_col, worksheet.max_column)
+    columns = range(min_col, last_column + 1)
+    nb_cells = (max(last_data_row, min_row) - min_row + 1) * len(columns)
+    if nb_cells > limits.max_table_cells:
+        msg = (
+            f"{table_label} of {subject} spans {nb_cells} cells, more than the {limits.max_table_cells} a table is read with "
+            "([runtime.table_reading] max_table_cells): read a smaller table."
+        )
+        raise TableTooLargeError(msg)
 
     header = [_header_text(value=worksheet.cell(row=min_row, column=column).value) for column in columns]
     empty_cells: list[tuple[int, int]] = []
     rows: list[RawTableRow] = []
     for sheet_row in range(first_data_row, last_data_row + 1):
+        row_label = f"row {sheet_row} of {table_label}"
+        if sheet_row > sheet_last_row:
+            rows.append(RawTableRow(label=row_label, cells=[None] * len(columns)))
+            continue
         cells: list[TableCellValue] = []
         for column_index, column in enumerate(columns):
             value = _cell_value(value=worksheet.cell(row=sheet_row, column=column).value)
             if value is None:
                 empty_cells.append((sheet_row, column_index))
             cells.append(value)
-        rows.append(RawTableRow(label=f"row {sheet_row} of {table_label}", cells=cells))
+        rows.append(RawTableRow(label=row_label, cells=cells))
 
     uncached_formula_columns = _uncached_formula_columns(
         raw_bytes=raw_bytes, sheet_title=worksheet.title, min_col=min_col, empty_cells=empty_cells, subject=subject
     )
     return RawTable(header=header, rows=rows, uncached_formula_columns=uncached_formula_columns)
+
+
+def _refuse_oversized_archive(*, raw_bytes: bytes, max_uncompressed_bytes: int, subject: str) -> None:
+    """Refuse a workbook whose parts, decompressed, would hold more bytes than the limit, before decompressing any.
+
+    The sizes are the ones the archive's directory declares, which bound what reading a part yields: Python's ZIP reader
+    stops a part at its declared size.
+
+    Raises:
+        CsvReadError: The bytes are not a ZIP archive.
+        TableTooLargeError: The declared sizes sum past the limit.
+    """
+    try:
+        with zipfile.ZipFile(io.BytesIO(raw_bytes)) as archive:
+            uncompressed_bytes = sum(info.file_size for info in archive.infolist())
+    except (zipfile.BadZipFile, OSError) as exc:
+        msg = f"Could not open {subject} as an Excel workbook (.xlsx): {type(exc).__name__}"
+        raise CsvReadError(msg) from exc
+    if uncompressed_bytes > max_uncompressed_bytes:
+        msg = (
+            f"{subject.capitalize()} holds {uncompressed_bytes} bytes once decompressed, more than the {max_uncompressed_bytes} "
+            "a workbook is read with ([runtime.table_reading] max_workbook_uncompressed_bytes)."
+        )
+        raise TableTooLargeError(msg, limit_bytes=max_uncompressed_bytes, size_bytes=uncompressed_bytes)
 
 
 def _missing_openpyxl() -> MissingDependencyError:
@@ -122,8 +173,10 @@ def _load_workbook(*, raw_bytes: bytes, data_only: bool, subject: str) -> "Workb
     try:
         return openpyxl.load_workbook(io.BytesIO(raw_bytes), data_only=data_only)
     # openpyxl raises these on a file that is not a workbook: a zip it cannot open, a zip missing a part it needs, or a part
-    # it cannot parse. None of their texts is quoted, since they can carry the file's own content.
-    except (zipfile.BadZipFile, InvalidFileException, KeyError, ValueError, OSError) as exc:
+    # it cannot parse, an XML part that is not well formed raising a `SyntaxError` (the standard library's `ParseError`
+    # and lxml's `XMLSyntaxError` both subclass it). None of their texts is quoted, since they can carry the file's own
+    # content.
+    except (zipfile.BadZipFile, InvalidFileException, KeyError, ValueError, OSError, SyntaxError) as exc:
         msg = f"Could not open {subject} as an Excel workbook (.xlsx): {type(exc).__name__}"
         raise CsvReadError(msg) from exc
 

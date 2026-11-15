@@ -382,6 +382,7 @@ StuffSpecFactoryError | method.schema_violation
 TableFileTypeUnsupportedError | input.file_type_unsupported
 TableReaderMisconfiguredError | runtime.misconfigured
 TableSelectionError | input.invalid
+TableTooLargeError | input.too_large
 TelemetryApiKeyMissingError | pipelex.config.variable_missing
 TelemetryConfigError | abstract
 TelemetryConfigValidationError | pipelex.config.invalid

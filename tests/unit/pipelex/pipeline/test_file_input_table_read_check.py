@@ -24,7 +24,7 @@ XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
 
-def _check(*, mocker: MockerFixture, mime_type: str | None, can_convert_documents: bool = False) -> None:
+def _check(*, mocker: MockerFixture, mime_type: str | None, can_convert_documents: bool = False, file_name: str | None = None) -> None:
     consumer = FileInputConsumer(
         slot_name="budget",
         consumed_path=("budget",),
@@ -39,7 +39,9 @@ def _check(*, mocker: MockerFixture, mime_type: str | None, can_convert_document
         asks_for_page_views=False,
     )
     mocker.patch("pipelex.pipeline.file_input_consumers.collect_file_input_consumers", return_value={"budget": [consumer]})
-    file_input = IdentifiedFileInput(path=("budget",), kind=FileInputKind.DOCUMENT, uri_kind=UriKind.PIPELEX_STORAGE, mime_type=mime_type)
+    file_input = IdentifiedFileInput(
+        path=("budget",), kind=FileInputKind.DOCUMENT, uri_kind=UriKind.PIPELEX_STORAGE, mime_type=mime_type, file_name=file_name
+    )
     conversions = check_file_inputs_against_consumers(
         entry_pipe=mocker.MagicMock(), file_inputs=[file_input], can_convert_documents=can_convert_documents
     )
@@ -50,6 +52,11 @@ class TestFileInputTableReadCheck:
     @pytest.mark.parametrize("mime_type", [XLSX_MIME, "text/csv", None])
     def test_a_workbook_a_csv_file_or_an_unknown_format_passes(self, mocker: MockerFixture, mime_type: str | None) -> None:
         _check(mocker=mocker, mime_type=mime_type)
+
+    @pytest.mark.parametrize("mime_type", ["application/vnd.ms-excel", "text/plain", "application/octet-stream", "text/x-csv"])
+    def test_a_csv_file_declared_with_a_type_naming_no_table_format_passes_by_its_name(self, mocker: MockerFixture, mime_type: str) -> None:
+        """The step judges such a file by its name and its bytes, so run setup leaves it to the step."""
+        _check(mocker=mocker, mime_type=mime_type, file_name="data.csv")
 
     @pytest.mark.parametrize(
         ("mime_type", "format_key", "described"),

@@ -77,6 +77,7 @@ from pipelex.pipeline.exceptions import PipelineInputFormatUnsupportedError
 from pipelex.pipeline.input_normalizer import IdentifiedFileInput
 from pipelex.runtime_hub import get_model_deck
 from pipelex.tools.misc.filetype_utils import PDF_FORMAT_KEY, UNKNOWN_FILE_TYPE, describe_file_format, describe_format_keys
+from pipelex.tools.tabular.table_reader import table_format_named_by
 from pipelex.tools.tabular.table_records import TABLE_READER, TableFormat
 from pipelex.tools.uri.resolved_uri import UriKind
 
@@ -395,6 +396,10 @@ def _format_refusal(*, file_input: IdentifiedFileInput, consumer: FileInputConsu
     file_format = describe_file_format(format_key=format_key, mime_type=file_input.mime_type)
     match consumer.kind:
         case FileConsumerKind.TABLE_READ:
+            # A CSV file is often declared with a type naming no table format, which the step then judges by the file's
+            # name, reading its bytes too (`table_format_key_of`): a name naming a table format leaves it to the step.
+            if file_input.file_name is not None and table_format_named_by(file_name=file_input.file_name) is not None:
+                return None
             return _ConsumerRefusal(
                 sentence=(
                     f"Input '{file_input.display_path}' is {file_format}: "

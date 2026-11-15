@@ -1,5 +1,6 @@
 import pytest
 
+from pipelex.config import TABLE_READING_FALLBACK
 from pipelex.tools.tabular.exceptions import CsvColumnError, TableSelectionError
 from pipelex.tools.tabular.table_reader import read_table_records, table_format_key_of, table_format_of
 from pipelex.tools.tabular.table_records import TableBinding, TableFormat, TableRecords
@@ -16,6 +17,7 @@ def _read_csv(text: str, *, table_name: str | None = None) -> TableRecords:
         row_field="line",
         table_name=table_name,
         binding=TableBinding.STEP,
+        limits=TABLE_READING_FALLBACK,
         input_name="budget",
     )
 
@@ -30,6 +32,14 @@ class TestTableReader:
             pytest.param(b"item,amount\n", None, "budget.CSV", "csv", id="csv-by-name"),
             pytest.param(b"%PDF-1.7\n", "text/csv", "budget.csv", "pdf", id="bytes-win-over-declarations"),
             pytest.param(b"item,amount\n", None, None, None, id="nothing-tells"),
+            # A CSV file declared with a type that names no table format, as uploads commonly are, is known by its name.
+            pytest.param(b"item,amount\n", "application/octet-stream", "data.csv", "csv", id="csv-declared-octet-stream"),
+            pytest.param(b"item,amount\n", "application/csv", "data.csv", "csv", id="csv-declared-application-csv"),
+            pytest.param(b"item,amount\n", "text/x-csv", "data.csv", "csv", id="csv-declared-text-x-csv"),
+            pytest.param(b"item,amount\n", "text/plain", "data.csv", "csv", id="csv-declared-text-plain"),
+            pytest.param(b"item,amount\n", "application/vnd.ms-excel", "data.csv", "csv", id="csv-declared-by-windows-excel"),
+            # A declared type naming no table format stands when the name names none either.
+            pytest.param(b"item,amount\n", "text/plain", "notes.txt", "txt", id="text-declared-and-named"),
         ],
     )
     def test_the_format_is_judged_from_bytes_then_media_type_then_name(
@@ -76,6 +86,7 @@ class TestTableReader:
             row_field="line",
             table_name="budget",
             binding=TableBinding.STEP,
+            limits=TABLE_READING_FALLBACK,
             input_name="budget",
         )
 

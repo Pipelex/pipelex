@@ -15,12 +15,14 @@ still a workbook, and a CSV file, which no bytes identify, is known by its decla
 
 from pathlib import Path
 
+from pipelex.config import table_reading_limits
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.errors.error_codes import error_code_spec
-from pipelex.tools.misc.filetype_utils import format_key_from_mime_type, identify_mime_type, mime_type_of_file_name
+from pipelex.tools.misc.filetype_utils import format_key_from_mime_type, guess_file_type_from_bytes, identify_mime_type, mime_type_of_file_name
 from pipelex.tools.tabular.csv_codec import csv_subject, flat_field_names, list_content_from_csv, read_csv_raw_table
 from pipelex.tools.tabular.exceptions import CsvError, CsvReadError, TableSelectionError
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 from pipelex.tools.tabular.table_records import (
     RawTable,
     TableBinding,
@@ -33,11 +35,26 @@ from pipelex.tools.tabular.xlsx_codec import read_xlsx_raw_table, xlsx_subject
 
 
 def table_format_key_of(*, raw_bytes: bytes, mime_type: str | None, file_name: str | None) -> str | None:
-    """The format key of a file, judged from its bytes, then its media type, then its name; None when nothing tells."""
+    """The format key of a file, judged from its bytes, then its media type, then its name; None when nothing tells.
+
+    A CSV file carries no signature its bytes could be identified by, and is often declared with a type that names no
+    table format: `application/octet-stream`, `text/plain`, or `application/vnd.ms-excel`, the type Windows gives a
+    `.csv` file when Excel is installed. So when the bytes identify nothing and the declared type names no format a
+    table is read from, the file's name decides, when it names one.
+    """
     identified_mime_type = identify_mime_type(head=raw_bytes, declared_mime_type=mime_type, file_name=file_name)
     if identified_mime_type is None and file_name:
         identified_mime_type = mime_type_of_file_name(file_name=file_name)
-    return format_key_from_mime_type(mime_type=identified_mime_type)
+    format_key = format_key_from_mime_type(mime_type=identified_mime_type)
+    if table_format_of(format_key=format_key) is not None or not file_name or guess_file_type_from_bytes(raw_bytes=raw_bytes) is not None:
+        return format_key
+    named_table_format = table_format_named_by(file_name=file_name)
+    return named_table_format if named_table_format is not None else format_key
+
+
+def table_format_named_by(*, file_name: str) -> TableFormat | None:
+    """The table format a file's name names by its extension, None for a name naming another format or none."""
+    return table_format_of(format_key=format_key_from_mime_type(mime_type=mime_type_of_file_name(file_name=file_name)))
 
 
 def table_format_of(*, format_key: str | None) -> TableFormat | None:
@@ -67,6 +84,7 @@ def read_table_records(
     row_field: str | None,
     table_name: str | None,
     binding: TableBinding,
+    limits: TableReadingConfig,
     input_name: str | None,
 ) -> TableRecords:
     """Read a table file's bytes into records keyed by the fields their columns match.
@@ -78,12 +96,14 @@ def read_table_records(
         row_field: The field that receives each row's position, which no column may match; None for none.
         table_name: The Excel Table to read; None for a workbook's only Table, and always None for a CSV file.
         binding: Whose rules the table is read under.
+        limits: How large a workbook, and a Table, may be read.
         input_name: The input the file was given as, which messages name it by.
 
     Raises:
         TableSelectionError: A Table is named for a CSV file, or the workbook's Table cannot be chosen.
         CsvError: The file cannot be read, or its header does not match the fields.
         MissingDependencyError: The file is a workbook and openpyxl is not installed.
+        TableTooLargeError: The workbook, or its Table, is larger than `limits` allow.
     """
     subject = table_subject(table_format=table_format, input_name=input_name)
     raw_table: RawTable
@@ -94,7 +114,7 @@ def read_table_records(
                 raise TableSelectionError(msg)
             raw_table = read_csv_raw_table(raw_bytes=raw_bytes, binding=binding, subject=subject)
         case TableFormat.XLSX:
-            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=table_name, subject=subject)
+            raw_table = read_xlsx_raw_table(raw_bytes=raw_bytes, table_name=table_name, limits=limits, subject=subject)
     return build_table_records(
         raw_table=raw_table,
         table_format=table_format,
@@ -136,6 +156,7 @@ def list_content_from_table_file(
         row_field=None,
         table_name=None,
         binding=TableBinding.RUN_INPUT,
+        limits=table_reading_limits(),
         input_name=input_name,
     )
     return list_content_from_table_records(

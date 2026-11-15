@@ -18,6 +18,7 @@ from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.network.network_config import NetworkConfig
 from pipelex.tools.secrets.secrets_config import SecretsProviderConfig
 from pipelex.tools.storage.storage_config import StorageConfig
+from pipelex.tools.tabular.table_reading_config import TableReadingConfig
 
 
 class ConfigPaths:
@@ -193,13 +194,15 @@ class RuntimeConfig(ConfigModel):
 
     The machinery present at execution time whatever is loaded, per
     ``docs/contribute/hub-layering.md``: storage, secrets, logging, cloud credentials,
-    error tracking, reporting, tracing, observation, outbound network posture, document conversion, and the plugin system's own denylist.
+    error tracking, reporting, tracing, observation, outbound network posture, document conversion, spreadsheet reading limits,
+    and the plugin system's own denylist.
     """
 
     storage: StorageConfig
     network: NetworkConfig
     secrets: SecretsProviderConfig
     document_conversion: DocumentConversionConfig
+    table_reading: TableReadingConfig
     log: LogConfig
     error_tracking: ErrorTrackingConfig
     aws: AwsConfig

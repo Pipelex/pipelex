@@ -58,7 +58,7 @@ See [Understanding Multiplicity](../understanding-multiplicity.md) for the full 
 
 ## Reading a spreadsheet
 
-When the single input is a `Document`, `PipeStructure` reads one table of the file into the output list, one item per data row, with no model call and no inference cost. The file's format is judged from its bytes first, then from the media type and the file name it was given with: an Excel workbook (`.xlsx`) or a CSV file is read, and any other file is refused, naming the input. Run setup already refuses a file of another format given as a method input, before any step runs. Reading a workbook needs the `tabular` extra (`pip install "pipelex[tabular]"`), which installs openpyxl.
+When the single input is a `Document`, `PipeStructure` reads one table of the file into the output list, one item per data row, with no model call and no inference cost. The file's format is judged from its bytes first, then from the media type and the file name it was given with: an Excel workbook (`.xlsx`) or a CSV file is read, and any other file is refused, naming the input. A CSV file has no signature its bytes could be told by, and uploads often declare it with a type that names no table format, such as `application/octet-stream`, `text/plain` or `application/vnd.ms-excel`, the type Windows gives a `.csv` file when Excel is installed: when the bytes say nothing and the declared type names neither format, a file named `….csv` or `….xlsx` is read by its name. Run setup already refuses a file of another format given as a method input, before any step runs. Reading a workbook needs the `tabular` extra (`pip install "pipelex[tabular]"`), which installs openpyxl.
 
 **Which table.** In a workbook, the rows are read from an Excel Table, the named table object created with Insert > Table: the one `table` names, or the workbook's only Table when `table` is left out. A workbook with no Table of that name, or, with no name given, several Tables or none, is refused, and the refusal lists the Tables found. The Table's header row names the columns, and its totals row is not read. A CSV file is one table, read as comma-separated UTF-8 with a header line, a leading byte order mark ignored.
 
@@ -69,6 +69,16 @@ When the single input is a `Document`, `PipeStructure` reads one table of the fi
 **Which values.** The output concept's fields must each be `text`, `integer`, `number`, `boolean`, `date`, `datetime` or `choices`; a concept without a structure, or with a nested or list field, is refused. An empty cell gives the field its default value, or nothing. A workbook cell keeps its type: a text field reads a whole number as its digits, another number in its shortest decimal form, a date in ISO 8601 form and a boolean as `true` or `false`; an integer field reads a number without a fractional part; a number field any number, never a boolean; a boolean field a boolean; a date field a date, or a datetime at midnight; a datetime field a datetime or a date. A text cell, which every CSV cell is, gives an integer only from an integer literal, a number only from a decimal written with a dot and no grouping separator (`1,5`, `1 234.5` and `1_000` are refused), a boolean from `true`/`false`, `yes`/`no`, `on`/`off`, `y`/`n`, `t`/`f` or `1`/`0` ignoring case, a date or a datetime only in ISO 8601 form, and a choice only when it matches exactly. A value that does not convert fails the step, naming the row's position and the field.
 
 **Formulas.** A formula cell is read as the value the workbook last calculated and stored. A workbook saved by a program that stores no such value, as some generators do, has none: the cell reads as empty, and the step logs a warning naming the field.
+
+**Limits.** Whoever supplies the file chooses its size, and a workbook of a few compressed kilobytes can declare a Table of millions of cells, so two limits are checked before any cell is read, set under `[runtime.table_reading]`:
+
+```toml
+[runtime.table_reading]
+max_workbook_uncompressed_bytes = 100_000_000
+max_table_cells = 2_000_000
+```
+
+A workbook whose parts would hold more than `max_workbook_uncompressed_bytes` once decompressed, as its archive declares them, is refused before it is decompressed, and a Table spanning more than `max_table_cells` cells, its rows, header included, times its columns, is refused before its cells are read. Both refusals are `input.too_large`, naming the input. Cells are only ever read within the part of the sheet that holds cells: a column of the Table's declared range past the sheet's last filled column is no column of the table, and a row past the sheet's last filled row is an empty data row, counted toward the row position without being read. A refused workbook is fixed by reading a smaller Table, or by raising the limits on a deployment that has the memory for it.
 
 A dry run reads nothing: it produces mock records, with their positions in the `row_field`.
 

@@ -6,6 +6,7 @@ A workbook openpyxl writes stores no cached value for a formula, which is what `
 import io
 import re
 import zipfile
+from collections.abc import Callable
 from typing import Any
 
 from openpyxl import Workbook
@@ -81,3 +82,25 @@ def formula_with_cached_value(*, xlsx_bytes: bytes, cached_value: str) -> bytes:
                 content = text.encode("utf-8")
             target.writestr(item, content)
     return buffer.getvalue()
+
+
+def with_part_rewritten(*, xlsx_bytes: bytes, part_name: str, rewrite: Callable[[bytes], bytes]) -> bytes:
+    """The bytes of a workbook whose part `part_name` is rewritten, the other parts kept as they are."""
+    source = zipfile.ZipFile(io.BytesIO(xlsx_bytes))
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            content = source.read(item.filename)
+            if item.filename == part_name:
+                content = rewrite(content)
+            target.writestr(item, content)
+    return buffer.getvalue()
+
+
+def with_table_ref(*, xlsx_bytes: bytes, ref: str) -> bytes:
+    """The bytes of a workbook whose first Table declares the range `ref`, whatever cells its sheet holds."""
+
+    def _rewrite(content: bytes) -> bytes:
+        return re.sub(rb'ref="[A-Z]+[0-9]+:[A-Z]+[0-9]+"', f'ref="{ref}"'.encode(), content)
+
+    return with_part_rewritten(xlsx_bytes=xlsx_bytes, part_name="xl/tables/table1.xml", rewrite=_rewrite)
