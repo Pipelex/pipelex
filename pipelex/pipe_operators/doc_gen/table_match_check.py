@@ -3,8 +3,9 @@
 Under `table_fill = "update"`, a list of records the step's data holds may fill a Table of the template, which the engine
 finds by the list's name. Which list fills which Table is known only once the template is read, so the load cannot hold a
 given list to the fields `match_on` or `match_row` names: it refuses the step only when no list carries every one of
-them, since then no Table could be updated, and holds each list that does carry them to their kinds. A Table filled from
-a list lacking the fields is the engine's to refuse, at its template check and at the fill (`RenderJob`). The lists are
+them with a kind that can match a row, since then no Table could be updated. A Table filled from a list lacking the
+fields, or holding one of a kind that cannot match, is the engine's to refuse, at its template check and at the fill
+(`RenderJob`). The lists are
 those where a Table can be filled from: an input that is a list of records, and a list of records a structured input
 holds in a field, at any depth through structures. A list inside a list fills no Table, so the records of a list are not
 searched further.
@@ -131,12 +132,15 @@ def _collect(*, shape: InputShape, path: str, found: RecordLists) -> None:
 def table_match_fields_refusal(*, found: RecordLists, match_on: list[str] | None, match_row: str | None) -> tuple[str, str] | None:
     """Why no Table of the step could be updated by the fields it matches records to rows by, with the blueprint field at fault, or None.
 
-    The step is refused when its data holds no list of records, when no list carries every field the update matches by,
-    or when a list that carries them holds one of a kind that cannot match a row. A value whose shape is not declared,
-    such as a JSON input, may hold a list carrying the fields, so it spares the step the first two refusals.
+    A list of records qualifies when it carries every field the update matches by, each of a kind that can match a row:
+    one value for each `match_on` field, an integer or number for the `match_row` field. Which list fills which Table is
+    the engine's to know, so the step passes as soon as one list qualifies, whatever the others hold. It is refused when
+    its data holds no list of records, or when no list qualifies; a value whose shape is not declared, such as a JSON
+    input, may hold a list that qualifies, so it spares the step the second refusal.
 
     Returns:
-        The blueprint field, `match_on` or `match_row`, and the finding, a clause naming the list, the field and why.
+        The blueprint field, `match_on` or `match_row`, and the finding: with one list, the clause naming the list, the
+        field and why; with several, each list's clause joined, the blueprint field being the first list's.
     """
     match_field = "match_on" if match_on is not None else "match_row"
     if not found.lists and not found.undeclared_paths:
@@ -147,21 +151,20 @@ def table_match_fields_refusal(*, found: RecordLists, match_on: list[str] | None
                 "the step's inputs holds a list of records: declare one, such as 'ExpenseCompletion[]'"
             ),
         )
-    missing_refusals: list[tuple[str, str]] = []
+    refusals: list[tuple[str, str]] = []
     for record_list in found.lists:
-        missing_refusal = _missing_field_refusal(record_list=record_list, match_on=match_on, match_row=match_row)
-        if missing_refusal is not None:
-            missing_refusals.append(missing_refusal)
-            continue
-        kind_refusal = _field_kind_refusal(record_list=record_list, match_on=match_on, match_row=match_row)
-        if kind_refusal is not None:
-            return kind_refusal
-    if found.undeclared_paths or len(missing_refusals) < len(found.lists):
+        refusal = _missing_field_refusal(record_list=record_list, match_on=match_on, match_row=match_row) or _field_kind_refusal(
+            record_list=record_list, match_on=match_on, match_row=match_row
+        )
+        if refusal is None:
+            return None
+        refusals.append(refusal)
+    if found.undeclared_paths:
         return None
-    if len(missing_refusals) == 1:
-        return missing_refusals[0]
-    findings = "; ".join(finding for _, finding in missing_refusals)
-    return missing_refusals[0][
+    if len(refusals) == 1:
+        return refusals[0]
+    findings = "; ".join(finding for _, finding in refusals)
+    return refusals[0][
         0
     ], f"no list of records of the step's data carries every field the update matches rows by, so no Table could be updated: {findings}"
 

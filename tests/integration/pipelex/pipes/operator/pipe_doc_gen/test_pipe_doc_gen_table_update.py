@@ -48,6 +48,12 @@ description = "A note on the report, which fills no Table"
 [concept.ExpenseNote.structure]
 text = { type = "text", description = "The note's text", required = true }
 
+[concept.ExpenseAttachment]
+description = "A file attached to expenses, which fills no Table"
+
+[concept.ExpenseAttachment.structure]
+invoice_number = { type = "list", item_type = "text", description = "The invoice numbers of the expenses it supports", required = true }
+
 [concept.AnnotatedExpenseReport]
 description = "A report holding completions and notes"
 
@@ -182,6 +188,12 @@ class TestPipeDocGenTableUpdate:
                 "match_row",
                 "the field 'category' of the records of 'report.completions' holds a row's position",
             ),
+            (
+                'workbook = "Document", attachments = "ExpenseAttachment[]"',
+                'match_on = ["invoice_number"]',
+                "match_on",
+                "the key field 'invoice_number' of the records of 'attachments' holds a list, not one value a cell can hold",
+            ),
         ],
         ids=[
             "unknown_key",
@@ -192,6 +204,7 @@ class TestPipeDocGenTableUpdate:
             "no_list_of_records",
             "no_list_of_two_carries_the_key",
             "the_list_carrying_the_field_holds_the_wrong_kind",
+            "the_only_list_holds_a_key_of_the_wrong_kind",
         ],
     )
     async def test_the_load_refuses_fields_the_records_do_not_carry(
@@ -227,6 +240,40 @@ class TestPipeDocGenTableUpdate:
 
         await validate_bundle(mthds_contents=[bundle])
 
+        assert updating_xlsx_stub_engines.engine.jobs == []
+
+    async def test_a_list_holding_the_key_with_the_wrong_kind_beside_one_that_can_match_is_accepted(
+        self, updating_xlsx_stub_engines: StubEngines
+    ) -> None:
+        """Which list fills which Table is the engine's to know, so the attachments' list of keys does not refuse the completions' update."""
+        bundle = _bundle(
+            inputs='workbook = "Document", completions = "ExpenseCompletion[]", attachments = "ExpenseAttachment[]"',
+            step_fields='match_on = ["invoice_number"]',
+        )
+
+        await validate_bundle(mthds_contents=[bundle])
+
+        assert updating_xlsx_stub_engines.engine.jobs == []
+
+    async def test_no_list_that_can_match_refuses_the_step_with_each_list_s_finding(self, updating_xlsx_stub_engines: StubEngines) -> None:
+        """One list holds the key with the wrong kind and the other lacks it, so the refusal names both, at the first one's field."""
+        bundle = _bundle(
+            inputs='workbook = "Document", attachments = "ExpenseAttachment[]", notes = "ExpenseNote[]"',
+            step_fields='match_on = ["invoice_number"]',
+        )
+
+        with pytest.raises(ValidateBundleError) as exc_info:
+            await validate_bundle(mthds_contents=[bundle])
+
+        item = only_problem_item(exc_info.value)
+        assert item.params is not None
+        params = item.params.model_dump(exclude_none=True)
+        assert params["field_path"] == "pipe.complete_expenses.match_on"
+        assert params["finding"] == (
+            "no list of records of the step's data carries every field the update matches rows by, so no Table could be updated: "
+            "the key field 'invoice_number' of the records of 'attachments' holds a list, not one value a cell can hold; "
+            "the records of 'notes' have no field 'invoice_number' to match a row's key by (their fields: 'text')"
+        )
         assert updating_xlsx_stub_engines.engine.jobs == []
 
     async def test_the_dry_run_hands_the_checker_no_mock_data_under_an_update(self, tmp_path: Path, updating_xlsx_stub_engines: StubEngines) -> None:
