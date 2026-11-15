@@ -7,6 +7,7 @@ from pipelex.cogt.doc_gen.input_shape import InputShape
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.method_file_urls import RelativeUrlBase
 from pipelex.cogt.doc_gen.render_job import RenderJob
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.tools.uri.uri_read_scope import UriReference
 
@@ -34,24 +35,74 @@ class TemplateRenderContext(BaseModel):
     runtime_params: dict[str, Any] = Field(default_factory=dict, description="The run's runtime parameters, which a template may read")
 
 
-class ComposedTemplateFile(BaseModel):
-    """A template file a step names, as its print stage reads it: a file of the step's method tree, and what to read it with.
+class TemplateInputFile(BaseModel):
+    """A template file a run supplies as one of the step's inputs: the input's name, and the document it holds.
 
-    The compose stage runs where the step runs, in a workflow on a hosted plane, which reads no file, so it names the
-    template file by its tree's digest and its tree path, and the print stage, an activity, reads it through the method
-    file store. An HTML template file carries the context it renders with; an office template file carries the shapes
-    of the step's inputs, which the engine's template checker reads at a dry print.
+    The compose stage reads no file, so it names the document by the URL its `DocumentContent` holds, with the media
+    type and the file name it carries, and the print stage reads it under the run's read scope as it reads any file the
+    run names. The file's name is never quoted in a message: an input is named by its name alone.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    file: MethodFileRef = Field(description="The template file, as a file of the step's method tree")
-    name: str = Field(description="The template file as the method names it, for messages")
+    input_name: str = Field(description="The step's input whose document is the template file")
+    url: str = Field(description="The document's URL, as its `DocumentContent` holds it")
+    mime_type: str | None = Field(default=None, description="The media type the document carries, if any")
+    filename: str | None = Field(default=None, description="The document's file name, if any, which the output's name defaults to")
+
+
+class ComposedTemplateFile(BaseModel):
+    """A template file a step prints from, as its print stage reads it: where the file is, and what to read it with.
+
+    The file is one of the step's method tree, named by its tree's digest and its tree path and read through the method
+    file store, or one the run supplies as one of the step's inputs (`TemplateInputFile`), read from the URL its document
+    holds. The compose stage runs where the step runs, in a workflow on a hosted plane, which reads no file, so it only
+    names the file, and the print stage, an activity, reads it. An HTML template file carries the context it renders
+    with, and is always the method's; an office template file carries the shapes of the step's inputs, which the
+    engine's template checker reads.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    file: MethodFileRef | TemplateInputFile = Field(description="The template file: a file of the step's method tree, or a run input's document")
+    name: str = Field(
+        description="The template file as the method names it, such as 'invoice.xlsx', or the input supplying it, as \"the input 'workbook'\""
+    )
     pipe_ref: str = Field(description="The step naming the template file, as 'domain.pipe_code', for the findings of its check")
     render_context: TemplateRenderContext | None = Field(default=None, description="What an HTML template file is rendered with")
     input_shapes: dict[str, InputShape] = Field(
         default_factory=dict, description="The step's declared inputs by name, as the shape of their plain data, for an office template's check"
     )
+
+    @model_validator(mode="after")
+    def validate_input_template(self) -> Self:
+        """A run input supplies an office template only: an HTML template is the method's own text."""
+        if isinstance(self.file, TemplateInputFile) and self.render_context is not None:
+            msg = "A template file a run input supplies is an office file, never an HTML template rendered before it prints."
+            raise ValueError(msg)
+        return self
+
+    @property
+    def method_file(self) -> MethodFileRef | None:
+        """The file of the step's method tree, when the template is the method's."""
+        return self.file if isinstance(self.file, MethodFileRef) else None
+
+    @property
+    def input_file(self) -> TemplateInputFile | None:
+        """The run input's document, when a run input supplies the template."""
+        return self.file if isinstance(self.file, TemplateInputFile) else None
+
+    @property
+    def desc(self) -> str:
+        """How a message names the template: "the template file 'invoice.xlsx'", or "the template the input 'workbook' supplies"."""
+        if self.input_file is not None:
+            return f"the template the input '{self.input_file.input_name}' supplies"
+        return f"the template file '{self.name}'"
+
+
+def template_input_name(*, input_name: str) -> str:
+    """How a template a run input supplies is named in a job and in messages: `the input 'workbook'`, never by its file's name."""
+    return f"the input '{input_name}'"
 
 
 class DocumentComposition(BaseModel):
@@ -82,10 +133,11 @@ class DocumentComposition(BaseModel):
     url_base: RelativeUrlBase | None = Field(
         default=None, description="Where the HTML template sits in its method tree, which every relative URL of the document resolves against"
     )
+    table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the template file's Tables are filled")
 
     @property
     def template_name(self) -> str | None:
-        """The template file as the method names it, when the step prints from one."""
+        """The template file as the method names it, or the input supplying it, when the step prints from one."""
         return self.template_file.name if self.template_file is not None else None
 
     @property
@@ -116,6 +168,9 @@ class DocumentComposition(BaseModel):
         if self.html is not None and self.template_file is not None:
             msg = "A document composed from HTML carries its rendered HTML or the template file the print stage renders, not both."
             raise ValueError(msg)
+        if not self.table_fill.is_replace and not self.source.fills_template_file:
+            msg = f"A document composed {self.source.desc} fills no Table of a template file, so it cannot {self.table_fill.desc}."
+            raise ValueError(msg)
         self._validate_url_base()
         return self
 
@@ -127,7 +182,10 @@ class DocumentComposition(BaseModel):
             msg = f"A document composed {self.source.desc} has no HTML, so it carries no base for relative URLs."
             raise ValueError(msg)
         if self.template_file is not None:
-            file_ref = self.template_file.file
+            file_ref = self.template_file.method_file
+            if file_ref is None:
+                msg = "A document composed from an HTML template file prints the method's own file, never one a run input supplies."
+                raise ValueError(msg)
             if self.url_base.tree_digest != file_ref.tree_digest or self.url_base.holder != file_ref.tree_path:
                 msg = "A document composed from an HTML template file resolves its relative URLs against that file, in its method tree."
                 raise ValueError(msg)
@@ -135,16 +193,20 @@ class DocumentComposition(BaseModel):
     def referenced_uris(self) -> list[UriReference]:
         """The files the print stage will read for the document, which it authorizes against the run's read scope first.
 
-        The images of the layout tree. A template file is a method file, read through the method file store under the
-        run's read scope, and composed HTML may name files too, but only an engine laying it out finds them, and it reads
-        each through `RenderResources`, which applies the same check, and reads a relative URL from the method tree.
+        The images of the layout tree, and the document of a run input that supplies the template file. A template file
+        of the method is read through the method file store under the run's read scope, and composed HTML may name files
+        too, but only an engine laying it out finds them, and it reads each through `RenderResources`, which applies the
+        same check, and reads a relative URL from the method tree.
         """
-        if self.layout is None:
-            return []
-        return [
-            UriReference(uri=image_url, position=f"image {index} of the document '{self.filename}'")
-            for index, image_url in enumerate(self.layout.image_urls(), start=1)
-        ]
+        uri_references: list[UriReference] = []
+        if self.template_file is not None and (input_file := self.template_file.input_file) is not None:
+            uri_references.append(UriReference(uri=input_file.url, position=f"the template the input '{input_file.input_name}' supplies"))
+        if self.layout is not None:
+            uri_references.extend(
+                UriReference(uri=image_url, position=f"image {index} of the document '{self.filename}'")
+                for index, image_url in enumerate(self.layout.image_urls(), start=1)
+            )
+        return uri_references
 
     def make_render_job(self, *, html: str | None = None, template: bytes | None = None) -> RenderJob:
         """The engine's job: this composition with what the print stage read and rendered.
@@ -162,6 +224,7 @@ class DocumentComposition(BaseModel):
             html=html if html is not None else self.html,
             template=template,
             template_name=self.template_name,
+            table_fill=self.table_fill,
             data=self.data,
             base_url=self.url_base.base_url if self.url_base is not None else None,
         )

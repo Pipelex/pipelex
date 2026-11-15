@@ -19,6 +19,7 @@ from mthds.protocol.problem.registry import CoreCode, ProblemDomain
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.doc_gen.doc_gen_engine import resolve_doc_gen_setting
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
+from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelDeckChoiceUnresolvedError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices, LLMSettingChoicesDefaults
@@ -113,7 +114,9 @@ def _use_deck(mocker: MockerFixture, *, model_deck: ModelDeck) -> None:
 
 
 def _resolve_doc_gen_default() -> Any:
-    return resolve_doc_gen_setting(doc_gen_choice=None, doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, pipe_code=None)
+    return resolve_doc_gen_setting(
+        doc_gen_choice=None, doc_gen_format=DocGenFormat.PDF, source=DocGenSource.LAYOUT, pipe_code=None, table_fill=TableFill.REPLACE
+    )
 
 
 def _deck_llm_setting_of_img_gen_model(model_deck: ModelDeck) -> Any:

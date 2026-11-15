@@ -68,6 +68,7 @@ class PipelexErrorCode(StrEnum):
     DOCGEN_CONTENT_UNPRINTABLE = "pipelex.docgen.content_unprintable"
     DOCGEN_PRINT_TIMEOUT = "pipelex.docgen.print_timeout"
     DOCGEN_TEMPLATE_WARNING = "pipelex.docgen.template_warning"
+    DOCGEN_TEMPLATE_INPUT_UNFIT = "pipelex.docgen.template_input_unfit"
     SANDBOX_UNAVAILABLE = "pipelex.sandbox.unavailable"
     CODEGEN_OUTPUT_CONFLICT = "pipelex.codegen.output_conflict"
     CODEGEN_LOCK_INVALID = "pipelex.codegen.lock_invalid"
@@ -883,6 +884,22 @@ class DocgenTemplateWarningParams(PipelexErrorParams):
     finding: str
 
 
+class DocgenTemplateInputUnfitParams(PipelexErrorParams):
+    """The parameters of `pipelex.docgen.template_input_unfit`.
+
+    The template a run supplied does not fit the step.
+
+    Attributes:
+        input: The input whose file is the template.
+        finding: What the engine's check found in the file the caller supplied.
+    """
+
+    code: ClassVar[PipelexErrorCode] = PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT
+
+    input: str
+    finding: str
+
+
 class SandboxUnavailableParams(PipelexErrorParams):
     """The parameters of `pipelex.sandbox.unavailable`.
 
@@ -1086,6 +1103,7 @@ PIPELEX_ERROR_PARAMS: dict[PipelexErrorCode, type[PipelexErrorParams]] = {
     PipelexErrorCode.DOCGEN_CONTENT_UNPRINTABLE: DocgenContentUnprintableParams,
     PipelexErrorCode.DOCGEN_PRINT_TIMEOUT: DocgenPrintTimeoutParams,
     PipelexErrorCode.DOCGEN_TEMPLATE_WARNING: DocgenTemplateWarningParams,
+    PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT: DocgenTemplateInputUnfitParams,
     PipelexErrorCode.SANDBOX_UNAVAILABLE: SandboxUnavailableParams,
     PipelexErrorCode.CODEGEN_OUTPUT_CONFLICT: CodegenOutputConflictParams,
     PipelexErrorCode.CODEGEN_LOCK_INVALID: CodegenLockInvalidParams,
@@ -1710,6 +1728,17 @@ PIPELEX_ERROR_ENTRIES: dict[PipelexErrorCode, PipelexErrorEntry] = {
         actor_step_detail="Check the template '{template}', and fix it if the finding is right.",
         other_step="contact_owner",
         other_step_detail="Ask the method's owner to check the template '{template}'.",
+    ),
+    PipelexErrorCode.DOCGEN_TEMPLATE_INPUT_UNFIT: PipelexErrorEntry(
+        title="The template a run supplied does not fit the step",
+        domain="input",
+        retry="no",
+        status=422,
+        detail="The file of the input '{input}' cannot be used as the document's template: {finding}",
+        actor_step="change_input",
+        actor_step_detail="Give the input '{input}' a file that fits the step's template, then run the method again.",
+        other_step="change_input",
+        other_step_detail="Pass this to the caller, whose file for the input '{input}' does not fit the step's template.",
     ),
     PipelexErrorCode.SANDBOX_UNAVAILABLE: PipelexErrorEntry(
         title="The Daytona sandbox could not be started",
