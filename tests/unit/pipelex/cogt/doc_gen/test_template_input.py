@@ -1,5 +1,10 @@
 """A template a run input supplies, and the fills of a template's Tables, as the document engine contract carries them."""
 
+import io
+import struct
+import tracemalloc
+import zipfile
+import zlib
 from typing import Any
 
 import pytest
@@ -12,7 +17,7 @@ from pipelex.cogt.doc_gen.exceptions import DocGenModelCapabilityError
 from pipelex.cogt.doc_gen.layout_tree import LayoutDocument
 from pipelex.cogt.doc_gen.render_job import RenderJob
 from pipelex.cogt.doc_gen.table_fill import TABLE_APPEND_CAPABILITY, TableFill
-from pipelex.cogt.doc_gen.template_input_format import judge_file_format, office_format_of_zip
+from pipelex.cogt.doc_gen.template_input_format import ZIP_FORMAT_KEY, judge_file_format, office_format_of_zip
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -20,6 +25,7 @@ from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from tests.helpers.office_files import (
     DOCX_MIME_TYPE,
     PPTX_MAIN_CONTENT_TYPE,
+    XLSX_MAIN_CONTENT_TYPE,
     XLSX_MIME_TYPE,
     docx_bytes,
     office_package_bytes,
@@ -49,6 +55,19 @@ def _composition(**overrides: Any) -> DocumentComposition:
     }
     kwargs.update(overrides)
     return DocumentComposition(**kwargs)
+
+
+def _zip_bomb(*, inflated_bytes: int) -> bytes:
+    """A zip whose content-types entry declares a hundred bytes and deflates to `inflated_bytes` zeros."""
+    compressor = zlib.compressobj(9, zlib.DEFLATED, -15)
+    chunk = b"\0" * (1024 * 1024)
+    compressed = b"".join(compressor.compress(chunk) for _ in range(inflated_bytes // len(chunk))) + compressor.flush()
+    name = b"[Content_Types].xml"
+    crc = zlib.crc32(b"x" * 100)
+    local_header = struct.pack("<4s5H3L2H", b"PK\x03\x04", 20, 0, 8, 0, 0, crc, len(compressed), 100, len(name), 0) + name
+    central_header = struct.pack("<4s6H3L5H2L", b"PK\x01\x02", 20, 20, 0, 8, 0, 0, crc, len(compressed), 100, len(name), 0, 0, 0, 0, 0, 0) + name
+    end_record = struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, len(central_header), len(local_header) + len(compressed), 0)
+    return local_header + compressed + central_header + end_record
 
 
 def _doc_gen_model(*, inputs: list[str]) -> InferenceModelSpec:
@@ -198,3 +217,28 @@ class TestTemplateInput:
 
     def test_bytes_that_are_not_a_zip_have_no_office_format(self) -> None:
         assert office_format_of_zip(data=b"%PDF-1.7") is None
+
+    def test_a_main_part_declared_in_single_quotes_is_recognised(self) -> None:
+        """XML lets an attribute be quoted either way, so a workbook writing `ContentType='…'` is still a workbook."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, mode="w", compression=zipfile.ZIP_DEFLATED) as package:
+            package.writestr(
+                "[Content_Types].xml",
+                "<?xml version='1.0' encoding='UTF-8'?>"
+                "<Types xmlns='http://schemas.openxmlformats.org/package/2006/content-types'>"
+                f"<Override PartName='/xl/workbook.xml' ContentType = '{XLSX_MAIN_CONTENT_TYPE}'/>"
+                "</Types>",
+            )
+        assert office_format_of_zip(data=buffer.getvalue()) == "xlsx"
+
+    def test_a_content_types_entry_that_inflates_past_its_declared_size_is_never_expanded(self) -> None:
+        """An entry declaring a few bytes and deflating to many is abandoned after a bounded read, and the file is a bare zip."""
+        bomb = _zip_bomb(inflated_bytes=64 * 1024 * 1024)
+        tracemalloc.start()
+        try:
+            judged = office_format_of_zip(data=bomb)
+            _current, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+        assert judged == ZIP_FORMAT_KEY
+        assert peak < 8 * 1024 * 1024

@@ -4,21 +4,24 @@ The compose stage names the file by its tree's digest and its tree path; the pri
 renders an HTML one through the interpreter's template file stage, and hands an office one's bytes to its engine.
 """
 
+import base64
+
 import pytest
 from mthds.protocol.problem.registry import CoreCode
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.content_generation import doc_gen_generate
+from pipelex.cogt.content_generation import doc_gen_generate, doc_gen_template_input
 from pipelex.cogt.content_generation.assignment_models import RenderDocumentAssignment
 from pipelex.cogt.content_generation.cogt_run_params import CogtRunParams
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat, DocGenSource
 from pipelex.cogt.doc_gen.doc_gen_setting import DocGenSetting
 from pipelex.cogt.doc_gen.document_composition import ComposedTemplateFile, DocumentComposition, TemplateInputFile, TemplateRenderContext
-from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, DocGenTemplateInputFormatError
+from pipelex.cogt.doc_gen.exceptions import DocGenRenderError, DocGenTemplateInputFormatError, DocGenTemplateInputTooLargeError
 from pipelex.cogt.doc_gen.table_fill import TableFill
 from pipelex.core.method_trees.tree_bundle import MethodFileRef
 from pipelex.system.job_metadata import JobMetadata, RunMetadata
 from pipelex.system.pipe_run_mode import PipeRunMode
+from pipelex.tools.misc.exceptions import RemoteFileSizeBound, RemoteFileTooLargeError
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.uri.exceptions import UriReadRefusedError
 from tests.helpers.office_files import docx_bytes, office_package_bytes, xlsx_bytes
@@ -63,10 +66,12 @@ def _input_template_composition(
     )
 
 
-def _input_template_assignment(*, composition: DocumentComposition, run_mode: PipeRunMode = PipeRunMode.LIVE) -> RenderDocumentAssignment:
+def _input_template_assignment(
+    *, composition: DocumentComposition, run_mode: PipeRunMode = PipeRunMode.LIVE, read_scope: str | None = "acme/runs"
+) -> RenderDocumentAssignment:
     return RenderDocumentAssignment(
         job_metadata=JobMetadata(
-            run_metadata=RunMetadata(user_id="u", pipeline_run_id="run_1", storage_scope="acme/runs/run_1", read_scope="acme/runs"),
+            run_metadata=RunMetadata(user_id="u", pipeline_run_id="run_1", storage_scope="acme/runs/run_1", read_scope=read_scope),
             pipe_code="append_rows",
         ),
         cogt_run_params=CogtRunParams(run_mode=run_mode),
@@ -187,3 +192,47 @@ class TestDocGenPrintTemplateFile:
             await doc_gen_generate.read_template_file(
                 render_assignment=_input_template_assignment(composition=_input_template_composition(url=url)), storage_provider=storage
             )
+
+    @pytest.mark.parametrize("uri_kind", ["storage", "data_url"])
+    async def test_a_template_input_past_the_fetch_cap_is_refused_before_it_is_loaded(self, mocker: MockerFixture, uri_kind: str) -> None:
+        """A stored file is sized without being read, and a data URL by its text, each against `max_fetch_bytes`."""
+        mocker.patch.object(doc_gen_template_input, "fetch_max_bytes", return_value=16)
+        load_spy = mocker.spy(doc_gen_template_input, "load_bytes_and_mime_type_from_any_uri")
+        storage = InMemoryStorageProvider()
+        workbook = xlsx_bytes()
+        url: str
+        match uri_kind:
+            case "storage":
+                url = await storage.store(data=workbook, key="acme/runs/run_1/inputs/expenses.xlsx")
+            case _:
+                url = f"data:application/octet-stream;base64,{base64.b64encode(workbook).decode('ascii')}"
+
+        with pytest.raises(DocGenTemplateInputTooLargeError) as exc_info:
+            await doc_gen_generate.read_template_file(
+                render_assignment=_input_template_assignment(composition=_input_template_composition(url=url)), storage_provider=storage
+            )
+
+        error = exc_info.value
+        assert error.resolve_error_code() == CoreCode.INPUT_TOO_LARGE
+        assert error.problem_params()["input"] == "workbook"
+        assert error.problem_params()["limit"] == 16
+        assert error.problem_params()["size"] >= len(workbook) - 2
+        load_spy.assert_not_called()
+
+    async def test_a_template_input_at_a_url_is_fetched_under_the_cap_naming_the_input(self, mocker: MockerFixture) -> None:
+        mocker.patch.object(doc_gen_template_input, "fetch_max_bytes", return_value=16)
+        fetch = mocker.patch(
+            "pipelex.tools.uri.uri_bytes.fetch_file_and_content_type_from_url_httpx",
+            side_effect=RemoteFileTooLargeError("too large", limit=16, size=4096, bound=RemoteFileSizeBound.DECODED),
+        )
+
+        with pytest.raises(RemoteFileTooLargeError) as exc_info:
+            await doc_gen_generate.read_template_file(
+                render_assignment=_input_template_assignment(
+                    composition=_input_template_composition(url="https://files.example.com/expenses.xlsx"), read_scope=None
+                ),
+                storage_provider=InMemoryStorageProvider(),
+            )
+
+        assert fetch.call_args.kwargs["max_bytes"] == 16
+        assert exc_info.value.input_name == "workbook"

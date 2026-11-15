@@ -246,6 +246,45 @@ class TemplateUrlRefusedError(PipelexError):
         self.refusal_code = refusal_code
 
 
+class DocGenTemplateInputTooLargeError(PipelexError):
+    """The file a run input supplies as a `PipeDocGen` step's template is larger than a file the runtime reads.
+
+    A template is read whole and handed to the engine, so it is bounded by `[runtime.network] max_fetch_bytes`, the most a
+    fetch reads, whatever kind of URI names it: a stored file is sized before it is read, a local file too, a data URL by
+    the length of its text, and a URL's body as the fetch streams it, which raises the fetch's own `RemoteFileTooLargeError`
+    naming the input. The input is the caller's, so it is ``input.too_large``, naming the input, the limit and the size.
+    """
+
+    error_code = CoreCode.INPUT_TOO_LARGE
+
+    user_action = UserAction(
+        kind=UserActionKind.CHANGE_INPUT,
+        detail="Use a smaller file, or raise [runtime.network] max_fetch_bytes if you run the runtime yourself.",
+    )
+
+    def __init__(self, message: str, *, input_name: str, limit: int, size: int):
+        """The refusal of a template input past the limit, named by the step's input, with the limit and the file's size.
+
+        Args:
+            message: What is wrong, naming the input and the sizes.
+            input_name: The step's input whose file is the template.
+            limit: The most bytes the runtime reads.
+            size: The file's size in bytes, or as the length of its data URL tells it.
+        """
+        super().__init__(message)
+        self.input_name = input_name
+        self.limit = limit
+        self.size = size
+
+    @override
+    def problem_params(self) -> dict[str, Any]:
+        return {"input": self.input_name, "limit": self.limit, "size": self.size}
+
+    @override
+    def problem_location(self) -> ProblemLocation | None:
+        return make_location(input_name=self.input_name)
+
+
 class DocGenTemplateInputFormatError(PipelexError):
     """The file a run input supplies as a `PipeDocGen` step's template is not a file of the step's format.
 

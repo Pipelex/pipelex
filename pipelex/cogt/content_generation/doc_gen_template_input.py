@@ -4,18 +4,27 @@ A step with `template_input` takes its office template from one of its inputs ra
 compose stage names the input's document by its URL (`TemplateInputFile`), and the file is read here, by the print
 stage, an activity on a hosted plane, and by run setup, which hands it to the engine's template checker before any step
 starts. Either reads it as it reads any file the run names, under the run's read scope: a storage URI through the
-storage provider, an `https://` URL through the guarded fetch, capped by `[runtime.network] max_fetch_bytes`. A file
-that is not of the step's format is refused, naming the input, before an engine sees it.
+storage provider, an `https://` URL through the guarded fetch. Every kind is bounded by `[runtime.network] max_fetch_bytes`
+before its bytes are loaded: a stored file and a local one are sized first, a data URL by the length of its text, and a
+URL's body as the fetch streams it. A file that is not of the step's format is refused, naming the input, before an
+engine sees it.
 """
+
+import asyncio
+from pathlib import Path
 
 from pipelex.cogt.content_generation.read_authorization import authorize_method_uri_read
 from pipelex.cogt.doc_gen.doc_gen_format import DocGenFormat
 from pipelex.cogt.doc_gen.document_composition import TemplateInputFile
-from pipelex.cogt.doc_gen.exceptions import DocGenTemplateInputFormatError
+from pipelex.cogt.doc_gen.exceptions import DocGenTemplateInputFormatError, DocGenTemplateInputTooLargeError
 from pipelex.cogt.doc_gen.template_input_format import judge_file_format
+from pipelex.config import fetch_max_bytes
+from pipelex.tools.misc.file_fetch_utils import fetching_for_input
 from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE, describe_file_format, describe_format_key
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedHttpUrl, ResolvedLocalPath, ResolvedPipelexStorage
 from pipelex.tools.uri.uri_bytes import load_bytes_and_mime_type_from_any_uri
+from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 def template_input_position(*, input_file: TemplateInputFile, pipe_code: str | None) -> str:
@@ -49,13 +58,20 @@ async def read_template_input(
     Raises:
         UriReadRefusedError: the run's read scope does not allow the document's URL.
         DocGenTemplateInputFormatError: the file is not of the step's format.
+        DocGenTemplateInputTooLargeError: the stored file, the local file or the data URL is past the fetch cap.
         StorageFileNotFoundError: the storage provider holds nothing under the document's URI.
         RemoteFileFetchError: the document's https URL could not be fetched.
-        RemoteFileTooLargeError: the document's https URL serves more than the fetch cap.
+        RemoteFileTooLargeError: the document's https URL serves more than the fetch cap, naming the input.
         SsrfBlockedError: the document's https URL, or a redirect hop, is a private or metadata address.
     """
     authorize_method_uri_read(uri=input_file.url, read_scope=read_scope, position=template_input_position(input_file=input_file, pipe_code=pipe_code))
-    loaded = await load_bytes_and_mime_type_from_any_uri(input_file.url, storage_provider=storage_provider)
+    max_bytes = fetch_max_bytes()
+    size = await _template_input_size(url=input_file.url, storage_provider=storage_provider)
+    if size is not None and size > max_bytes:
+        msg = f"The input '{input_file.input_name}' is {size} bytes, past the {max_bytes} bytes a template is read up to: it was not read."
+        raise DocGenTemplateInputTooLargeError(msg, input_name=input_file.input_name, limit=max_bytes, size=size)
+    with fetching_for_input(input_name=input_file.input_name):
+        loaded = await load_bytes_and_mime_type_from_any_uri(input_file.url, storage_provider=storage_provider, max_bytes=max_bytes)
     check_template_input_format(
         data=loaded.data,
         mime_type=input_file.mime_type or loaded.mime_type,
@@ -65,6 +81,30 @@ async def read_template_input(
         engine=engine,
     )
     return loaded.data
+
+
+async def _template_input_size(*, url: str, storage_provider: StorageProviderAbstract) -> int | None:
+    """The size of a template input's file, read without its bytes, or None for a URL, whose fetch bounds its own body.
+
+    A data URL's size is its decoded length as the length of its base64 text tells it, which the request already holds.
+    A local file that cannot be sized is left to the load, which reports why it cannot be read.
+
+    Raises:
+        StorageFileNotFoundError: the storage provider holds nothing under the URI.
+    """
+    resolved_uri = resolve_uri(url)
+    match resolved_uri:
+        case ResolvedPipelexStorage():
+            return await storage_provider.load_size(resolved_uri.storage_uri)
+        case ResolvedLocalPath():
+            try:
+                return (await asyncio.to_thread(Path(resolved_uri.path).stat)).st_size
+            except OSError:
+                return None
+        case ResolvedBase64DataUrl():
+            return len(resolved_uri.base64_data) * 3 // 4
+        case ResolvedHttpUrl():
+            return None
 
 
 def check_template_input_format(

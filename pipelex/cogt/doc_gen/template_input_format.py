@@ -10,6 +10,7 @@ the declared media type decide, then the suffix of the file's name.
 """
 
 import io
+import re
 import zipfile
 import zlib
 from pathlib import PurePosixPath
@@ -19,7 +20,8 @@ from pipelex.tools.misc.filetype_utils import format_key_from_mime_type, guess_f
 
 # The entry of an Office Open XML package that names the content type of each of its parts.
 _CONTENT_TYPES_ENTRY: Final[str] = "[Content_Types].xml"
-# A content-types entry is a few kilobytes; one past this is not read, and the file is judged a zip of no known kind.
+# A content-types entry is a few kilobytes; one that inflates past this, whatever size its zip entry declares, is not read
+# further, and the file is judged a zip of no known kind.
 _MAX_CONTENT_TYPES_BYTES: Final[int] = 1_000_000
 # The format a zip is judged to be when its content types name no main part of a known Office format.
 ZIP_FORMAT_KEY: Final[str] = "zip"
@@ -38,13 +40,21 @@ _OFFICE_MAIN_PART_CONTENT_TYPES: Final[dict[str, str]] = {
     "potx": "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml",
 }
 
+# The declaration of each main part's content type, an XML attribute quoted with either kind of quote.
+_OFFICE_MAIN_PART_DECLARATIONS: Final[dict[str, re.Pattern[str]]] = {
+    format_key: re.compile(rf"ContentType\s*=\s*([\"']){re.escape(content_type)}\1")
+    for format_key, content_type in _OFFICE_MAIN_PART_CONTENT_TYPES.items()
+}
+
 
 def office_format_of_zip(*, data: bytes) -> str | None:
     """The format of a zip's bytes by the main part its content types name: `xlsx`, `docx`, `pptx` or a variant of one.
 
     Returns `zip` for a zip whose content types name no known main part, or that has none, and None when the bytes are
-    not a zip at all. The content types are read as text and searched for each known main part's declaration, so no XML
-    parser reads what the caller sent.
+    not a zip at all. The content types are read as text and searched for each known main part's declaration, its value
+    in single or double quotes, so no XML parser reads what the caller sent. The entry is inflated a bounded amount at a
+    time and abandoned past `_MAX_CONTENT_TYPES_BYTES`, so a zip whose entry declares a few bytes and inflates to many is
+    never expanded in memory.
     """
     buffer = io.BytesIO(data)
     if not zipfile.is_zipfile(buffer):
@@ -54,14 +64,20 @@ def office_format_of_zip(*, data: bytes) -> str | None:
             content_types_info = package.getinfo(_CONTENT_TYPES_ENTRY)
             if content_types_info.file_size > _MAX_CONTENT_TYPES_BYTES:
                 return ZIP_FORMAT_KEY
-            content_types = package.read(content_types_info).decode("utf-8", errors="replace")
+            # The declared size is the archive's word, so the read is bounded on its own: one byte past the limit says
+            # the entry inflates past it.
+            with package.open(content_types_info) as content_types_entry:
+                content_types_bytes = content_types_entry.read(_MAX_CONTENT_TYPES_BYTES + 1)
+            if len(content_types_bytes) > _MAX_CONTENT_TYPES_BYTES:
+                return ZIP_FORMAT_KEY
+            content_types = content_types_bytes.decode("utf-8", errors="replace")
     except (KeyError, zipfile.BadZipFile, NotImplementedError, RuntimeError, EOFError, zlib.error):
         # No content-types entry (KeyError), an entry compressed in a way the zip module cannot read (NotImplementedError),
         # encrypted (RuntimeError) or corrupt (BadZipFile, zlib.error), or a truncated archive (EOFError): the bytes are
         # a zip, and no Office file an engine can fill.
         return ZIP_FORMAT_KEY
-    for format_key, content_type in _OFFICE_MAIN_PART_CONTENT_TYPES.items():
-        if f'"{content_type}"' in content_types:
+    for format_key, declaration in _OFFICE_MAIN_PART_DECLARATIONS.items():
+        if declaration.search(content_types):
             return format_key
     return ZIP_FORMAT_KEY
 
