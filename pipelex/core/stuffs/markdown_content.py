@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from pydantic import Field
 from typing_extensions import override
@@ -27,24 +27,29 @@ if TYPE_CHECKING:
 class MarkdownContent(TextContent):
     """A text written in Markdown"""
 
-    text: str = Field(description="The text, written in Markdown")
+    value_kind_desc: ClassVar[str] = "markdown"
+
+    text: str | None = Field(default=None, description="The text, written in Markdown")
 
     @property
     @override
     def short_desc(self) -> str:
+        if self.text is None:
+            return self._stored_short_desc()
         return f"some markdown ({len(self.text)} chars)"
 
     @override
     def rendered_html(self) -> str:
-        return render_markdown_as_html(self.text)
+        return render_markdown_as_html(self.require_text())
 
     @override
     def rendered_pretty(self, *, title: str | None = None, depth: int = 0) -> "PrettyPrintable":
         # Always Markdown: `TextContent` sniffs for HTML first, but raw HTML in a Markdown source is text.
+        text = self.require_text()
         require_rich_for_rendering()
         from rich.markdown import Markdown
 
-        return Markdown(self.text)
+        return Markdown(text)
 
     def __html__(self) -> str:
         """The HTML that markupsafe inserts as it is: the converted Markdown, which holds no raw HTML from the source."""

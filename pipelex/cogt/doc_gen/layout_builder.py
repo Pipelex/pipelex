@@ -135,7 +135,7 @@ def _scalar(value: Any) -> tuple[bool, LayoutScalar]:
         case MarkdownContent():
             return False, None
         case TextContent():
-            return True, value.text
+            return True, value.require_text()
         case NumberContent():
             return True, value.number
         case YesNoContent():
@@ -225,18 +225,18 @@ def _blocks_for_value(*, value: Any, title: str, path: str, level: int) -> list[
         return [FieldGridBlock(fields=[LayoutField(label=title, value=scalar)])]
     match value:
         case MarkdownContent():
-            return [SectionBlock(title=title, level=level, blocks=[MarkdownBlock(markdown=value.text)])]
+            return [SectionBlock(title=title, level=level, blocks=[MarkdownBlock(markdown=value.require_text())])]
         case TextContent():
-            return [SectionBlock(title=title, level=level, blocks=[_paragraphs(value.text)])]
+            return [SectionBlock(title=title, level=level, blocks=[_paragraphs(value.require_text())])]
         case HtmlContent():
-            return [SectionBlock(title=title, level=level, blocks=[ParagraphsBlock(paragraphs=html_to_paragraphs(value.inner_html))])]
+            return [SectionBlock(title=title, level=level, blocks=[ParagraphsBlock(paragraphs=html_to_paragraphs(value.require_inner_html()))])]
         case ImageContent():
             return [ImageBlock(url=value.url, caption=value.caption or title)]
         case DocumentContent():
             label = value.title or value.filename or title
             return [FieldGridBlock(fields=[LayoutField(label=label, value=value.public_url or value.url)])]
         case JSONContent():
-            return _blocks_for_value(value=value.json_obj, title=title, path=path, level=level)
+            return _blocks_for_value(value=value.require_json_obj(), title=title, path=path, level=level)
         case ListContent():
             return _blocks_for_list(items=list(value.items), title=title, path=path, level=level)  # pyright: ignore[reportUnknownArgumentType, reportUnknownMemberType]
         case list() | tuple() | set() | frozenset():

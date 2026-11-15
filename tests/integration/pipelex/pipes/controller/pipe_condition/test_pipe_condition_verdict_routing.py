@@ -101,7 +101,7 @@ template = "unsure $approved"
 
 async def _run(*, pipe_code: str, inputs: dict[str, Any]) -> str:
     response = await PipelexMTHDSProtocol().execute(pipe_code=pipe_code, mthds_contents=[_VERDICT_ROUTING_MTHDS], inputs=inputs)
-    return response.pipe_output.main_stuff.as_text.text
+    return response.pipe_output.main_stuff.as_text.require_text()
 
 
 @pytest.mark.asyncio(loop_scope="class")

@@ -83,4 +83,6 @@ class TestNativeExpansion:
         assert json_field.type == ConceptStructureBlueprintFieldType.DICT
         assert json_field.key_type == "text"
         assert json_field.value_type == "Any"
-        assert json_field.required is True
+        # Optional: a JSON value is its object inline or a URL to it in storage.
+        assert json_field.required is False
+        assert "url" in blueprint.structure

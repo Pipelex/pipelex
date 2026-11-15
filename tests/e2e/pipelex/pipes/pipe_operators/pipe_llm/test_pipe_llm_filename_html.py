@@ -50,5 +50,5 @@ class TestFilenameHtmlE2E:
         if pipe_run_mode.is_live:
             result = pipe_output.main_stuff_as_html
             print(result)
-            assert "ai_lympics.png" in result.inner_html
-            assert "Job-Offer.pdf" in result.inner_html
+            assert "ai_lympics.png" in result.require_inner_html()
+            assert "Job-Offer.pdf" in result.require_inner_html()

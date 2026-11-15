@@ -15,7 +15,7 @@ from pipelex.system.configuration.config_surface import (
 )
 from pipelex.system.environment import CONFIG_DIR_NAME, get_pipelex_home_dir
 from pipelex.system.exceptions import ConfigValidationError
-from pipelex.system.runtime import runtime_manager
+from pipelex.system.runtime import RunMode, runtime_manager
 from pipelex.tools.misc.json_utils import deep_update
 from pipelex.tools.misc.toml_utils import load_toml_from_path_and_merge_with_overrides
 
@@ -48,6 +48,11 @@ def pydantic_error_behind(*, config_error: Exception) -> ValidationError | None:
 
 
 CONFIG_NAME = "pipelex.toml"
+
+# The layer every test run reads last, from `./tests/`, whatever its test run mode: `unit_test` on a developer's machine,
+# `ci_test` on CI, `codex_cloud_test` in Codex Cloud. Named after the run mode a test run takes locally, it is the same
+# file in all three, so a test setting cannot hold on one machine and silently lapse on another.
+TEST_CONFIG_FILE_NAME = f"pipelex_{RunMode.UNIT_TEST}.toml"
 
 PROJECT_ROOT_MARKERS: frozenset[str] = frozenset({CONFIG_DIR_NAME, ".git", "pyproject.toml", "setup.py", "setup.cfg", "package.json", ".hg"})
 
@@ -386,8 +391,8 @@ class ConfigLoader:
         Args:
             config_dir: The .pipelex directory to look in.
             include_run_mode: When False, omit the `pipelex_{run_mode}.toml` entry.
-                Used under unit testing so the run_mode file is sourced only from
-                `./tests/` and not from per-dir overrides.
+                Used under unit testing, where the test layer `./tests/pipelex_unit_test.toml`
+                takes its place and no per-dir run-mode file is read.
 
         Returns:
             Ordered list of candidate file paths (missing files are ignored at load time).
@@ -501,10 +506,11 @@ class ConfigLoader:
         6. Programmatic `extra_overrides`, if any
 
         Unit-testing special case: when `runtime_manager.is_unit_testing` is
-        true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from
-        `./tests/pipelex_{run_mode}.toml` and is layered at the highest run_mode
-        precedence. Global and project run_mode files are not loaded, to keep
-        test runs hermetic.
+        true, under any test run mode (`unit_test`, `ci_test`, `codex_cloud_test`),
+        no `pipelex_{run_mode}.toml` is read from the global or project directory,
+        to keep test runs hermetic, and `./tests/pipelex_unit_test.toml` is layered
+        on top of every file layer instead. It is the same file under every test run
+        mode, so CI runs the tests with the settings a developer runs them with.
 
         Args:
             extra_overrides: Optional dict deep-merged on top as the final layer.
@@ -559,7 +565,7 @@ class ConfigLoader:
                 )
 
         if is_unit_testing:
-            list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")
+            list_of_configs.append(Path.cwd() / "tests" / TEST_CONFIG_FILE_NAME)
 
         return list_of_configs
 

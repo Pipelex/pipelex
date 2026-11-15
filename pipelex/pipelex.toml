@@ -8,6 +8,7 @@
 is_fetch_remote_content_enabled = true
 is_upload_local_content_enabled = true
 method = "local"                       # local, in_memory, s3, gcp
+inline_text_max_bytes = 4096           # a Text, Html or JSON value past this many bytes lives in storage
 
 [runtime.storage.local]
 uri_format = "{hash}.{extension}"

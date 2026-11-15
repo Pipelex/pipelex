@@ -25,6 +25,7 @@ from pipelex.core.stuffs.date_content import DateContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
+from pipelex.core.stuffs.stored_value_content import StoredValueContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.core.stuffs.time_content import TimeContent
@@ -76,7 +77,7 @@ def bind_content(*, root_content: StuffContent, derivation: BindingDerivation) -
                     f"'{type(value).__name__}', has no such field, although the declared structure has one."
                 )
                 raise BindingStepRunError(msg).with_params(binding=derivation.path, segment=segment.name)
-            field_value = getattr(value, segment.name)
+            field_value = _read_field(value=value, field_name=segment.name)
             if field_value is None:
                 if empty_path is None:
                     empty_path = reached_path
@@ -94,6 +95,20 @@ def bind_content(*, root_content: StuffContent, derivation: BindingDerivation) -
     if not values or values[0] is None:
         return FoundNothing(empty_path=empty_path or reached_path)
     return _store_value(value=values[0], leaf_kind=derivation.leaf_kind, path=derivation.path)
+
+
+def _read_field(*, value: Any, field_name: str) -> Any:
+    """A field of the value reached, the value of a stored `Text`, `Html` or `JSON` read through the content.
+
+    A stored value is not nothing: its field holds `None` and its value lives at `url`, so the walk reads it as loaded,
+    and a reference never loaded refuses rather than recording an absence the derivation said could not happen.
+
+    Raises:
+        StoredValueNotLoadedError: The field is the value of a stored content whose value was never loaded.
+    """
+    if isinstance(value, StoredValueContent) and value.is_value_field(field_name=field_name):
+        return value.require_value()
+    return getattr(value, field_name)
 
 
 def _refuse_shape_mismatch(*, root_content: StuffContent, derivation: BindingDerivation) -> None:

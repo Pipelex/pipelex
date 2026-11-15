@@ -110,7 +110,7 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     @property
     def main_stuff_as_str(self) -> str:
         """Get main stuff content as TextContent if applicable and return the text."""
-        return self.working_memory.main_stuff_as_text.text
+        return self.working_memory.main_stuff_as_text.require_text()
 
     @property
     def main_stuff_as_image(self) -> ImageContent:

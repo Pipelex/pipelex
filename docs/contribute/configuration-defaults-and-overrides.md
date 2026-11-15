@@ -43,7 +43,7 @@ Load order:
 6. **Programmatic `extra_overrides`** passed into `ConfigLoader.load_config()` (if any).
 
 !!! note "Unit-test special case"
-    When `runtime_manager.is_unit_testing` is true, the `pipelex_{run_mode}.toml` entry is sourced exclusively from `./tests/pipelex_{run_mode}.toml` (e.g. `tests/pipelex_unit_test.toml`). Global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides.
+    When `runtime_manager.is_unit_testing` is true, under any test run mode (`unit_test` on a developer's machine, `ci_test` on CI, `codex_cloud_test` in Codex Cloud), global and project run_mode files are not loaded, keeping test runs hermetic from machine-wide overrides, and `./tests/pipelex_unit_test.toml` is layered on top instead. It is the same file under every test run mode, so a setting the tests depend on, such as `[runtime.storage] inline_text_max_bytes = 0`, holds on CI exactly as it does locally.
 
 ### The inference documents
 

@@ -33,7 +33,7 @@ from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBl
 from pipelex.core.concepts.exceptions import ConceptStructureClassNotFoundError
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_blueprint
+from pipelex.core.concepts.native.pinned_blueprints import make_pinned_native_value_blueprint
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.non_null_any import class_field_may_hold_nothing
@@ -104,9 +104,11 @@ def walkable_native_concept(*, native_code: NativeConceptCode, walks_single_fiel
 
     A native whose pinned definition is a single field holding the value itself (`Text`, `Number`, `Time`, `JSON`) is a
     leaf to a binding, which refuses to walk into it. A template reads that field all the same (`$note.text`), so a check
-    asking whether a template's read holds passes `walks_single_field` to walk it through its pinned field.
+    asking whether a template's read holds passes `walks_single_field` to walk it through its pinned field. The fields
+    carrying a stored value (`url` and the three describing it) are no part of the value, so the walk never sees them:
+    `Text` holds its value in `text` alone, stored or not.
     """
-    pinned_blueprint = make_pinned_native_blueprint(native_code)
+    pinned_blueprint = make_pinned_native_value_blueprint(native_code)
     if not isinstance(pinned_blueprint.structure, dict):
         return WalkableConcept(concept_ref=native_code.concept_ref, shape=ConceptShape.NO_STRUCTURE, shape_reason="is structureless by definition")
     if len(pinned_blueprint.structure) == 1 and not walks_single_field:

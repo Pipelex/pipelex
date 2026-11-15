@@ -83,7 +83,7 @@ class TestWorkingMemoryFactory:
         text_content = page_content.text_and_images.text
         assert text_content is not None
         assert isinstance(text_content, TextContent)
-        assert "complex document page" in text_content.text
+        assert "complex document page" in text_content.require_text()
 
         # Verify images
         images = page_content.text_and_images.images

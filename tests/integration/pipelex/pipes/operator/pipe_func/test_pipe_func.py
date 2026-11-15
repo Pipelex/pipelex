@@ -80,7 +80,7 @@ if __name__ == "__main__":
         assert pipe_func_output.main_stuff is not None
 
         # Get the actual text string for verification
-        wrapped_text_str = wrapped_text.text
+        wrapped_text_str = wrapped_text.require_text()
 
         # In DRY mode, we get mock content, so we only check basic structure
         if pipe_run_mode.is_dry:
