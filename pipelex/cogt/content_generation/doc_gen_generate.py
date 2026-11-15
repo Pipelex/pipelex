@@ -289,7 +289,9 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment, s
     is handed to its engine's template checker, when the engine has one, and the interpreter's template file stage
     reports what it found: an error fails the step, and a warning joins the validation verdict's warnings, or the log.
     A template a run input supplies cannot be read, since the dry run's inputs are mocks, so the stage reports that it
-    is checked when a run supplies it, as an advisory warning.
+    is checked when a run supplies it, as an advisory warning. Under `table_fill = "update"` the checker receives no
+    data: mock records match no real row of the template, so a checker filling it in memory would fail every valid
+    update, and it judges the template's structure alone.
 
     Raises:
         MethodFileUnavailableError: the file cannot be read through the method file store for this run.
@@ -316,7 +318,7 @@ async def _check_template_file(*, render_assignment: RenderDocumentAssignment, s
         template_file=template_file,
         template=read_template.template,
         doc_gen_format=composition.format,
-        data=composition.data,
+        data=None if composition.table_fill.is_update else composition.data,
         table_fill=composition.table_fill,
         match_on=composition.match_on,
         match_row=composition.match_row,

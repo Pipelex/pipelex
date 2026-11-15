@@ -1,12 +1,14 @@
 """A PipeDocGen step that updates the rows of the workbook its run supplies, matching each record to its row.
 
 The step's engine receives the fill, the fields a record is matched to its row by and the cell policy, and so does its
-template checker. Every list of records the step's data holds must carry those fields, which the method's load checks
-once its concepts are known, and an engine that does not declare updating is refused when the method loads.
+template checker. Some list of records the step's data holds must carry those fields, which the method's load checks
+once its concepts are known, and an engine that does not declare updating is refused when the method loads. The dry run
+hands the checker no mock data under an update, since mock records match no real row.
 """
 
 import base64
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -18,7 +20,7 @@ from pipelex.pipeline.exceptions import ValidateBundleError
 from pipelex.pipeline.runner import PipelexMTHDSProtocol
 from pipelex.pipeline.validate_bundle import validate_bundle
 from tests.helpers.office_files import XLSX_MIME_TYPE, xlsx_bytes
-from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import StubEngines, only_problem_item, refusal_messages
+from tests.integration.pipelex.pipes.operator.pipe_doc_gen.doc_gen_helpers import METHOD_MANIFEST, StubEngines, only_problem_item, refusal_messages
 
 _CONCEPTS = """
 domain = "doc_gen_update"
@@ -40,13 +42,28 @@ description = "A report holding completions"
 title       = { type = "text", description = "The report's title", required = true }
 completions = { type = "list", item_type = "concept", item_concept_ref = "doc_gen_update.ExpenseCompletion", description = "Its completions" }
 
+[concept.ExpenseNote]
+description = "A note on the report, which fills no Table"
+
+[concept.ExpenseNote.structure]
+text = { type = "text", description = "The note's text", required = true }
+
+[concept.AnnotatedExpenseReport]
+description = "A report holding completions and notes"
+
+[concept.AnnotatedExpenseReport.structure]
+completions = { type = "list", item_type = "concept", item_concept_ref = "doc_gen_update.ExpenseCompletion", description = "Its completions" }
+notes       = { type = "list", item_type = "concept", item_concept_ref = "doc_gen_update.ExpenseNote", description = "Its notes" }
+
 [concept.ExpenseWorkbook]
 description = "The caller's workbook with the categories filled in"
 refines     = "Document"
 """
 
 
-def _bundle(*, inputs: str = 'workbook = "Document", completions = "ExpenseCompletion[]"', step_fields: str) -> str:
+def _bundle(
+    *, inputs: str = 'workbook = "Document", completions = "ExpenseCompletion[]"', template: str = 'template_input = "workbook"', step_fields: str
+) -> str:
     return (
         _CONCEPTS
         + f"""
@@ -56,7 +73,7 @@ description    = "Write the categories into the workbook's rows"
 inputs         = {{ {inputs} }}
 output         = "ExpenseWorkbook"
 format         = "xlsx"
-template_input = "workbook"
+{template}
 table_fill     = "update"
 {step_fields}
 """
@@ -150,8 +167,32 @@ class TestPipeDocGenTableUpdate:
                 "match_on",
                 "none of the step's inputs holds a list of records",
             ),
+            (
+                'workbook = "Document", report = "AnnotatedExpenseReport"',
+                'match_on = ["invoice_no"]',
+                "match_on",
+                (
+                    "no list of records of the step's data carries every field the update matches rows by, so no Table could be updated: "
+                    "the records of 'report.completions' have no field 'invoice_no'"
+                ),
+            ),
+            (
+                'workbook = "Document", report = "AnnotatedExpenseReport"',
+                'match_row = "category"',
+                "match_row",
+                "the field 'category' of the records of 'report.completions' holds a row's position",
+            ),
         ],
-        ids=["unknown_key", "one_unknown_key_of_two", "unknown_row_field", "text_row_field", "nested_list", "no_list_of_records"],
+        ids=[
+            "unknown_key",
+            "one_unknown_key_of_two",
+            "unknown_row_field",
+            "text_row_field",
+            "nested_list",
+            "no_list_of_records",
+            "no_list_of_two_carries_the_key",
+            "the_list_carrying_the_field_holds_the_wrong_kind",
+        ],
     )
     async def test_the_load_refuses_fields_the_records_do_not_carry(
         self,
@@ -179,3 +220,31 @@ class TestPipeDocGenTableUpdate:
         await validate_bundle(mthds_contents=[bundle])
 
         assert updating_xlsx_stub_engines.engine.jobs == []
+
+    async def test_a_list_lacking_the_key_beside_one_carrying_it_is_accepted(self, updating_xlsx_stub_engines: StubEngines) -> None:
+        """The report's notes fill no Table, so the load does not hold them to the key its completions carry."""
+        bundle = _bundle(inputs='workbook = "Document", report = "AnnotatedExpenseReport"', step_fields='match_on = ["invoice_number"]')
+
+        await validate_bundle(mthds_contents=[bundle])
+
+        assert updating_xlsx_stub_engines.engine.jobs == []
+
+    async def test_the_dry_run_hands_the_checker_no_mock_data_under_an_update(self, tmp_path: Path, updating_xlsx_stub_engines: StubEngines) -> None:
+        """Mock records match no real row of the method's template, so the checker judges its structure alone."""
+        (tmp_path / "expenses.xlsx").write_bytes(xlsx_bytes())
+        (tmp_path / "METHODS.toml").write_text(METHOD_MANIFEST, encoding="utf-8")
+        bundle_path = tmp_path / "complete_expenses.mthds"
+        bundle_path.write_text(
+            _bundle(
+                inputs='completions = "ExpenseCompletion[]"', template='template_file  = "expenses.xlsx"', step_fields='match_on = ["invoice_number"]'
+            ),
+            encoding="utf-8",
+        )
+
+        await validate_bundle(mthds_file_path=bundle_path)
+
+        assert updating_xlsx_stub_engines.check_requests
+        for request in updating_xlsx_stub_engines.check_requests:
+            assert request.table_fill == TableFill.UPDATE
+            assert request.match_on == ["invoice_number"]
+            assert request.data is None

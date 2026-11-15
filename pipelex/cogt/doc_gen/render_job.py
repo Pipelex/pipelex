@@ -66,9 +66,14 @@ class RenderJob(BaseModel):
       (`pipelex.cogt.doc_gen.header_matching`), and a record matches the row whose key cells equal its key fields. With
       `match_row`, that field of the record holds the row's position among the Table's data rows, one for the first, as
       Pipelex's spreadsheet reader counts it (`pipelex.tools.tabular`). The fields a record is matched by are not written.
+    - **Every record of a filled Table's list carries the matching fields.** A Table filled from a list whose records
+      lack a `match_on` field, or the `match_row` field, fails the fill, and the engine's template checker reports it
+      as an error. The method's load holds only some list of the step's data to those fields, since only the engine
+      knows which list fills which Table.
     - **Nothing is written unless every record matches exactly one row.** The engine matches every record before it
       writes any cell, and fails the fill when a key appears twice in the Table, when a record matches no row, or when
-      two records match the same row.
+      two records match the same row. A record whose `match_on` value is null, or whose `match_row` value is null, not a
+      whole number, or outside 1 to the number of the Table's data rows, matches no row, and so fails the fill.
     - **A null means "nothing produced"**: the cell is left as it was. This is the opposite of the other fills, where a
       null empties what the template holds.
     - **`cells` says which cells may be written.** Under `fill_empty`, only an empty cell is written, and a non-empty

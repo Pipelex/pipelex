@@ -50,6 +50,11 @@ class TemplateCheckRequest(BaseModel):
     as a `match_on` field no column of a filled Table matches, or a field that matches a calculated column, and fills
     the template in memory the way the job would; a checker that does not ignores them, and is never handed an update,
     since a step asking its engine for a fill it does not declare is refused when the method loads.
+
+    Under `update`, the dry run sends no `data`: its mock records cannot match the template's real rows, so the checker
+    judges the template's structure alone. A Table filled from a list whose records lack a `match_on` or `match_row`
+    field is an error finding, which fails the step: the method's load holds only some list of the step's data to those
+    fields, since only the engine knows which list fills which Table.
     """
 
     model_config = ConfigDict(extra="forbid", ser_json_bytes="base64", val_json_bytes="base64")
@@ -62,7 +67,8 @@ class TemplateCheckRequest(BaseModel):
         default=None,
         description=(
             "Mock inputs as plain data, shaped as `RenderJob.data` is, so the checker can fill the template in memory and report "
-            "what the fill would raise; None when only the structure is to be compared"
+            "what the fill would raise; None when only the structure is to be compared, as at run setup and, under `update`, "
+            "at the dry run"
         ),
     )
     table_fill: TableFill = Field(default=TableFill.REPLACE, strict=False, description="How the step fills the template's Tables")

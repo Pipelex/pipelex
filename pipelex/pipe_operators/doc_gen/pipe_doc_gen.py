@@ -40,7 +40,7 @@ from pipelex.kernel.templating_style_ops import resolve_templating_style
 from pipelex.pipe_machinery.template_guard_lint import lint_authored_template
 from pipelex.pipe_operators.doc_gen.doc_gen_rendering import render_doc_gen_template
 from pipelex.pipe_operators.doc_gen.exceptions import PipeDocGenRunError, PipeDocGenTemplateFileUncheckedError
-from pipelex.pipe_operators.doc_gen.table_match_check import match_field_refusal, record_lists
+from pipelex.pipe_operators.doc_gen.table_match_check import record_lists, table_match_fields_refusal
 from pipelex.pipe_operators.doc_gen.template_field_check import check_template_field_paths
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -88,7 +88,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
     data and of the input shapes the engine fills the template with. `table_fill` says how the template's Tables are
     filled, and an engine that does not declare the fill is refused when the method loads. Under `update`, `match_on` or
     `match_row` says how a record finds its row and `cells` which of its cells may be written, resolved here so the
-    engine never picks a default; the load checks that every list of records the step's data holds carries those fields.
+    engine never picks a default; the load checks that some list of records the step's data holds carries those fields.
     """
 
     type: Literal["PipeDocGen"] = "PipeDocGen"
@@ -238,7 +238,7 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         # The template input's file is filled as the step's template, so its concept must be a document.
         if self.template_input is not None:
             self._validate_template_input_concept(template_input=self.template_input)
-        # An update matches each record to its row by fields every list of records it may fill a Table from must carry.
+        # An update matches each record to its row by fields some list of records of the step's data must carry.
         if self.table_fill.is_update:
             self._validate_table_match_fields()
         # A step built from a crate by digest alone holds no text of its HTML template file, so no check of it ran: the
@@ -289,31 +289,23 @@ class PipeDocGen(PipeOperator[PipeDocGenOutput]):
         )
 
     def _validate_table_match_fields(self) -> None:
-        """Refuse an update whose `match_on` or `match_row` names a field some list of records of the step's data lacks.
+        """Refuse an update whose `match_on` or `match_row` no list of records of the step's data carries.
 
-        Which list fills which Table is known only once the template is read, so every list of records the data holds is
-        held to the fields. A step whose data holds no list of records at all has nothing to update a Table's rows with,
-        unless some value's shape is undeclared, such as a JSON input, which may hold one this check cannot see.
+        Which list fills which Table is known only once the template is read, so the step is refused only when no list
+        of records carries every field the update matches by, since then no Table could be updated; a list lacking them,
+        such as a list of notes beside the list of line items, fills no Table, or else the engine refuses its fill. Each
+        list that carries the fields is held to their kinds. A step whose data holds no list of records at all has nothing
+        to update a Table's rows with, unless some value's shape is undeclared, such as a JSON input, which may hold one
+        this check cannot see.
 
         Raises:
-            PipeValidationError: A field is missing from a list's records, or cannot match a row by its kind, or the
-                step's data holds no list of records.
+            PipeValidationError: No list of records carries every field, or a list that does holds one of a kind that
+                cannot match a row, or the step's data holds no list of records.
         """
-        found = record_lists(input_shapes=self.input_shapes())
-        if not found.lists and not found.undeclared_paths:
-            match_field = "match_on" if self.match_on is not None else "match_row"
-            self._refuse_table_match(
-                field_name=match_field,
-                finding=(
-                    "'table_fill = \"update\"' writes the records of a list into the rows of the Table it fills, and none of "
-                    "the step's inputs holds a list of records: declare one, such as 'ExpenseCompletion[]'"
-                ),
-            )
-        for record_list in found.lists:
-            refusal = match_field_refusal(record_list=record_list, match_on=self.match_on, match_row=self.match_row)
-            if refusal is not None:
-                field_name, finding = refusal
-                self._refuse_table_match(field_name=field_name, finding=finding)
+        refusal = table_match_fields_refusal(found=record_lists(input_shapes=self.input_shapes()), match_on=self.match_on, match_row=self.match_row)
+        if refusal is not None:
+            field_name, finding = refusal
+            self._refuse_table_match(field_name=field_name, finding=finding)
 
     def _refuse_table_match(self, *, field_name: str, finding: str) -> NoReturn:
         """Refuse the step's `match_on` or `match_row`, located at the field's key path."""
